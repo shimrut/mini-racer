@@ -9,7 +9,7 @@ import {
 } from './api-client.js?v=1.91';
 import {
     getConstructedLeaderboardName,
-} from '../../src/shared/leaderboard-identity.js?v=1.91';
+} from '../shared/leaderboard-identity.js';
 import {
     getLeaderboardIdentityPreference,
 } from './display-preference.js?v=1.91';

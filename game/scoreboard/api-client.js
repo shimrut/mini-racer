@@ -5,8 +5,6 @@ function trimTrailingSlashes(value) {
 }
 
 export function getBaseApiConfig() {
-    // Reddit Dev Platform backend typically uses the same host as the frontend
-    // or a standard /api prefix.
     const apiBaseUrl = '/api';
 
     return {
@@ -49,7 +47,6 @@ export function getOrCreatePlayerId(logLabel = 'scoreboard') {
 }
 
 export function buildServiceHeaders(_config, extraHeaders = {}) {
-    // Reddit backend uses session context; no special Supabase keys needed.
     return { ...extraHeaders };
 }
 

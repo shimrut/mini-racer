@@ -1,7 +1,7 @@
 import {
     LEADERBOARD_IDENTITY_CONSTRUCTED,
     normalizeLeaderboardIdentityPreference,
-} from '../../src/shared/leaderboard-identity.js?v=1.91';
+} from '../shared/leaderboard-identity.js';
 
 const LEADERBOARD_IDENTITY_STORAGE_KEY = 'VectorGpLeaderboardIdentityPreference';
 

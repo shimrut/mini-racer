@@ -7,7 +7,7 @@ import {
     LEADERBOARD_IDENTITY_REDDIT,
     getConstructedLeaderboardName,
     sanitizeRedditUsername,
-} from '../../src/shared/leaderboard-identity.js?v=1.91';
+} from '../shared/leaderboard-identity.js';
 import { getPlayerProgressState } from '../storage.js?v=1.91';
 import { getOrCreatePlayerId } from '../scoreboard/api-client.js?v=1.91';
 import {

@@ -5,11 +5,7 @@
   "scripts": {
     "generate:car-assets": "node tools/generate-player-car-assets.js",
     "predev": "npm run generate:car-assets",
-    "build": "npm run generate:car-assets && vite build",
-    "deploy": "npm run test && devvit upload",
-    "dev": "devvit playtest",
-    "launch": "npm run deploy && devvit publish",
-    "login": "devvit login",
+    "pretest": "npm run generate:car-assets",
     "test": "vitest run",
     "test:watch": "vitest",
     "mutation": "stryker run",
@@ -18,17 +14,9 @@
   "engines": {
     "node": ">=22.2.0"
   },
-  "dependencies": {
-    "@devvit/server": "0.12.22",
-    "@devvit/start": "0.12.22",
-    "@devvit/web": "0.12.22",
-    "devvit": "0.12.22",
-    "express": "^5.1.0"
-  },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
-    "vite": "7.3.1",
     "vitest": "^3.1.1"
   }
 }
