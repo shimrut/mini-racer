@@ -1,3 +1,4 @@
+tests/
 reports/
 node_modules/
 
@@ -7,6 +8,7 @@ dist/
 
 # Hosting backend (local only — not published to GitHub)
 devvit.json
+package.devvit.local.json
 vite.config.js
 src/
 preview.html
