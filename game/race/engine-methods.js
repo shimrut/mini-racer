@@ -1,0 +1,808 @@
+import { CONFIG } from "../config.js?v=1.91";
+import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js?v=1.91";
+import { createModalActions } from "./result-flow.js?v=1.91";
+import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js?v=1.91";
+import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
+import { readSkillPointAllocation } from "../car/skill-points.js?v=1.91";
+import {
+  getDailyChallengeCopyLabels,
+  getDailyChallengeTrackName,
+} from "../daily-challenge/service.js?v=1.91";
+import { TRACKS } from "../track/tracks.js?v=1.91";
+
+const CAMERA_DT_MIN_S = 1 / 120;
+const CAMERA_DT_MAX_S = 1 / 45;
+const SKID_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
+
+function lerpAngle(a, b, t) {
+  let delta = b - a;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta < -Math.PI) delta += 2 * Math.PI;
+  return a + delta * t;
+}
+
+export const raceEngineMethods = {
+  clearTimers() {
+    this.activeTimers.forEach((id) => {
+      clearTimeout(id);
+      clearInterval(id);
+    });
+    this.activeTimers = [];
+  },
+
+  snapRenderPoseToCurrentPose() {
+    this.prevPos.x = this.pos.x;
+    this.prevPos.y = this.pos.y;
+    this.prevAngle = this.angle;
+  },
+
+  _resetLapTrailAfterIntermediateLap() {
+    this.routeTrace.clear();
+    this.runHistory.clear();
+    this.runHistoryTimer = 0;
+    this.trailTimer = 0;
+    this.recordRunPoint(getCarRearAxleWorldPoint(this.pos, this.angle, this.runtimeConfig));
+  },
+
+  startSequence() {
+    if (this.status !== "ready") return;
+
+    this.carEffectsAudio?.prepareOnUserGesture?.();
+    this.medalEffectsAudio?.prepareOnUserGesture?.();
+    this.proceduralMusic?.prepareOnUserGesture?.();
+    this.status = "starting";
+    this.hud.setHudPersonalBestsOpenAllowed(false);
+    this.hud.setPauseVisible(false);
+    this.scoreboardReplay.reset();
+    this.syncChallengeHudPrimaryStats();
+    this.runHistory.clear();
+    this.runHistoryTimer = 0;
+    this.recordRunPoint(getCarRearAxleWorldPoint(this.pos, this.angle, this.runtimeConfig));
+    this.startOverlay.hideStartOverlay();
+    this.hud.showStartLights();
+
+    this.activeTimers.push(
+      setTimeout(() => {
+        this.hud.turnOnCountdownLight(0);
+        this.carEffectsAudio?.scheduleCountdownLight?.(0);
+      }, 100),
+    );
+    this.activeTimers.push(
+      setTimeout(() => {
+        this.hud.turnOnCountdownLight(1);
+        this.carEffectsAudio?.scheduleCountdownLight?.(1);
+      }, 433),
+    );
+    this.activeTimers.push(
+      setTimeout(() => {
+        this.hud.turnOnCountdownLight(2);
+        this.carEffectsAudio?.scheduleCountdownLight?.(2);
+      }, 767),
+    );
+
+    this.activeTimers.push(
+      setTimeout(() => {
+        this.hud.hideStartLights();
+        this.hud.showGoMessage();
+        this.carEffectsAudio?.scheduleGo?.();
+
+        this.pendingStartFrame = requestAnimationFrame((time) => {
+          this.pendingStartFrame = null;
+          this.snapRenderPoseToCurrentPose();
+          this.accumulator = 0;
+          this.status = "playing";
+          this.activeRunId += 1;
+          this.currentTime = 0;
+          this.lastTime = time;
+          this.resetFrameTimingHistory();
+          this.frameSkip = 0;
+          this.hud.setPauseVisible(true);
+          this.updateDailyChallengeHud();
+          this.requestRender();
+
+          this.activeTimers.push(
+            setTimeout(() => {
+              this.hud.resetCountdown();
+            }, 300),
+          );
+        });
+      }, 1100),
+    );
+  },
+
+  syncSteeringKeys() {
+    this.steeringInput.syncKeys();
+  },
+
+  setSteeringSource(direction, sourceId, isDown) {
+    this.steeringInput.setSource(direction, sourceId, isDown);
+  },
+
+  setTouchSteering(direction, isDown) {
+    this.steeringInput.setTouch(direction, isDown);
+  },
+
+  getSteeringDirection(event) {
+    return this.steeringInput.getDirection(event);
+  },
+
+  getSteeringSourceId(event, direction) {
+    return this.steeringInput.getSourceId(event, direction);
+  },
+
+  clearSteeringInput() {
+    this.steeringInput.clearSources();
+    this.interactions.resetTouchControls();
+  },
+
+  armRelaunchDelay(delaySeconds) {
+    this.clearSteeringInput();
+    this.relaunchDelayRemaining = delaySeconds;
+  },
+
+  restartCurrentRunAfterHardCrash() {
+    this.dailyGpRaceStats.crash++;
+    this.status = "playing";
+    this.resetRunToTrackStart({
+      currentTime: 0,
+      relaunchDelay: this.crashRestartDelaySec,
+    });
+    this.modal.closeModal();
+    this.hud.setPauseVisible(true);
+    this.hud.setHudPersonalBestsOpenAllowed(false);
+    this.hud.syncHud({ time: 0, speed: 0, force: true });
+    this.updateDailyChallengeHud();
+    this.accumulator = 0;
+    this.lastTime = this.getNow();
+    this.requestRender();
+  },
+
+  resetRunToTrackStart({ currentTime = 0, relaunchDelay = 0 } = {}) {
+    this.pos = { ...this.currentTrack.startPos };
+    this.prevPos = { ...this.currentTrack.startPos };
+    this.velocity = { x: 0, y: 0 };
+    this.angle = this.currentTrack.startAngle;
+    this.prevAngle = this.currentTrack.startAngle;
+    this.cachedSpeed = 0;
+    this.angularVelocity = 0;
+    this.currentTime = currentTime;
+    this.armRelaunchDelay(relaunchDelay);
+    this.nextCheckpointIndex = 0;
+    this.skidMarks.clear();
+    this._resetLapTrailAfterIntermediateLap();
+  },
+
+  getSelectedCarAssetName() {
+    return readPlayerCarSkinAssetName();
+  },
+
+  getDailyChallengeCarAssetName() {
+    return this.activeDailyChallenge ? STOCK_CAR_ASSET_NAME : null;
+  },
+
+  syncCarSpriteAsset() {
+    return this.loadCarSpriteAsset(this.getSelectedCarAssetName());
+  },
+
+  prefetchCarSpriteAsset(assetName) {
+    return this.carSpriteLoader.prefetch(assetName);
+  },
+
+  loadCarSpriteAsset(assetName) {
+    return new Promise((resolve) => {
+      this.carSpriteLoader.load(assetName, {
+        onLoaded: (image) => {
+          this.carSprite = image;
+          this.carSpriteDrawWidth = 52;
+          this.carSpriteDrawHeight = 52;
+          this.requestRender();
+          resolve(image);
+        },
+        onError: (name) => {
+          console.warn(`Unable to load ${name}; using fallback car sprite.`);
+          resolve(this.carSprite);
+        },
+      });
+    });
+  },
+
+  handleKey(event, isDown) {
+    if (!event.key && !event.code) return;
+    const isEscape =
+      event.key === "Escape" || event.code === "Escape";
+    if (
+      isDown &&
+      isEscape &&
+      this.status === "ready" &&
+      this.startOverlay?.isStartOverlayVisible?.() &&
+      this.skillPoints?.isGarageOpen?.()
+    ) {
+      event.preventDefault?.();
+      this.skillPoints.setPanelVisible(false);
+      return;
+    }
+    if (
+      isDown &&
+      isEscape &&
+      this.status === "paused" &&
+      this.modal?.isPauseModalActive?.()
+    ) {
+      event.preventDefault?.();
+      this.resumeActiveRun();
+      return;
+    }
+    if (
+      isDown &&
+      !this.isCoarsePointer &&
+      isEscape &&
+      this.status === "playing"
+    ) {
+      event.preventDefault?.();
+      this.pauseActiveRun();
+      return;
+    }
+    if (
+      event.key.toLowerCase() === "r" &&
+      isDown &&
+      this.modal.isModalActive()
+    ) {
+      event.preventDefault();
+      if (this.modal.isPauseModalActive()) {
+        return;
+      }
+      if (this.modal.isStandaloneRunsViewActive()) {
+        this.modal.closeModal();
+        return;
+      }
+      if (this.currentChallengeRun) {
+        this.restartDailyChallenge();
+        return;
+      }
+      this.reset(true);
+      return;
+    }
+    const steeringDirection = this.getSteeringDirection(event);
+    if (steeringDirection) {
+      event.preventDefault?.();
+      this.setSteeringSource(
+        steeringDirection,
+        this.getSteeringSourceId(event, steeringDirection),
+        isDown,
+      );
+    }
+  },
+
+  pauseActiveRun() {
+    if (this.status !== "playing") return;
+
+    this.clearSteeringInput();
+    this.status = "paused";
+
+    if (this.isCrashBudgetDailyChallenge()) {
+      const completedLaps = Math.max(
+        0,
+        Math.trunc(this.currentChallengeRun?.completedLaps || 0),
+      );
+      const crashesLeft = Math.max(
+        0,
+        (this.currentChallengeRun?.maxCrashes || 0) -
+        (this.currentChallengeRun?.crashCount || 0),
+      );
+      this.modal.showModal(
+        "PAUSED",
+        null,
+        {
+          variant: "daily-crash-budget-pause",
+          completedLaps,
+          crashesLeft,
+        },
+        {
+          ...createModalActions({
+            modalKind: "pause",
+            primaryActionLabel: "Resume",
+            primaryAction: () => this.resumeActiveRun(),
+            primaryActionIcon: "play",
+            restartAction: () => this.restartDailyChallenge(),
+            secondaryActionLabel: "Done",
+            secondaryActionIcon: "done",
+            secondaryAction: () => this.reset(false),
+          }),
+          pauseTrackPreview: {
+            trackKey: this.currentTrackKey,
+            skin: this.activeDailyChallenge?.skin ?? null,
+            trackName: this.activeDailyChallenge
+              ? getDailyChallengeTrackName(this.activeDailyChallenge)
+              : (TRACKS[this.currentTrackKey]?.name || this.currentTrackKey),
+            skillAllocation:
+              this.skillPoints?.getAllocation?.() ?? readSkillPointAllocation(),
+          },
+          settingsAction: () => this.settings.openSettings(),
+        },
+      );
+      return;
+    }
+
+    const bestTime = this.bestLapTime;
+    const deltaToBest =
+      bestTime === null || bestTime === undefined
+        ? null
+        : this.currentTime - bestTime;
+    this.modal.showModal(
+      "PAUSED",
+      null,
+      {
+        variant: "daily-pause",
+        lapTime: this.currentTime,
+        bestTime,
+        deltaToBest,
+        primaryStatLabel: getDailyChallengeCopyLabels(this.activeDailyChallenge)
+          .primaryStatLabel,
+      },
+      {
+        ...createModalActions({
+          modalKind: "pause",
+          primaryActionLabel: "Resume",
+          primaryActionIcon: "play",
+          primaryAction: () => this.resumeActiveRun(),
+          restartAction: () => this.restartDailyChallenge(),
+          secondaryActionLabel: "Done",
+          secondaryActionIcon: "done",
+          secondaryAction: () => this.reset(false),
+        }),
+        pauseTrackPreview: {
+          trackKey: this.currentTrackKey,
+          skin: this.activeDailyChallenge?.skin ?? null,
+          trackName: this.activeDailyChallenge
+            ? getDailyChallengeTrackName(this.activeDailyChallenge)
+            : (TRACKS[this.currentTrackKey]?.name || this.currentTrackKey),
+          skillAllocation:
+            this.skillPoints?.getAllocation?.() ?? readSkillPointAllocation(),
+        },
+        settingsAction: () => this.settings.openSettings(),
+      },
+    );
+  },
+
+  resumeActiveRun() {
+    if (this.status !== "paused") return;
+
+    this.carEffectsAudio?.prepareOnUserGesture?.();
+    this.medalEffectsAudio?.prepareOnUserGesture?.();
+    this.proceduralMusic?.prepareOnUserGesture?.();
+    this.status = "playing";
+    this.armRelaunchDelay(this.runtimeConfig.resumeRelaunchDelay);
+    this.accumulator = 0;
+    this.lastTime = this.getNow();
+    this.modal.closeModal();
+    this.updateDailyChallengeHud();
+    this.requestRender();
+  },
+
+  update(dt) {
+    if (this.status === "playing") {
+      this.scoreboardReplay.record(
+        Boolean(this.keys.left),
+        Boolean(this.keys.right),
+        this.relaunchDelayRemaining > 0,
+      );
+    }
+
+    const events = updateSimulation(
+      this,
+      dt,
+      this.runtimeConfig,
+      this.currentTrack,
+      this.collisionSegments,
+    );
+
+    if (events.crashImpact != null) {
+      this.carEffectsAudio?.scheduleCrash?.(events.crashImpact);
+    }
+
+    if (events.challengeLapCompleted) {
+      this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime);
+    }
+    if (events.winTriggered) {
+      this.handleDailyChallengeWin(events.winData);
+    }
+    if (events.challengeCrashReset) {
+      this.restartDailyChallengeAfterCrash();
+      return;
+    }
+    if (this.crashAutoRestartAfterCrash && events.crashEndedRun) {
+      this.restartCurrentRunAfterHardCrash();
+      return;
+    }
+    if (events.challengeFailed) {
+      this.handleDailyChallengeFailure(
+        events.challengeFailureReason,
+        events.crashImpact,
+      );
+      if (this.currentChallengeRun) {
+        return;
+      }
+    }
+    if (events.crashEndedRun) {
+      this.dailyGpRaceStats.crash++;
+      this.hud.setPauseVisible(false);
+      this.hud.setHudPersonalBestsOpenAllowed(true);
+      this.modal.showModal(
+        "CRASHED",
+        null,
+        {
+          isCrash: true,
+          impact: events.crashImpact,
+          currentTime: this.currentTime,
+          scoreboardSnapshot:
+            this.dailyChallengeUi?.getDailyChallengeScoreboardSnapshot() || null,
+        },
+        {
+          ...createModalActions({
+            modalKind: "crash",
+            primaryActionLabel: "Retry",
+            primaryAction: () => this.reset(true),
+            primaryActionIcon: "retry",
+            secondaryActionLabel: "Done",
+            secondaryAction: () => this.reset(false),
+            secondaryActionIcon: "done",
+          }),
+        },
+      );
+    }
+  },
+
+  reset(autoStart = false, { preserveDailyChallenge = false } = {}) {
+    this.clearTimers();
+    if (this.pendingStartFrame !== null) {
+      cancelAnimationFrame(this.pendingStartFrame);
+      this.pendingStartFrame = null;
+    }
+
+    const dailyChallengeToRestore = preserveDailyChallenge
+      ? this.activeDailyChallenge
+      : null;
+
+    this.pos = { ...this.currentTrack.startPos };
+    this.prevPos = { ...this.currentTrack.startPos };
+    this.velocity = { x: 0, y: 0 };
+    this.angle = this.currentTrack.startAngle;
+    this.prevAngle = this.currentTrack.startAngle;
+    this.cachedSpeed = 0;
+    this.angularVelocity = 0;
+    this.clearSteeringInput();
+    this.relaunchDelayRemaining = 0;
+    this.status = "ready";
+    this.activeRunId += 1;
+    this.nextCheckpointIndex = 0;
+    this.accumulator = 0;
+    this.currentTime = 0;
+    this.skidMarks.clear();
+    this.routeTrace.clear();
+    this.runHistory.clear();
+    this.runHistoryTimer = 0;
+    this.particles = [];
+    if (dailyChallengeToRestore) {
+      this.currentChallengeRun = null;
+      this.dailyChallengeBestResult = null;
+      this.syncCurrentRunPolicy();
+    } else {
+      this.clearDailyChallengeRun();
+    }
+    this.modal.closeModal();
+    this.hud.setHudPersonalBestsOpenAllowed(false);
+    this.hud.setPauseVisible(false);
+
+    this.hud.resetCountdown();
+    this.hud.resetHud();
+    if (dailyChallengeToRestore) {
+      this.applyDailyChallenge(dailyChallengeToRestore);
+    }
+
+    this._lookAheadX = 0;
+    this._lookAheadY = 0;
+
+    if (autoStart) {
+      this.startOverlay.hideStartOverlay();
+    } else {
+      this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
+      this.resetCanvasPresentation();
+    }
+
+    this.resize({ render: false });
+    const cw =
+      this.viewportWidth || this.container.clientWidth || this.canvas.width;
+    const ch =
+      this.viewportHeight || this.container.clientHeight || this.canvas.height;
+    const gs = CONFIG.gridSize;
+    this.camera.x = this.pos.x * gs - cw / 2 / this.zoom;
+    this.camera.y = this.pos.y * gs - ch / 2 / this.zoom;
+    this.requestRender();
+
+    if (autoStart) {
+      this.startSequence();
+    }
+  },
+
+  recordRunPoint(point) {
+    const roundedX = Math.round(point.x * 1000) / 1000;
+    const roundedY = Math.round(point.y * 1000) / 1000;
+    const last = this.runHistory.last();
+    if (
+      last &&
+      Math.abs(last.x - roundedX) < 0.001 &&
+      Math.abs(last.y - roundedY) < 0.001
+    ) {
+      return;
+    }
+    const slot = this.runHistory.write();
+    slot.x = roundedX;
+    slot.y = roundedY;
+  },
+
+  getDesiredLookAhead(speed, cw, ch, mobileCameraMode) {
+    const out = this._desiredLookAhead;
+    out.x = 0;
+    out.y = 0;
+
+    if (speed > 1) {
+      const multiplier = mobileCameraMode ? 12 : 5;
+      const maxOffset = mobileCameraMode
+        ? Math.min(cw, ch) / 2.5
+        : Math.min(cw, ch) / 5;
+
+      out.x = this.velocity.x * multiplier;
+      out.y = this.velocity.y * multiplier;
+
+      const magnitude = Math.hypot(out.x, out.y);
+      if (magnitude > maxOffset) {
+        out.x = (out.x / magnitude) * maxOffset;
+        out.y = (out.y / magnitude) * maxOffset;
+      }
+    }
+
+    return out;
+  },
+
+  render(dt, alpha = 1) {
+    const ctx = this.ctx;
+    const cw =
+      this.viewportWidth || this.container.clientWidth || this.canvas.width;
+    const ch =
+      this.viewportHeight || this.container.clientHeight || this.canvas.height;
+    const gs = CONFIG.gridSize;
+
+    const displayPos = this._displayPos;
+    if (this.status === "playing") {
+      displayPos.x = this.prevPos.x + (this.pos.x - this.prevPos.x) * alpha;
+      displayPos.y = this.prevPos.y + (this.pos.y - this.prevPos.y) * alpha;
+    } else {
+      displayPos.x = this.pos.x;
+      displayPos.y = this.pos.y;
+    }
+    const displayAngle =
+      this.status === "playing"
+        ? lerpAngle(this.prevAngle, this.angle, alpha)
+        : this.angle;
+
+    ctx.clearRect(0, 0, cw, ch);
+
+    const speed = this.cachedSpeed;
+    const mobileCameraMode = this.isCoarsePointer || this.isNarrowViewport;
+    this.zoom = mobileCameraMode ? 0.75 : 1.0;
+
+    const desiredLookAhead = this.getDesiredLookAhead(
+      speed,
+      cw,
+      ch,
+      mobileCameraMode,
+    );
+
+    const smoothSpeed = mobileCameraMode ? 2 : 4;
+    const cameraDt =
+      dt > 0 ? Math.min(Math.max(dt, CAMERA_DT_MIN_S), CAMERA_DT_MAX_S) : 0;
+    const lerpFactor = cameraDt > 0 ? 1 - Math.exp(-cameraDt * smoothSpeed) : 0;
+
+    this._lookAheadX += (desiredLookAhead.x - this._lookAheadX) * lerpFactor;
+    this._lookAheadY += (desiredLookAhead.y - this._lookAheadY) * lerpFactor;
+
+    this.camera.x = displayPos.x * gs + this._lookAheadX - cw / 2 / this.zoom;
+    this.camera.y = displayPos.y * gs + this._lookAheadY - ch / 2 / this.zoom;
+
+    this.drawVisibleTrackCanvas();
+
+    ctx.save();
+    ctx.scale(this.zoom, this.zoom);
+    ctx.translate(-this.camera.x, -this.camera.y);
+
+    if (this.skidMarks.length > 0) {
+      const startIdx =
+        this.frameSkip > 0 ? Math.max(0, this.skidMarks.length - 50) : 0;
+      const len = this.skidMarks.length;
+      const tw = 0.17;
+      const z = this.zoom;
+
+      ctx.save();
+      ctx.strokeStyle = CONFIG.skidColor;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.lineWidth = Math.max(3.4, 4.2 / z);
+
+      const m0 = this.skidMarks.get(startIdx);
+      ctx.beginPath();
+      ctx.moveTo((m0.x - m0.sin * tw) * gs, (m0.y + m0.cos * tw) * gs);
+      for (let i = startIdx + 1; i < len; i++) {
+        const prev = this.skidMarks.get(i - 1);
+        const mark = this.skidMarks.get(i);
+        const dx = mark.x - prev.x;
+        const dy = mark.y - prev.y;
+        const lx = (mark.x - mark.sin * tw) * gs;
+        const ly = (mark.y + mark.cos * tw) * gs;
+        if (dx * dx + dy * dy > SKID_GAP_BREAK_DIST_SQ) ctx.moveTo(lx, ly);
+        else ctx.lineTo(lx, ly);
+      }
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo((m0.x + m0.sin * tw) * gs, (m0.y - m0.cos * tw) * gs);
+      for (let i = startIdx + 1; i < len; i++) {
+        const prev = this.skidMarks.get(i - 1);
+        const mark = this.skidMarks.get(i);
+        const dx = mark.x - prev.x;
+        const dy = mark.y - prev.y;
+        const rx = (mark.x + mark.sin * tw) * gs;
+        const ry = (mark.y - mark.cos * tw) * gs;
+        if (dx * dx + dy * dy > SKID_GAP_BREAK_DIST_SQ) ctx.moveTo(rx, ry);
+        else ctx.lineTo(rx, ry);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (this.routeTrace.length > 1) {
+      ctx.beginPath();
+      ctx.strokeStyle =
+        this.routeTraceStrokeStyle ?? "rgba(56, 189, 248, 0.5)";
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      const firstPt = this.routeTrace.get(0);
+      ctx.moveTo(firstPt.x * gs, firstPt.y * gs);
+      const traceStep = Math.max(
+        this.frameSkip > 0 ? 2 : 1,
+        Math.ceil(this.routeTrace.length / 240),
+      );
+      for (let i = traceStep; i < this.routeTrace.length; i += traceStep) {
+        const pt = this.routeTrace.get(i);
+        ctx.lineTo(pt.x * gs, pt.y * gs);
+      }
+      const lastTracePoint = this.routeTrace.get(this.routeTrace.length - 1);
+      ctx.lineTo(lastTracePoint.x * gs, lastTracePoint.y * gs);
+      ctx.lineTo(displayPos.x * gs, displayPos.y * gs);
+      ctx.stroke();
+    }
+
+    if (this.particles.length > 0) {
+      const buckets = new Map();
+      for (let i = 0; i < this.particles.length; i++) {
+        const particle = this.particles[i];
+        const rawAlpha =
+          particle.maxLife > 0 ? particle.life / particle.maxLife : 0;
+        const quantizedAlpha = Math.round(rawAlpha * 12) / 12;
+        const key = `${particle.color}\0${quantizedAlpha}`;
+        let list = buckets.get(key);
+        if (!list) {
+          list = [];
+          buckets.set(key, list);
+        }
+        list.push(particle);
+      }
+      for (const [key, list] of buckets) {
+        const sep = key.indexOf("\0");
+        const color = key.slice(0, sep);
+        const alphaValue = Number(key.slice(sep + 1));
+        ctx.fillStyle = color;
+        ctx.globalAlpha = Math.max(0, Math.min(1, alphaValue));
+        ctx.beginPath();
+        for (let i = 0; i < list.length; i++) {
+          const particle = list[i];
+          const px = particle.x * gs;
+          const py = particle.y * gs;
+          ctx.moveTo(px + particle.size, py);
+          ctx.arc(px, py, particle.size, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1.0;
+    }
+
+    const px = displayPos.x * gs;
+    const py = displayPos.y * gs;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(displayAngle);
+
+    const renderScale = CONFIG.carSpriteRenderScale ?? 1;
+    const drawWidth = this.carSpriteDrawWidth * renderScale;
+    const drawHeight = this.carSpriteDrawHeight * renderScale;
+    ctx.shadowColor = CONFIG.carSpriteShadowColor;
+    ctx.shadowBlur = CONFIG.carSpriteShadowBlur;
+    ctx.shadowOffsetX = CONFIG.carSpriteShadowOffsetX;
+    ctx.shadowOffsetY = CONFIG.carSpriteShadowOffsetY;
+    ctx.drawImage(
+      this.carSprite,
+      -drawWidth / 2,
+      -drawHeight / 2,
+      drawWidth,
+      drawHeight,
+    );
+
+    ctx.restore();
+    ctx.restore();
+  },
+
+  loop(now) {
+    this._frameRequestId = null;
+
+    const rawDt = Math.min((now - this.lastTime) / 1000, 0.1);
+    const frameTime = now - this.lastTime;
+    this.lastTime = now;
+
+    const animateFrame = this.shouldAnimateFrame();
+    const shouldUpdate = this.status === "playing";
+
+    if (frameTime < 250) {
+      this.frameTimeTotal -= this.frameTimeHistory[this.frameTimeHistoryIndex] || 0;
+      this.frameTimeHistory[this.frameTimeHistoryIndex] = frameTime;
+      this.frameTimeTotal += frameTime;
+      this.frameTimeHistoryIndex =
+        (this.frameTimeHistoryIndex + 1) % Math.max(1, 30);
+
+      const sampleCount = Math.min(this.frameTimeHistory.length, 30);
+      const avgFrameTime = sampleCount > 0 ? this.frameTimeTotal / sampleCount : frameTime;
+      if (avgFrameTime >= 22) this.frameSkip = 1;
+      else if (avgFrameTime <= 18) this.frameSkip = 0;
+    }
+
+    if (shouldUpdate) {
+      this.accumulator += rawDt;
+      while (this.accumulator >= this.FIXED_DT) {
+        this.prevPos.x = this.pos.x;
+        this.prevPos.y = this.pos.y;
+        this.prevAngle = this.angle;
+        this.update(this.FIXED_DT);
+        this.accumulator -= this.FIXED_DT;
+      }
+    }
+
+    if (animateFrame || this._needsRender) {
+      const alpha = shouldUpdate ? this.accumulator / this.FIXED_DT : 1;
+      this.render(rawDt, alpha);
+      this._needsRender = false;
+    }
+
+    if (shouldUpdate) {
+      this.hud.syncHud({ time: this.currentTime, speed: this.cachedSpeed });
+    }
+
+    const cs = this.cachedSpeed;
+    const vx = Math.cos(this.angle);
+    const vy = Math.sin(this.angle);
+    const sideSlip = Math.abs(-vy * this.velocity.x + vx * this.velocity.y);
+    const slipRatio = cs > 0.001 ? sideSlip / cs : 0;
+    this.carEffectsAudio?.syncFrame?.({
+      status: this.status,
+      speed: cs,
+      maxSpeedKph: this.runtimeConfig.maxSpeed,
+      slipRatio,
+      throttleBlocked: this.relaunchDelayRemaining > 0,
+    });
+    this.proceduralMusic?.syncFrame?.({
+      status: this.status,
+      speed: cs,
+      maxSpeedKph: this.runtimeConfig.maxSpeed,
+    });
+
+    if (animateFrame || shouldUpdate || this._needsRender) {
+      this.requestFrame();
+    }
+  },
+};

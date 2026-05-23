@@ -1,0 +1,40 @@
+tests/
+reports/
+node_modules/
+
+# Dependencies & build
+dist/
+.venv/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Test & mutation tooling
+stryker.log
+.stryker-tmp/
+coverage/
+test-results/
+playwright-report/
+.playwright-mcp/
+
+# Cursor debug output (keep .cursor/agents/ if you commit those)
+.cursor/debug-*.log
+
+# Runtime & incident logs (large JSON dumps)
+logs/
+
+# Uncompressed source art — ship webp versions under public/assets/ instead
+cars/original/
+
+# OS
+.DS_Store
+
+# Local snapshots & duplicate scratch files
+page-snapshot.md
+**/* copy.*
+**/* copy.js
+
+# Draft image exports (not wired in game code; use assets under public/assets/)
+**/ChatGPT Image*

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer Runner Lab</title>
+    <link rel="stylesheet" href="runner.css?v=1.81">
+</head>
+<body class="runner-body">
+    <header class="runner-header">
+        <div>
+            <p class="runner-kicker">Track Validation Suite</p>
+            <h1>Mini Racer Runner Lab</h1>
+            <p class="runner-subhead">Spawn validation bots, stress a selected map, and surface lap-flow, checkpoint, finish-line, and wall-contact issues.</p>
+        </div>
+        <div class="runner-header-actions">
+            <a class="runner-link ghost-link" href="tiktok-studio.html">TikTok Studio</a>
+            <a class="runner-link" href="../game.html">Back to Game</a>
+            <a class="runner-link ghost-link" href="mapmaker.html">Open Mapmaker</a>
+        </div>
+    </header>
+
+    <main class="runner-layout">
+        <aside class="runner-sidebar">
+            <section class="runner-panel">
+                <div class="panel-head">
+                    <h2>Run Setup</h2>
+                    <span id="run-state-pill" class="pill">Ready</span>
+                </div>
+
+                <label class="field">
+                    <span>Selected Track</span>
+                    <select id="runner-track-select"></select>
+                </label>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Bots</span>
+                        <input id="bot-count-input" type="number" min="1" max="48" step="1" value="18">
+                    </label>
+                    <label class="field">
+                        <span>Laps</span>
+                        <input id="lap-count-input" type="number" min="1" max="5" step="1" value="1">
+                    </label>
+                </div>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Max Seconds</span>
+                        <input id="max-seconds-input" type="number" min="5" max="180" step="1" value="40">
+                    </label>
+                    <label class="field">
+                        <span>Path Samples</span>
+                        <input id="path-samples-input" type="number" min="120" max="900" step="30" value="360">
+                    </label>
+                </div>
+
+                <div class="button-row">
+                    <button id="run-validation-btn" type="button">Run Validation</button>
+                    <button id="copy-summary-btn" type="button" class="ghost-btn">Copy Summary</button>
+                </div>
+
+                <p id="runner-status-text" class="panel-note">Select a map and run the swarm to generate a validation report.</p>
+            </section>
+
+            <section class="runner-panel">
+                <div class="panel-head">
+                    <h2>Overview</h2>
+                    <span id="issue-total-pill" class="pill pill-warn">0 issues</span>
+                </div>
+                <div class="metric-grid">
+                    <article class="metric-card">
+                        <span class="metric-label">Finishers</span>
+                        <strong id="finishers-metric">0 / 0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Crashes</span>
+                        <strong id="crashes-metric">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Scrapes</span>
+                        <strong id="scrapes-metric">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Min Width</span>
+                        <strong id="width-metric">--</strong>
+                    </article>
+                </div>
+            </section>
+
+            <section class="runner-panel">
+                <div class="panel-head">
+                    <h2>Issues</h2>
+                    <span id="fatal-pill" class="pill">No fatal blocks</span>
+                </div>
+                <div id="issue-list" class="issue-list">
+                    <article class="issue-card issue-card--empty">
+                        <strong>No report yet</strong>
+                        <p>Run the validator to inspect the selected map.</p>
+                    </article>
+                </div>
+            </section>
+        </aside>
+
+        <section class="runner-stage">
+            <div class="stage-head">
+                <div>
+                    <p id="stage-title" class="stage-title">Track Preview</p>
+                    <p id="stage-subtitle" class="stage-subtitle">The canvas overlays bot paths, gate lines, and hotspot markers from the latest run.</p>
+                </div>
+                <div class="legend">
+                    <span><i class="legend-swatch legend-track"></i>Track</span>
+                    <span><i class="legend-swatch legend-center"></i>Bot guide</span>
+                    <span><i class="legend-swatch legend-finish"></i>Finish / checkpoints</span>
+                    <span><i class="legend-swatch legend-hotspot"></i>Hotspots</span>
+                </div>
+            </div>
+
+            <div class="canvas-shell">
+                <canvas id="runner-canvas" aria-label="Track runner diagnostics canvas"></canvas>
+                <div class="canvas-overlay">
+                    <p>Hotspot markers match the numbered issues in the sidebar.</p>
+                </div>
+            </div>
+
+            <section class="runner-report">
+                <div class="panel-head">
+                    <h2>Bot Runs</h2>
+                    <span id="bot-summary-pill" class="pill">No data</span>
+                </div>
+                <div class="table-wrap">
+                    <table class="bot-table">
+                        <thead>
+                            <tr>
+                                <th>Bot</th>
+                                <th>Status</th>
+                                <th>Laps</th>
+                                <th>Finish</th>
+                                <th>Crashes</th>
+                                <th>Scrapes</th>
+                                <th>Last Checkpoint</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bot-runs-body">
+                            <tr>
+                                <td colspan="8" class="empty-row">Run the validator to populate bot diagnostics.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <script type="module" src="runner.js?v=1.81"></script>
+</body>
+</html>

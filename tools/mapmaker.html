@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer Mapmaker</title>
+    <link rel="stylesheet" href="mapmaker.css?v=1.81">
+</head>
+<body class="mapmaker-body">
+    <header class="maker-header">
+        <div>
+            <p class="maker-kicker">Track Authoring Suite</p>
+            <h1>Mini Racer Mapmaker</h1>
+        </div>
+        <div class="maker-header-actions">
+            <a class="maker-link ghost-btn" href="tiktok-studio.html">TikTok Studio</a>
+            <a class="maker-link ghost-btn" href="runner.html">Runner Lab</a>
+            <a class="maker-link" href="../game.html">Back to Game</a>
+            <button id="save-tracks-btn" type="button">Save to tracks.js</button>
+        </div>
+    </header>
+
+    <main class="maker-layout">
+        <aside class="maker-sidebar">
+            <section class="maker-panel">
+                <div class="panel-head">
+                    <h2>Track</h2>
+                    <button id="download-tracks-btn" type="button" class="ghost-btn">Download File</button>
+                </div>
+
+                <label class="field">
+                    <span>Current Track</span>
+                    <select id="editor-track-select"></select>
+                </label>
+
+                <div class="button-row">
+                    <button id="new-track-btn" type="button">New Blank</button>
+                    <button id="duplicate-track-btn" type="button" class="ghost-btn">Duplicate</button>
+                </div>
+
+                <label class="field">
+                    <span>Track Key</span>
+                    <input id="track-key-input" type="text" spellcheck="false" autocomplete="off">
+                </label>
+
+                <label class="field">
+                    <span>Display Name</span>
+                    <input id="track-name-input" type="text" spellcheck="false" autocomplete="off">
+                </label>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Curve Radius</span>
+                        <input id="corner-radius-input" type="number" min="0" step="0.1">
+                    </label>
+                    <label class="field">
+                        <span>Start Angle</span>
+                        <input id="start-angle-input" type="number" step="0.01">
+                    </label>
+                </div>
+            </section>
+
+            <section class="maker-panel">
+                <div class="panel-head">
+                    <h2>Edit Layer</h2>
+                    <button id="reframe-btn" type="button" class="ghost-btn">Reframe</button>
+                </div>
+
+                <div id="tool-buttons" class="tool-grid">
+                    <button type="button" data-tool="draw">Line Build</button>
+                    <button type="button" data-tool="outer">Outer Wall</button>
+                    <button type="button" data-tool="inner">Inner Wall</button>
+                    <button type="button" data-tool="startLine">Start Line</button>
+                    <button type="button" data-tool="startPos">Start Pos</button>
+                    <button type="button" data-tool="checkpoints">Checkpoints</button>
+                </div>
+
+                <label class="field">
+                    <span>Line Brush Size</span>
+                    <input id="draw-width-input" type="number" min="1.5" max="20" step="0.25">
+                </label>
+
+                <label class="field">
+                    <span>Line Smoothing</span>
+                    <input id="line-smoothing-input" type="number" min="0" max="1" step="0.05">
+                </label>
+
+                <div class="field">
+                    <span>Brush Presets</span>
+                    <div id="draw-width-presets" class="chip-row">
+                        <button type="button" data-draw-width="3">3u</button>
+                        <button type="button" data-draw-width="4">4u</button>
+                        <button type="button" data-draw-width="5">5u</button>
+                        <button type="button" data-draw-width="6">6u</button>
+                        <button type="button" data-draw-width="8">8u</button>
+                    </div>
+                </div>
+
+                <p id="draw-metrics-label" class="panel-note">Brush 5u. Place the first point to start measuring straights.</p>
+
+                <div class="button-row">
+                    <button id="insert-point-btn" type="button">Insert Point</button>
+                    <button id="delete-point-btn" type="button" class="danger-btn">Delete Point</button>
+                </div>
+
+                <div class="button-row">
+                    <button id="reverse-polygon-btn" type="button" class="ghost-btn">Reverse Wall</button>
+                    <button id="copy-track-btn" type="button" class="ghost-btn">Copy Track</button>
+                </div>
+
+                <label class="field">
+                    <span>Selected X</span>
+                    <input id="selected-x-input" type="number" step="0.1">
+                </label>
+
+                <label class="field">
+                    <span>Selected Y</span>
+                    <input id="selected-y-input" type="number" step="0.1">
+                </label>
+
+                <p id="selection-label" class="panel-note">No point selected.</p>
+            </section>
+
+            <section class="maker-panel">
+                <div class="panel-head">
+                    <h2>Checkpoints</h2>
+                    <span id="checkpoint-count" class="pill">0 total</span>
+                </div>
+
+                <label class="field">
+                    <span>Current Checkpoint</span>
+                    <select id="checkpoint-select"></select>
+                </label>
+
+                <div class="button-row">
+                    <button id="add-checkpoint-btn" type="button">Add</button>
+                    <button id="remove-checkpoint-btn" type="button" class="danger-btn">Remove</button>
+                </div>
+            </section>
+
+            <section class="maker-panel">
+                <div class="panel-head">
+                    <h2>Status</h2>
+                    <span id="dirty-badge" class="pill pill-warn">Saved</span>
+                </div>
+                <p id="status-text" class="panel-note">Ready.</p>
+                <ul class="shortcut-list">
+                    <li><kbd>Line Build</kbd> places loop points one by one. Use Line Smoothing for softer generated walls and Curve Radius for rendered corner rounding.</li>
+                    <li>Click any wall, checkpoint, or start marker to select it.</li>
+                    <li><kbd>Backspace</kbd> removes the last draft point while building a new loop.</li>
+                    <li><kbd>Esc</kbd> clears the current draft loop.</li>
+                    <li>Drag handles to move points.</li>
+                    <li><kbd>Shift</kbd> + click on a wall to insert a point.</li>
+                    <li><kbd>Delete</kbd> removes the selected wall point.</li>
+                    <li><kbd>Arrow keys</kbd> nudge the selected point.</li>
+                    <li><kbd>Wheel</kbd> or trackpad pinch zooms. Two-finger trackpad scroll pans.</li>
+                    <li><kbd>Space</kbd> + drag pans.</li>
+                </ul>
+            </section>
+        </aside>
+
+        <section class="maker-stage">
+            <div class="stage-head">
+                <div>
+                    <p id="stage-title" class="stage-title">Classic Circuit</p>
+                    <p id="stage-subtitle" class="stage-subtitle">Editing outer wall</p>
+                </div>
+                <div class="legend">
+                    <span><i class="legend-swatch legend-outer"></i>Outer</span>
+                    <span><i class="legend-swatch legend-inner"></i>Inner</span>
+                    <span><i class="legend-swatch legend-line"></i>Lines</span>
+                </div>
+            </div>
+
+            <div class="canvas-shell">
+                <canvas id="map-canvas"></canvas>
+                <div class="canvas-overlay">
+                    <p id="canvas-hint">Click the track to select, then drag to edit or use the sidebar for precise values.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="mapmaker.js?v=1.82"></script>
+</body>
+</html>

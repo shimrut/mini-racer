@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer TikTok Promo Studio</title>
+    <link rel="stylesheet" href="tiktok-studio.css?v=1.81">
+</head>
+<body class="promo-body">
+    <header class="promo-header">
+        <div>
+            <p class="promo-kicker">Growth Content Tool</p>
+            <h1>Mini Racer TikTok Promo Studio</h1>
+            <p class="promo-subhead">Build vertical race teasers with editable hooks, animated track reveals, and one-click clip export.</p>
+        </div>
+        <div class="promo-header-actions">
+            <a class="promo-link ghost-link" href="runner.html">Runner Lab</a>
+            <a class="promo-link ghost-link" href="mapmaker.html">Mapmaker</a>
+            <a class="promo-link" href="../game.html">Back to Game</a>
+        </div>
+    </header>
+
+    <main class="promo-layout">
+        <aside class="promo-sidebar">
+            <section class="promo-panel">
+                <div class="panel-head">
+                    <h2>Story Setup</h2>
+                    <span id="promo-status-pill" class="pill">Ready</span>
+                </div>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Track</span>
+                        <select id="track-select"></select>
+                    </label>
+                    <label class="field">
+                        <span>Render Mode</span>
+                        <select id="render-mode-select"></select>
+                    </label>
+                </div>
+
+                <label class="field">
+                    <span>Template Style</span>
+                    <select id="template-style-select"></select>
+                </label>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Preset</span>
+                        <select id="preset-select"></select>
+                    </label>
+                    <label class="field">
+                        <span>Theme</span>
+                        <select id="theme-select"></select>
+                    </label>
+                </div>
+
+                <label class="field">
+                    <span>Aspect Ratio</span>
+                    <select id="aspect-select"></select>
+                </label>
+
+                <label class="field">
+                    <span>Headline</span>
+                    <input id="headline-input" type="text" maxlength="42" autocomplete="off" spellcheck="false">
+                </label>
+
+                <label class="field">
+                    <span>Subhead</span>
+                    <input id="subhead-input" type="text" maxlength="60" autocomplete="off" spellcheck="false">
+                </label>
+
+                <label class="field">
+                    <span>Call To Action</span>
+                    <input id="cta-input" type="text" maxlength="42" autocomplete="off" spellcheck="false">
+                </label>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Lap Time</span>
+                        <input id="lap-time-input" type="number" min="8" max="180" step="0.01" value="27.48">
+                    </label>
+                    <label class="field">
+                        <span>Clip Seconds</span>
+                        <input id="duration-input" type="number" min="4" max="20" step="0.5" value="7">
+                    </label>
+                </div>
+
+                <label class="field">
+                    <span>Brand Handle</span>
+                    <input id="handle-input" type="text" maxlength="32" autocomplete="off" spellcheck="false" value="@vectorgp.run">
+                </label>
+
+                <div class="toggle-row">
+                    <label class="toggle">
+                        <input id="show-grid-toggle" type="checkbox" checked>
+                        <span>Animated grid</span>
+                    </label>
+                    <label class="toggle">
+                        <input id="show-timer-toggle" type="checkbox" checked>
+                        <span>Lap stat</span>
+                    </label>
+                </div>
+
+                <div class="toggle-row">
+                    <label class="toggle">
+                        <input id="show-safe-zones-toggle" type="checkbox">
+                        <span>Platform safe zones</span>
+                    </label>
+                    <label class="toggle">
+                        <input id="seamless-loop-toggle" type="checkbox" checked>
+                        <span>Seamless loop</span>
+                    </label>
+                </div>
+
+                <div class="button-row">
+                    <button id="shuffle-copy-btn" type="button" class="ghost-btn">Shuffle Hook</button>
+                    <button id="restart-btn" type="button" class="ghost-btn">Restart</button>
+                </div>
+            </section>
+
+            <section class="promo-panel">
+                <div class="panel-head">
+                    <h2>Playback</h2>
+                    <span id="playback-pill" class="pill pill-accent">Looping</span>
+                </div>
+
+                <div class="metric-grid">
+                    <article class="metric-card">
+                        <span class="metric-label">Resolution</span>
+                        <strong id="resolution-metric">1080 × 1920</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Output</span>
+                        <strong>H.264 / AAC MP4</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Active Track</span>
+                        <strong id="track-name-metric">Classic Circuit</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Current Time</span>
+                        <strong id="playhead-metric">0.0s</strong>
+                    </article>
+                </div>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Save As</span>
+                        <select id="export-format-select">
+                            <option value="auto">Auto (MP4 preferred)</option>
+                            <option value="mp4">MP4 (H.264 + AAC)</option>
+                            <option value="mov">MOV</option>
+                            <option value="webm">WebM</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Export What</span>
+                        <select id="export-content-select">
+                            <option value="promo-clip">Promo clip</option>
+                            <option value="replay-only">Replay only</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="button-row button-row--stack">
+                    <button id="play-toggle-btn" type="button">Pause Preview</button>
+                    <button id="export-video-btn" type="button">Save Video (Current Aspect)</button>
+                    <button id="export-all-aspects-btn" type="button" class="ghost-btn">Save Video · All Aspects</button>
+                    <button id="export-poster-btn" type="button" class="ghost-btn">Download Poster PNG</button>
+                    <button id="export-thumbnail-pack-btn" type="button" class="ghost-btn">Download Thumbnail Pack</button>
+                    <button id="export-display-pack-btn" type="button" class="ghost-btn">Download Display Banner Pack</button>
+                </div>
+
+                <p id="status-text" class="panel-note">MP4 (H.264 + silent AAC) when your browser supports WebCodecs; MOV/WebM fallback otherwise. Exports are rendered frame-by-frame for steady pacing.</p>
+            </section>
+
+            <section class="promo-panel">
+                <div class="panel-head">
+                    <h2>Angle</h2>
+                    <span class="pill pill-muted">TikTok-friendly</span>
+                </div>
+                <ul class="angle-list">
+                    <li>Open with a hard hook in the first second.</li>
+                    <li>Keep the track readable with one strong moving focal point.</li>
+                    <li>End on a direct challenge that invites a retry or comment.</li>
+                </ul>
+            </section>
+        </aside>
+
+        <section class="promo-stage">
+            <div class="stage-head">
+                <div>
+                    <p class="stage-title">Vertical Preview</p>
+                    <p class="stage-subtitle">Designed for fast social clips, creator posts, and lightweight challenge ads.</p>
+                </div>
+                <div class="legend">
+                    <span><i class="legend-swatch legend-track"></i>Track shell</span>
+                    <span><i class="legend-swatch legend-route"></i>Ghost line</span>
+                    <span><i class="legend-swatch legend-accent"></i>CTA pulse</span>
+                </div>
+            </div>
+
+            <div id="stage-shell" class="stage-shell">
+                <canvas id="promo-canvas" class="promo-canvas" width="1080" height="1920" aria-label="TikTok promo animation preview"></canvas>
+                <canvas id="export-canvas" class="export-canvas" width="1080" height="1920" aria-hidden="true"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="tiktok-studio.js?v=1.81"></script>
+</body>
+</html>

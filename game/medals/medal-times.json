@@ -1,0 +1,16 @@
+{
+  "alloyRing": { "gold": 15.01, "silver": 15.47, "bronze": 15.82, "author": 14.69 },
+  "blueSector": { "gold": 13.29, "silver": 13.88, "bronze": 14.15, "author": 12.88 },
+  "carbonBend": { "gold": 7.16, "silver": 7.99, "bronze": 8.38, "author": 6.65 },
+  "cedarRidgeCircuit": { "gold": 11.73, "silver": 12.42, "bronze": 13.03, "author": 11.3 },
+  "circuit": { "gold": 5.64, "silver": 6.17, "bronze": 6.47, "author": 4.8 },
+  "harborParkLoop": { "gold": 11.27, "silver": 11.88, "bronze": 12.36, "author": 10.25 },
+  "jadeSpiralCircuit": { "gold": 19.46, "silver": 20.27, "bronze": 21.02, "author": 18.33 },
+  "kettleRun": { "gold": 14.65, "silver": 15.29, "bronze": 16.02, "author": 14.53 },
+  "mistwoodSerpent": { "gold": 8.95, "silver": 9.35, "bronze": 9.75, "author": 8.63 },
+  "moebiusStrip": { "gold": 11.93, "silver": 13.31, "bronze": 13.97, "author": 11.12 },
+  "royalPlateau": { "gold": 10.19, "silver": 10.45, "bronze": 10.92, "author": 9.62 },
+  "sakuraWeave": { "gold": 16.21, "silver": 16.97, "bronze": 17.56, "author": 15.15 },
+  "sunlitTemple": { "gold": 10.93, "silver": 12.19, "bronze": 12.79, "author": 9.68 },
+  "twinRise": { "gold": 19.78, "silver": 20.38, "bronze": 21.07, "author": 19.22 }
+}
