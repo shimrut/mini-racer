@@ -32,6 +32,8 @@ import {
     getMusicEnabled,
     setMusicEnabled,
 } from './music-preference.js?v=1.91';
+import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
+import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
     constructor({ modal, onCrashAutoRestartChanged, onCrashRestartDelayChanged, onCarAudioChanged, onMusicChanged } = {}) {
@@ -146,14 +148,15 @@ export class SettingsUi {
     }
 
     bindEvents() {
+        configureReusableModal(this.settingsModal, {
+            title: 'Settings',
+            closeLabel: 'Close',
+        });
+        bindReusableModal(this.settingsModal, () => this.closeSettings());
+
         if (this.settingsBtn) {
             this.settingsBtn.addEventListener('click', () => {
                 this.openSettings();
-            });
-        }
-        if (this.settingsBackBtn) {
-            this.settingsBackBtn.addEventListener('click', () => {
-                this.closeSettings();
             });
         }
         if (this.redditIdentitySwitch) {
@@ -298,7 +301,7 @@ export class SettingsUi {
     closeSettings() {
         if (this.settingsModal) {
             this.modal?.releaseModalFocusTrap?.(this.settingsModal);
-            this.settingsModal.classList.remove('active');
+            closeModalElement(this.settingsModal, () => this.settingsModal.classList.remove('active'));
         }
         if (this.modal?.isPauseModalActive?.()) {
             const raceModal = document.getElementById('modal');
@@ -323,7 +326,7 @@ export class SettingsUi {
         this.onCrashRestartDelayChanged?.(getCrashRestartDelaySec());
         void this.syncIdentityBootstrap();
 
-        this.settingsModal.classList.add('active');
+        openModalElement(this.settingsModal, () => this.settingsModal.classList.add('active'));
 
         requestAnimationFrame(() => {
             if (this.modal && this.modal.activateModalFocusTrap) {

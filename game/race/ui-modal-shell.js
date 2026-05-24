@@ -21,6 +21,8 @@ import {
     scheduleCombinedMedalEntranceAfterModal,
     shouldCelebrateMedalTier
 } from '../medals/medals.js?v=2.04';
+import { closeModalElement, openModalElement, runModalHandoff } from '../ui/modal-handoff.js';
+import { configureReusableModal } from '../ui/reusable-modal.js';
 
 function isButtonElement(node) {
     return typeof HTMLButtonElement !== 'undefined' && node instanceof HTMLButtonElement;
@@ -57,6 +59,7 @@ export class ModalShell {
         this._modalSecondaryAction = null;
         this._modalRunsPayload = null;
         this._runsViewMode = 'close';
+        this._runsCloseAction = null;
         this._focusBeforeModal = null;
         this._activeTrapModal = null;
         this._modalTrapKeydown = null;
@@ -412,7 +415,7 @@ export class ModalShell {
             this.showMainModalView();
         }
 
-        this.modal.classList.add('active');
+        openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
     }
 
@@ -432,7 +435,7 @@ export class ModalShell {
         this.modalCombinedView?.classList.remove('active-view');
         this.modalPauseView.classList.add('active-view');
 
-        this.modal.classList.add('active');
+        openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => {
             this._syncPauseTrackPreview(options.pauseTrackPreview);
             this.activateModalFocusTrap(this.modal);
@@ -505,7 +508,7 @@ export class ModalShell {
         this.modalPauseView?.classList.remove('active-view');
         this.modalCombinedView.classList.add('active-view');
 
-        this.modal.classList.add('active');
+        openModalElement(this.modal, () => this.modal.classList.add('active'));
 
         const heroMedalEl = this.modalCombinedView?.querySelector('#combined-hero-medal');
         const previousTrackMedal = isCrash ? null : (lapData.previousTrackMedal ?? null);
@@ -538,7 +541,8 @@ export class ModalShell {
         scoreboardTrackKey = null,
         scoreboardSubhead = null,
         showGlobalLeaderboard = true,
-        allowLeaderboardOpen = true
+        allowLeaderboardOpen = true,
+        onClose = null
     } = {}) {
         if (!this.modal || !this.modalTitle || !this.modalLapTimes || !this.modalRunsView || !this.modalMainView) return;
 
@@ -567,6 +571,7 @@ export class ModalShell {
         this._mainModalIsCrash = false;
         this._hidePauseTrackPreview();
         this.modalLapTimes.replaceChildren();
+        const hasPersonalBestList = Array.isArray(lapTimesArray);
         this.content.renderLapTimesList(this.modalLapTimes, lapTimesArray, bestTime, currentTime);
         this._modalRunsPayload = buildModalRunsPayload({
             lapTimesArray,
@@ -582,19 +587,23 @@ export class ModalShell {
         }, {
             currentTrackKey: this.getCurrentTrackKey()
         });
+        this._runsViewMode = returnMode === 'back' ? 'back' : 'close';
+        this._runsCloseAction = typeof onClose === 'function' ? onClose : null;
+        this.configureRunsModalHeader?.();
         if (this._modalRunsPayload.showGlobalLeaderboard) {
             this.content.renderScoreboardList(
                 this.modalLapTimes,
                 this._modalRunsPayload.scoreboardSnapshot,
                 TRACK_MODE_DAILY_GP,
                 this._modalRunsPayload.scoreboardTrackKey,
-                this._modalRunsPayload.scoreboardSubhead
+                this._modalRunsPayload.scoreboardSubhead,
+                { showHeader: hasPersonalBestList }
             );
         }
-        this._runsViewMode = returnMode === 'back' ? 'back' : 'close';
         if (this.backToMainBtn) {
             const labelText = this._runsViewMode === 'back' ? 'Back' : 'Close';
-            const labelSpan = this.backToMainBtn.querySelector('.combined-action-btn-label');
+            const labelSpan = this.backToMainBtn.querySelector('[data-modal-close-label]')
+                || this.backToMainBtn.querySelector('.combined-action-btn-label');
             if (labelSpan) labelSpan.textContent = labelText;
             else this.backToMainBtn.textContent = labelText;
             this.backToMainBtn.setAttribute('aria-label', labelText);
@@ -603,7 +612,7 @@ export class ModalShell {
         if (this.modalCombinedView) this.modalCombinedView.classList.remove('active-view');
         if (this.modalPauseView) this.modalPauseView.classList.remove('active-view');
         this.modalRunsView.classList.add('active-view');
-        this.modal.classList.add('active');
+        openModalElement(this.modal, () => this.modal.classList.add('active'));
         if (wasActive) {
             scheduleAfterModalPaint(() => {
                 this.content.centerLeaderboardCurrentRow();
@@ -621,7 +630,7 @@ export class ModalShell {
         if (!this.modal) return;
 
         const modal = this.modal;
-        modal.classList.remove('active');
+        closeModalElement(modal, () => modal.classList.remove('active'));
         this.cancelLeaderboardRequests?.();
 
         this.cancelPendingModalClose();
@@ -641,6 +650,7 @@ export class ModalShell {
             this._modalSecondaryAction = null;
             this._modalRunsPayload = null;
             this._runsReturnView = null;
+            this._runsCloseAction = null;
             this._savedModalKind = null;
             this._savedMainModalIsCrash = false;
             this.releaseModalFocusTrap(modal);
@@ -666,14 +676,30 @@ export class ModalShell {
         }, 350);
     }
 
+    dismissRunsView() {
+        if (this._runsViewMode === 'close') {
+            const closeAction = this._runsCloseAction;
+            runModalHandoff(() => {
+                this.closeModal();
+                closeAction?.();
+            });
+            return;
+        }
+
+        this.showMainModalView();
+        requestAnimationFrame(() => this.activateModalFocusTrap(this.modal));
+    }
+
     showMainModalView() {
         this._runsViewMode = 'back';
         if (this.backToMainBtn) {
-            const labelSpan = this.backToMainBtn.querySelector('.combined-action-btn-label');
+            const labelSpan = this.backToMainBtn.querySelector('[data-modal-close-label]')
+                || this.backToMainBtn.querySelector('.combined-action-btn-label');
             if (labelSpan) labelSpan.textContent = 'Back';
             else this.backToMainBtn.textContent = 'Back';
             this.backToMainBtn.setAttribute('aria-label', 'Back');
         }
+        this.configureRunsModalHeader?.();
 
         const isCombinedViewReturn = this._runsReturnView === 'combined'
             || this._savedModalKind === 'win'
@@ -833,12 +859,7 @@ export class ModalShell {
                 && this.modalRunsView?.classList.contains('active-view')
             ) {
                 event.preventDefault();
-                if (this._runsViewMode === 'close') {
-                    this.closeModal();
-                } else {
-                    this.showMainModalView();
-                    requestAnimationFrame(() => this.activateModalFocusTrap(this.modal));
-                }
+                this.dismissRunsView();
                 return;
             }
         }
@@ -1087,6 +1108,25 @@ export class ModalShell {
             'back',
             buildModalRunsViewOptions(this._modalRunsPayload)
         );
+    }
+
+    configureRunsModalHeader() {
+        if (!this.modalRunsView) return;
+
+        const payload = this._modalRunsPayload;
+        const hasPersonalBestList = Array.isArray(payload?.lapTimesArray);
+        const isLeaderboardOnly = Boolean(payload?.showGlobalLeaderboard) && !hasPersonalBestList;
+        const trackName = payload?.scoreboardTrackKey && TRACKS[payload.scoreboardTrackKey]
+            ? TRACKS[payload.scoreboardTrackKey].name
+            : null;
+
+        configureReusableModal(this.modalRunsView, {
+            title: isLeaderboardOnly ? 'Leaderboard' : 'Your 5 PBs',
+            subtitle: isLeaderboardOnly
+                ? (payload?.scoreboardSubhead || trackName || 'This track')
+                : 'Personal Bests',
+            closeLabel: this._runsViewMode === 'back' ? 'Back' : 'Close',
+        });
     }
 
     matchesModalScoreboardContext({ challengeId = null, trackKey = null } = {}) {

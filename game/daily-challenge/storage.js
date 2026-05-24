@@ -1,5 +1,18 @@
+import { normalizeCheckpointTimesSec } from "./checkpoint-times.js";
+
 const DAILY_CHALLENGE_STORAGE_KEY = "VectorGpDailyChallengeData";
 const MAX_STORED_DAILY_CHALLENGES = 7;
+
+function readStoredCheckpointTimesSec(stored) {
+  if (!stored || typeof stored !== "object") {
+    return null;
+  }
+  const bestTime = Number(stored.bestTime);
+  if (!Number.isFinite(bestTime)) {
+    return null;
+  }
+  return normalizeCheckpointTimesSec(bestTime, stored.checkpointTimesSec);
+}
 
 function normalizeCompletedLaps(value) {
   return Math.max(0, Math.trunc(value || 0));
@@ -85,9 +98,14 @@ export function saveDailyChallengeBestTime(
   challenge,
   bestTime,
   completedLaps = null,
+  checkpointTimesSec = null,
 ) {
   if (!challenge?.id || !Number.isFinite(bestTime)) return null;
 
+  const normalizedCheckpoints = normalizeCheckpointTimesSec(
+    bestTime,
+    checkpointTimesSec,
+  );
   const challengeMap = readDailyChallengeMap();
   const previous =
     challengeMap[challenge.id] && typeof challengeMap[challenge.id] === "object"
@@ -106,6 +124,7 @@ export function saveDailyChallengeBestTime(
             : Number.isFinite(previous.completedLaps)
               ? previous.completedLaps
               : null,
+        checkpointTimesSec: normalizedCheckpoints,
       }
     : {
         bestTime: Number.isFinite(previous.bestTime)
@@ -116,6 +135,7 @@ export function saveDailyChallengeBestTime(
           : challenge?.objectiveType === "finish_with_crash_budget"
             ? normalizeCompletedLaps(completedLaps)
             : null,
+        checkpointTimesSec: readStoredCheckpointTimesSec(previous),
       };
   const nextMap = pruneDailyChallengeMap({
     ...challengeMap,
@@ -126,6 +146,7 @@ export function saveDailyChallengeBestTime(
       objectiveType: challenge.objectiveType || previous.objectiveType || null,
       bestTime: nextResult.bestTime,
       completedLaps: nextResult.completedLaps,
+      checkpointTimesSec: nextResult.checkpointTimesSec,
       updatedAt: new Date().toISOString(),
     },
   });
@@ -137,9 +158,14 @@ export function setDailyChallengeBestTime(
   challenge,
   bestTime,
   completedLaps = null,
+  checkpointTimesSec = null,
 ) {
   if (!challenge?.id || !Number.isFinite(bestTime)) return null;
 
+  const normalizedCheckpoints = normalizeCheckpointTimesSec(
+    bestTime,
+    checkpointTimesSec,
+  );
   const challengeMap = readDailyChallengeMap();
   const previous =
     challengeMap[challenge.id] && typeof challengeMap[challenge.id] === "object"
@@ -159,6 +185,7 @@ export function setDailyChallengeBestTime(
           : Number.isFinite(completedLaps)
             ? normalizeCompletedLaps(completedLaps)
             : null,
+      checkpointTimesSec: normalizedCheckpoints,
       updatedAt: new Date().toISOString(),
     },
   });

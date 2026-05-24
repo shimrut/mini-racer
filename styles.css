@@ -1862,6 +1862,10 @@ body.start-selection-active #start-overlay {
     pointer-events: all;
 }
 
+.modal.modal--instant {
+    transition: none;
+}
+
 /* Pause menu: compact bottom sheet (same family as win/crash) */
 #modal.modal--pause:not(.modal--crash):not(.modal--win) {
     justify-content: flex-end;
@@ -2695,6 +2699,7 @@ body.start-selection-active #start-overlay {
 
 #settings-modal .modal-card,
 #achievements-modal .modal-card,
+#daily-playlist-modal .modal-card,
 #garage-modal .modal-card {
     padding: 0
 }
@@ -2927,6 +2932,117 @@ body.start-selection-active #start-overlay {
     font-weight: 800;
 }
 
+#daily-playlist-modal .modal-card-section--sheet {
+    gap: 1rem;
+}
+
+.daily-playlist-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.daily-playlist-list::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+}
+
+.daily-playlist-row {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    width: 100%;
+    min-height: 4.65rem;
+    box-sizing: border-box;
+}
+
+.daily-playlist-preview {
+    width: 5.5rem;
+    height: 3.4rem;
+}
+
+.daily-playlist-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.daily-playlist-title {
+    overflow: hidden;
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 1rem;
+    font-weight: 900;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.daily-playlist-subtitle {
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.daily-playlist-availability {
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.daily-playlist-availability:empty {
+    display: none;
+}
+
+.daily-playlist-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.daily-playlist-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.45rem;
+    height: 2.45rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+    cursor: pointer;
+}
+
+.daily-playlist-icon-btn--primary {
+    background: var(--accent-color);
+}
+
+.daily-playlist-icon-btn svg {
+    width: 1.2rem;
+    height: 1.2rem;
+    pointer-events: none;
+}
+
+.daily-playlist-empty {
+    margin: auto;
+    color: var(--text-dim);
+    font-family: var(--header-font);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+}
+
 .modal.active .modal-card {
     transform: translateY(0);
 }
@@ -3011,6 +3127,79 @@ body.start-selection-active #start-overlay {
     gap: 1.5rem;
     flex: 1;
     min-height: 0;
+}
+
+.reusable-modal-sheet {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.reusable-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    flex: 0 0 auto;
+}
+
+.reusable-modal-heading {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    text-align: left;
+}
+
+.reusable-modal-heading .leaderboard-hero-track {
+    text-align: left;
+}
+
+.reusable-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.reusable-modal-content::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+}
+
+.reusable-modal-close {
+    flex: 0 0 auto;
+    min-width: 4.6rem;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-color);
+    cursor: pointer;
+    font-family: var(--header-font);
+    font-size: 0.74rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.reusable-modal-close:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.reusable-modal-close:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
 }
 
 .result-modal .modal-card-section--sheet .achievements-list {

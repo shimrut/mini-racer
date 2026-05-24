@@ -409,7 +409,9 @@ export class ModalContentUi {
     container.appendChild(list);
 }
 
-    renderScoreboardList(container, scoreboardSnapshot, scoreboardMode, trackKey = null, scoreboardSubhead = null) {
+    renderScoreboardList(container, scoreboardSnapshot, scoreboardMode, trackKey = null, scoreboardSubhead = null, {
+    showHeader = true
+} = {}) {
     if (!container) return;
     const isLoading = Boolean(scoreboardSnapshot?.isLoading);
     const topRows = Array.isArray(scoreboardSnapshot?.topRows)
@@ -441,23 +443,25 @@ export class ModalContentUi {
         trackName ? `Leaderboard for ${trackName}` : 'Global leaderboard'
     );
 
-    const headerRow = document.createElement('div');
-    headerRow.className = 'runs-header-row leaderboard-header-row';
+    if (showHeader) {
+        const headerRow = document.createElement('div');
+        headerRow.className = 'runs-header-row leaderboard-header-row';
 
-    const headerStack = document.createElement('div');
-    headerStack.className = 'leaderboard-header-stack';
+        const headerStack = document.createElement('div');
+        headerStack.className = 'leaderboard-header-stack';
 
-    const trackLine = document.createElement('span');
-    trackLine.className = 'leaderboard-hero-track';
-    trackLine.textContent = 'Leaderboard';
-    headerStack.appendChild(trackLine);
+        const trackLine = document.createElement('span');
+        trackLine.className = 'leaderboard-hero-track';
+        trackLine.textContent = 'Leaderboard';
+        headerStack.appendChild(trackLine);
 
-    const subhead = document.createElement('span');
-    subhead.className = 'leaderboard-subhead';
-    subhead.textContent = trackName || 'This track';
-    headerStack.appendChild(subhead);
-    headerRow.appendChild(headerStack);
-    section.appendChild(headerRow);
+        const subhead = document.createElement('span');
+        subhead.className = 'leaderboard-subhead';
+        subhead.textContent = trackName || 'This track';
+        headerStack.appendChild(subhead);
+        headerRow.appendChild(headerStack);
+        section.appendChild(headerRow);
+    }
 
     const hasScoredRow = topRows.length > 0
         || nearbyRows.length > 0

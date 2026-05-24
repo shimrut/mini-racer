@@ -1,3 +1,5 @@
+import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
+
 export class AchievementsUi {
     constructor({ modal } = {}) {
         this.modal = modal;
@@ -25,7 +27,7 @@ export class AchievementsUi {
     openAchievements() {
         if (!this.achievementsModal) return;
         this.renderAchievements();
-        this.achievementsModal.classList.add('active');
+        openModalElement(this.achievementsModal, () => this.achievementsModal.classList.add('active'));
         requestAnimationFrame(() => {
             if (this.modal && this.modal.activateModalFocusTrap) {
                 this.modal.activateModalFocusTrap(this.achievementsModal);
@@ -36,7 +38,7 @@ export class AchievementsUi {
     closeAchievements() {
         if (this.achievementsModal) {
             this.modal?.releaseModalFocusTrap?.(this.achievementsModal);
-            this.achievementsModal.classList.remove('active');
+            closeModalElement(this.achievementsModal, () => this.achievementsModal.classList.remove('active'));
         }
     }
 

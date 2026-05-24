@@ -21,6 +21,8 @@ import {
     writePlayerTrailId
 } from '../car/player-trail.js';
 import { setCarAssetImageWithFallbacks } from '../car/sprite.js';
+import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
+import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 const GARAGE_TABS = Object.freeze(['tuning', 'skin', 'trails']);
 
@@ -69,9 +71,14 @@ export class SkillPointsUi {
         this.syncSkinSelection();
         this.syncTrailSelection();
         this.setGarageTab(this.activeGarageTab, { focusTab: false });
+        configureReusableModal(this.garageModal, {
+            title: 'Garage',
+            subtitle: 'Tune Your Car',
+            closeLabel: 'Close',
+        });
+        bindReusableModal(this.garageModal, () => this.setPanelVisible(false));
 
         this.garageButton?.addEventListener('click', () => this.togglePanel());
-        this.closeButton?.addEventListener('click', () => this.setPanelVisible(false));
         this.resetButton?.addEventListener('click', () => {
             this.setAllocation(DEFAULT_SKILL_POINT_ALLOCATION);
         });
@@ -101,7 +108,11 @@ export class SkillPointsUi {
         const garageModal = this.garageModal;
         if (!panel || !garageModal) return;
         panel.hidden = !isVisible;
-        garageModal.classList.toggle('active', Boolean(isVisible));
+        if (isVisible) {
+            openModalElement(garageModal, () => garageModal.classList.add('active'));
+        } else {
+            closeModalElement(garageModal, () => garageModal.classList.remove('active'));
+        }
         this.garageToggleButtons.forEach((button) => {
             button.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
             if (button.classList.contains('combined-action-btn')) {

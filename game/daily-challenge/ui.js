@@ -1,7 +1,10 @@
 import {
     formatDailyChallengeBestLabel,
-    getDailyChallengeCopyLabels
-} from './service.js?v=1.91';
+    formatDailyChallengePlaylistAvailabilityLabel,
+    getDailyChallengeCopyLabels,
+    getDailyChallengeTrackName
+} from './service.js?v=1.92';
+import { getDailyChallengeData } from './storage.js?v=1.91';
 import {
     getDailyChallengeVerificationEntry,
     getDailyChallengeVerificationState
@@ -13,6 +16,8 @@ import {
     setCarAssetImageWithFallbacks,
     STOCK_CAR_ASSET_NAME
 } from '../car/sprite.js';
+import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
+import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class DailyChallengeUi {
     constructor({
@@ -36,6 +41,9 @@ export class DailyChallengeUi {
     get dailyChallengeRankBtn() { return document.getElementById('daily-challenge-rank-btn'); }
     get dailyChallengeReset() { return document.getElementById('daily-challenge-reset'); }
     get dailyChallengeStartBtn() { return document.getElementById('daily-challenge-start-btn'); }
+    get dailyChallengePlaylistModal() { return document.getElementById('daily-playlist-modal'); }
+    get dailyChallengePlaylistList() { return document.getElementById('daily-playlist-list'); }
+    get dailyChallengePlaylistCloseBtn() { return document.getElementById('daily-playlist-close-btn'); }
     get dailyChallengeCarName() { return document.getElementById('daily-challenge-car-name'); }
     get dailyChallengeCarLabel() { return document.getElementById('daily-challenge-car-label'); }
     get dailyChallengeCarImage() { return document.getElementById('daily-challenge-car-image'); }
@@ -187,6 +195,154 @@ export class DailyChallengeUi {
             event: summary.skin ? { key: 'daily-challenge', trackKey: summary.trackKey, skin: summary.skin } : null
         });
 
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: {
+                outer: track.outer,
+                inner: track.inner
+            },
+            presentation,
+            startLine: track.startLine,
+            startPos: track.startPos,
+            startAngle: track.startAngle,
+            transparentBackground: true,
+            previewRenderMode: 'schematic'
+        });
+    }
+
+    openPlaylistModal(challenges = [], actions = null) {
+        const modal = this.dailyChallengePlaylistModal;
+        if (!modal) return;
+        this.renderPlaylist(challenges, actions);
+        openModalElement(modal, () => {
+            modal.style.display = 'flex';
+            modal.classList.add('active');
+        });
+        document.body.classList.add('modal-open');
+        requestAnimationFrame(() => {
+            const firstPlay = modal.querySelector('.daily-playlist-icon-btn--primary');
+            if (firstPlay instanceof HTMLButtonElement) {
+                firstPlay.focus();
+            } else {
+                this.dailyChallengePlaylistCloseBtn?.focus?.();
+            }
+        });
+    }
+
+    closePlaylistModal() {
+        const modal = this.dailyChallengePlaylistModal;
+        if (!modal) return;
+        closeModalElement(modal, () => {
+            modal.classList.remove('active');
+            modal.style.display = '';
+            document.body.classList.remove('modal-open');
+        });
+    }
+
+    bindPlaylistModal() {
+        configureReusableModal(this.dailyChallengePlaylistModal, {
+            title: 'Playlist',
+            subtitle: 'Last 7 Days',
+            closeLabel: 'Close',
+        });
+        bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
+    }
+
+    renderPlaylist(challenges = [], actions = null) {
+        const list = this.dailyChallengePlaylistList;
+        if (!list) return;
+        list.replaceChildren();
+        const onPlay = typeof actions === 'function'
+            ? actions
+            : actions?.onPlay;
+        const onLeaderboard = actions?.onLeaderboard;
+
+        const playableChallenges = Array.isArray(challenges)
+            ? challenges.filter((challenge) => challenge?.trackKey && TRACKS[challenge.trackKey])
+            : [];
+        if (!playableChallenges.length) {
+            const empty = document.createElement('div');
+            empty.className = 'daily-playlist-empty';
+            empty.textContent = 'No tracks available';
+            list.appendChild(empty);
+            return;
+        }
+
+        for (const challenge of playableChallenges) {
+            const row = document.createElement('div');
+            row.className = 'daily-playlist-row';
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'daily-playlist-preview';
+            canvas.width = 176;
+            canvas.height = 108;
+            canvas.setAttribute('aria-hidden', 'true');
+
+            const copy = document.createElement('div');
+            copy.className = 'daily-playlist-copy';
+            const title = document.createElement('div');
+            title.className = 'daily-playlist-title';
+            title.textContent = getDailyChallengeTrackName(challenge);
+            const subtitle = document.createElement('div');
+            subtitle.className = 'daily-playlist-subtitle';
+            const stored = getDailyChallengeData(challenge.id);
+            subtitle.textContent = `Best: ${formatDailyChallengeBestLabel(
+                challenge.objectiveType,
+                stored?.bestTime,
+                stored?.completedLaps,
+            )}`;
+            const availability = document.createElement('div');
+            availability.className = 'daily-playlist-availability';
+            const availabilityLabel = formatDailyChallengePlaylistAvailabilityLabel(challenge);
+            if (availabilityLabel) {
+                availability.textContent = availabilityLabel;
+            }
+            copy.append(title, subtitle, availability);
+
+            const actionsWrap = document.createElement('div');
+            actionsWrap.className = 'daily-playlist-actions';
+
+            const leaderboard = document.createElement('button');
+            leaderboard.className = 'daily-playlist-icon-btn';
+            leaderboard.type = 'button';
+            leaderboard.setAttribute('aria-label', `Open leaderboard for ${getDailyChallengeTrackName(challenge)}`);
+            leaderboard.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+                    <path d="M353.8 118.1L330.2 70.3C326.3 62 314.1 61.7 309.8 70.3L286.2 118.1L233.9 125.6C224.6 127 220.6 138.5 227.5 145.4L265.5 182.4L256.5 234.5C255.1 243.8 264.7 251 273.3 246.7L320.2 221.9L366.8 246.3C375.4 250.6 385.1 243.4 383.6 234.1L374.6 182L412.6 145.4C419.4 138.6 415.5 127.1 406.2 125.6L353.9 118.1zM288 320C261.5 320 240 341.5 240 368L240 528C240 554.5 261.5 576 288 576L352 576C378.5 576 400 554.5 400 528L400 368C400 341.5 378.5 320 352 320L288 320zM80 384C53.5 384 32 405.5 32 432L32 528C32 554.5 53.5 576 80 576L144 576C170.5 576 192 554.5 192 528L192 432C192 405.5 170.5 384 144 384L80 384zM448 496L448 528C448 554.5 469.5 576 496 576L560 576C586.5 576 608 554.5 608 528L608 496C608 469.5 586.5 448 560 448L496 448C469.5 448 448 469.5 448 496z"/>
+                </svg>
+            `;
+            leaderboard.addEventListener('click', () => {
+                this.closePlaylistModal();
+                onLeaderboard?.(challenge);
+            });
+
+            const play = document.createElement('button');
+            play.className = 'daily-playlist-icon-btn daily-playlist-icon-btn--primary';
+            play.type = 'button';
+            play.setAttribute('aria-label', `Play ${getDailyChallengeTrackName(challenge)}`);
+            play.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+                    <path d="M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z"/>
+                </svg>
+            `;
+            play.addEventListener('click', () => {
+                this.closePlaylistModal();
+                onPlay?.(challenge);
+            });
+            actionsWrap.append(leaderboard, play);
+
+            row.append(canvas, copy, actionsWrap);
+            list.appendChild(row);
+            this.renderPlaylistPreview(canvas, challenge);
+        }
+    }
+
+    renderPlaylistPreview(canvas, challenge) {
+        const track = TRACKS[challenge.trackKey];
+        if (!track) return;
+        const presentation = resolveTrackPresentation(challenge.trackKey, {
+            surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+            event: challenge.skin ? { key: 'daily-challenge', trackKey: challenge.trackKey, skin: challenge.skin } : null
+        });
         renderTrackPreviewCanvas(canvas, {
             trackGeometry: {
                 outer: track.outer,

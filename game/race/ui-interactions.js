@@ -5,6 +5,7 @@ export class InteractionsUi {
         leaderboards,
         onStart = null,
         onStartDailyChallenge = null,
+        onOpenDailyPlaylist = null,
         onShowPersonalBests = null,
         onPauseRun = null,
     } = {}) {
@@ -13,6 +14,7 @@ export class InteractionsUi {
         this.leaderboards = leaderboards;
         this.onStart = onStart;
         this.onStartDailyChallenge = onStartDailyChallenge;
+        this.onOpenDailyPlaylist = onOpenDailyPlaylist;
         this.onShowPersonalBests = onShowPersonalBests;
         this.onPauseRun = onPauseRun;
     }
@@ -23,6 +25,7 @@ export class InteractionsUi {
     get startBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get hudStatsBtn() { return document.getElementById('hud-stats-btn'); }
     get dailyChallengeRankBtn() { return document.getElementById('daily-challenge-rank-btn'); }
+    get dailyChallengePlaylistBtn() { return document.getElementById('daily-challenge-playlist-btn'); }
     get menuGarageBtn() { return document.getElementById('menu-btn-garage'); }
     get menuLeaderboardBtn() { return document.getElementById('daily-challenge-rank-btn'); }
     get menuAchievementsBtn() { return document.getElementById('menu-btn-achievements'); }
@@ -34,11 +37,7 @@ export class InteractionsUi {
     bindModalViewToggles() {
         if (this.backToMainBtn) {
             this.backToMainBtn.addEventListener("click", () => {
-                if (this.modal._runsViewMode === "close") {
-                    this.modal.closeModal();
-                    return;
-                }
-                this.modal.showMainModalView();
+                this.modal.dismissRunsView?.();
             });
         }
     }
@@ -84,6 +83,11 @@ export class InteractionsUi {
             this.dailyChallengeRankBtn.addEventListener("click", () => {
                 if (this.dailyChallengeRankBtn.disabled) return;
                 void this.leaderboards?.openDailyChallengeLeaderboard?.();
+            });
+        }
+        if (this.dailyChallengePlaylistBtn && this.onOpenDailyPlaylist) {
+            this.dailyChallengePlaylistBtn.addEventListener("click", () => {
+                void this.onOpenDailyPlaylist();
             });
         }
         if (this.menuGarageBtn) {

@@ -27,16 +27,16 @@ import { TrackLayerRenderer } from "./track/layer.js?v=1.91";
 import { RaceHud } from "./race/ui-hud.js?v=1.91";
 import { StartOverlay } from "./race/ui-start-overlay.js?v=1.91";
 import { DailyChallengeUi } from "./daily-challenge/ui.js?v=1.92";
-import { ModalContentUi } from "./race/ui-modal-content.js?v=1.91";
-import { ModalShell } from "./race/ui-modal-shell.js?v=2.03";
+import { ModalContentUi } from "./race/ui-modal-content.js?v=1.92";
+import { ModalShell } from "./race/ui-modal-shell.js?v=2.06";
 import { LoadingScreen } from "./ui/loader.js";
 import { InteractionsUi } from "./race/ui-interactions.js?v=1.91";
-import { LeaderboardsUi } from "./scoreboard/ui.js?v=1.91";
-import { SettingsUi } from "./settings/ui.js?v=1.95";
-import { SkillPointsUi } from "./settings/skill-points-ui.js";
+import { LeaderboardsUi } from "./scoreboard/ui.js?v=1.93";
+import { SettingsUi } from "./settings/ui.js?v=1.97";
+import { SkillPointsUi } from "./settings/skill-points-ui.js?v=1.01";
 import { applySkillPointAllocation } from "./car/skill-points.js?v=1.91";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
-import { AchievementsUi } from "./achievements/ui.js?v=1.91";
+import { AchievementsUi } from "./achievements/ui.js?v=1.92";
 import { trackEngineMethods } from "./track/engine-methods.js?v=1.91";
 import { raceEngineMethods } from "./race/engine-methods.js?v=1.91";
 import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=1.91";
@@ -300,6 +300,7 @@ export class RealTimeRacer {
       startOverlay: this.startOverlay,
       leaderboards: this.leaderboards,
       onStartDailyChallenge: () => this.handleStartDailyChallenge(),
+      onOpenDailyPlaylist: () => this.openDailyChallengePlaylist(),
       onPauseRun: () => this.pauseActiveRun(),
       onHeaderMenuOpen: () => this.analytics.trackHeaderMenuOpen(),
     });
@@ -307,6 +308,7 @@ export class RealTimeRacer {
     this.interactions.bindModalActionRowPointerFocus();
     this.interactions.bindMenu();
     this.interactions.bindPrimaryActions();
+    this.dailyChallengeUi.bindPlaylistModal();
     this.skillPoints.bind();
     this.hud.setPauseVisible(false);
 

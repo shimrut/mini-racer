@@ -196,6 +196,7 @@ export function enqueueDailyChallengeVerification({
   bestTime,
   completedLaps = null,
   replay,
+  checkpointTimesSec = null,
   objectiveType = null,
   challengeDate = null,
   trackKey = null,
@@ -216,6 +217,9 @@ export function enqueueDailyChallengeVerification({
       ? Math.max(0, Math.trunc(completedLaps))
       : null,
     replay,
+    checkpointTimesSec: Array.isArray(checkpointTimesSec)
+      ? checkpointTimesSec.slice()
+      : null,
     objectiveType: typeof objectiveType === "string" ? objectiveType : null,
     challengeDate: typeof challengeDate === "string" ? challengeDate : null,
     trackKey: typeof trackKey === "string" ? trackKey : null,

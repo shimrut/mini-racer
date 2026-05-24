@@ -84,6 +84,7 @@ export const scoreboardEngineMethods = {
         challengeId: entry.challengeId,
         bestTime: entry.bestTime,
         replay: entry.replay,
+        checkpointTimesSec: entry.checkpointTimesSec,
       });
       await this.handleDailyChallengeVerificationResult(entry, result);
     } catch (error) {
@@ -155,6 +156,9 @@ export const scoreboardEngineMethods = {
         Number.isFinite(body?.completedLaps)
           ? body.completedLaps
           : entry.completedLaps,
+        Array.isArray(body?.checkpointTimesSec)
+          ? body.checkpointTimesSec
+          : entry.checkpointTimesSec,
       );
       clearDailyChallengeVerification(entry.challengeId);
 
@@ -209,12 +213,14 @@ export const scoreboardEngineMethods = {
     bestTime,
     completedLaps = null,
     replay,
+    checkpointTimesSec = null,
   } = {}) {
     const { enqueued } = enqueueDailyChallengeVerification({
       challengeId: challenge?.id,
       bestTime,
       completedLaps,
       replay,
+      checkpointTimesSec,
       objectiveType: challenge?.objectiveType,
       challengeDate: challenge?.challengeDate,
       trackKey: challenge?.trackKey,

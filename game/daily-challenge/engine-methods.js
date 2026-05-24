@@ -1,7 +1,9 @@
 import {
   getDailyChallengeData,
+  saveDailyChallengeBestTime,
   setDailyChallengeBestTime,
 } from "./storage.js?v=1.91";
+import { normalizeCheckpointTimesSec } from "./checkpoint-times.js?v=1.92";
 import {
   buildLapRecord,
   createModalActions,
@@ -17,10 +19,11 @@ import {
   getDailyChallengeModifierLabel,
   getDailyChallengeObjectiveLabel,
   getDailyChallengeRequiredLaps,
+  getDailyChallengePlaylist,
   getDailyChallengeSnapshot,
   getDailyChallengeTrackName,
   isCrashBudgetDailyChallenge,
-} from "./service.js?v=1.91";
+} from "./service.js?v=1.92";
 import { createVerificationSnapshot } from "../scoreboard/verification-queue.js";
 import { applySkillPointAllocation } from "../car/skill-points.js";
 import { getMedalForLapTime } from "../medals/medals.js?v=2.04";
@@ -164,12 +167,14 @@ export const dailyChallengeEngineMethods = {
     try {
       this.setLoadingStatus(40, "Checking Challenge...");
       const challenge = await getActiveDailyChallenge();
+      this.currentDailyChallenge = challenge || null;
       this.activeDailyChallenge = challenge || null;
       this.setDailyChallengeLobbySummary(challenge);
       await this.syncReadyBackgroundTrack(challenge);
       return challenge;
     } catch (error) {
       console.error("Error loading daily challenge:", error);
+      this.currentDailyChallenge = null;
       this.activeDailyChallenge = null;
       await this.syncReadyBackgroundTrack(null);
       this.dailyChallengeUi.setDailyChallengeSummary(null);
@@ -178,7 +183,7 @@ export const dailyChallengeEngineMethods = {
   },
 
   async refreshDailyChallengeSummary() {
-    const challenge = this.activeDailyChallenge;
+    const challenge = this.currentDailyChallenge || this.activeDailyChallenge;
     if (!challenge) {
       this.dailyChallengeUi.setDailyChallengeSummary(null);
       return null;
@@ -206,6 +211,7 @@ export const dailyChallengeEngineMethods = {
         Number.isFinite(snapshot.currentPlayerRow.completedLaps)
           ? snapshot.currentPlayerRow.completedLaps
           : null,
+        snapshot.currentPlayerRow.checkpointTimesSec,
       ) || localData;
       this.dailyChallengeBestResult = localData ? { ...localData } : null;
       this.bestLapTime = Number.isFinite(localData?.bestTime)
@@ -285,6 +291,16 @@ export const dailyChallengeEngineMethods = {
       if (!Number.isFinite(cur) || storedSec < cur) {
         this.sessionBestLapSecByTrackKey[tk] = storedSec;
       }
+      const storedCheckpoints = normalizeCheckpointTimesSec(
+        storedSec,
+        storedDaily.checkpointTimesSec,
+      );
+      if (storedCheckpoints) {
+        if (!this.sessionBestCheckpointTimesByTrackKey) {
+          this.sessionBestCheckpointTimesByTrackKey = Object.create(null);
+        }
+        this.sessionBestCheckpointTimesByTrackKey[tk] = storedCheckpoints.slice();
+      }
     }
     this.hud.setPauseVisible(false);
     this.hud.setHudPersonalBestsOpenAllowed(false);
@@ -297,6 +313,7 @@ export const dailyChallengeEngineMethods = {
     this.trackMedalBeforeLastLapWrite = null;
     this.hasTrackMedalBeforeLastLapWrite = false;
     this.currentChallengeRun = null;
+    this.activeDailyChallenge = this.currentDailyChallenge || this.activeDailyChallenge;
     this.dailyChallengeBestResult = null;
     this.syncCurrentRunPolicy();
     this.setRuntimeConfig(null);
@@ -309,11 +326,11 @@ export const dailyChallengeEngineMethods = {
     this.updateDailyChallengeHud();
   },
 
-  async handleStartDailyChallenge() {
+  async handleStartDailyChallenge(challengeOverride = null) {
     if (
       this.status !== "ready" ||
       this.startButtonPending ||
-      !this.activeDailyChallenge
+      (!challengeOverride && !(this.currentDailyChallenge || this.activeDailyChallenge))
     ) {
       return;
     }
@@ -322,7 +339,8 @@ export const dailyChallengeEngineMethods = {
     this.startButtonPending = true;
     const playerTypeAlreadySent = this.sessionFlags.get("playerTypeSent");
     try {
-      const challenge = this.activeDailyChallenge;
+      const challenge = challengeOverride || this.currentDailyChallenge || this.activeDailyChallenge;
+      this.activeDailyChallenge = challenge;
       if (challenge.trackKey && challenge.trackKey !== this.currentTrackKey) {
         await this.loadTrack(challenge.trackKey, {
           trackPageview: false,
@@ -362,6 +380,30 @@ export const dailyChallengeEngineMethods = {
       this.startSequence();
     } finally {
       this.startButtonPending = false;
+    }
+  },
+
+  async openDailyChallengePlaylist() {
+    try {
+      const challenges = await getDailyChallengePlaylist();
+      const playlistActions = {
+        onPlay: (challenge) => {
+          void this.handleStartDailyChallenge(challenge);
+        },
+        onLeaderboard: (challenge) => {
+          void this.leaderboards?.openDailyChallengeLeaderboardForChallenge?.(
+            challenge,
+            "close",
+            {
+              onClose: () => this.dailyChallengeUi.openPlaylistModal(challenges, playlistActions),
+            },
+          );
+        },
+      };
+      this.dailyChallengeUi.openPlaylistModal(challenges, playlistActions);
+    } catch (error) {
+      console.error("Error loading daily challenge playlist:", error);
+      this.dailyChallengeUi.openPlaylistModal([], null);
     }
   },
 
@@ -529,10 +571,15 @@ export const dailyChallengeEngineMethods = {
     this.hud.setHudPersonalBestsOpenAllowed(false);
 
     const lapCheckpointTimes = this.getLapCheckpointTimesSec?.() ?? [];
+    const storedPbCheckpointTimes = normalizeCheckpointTimesSec(
+      storedChallengeBestSec ?? finalTime,
+      previousBest?.checkpointTimesSec,
+    );
     const priorPbCheckpointTimes =
-      trackKey && this.sessionBestCheckpointTimesByTrackKey
+      storedPbCheckpointTimes
+      ?? (trackKey && this.sessionBestCheckpointTimesByTrackKey
         ? this.sessionBestCheckpointTimesByTrackKey[trackKey] ?? null
-        : null;
+        : null);
     const priorPbFinishSec =
       trackKey && this.sessionBestLapSecByTrackKey
         ? this.sessionBestLapSecByTrackKey[trackKey] ?? null
@@ -613,11 +660,27 @@ export const dailyChallengeEngineMethods = {
     }
 
     if (isNewBest) {
+      if (!isCrashBudget) {
+        const saved = saveDailyChallengeBestTime(
+          challenge,
+          finalTime,
+          completedLaps,
+          lapCheckpointTimes,
+        );
+        if (saved) {
+          this.dailyChallengeBestResult = { ...saved };
+          this.bestLapTime = Number.isFinite(saved.bestTime)
+            ? saved.bestTime
+            : this.bestLapTime;
+        }
+      }
+
       const replayPayload = this.scoreboardReplay.getPayload(1);
       this.enqueueDailyChallengeVerificationSubmission({
         challenge,
         bestTime: finalTime,
         completedLaps,
+        checkpointTimesSec: lapCheckpointTimes,
         replay: replayPayload
           ? {
             ...replayPayload,
