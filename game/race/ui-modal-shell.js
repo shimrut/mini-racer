@@ -298,6 +298,7 @@ export class ModalShell {
     get modalPauseView() { return document.getElementById('modal-pause-view'); }
     get pauseSettingsBtn() { return document.getElementById('pause-settings-btn'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
+    get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
     get combinedTuneBtn() { return document.getElementById('combined-tune-btn'); }
     get combinedRestartBtn() { return document.getElementById('combined-restart-btn'); }
     cancelPendingModalClose() {
@@ -482,6 +483,7 @@ export class ModalShell {
         }
 
         this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
+        this._bindClickAction(this.combinedSettingsBtn, options.settingsAction);
         this._bindCombinedGarageBtn(this.combinedTuneBtn);
         this._bindClickAction(this.combinedRestartBtn, finishResultModal(options.restartAction || options.primaryAction));
 
@@ -602,10 +604,6 @@ export class ModalShell {
         }
         if (this.backToMainBtn) {
             const labelText = this._runsViewMode === 'back' ? 'Back' : 'Close';
-            const labelSpan = this.backToMainBtn.querySelector('[data-modal-close-label]')
-                || this.backToMainBtn.querySelector('.combined-action-btn-label');
-            if (labelSpan) labelSpan.textContent = labelText;
-            else this.backToMainBtn.textContent = labelText;
             this.backToMainBtn.setAttribute('aria-label', labelText);
         }
         this.modalMainView.classList.remove('active-view');
@@ -693,10 +691,6 @@ export class ModalShell {
     showMainModalView() {
         this._runsViewMode = 'back';
         if (this.backToMainBtn) {
-            const labelSpan = this.backToMainBtn.querySelector('[data-modal-close-label]')
-                || this.backToMainBtn.querySelector('.combined-action-btn-label');
-            if (labelSpan) labelSpan.textContent = 'Back';
-            else this.backToMainBtn.textContent = 'Back';
             this.backToMainBtn.setAttribute('aria-label', 'Back');
         }
         this.configureRunsModalHeader?.();
@@ -734,6 +728,10 @@ export class ModalShell {
 
     isPauseModalActive() {
         return this.isModalActive() && this._modalKind === 'pause';
+    }
+
+    isCombinedResultsModalActive() {
+        return this.isModalActive() && (this._modalKind === 'win' || this._modalKind === 'crash');
     }
 
     isPauseEscapeTarget(trapRoot) {

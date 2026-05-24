@@ -21,7 +21,7 @@ function skinLabelForAsset(assetName) {
     if (!m) return 'Car';
     const rest = m[1];
     if (rest.toLowerCase().startsWith('mr_')) {
-        return `MR ${titleCaseUnderscored(rest.slice(3))}`;
+        return `Mini ${titleCaseUnderscored(rest.slice(3))}`;
     }
     if (rest.toLowerCase().startsWith('cyber_')) {
         return `Cyber ${titleCaseUnderscored(rest.slice(6))}`;
@@ -32,22 +32,22 @@ function skinLabelForAsset(assetName) {
     return titleCaseUnderscored(rest);
 }
 
-/** @typedef {'mr' | 'cyberpunk' | 'steampunk'} PlayerCarSkinSeriesId */
+/** @typedef {'mini' | 'cyberpunk' | 'steampunk'} PlayerCarSkinSeriesId */
 
 /** @param {string} assetName */
 function skinSeriesIdForAsset(assetName) {
     const m = /^assets\/cars\/mr_(.+)\.webp$/i.exec(assetName);
-    if (!m) return 'mr';
+    if (!m) return 'mini';
     const rest = m[1].toLowerCase();
-    if (rest.startsWith('mr_')) return 'mr';
+    if (rest.startsWith('mr_')) return 'mini';
     if (rest.startsWith('cyber_')) return 'cyberpunk';
     if (rest.startsWith('steam_')) return 'steampunk';
-    return 'mr';
+    return 'mini';
 }
 
 /** Garage UI section order and headings. */
 export const PLAYER_CAR_SKIN_SECTION_META = Object.freeze([
-    Object.freeze({ id: 'mr', title: 'MR cars' }),
+    Object.freeze({ id: 'mini', title: 'Mini cars' }),
     Object.freeze({ id: 'cyberpunk', title: 'Cyberpunk cars' }),
     Object.freeze({ id: 'steampunk', title: 'Steampunk cars' })
 ]);
@@ -68,7 +68,7 @@ export const PLAYER_CAR_SKINS = Object.freeze(
 function buildPlayerCarSkinSections() {
     const byId = new Map(PLAYER_CAR_SKIN_SECTION_META.map((m) => [m.id, []]));
     for (const skin of PLAYER_CAR_SKINS) {
-        const bucket = byId.get(skin.series) ?? byId.get('mr');
+        const bucket = byId.get(skin.series) ?? byId.get('mini');
         bucket.push(skin);
     }
     return Object.freeze(

@@ -114,7 +114,7 @@ export class LeaderboardsUi {
         const sharedOptions = {
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: challenge.trackKey,
-            scoreboardSubhead: 'Leaderboard · Daily Challenge'
+            scoreboardSubhead: TRACKS[challenge.trackKey].name,
         };
         const initialSnapshot = this.resolveInitialDailyChallengeSnapshot(challenge);
 

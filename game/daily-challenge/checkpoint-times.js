@@ -18,10 +18,10 @@ export function normalizeCheckpointTimesSec(bestTimeSec, raw) {
 
     const splits = [];
     for (const item of raw) {
-        if (!Number.isFinite(item)) {
+        const sec = Number(item);
+        if (!Number.isFinite(sec)) {
             return null;
         }
-        const sec = Number(item);
         if (sec < 0 || sec > bestTimeSec) {
             return null;
         }

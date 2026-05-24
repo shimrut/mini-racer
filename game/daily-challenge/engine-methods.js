@@ -19,10 +19,12 @@ import {
   getDailyChallengeModifierLabel,
   getDailyChallengeObjectiveLabel,
   getDailyChallengeRequiredLaps,
+  getCachedDailyChallengePlaylist,
   getDailyChallengePlaylist,
   getDailyChallengeSnapshot,
   getDailyChallengeTrackName,
   invalidateDailyChallengeSnapshot,
+  isDailyChallengeStoredResultForChallenge,
   isCrashBudgetDailyChallenge,
   prefetchDailyChallengeSnapshots,
 } from "./service.js?v=1.94";
@@ -139,7 +141,10 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
-    const localData = getDailyChallengeData(challenge.id);
+    const storedLocalData = getDailyChallengeData(challenge.id);
+    const localData = isDailyChallengeStoredResultForChallenge(challenge, storedLocalData)
+      ? storedLocalData
+      : null;
     this.dailyChallengeBestResult = localData ? { ...localData } : null;
     this.bestLapTime = Number.isFinite(localData?.bestTime)
       ? localData.bestTime
@@ -191,7 +196,10 @@ export const dailyChallengeEngineMethods = {
       return null;
     }
 
-    let localData = getDailyChallengeData(challenge.id);
+    const storedLocalData = getDailyChallengeData(challenge.id);
+    let localData = isDailyChallengeStoredResultForChallenge(challenge, storedLocalData)
+      ? storedLocalData
+      : null;
     this.dailyChallengeBestResult = localData ? { ...localData } : null;
     this.bestLapTime = Number.isFinite(localData?.bestTime)
       ? localData.bestTime
@@ -283,7 +291,10 @@ export const dailyChallengeEngineMethods = {
       ),
     );
 
-    const storedDaily = getDailyChallengeData(challenge.id);
+    const storedDailyRaw = getDailyChallengeData(challenge.id);
+    const storedDaily = isDailyChallengeStoredResultForChallenge(challenge, storedDailyRaw)
+      ? storedDailyRaw
+      : null;
     this.dailyChallengeBestResult = storedDaily ? { ...storedDaily } : null;
     this.bestLapTime = Number.isFinite(storedDaily?.bestTime)
       ? storedDaily.bestTime
@@ -403,7 +414,11 @@ export const dailyChallengeEngineMethods = {
         );
       },
     };
-    this.dailyChallengeUi.openPlaylistModal(null, playlistActions);
+    loadedChallenges = getCachedDailyChallengePlaylist();
+    this.dailyChallengeUi.openPlaylistModal(
+      loadedChallenges.length ? loadedChallenges : null,
+      playlistActions,
+    );
 
     try {
       const challenges = await getDailyChallengePlaylist();
@@ -520,6 +535,7 @@ export const dailyChallengeEngineMethods = {
           secondaryActionIcon: "done",
           secondaryAction: () => this.reset(false),
         }),
+        settingsAction: () => this.settings.openSettings(),
       },
     );
   },
@@ -659,6 +675,7 @@ export const dailyChallengeEngineMethods = {
           secondaryActionIcon: "done",
           secondaryAction: () => this.reset(false),
         }),
+        settingsAction: () => this.settings.openSettings(),
       },
     );
     if (this.modal.modalMsg) {

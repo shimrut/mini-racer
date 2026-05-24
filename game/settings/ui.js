@@ -303,7 +303,10 @@ export class SettingsUi {
             this.modal?.releaseModalFocusTrap?.(this.settingsModal);
             closeModalElement(this.settingsModal, () => this.settingsModal.classList.remove('active'));
         }
-        if (this.modal?.isPauseModalActive?.()) {
+        if (
+            this.modal?.isPauseModalActive?.()
+            || this.modal?.isCombinedResultsModalActive?.()
+        ) {
             const raceModal = document.getElementById('modal');
             if (raceModal) {
                 requestAnimationFrame(() => {

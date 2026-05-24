@@ -302,6 +302,71 @@ function cloneSnapshot(snapshot) {
     };
 }
 
+function normalizeNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
+function normalizeBestTimeSec(row) {
+    if (!row || typeof row !== 'object') return null;
+    const bestTime = normalizeNumber(row.bestTime);
+    if (bestTime !== null) return bestTime;
+    const bestTimeSec = normalizeNumber(row.bestTimeSec);
+    if (bestTimeSec !== null) return bestTimeSec;
+    const bestTimeMs = normalizeNumber(row.bestTimeMs);
+    return bestTimeMs !== null ? bestTimeMs / 1000 : null;
+}
+
+function normalizeCompletedLaps(value) {
+    const laps = Number(value);
+    return Number.isFinite(laps) ? Math.max(0, Math.trunc(laps)) : null;
+}
+
+function normalizeSnapshotRow(row) {
+    if (!row || typeof row !== 'object') return null;
+    const normalized = { ...row };
+    const bestTime = normalizeBestTimeSec(row);
+    if (bestTime !== null) {
+        normalized.bestTime = bestTime;
+    }
+    const completedLaps = normalizeCompletedLaps(row.completedLaps);
+    if (completedLaps !== null) {
+        normalized.completedLaps = completedLaps;
+    }
+    return normalized;
+}
+
+export function isDailyChallengeStoredResultForChallenge(challenge, result) {
+    if (!challenge || !result || typeof result !== 'object') return false;
+    if (!Number.isFinite(Number(result.bestTime))) return false;
+    if (
+        typeof result.trackKey === 'string'
+        && result.trackKey
+        && result.trackKey !== challenge.trackKey
+    ) {
+        return false;
+    }
+    if (
+        typeof result.objectiveType === 'string'
+        && result.objectiveType
+        && result.objectiveType !== challenge.objectiveType
+    ) {
+        return false;
+    }
+    return true;
+}
+
+function toDailyChallengeResultFromRow(row) {
+    if (!row || !Number.isFinite(row.bestTime)) return null;
+    return {
+        bestTime: row.bestTime,
+        completedLaps: Number.isFinite(row.completedLaps) ? row.completedLaps : null,
+        checkpointTimesSec: Array.isArray(row.checkpointTimesSec)
+            ? row.checkpointTimesSec
+            : null,
+    };
+}
+
 function findCachedPlaylistChallenge(challengeId) {
     if (!challengeId || !Array.isArray(dailyPlaylistCache.challenges)) return null;
     return dailyPlaylistCache.challenges.find((challenge) => challenge?.id === challengeId) || null;
@@ -351,39 +416,36 @@ function syncDailyChallengeStoredBestFromSnapshot(challengeId, snapshot) {
 }
 
 function mergeDailyChallengeBestResult(challenge) {
-    const local = getDailyChallengeData(challenge?.id);
+    const storedLocal = getDailyChallengeData(challenge?.id);
+    const local = isDailyChallengeStoredResultForChallenge(challenge, storedLocal)
+        ? storedLocal
+        : null;
     const row = readCachedDailySnapshot(challenge?.id)?.currentPlayerRow;
 
     if (!row || !Number.isFinite(row.bestTime)) {
         return local;
     }
     if (!local || !Number.isFinite(local.bestTime)) {
-        return {
-            bestTime: row.bestTime,
-            completedLaps: Number.isFinite(row.completedLaps) ? row.completedLaps : null,
-        };
+        return toDailyChallengeResultFromRow(row);
     }
 
     if (challenge?.objectiveType === 'finish_with_crash_budget') {
         const localLaps = Math.max(0, Math.trunc(local.completedLaps || 0));
         const rowLaps = Math.max(0, Math.trunc(row.completedLaps || 0));
         if (rowLaps > localLaps) {
-            return {
-                bestTime: row.bestTime,
-                completedLaps: rowLaps,
-            };
+            return toDailyChallengeResultFromRow(row);
         }
         if (rowLaps < localLaps) {
             return local;
         }
         return row.bestTime > local.bestTime
-            ? { bestTime: row.bestTime, completedLaps: rowLaps }
+            ? toDailyChallengeResultFromRow(row)
             : local;
     }
 
     return row.bestTime < local.bestTime
         ? {
-            bestTime: row.bestTime,
+            ...toDailyChallengeResultFromRow(row),
             completedLaps: Number.isFinite(row.completedLaps)
                 ? row.completedLaps
                 : local.completedLaps,
@@ -432,10 +494,10 @@ function normalizeSnapshot(raw) {
         : totalCount;
 
     return {
-        topRows: Array.isArray(raw.topRows) ? raw.topRows : [],
-        nearbyRows: Array.isArray(raw.nearbyRows) ? raw.nearbyRows : [],
+        topRows: Array.isArray(raw.topRows) ? raw.topRows.map(normalizeSnapshotRow).filter(Boolean) : [],
+        nearbyRows: Array.isArray(raw.nearbyRows) ? raw.nearbyRows.map(normalizeSnapshotRow).filter(Boolean) : [],
         currentPlayerRow: raw.currentPlayerRow && typeof raw.currentPlayerRow === 'object'
-            ? raw.currentPlayerRow
+            ? normalizeSnapshotRow(raw.currentPlayerRow)
             : null,
         totalCount,
         leaderboardEntryCount,
@@ -677,6 +739,12 @@ export async function getDailyChallengePlaylist({ forceRefresh = false } = {}) {
 
     dailyPlaylistCache.promise = requestPromise;
     return cloneDailyPlaylist(await requestPromise);
+}
+
+export function getCachedDailyChallengePlaylist() {
+    return dailyPlaylistCache.challenges && dailyPlaylistCache.expiresAt > Date.now()
+        ? cloneDailyPlaylist(dailyPlaylistCache.challenges)
+        : [];
 }
 
 async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_LIMIT } = {}) {

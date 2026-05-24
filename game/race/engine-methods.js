@@ -482,6 +482,7 @@ export const raceEngineMethods = {
             secondaryAction: () => this.reset(false),
             secondaryActionIcon: "done",
           }),
+          settingsAction: () => this.settings.openSettings(),
         },
       );
     }
