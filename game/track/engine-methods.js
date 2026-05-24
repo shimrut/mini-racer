@@ -118,7 +118,11 @@ export const trackEngineMethods = {
 
   async loadTrack(
     trackKey,
-    { trackPageview = true, countMapSelection = true } = {},
+    {
+      trackPageview = true,
+      countMapSelection = true,
+      loadPlayerProgress = true,
+    } = {},
   ) {
     const nextTrack = TRACKS[trackKey];
     if (!nextTrack) return;
@@ -146,7 +150,7 @@ export const trackEngineMethods = {
     this.collisionSegments = runtime.collisionSegments;
     this.collisionHash = runtime.collisionHash;
     this.setLoadingStatus(75, "Syncing Graphics...");
-    this.refreshTrackPresentation(requestId);
+    await this.refreshTrackPresentation(requestId);
 
     this.bestLapTime = null;
     this.syncCurrentRunPolicy();
@@ -161,6 +165,17 @@ export const trackEngineMethods = {
     this.hud.setBestTime(this.bestLapTime, {
       persistToTrackCard: false,
     });
+
+    if (!loadPlayerProgress) {
+      this.reset();
+      if (
+        document.activeElement &&
+        typeof document.activeElement.blur === "function"
+      ) {
+        document.activeElement.blur();
+      }
+      return;
+    }
 
     try {
       const { hasAnyData, isReturningPlayer } = await getPlayerProgressState();

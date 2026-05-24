@@ -15,30 +15,51 @@ const MAX_DAILY_TIME = 60 * 60;
 const DEFAULT_DAILY_LIMIT = 10;
 const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
 
-function shouldUseMockDailyChallenge() {
-    if (typeof window === 'undefined' || !window.location?.search) return false;
+function getMockDailyUrlParams() {
+    if (typeof window === 'undefined' || !window.location?.search) return null;
     try {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('mockDaily') === 'true' || params.get('localDev') === 'true' || isLocalEnvironment();
+        return new URLSearchParams(window.location.search);
     } catch {
-        return isLocalEnvironment();
+        return null;
     }
+}
+
+/** mockDaily=true → random track; mockDaily=<trackKey> → that track only */
+function resolveMockDailyTrackKey(params) {
+    if (!params) return null;
+
+    const mockDaily = params.get('mockDaily');
+    if (mockDaily && mockDaily !== 'true' && TRACKS[mockDaily]) {
+        return mockDaily;
+    }
+
+    const mockTrack = params.get('mockTrack');
+    if (mockTrack && TRACKS[mockTrack]) {
+        return mockTrack;
+    }
+
+    return null;
+}
+
+function shouldUseMockDailyChallenge() {
+    const params = getMockDailyUrlParams();
+    if (params) {
+        const mockDaily = params.get('mockDaily');
+        if (mockDaily === 'true' || (mockDaily && TRACKS[mockDaily])) {
+            return true;
+        }
+        if (params.get('localDev') === 'true') {
+            return true;
+        }
+    }
+    return isLocalEnvironment();
 }
 
 function getMockDailyChallenge() {
     const trackKeys = Object.keys(TRACKS);
-    let trackKey = trackKeys[Math.floor(Math.random() * trackKeys.length)];
-    
-    // Allow specifying track via query param: ?mockTrack=circuit
-    if (typeof window !== 'undefined' && window.location?.search) {
-        try {
-            const params = new URLSearchParams(window.location.search);
-            const requestedTrack = params.get('mockTrack');
-            if (requestedTrack && TRACKS[requestedTrack]) {
-                trackKey = requestedTrack;
-            }
-        } catch { /* ignore */ }
-    }
+    const params = getMockDailyUrlParams();
+    const fixedTrackKey = resolveMockDailyTrackKey(params);
+    const trackKey = fixedTrackKey ?? trackKeys[Math.floor(Math.random() * trackKeys.length)];
     
     const now = Date.now();
     return normalizeDailyChallenge({

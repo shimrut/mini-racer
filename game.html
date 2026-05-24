@@ -124,26 +124,28 @@
             <span id="lap-flash-delta" class="lap-flash-delta">FIRST LAP</span>
         </div>
 
+        <div class="mobile-hud-bar">
+            <div id="mobile-speedometer" class="mobile-speedometer" aria-live="off" aria-label="Current speed">
+                <div class="speedometer-content">
+                    <div id="mobile-speed-bar" class="speedometer-bar"></div>
+                    <div class="speedometer-text">
+                        <span id="mobile-speed-val" class="mobile-speedometer-value">0</span>
+                        <span class="mobile-speedometer-label">KPH</span>
+                    </div>
+                </div>
+            </div>
+            <button id="pause-btn" class="hud-pause-btn" type="button" aria-label="Pause run" hidden>
+                <span class="hud-pause-icon" aria-hidden="true"></span>
+                <span class="hud-pause-label">PAUSE</span>
+            </button>
+        </div>
+
         <div class="mobile-controls">
             <div class="control-group">
                 <button id="btn-left" class="touch-btn" type="button" aria-label="Steer left"></button>
-                <div id="mobile-speedometer" class="mobile-speedometer" aria-live="off" aria-label="Current speed">
-                    <div class="speedometer-content">
-                        <div id="mobile-speed-bar" class="speedometer-bar"></div>
-                        <div class="speedometer-text">
-                            <span id="mobile-speed-val" class="mobile-speedometer-value">0</span>
-                            <span class="mobile-speedometer-label">KPH</span>
-                        </div>
-                    </div>
-                </div>
                 <button id="btn-right" class="touch-btn" type="button" aria-label="Steer right"></button>
             </div>
         </div>
-
-        <button id="pause-btn" class="hud-pause-btn" type="button" aria-label="Pause run" hidden>
-            <span class="hud-pause-icon" aria-hidden="true"></span>
-            <span class="hud-pause-label">PAUSE</span>
-        </button>
 
         <div id="modal" class="modal result-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
             <div class="modal-card">
@@ -238,13 +240,13 @@
                                 <span class="combined-action-btn-label">HOME</span>
                             </button>
                             <button id="combined-tune-btn" class="combined-action-btn" type="button"
-                                aria-label="Tune" aria-expanded="false" aria-controls="combined-tune-inline">
+                                aria-label="Garage" aria-expanded="false" aria-controls="garage-modal">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
                                     fill="currentColor" aria-hidden="true">
                                     <path
                                         d="M32 206.1L32 544C32 561.7 46.3 576 64 576C81.7 576 96 561.7 96 544L96 304C96 286.3 110.3 272 128 272L512 272C529.7 272 544 286.3 544 304L544 544C544 561.7 558.3 576 576 576C593.7 576 608 561.7 608 544L608 206.1C608 178.6 590.4 154.1 564.2 145.4L335.2 69.1C325.3 65.8 314.7 65.8 304.8 69.1L75.8 145.4C49.6 154.1 32 178.6 32 206.1zM496 320L144 320L144 384L496 384L496 320zM144 480L496 480L496 416L144 416L144 480zM496 512L144 512L144 576L496 576L496 512z" />
                                 </svg>
-                                <span class="combined-action-btn-label">TUNE</span>
+                                <span class="combined-action-btn-label">GARAGE</span>
                             </button>
                         </div>
                         <div class="combined-results-body">
@@ -282,16 +284,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div id="combined-tune-inline" class="combined-tune-inline" hidden aria-hidden="true"
-                            tabindex="-1" role="region" aria-label="Tune car">
-                            <div id="combined-tune-inline-mount" class="combined-tune-inline__mount"></div>
-                            <div class="combined-tune-inline__foot"></div>
-                            <button id="combined-tune-done-btn" class="combined-action-btn combined-tune-inline__done"
-                                type="button" hidden aria-hidden="true" tabindex="-1" aria-label="Back to results">
-                                <span class="combined-action-btn-label">BACK</span>
-                            </button>
                         </div>
 
                         <div class="combined-actions">

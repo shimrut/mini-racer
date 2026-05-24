@@ -10,6 +10,7 @@ import {
     getAuthorMedalSeconds,
     maxMedalTier
 } from '../medals/medals.js?v=2.04';
+import { formatSplitTimeDeltaSec } from '../race/lap-speed.js?v=1.91';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
@@ -25,6 +26,70 @@ export function bindMedalTargetsOverlayEscapeDismiss(onDismiss) {
     };
     document.addEventListener('keydown', onKeydown, true);
     return () => document.removeEventListener('keydown', onKeydown, true);
+}
+
+/**
+ * @param {HTMLElement} container
+ * @param {{ title: string, overlayClass?: string, buildRows: (listEl: HTMLElement) => void }} options
+ */
+export function mountCombinedPopoverOverlay(container, { title, overlayClass = '', buildRows }) {
+    const existing = container.querySelector('.combined-medal-times-overlay');
+    if (existing) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = `combined-medal-times-overlay${overlayClass ? ` ${overlayClass}` : ''}`;
+
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'combined-medal-times-modal';
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'combined-medal-times-header';
+
+    const titleEl = document.createElement('h3');
+    titleEl.className = 'combined-medal-times-title';
+    titleEl.textContent = title;
+    headerEl.appendChild(titleEl);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'combined-medal-times-close';
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 384 512" fill="currentColor">
+            <path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"/>
+        </svg>
+    `;
+    headerEl.appendChild(closeBtn);
+    modalContainer.appendChild(headerEl);
+
+    const listEl = document.createElement('div');
+    listEl.className = 'combined-medal-times-list';
+    buildRows(listEl);
+    modalContainer.appendChild(listEl);
+
+    overlay.appendChild(modalContainer);
+    container.appendChild(overlay);
+
+    let unbindEscape = () => {};
+    const dismiss = () => {
+        unbindEscape();
+        unbindEscape = () => {};
+        overlay.classList.remove('is-active');
+        overlay.addEventListener('transitionend', () => {
+            overlay.remove();
+        }, { once: true });
+    };
+
+    unbindEscape = bindMedalTargetsOverlayEscapeDismiss(dismiss);
+
+    overlay.onclick = (e) => {
+        if (e.target === overlay) dismiss();
+    };
+    closeBtn.onclick = () => dismiss();
+
+    requestAnimationFrame(() => {
+        overlay.classList.add('is-active');
+    });
 }
 
 export class ModalContentUi {
@@ -560,6 +625,9 @@ export class ModalContentUi {
         deltaToPersonalBest = undefined,
         previousTrackMedal = null,
         trackKey = null,
+        lapCheckpointTimes = null,
+        pbCheckpointTimes = null,
+        pbFinishSec = null,
         crashImpact = null,
         crashElapsedSec = null,
         crashCombined = false
@@ -605,117 +673,51 @@ export class ModalContentUi {
             // Set up click/tap interaction for medal times popover modal
             heroMedalEl.classList.add('combined-hero-medal--interactive');
             heroMedalEl.onclick = () => {
-                // Prevent duplicate overlays
-                const existing = container.querySelector('.combined-medal-times-overlay');
-                if (existing) return;
-
                 const thresholds = trackKey ? getTrackMedalThresholds(trackKey) : null;
                 const authorSec = trackKey ? getAuthorMedalSeconds(trackKey) : null;
 
-                // Determine the best medal unlocked between previous and current lap
                 const bestMedal = maxMedalTier(previousTrackMedal, lapMedal);
                 const tierRank = { bronze: 0, silver: 1, gold: 2, author: 3 };
                 const bestRank = bestMedal ? tierRank[bestMedal] : -1;
 
-                const overlay = document.createElement('div');
-                overlay.className = 'combined-medal-times-overlay';
+                mountCombinedPopoverOverlay(container, {
+                    title: 'MEDAL TARGETS',
+                    buildRows: (listEl) => {
+                        const addRow = (tier, seconds) => {
+                            if (seconds == null || !Number.isFinite(seconds)) return;
+                            const row = document.createElement('div');
+                            row.className = `combined-medal-times-row combined-medal-times-row--${tier}`;
 
-                const modalContainer = document.createElement('div');
-                modalContainer.className = 'combined-medal-times-modal';
+                            const isUnlocked = bestRank !== -1 && tierRank[tier] <= bestRank;
+                            if (isUnlocked) {
+                                row.classList.add('combined-medal-times-row--unlocked');
+                            }
 
-                // Header Container (Flexbox)
-                const headerEl = document.createElement('div');
-                headerEl.className = 'combined-medal-times-header';
+                            const iconSlot = document.createElement('div');
+                            iconSlot.className = 'combined-medal-times-icon-slot';
+                            iconSlot.appendChild(createMedalIconSvg(tier, { className: 'medal-svg--sm' }));
 
-                // Title
-                const titleEl = document.createElement('h3');
-                titleEl.className = 'combined-medal-times-title';
-                titleEl.textContent = 'MEDAL TARGETS';
-                headerEl.appendChild(titleEl);
+                            const label = document.createElement('span');
+                            label.className = 'combined-medal-times-label';
+                            label.textContent = formatMedalLabel(tier).toUpperCase();
 
-                // Close Button
-                const closeBtn = document.createElement('button');
-                closeBtn.className = 'combined-medal-times-close';
-                closeBtn.type = 'button';
-                closeBtn.setAttribute('aria-label', 'Close');
-                closeBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 384 512" fill="currentColor">
-                        <path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"/>
-                    </svg>
-                `;
-                headerEl.appendChild(closeBtn);
-                modalContainer.appendChild(headerEl);
+                            const timeVal = document.createElement('span');
+                            timeVal.className = 'combined-medal-times-time';
+                            timeVal.textContent = `${seconds.toFixed(2)}s`;
 
-                // List
-                const listEl = document.createElement('div');
-                listEl.className = 'combined-medal-times-list';
+                            row.appendChild(iconSlot);
+                            row.appendChild(label);
+                            row.appendChild(timeVal);
+                            listEl.appendChild(row);
+                        };
 
-                const addRow = (tier, seconds) => {
-                    if (seconds == null || !Number.isFinite(seconds)) return;
-                    const row = document.createElement('div');
-                    row.className = `combined-medal-times-row combined-medal-times-row--${tier}`;
-
-                    const isUnlocked = bestRank !== -1 && tierRank[tier] <= bestRank;
-                    if (isUnlocked) {
-                        row.classList.add('combined-medal-times-row--unlocked');
-                    }
-
-                    const iconSlot = document.createElement('div');
-                    iconSlot.className = 'combined-medal-times-icon-slot';
-                    iconSlot.appendChild(createMedalIconSvg(tier, { className: 'medal-svg--sm' }));
-
-                    const label = document.createElement('span');
-                    label.className = 'combined-medal-times-label';
-                    label.textContent = formatMedalLabel(tier).toUpperCase();
-
-                    const timeVal = document.createElement('span');
-                    timeVal.className = 'combined-medal-times-time';
-                    timeVal.textContent = `${seconds.toFixed(2)}s`;
-
-                    row.appendChild(iconSlot);
-                    row.appendChild(label);
-                    row.appendChild(timeVal);
-                    listEl.appendChild(row);
-                };
-
-                // Render rows in descending difficulty
-                if (authorSec != null) addRow('author', authorSec);
-                if (thresholds) {
-                    addRow('gold', thresholds.gold);
-                    addRow('silver', thresholds.silver);
-                    addRow('bronze', thresholds.bronze);
-                }
-
-                modalContainer.appendChild(listEl);
-                overlay.appendChild(modalContainer);
-                container.appendChild(overlay);
-
-                // Dismiss helpers
-                let unbindEscape = () => {};
-                const dismiss = () => {
-                    unbindEscape();
-                    unbindEscape = () => {};
-                    overlay.classList.remove('is-active');
-                    overlay.addEventListener('transitionend', () => {
-                        overlay.remove();
-                    }, { once: true });
-                };
-
-                unbindEscape = bindMedalTargetsOverlayEscapeDismiss(dismiss);
-
-                overlay.onclick = (e) => {
-                    if (e.target === overlay) {
-                        dismiss();
-                    }
-                };
-
-                closeBtn.onclick = () => {
-                    dismiss();
-                };
-
-                // Animate in
-                requestAnimationFrame(() => {
-                    overlay.classList.add('is-active');
+                        if (authorSec != null) addRow('author', authorSec);
+                        if (thresholds) {
+                            addRow('gold', thresholds.gold);
+                            addRow('silver', thresholds.silver);
+                            addRow('bronze', thresholds.bronze);
+                        }
+                    },
                 });
             };
         }
@@ -835,6 +837,100 @@ export class ModalContentUi {
                     ? `<span class="time-num">${time.toFixed(2)}</span><span class="time-unit">s</span>`
                     : '--';
                 timeEl.classList.remove('combined-stat-value--impact');
+
+                const checkpointTimes = Array.isArray(lapCheckpointTimes)
+                    ? lapCheckpointTimes
+                    : [];
+                const pbCheckpoints = Array.isArray(pbCheckpointTimes)
+                    ? pbCheckpointTimes
+                    : [];
+                const hasSplits =
+                    checkpointTimes.length > 0 || Number.isFinite(time);
+                if (hasSplits) {
+                    timeEl.classList.add('combined-stat-value--interactive');
+                    timeEl.setAttribute('role', 'button');
+                    timeEl.setAttribute('tabindex', '0');
+                    timeEl.setAttribute('aria-label', 'View checkpoint split times');
+
+                    const openSplitsPopover = () => {
+                        mountCombinedPopoverOverlay(container, {
+                            title: 'SPLIT TIMES',
+                            overlayClass: 'combined-lap-splits-overlay',
+                            buildRows: (listEl) => {
+                                const addSplitRow = (labelText, valueText, deltaSec) => {
+                                    const row = document.createElement('div');
+                                    row.className = 'combined-medal-times-row combined-medal-times-row--split';
+
+                                    const label = document.createElement('span');
+                                    label.className = 'combined-medal-times-label';
+                                    label.textContent = labelText;
+
+                                    const valueEl = document.createElement('span');
+                                    valueEl.className = 'combined-medal-times-time';
+                                    valueEl.textContent = valueText;
+
+                                    const deltaEl = document.createElement('span');
+                                    deltaEl.className = 'combined-lap-speed-delta';
+                                    const deltaDisplay = formatSplitTimeDeltaSec(deltaSec);
+                                    if (deltaDisplay) {
+                                        deltaEl.textContent = deltaDisplay.text;
+                                        if (deltaDisplay.isGain) deltaEl.classList.add('is-gain');
+                                        if (deltaDisplay.isLoss) deltaEl.classList.add('is-loss');
+                                    } else {
+                                        deltaEl.textContent = '—';
+                                        deltaEl.classList.add('combined-lap-speed-delta--empty');
+                                    }
+
+                                    row.appendChild(label);
+                                    row.appendChild(valueEl);
+                                    row.appendChild(deltaEl);
+                                    listEl.appendChild(row);
+                                };
+
+                                checkpointTimes.forEach((splitSec, index) => {
+                                    const pbSec = pbCheckpoints[index];
+                                    const deltaSec =
+                                        Number.isFinite(splitSec) && Number.isFinite(pbSec)
+                                            ? splitSec - pbSec
+                                            : null;
+                                    addSplitRow(
+                                        `CP ${index + 1}`,
+                                        Number.isFinite(splitSec)
+                                            ? `${splitSec.toFixed(2)}s`
+                                            : '--',
+                                        deltaSec,
+                                    );
+                                });
+
+                                if (Number.isFinite(time)) {
+                                    const deltaFinish =
+                                        Number.isFinite(pbFinishSec)
+                                            ? time - pbFinishSec
+                                            : null;
+                                    addSplitRow(
+                                        'FINISH',
+                                        `${time.toFixed(2)}s`,
+                                        deltaFinish,
+                                    );
+                                }
+                            },
+                        });
+                    };
+
+                    timeEl.onclick = openSplitsPopover;
+                    timeEl.onkeydown = (event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        openSplitsPopover();
+                    };
+                } else {
+                    timeEl.classList.remove('combined-stat-value--interactive');
+                    timeEl.removeAttribute('role');
+                    timeEl.removeAttribute('tabindex');
+                    timeEl.removeAttribute('aria-label');
+                    timeEl.onclick = null;
+                    timeEl.onkeydown = null;
+                }
             }
             if (bestLapEl) {
                 this._applyCombinedWinPbDelta(

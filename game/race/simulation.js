@@ -18,7 +18,8 @@ const _events = {
     challengeFailed: false,
     challengeFailureReason: null,
     crashImpact: null,
-    crashEndedRun: false
+    crashEndedRun: false,
+    checkpointPassed: null
 };
 
 function resetEvents() {
@@ -33,6 +34,7 @@ function resetEvents() {
     _events.challengeFailureReason = null;
     _events.crashImpact = null;
     _events.crashEndedRun = false;
+    _events.checkpointPassed = null;
 }
 
 function createSparkParticles(pos, count, sparkColor) {
@@ -293,7 +295,15 @@ export function updateSimulation(
             if (state.nextCheckpointIndex < checkpoints.length) {
                 const cp = checkpoints[state.nextCheckpointIndex];
                 if (segmentsIntersect(state.pos, _nextPos, cp.p1, cp.p2)) {
+                    if (!Array.isArray(state.lapCheckpointTimesSec)) {
+                        state.lapCheckpointTimesSec = [];
+                    }
+                    state.lapCheckpointTimesSec.push(state.currentTime);
                     state.nextCheckpointIndex++;
+                    _events.checkpointPassed = {
+                        index: state.lapCheckpointTimesSec.length - 1,
+                        splitTimeSec: state.currentTime
+                    };
                 }
             }
 

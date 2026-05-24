@@ -49,6 +49,7 @@ export const dailyChallengeEngineMethods = {
     await this.loadTrack(targetTrackKey, {
       trackPageview: false,
       countMapSelection: false,
+      loadPlayerProgress: false,
     });
   },
 
@@ -127,13 +128,45 @@ export const dailyChallengeEngineMethods = {
     });
   },
 
-  async loadDailyChallenge() {
+  setDailyChallengeLobbySummary(challenge) {
+    if (!challenge) {
+      this.dailyChallengeUi.setDailyChallengeSummary(null);
+      return;
+    }
+
+    const localData = getDailyChallengeData(challenge.id);
+    this.dailyChallengeBestResult = localData ? { ...localData } : null;
+    this.bestLapTime = Number.isFinite(localData?.bestTime)
+      ? localData.bestTime
+      : null;
+    const objectiveLabel = getDailyChallengeObjectiveLabel(challenge);
+
+    this.dailyChallengeUi.setDailyChallengeSummary({
+      available: true,
+      challengeId: challenge.id,
+      title: getDailyChallengeTrackName(challenge),
+      trackKey: challenge.trackKey,
+      skin: challenge.skin,
+      trackName: getDailyChallengeTrackName(challenge),
+      objectiveLabel,
+      modifierBadges: getDailyChallengeModifierBadges(challenge),
+      modifierLabel: getDailyChallengeModifierLabel(challenge),
+      bestTime: this.bestLapTime,
+      bestLabel: formatDailyChallengeResultLabel(challenge, localData),
+      rankLabel: "--",
+      scoreboardSnapshot: null,
+      objectiveType: challenge.objectiveType,
+      endsAt: challenge.endsAt,
+    });
+  },
+
+  async loadDailyChallengeCritical() {
     try {
       this.setLoadingStatus(40, "Checking Challenge...");
       const challenge = await getActiveDailyChallenge();
       this.activeDailyChallenge = challenge || null;
+      this.setDailyChallengeLobbySummary(challenge);
       await this.syncReadyBackgroundTrack(challenge);
-      await this.refreshDailyChallengeSummary();
       return challenge;
     } catch (error) {
       console.error("Error loading daily challenge:", error);
@@ -306,10 +339,15 @@ export const dailyChallengeEngineMethods = {
       }
 
       if (!this.playerTypeSent && !playerTypeAlreadySent) {
-        const { isReturningPlayer } = await this.playerHistoryPromise;
         this.playerTypeSent = true;
         this.sessionFlags.set("playerTypeSent", "1");
-        this.analytics.trackPlayerType(isReturningPlayer);
+        this.playerHistoryPromise
+          .then(({ isReturningPlayer }) => {
+            this.analytics.trackPlayerType(isReturningPlayer);
+          })
+          .catch(() => {
+            this.analytics.trackPlayerType(false);
+          });
       }
 
       this.applyDailyChallenge(challenge);
@@ -490,6 +528,16 @@ export const dailyChallengeEngineMethods = {
     });
     this.hud.setHudPersonalBestsOpenAllowed(false);
 
+    const lapCheckpointTimes = this.getLapCheckpointTimesSec?.() ?? [];
+    const priorPbCheckpointTimes =
+      trackKey && this.sessionBestCheckpointTimesByTrackKey
+        ? this.sessionBestCheckpointTimesByTrackKey[trackKey] ?? null
+        : null;
+    const priorPbFinishSec =
+      trackKey && this.sessionBestLapSecByTrackKey
+        ? this.sessionBestLapSecByTrackKey[trackKey] ?? null
+        : null;
+
     const existingScoreboardSnapshot =
       this.dailyChallengeUi.getDailyChallengeScoreboardSnapshot();
     this.modal.showModal(
@@ -527,6 +575,9 @@ export const dailyChallengeEngineMethods = {
         previousTrackMedal,
         previousPersonalBestSec,
         trackKey: challenge.trackKey,
+        lapCheckpointTimes,
+        pbCheckpointTimes: priorPbCheckpointTimes,
+        pbFinishSec: priorPbFinishSec,
       },
       {
         ...createModalActions({
@@ -554,6 +605,10 @@ export const dailyChallengeEngineMethods = {
       const curSession = this.sessionBestLapSecByTrackKey[trackKey];
       if (!Number.isFinite(curSession) || finalTime < curSession) {
         this.sessionBestLapSecByTrackKey[trackKey] = finalTime;
+        if (!this.sessionBestCheckpointTimesByTrackKey) {
+          this.sessionBestCheckpointTimesByTrackKey = Object.create(null);
+        }
+        this.sessionBestCheckpointTimesByTrackKey[trackKey] = lapCheckpointTimes.slice();
       }
     }
 

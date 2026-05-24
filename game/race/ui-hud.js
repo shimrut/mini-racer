@@ -21,6 +21,8 @@ export class RaceHud {
         this._lapFlashTimer = null;
         this._hudAnchorResizeObserver = null;
         this._maxSpeed = 240;
+        this._speedTicks = [];
+        this._mobileSpeedTicks = [];
 
         this.anchorHudBar();
         this.initSpeedBars();
@@ -94,18 +96,21 @@ export class RaceHud {
 
     initSpeedBars() {
         const createBar = (container) => {
-            if (!container) return;
+            if (!container || typeof document.createElement !== 'function') return [];
             container.innerHTML = '';
+            const ticks = [];
             // Create a single continuous sequence of ticks
             for (let t = 0; t < 20; t++) {
                 const tick = document.createElement('div');
                 tick.className = 'speedometer-tick';
                 container.appendChild(tick);
+                ticks.push(tick);
             }
+            return ticks;
         };
 
-        createBar(this.speedBar);
-        createBar(this.mobileSpeedBar);
+        this._speedTicks = createBar(this.speedBar);
+        this._mobileSpeedTicks = createBar(this.mobileSpeedBar);
     }
 
 
@@ -148,16 +153,14 @@ export class RaceHud {
         const maxSpeed = this._maxSpeed || 240; 
         const activeTicks = Math.min(totalTicks, Math.ceil((speedKph / maxSpeed) * totalTicks));
 
-        const updateBar = (container) => {
-            if (!container) return;
-            const ticks = container.querySelectorAll('.speedometer-tick');
+        const updateBar = (ticks) => {
             ticks.forEach((tick, i) => {
                 tick.classList.toggle('active', i < activeTicks);
             });
         };
 
-        updateBar(this.speedBar);
-        updateBar(this.mobileSpeedBar);
+        updateBar(this._speedTicks);
+        updateBar(this._mobileSpeedTicks);
     }
 
     setMaxSpeed(speedKph) {
@@ -291,45 +294,63 @@ export class RaceHud {
     if (this.goMessage) this.goMessage.classList.add('visible');
 }
 
+    _showTimingFlash({ label, timeSec, deltaVsBest, isNewBest = false, evenDeltaText = 'Even lap' }) {
+        if (!this.lapFlash || !this.lapFlashLabel || !this.lapFlashTime || !this.lapFlashDelta) return;
+
+        if (this._lapFlashTimer !== null) {
+            clearTimeout(this._lapFlashTimer);
+            this._lapFlashTimer = null;
+        }
+
+        this.lapFlashLabel.textContent = label;
+        this.lapFlashTime.textContent = `${timeSec.toFixed(2)}s`;
+
+        if (isNewBest) {
+            this.lapFlashDelta.hidden = false;
+            this.lapFlashDelta.textContent = 'New PB';
+            this.lapFlashDelta.classList.add('is-gain');
+            this.lapFlashDelta.classList.remove('is-loss');
+        } else if (deltaVsBest === null || deltaVsBest === undefined) {
+            this.lapFlashDelta.textContent = '';
+            this.lapFlashDelta.hidden = true;
+            this.lapFlashDelta.classList.remove('is-gain', 'is-loss');
+        } else if (deltaVsBest < -0.005) {
+            this.lapFlashDelta.hidden = false;
+            this.lapFlashDelta.textContent = `${deltaVsBest.toFixed(2)}s`;
+            this.lapFlashDelta.classList.add('is-gain');
+            this.lapFlashDelta.classList.remove('is-loss');
+        } else if (deltaVsBest > 0.005) {
+            this.lapFlashDelta.hidden = false;
+            this.lapFlashDelta.textContent = `+${deltaVsBest.toFixed(2)}s`;
+            this.lapFlashDelta.classList.add('is-loss');
+            this.lapFlashDelta.classList.remove('is-gain');
+        } else {
+            this.lapFlashDelta.hidden = false;
+            this.lapFlashDelta.textContent = evenDeltaText;
+            this.lapFlashDelta.classList.remove('is-gain', 'is-loss');
+        }
+
+        this.lapFlash.classList.add('visible');
+        this._lapFlashTimer = setTimeout(() => this.hideLapFlash(), 1400);
+    }
+
     showLapFlash({ lapNumber, lapTime, deltaVsBest, isBest, isNewBest = false }) {
-    if (!this.lapFlash || !this.lapFlashLabel || !this.lapFlashTime || !this.lapFlashDelta) return;
-
-    if (this._lapFlashTimer !== null) {
-        clearTimeout(this._lapFlashTimer);
-        this._lapFlashTimer = null;
+        this._showTimingFlash({
+            label: isBest ? `Lap ${lapNumber} Best` : `Lap ${lapNumber}`,
+            timeSec: lapTime,
+            deltaVsBest,
+            isNewBest
+        });
     }
 
-    this.lapFlashLabel.textContent = isBest ? `Lap ${lapNumber} Best` : `Lap ${lapNumber}`;
-    this.lapFlashTime.textContent = `${lapTime.toFixed(2)}s`;
-
-    if (isNewBest) {
-        this.lapFlashDelta.hidden = false;
-        this.lapFlashDelta.textContent = 'New PB';
-        this.lapFlashDelta.classList.add('is-gain');
-        this.lapFlashDelta.classList.remove('is-loss');
-    } else if (deltaVsBest === null || deltaVsBest === undefined) {
-        this.lapFlashDelta.textContent = '';
-        this.lapFlashDelta.hidden = true;
-        this.lapFlashDelta.classList.remove('is-gain', 'is-loss');
-    } else if (deltaVsBest < -0.005) {
-        this.lapFlashDelta.hidden = false;
-        this.lapFlashDelta.textContent = `${deltaVsBest.toFixed(2)}s`;
-        this.lapFlashDelta.classList.add('is-gain');
-        this.lapFlashDelta.classList.remove('is-loss');
-    } else if (deltaVsBest > 0.005) {
-        this.lapFlashDelta.hidden = false;
-        this.lapFlashDelta.textContent = `+${deltaVsBest.toFixed(2)}s`;
-        this.lapFlashDelta.classList.add('is-loss');
-        this.lapFlashDelta.classList.remove('is-gain');
-    } else {
-        this.lapFlashDelta.hidden = false;
-        this.lapFlashDelta.textContent = 'Even lap';
-        this.lapFlashDelta.classList.remove('is-gain', 'is-loss');
+    showCheckpointFlash({ checkpointNumber, splitTimeSec, deltaVsBest }) {
+        this._showTimingFlash({
+            label: `CP ${checkpointNumber}`,
+            timeSec: splitTimeSec,
+            deltaVsBest,
+            evenDeltaText: 'Even split'
+        });
     }
-
-    this.lapFlash.classList.add('visible');
-    this._lapFlashTimer = setTimeout(() => this.hideLapFlash(), 1400);
-}
 
     hideLapFlash() {
     if (this._lapFlashTimer !== null) {

@@ -50,6 +50,7 @@ export class SkillPointsUi {
     get rows() { return document.getElementById('skill-points-rows'); }
     get remaining() { return document.getElementById('skill-points-remaining'); }
     get garageButton() { return document.getElementById('menu-btn-garage'); }
+    get garageToggleButtons() { return document.querySelectorAll('[aria-controls="garage-modal"]'); }
     get closeButton() { return document.getElementById('skill-points-close-btn'); }
     get resetButton() { return document.getElementById('skill-points-reset-btn'); }
     get tabTuning() { return document.getElementById('garage-tab-tuning'); }
@@ -101,12 +102,20 @@ export class SkillPointsUi {
         if (!panel || !garageModal) return;
         panel.hidden = !isVisible;
         garageModal.classList.toggle('active', Boolean(isVisible));
-        this.garageButton?.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
+        this.garageToggleButtons.forEach((button) => {
+            button.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
+            if (button.classList.contains('combined-action-btn')) {
+                button.classList.toggle('combined-action-btn--active', Boolean(isVisible));
+            }
+        });
         if (isVisible) {
             this.setGarageTab(this.activeGarageTab, { focusTab: false });
             requestAnimationFrame(() => this.modal?.activateModalFocusTrap?.(garageModal));
         } else {
             this.modal?.releaseModalFocusTrap?.(garageModal);
+            if (this.modal?.isModalActive?.()) {
+                requestAnimationFrame(() => this.modal?.activateModalFocusTrap?.(this.modal.modal));
+            }
         }
     }
 
@@ -358,8 +367,7 @@ export class SkillPointsUi {
 
         if (this.remaining) {
             const left = Math.max(0, SKILL_POINT_TOTAL - used);
-            const inlineTune = Boolean(this.remaining.closest('#combined-tune-inline'));
-            this.remaining.textContent = inlineTune ? String(left) : `Points left: ${left}`;
+            this.remaining.textContent = `Points left: ${left}`;
             this.remaining.setAttribute('aria-label', `${left} skill points remaining`);
         }
 

@@ -95,6 +95,8 @@ export class RealTimeRacer {
     this.hasTrackMedalBeforeLastLapWrite = false;
     /** Per-track fastest lap this page session (survives challenge retries). */
     this.sessionBestLapSecByTrackKey = Object.create(null);
+    /** Per-track checkpoint split times (sec) for the session PB lap. */
+    this.sessionBestCheckpointTimesByTrackKey = Object.create(null);
     this.dailyChallengeBestResult = null;
     this.verificationQueueTimer = null;
     this.isProcessingVerificationQueue = false;
@@ -175,6 +177,7 @@ export class RealTimeRacer {
     this.currentTrackMapSelectionPending = false;
     this.activeRunId = 0;
     this.scoreboardReplay = new ReplayRecorder();
+    this.lapCheckpointTimesSec = [];
 
     this.dailyGpRaceStats = { start: 0, crash: 0, win: 0 };
     this.playerTypeSent = false;
@@ -325,17 +328,13 @@ export class RealTimeRacer {
           isReturningPlayer: false,
         };
       });
-    this.dailyChallengePromise = this.loadDailyChallenge();
+    this.dailyChallengePromise = this.loadDailyChallengeCritical();
     Promise.allSettled([
-      this.playerHistoryPromise,
       this.dailyChallengePromise,
       this.carAssetPromise,
       this.trackReadyPromise,
-      this.fontsReadyPromise,
     ]).finally(async () => {
       this.loadingScreen.update(95, "Displaying Lobby...");
-      this.dailyChallengeUi.refreshDailyChallengeVerificationState();
-      this.scheduleVerificationQueueProcessing(0);
 
       this.startOverlay.showStartOverlay(
         this.hasAnyData,
@@ -344,6 +343,7 @@ export class RealTimeRacer {
       this.startOverlay.setReady(true);
 
       await this.loadingScreen.dismiss();
+      this.loadSecondaryStartupData();
     });
 
     new ResizeObserver(() => this.scheduleResizeCommit()).observe(
@@ -513,6 +513,18 @@ export class RealTimeRacer {
 
   setLoadingStatus(progress, status) {
     this.loadingScreen?.update(progress, status);
+  }
+
+  loadSecondaryStartupData() {
+    this.dailyChallengeSummaryPromise = this.refreshDailyChallengeSummary()
+      .catch((error) => {
+        console.error("Error loading daily challenge summary:", error);
+        return null;
+      })
+      .finally(() => {
+        this.dailyChallengeUi.refreshDailyChallengeVerificationState();
+      });
+    this.scheduleVerificationQueueProcessing(0);
   }
 }
 

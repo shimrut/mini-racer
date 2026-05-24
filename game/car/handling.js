@@ -4,12 +4,12 @@ export const KPH_PER_WORLD_UNIT = 20;
 export const DEFAULT_PHYSICS_TUNING = Object.freeze({
     accel: 400,
     brakePower: 118,
-    maxSpeed: 340,
-    turnRate: 4.2,
-    grip: 3.5,
-    steerGripScale: 0.88,
-    downforceGrip: 0.62,
-    highSpeedSteerTrim: 0.38,
+    maxSpeed: 310,
+    turnRate: 4.3,
+    grip: 4.3,
+    steerGripScale: 0.97,
+    downforceGrip: 0.72,
+    highSpeedSteerTrim: 0.32,
     angularResponse: 22
 });
 

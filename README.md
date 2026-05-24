@@ -9,7 +9,7 @@ Scoreboards and daily challenges talk to a host app through `/api` (see `game/sc
 1. `npm install`
 2. `npm run generate:car-assets` (also runs automatically before tests)
 3. Serve the project root with any static file server, then open `game.html`
-4. For offline daily challenge testing: add `?mockDaily=true` to the URL (optional `?mockTrack=<trackKey>`)
+4. For offline daily challenge testing: add `?mockDaily=true` for a random track, or `?mockDaily=<trackKey>` (e.g. `twistedCanyon`) for a specific track
 
 ## Project layout
 

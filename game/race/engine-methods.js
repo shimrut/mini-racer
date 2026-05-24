@@ -41,6 +41,7 @@ export const raceEngineMethods = {
     this.runHistory.clear();
     this.runHistoryTimer = 0;
     this.trailTimer = 0;
+    this.lapCheckpointTimesSec = [];
     this.recordRunPoint(getCarRearAxleWorldPoint(this.pos, this.angle, this.runtimeConfig));
   },
 
@@ -93,6 +94,7 @@ export const raceEngineMethods = {
           this.status = "playing";
           this.activeRunId += 1;
           this.currentTime = 0;
+          this.lapCheckpointTimesSec = [];
           this.lastTime = time;
           this.resetFrameTimingHistory();
           this.frameSkip = 0;
@@ -166,10 +168,40 @@ export const raceEngineMethods = {
     this.cachedSpeed = 0;
     this.angularVelocity = 0;
     this.currentTime = currentTime;
+    this.lapCheckpointTimesSec = [];
     this.armRelaunchDelay(relaunchDelay);
     this.nextCheckpointIndex = 0;
     this.skidMarks.clear();
     this._resetLapTrailAfterIntermediateLap();
+  },
+
+  getLapCheckpointTimesSec() {
+    return Array.isArray(this.lapCheckpointTimesSec)
+      ? this.lapCheckpointTimesSec.slice()
+      : [];
+  },
+
+  handleCheckpointPassed({ index, splitTimeSec }) {
+    if (!Number.isFinite(splitTimeSec) || index < 0) return;
+
+    const trackKey =
+      typeof this.activeDailyChallenge?.trackKey === "string"
+        ? this.activeDailyChallenge.trackKey
+        : this.currentTrackKey;
+    const pbTimes =
+      trackKey && this.sessionBestCheckpointTimesByTrackKey
+        ? this.sessionBestCheckpointTimesByTrackKey[trackKey]
+        : null;
+    const pbSec = Array.isArray(pbTimes) ? pbTimes[index] : undefined;
+    const deltaVsBest = Number.isFinite(pbSec)
+      ? splitTimeSec - pbSec
+      : undefined;
+
+    this.hud.showCheckpointFlash({
+      checkpointNumber: index + 1,
+      splitTimeSec,
+      deltaVsBest,
+    });
   },
 
   getSelectedCarAssetName() {
@@ -399,11 +431,15 @@ export const raceEngineMethods = {
       this.carEffectsAudio?.scheduleCrash?.(events.crashImpact);
     }
 
-    if (events.challengeLapCompleted) {
-      this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime);
+    if (events.checkpointPassed) {
+      this.handleCheckpointPassed(events.checkpointPassed);
     }
+
     if (events.winTriggered) {
       this.handleDailyChallengeWin(events.winData);
+    }
+    if (events.challengeLapCompleted) {
+      this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime);
     }
     if (events.challengeCrashReset) {
       this.restartDailyChallengeAfterCrash();
@@ -469,6 +505,7 @@ export const raceEngineMethods = {
     this.prevAngle = this.currentTrack.startAngle;
     this.cachedSpeed = 0;
     this.angularVelocity = 0;
+    this.lapCheckpointTimesSec = [];
     this.clearSteeringInput();
     this.relaunchDelayRemaining = 0;
     this.status = "ready";
@@ -764,12 +801,18 @@ export const raceEngineMethods = {
 
     if (shouldUpdate) {
       this.accumulator += rawDt;
-      while (this.accumulator >= this.FIXED_DT) {
+      let stepCount = 0;
+      const maxStepsPerFrame = 3;
+      while (this.accumulator >= this.FIXED_DT && stepCount < maxStepsPerFrame) {
         this.prevPos.x = this.pos.x;
         this.prevPos.y = this.pos.y;
         this.prevAngle = this.angle;
         this.update(this.FIXED_DT);
         this.accumulator -= this.FIXED_DT;
+        stepCount++;
+      }
+      if (this.accumulator >= this.FIXED_DT) {
+        this.accumulator = 0;
       }
     }
 

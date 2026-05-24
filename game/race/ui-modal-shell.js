@@ -26,6 +26,12 @@ function isButtonElement(node) {
     return typeof HTMLButtonElement !== 'undefined' && node instanceof HTMLButtonElement;
 }
 
+function scheduleAfterModalPaint(callback) {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(callback);
+    });
+}
+
 export class ModalShell {
     constructor({
         content,
@@ -54,118 +60,36 @@ export class ModalShell {
         this._focusBeforeModal = null;
         this._activeTrapModal = null;
         this._modalTrapKeydown = null;
-        this._combinedInlineTuneMarker = null;
-        /** Inline tune: points + reset in footer; restored in hideCombinedInlineTune */
-        this._inlineTuneChromeApplied = false;
-        this._inlineTuneCloseTimer = null;
-        this._inlineTuneHideTransitionHandler = null;
-        this._ignoreTuneCloseUntil = 0;
-        this._tuneOpenedAt = 0;
     }
 
-    _usesTouchTapForTune() {
-        return typeof window !== 'undefined' && navigator.maxTouchPoints > 0;
-    }
-
-    _cancelInlineTuneHideAnimation() {
-        this._clearInlineTuneCloseTimer();
-        const inline = this.combinedTuneInline;
-        if (inline && this._inlineTuneHideTransitionHandler) {
-            inline.removeEventListener('transitionend', this._inlineTuneHideTransitionHandler);
-            this._inlineTuneHideTransitionHandler = null;
-        }
-    }
-
-    _syncTuneButtonToPanelState() {
+    _syncGarageButtonToPanelState() {
         const btn = this.combinedTuneBtn;
         if (!btn) return;
-        const viewOpen = this.isCombinedInlineTuneOpen();
-        btn.classList.remove('combined-action-btn--active');
-        btn.setAttribute('aria-expanded', viewOpen ? 'true' : 'false');
-        if (!viewOpen) btn.blur();
+        const garageOpen = Boolean(this.getSkillPointsUi?.()?.isGarageOpen?.());
+        btn.classList.toggle('combined-action-btn--active', garageOpen);
+        btn.setAttribute('aria-expanded', garageOpen ? 'true' : 'false');
     }
 
-    isCombinedInlineTuneOpen() {
-        return Boolean(this.modalCombinedView?.classList.contains('modal-combined-view--inline-tune'));
+    _openGarageModal() {
+        const skillPointsUi = this.getSkillPointsUi?.();
+        skillPointsUi?.setPanelVisible?.(true);
+        this._syncGarageButtonToPanelState();
     }
 
-    _setCombinedTuneExpanded(expanded) {
-        const btn = this.combinedTuneBtn;
-        if (!btn) return;
-        btn.classList.remove('combined-action-btn--active');
-        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        if (!expanded) {
-            btn.blur();
-        }
-    }
-
-    _restoreInlineTuneChromeIfNeeded() {
-        if (!this._inlineTuneChromeApplied) return;
-        const inline = this.combinedTuneInline;
-        const foot = inline?.querySelector('.combined-tune-inline__foot');
-        const panel = document.getElementById('garage-panel-tuning');
-        const toolbar = panel?.querySelector('.skill-points-panel__toolbar');
-        const remaining = document.getElementById('skill-points-remaining');
-        const resetBtn = document.getElementById('skill-points-reset-btn');
-        if (!foot || !toolbar || !remaining) {
-            this._inlineTuneChromeApplied = false;
-            return;
-        }
-        if (foot.contains(remaining)) remaining.remove();
-        if (resetBtn && foot.contains(resetBtn)) resetBtn.remove();
-        toolbar.appendChild(remaining);
-        if (resetBtn) toolbar.appendChild(resetBtn);
-        this.getSkillPointsUi?.()?.render?.();
-        this._inlineTuneChromeApplied = false;
-    }
-
-    _applyInlineTuneChrome() {
-        const inline = this.combinedTuneInline;
-        const foot = inline?.querySelector('.combined-tune-inline__foot');
-        const panel = document.getElementById('garage-panel-tuning');
-        const toolbar = panel?.querySelector('.skill-points-panel__toolbar');
-        const remaining = document.getElementById('skill-points-remaining');
-        const resetBtn = document.getElementById('skill-points-reset-btn');
-        if (!foot || !toolbar || !remaining) return;
-        if (this._inlineTuneChromeApplied) return;
-        remaining.remove();
-        resetBtn?.remove();
-        foot.appendChild(remaining);
-        if (resetBtn) foot.appendChild(resetBtn);
-        this.getSkillPointsUi?.()?.render?.();
-        this._inlineTuneChromeApplied = true;
-    }
-
-    toggleCombinedInlineTune() {
-        if (this.isCombinedInlineTuneOpen()) {
-            this.hideCombinedInlineTune();
-        } else {
-            this.showCombinedInlineTune();
-        }
-    }
-
-    _bindCombinedTuneBtn(btn) {
+    _bindCombinedGarageBtn(btn) {
         if (!btn) return;
         const newBtn = btn.cloneNode(true);
         btn.replaceWith(newBtn);
-        let tuneTapLocked = false;
-        const onTuneActivate = (event) => {
-            if (tuneTapLocked) return;
-            tuneTapLocked = true;
+        let tapLocked = false;
+        const onGarageActivate = (event) => {
+            if (tapLocked) return;
+            tapLocked = true;
             setTimeout(() => {
-                tuneTapLocked = false;
+                tapLocked = false;
             }, 500);
             event?.preventDefault?.();
             event?.stopPropagation?.();
-
-            const now = Date.now();
-            if (!this.isCombinedInlineTuneOpen()) {
-                this.showCombinedInlineTune();
-            } else if (now < this._ignoreTuneCloseUntil) {
-                return;
-            } else {
-                this.hideCombinedInlineTune();
-            }
+            this._openGarageModal();
         };
         if (typeof window !== 'undefined' && window.PointerEvent) {
             let activePointerId = null;
@@ -177,7 +101,7 @@ export class ModalShell {
                 if (event.pointerType === 'mouse' && event.button !== 0) return;
                 if (event.pointerId !== activePointerId) return;
                 activePointerId = null;
-                onTuneActivate(event);
+                onGarageActivate(event);
             });
             newBtn.addEventListener('pointercancel', () => {
                 activePointerId = null;
@@ -188,136 +112,15 @@ export class ModalShell {
             }, true);
             return;
         }
-        if (this._usesTouchTapForTune()) {
-            newBtn.addEventListener('touchend', onTuneActivate, { passive: false });
+        if (typeof window !== 'undefined' && navigator.maxTouchPoints > 0) {
+            newBtn.addEventListener('touchend', onGarageActivate, { passive: false });
             newBtn.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
             }, true);
             return;
         }
-        newBtn.addEventListener('click', onTuneActivate);
-    }
-
-    _clearInlineTuneCloseTimer() {
-        if (this._inlineTuneCloseTimer) {
-            clearTimeout(this._inlineTuneCloseTimer);
-            this._inlineTuneCloseTimer = null;
-        }
-    }
-
-    _finishHideCombinedInlineTune() {
-        if (this.isCombinedInlineTuneOpen()) {
-            return;
-        }
-        this._cancelInlineTuneHideAnimation();
-        const panel = document.getElementById('garage-panel-tuning');
-        const mount = this.combinedTuneInlineMount;
-        const marker = this._combinedInlineTuneMarker;
-        this._restoreInlineTuneChromeIfNeeded();
-        if (panel && mount?.contains(panel) && marker?.parentNode) {
-            marker.parentNode.insertBefore(panel, marker);
-            marker.remove();
-        } else if (panel && mount?.contains(panel)) {
-            const skin = document.getElementById('garage-panel-skin');
-            const section = document.getElementById('skill-points-panel');
-            if (skin?.parentNode) {
-                skin.parentNode.insertBefore(panel, skin);
-            } else if (section) {
-                section.appendChild(panel);
-            }
-        }
-        this._combinedInlineTuneMarker = null;
-        const inline = this.combinedTuneInline;
-        if (inline) {
-            inline.hidden = true;
-            inline.setAttribute('aria-hidden', 'true');
-        }
-        this._syncTuneButtonToPanelState();
-    }
-
-    hideCombinedInlineTune() {
-        const panel = document.getElementById('garage-panel-tuning');
-        const mount = this.combinedTuneInlineMount;
-        const isOpen = this.isCombinedInlineTuneOpen();
-        if (!isOpen) {
-            this._setCombinedTuneExpanded(false);
-            if (this._combinedInlineTuneMarker || (panel && mount?.contains(panel))) {
-                this._finishHideCombinedInlineTune();
-            } else {
-                const inline = this.combinedTuneInline;
-                if (inline) {
-                    inline.hidden = true;
-                    inline.setAttribute('aria-hidden', 'true');
-                }
-            }
-            return;
-        }
-
-        this._cancelInlineTuneHideAnimation();
-        this.modalCombinedView?.classList.remove('modal-combined-view--inline-tune');
-        this._setCombinedTuneExpanded(false);
-
-        const inline = this.combinedTuneInline;
-        const prefersReducedMotion = typeof window !== 'undefined'
-            && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-
-        if (!inline || prefersReducedMotion) {
-            this._finishHideCombinedInlineTune();
-            return;
-        }
-
-        const finish = () => {
-            if (this._inlineTuneHideTransitionHandler) {
-                inline.removeEventListener('transitionend', this._inlineTuneHideTransitionHandler);
-                this._inlineTuneHideTransitionHandler = null;
-            }
-            this._clearInlineTuneCloseTimer();
-            this._finishHideCombinedInlineTune();
-        };
-
-        const onTransitionEnd = (event) => {
-            if (event.target !== inline || event.propertyName !== 'max-height') return;
-            finish();
-        };
-
-        this._inlineTuneHideTransitionHandler = onTransitionEnd;
-        inline.addEventListener('transitionend', onTransitionEnd);
-        this._inlineTuneCloseTimer = setTimeout(finish, 360);
-    }
-
-    showCombinedInlineTune() {
-        const panel = document.getElementById('garage-panel-tuning');
-        const mount = this.combinedTuneInlineMount;
-        const inline = this.combinedTuneInline;
-        if (!panel || !mount || !inline || !this.modalCombinedView) return;
-        if (this.isCombinedInlineTuneOpen()) return;
-
-        this._cancelInlineTuneHideAnimation();
-
-        if (!mount.contains(panel)) {
-            const parent = panel.parentNode;
-            if (!parent) return;
-            const marker = document.createComment('garage-panel-tuning-anchor');
-            parent.insertBefore(marker, panel);
-            this._combinedInlineTuneMarker = marker;
-            mount.appendChild(panel);
-        }
-        this.getSkillPointsUi?.()?.setGarageTab?.('tuning', { focusTab: false });
-        this._applyInlineTuneChrome();
-        inline.hidden = false;
-        inline.setAttribute('aria-hidden', 'false');
-        this._tuneOpenedAt = Date.now();
-        this._ignoreTuneCloseUntil = this._tuneOpenedAt + 600;
-        this.modalCombinedView.classList.add('modal-combined-view--inline-tune');
-        this._setCombinedTuneExpanded(true);
-
-        requestAnimationFrame(() => {
-            void inline.offsetHeight;
-            requestAnimationFrame(() => {
-                this.activateModalFocusTrap(this.modal);
-            });
-        });
+        newBtn.addEventListener('click', onGarageActivate);
     }
 
     _hidePauseTrackPreview() {
@@ -494,9 +297,6 @@ export class ModalShell {
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
     get combinedTuneBtn() { return document.getElementById('combined-tune-btn'); }
     get combinedRestartBtn() { return document.getElementById('combined-restart-btn'); }
-    get combinedTuneInline() { return document.getElementById('combined-tune-inline'); }
-    get combinedTuneInlineMount() { return document.getElementById('combined-tune-inline-mount'); }
-    get combinedTuneDoneBtn() { return document.getElementById('combined-tune-done-btn'); }
     cancelPendingModalClose() {
         if (!this.modal) return;
 
@@ -511,11 +311,15 @@ export class ModalShell {
         }
     }
 
+    _bindClickAction(btn, action) {
+        if (!btn) return;
+        btn.onclick = typeof action === 'function' ? action : null;
+    }
+
     showModal(title, msg, lapData, options = {}) {
         if (!this.modal || !this.modalTitle) return;
 
         this.cancelPendingModalClose();
-        this.hideCombinedInlineTune();
         const modalKind = options.modalKind || null;
         if (modalKind !== 'pause') {
             this._hidePauseTrackPreview();
@@ -609,29 +413,19 @@ export class ModalShell {
         }
 
         this.modal.classList.add('active');
-        requestAnimationFrame(() => this.activateModalFocusTrap(this.modal));
+        scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
     }
 
     showPauseResults(lapData, options = {}) {
         if (!this.modal || !this.modalPauseView) return;
 
         this.cancelPendingModalClose();
-        this.hideCombinedInlineTune();
-
-        const bindBtn = (btn, action) => {
-            if (!btn) return;
-            const newBtn = btn.cloneNode(true);
-            btn.replaceWith(newBtn);
-            if (action) newBtn.addEventListener('click', action);
-        };
-
         this._renderPauseRaceStats(lapData);
-        this._syncPauseTrackPreview(options.pauseTrackPreview);
 
-        bindBtn(this.modalMenuBtn, options.secondaryAction);
-        bindBtn(this.pauseSettingsBtn, options.settingsAction);
-        bindBtn(this.modalRestartBtn, options.restartAction);
-        bindBtn(this.modalResumeBtn, options.primaryAction);
+        this._bindClickAction(this.modalMenuBtn, options.secondaryAction);
+        this._bindClickAction(this.pauseSettingsBtn, options.settingsAction);
+        this._bindClickAction(this.modalRestartBtn, options.restartAction);
+        this._bindClickAction(this.modalResumeBtn, options.primaryAction);
 
         this.modalMainView?.classList.remove('active-view');
         this.modalRunsView?.classList.remove('active-view');
@@ -639,15 +433,16 @@ export class ModalShell {
         this.modalPauseView.classList.add('active-view');
 
         this.modal.classList.add('active');
-        requestAnimationFrame(() => this.activateModalFocusTrap(this.modal));
+        scheduleAfterModalPaint(() => {
+            this._syncPauseTrackPreview(options.pauseTrackPreview);
+            this.activateModalFocusTrap(this.modal);
+        });
     }
 
     showCombinedResults(lapData, options = {}) {
         if (!this.modal || !this.modalCombinedView) return;
 
         this.cancelPendingModalClose();
-        this.hideCombinedInlineTune();
-
         const isCrash = this._modalKind === 'crash';
 
         this.content.renderCombinedResults(this.modalCombinedView, {
@@ -663,22 +458,15 @@ export class ModalShell {
             deltaToPersonalBest: isCrash ? undefined : lapData.deltaToPersonalBest,
             previousTrackMedal: isCrash ? null : (lapData.previousTrackMedal ?? null),
             trackKey: lapData.trackKey || this.getCurrentTrackKey(),
+            lapCheckpointTimes: isCrash ? null : lapData.lapCheckpointTimes,
+            pbCheckpointTimes: isCrash ? null : lapData.pbCheckpointTimes,
+            pbFinishSec: isCrash ? null : lapData.pbFinishSec,
             crashCombined: isCrash
         });
 
-        const bindBtn = (btn, action) => {
-            if (!btn) return;
-            const newBtn = btn.cloneNode(true);
-            btn.replaceWith(newBtn);
-            if (action) newBtn.addEventListener('click', action);
-        };
-
-        const finishInline = (fn) => {
+        const finishResultModal = (fn) => {
             if (!fn) return null;
-            return () => {
-                this.hideCombinedInlineTune();
-                fn();
-            };
+            return () => fn();
         };
 
         if (this.combinedRestartBtn) {
@@ -690,9 +478,9 @@ export class ModalShell {
             );
         }
 
-        bindBtn(this.combinedMenuBtn, finishInline(options.secondaryAction));
-        this._bindCombinedTuneBtn(this.combinedTuneBtn);
-        bindBtn(this.combinedRestartBtn, finishInline(options.restartAction || options.primaryAction));
+        this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
+        this._bindCombinedGarageBtn(this.combinedTuneBtn);
+        this._bindClickAction(this.combinedRestartBtn, finishResultModal(options.restartAction || options.primaryAction));
 
         // Bind click/tap interaction for global leaderboard modal on rank tap
         const rightGroupEl = this.modalCombinedView?.querySelector('#combined-stats-right-group');
@@ -741,7 +529,7 @@ export class ModalShell {
             playUnlockSound
         });
 
-        requestAnimationFrame(() => this.activateModalFocusTrap(this.modal));
+        scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
     }
 
     showRunsModal(lapTimesArray, bestTime, currentTime = null, returnMode = 'close', {
@@ -755,7 +543,6 @@ export class ModalShell {
         if (!this.modal || !this.modalTitle || !this.modalLapTimes || !this.modalRunsView || !this.modalMainView) return;
 
         this.cancelPendingModalClose();
-        this.hideCombinedInlineTune();
         const wasActive = this.isModalActive();
 
         // Save previous view state before clearing
@@ -818,13 +605,13 @@ export class ModalShell {
         this.modalRunsView.classList.add('active-view');
         this.modal.classList.add('active');
         if (wasActive) {
-            requestAnimationFrame(() => {
+            scheduleAfterModalPaint(() => {
                 this.content.centerLeaderboardCurrentRow();
                 if (this.backToMainBtn) this.backToMainBtn.focus();
             });
             return;
         }
-        requestAnimationFrame(() => {
+        scheduleAfterModalPaint(() => {
             this.content.centerLeaderboardCurrentRow();
             this.activateModalFocusTrap(this.modal);
         });
@@ -840,7 +627,6 @@ export class ModalShell {
         this.cancelPendingModalClose();
 
         const cleanupAfterClose = () => {
-            this.hideCombinedInlineTune();
             this._modalCloseTransitionEndHandler = null;
             modal.classList.remove('modal--crash');
             modal.classList.remove('modal--pause');
@@ -881,7 +667,6 @@ export class ModalShell {
     }
 
     showMainModalView() {
-        this.hideCombinedInlineTune();
         this._runsViewMode = 'back';
         if (this.backToMainBtn) {
             const labelSpan = this.backToMainBtn.querySelector('.combined-action-btn-label');
@@ -969,24 +754,11 @@ export class ModalShell {
         this._focusBeforeModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this._activeTrapModal = modalEl;
         const focusables = this.getFocusables(modalEl);
-        if (
-            modalEl === this.modal
-            && this.modalCombinedView?.classList.contains('modal-combined-view--inline-tune')
-        ) {
-            const mount = this.combinedTuneInlineMount;
-            const firstStep = mount?.querySelector?.('.skill-points-stepper:not([disabled])');
-            if (firstStep && firstStep.offsetParent !== null) {
-                firstStep.focus();
-            } else {
-                this.combinedTuneBtn?.focus();
-            }
-        } else {
-            const preferredFocus = modalEl === this.modal
-                ? this.getModalPreferredFocusTarget()
-                : null;
-            if (preferredFocus) preferredFocus.focus();
-            else if (focusables.length) focusables[0].focus();
-        }
+        const preferredFocus = modalEl === this.modal
+            ? this.getModalPreferredFocusTarget()
+            : null;
+        if (preferredFocus) preferredFocus.focus();
+        else if (focusables.length) focusables[0].focus();
         this._modalTrapKeydown = (event) => this.handleModalTrapKeydown(event);
         document.addEventListener('keydown', this._modalTrapKeydown, true);
     }
@@ -1054,15 +826,6 @@ export class ModalShell {
             if (trapRoot.id === 'garage-modal') {
                 event.preventDefault();
                 document.getElementById('skill-points-close-btn')?.click();
-                return;
-            }
-            if (
-                trapRoot?.id === 'modal'
-                && this.modalCombinedView?.classList.contains('modal-combined-view--inline-tune')
-            ) {
-                event.preventDefault();
-                this.hideCombinedInlineTune();
-                requestAnimationFrame(() => this.activateModalFocusTrap(this.modal));
                 return;
             }
             if (
