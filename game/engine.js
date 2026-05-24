@@ -26,7 +26,7 @@ import { normalizePhysicsConfig } from "./car/handling.js";
 import { TrackLayerRenderer } from "./track/layer.js?v=1.91";
 import { RaceHud } from "./race/ui-hud.js?v=1.91";
 import { StartOverlay } from "./race/ui-start-overlay.js?v=1.91";
-import { DailyChallengeUi } from "./daily-challenge/ui.js?v=1.92";
+import { DailyChallengeUi } from "./daily-challenge/ui.js?v=1.94";
 import { ModalContentUi } from "./race/ui-modal-content.js?v=1.92";
 import { ModalShell } from "./race/ui-modal-shell.js?v=2.06";
 import { LoadingScreen } from "./ui/loader.js";
@@ -39,7 +39,7 @@ import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
 import { AchievementsUi } from "./achievements/ui.js?v=1.92";
 import { trackEngineMethods } from "./track/engine-methods.js?v=1.91";
 import { raceEngineMethods } from "./race/engine-methods.js?v=1.91";
-import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=1.91";
+import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=1.96";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js?v=1.91";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js?v=1.97";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js?v=1.97";
@@ -526,6 +526,9 @@ export class RealTimeRacer {
       .finally(() => {
         this.dailyChallengeUi.refreshDailyChallengeVerificationState();
       });
+    window.setTimeout(() => {
+      this.prefetchDailyChallengePlaylist?.();
+    }, 0);
     this.scheduleVerificationQueueProcessing(0);
   }
 }

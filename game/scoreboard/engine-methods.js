@@ -11,7 +11,7 @@ import {
   VERIFICATION_REJECTED_SNAPSHOT,
 } from "./verification-queue.js";
 import { setDailyChallengeBestTime } from "../daily-challenge/storage.js?v=1.91";
-import { submitDailyChallengeBestTime } from "../daily-challenge/service.js?v=1.91";
+import { invalidateDailyChallengeSnapshot, submitDailyChallengeBestTime } from "../daily-challenge/service.js?v=1.94";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js?v=1.91";
 
 export const scoreboardEngineMethods = {
@@ -150,6 +150,7 @@ export const scoreboardEngineMethods = {
         trackKey: entry.trackKey,
         objectiveType: entry.objectiveType,
       };
+      invalidateDailyChallengeSnapshot(entry.challengeId);
       setDailyChallengeBestTime(
         challenge,
         body.bestTimeMs / 1000,

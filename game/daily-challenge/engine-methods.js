@@ -22,8 +22,10 @@ import {
   getDailyChallengePlaylist,
   getDailyChallengeSnapshot,
   getDailyChallengeTrackName,
+  invalidateDailyChallengeSnapshot,
   isCrashBudgetDailyChallenge,
-} from "./service.js?v=1.92";
+  prefetchDailyChallengeSnapshots,
+} from "./service.js?v=1.94";
 import { createVerificationSnapshot } from "../scoreboard/verification-queue.js";
 import { applySkillPointAllocation } from "../car/skill-points.js";
 import { getMedalForLapTime } from "../medals/medals.js?v=2.04";
@@ -254,6 +256,7 @@ export const dailyChallengeEngineMethods = {
   createDailyChallengeRun(challenge) {
     return {
       challengeId: challenge.id,
+      trackKey: challenge.trackKey,
       objectiveType: challenge.objectiveType,
       requiredLaps: getDailyChallengeRequiredLaps(challenge),
       maxCrashes: getDailyChallengeMaxCrashes(challenge),
@@ -268,6 +271,7 @@ export const dailyChallengeEngineMethods = {
   },
 
   applyDailyChallenge(challenge) {
+    this.activeDailyChallenge = challenge;
     this.trackMedalBeforeLastLapWrite = null;
     this.hasTrackMedalBeforeLastLapWrite = false;
     this.currentChallengeRun = this.createDailyChallengeRun(challenge);
@@ -384,27 +388,46 @@ export const dailyChallengeEngineMethods = {
   },
 
   async openDailyChallengePlaylist() {
+    let loadedChallenges = [];
+    const playlistActions = {
+      onPlay: (challenge) => {
+        void this.handleStartDailyChallenge(challenge);
+      },
+      onLeaderboard: (challenge) => {
+        void this.leaderboards?.openDailyChallengeLeaderboardForChallenge?.(
+          challenge,
+          "close",
+          {
+            onClose: () => this.dailyChallengeUi.openPlaylistModal(loadedChallenges, playlistActions),
+          },
+        );
+      },
+    };
+    this.dailyChallengeUi.openPlaylistModal(null, playlistActions);
+
     try {
       const challenges = await getDailyChallengePlaylist();
-      const playlistActions = {
-        onPlay: (challenge) => {
-          void this.handleStartDailyChallenge(challenge);
-        },
-        onLeaderboard: (challenge) => {
-          void this.leaderboards?.openDailyChallengeLeaderboardForChallenge?.(
-            challenge,
-            "close",
-            {
-              onClose: () => this.dailyChallengeUi.openPlaylistModal(challenges, playlistActions),
-            },
-          );
-        },
-      };
+      loadedChallenges = challenges;
+      await prefetchDailyChallengeSnapshots(
+        challenges.map((challenge) => challenge?.id).filter(Boolean),
+      );
+      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
       this.dailyChallengeUi.openPlaylistModal(challenges, playlistActions);
     } catch (error) {
       console.error("Error loading daily challenge playlist:", error);
+      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
       this.dailyChallengeUi.openPlaylistModal([], null);
     }
+  },
+
+  prefetchDailyChallengePlaylist() {
+    getDailyChallengePlaylist()
+      .then((challenges) => prefetchDailyChallengeSnapshots(
+        challenges.map((challenge) => challenge?.id).filter(Boolean),
+      ))
+      .catch((error) => {
+        console.error("Error preloading daily challenge playlist:", error);
+      });
   },
 
   handleDailyChallengeLapCompleted(lapTime) {
@@ -660,6 +683,7 @@ export const dailyChallengeEngineMethods = {
     }
 
     if (isNewBest) {
+      invalidateDailyChallengeSnapshot(challenge.id);
       if (!isCrashBudget) {
         const saved = saveDailyChallengeBestTime(
           challenge,
@@ -695,6 +719,25 @@ export const dailyChallengeEngineMethods = {
     if (!winData || typeof winData !== "object") return false;
     if (this.status !== "won") return false;
     if (winData.trackKey !== this.currentTrackKey) return false;
+    if (
+      this.activeDailyChallenge?.trackKey &&
+      winData.trackKey !== this.activeDailyChallenge.trackKey
+    ) {
+      return false;
+    }
+    if (
+      this.currentChallengeRun?.challengeId &&
+      this.activeDailyChallenge?.id &&
+      this.currentChallengeRun.challengeId !== this.activeDailyChallenge.id
+    ) {
+      return false;
+    }
+    if (
+      this.currentChallengeRun?.trackKey &&
+      winData.trackKey !== this.currentChallengeRun.trackKey
+    ) {
+      return false;
+    }
     if (winData.runId !== this.activeRunId) return false;
 
     const checkpointCount = this.currentTrack.checkpoints?.length || 0;

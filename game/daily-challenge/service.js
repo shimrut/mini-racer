@@ -9,6 +9,10 @@ import {
 import {
     getLeaderboardIdentityPreference,
 } from '../scoreboard/display-preference.js?v=1.91';
+import {
+    getDailyChallengeData,
+    setDailyChallengeBestTime,
+} from './storage.js?v=1.91';
 
 const MIN_DAILY_TIME = 2.0;
 const MAX_DAILY_TIME = 60 * 60;
@@ -17,6 +21,13 @@ const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_PLAYLIST_DAYS = 7;
 const DAILY_TRACK_STEP_SEED = 17;
+let dailyPlaylistCache = {
+    challenges: null,
+    expiresAt: 0,
+    promise: null
+};
+const dailySnapshotCache = new Map();
+const dailySnapshotInflight = new Map();
 
 function getMockDailyUrlParams() {
     if (typeof window === 'undefined' || !window.location?.search) return null;
@@ -116,6 +127,10 @@ function getUtcDayIndex(date = new Date()) {
 
 function getUtcDayStart(dayIndex) {
     return new Date(dayIndex * DAY_MS);
+}
+
+function getNextUtcDayStartMs(date = new Date()) {
+    return getUtcDayStart(getUtcDayIndex(date) + 1).getTime();
 }
 
 function formatUtcChallengeDate(date = new Date()) {
@@ -241,6 +256,159 @@ function normalizeDailyChallenge(raw) {
             : {},
         skin: typeof raw.skin === 'string' && raw.skin.trim() ? raw.skin.trim() : 'default'
     };
+}
+
+function cloneDailyChallenge(challenge) {
+    if (!challenge || typeof challenge !== 'object') return null;
+    return {
+        ...challenge,
+        objectiveParams: challenge.objectiveParams && typeof challenge.objectiveParams === 'object'
+            ? { ...challenge.objectiveParams }
+            : {}
+    };
+}
+
+function cloneDailyPlaylist(challenges) {
+    return Array.isArray(challenges)
+        ? challenges.map((challenge) => cloneDailyChallenge(challenge)).filter(Boolean)
+        : [];
+}
+
+function resolveDailyPlaylistCacheExpiresAt(challenges, nowMs = Date.now()) {
+    const nextKnownChange = cloneDailyPlaylist(challenges)
+        .flatMap((challenge) => [
+            challenge.startsAt,
+            challenge.endsAt,
+            challenge.availableUntil
+        ])
+        .map((value) => (typeof value === 'string' ? Date.parse(value) : NaN))
+        .filter((time) => Number.isFinite(time) && time > nowMs + 1000)
+        .sort((a, b) => a - b)[0];
+
+    return Number.isFinite(nextKnownChange)
+        ? nextKnownChange
+        : getNextUtcDayStartMs(new Date(nowMs));
+}
+
+function cloneSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return normalizeSnapshot(null);
+    return {
+        ...snapshot,
+        topRows: Array.isArray(snapshot.topRows) ? snapshot.topRows.slice() : [],
+        nearbyRows: Array.isArray(snapshot.nearbyRows) ? snapshot.nearbyRows.slice() : [],
+        currentPlayerRow: snapshot.currentPlayerRow && typeof snapshot.currentPlayerRow === 'object'
+            ? { ...snapshot.currentPlayerRow }
+            : null
+    };
+}
+
+function findCachedPlaylistChallenge(challengeId) {
+    if (!challengeId || !Array.isArray(dailyPlaylistCache.challenges)) return null;
+    return dailyPlaylistCache.challenges.find((challenge) => challenge?.id === challengeId) || null;
+}
+
+function resolveDailySnapshotCacheExpiresAt(challengeId, nowMs = Date.now()) {
+    const challenge = findCachedPlaylistChallenge(challengeId);
+    if (challenge) {
+        return resolveDailyPlaylistCacheExpiresAt([challenge], nowMs);
+    }
+    return getNextUtcDayStartMs(new Date(nowMs));
+}
+
+function readCachedDailySnapshot(challengeId) {
+    if (!challengeId) return null;
+    const entry = dailySnapshotCache.get(challengeId);
+    if (!entry) return null;
+    if (entry.expiresAt <= Date.now()) {
+        dailySnapshotCache.delete(challengeId);
+        return null;
+    }
+    return cloneSnapshot(entry.snapshot);
+}
+
+function writeCachedDailySnapshot(challengeId, snapshot) {
+    if (!challengeId || !snapshot) return;
+    dailySnapshotCache.set(challengeId, {
+        snapshot: cloneSnapshot(snapshot),
+        expiresAt: resolveDailySnapshotCacheExpiresAt(challengeId)
+    });
+    syncDailyChallengeStoredBestFromSnapshot(challengeId, snapshot);
+}
+
+function syncDailyChallengeStoredBestFromSnapshot(challengeId, snapshot) {
+    const row = snapshot?.currentPlayerRow;
+    if (!row || !Number.isFinite(row.bestTime)) return;
+
+    const challenge = findCachedPlaylistChallenge(challengeId);
+    if (!challenge) return;
+
+    setDailyChallengeBestTime(
+        challenge,
+        row.bestTime,
+        Number.isFinite(row.completedLaps) ? row.completedLaps : null,
+        Array.isArray(row.checkpointTimesSec) ? row.checkpointTimesSec : null,
+    );
+}
+
+function mergeDailyChallengeBestResult(challenge) {
+    const local = getDailyChallengeData(challenge?.id);
+    const row = readCachedDailySnapshot(challenge?.id)?.currentPlayerRow;
+
+    if (!row || !Number.isFinite(row.bestTime)) {
+        return local;
+    }
+    if (!local || !Number.isFinite(local.bestTime)) {
+        return {
+            bestTime: row.bestTime,
+            completedLaps: Number.isFinite(row.completedLaps) ? row.completedLaps : null,
+        };
+    }
+
+    if (challenge?.objectiveType === 'finish_with_crash_budget') {
+        const localLaps = Math.max(0, Math.trunc(local.completedLaps || 0));
+        const rowLaps = Math.max(0, Math.trunc(row.completedLaps || 0));
+        if (rowLaps > localLaps) {
+            return {
+                bestTime: row.bestTime,
+                completedLaps: rowLaps,
+            };
+        }
+        if (rowLaps < localLaps) {
+            return local;
+        }
+        return row.bestTime > local.bestTime
+            ? { bestTime: row.bestTime, completedLaps: rowLaps }
+            : local;
+    }
+
+    return row.bestTime < local.bestTime
+        ? {
+            bestTime: row.bestTime,
+            completedLaps: Number.isFinite(row.completedLaps)
+                ? row.completedLaps
+                : local.completedLaps,
+        }
+        : local;
+}
+
+export function getDailyChallengeBestDisplay(challenge) {
+    if (!challenge) return '--';
+    const merged = mergeDailyChallengeBestResult(challenge);
+    return formatDailyChallengeBestLabel(
+        challenge.objectiveType,
+        merged?.bestTime,
+        merged?.completedLaps,
+    );
+}
+
+export function getCachedDailyChallengeSnapshot(challengeId) {
+    return readCachedDailySnapshot(challengeId);
+}
+
+export function invalidateDailyChallengeSnapshot(challengeId) {
+    if (!challengeId) return;
+    dailySnapshotCache.delete(challengeId);
+    dailySnapshotInflight.delete(challengeId);
 }
 
 function normalizeSnapshot(raw) {
@@ -452,7 +620,7 @@ export async function getActiveDailyChallenge() {
     }
 }
 
-export async function getDailyChallengePlaylist() {
+async function loadDailyChallengePlaylist() {
     if (shouldUseMockDailyChallenge()) {
         return getLocalDailyPlaylist();
     }
@@ -482,7 +650,36 @@ export async function getDailyChallengePlaylist() {
         .filter(Boolean);
 }
 
-export async function getDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_LIMIT } = {}) {
+export async function getDailyChallengePlaylist({ forceRefresh = false } = {}) {
+    const nowMs = Date.now();
+    if (!forceRefresh) {
+        if (dailyPlaylistCache.challenges && dailyPlaylistCache.expiresAt > nowMs) {
+            return cloneDailyPlaylist(dailyPlaylistCache.challenges);
+        }
+        if (dailyPlaylistCache.promise) {
+            return cloneDailyPlaylist(await dailyPlaylistCache.promise);
+        }
+    }
+
+    const requestPromise = loadDailyChallengePlaylist()
+        .then((challenges) => {
+            dailyPlaylistCache = {
+                challenges,
+                expiresAt: resolveDailyPlaylistCacheExpiresAt(challenges),
+                promise: null
+            };
+            return challenges;
+        })
+        .catch((error) => {
+            dailyPlaylistCache.promise = null;
+            throw error;
+        });
+
+    dailyPlaylistCache.promise = requestPromise;
+    return cloneDailyPlaylist(await requestPromise);
+}
+
+async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_LIMIT } = {}) {
     if (shouldUseMockDailyChallenge() || isLocalEnvironment()) {
         console.log('Using mock daily challenge snapshot for local development');
         return getMockDailyChallengeSnapshot();
@@ -514,6 +711,61 @@ export async function getDailyChallengeSnapshot({ challengeId, limit = DEFAULT_D
 
     const payload = await response.json();
     return normalizeSnapshot(payload);
+}
+
+export async function getDailyChallengeSnapshot({
+    challengeId,
+    limit = DEFAULT_DAILY_LIMIT,
+    forceRefresh = false
+} = {}) {
+    if (!challengeId) {
+        return normalizeSnapshot(null);
+    }
+
+    if (!forceRefresh) {
+        const cachedSnapshot = readCachedDailySnapshot(challengeId);
+        if (cachedSnapshot) {
+            return cachedSnapshot;
+        }
+        const inflight = dailySnapshotInflight.get(challengeId);
+        if (inflight) {
+            return cloneSnapshot(await inflight);
+        }
+    } else {
+        invalidateDailyChallengeSnapshot(challengeId);
+    }
+
+    const requestPromise = loadDailyChallengeSnapshot({ challengeId, limit })
+        .then((snapshot) => {
+            writeCachedDailySnapshot(challengeId, snapshot);
+            return snapshot;
+        })
+        .catch((error) => {
+            dailySnapshotInflight.delete(challengeId);
+            throw error;
+        });
+
+    dailySnapshotInflight.set(challengeId, requestPromise);
+    try {
+        return cloneSnapshot(await requestPromise);
+    } finally {
+        if (dailySnapshotInflight.get(challengeId) === requestPromise) {
+            dailySnapshotInflight.delete(challengeId);
+        }
+    }
+}
+
+export async function prefetchDailyChallengeSnapshots(challengeIds = []) {
+    const uniqueIds = [...new Set(
+        (Array.isArray(challengeIds) ? challengeIds : [])
+            .filter((challengeId) => typeof challengeId === 'string' && challengeId)
+    )];
+
+    if (!uniqueIds.length) return;
+
+    await Promise.allSettled(
+        uniqueIds.map((challengeId) => getDailyChallengeSnapshot({ challengeId }))
+    );
 }
 
 export async function submitDailyChallengeBestTime({

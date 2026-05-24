@@ -1,4 +1,4 @@
-import { RealTimeRacer } from './engine.js?v=2.00';
+import { RealTimeRacer } from './engine.js?v=2.05';
 import { RUNTIME_SCOREBOARD_CONFIG } from './runtime-config.js?v=1.91';
 
 if (typeof window !== 'undefined' && !window.VECTORGP_SCOREBOARD_CONFIG) {

@@ -1,8 +1,9 @@
 import { TRACKS } from '../track/tracks.js?v=1.91';
 import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
 import {
+    getCachedDailyChallengeSnapshot,
     getDailyChallengeSnapshot
-} from '../daily-challenge/service.js?v=1.92';
+} from '../daily-challenge/service.js?v=1.94';
 import { getScoreboardSnapshot } from './service.js?v=1.91';
 
 export class LeaderboardsUi {
@@ -20,7 +21,6 @@ export class LeaderboardsUi {
         this.loadScoreboardSnapshot = loadScoreboardSnapshot;
         this.isRunsViewActive = isRunsViewActive;
         this.updateModalScoreboardSnapshot = updateModalScoreboardSnapshot;
-        this._pendingDailyChallengeSnapshotRequest = null;
         this._requestVersion = 0;
     }
 
@@ -54,41 +54,44 @@ export class LeaderboardsUi {
         this._requestVersion += 1;
     }
 
-    async requestDailyChallengeLeaderboardSnapshot(challengeId) {
-        if (!challengeId) return null;
-
-        const pendingRequest = this._pendingDailyChallengeSnapshotRequest;
-        if (pendingRequest?.challengeId === challengeId) {
-            return pendingRequest.promise;
+    resolveInitialDailyChallengeSnapshot(challenge) {
+        const providedSnapshot = challenge?.scoreboardSnapshot;
+        if (
+            providedSnapshot
+            && typeof providedSnapshot === 'object'
+            && !providedSnapshot.isLoading
+        ) {
+            return providedSnapshot;
         }
 
-        const requestPromise = getDailyChallengeSnapshot({ challengeId })
-            .then((scoreboardSnapshot) => {
-                const summary = this.dailyChallengeUi.getSummary();
-                if (summary?.challengeId === challengeId) {
-                    this.dailyChallengeUi.setDailyChallengeSummary({
-                        ...summary,
-                        rankLabel: scoreboardSnapshot?.playerRankLabel || '--',
-                        scoreboardSnapshot: scoreboardSnapshot || null
-                    });
-                }
-                return scoreboardSnapshot || null;
-            })
-            .catch((error) => {
-                console.error('Error loading daily challenge leaderboard:', error);
-                return null;
-            })
-            .finally(() => {
-                if (this._pendingDailyChallengeSnapshotRequest?.challengeId === challengeId) {
-                    this._pendingDailyChallengeSnapshotRequest = null;
-                }
-            });
+        return getCachedDailyChallengeSnapshot(challenge?.id);
+    }
 
-        this._pendingDailyChallengeSnapshotRequest = {
-            challengeId,
-            promise: requestPromise
-        };
-        return requestPromise;
+    syncDailyChallengeSummarySnapshot(challengeId, scoreboardSnapshot) {
+        const summary = this.dailyChallengeUi.getSummary();
+        if (summary?.challengeId !== challengeId) return;
+
+        this.dailyChallengeUi.setDailyChallengeSummary({
+            ...summary,
+            rankLabel: scoreboardSnapshot?.playerRankLabel || '--',
+            scoreboardSnapshot: scoreboardSnapshot || null
+        });
+    }
+
+    async requestDailyChallengeLeaderboardSnapshot(challengeId, { forceRefresh = false } = {}) {
+        if (!challengeId) return null;
+
+        try {
+            const scoreboardSnapshot = await getDailyChallengeSnapshot({
+                challengeId,
+                forceRefresh
+            });
+            this.syncDailyChallengeSummarySnapshot(challengeId, scoreboardSnapshot);
+            return scoreboardSnapshot || null;
+        } catch (error) {
+            console.error('Error loading daily challenge leaderboard:', error);
+            return null;
+        }
     }
 
     async openDailyChallengeLeaderboard(returnMode = 'close', options = {}) {
@@ -113,12 +116,16 @@ export class LeaderboardsUi {
             scoreboardTrackKey: challenge.trackKey,
             scoreboardSubhead: 'Leaderboard · Daily Challenge'
         };
+        const initialSnapshot = this.resolveInitialDailyChallengeSnapshot(challenge);
+
         this.showLeaderboardModalState(returnMode, {
             ...sharedOptions,
             scoreboardChallengeId: challenge.id,
-            scoreboardSnapshot: challenge.scoreboardSnapshot || { isLoading: true },
+            scoreboardSnapshot: initialSnapshot || { isLoading: true },
             onClose
         });
+
+        if (initialSnapshot) return;
 
         const scoreboardSnapshot = await this.requestDailyChallengeLeaderboardSnapshot(challenge.id);
         if (requestId !== this._requestVersion) return;

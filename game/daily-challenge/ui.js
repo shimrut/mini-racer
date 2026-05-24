@@ -1,10 +1,10 @@
 import {
     formatDailyChallengeBestLabel,
     formatDailyChallengePlaylistAvailabilityLabel,
+    getDailyChallengeBestDisplay,
     getDailyChallengeCopyLabels,
     getDailyChallengeTrackName
-} from './service.js?v=1.92';
-import { getDailyChallengeData } from './storage.js?v=1.91';
+} from './service.js?v=1.94';
 import {
     getDailyChallengeVerificationEntry,
     getDailyChallengeVerificationState
@@ -238,6 +238,10 @@ export class DailyChallengeUi {
         });
     }
 
+    isPlaylistModalOpen() {
+        return Boolean(this.dailyChallengePlaylistModal?.classList.contains('active'));
+    }
+
     bindPlaylistModal() {
         configureReusableModal(this.dailyChallengePlaylistModal, {
             title: 'Playlist',
@@ -255,6 +259,14 @@ export class DailyChallengeUi {
             ? actions
             : actions?.onPlay;
         const onLeaderboard = actions?.onLeaderboard;
+
+        if (challenges === null) {
+            const loading = document.createElement('div');
+            loading.className = 'daily-playlist-empty';
+            loading.textContent = 'Loading playlist...';
+            list.appendChild(loading);
+            return;
+        }
 
         const playableChallenges = Array.isArray(challenges)
             ? challenges.filter((challenge) => challenge?.trackKey && TRACKS[challenge.trackKey])
@@ -284,12 +296,7 @@ export class DailyChallengeUi {
             title.textContent = getDailyChallengeTrackName(challenge);
             const subtitle = document.createElement('div');
             subtitle.className = 'daily-playlist-subtitle';
-            const stored = getDailyChallengeData(challenge.id);
-            subtitle.textContent = `Best: ${formatDailyChallengeBestLabel(
-                challenge.objectiveType,
-                stored?.bestTime,
-                stored?.completedLaps,
-            )}`;
+            subtitle.textContent = `Best: ${getDailyChallengeBestDisplay(challenge)}`;
             const availability = document.createElement('div');
             availability.className = 'daily-playlist-availability';
             const availabilityLabel = formatDailyChallengePlaylistAvailabilityLabel(challenge);
