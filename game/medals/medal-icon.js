@@ -226,21 +226,47 @@ function appendMedalEmblemText(tier, svg, emblemGradId = null) {
 }
 
 /**
+ * @param {SVGSVGElement} svg
+ * @param {string} label
+ * @param {string|null} [emblemGradId]
+ */
+function appendMedalCenterTime(svg, label, emblemGradId = null) {
+    appendMedalSvgText(svg, 'medal-svg__center-time', label, MEDAL_MAIN_TEXT_Y, emblemGradId);
+}
+
+/**
  * @param {'author'|'gold'|'silver'|'bronze'|'personal-best'} tier
  * @param {SVGSVGElement} svg
- * @param {{ emblemGradId?: string|null }} [options]
+ * @param {{ emblemGradId?: string|null, centerText?: string|null, showEmblem?: boolean }} [options]
  */
-function appendMedalCenterContent(tier, svg, { emblemGradId = null } = {}) {
+function appendMedalCenterContent(tier, svg, { emblemGradId = null, centerText = null, showEmblem = true } = {}) {
+    if (centerText != null && centerText !== '') {
+        appendMedalCenterTime(svg, centerText, emblemGradId);
+        return;
+    }
+    if (!showEmblem) return;
     appendMedalEmblemText(tier, svg, emblemGradId);
     appendMedalTierCaption(tier, svg, emblemGradId);
 }
 
 /**
+ * Flat ghost hex for locked row slots (not the 3D unlocked medal).
+ * @param {SVGSVGElement} svg
+ */
+function appendRowPlaceholderInnerFill(svg) {
+    const innerFill = document.createElementNS(SVG_NS, 'path');
+    innerFill.setAttribute('d', MEDAL_HEX_PATH);
+    innerFill.setAttribute('transform', 'translate(320 320) scale(0.8) translate(-320 -320)');
+    innerFill.setAttribute('class', 'medal-svg__placeholder-fill');
+    svg.appendChild(innerFill);
+}
+
+/**
  * @param {'author'|'gold'|'silver'|'bronze'|'personal-best'|'white'|'crash'} tier
- * @param {{ className?: string, outline?: boolean }} [options]
+ * @param {{ className?: string, outline?: boolean, centerText?: string|null, showEmblem?: boolean, rowPlaceholder?: boolean }} [options]
  * @returns {HTMLElement}
  */
-function buildMedalIcon(tier, { className = '', outline = false } = {}) {
+function buildMedalIcon(tier, { className = '', outline = false, centerText = null, showEmblem = true, rowPlaceholder = false } = {}) {
     const cssTier = tier === 'white' ? 'placeholder' : tier;
     const el = document.createElement('span');
     const ariaBase = MEDAL_ARIA[tier] || 'Medal';
@@ -265,9 +291,9 @@ function buildMedalIcon(tier, { className = '', outline = false } = {}) {
     const faceGradId = `medal-face-grad-${uniqueId}`;
     const emblemGradId = `medal-emblem-grad-${uniqueId}`;
 
-    // Define gradients based on the tier
+    // Define gradients based on the tier (skipped for flat row placeholders)
     let faceStops = [];
-    if (tier !== 'white') {
+    if (tier !== 'white' && !rowPlaceholder) {
         let borderStops = [];
         let emblemStops = [];
 
@@ -355,24 +381,34 @@ function buildMedalIcon(tier, { className = '', outline = false } = {}) {
     const grooveColor = faceStops.length ? darkenHex(faceStops[0].color) : '#000000';
 
     if (outline || tier === 'white') {
-        const shape = document.createElementNS(SVG_NS, 'path');
-        shape.setAttribute('d', MEDAL_HEX_PATH);
-        shape.setAttribute('class', 'medal-svg__shape');
-        
-        if (tier === 'white') {
-            shape.setAttribute('stroke', '#475569');
-            shape.setAttribute('stroke-width', '16');
-            shape.setAttribute('stroke-dasharray', '24 16');
+        if (rowPlaceholder && tier !== 'white') {
+            appendRowPlaceholderInnerFill(svg);
+            const shape = document.createElementNS(SVG_NS, 'path');
+            shape.setAttribute('d', MEDAL_HEX_PATH);
+            shape.setAttribute('class', 'medal-svg__shape');
             shape.setAttribute('fill', 'none');
+            svg.appendChild(shape);
+            appendMedalCenterContent(tier, svg, { emblemGradId: null, centerText, showEmblem: false });
         } else {
-            shape.setAttribute('stroke', `url(#${borderGradId})`);
-            shape.setAttribute('stroke-width', '24');
-            shape.setAttribute('stroke-dasharray', '32 16');
-            shape.setAttribute('fill', 'none');
-        }
-        svg.appendChild(shape);
-        if (tier !== 'white' && tier !== 'crash') {
-            appendMedalCenterContent(tier, svg, { emblemGradId });
+            const shape = document.createElementNS(SVG_NS, 'path');
+            shape.setAttribute('d', MEDAL_HEX_PATH);
+            shape.setAttribute('class', 'medal-svg__shape');
+
+            if (tier === 'white') {
+                shape.setAttribute('stroke', '#475569');
+                shape.setAttribute('stroke-width', '16');
+                shape.setAttribute('stroke-dasharray', '24 16');
+                shape.setAttribute('fill', 'none');
+            } else {
+                shape.setAttribute('stroke', `url(#${borderGradId})`);
+                shape.setAttribute('stroke-width', '24');
+                shape.setAttribute('stroke-dasharray', '32 16');
+                shape.setAttribute('fill', 'none');
+            }
+            svg.appendChild(shape);
+            if (tier !== 'white' && tier !== 'crash') {
+                appendMedalCenterContent(tier, svg, { emblemGradId, centerText, showEmblem });
+            }
         }
     } else {
         // Filled Medal: render the gorgeous multi-layered 3D metallic style!
@@ -403,9 +439,9 @@ function buildMedalIcon(tier, { className = '', outline = false } = {}) {
         innerFace.setAttribute('class', 'medal-svg__inner-face');
         svg.appendChild(innerFace);
 
-        // 4. Center emblem and tier caption
+        // 4. Center emblem, tier caption, or unlock time
         if (tier !== 'white' && tier !== 'crash') {
-            appendMedalCenterContent(tier, svg, { emblemGradId });
+            appendMedalCenterContent(tier, svg, { emblemGradId, centerText, showEmblem });
         }
     }
 
@@ -428,10 +464,10 @@ export function createCrashMedalHeroIcon({ className = '' } = {}) {
 
 /**
  * @param {'author'|'gold'|'silver'|'bronze'|'personal-best'|'white'|null|undefined} medal
- * @param {{ className?: string, outline?: boolean }} [options]
+ * @param {{ className?: string, outline?: boolean, centerText?: string|null, showEmblem?: boolean, rowPlaceholder?: boolean }} [options]
  * @returns {HTMLElement}
  */
-export function createMedalIconSvg(medal, { className = '', outline = false } = {}) {
+export function createMedalIconSvg(medal, { className = '', outline = false, centerText = null, showEmblem = true, rowPlaceholder = false } = {}) {
     const isKnownTier =
         medal === 'author'
         || medal === 'gold'
@@ -439,5 +475,5 @@ export function createMedalIconSvg(medal, { className = '', outline = false } = 
         || medal === 'bronze'
         || medal === 'personal-best';
     const tier = isKnownTier ? medal : 'white';
-    return buildMedalIcon(tier, { className, outline });
+    return buildMedalIcon(tier, { className, outline, centerText, showEmblem, rowPlaceholder });
 }

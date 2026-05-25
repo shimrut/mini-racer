@@ -468,40 +468,197 @@ body.start-selection-active .lap-flash {
     animation: medal-entrance-pop 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Combined results hero: earned medals in offset slots (back = smaller / left), best on top; icons animate in sequence */
-/* ~10% of the medal behind peeks past each front tier (tight stack) */
-.combined-hero-medal-pile {
-    --medal-step: 0.75rem;
-    --medal-fan-x: 0.5rem;
-    --medal-fan-y: 0.25rem;
-    position: relative;
-    width: calc(5.5rem + (var(--stack-total, 1) - 1) * var(--medal-step));
-    height: calc(5.5rem + (var(--stack-total, 1) - 1) * 1rem);
+/* Combined results: horizontal medal row (bronze → author) */
+.combined-medal-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.2rem, 1.5vw, 0.55rem);
+    flex-shrink: 0;
+    max-width: 100%;
+}
+
+.combined-medal-row-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 0;
+    flex: 0 1 auto;
+}
+
+.combined-medal-row-slot .medal-svg--hero {
+    width: min(22vw, 5.25rem);
+    height: min(22vw, 5.25rem);
+    display: block;
     flex-shrink: 0;
 }
 
-.combined-hero-medal-pile-slot {
-    position: absolute;
-    top: 0;
-    right: calc((var(--stack-total, 1) - 1 - var(--stack-index, 0)) * var(--medal-step));
-    width: 5.5rem;
-    height: 5.5rem;
-    z-index: calc(10 + var(--stack-index, 0));
+.combined-medal-row-slot--fallback .medal-svg--hero {
+    width: min(34vw, 5.5rem);
+    height: min(34vw, 5.5rem);
+}
+
+.medal-svg__center-time {
+    font-family: var(--header-font), "Outfit", sans-serif;
+    font-size: 82px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    paint-order: stroke fill;
+    stroke: rgba(0, 0, 0, 0.4);
+    stroke-width: 8px;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
+
+.medal-svg--hero .medal-svg__center-time {
+    font-size: 92px;
+    stroke-width: 9px;
+}
+
+.combined-medal-row-slot .medal-svg--hero {
+    transition:
+        transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        filter 0.22s ease,
+        opacity 0.22s ease;
+}
+
+.medal-svg__placeholder-fill {
+    fill: rgba(30, 41, 59, 0.42);
     pointer-events: none;
-    transform-origin: 72% 42%;
-    transform: translate(calc((var(--stack-total, 1) - 1 - var(--stack-index, 0)) * -1 * var(--medal-fan-x)),
-            calc((var(--stack-total, 1) - 1 - var(--stack-index, 0)) * var(--medal-fan-y))) scale(calc(1 - (var(--stack-total, 1) - 1 - var(--stack-index, 0)) * 0.04));
 }
 
-.combined-hero-medal-pile-slot .medal-svg--hero {
-    width: 100%;
-    height: 100%;
-    display: block;
+.medal-svg--row-placeholder {
+    opacity: 0.72;
 }
 
-.combined-hero-medal-pile .medal-pile-icon--deferred {
+.medal-svg--row-placeholder .medal-svg__shape {
+    fill: none;
+}
+
+.combined-medal-row-slot--locked .medal-svg--row-placeholder {
+    filter: saturate(0.35) brightness(0.78);
+}
+
+.combined-medal-row-slot--locked .medal-svg--hero:not(.medal-svg--row-placeholder) {
+    filter: saturate(0.38) brightness(0.82);
+    opacity: 0.68;
+}
+
+.combined-medal-row-slot--locked .medal-svg--outline .medal-svg__shape {
+    stroke-dasharray: 12 34;
+    stroke-width: 22;
+}
+
+.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
+    stroke: #7a726c;
+}
+
+.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--silver .medal-svg__shape {
+    stroke: #8b939c;
+}
+
+.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--gold .medal-svg__shape {
+    stroke: #8f8770;
+}
+
+.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--author .medal-svg__shape {
+    stroke: #8e8aa8;
+}
+
+.combined-medal-row-slot--locked .medal-svg--outline .medal-svg__center-time {
+    fill: #94a3b8;
+    opacity: 0.9;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot {
+    cursor: pointer;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot:hover .medal-svg--hero,
+.combined-hero-medal--interactive .combined-medal-row-slot:focus-visible .medal-svg--hero {
+    transform: scale(1.08);
+    opacity: 1;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero {
+    filter: none;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--bronze .medal-svg__shape,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
+    stroke: #c17f59;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--silver .medal-svg__shape,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--silver .medal-svg__shape {
+    stroke: #b8c4d4;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--gold .medal-svg__shape,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--gold .medal-svg__shape {
+    stroke: #e8b84a;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--author .medal-svg__shape,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--author .medal-svg__shape {
+    stroke: #c4b5fd;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--bronze.medal-svg--outline .medal-svg__center-time,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--bronze.medal-svg--outline .medal-svg__center-time {
+    fill: #ffd3b6;
+    opacity: 1;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--silver.medal-svg--outline .medal-svg__center-time,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--silver.medal-svg--outline .medal-svg__center-time {
+    fill: #f8fafc;
+    opacity: 1;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--gold.medal-svg--outline .medal-svg__center-time,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--gold.medal-svg--outline .medal-svg__center-time {
+    fill: #fff7c2;
+    opacity: 1;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--author.medal-svg--outline .medal-svg__center-time,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--author.medal-svg--outline .medal-svg__center-time {
+    fill: #e0e7ff;
+    opacity: 1;
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--bronze,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--bronze {
+    filter: drop-shadow(0 0 10px rgba(217, 119, 87, 0.4)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--silver,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--silver {
+    filter: drop-shadow(0 0 10px rgba(203, 213, 225, 0.35)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--gold,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--gold {
+    filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.45)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--author,
+.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--author {
+    filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.65)) drop-shadow(0 0 8px rgba(103, 232, 249, 0.45)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
+}
+
+.combined-medal-row .medal-pile-icon--deferred {
     opacity: 0;
     transform: scale(0.42) translateY(0.55rem);
+}
+
+.combined-medal-row .medal-svg--row-placeholder {
+    opacity: 0.72;
+    transform: none;
 }
 
 .win-combined-medal-overlay .medal-pile-icon--deferred {
@@ -509,20 +666,27 @@ body.start-selection-active .lap-flash {
     transform: scale(0.42) translateY(0.55rem);
 }
 
-.combined-hero-medal .medal-svg--hero.medal-svg--gold {
+.combined-hero-medal .combined-medal-row-slot:not(.combined-medal-row-slot--locked) .medal-svg--hero.medal-svg--gold {
     filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.45)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
 
-.combined-hero-medal .medal-svg--hero.medal-svg--silver {
+.combined-hero-medal .combined-medal-row-slot:not(.combined-medal-row-slot--locked) .medal-svg--hero.medal-svg--silver {
     filter: drop-shadow(0 0 10px rgba(203, 213, 225, 0.35)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
 
-.combined-hero-medal .medal-svg--hero.medal-svg--bronze {
+.combined-hero-medal .combined-medal-row-slot:not(.combined-medal-row-slot--locked) .medal-svg--hero.medal-svg--bronze {
     filter: drop-shadow(0 0 10px rgba(217, 119, 87, 0.4)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
 
-.combined-hero-medal .medal-svg--hero.medal-svg--author {
+.combined-hero-medal .combined-medal-row-slot:not(.combined-medal-row-slot--locked) .medal-svg--hero.medal-svg--author {
     filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.65)) drop-shadow(0 0 8px rgba(103, 232, 249, 0.45)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
+}
+
+.combined-hero-medal .medal-svg--row-placeholder.medal-svg--gold,
+.combined-hero-medal .medal-svg--row-placeholder.medal-svg--silver,
+.combined-hero-medal .medal-svg--row-placeholder.medal-svg--bronze,
+.combined-hero-medal .medal-svg--row-placeholder.medal-svg--author {
+    filter: saturate(0.35) brightness(0.78);
 }
 
 .combined-hero-medal .medal-svg--hero.medal-svg--personal-best {
@@ -545,6 +709,11 @@ body.start-selection-active .lap-flash {
 
     .medal-pile-icon--deferred {
         opacity: 1;
+        transform: none;
+    }
+
+    .combined-hero-medal--interactive .combined-medal-row-slot:hover .medal-svg--hero,
+    .combined-hero-medal--interactive .combined-medal-row-slot:focus-visible .medal-svg--hero {
         transform: none;
     }
 
@@ -2274,7 +2443,7 @@ body.start-selection-active #start-overlay {
     padding: 1.25rem 1.35rem 1.05rem !important;
 }
 
-/* Win overlay: large center medal + bottom row (earned L, next R) */
+/* Win overlay: horizontal medal row */
 .win-combined-medal-overlay {
     display: flex;
     flex-direction: column;
@@ -2286,27 +2455,24 @@ body.start-selection-active #start-overlay {
 
 .win-combined-medal-overlay__center {
     display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
+    align-items: center;
+    justify-content: center;
     line-height: 0;
-}
-
-.combined-hero-medal .win-combined-medal-overlay__pile.combined-hero-medal-pile {
-    --medal-step: 0.38rem;
-    --medal-fan-x: 0.28rem;
-    --medal-fan-y: 0.14rem;
-    width: calc(min(34vw, 6.75rem) + (var(--stack-total, 1) - 1) * var(--medal-step));
-    height: calc(min(34vw, 6.75rem) + (var(--stack-total, 1) - 1) * 0.45rem);
-}
-
-.combined-hero-medal .win-combined-medal-overlay__pile .combined-hero-medal-pile-slot {
-    width: min(34vw, 6.75rem);
-    height: min(34vw, 6.75rem);
-}
-
-.combined-hero-medal .win-combined-medal-overlay__pile .combined-hero-medal-pile-slot .medal-svg--hero {
     width: 100%;
-    height: 100%;
+}
+
+.combined-hero-medal .win-combined-medal-overlay__row.combined-medal-row {
+    width: 100%;
+    justify-content: center;
+}
+
+.combined-hero-medal .win-combined-medal-overlay__row .combined-medal-row-slot .medal-svg--hero {
+    width: min(21vw, 5.5rem);
+    height: min(21vw, 5.5rem);
+}
+
+.combined-hero-medal .win-combined-medal-overlay__row .medal-svg--hero .medal-svg__center-time {
+    font-size: 96px;
 }
 
 #modal.modal--crash.active .modal-card,
@@ -4146,21 +4312,9 @@ body.start-selection-active #start-overlay {
 
 .combined-hero-medal .win-combined-medal-overlay {
     width: auto;
-    max-width: min(40vw, 9.5rem);
-    align-items: flex-start;
+    max-width: min(92vw, 22rem);
+    align-items: center;
     gap: 0.35rem;
-}
-
-.combined-hero-medal .win-combined-medal-overlay__hero.medal-svg--hero {
-    width: min(42vw, 8.25rem);
-    height: min(42vw, 8.25rem);
-    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.4));
-}
-
-.combined-hero-medal .win-combined-medal-overlay__medal-sm.medal-svg--hero {
-    width: 2.35rem;
-    height: 2.35rem;
-    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.32));
 }
 
 .combined-hero-medal > .medal-svg--crash.medal-svg--hero {
@@ -4542,19 +4696,13 @@ body:not(.loading-active) #loading-screen {
     }
 }
 
-/* Win Combined: Interactive Medal Stack & Target Times Flat Popover Modal */
+/* Win Combined: per-slot medal hover; tap anywhere on row still opens targets popover */
 .combined-hero-medal--interactive {
     cursor: pointer;
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
 }
 
-.combined-hero-medal--interactive:hover {
-    transform: scale(1.05);
-    filter: brightness(1.1);
-}
-
-.combined-hero-medal--interactive:active {
-    transform: scale(0.95);
+.combined-hero-medal--interactive .combined-medal-row-slot:active .medal-svg--hero {
+    transform: scale(1.03);
 }
 
 .combined-stat-value--interactive {

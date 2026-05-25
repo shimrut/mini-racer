@@ -148,6 +148,7 @@ function revealDeferredMedalIcon(
     { delay = 0, reduced = false, celebrate = true, playUnlockSound = null } = {},
 ) {
     if (!icon) return;
+    if (icon.classList.contains('medal-svg--row-placeholder')) return;
     const run = () => {
         icon.classList.remove('medal-pile-icon--deferred');
         if (!celebrate) return;
@@ -238,71 +239,14 @@ function revealMedalIconsInOrder(
 }
 
 /**
- * Win overlay: large = highest medal unlocked on this track (saved best); small row = every other unlocked tier;
- * next goal from that best tier.
+ * Whether every standard tier on this track is unlocked for the stored best medal.
  * @param {string|null|undefined} trackKey
- * @param {number|null|undefined} lapTimeSec
- * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} lapMedal
- * @param {{ previousPersonalBestSec?: number|null|undefined, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [options]
- *   PB hero only when creator was already unlocked on this track and the lap strictly beats the saved PB
- *   ({@link shouldShowPersonalBestMedalHero}); never on the same run as first creator unlock.
- * @returns {{
- *   centerTier: 'white'|'personal-best'|'author'|'gold'|'silver'|'bronze',
- *   othersLeft: Array<'author'|'gold'|'silver'|'bronze'>,
- *   next: { tier: 'author'|'gold'|'silver'|'bronze', maxSeconds: number } | null,
- *   allUnlocked: boolean
- * }}
+ * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} bestStoredMedal
+ * @returns {boolean}
  */
-export function getWinOverlayMedalLayout(
-    trackKey,
-    lapTimeSec,
-    lapMedal,
-    { previousPersonalBestSec, previousTrackMedal = null } = {},
-) {
-    const t = getTrackMedalThresholds(trackKey);
-    const tierThisLap =
-        t && Number.isFinite(lapTimeSec) ? getMedalForLapTime(trackKey, lapTimeSec) : null;
-    const bestUnlocked = maxMedalTier(
-        isStandardMedalTier(lapMedal) ? lapMedal : null,
-        isStandardMedalTier(tierThisLap) ? tierThisLap : null,
-    );
-    let featuredTier = isStandardMedalTier(bestUnlocked) ? bestUnlocked : 'white';
-    const stack = t ? getCombinedMedalStackTiers(trackKey, lapMedal) : [];
-    const earned = stack.filter((x) => x.filled).map((x) => x.tier);
-    const nextBasis =
-        featuredTier !== 'white'
-            ? featuredTier
-            : maxMedalTier(
-                t && Number.isFinite(lapTimeSec) ? getMedalForLapTime(trackKey, lapTimeSec) : null,
-                lapMedal,
-            );
-    const next =
-        t && nextBasis !== 'white' && nextBasis !== 'author'
-            ? getNextMedalTarget(trackKey, nextBasis)
-            : null;
-    const allUnlocked = stack.length > 0 && stack.every((x) => x.filled);
-    let othersLeft = earned
-        .filter((tier) => tier !== featuredTier)
-        .sort((a, b) => STANDARD_MEDAL_TIER_RANK[a] - STANDARD_MEDAL_TIER_RANK[b]);
-    if (!allUnlocked && next) {
-        othersLeft = othersLeft.filter((tier) => tier !== next.tier);
-    }
-    const nextOut = allUnlocked ? null : next;
-
-    let centerTier = featuredTier;
-    const showPbHero = shouldShowPersonalBestMedalHero(trackKey, lapTimeSec, {
-        previousTrackMedal,
-        previousPersonalBestSec,
-    });
-    if (showPbHero) {
-        centerTier = 'personal-best';
-        othersLeft = [...earned].sort((a, b) => STANDARD_MEDAL_TIER_RANK[a] - STANDARD_MEDAL_TIER_RANK[b]);
-        if (!allUnlocked && nextOut) {
-            othersLeft = othersLeft.filter((tier) => tier !== nextOut.tier);
-        }
-    }
-
-    return { centerTier, othersLeft, next: nextOut, allUnlocked };
+export function getWinOverlayAllMedalsUnlocked(trackKey, bestStoredMedal) {
+    const slots = getMedalRowSlots(trackKey, bestStoredMedal);
+    return slots.length > 0 && slots.every((s) => s.filled);
 }
 
 /**
@@ -398,6 +342,98 @@ export function getCombinedMedalStackTiers(trackKey, lapMedal) {
 }
 
 /**
+ * Lap-time ceiling (seconds) to earn a standard tier on this track.
+ * @param {string|null|undefined} trackKey
+ * @param {'bronze'|'silver'|'gold'|'author'} tier
+ * @returns {number|null}
+ */
+function getTierThresholdSeconds(trackKey, tier) {
+    const t = getTrackMedalThresholds(trackKey);
+    if (!t) return null;
+    if (tier === 'author') return getAuthorMedalSeconds(trackKey);
+    if (tier === 'bronze') return t.bronze;
+    if (tier === 'silver') return t.silver;
+    if (tier === 'gold') return t.gold;
+    return null;
+}
+
+/**
+ * Horizontal medal row slots (bronze → author): filled state + target time for locked tiers.
+ * @param {string|null|undefined} trackKey
+ * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} bestStoredMedal
+ * @returns {Array<{ tier: 'bronze'|'silver'|'gold'|'author', filled: boolean, thresholdSec: number|null }>}
+ */
+export function getMedalRowSlots(trackKey, bestStoredMedal) {
+    const stack = getCombinedMedalStackTiers(trackKey, bestStoredMedal);
+    return stack.map(({ tier, filled }) => ({
+        tier,
+        filled,
+        thresholdSec: getTierThresholdSeconds(trackKey, tier),
+    }));
+}
+
+/**
+ * @param {HTMLElement} parent
+ * @param {string|null|undefined} trackKey
+ * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} bestStoredMedal
+ * @param {{ rowClass?: string, iconClass?: string, ariaLabel?: string }} [options]
+ * @returns {HTMLDivElement}
+ */
+function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
+    rowClass = '',
+    iconClass = 'medal-svg--hero medal-pile-icon--deferred',
+    ariaLabel = 'Medals for this track',
+} = {}) {
+    const row = document.createElement('div');
+    row.className = rowClass ? `combined-medal-row ${rowClass}` : 'combined-medal-row';
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', ariaLabel);
+
+    const slots = getMedalRowSlots(trackKey, bestStoredMedal);
+    if (slots.length === 0) {
+        const slot = document.createElement('div');
+        slot.className = 'combined-medal-row-slot combined-medal-row-slot--fallback';
+        slot.appendChild(createMedalIconSvg('white', { className: iconClass }));
+        row.appendChild(slot);
+        parent.appendChild(row);
+        return row;
+    }
+
+    for (const { tier, filled, thresholdSec } of slots) {
+        const slot = document.createElement('div');
+        slot.className = 'combined-medal-row-slot';
+        slot.dataset.tier = tier;
+        if (!filled) {
+            slot.classList.add('combined-medal-row-slot--locked');
+        }
+
+        const centerText =
+            !filled && thresholdSec != null && Number.isFinite(thresholdSec)
+                ? `${thresholdSec.toFixed(2)}s`
+                : null;
+
+        const icon = createMedalIconSvg(tier, {
+            className: filled
+                ? iconClass
+                : 'medal-svg--hero medal-svg--row-placeholder',
+            outline: !filled,
+            showEmblem: filled,
+            centerText,
+            rowPlaceholder: !filled,
+        });
+        if (!filled && centerText) {
+            icon.setAttribute('aria-label', `${formatMedalLabel(tier)} locked, unlock at ${centerText}`);
+        }
+        slot.appendChild(icon);
+
+        row.appendChild(slot);
+    }
+
+    parent.appendChild(row);
+    return row;
+}
+
+/**
  * Bronze → gold (→ author) icons: filled through earned tier, outline for the rest.
  * @param {HTMLElement|null|undefined} el
  * @param {string|null|undefined} trackKey
@@ -414,8 +450,8 @@ export function renderMedalTierStack(el, trackKey, lapMedal, { iconClass = 'meda
 }
 
 /**
- * Combined results: earned tiers only; each in a slot (offset + depth), best tier on top (z-index).
- * Icons start hidden for {@link playCombinedHeroPileEntrance}.
+ * Combined results: horizontal medal row (all tiers; locked = outline + target time).
+ * Icons start hidden for {@link playCombinedMedalRowEntrance}.
  * @param {HTMLElement|null|undefined} heroEl `#combined-hero-medal`
  * @param {string|null|undefined} trackKey
  * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} lapMedal
@@ -423,53 +459,13 @@ export function renderMedalTierStack(el, trackKey, lapMedal, { iconClass = 'meda
 export function renderCombinedHeroMedalPile(heroEl, trackKey, lapMedal) {
     if (!heroEl) return;
     heroEl.replaceChildren();
-    const pile = document.createElement('div');
-    pile.className = 'combined-hero-medal-pile';
-    pile.setAttribute('role', 'group');
-    pile.setAttribute('aria-label', 'Medals unlocked for this track');
-
-    const appendOne = (tier) => {
-        const slot = document.createElement('div');
-        slot.className = 'combined-hero-medal-pile-slot';
-        slot.style.setProperty('--stack-index', '0');
-        const icon = createMedalIconSvg(tier, { className: 'medal-svg--hero medal-pile-icon--deferred' });
-        slot.appendChild(icon);
-        pile.appendChild(slot);
-        pile.style.setProperty('--stack-total', '1');
-    };
-
-    const thresholds = trackKey ? getTrackMedalThresholds(trackKey) : null;
-    if (!thresholds) {
-        appendOne(lapMedal || 'white');
-        heroEl.appendChild(pile);
-        return;
-    }
-
-    const earned = getCombinedMedalStackTiers(trackKey, lapMedal).filter((x) => x.filled);
-    if (earned.length === 0) {
-        appendOne('white');
-        heroEl.appendChild(pile);
-        return;
-    }
-
-    let idx = 0;
-    for (const { tier } of earned) {
-        const slot = document.createElement('div');
-        slot.className = 'combined-hero-medal-pile-slot';
-        slot.style.setProperty('--stack-index', String(idx));
-        const icon = createMedalIconSvg(tier, {
-            className: 'medal-svg--hero medal-pile-icon--deferred',
-        });
-        slot.appendChild(icon);
-        pile.appendChild(slot);
-        idx += 1;
-    }
-    pile.style.setProperty('--stack-total', String(earned.length));
-    heroEl.appendChild(pile);
+    appendMedalRowTo(heroEl, trackKey, lapMedal, {
+        ariaLabel: 'Medals unlocked for this track',
+    });
 }
 
 /**
- * Win combined overlay: stacked earned medals (hero on top, others peeking behind); subrow shows next goal when applicable.
+ * Win combined overlay: horizontal row of all medal tiers for this track.
  * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
  * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|null, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
  */
@@ -477,20 +473,18 @@ export function renderWinCombinedMedalOverlay(
     overlayEl,
     {
         trackKey = null,
-        lapTimeSec = null,
         lapMedal = null,
-        previousPersonalBestSec = undefined,
         previousTrackMedal = null,
     } = {},
 ) {
     if (!overlayEl) return;
     overlayEl.replaceChildren();
-    const { centerTier, othersLeft, allUnlocked } = getWinOverlayMedalLayout(
-        trackKey,
-        lapTimeSec,
-        lapMedal,
-        { previousPersonalBestSec, previousTrackMedal },
+
+    const bestStoredMedal = maxMedalTier(
+        isStandardMedalTier(previousTrackMedal) ? previousTrackMedal : null,
+        isStandardMedalTier(lapMedal) ? lapMedal : null,
     );
+    const allUnlocked = getWinOverlayAllMedalsUnlocked(trackKey, bestStoredMedal);
 
     const root = document.createElement('div');
     root.className = 'win-combined-medal-overlay';
@@ -502,45 +496,45 @@ export function renderWinCombinedMedalOverlay(
 
     const centerWrap = document.createElement('div');
     centerWrap.className = 'win-combined-medal-overlay__center';
-    const heroMedal = centerTier === 'white' ? 'white' : centerTier;
-    const pile = document.createElement('div');
-    pile.className = 'combined-hero-medal-pile win-combined-medal-overlay__pile';
-    pile.setAttribute('role', 'group');
-    pile.setAttribute('aria-label', 'Medals earned on this track');
-    let idx = 0;
-    for (const tier of othersLeft) {
-        const slot = document.createElement('div');
-        slot.className = 'combined-hero-medal-pile-slot';
-        slot.style.setProperty('--stack-index', String(idx));
-        slot.appendChild(
-            createMedalIconSvg(tier, {
-                className: 'medal-svg--hero medal-pile-icon--deferred',
-            }),
-        );
-        pile.appendChild(slot);
-        idx += 1;
-    }
-    const heroSlot = document.createElement('div');
-    heroSlot.className = 'combined-hero-medal-pile-slot';
-    heroSlot.style.setProperty('--stack-index', String(idx));
-    heroSlot.appendChild(
-        createMedalIconSvg(heroMedal, {
-            className: 'medal-svg--hero win-combined-medal-overlay__hero medal-pile-icon--deferred',
-        }),
-    );
-    pile.appendChild(heroSlot);
-    pile.style.setProperty('--stack-total', String(idx + 1));
-    centerWrap.appendChild(pile);
+    appendMedalRowTo(centerWrap, trackKey, bestStoredMedal, {
+        rowClass: 'win-combined-medal-overlay__row',
+        ariaLabel: 'Medals earned on this track',
+    });
     root.appendChild(centerWrap);
 
     overlayEl.appendChild(root);
 }
 
 /**
- * Reveal combined-result pile medals one after another (bronze → … → best).
- * @param {HTMLElement|null|undefined} pileEl `.combined-hero-medal-pile`
- * @param {{ staggerMs?: number, baseDelayMs?: number, reduced?: boolean, playUnlockSound?: (tier: string) => void }} [options]
+ * Reveal combined-result medal row left to right (bronze → … → author).
+ * @param {HTMLElement|null|undefined} rowEl `.combined-medal-row`
+ * @param {{ baseDelayMs?: number, reduced?: boolean, playUnlockSound?: (tier: string) => void }} [options]
  */
+export function playCombinedMedalRowEntrance(
+    rowEl,
+    { baseDelayMs = 0, reduced = false, shouldCelebrateTier = null, playUnlockSound = null, firstUnlockHoldMs = FIRST_UNLOCK_MEDAL_HOLD_MS } = {},
+) {
+    if (!rowEl) return;
+    const icons = rowEl.querySelectorAll(
+        ':scope > .combined-medal-row-slot:not(.combined-medal-row-slot--locked) > .medal-svg',
+    );
+    if (baseDelayMs > 0) {
+        setTimeout(() => {
+            revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound, firstUnlockHoldMs });
+        }, baseDelayMs);
+        return;
+    }
+    revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound, firstUnlockHoldMs });
+}
+
+/** @deprecated Use {@link playCombinedMedalRowEntrance} */
+export function playCombinedHeroPileEntrance(
+    rowEl,
+    options = {},
+) {
+    playCombinedMedalRowEntrance(rowEl, options);
+}
+
 /**
  * Crash combined view: impact slam on the hero crash medal (starts when the crash modal opens).
  * @param {HTMLElement|null|undefined} heroMedalEl `#combined-hero-medal`
@@ -555,71 +549,28 @@ export function playCrashMedalEntrance(heroMedalEl, { reduced = false } = {}) {
     icon.classList.remove('medal-pile-icon--deferred');
 }
 
-export function playCombinedHeroPileEntrance(
-    pileEl,
-    { baseDelayMs = 0, reduced = false, shouldCelebrateTier = null, playUnlockSound = null, firstUnlockHoldMs = FIRST_UNLOCK_MEDAL_HOLD_MS } = {},
-) {
-    if (!pileEl) return;
-    const icons = pileEl.querySelectorAll(':scope > .combined-hero-medal-pile-slot > .medal-svg');
-    if (baseDelayMs > 0) {
-        setTimeout(() => {
-            revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound, firstUnlockHoldMs });
-        }, baseDelayMs);
-        return;
-    }
-    revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound, firstUnlockHoldMs });
-}
-
-function revealWinOverlayHeroMedal(
+function revealWinOverlayMedalRow(
     root,
     { reduced = false, shouldCelebrateTier = null, playUnlockSound = null } = {},
 ) {
     if (!root) return;
-    const pile = root.querySelector('.win-combined-medal-overlay__pile');
-    if (pile) {
-        playCombinedHeroPileEntrance(pile, { baseDelayMs: 0, reduced, shouldCelebrateTier, playUnlockSound });
-        return;
+    const row = root.querySelector('.win-combined-medal-overlay__row, .combined-medal-row');
+    if (row) {
+        playCombinedMedalRowEntrance(row, { baseDelayMs: 0, reduced, shouldCelebrateTier, playUnlockSound });
     }
-    const hero = root.querySelector('.win-combined-medal-overlay__hero.medal-pile-icon--deferred');
-    const tier = hero?.dataset?.tier;
-    const celebrate = typeof shouldCelebrateTier === 'function'
-        ? shouldCelebrateTier(tier)
-        : true;
-    revealDeferredMedalIcon(hero, { delay: 0, reduced, celebrate, playUnlockSound });
-}
-
-function revealWinOverlaySecondaryMedals(
-    root,
-    { baseDelayMs = 130, reduced = false, shouldCelebrateTier = null, playUnlockSound = null } = {},
-) {
-    if (!root) return;
-    const icons = root.querySelectorAll('.win-combined-medal-overlay__medal-sm.medal-pile-icon--deferred');
-    if (baseDelayMs > 0) {
-        setTimeout(() => {
-            revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound });
-        }, baseDelayMs);
-        return;
-    }
-    revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound });
 }
 
 /**
- * Win overlay: hero pops immediately; earned + next small medals stagger after `baseDelayMs`.
+ * Win overlay: reveal medal row left to right after sheet intro.
  * @param {HTMLElement|null|undefined} root `.win-combined-medal-overlay`
- * @param {{ staggerMs?: number, secondaryBaseDelayMs?: number, reduced?: boolean, playUnlockSound?: (tier: string) => void }} [options]
+ * @param {{ reduced?: boolean, playUnlockSound?: (tier: string) => void }} [options]
  */
 export function playWinCombinedMedalOverlayEntrance(
     root,
-    { secondaryBaseDelayMs = 130, reduced = false, shouldCelebrateTier = null, playUnlockSound = null } = {},
+    { reduced = false, shouldCelebrateTier = null, playUnlockSound = null } = {},
 ) {
     if (!root) return;
-    revealWinOverlayHeroMedal(root, { reduced, shouldCelebrateTier, playUnlockSound });
-    revealWinOverlaySecondaryMedals(root, {
-        baseDelayMs: secondaryBaseDelayMs,
-        reduced,
-        shouldCelebrateTier,
-        playUnlockSound
-    });
+    revealWinOverlayMedalRow(root, { reduced, shouldCelebrateTier, playUnlockSound });
 }
 
 /**
@@ -632,7 +583,6 @@ function scheduleWinOverlayMedalEntranceWithSheetIntro(
     combinedViewEl,
     winOverlayRoot,
     {
-        secondaryBaseDelayMs = 130,
         reduced = false,
         fallbackMs = 200,
         shouldCelebrateTier = null,
@@ -642,13 +592,7 @@ function scheduleWinOverlayMedalEntranceWithSheetIntro(
     if (!winOverlayRoot) return;
 
     if (reduced) {
-        revealWinOverlayHeroMedal(winOverlayRoot, { reduced: true, shouldCelebrateTier, playUnlockSound });
-        revealWinOverlaySecondaryMedals(winOverlayRoot, {
-            baseDelayMs: 0,
-            reduced: true,
-            shouldCelebrateTier,
-            playUnlockSound
-        });
+        revealWinOverlayMedalRow(winOverlayRoot, { reduced: true, shouldCelebrateTier, playUnlockSound });
         return;
     }
 
@@ -660,13 +604,7 @@ function scheduleWinOverlayMedalEntranceWithSheetIntro(
         if (combinedViewEl) {
             combinedViewEl.removeEventListener('animationstart', onAnimationStart);
         }
-        revealWinOverlayHeroMedal(winOverlayRoot, { reduced: false, shouldCelebrateTier, playUnlockSound });
-        revealWinOverlaySecondaryMedals(winOverlayRoot, {
-            baseDelayMs: secondaryBaseDelayMs,
-            reduced: false,
-            shouldCelebrateTier,
-            playUnlockSound
-        });
+        revealWinOverlayMedalRow(winOverlayRoot, { reduced: false, shouldCelebrateTier, playUnlockSound });
     };
 
     const onAnimationStart = (e) => {
@@ -832,11 +770,11 @@ export function scheduleCombinedMedalEntranceAfterModal(
     } = {},
 ) {
     const winOverlayRoot = heroMedalEl?.querySelector?.(':scope > .win-combined-medal-overlay');
-    const winOverlayPile = winOverlayRoot?.querySelector?.('.win-combined-medal-overlay__pile');
-    const heroPile = heroMedalEl?.querySelector?.('.combined-hero-medal-pile');
+    const winOverlayRow = winOverlayRoot?.querySelector?.('.win-combined-medal-overlay__row, .combined-medal-row');
+    const heroRow = heroMedalEl?.querySelector?.(':scope > .combined-medal-row');
     const crashHeroMedal = heroMedalEl?.querySelector?.(':scope > .medal-svg--crash.medal-pile-icon--deferred');
     const hasStack = Boolean(stackEl && stackEl.childElementCount > 0);
-    if (!heroPile && !hasStack && !winOverlayRoot && !crashHeroMedal) return;
+    if (!heroRow && !hasStack && !winOverlayRoot && !crashHeroMedal) return;
 
     const reduced =
         typeof globalThis !== 'undefined'
@@ -851,8 +789,8 @@ export function scheduleCombinedMedalEntranceAfterModal(
     }
 
     const runEntrance = () => {
-        if (heroPile && !winOverlayPile) {
-            playCombinedHeroPileEntrance(heroPile, {
+        if (heroRow && !winOverlayRow) {
+            playCombinedMedalRowEntrance(heroRow, {
                 baseDelayMs: 0,
                 reduced,
                 shouldCelebrateTier,
@@ -884,7 +822,6 @@ export function scheduleCombinedMedalEntranceAfterModal(
     if (reduced) {
         if (winOverlayRoot) {
             scheduleWinOverlayMedalEntranceWithSheetIntro(combinedViewEl, winOverlayRoot, {
-                secondaryBaseDelayMs: 0,
                 reduced: true,
                 shouldCelebrateTier,
                 playUnlockSound
@@ -896,14 +833,13 @@ export function scheduleCombinedMedalEntranceAfterModal(
 
     if (winOverlayRoot) {
         scheduleWinOverlayMedalEntranceWithSheetIntro(combinedViewEl, winOverlayRoot, {
-            secondaryBaseDelayMs: winSecondaryBaseDelayMs,
             reduced: false,
             shouldCelebrateTier,
             playUnlockSound
         });
     }
 
-    if ((heroPile && !winOverlayPile) || hasStack) {
+    if ((heroRow && !winOverlayRow) || hasStack) {
         scheduleAfterModalCombinedIntro(modalEl, combinedViewEl, runEntrance);
     }
 }

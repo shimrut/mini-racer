@@ -4,7 +4,6 @@ import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/resu
 import { createCrashMedalHeroIcon, createMedalIconSvg } from '../medals/medal-icon.js?v=2.04';
 import {
     formatMedalLabel,
-    getWinOverlayMedalLayout,
     renderWinCombinedMedalOverlay,
     getTrackMedalThresholds,
     getAuthorMedalSeconds,
