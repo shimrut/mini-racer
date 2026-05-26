@@ -364,6 +364,7 @@ export const dailyChallengeEngineMethods = {
         await this.loadTrack(challenge.trackKey, {
           trackPageview: false,
           countMapSelection: true,
+          loadPlayerProgress: false,
         });
       }
 
