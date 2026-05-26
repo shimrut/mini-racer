@@ -246,8 +246,8 @@ export class DailyChallengeUi {
 
     bindPlaylistModal() {
         configureReusableModal(this.dailyChallengePlaylistModal, {
-            title: 'Playlist',
-            subtitle: 'Last 7 Days',
+            title: 'Tracks',
+            subtitle: 'Playable daily tracks',
             closeLabel: 'Close',
         });
         bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
@@ -265,7 +265,7 @@ export class DailyChallengeUi {
         if (challenges === null) {
             const loading = document.createElement('div');
             loading.className = 'daily-playlist-empty';
-            loading.textContent = 'Loading playlist...';
+            loading.textContent = 'Loading tracks...';
             list.appendChild(loading);
             return;
         }
@@ -293,11 +293,15 @@ export class DailyChallengeUi {
 
             const copy = document.createElement('div');
             copy.className = 'daily-playlist-copy';
+            const titleRow = document.createElement('div');
+            titleRow.className = 'daily-playlist-title-row';
             const title = document.createElement('div');
             title.className = 'daily-playlist-title';
             title.textContent = getDailyChallengeTrackName(challenge);
-            const subtitle = document.createElement('div');
-            subtitle.className = 'daily-playlist-subtitle';
+            titleRow.append(title);
+
+            const stats = document.createElement('div');
+            stats.className = 'daily-playlist-metrics';
             const pendingEntry = getDailyChallengeVerificationEntry(challenge.id);
             const isPending = getDailyChallengeVerificationState(challenge.id) === 'pending'
                 && pendingEntry;
@@ -308,32 +312,35 @@ export class DailyChallengeUi {
                     pendingEntry.completedLaps
                 )
                 : getDailyChallengeBestDisplay(challenge);
-            subtitle.textContent = `Best: ${bestLabel}`;
+            const best = document.createElement('span');
+            best.className = 'daily-playlist-metric daily-playlist-metric--best';
+            best.textContent = bestLabel && bestLabel !== '--' ? bestLabel : '--';
             if (isPending) {
-                const spinner = document.createElement('span');
-                spinner.className = 'daily-playlist-row-spinner';
-                spinner.setAttribute('aria-label', 'Updating this track');
-                subtitle.appendChild(spinner);
+                best.setAttribute('aria-label', 'Pending best time verification');
             }
-            const availability = document.createElement('div');
-            availability.className = 'daily-playlist-availability';
-            const availabilityLabel = formatDailyChallengePlaylistAvailabilityLabel(challenge);
-            if (availabilityLabel) {
-                availability.textContent = availabilityLabel;
-            }
-            copy.append(title, subtitle, availability);
-
-            const actionsWrap = document.createElement('div');
-            actionsWrap.className = 'daily-playlist-actions';
+            stats.append(best);
 
             const rankBtn = document.createElement('button');
-            rankBtn.className = 'daily-playlist-rank-btn';
+            rankBtn.className = 'daily-playlist-metric daily-playlist-rank-btn';
             rankBtn.type = 'button';
             this.applyPlaylistRankButton(rankBtn, challenge);
             rankBtn.addEventListener('click', () => {
                 this.closePlaylistModal();
                 onLeaderboard?.(challenge);
             });
+            stats.append(rankBtn);
+
+            const availabilityLabel = formatDailyChallengePlaylistAvailabilityLabel(challenge);
+            if (availabilityLabel) {
+                const availability = document.createElement('span');
+                availability.className = 'daily-playlist-metric daily-playlist-metric--time';
+                availability.textContent = availabilityLabel;
+                stats.append(availability);
+            }
+            copy.append(titleRow, stats);
+
+            const actionsWrap = document.createElement('div');
+            actionsWrap.className = 'daily-playlist-actions';
 
             const play = document.createElement('button');
             play.className = 'daily-playlist-icon-btn daily-playlist-icon-btn--primary';
@@ -348,7 +355,7 @@ export class DailyChallengeUi {
                 this.closePlaylistModal();
                 onPlay?.(challenge);
             });
-            actionsWrap.append(rankBtn, play);
+            actionsWrap.append(play);
 
             row.append(canvas, copy, actionsWrap);
             list.appendChild(row);
@@ -382,10 +389,7 @@ export class DailyChallengeUi {
         button.classList.toggle('daily-playlist-rank-btn--loading', rankDisplay.isLoading);
 
         if (rankDisplay.isLoading) {
-            const spinner = document.createElement('span');
-            spinner.className = 'daily-playlist-rank-spinner';
-            spinner.setAttribute('aria-hidden', 'true');
-            button.appendChild(spinner);
+            button.textContent = '--';
             button.setAttribute('aria-busy', 'true');
             button.setAttribute('aria-label', `Loading rank for ${trackName}. Open leaderboard.`);
             return;
@@ -393,14 +397,11 @@ export class DailyChallengeUi {
 
         button.removeAttribute('aria-busy');
         const rankText = rankDisplay.text || '--';
-        const value = document.createElement('span');
-        value.className = 'daily-playlist-rank-value';
         if (rankText.startsWith('#')) {
-            value.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
+            button.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
         } else {
-            value.textContent = rankText;
+            button.textContent = rankText;
         }
-        button.appendChild(value);
         button.setAttribute(
             'aria-label',
             rankText && rankText !== 'N/A'

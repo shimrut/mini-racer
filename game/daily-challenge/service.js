@@ -606,25 +606,19 @@ export function formatDailyChallengePlaylistAvailabilityLabel(challenge) {
     if (!Number.isFinite(untilMs)) return '';
 
     const remainingMs = untilMs - Date.now();
-    if (remainingMs <= 0) return 'No longer available';
+    if (remainingMs <= 0) return 'Expired';
 
-    if (remainingMs < DAY_MS) {
-        const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const parts = [];
-        if (hours > 0) parts.push(`${hours}h`);
-        parts.push(`${minutes}m`);
-        return `Leaves playlist in ${parts.join(' ')}`;
+    const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+    if (totalMinutes < 60) {
+        return `${totalMinutes}m`;
     }
 
-    const untilDate = new Date(untilMs);
-    const now = new Date();
-    const options = { month: 'short', day: 'numeric' };
-    if (untilDate.getFullYear() !== now.getFullYear()) {
-        options.year = 'numeric';
+    const totalHours = Math.ceil(totalMinutes / 60);
+    if (totalHours < 24) {
+        return `${totalHours}h`;
     }
-    return `Available until ${untilDate.toLocaleDateString(undefined, options)}`;
+
+    return `${Math.ceil(totalHours / 24)}d`;
 }
 
 export function getDailyChallengeModifierBadges(challenge) {

@@ -342,10 +342,12 @@ export const dailyChallengeEngineMethods = {
   },
 
   async handleStartDailyChallenge(challengeOverride = null) {
+    const challenge = challengeOverride || this.currentDailyChallenge || this.activeDailyChallenge;
+    const replacesCurrentRun = Boolean(challengeOverride) && this.status !== "ready";
     if (
-      this.status !== "ready" ||
+      (this.status !== "ready" && !replacesCurrentRun) ||
       this.startButtonPending ||
-      (!challengeOverride && !(this.currentDailyChallenge || this.activeDailyChallenge))
+      !challenge
     ) {
       return;
     }
@@ -354,7 +356,9 @@ export const dailyChallengeEngineMethods = {
     this.startButtonPending = true;
     const playerTypeAlreadySent = this.sessionFlags.get("playerTypeSent");
     try {
-      const challenge = challengeOverride || this.currentDailyChallenge || this.activeDailyChallenge;
+      if (replacesCurrentRun && challenge.trackKey === this.currentTrackKey) {
+        this.reset(false);
+      }
       this.activeDailyChallenge = challenge;
       if (challenge.trackKey && challenge.trackKey !== this.currentTrackKey) {
         await this.loadTrack(challenge.trackKey, {
