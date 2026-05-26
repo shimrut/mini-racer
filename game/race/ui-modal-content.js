@@ -2,18 +2,12 @@ import { TRACKS } from '../track/tracks.js?v=1.91';
 import { getLeaderboardPlayerName } from '../scoreboard/service.js?v=1.91';
 import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/result-flow.js?v=1.91';
 import { createCrashMedalHeroIcon, createMedalIconSvg } from '../medals/medal-icon.js?v=2.04';
-import {
-    formatMedalLabel,
-    renderWinCombinedMedalOverlay,
-    getTrackMedalThresholds,
-    getAuthorMedalSeconds,
-    maxMedalTier
-} from '../medals/medals.js?v=2.04';
+import { renderWinCombinedMedalOverlay } from '../medals/medals.js?v=2.04';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js?v=1.91';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
-export function bindMedalTargetsOverlayEscapeDismiss(onDismiss) {
+export function bindPopoverOverlayEscapeDismiss(onDismiss) {
     if (typeof document === 'undefined') return () => {};
 
     const onKeydown = (event) => {
@@ -79,7 +73,7 @@ export function mountCombinedPopoverOverlay(container, { title, overlayClass = '
         }, { once: true });
     };
 
-    unbindEscape = bindMedalTargetsOverlayEscapeDismiss(dismiss);
+    unbindEscape = bindPopoverOverlayEscapeDismiss(dismiss);
 
     overlay.onclick = (e) => {
         if (e.target === overlay) dismiss();
@@ -660,8 +654,6 @@ export class ModalContentUi {
 
         if (isCrashCombined) {
             if (heroMedalEl) {
-                heroMedalEl.classList.remove('combined-hero-medal--interactive');
-                heroMedalEl.onclick = null;
                 heroMedalEl.appendChild(createCrashMedalHeroIcon());
             }
         } else if (heroMedalEl) {
@@ -672,57 +664,6 @@ export class ModalContentUi {
                 previousPersonalBestSec,
                 previousTrackMedal,
             });
-
-            // Set up click/tap interaction for medal times popover modal
-            heroMedalEl.classList.add('combined-hero-medal--interactive');
-            heroMedalEl.onclick = () => {
-                const thresholds = trackKey ? getTrackMedalThresholds(trackKey) : null;
-                const authorSec = trackKey ? getAuthorMedalSeconds(trackKey) : null;
-
-                const bestMedal = maxMedalTier(previousTrackMedal, lapMedal);
-                const tierRank = { bronze: 0, silver: 1, gold: 2, author: 3 };
-                const bestRank = bestMedal ? tierRank[bestMedal] : -1;
-
-                mountCombinedPopoverOverlay(container, {
-                    title: 'MEDAL TARGETS',
-                    buildRows: (listEl) => {
-                        const addRow = (tier, seconds) => {
-                            if (seconds == null || !Number.isFinite(seconds)) return;
-                            const row = document.createElement('div');
-                            row.className = `combined-medal-times-row combined-medal-times-row--${tier}`;
-
-                            const isUnlocked = bestRank !== -1 && tierRank[tier] <= bestRank;
-                            if (isUnlocked) {
-                                row.classList.add('combined-medal-times-row--unlocked');
-                            }
-
-                            const iconSlot = document.createElement('div');
-                            iconSlot.className = 'combined-medal-times-icon-slot';
-                            iconSlot.appendChild(createMedalIconSvg(tier, { className: 'medal-svg--sm' }));
-
-                            const label = document.createElement('span');
-                            label.className = 'combined-medal-times-label';
-                            label.textContent = formatMedalLabel(tier).toUpperCase();
-
-                            const timeVal = document.createElement('span');
-                            timeVal.className = 'combined-medal-times-time';
-                            timeVal.textContent = `${seconds.toFixed(2)}s`;
-
-                            row.appendChild(iconSlot);
-                            row.appendChild(label);
-                            row.appendChild(timeVal);
-                            listEl.appendChild(row);
-                        };
-
-                        if (authorSec != null) addRow('author', authorSec);
-                        if (thresholds) {
-                            addRow('gold', thresholds.gold);
-                            addRow('silver', thresholds.silver);
-                            addRow('bronze', thresholds.bronze);
-                        }
-                    },
-                });
-            };
         }
         
         const formatStat = (val, label) => {

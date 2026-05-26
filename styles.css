@@ -572,85 +572,6 @@ body.start-selection-active .lap-flash {
     opacity: 0.9;
 }
 
-.combined-hero-medal--interactive .combined-medal-row-slot {
-    cursor: pointer;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot:hover .medal-svg--hero,
-.combined-hero-medal--interactive .combined-medal-row-slot:focus-visible .medal-svg--hero {
-    transform: scale(1.08);
-    opacity: 1;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero {
-    filter: none;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--bronze .medal-svg__shape,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
-    stroke: #c17f59;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--silver .medal-svg__shape,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--silver .medal-svg__shape {
-    stroke: #b8c4d4;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--gold .medal-svg__shape,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--gold .medal-svg__shape {
-    stroke: #e8b84a;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--outline.medal-svg--author .medal-svg__shape,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--outline.medal-svg--author .medal-svg__shape {
-    stroke: #c4b5fd;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--bronze.medal-svg--outline .medal-svg__center-time,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--bronze.medal-svg--outline .medal-svg__center-time {
-    fill: #ffd3b6;
-    opacity: 1;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--silver.medal-svg--outline .medal-svg__center-time,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--silver.medal-svg--outline .medal-svg__center-time {
-    fill: #f8fafc;
-    opacity: 1;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--gold.medal-svg--outline .medal-svg__center-time,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--gold.medal-svg--outline .medal-svg__center-time {
-    fill: #fff7c2;
-    opacity: 1;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--author.medal-svg--outline .medal-svg__center-time,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--author.medal-svg--outline .medal-svg__center-time {
-    fill: #e0e7ff;
-    opacity: 1;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--bronze,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--bronze {
-    filter: drop-shadow(0 0 10px rgba(217, 119, 87, 0.4)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--silver,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--silver {
-    filter: drop-shadow(0 0 10px rgba(203, 213, 225, 0.35)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--gold,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--gold {
-    filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.45)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:hover .medal-svg--hero.medal-svg--author,
-.combined-hero-medal--interactive .combined-medal-row-slot--locked:focus-visible .medal-svg--hero.medal-svg--author {
-    filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.65)) drop-shadow(0 0 8px rgba(103, 232, 249, 0.45)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
-}
-
 .combined-medal-row .medal-pile-icon--deferred {
     opacity: 0;
     transform: scale(0.42) translateY(0.55rem);
@@ -709,11 +630,6 @@ body.start-selection-active .lap-flash {
 
     .medal-pile-icon--deferred {
         opacity: 1;
-        transform: none;
-    }
-
-    .combined-hero-medal--interactive .combined-medal-row-slot:hover .medal-svg--hero,
-    .combined-hero-medal--interactive .combined-medal-row-slot:focus-visible .medal-svg--hero {
         transform: none;
     }
 
@@ -2077,24 +1993,12 @@ body.start-selection-active #start-overlay {
     padding-bottom: 0.2rem;
 }
 
-#modal.modal--pause .pause-results-section .combined-sheet-topbar #modal-menu-btn,
-#modal.modal--pause .pause-results-section .combined-sheet-topbar #pause-settings-btn {
+#modal.modal--pause .pause-results-section .combined-sheet-topbar .combined-action-btn {
     width: auto;
     max-width: none;
     height: auto;
-    padding: 0.42rem 0.88rem;
+    padding: 0.42rem;
     flex-shrink: 0;
-}
-
-#modal.modal--pause .pause-results-section .combined-sheet-topbar #modal-menu-btn {
-    align-self: flex-start;
-    padding: 0.42rem;
-}
-
-#modal.modal--pause .pause-results-section .combined-sheet-topbar #pause-settings-btn {
-    align-self: flex-end;
-    margin-left: auto;
-    padding: 0.42rem;
 }
 
 #modal.modal--pause .pause-results-header {
@@ -3437,6 +3341,7 @@ body.start-selection-active #start-overlay {
     width: 2rem;
     height: 2rem;
     pointer-events: none;
+    fill: var(--text-muted);
 }
 
 .reusable-modal-close:hover {
@@ -3876,8 +3781,8 @@ body.start-selection-active #start-overlay {
 
 .modal--pause .modal-action-icon,
 .modal--win .modal-action-icon {
-    width: 1.85rem;
-    height: 1.85rem;
+    width: 2.1rem;
+    height: 2.1rem;
     stroke-width: 2.15
 }
 
@@ -4076,10 +3981,6 @@ body.start-selection-active #start-overlay {
         display: none
     }
 
-    .modal {
-        padding-top: 2rem
-    }
-
     .modal-card {
         padding: 1rem;
         max-width: min(92vw, 420px)
@@ -4211,7 +4112,7 @@ body.start-selection-active #start-overlay {
     margin: auto;
 }
 
-/* Win/crash: sheet header chrome — Home at card top-left (not in footer .combined-actions) */
+/* Win/crash/pause: sheet header — tools left, close right */
 .combined-sheet-topbar {
     display: none;
     width: 100%;
@@ -4223,6 +4124,22 @@ body.start-selection-active #start-overlay {
     padding: 0 0 0.45rem;
 }
 
+.combined-sheet-topbar__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.combined-sheet-topbar__close {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.combined-sheet-topbar__close svg {
+    fill: var(--text-dim);
+}
+
 #modal.modal--win #modal-combined-view.active-view .combined-results-section > .combined-sheet-topbar,
 #modal.modal--crash #modal-combined-view.active-view .combined-results-section > .combined-sheet-topbar {
     display: flex;
@@ -4230,36 +4147,17 @@ body.start-selection-active #start-overlay {
     padding-bottom: 0.2rem;
 }
 
-#modal.modal--win .combined-results-section .combined-sheet-topbar #combined-menu-btn,
-#modal.modal--crash .combined-results-section .combined-sheet-topbar #combined-menu-btn,
-#modal.modal--win .combined-results-section .combined-sheet-topbar #combined-settings-btn,
-#modal.modal--crash .combined-results-section .combined-sheet-topbar #combined-settings-btn,
-#modal.modal--win .combined-results-section .combined-sheet-topbar #combined-tune-btn,
-#modal.modal--crash .combined-results-section .combined-sheet-topbar #combined-tune-btn {
+#modal.modal--win .combined-results-section .combined-sheet-topbar .combined-action-btn,
+#modal.modal--crash .combined-results-section .combined-sheet-topbar .combined-action-btn {
     width: auto;
     max-width: none;
     height: auto;
-    padding: 0.42rem 0.88rem;
+    padding: 0.42rem;
     flex-shrink: 0;
-}
-
-#modal.modal--win .combined-results-section .combined-sheet-topbar #combined-menu-btn,
-#modal.modal--crash .combined-results-section .combined-sheet-topbar #combined-menu-btn {
-    align-self: flex-start;
-    padding: 0.42rem;
-}
-
-#modal.modal--win .combined-results-section .combined-sheet-topbar #combined-settings-btn,
-#modal.modal--crash .combined-results-section .combined-sheet-topbar #combined-settings-btn {
-    align-self: flex-end;
-    margin-left: auto;
-    padding: 0.42rem;
 }
 
 #modal.modal--win .combined-results-section .combined-sheet-topbar #combined-tune-btn,
 #modal.modal--crash .combined-results-section .combined-sheet-topbar #combined-tune-btn {
-    align-self: flex-end;
-    padding: 0.42rem;
     touch-action: manipulation;
 }
 
@@ -4432,7 +4330,7 @@ body.start-selection-active #start-overlay {
     gap: 0.75rem;
 }
 
-/* Win / crash: Home + Settings + Garage in top bar; footer = Improve/Retry only */
+/* Win / crash: Settings + Garage + Playlist left, Close right; footer = Improve/Retry only */
 #modal.modal--win .combined-results-section .combined-actions,
 #modal.modal--crash .combined-results-section .combined-actions {
     grid-template-columns: 1fr;
@@ -4476,6 +4374,13 @@ body.start-selection-active #start-overlay {
 .combined-action-btn svg,
 .combined-action-btn .combined-action-btn-label {
     pointer-events: none;
+}
+
+#modal.modal--win .combined-sheet-topbar .combined-action-btn svg,
+#modal.modal--crash .combined-sheet-topbar .combined-action-btn svg,
+#modal.modal--pause .combined-sheet-topbar .combined-action-btn svg {
+    width: 1.5rem;
+    height: 1.5rem;
 }
 
 .combined-action-btn:active {
@@ -4696,15 +4601,6 @@ body:not(.loading-active) #loading-screen {
     }
 }
 
-/* Win Combined: per-slot medal hover; tap anywhere on row still opens targets popover */
-.combined-hero-medal--interactive {
-    cursor: pointer;
-}
-
-.combined-hero-medal--interactive .combined-medal-row-slot:active .medal-svg--hero {
-    transform: scale(1.03);
-}
-
 .combined-stat-value--interactive {
     cursor: pointer;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
@@ -4807,21 +4703,6 @@ body:not(.loading-active) #loading-screen {
     padding: 0.55rem;
 }
 
-.combined-medal-times-icon-slot {
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 0.75rem;
-}
-
-.combined-medal-times-icon-slot .medal-svg--sm {
-    width: 2rem;
-    height: 2rem;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-}
-
 .combined-medal-times-label {
     font-size: 0.75rem;
     font-weight: 800;
@@ -4829,43 +4710,11 @@ body:not(.loading-active) #loading-screen {
     flex-grow: 1;
 }
 
-/* Colors matching the exact theme colors */
-.combined-medal-times-row--author .combined-medal-times-label {
-    color: #a78bfa; /* purple */
-}
-
-.combined-medal-times-row--gold .combined-medal-times-label {
-    color: #fcd34d; /* gold */
-}
-
-.combined-medal-times-row--silver .combined-medal-times-label {
-    color: #cbd5e1; /* silver/white */
-}
-
-.combined-medal-times-row--bronze .combined-medal-times-label {
-    color: #d0885f; /* bronze/copper */
-}
-
 .combined-medal-times-time {
     font-size: 0.95rem;
     font-weight: 900;
     font-family: var(--mono-font);
     color: var(--text-color);
-}
-
-/* Unlocked row style: greyed out and strikethrough */
-.combined-medal-times-row--unlocked {
-    opacity: 0.45;
-}
-
-.combined-medal-times-row--unlocked .combined-medal-times-label,
-.combined-medal-times-row--unlocked .combined-medal-times-time {
-    text-decoration: line-through;
-    color: #64748b !important;
-}
-
-.combined-medal-times-row--unlocked .combined-medal-times-icon-slot {
-    filter: grayscale(1) contrast(0.8) brightness(0.9);
 }
 
 .combined-medal-times-row--split .combined-medal-times-label {
