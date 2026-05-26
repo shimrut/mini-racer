@@ -66,9 +66,9 @@ export class ModalShell {
     }
 
     _syncGarageButtonToPanelState() {
+        const garageOpen = Boolean(this.getSkillPointsUi?.()?.isGarageOpen?.());
         const btn = this.combinedTuneBtn;
         if (!btn) return;
-        const garageOpen = Boolean(this.getSkillPointsUi?.()?.isGarageOpen?.());
         btn.classList.toggle('combined-action-btn--active', garageOpen);
         btn.setAttribute('aria-expanded', garageOpen ? 'true' : 'false');
     }
@@ -297,9 +297,11 @@ export class ModalShell {
     get modalCombinedView() { return document.getElementById('modal-combined-view'); }
     get modalPauseView() { return document.getElementById('modal-pause-view'); }
     get pauseSettingsBtn() { return document.getElementById('pause-settings-btn'); }
+    get pausePlaylistBtn() { return document.getElementById('modal-pause-playlist-btn'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
     get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
     get combinedTuneBtn() { return document.getElementById('combined-tune-btn'); }
+    get combinedPlaylistBtn() { return document.getElementById('combined-playlist-btn'); }
     get combinedRestartBtn() { return document.getElementById('combined-restart-btn'); }
     cancelPendingModalClose() {
         if (!this.modal) return;
@@ -428,8 +430,10 @@ export class ModalShell {
 
         this._bindClickAction(this.modalMenuBtn, options.secondaryAction);
         this._bindClickAction(this.pauseSettingsBtn, options.settingsAction);
+        this._bindClickAction(this.pausePlaylistBtn, options.playlistAction);
         this._bindClickAction(this.modalRestartBtn, options.restartAction);
         this._bindClickAction(this.modalResumeBtn, options.primaryAction);
+        this._syncGarageButtonToPanelState();
 
         this.modalMainView?.classList.remove('active-view');
         this.modalRunsView?.classList.remove('active-view');
@@ -485,7 +489,9 @@ export class ModalShell {
         this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
         this._bindClickAction(this.combinedSettingsBtn, options.settingsAction);
         this._bindCombinedGarageBtn(this.combinedTuneBtn);
+        this._bindClickAction(this.combinedPlaylistBtn, options.playlistAction);
         this._bindClickAction(this.combinedRestartBtn, finishResultModal(options.restartAction || options.primaryAction));
+        this._syncGarageButtonToPanelState();
 
         // Bind click/tap interaction for global leaderboard modal on rank tap
         const rightGroupEl = this.modalCombinedView?.querySelector('#combined-stats-right-group');

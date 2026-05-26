@@ -536,6 +536,9 @@ export const dailyChallengeEngineMethods = {
           secondaryAction: () => this.reset(false),
         }),
         settingsAction: () => this.settings.openSettings(),
+        playlistAction: () => {
+          void this.openDailyChallengePlaylist();
+        },
       },
     );
   },
@@ -676,6 +679,9 @@ export const dailyChallengeEngineMethods = {
           secondaryAction: () => this.reset(false),
         }),
         settingsAction: () => this.settings.openSettings(),
+        playlistAction: () => {
+          void this.openDailyChallengePlaylist();
+        },
       },
     );
     if (this.modal.modalMsg) {

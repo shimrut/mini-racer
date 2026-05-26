@@ -349,6 +349,9 @@ export const raceEngineMethods = {
               this.skillPoints?.getAllocation?.() ?? readSkillPointAllocation(),
           },
           settingsAction: () => this.settings.openSettings(),
+          playlistAction: () => {
+            void this.openDailyChallengePlaylist();
+          },
         },
       );
       return;
@@ -391,6 +394,9 @@ export const raceEngineMethods = {
             this.skillPoints?.getAllocation?.() ?? readSkillPointAllocation(),
         },
         settingsAction: () => this.settings.openSettings(),
+        playlistAction: () => {
+          void this.openDailyChallengePlaylist();
+        },
       },
     );
   },
@@ -483,6 +489,9 @@ export const raceEngineMethods = {
             secondaryActionIcon: "done",
           }),
           settingsAction: () => this.settings.openSettings(),
+          playlistAction: () => {
+            void this.openDailyChallengePlaylist();
+          },
         },
       );
     }
