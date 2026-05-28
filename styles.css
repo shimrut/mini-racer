@@ -452,6 +452,14 @@ body.start-selection-active .lap-flash {
     flex-shrink: 0;
 }
 
+.medal-svg--playlist {
+    width: 1rem;
+    height: auto;
+    margin-right: 0.25rem;
+    align-self: center;
+    flex-shrink: 0;
+}
+
 @keyframes medal-entrance-pop {
     0% {
         opacity: 0;
@@ -832,7 +840,7 @@ button:active {
     filter: brightness(.92);
 }
 
-button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-modal-close):not(.modal-btn):not(.hud-pause-btn):not(.daily-playlist-rank-btn):not(.daily-playlist-icon-btn):not(.touch-btn) {
+button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-modal-close):not(.modal-btn):not(.hud-pause-btn):not(.daily-playlist-rank-btn):not(.daily-playlist-icon-btn):not(.daily-playlist-start-btn):not(.touch-btn) {
     transform: scale(.98);
 }
 
@@ -3025,7 +3033,7 @@ body.start-selection-active #start-overlay {
     column-gap: 0.75rem;
     align-items: center;
     width: 100%;
-    min-height: 4.9rem;
+    min-height: 4rem;
     box-sizing: border-box;
 }
 
@@ -3062,20 +3070,30 @@ body.start-selection-active #start-overlay {
     white-space: nowrap;
 }
 
+.daily-playlist-expiry {
+    font-family: var(--header-font);
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    line-height: 1;
+    margin-bottom: -0.22rem;
+}
+
 .daily-playlist-metrics {
-    display: grid;
-    grid-template-columns: minmax(3.5rem, 1fr) minmax(2.25rem, 0.65fr) minmax(2.25rem, 0.65fr);
-    align-items: baseline;
-    gap: 0.75rem;
-    width: min(100%, 11.5rem);
+    display: flex;
+    align-items: center;
+    width: min(100%, 8.5rem);
     min-width: 0;
+    justify-content: space-between;
 }
 
 .daily-playlist-metric,
 .daily-playlist-rank-btn {
     display: inline-flex;
     min-width: 0;
-    align-items: baseline;
+    align-items: center;
     justify-content: flex-start;
     box-sizing: border-box;
     color: var(--text-dim);
@@ -3107,29 +3125,36 @@ body.start-selection-active #start-overlay {
     font-weight: 700;
 }
 
-.daily-playlist-icon-btn {
+.daily-playlist-start-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    padding: 0;
+    height: 2.35rem;
+    padding: 0 1rem;
     border: none;
     border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.09);
+    background: var(--accent-color);
     color: #fff;
     cursor: pointer;
-    transition: none;
+    font-family: var(--header-font);
+    font-size: 0.78rem;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
-.daily-playlist-icon-btn--primary {
-    background: var(--accent-color);
+.daily-playlist-start-btn:hover {
+    background: var(--accent-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
 }
 
-.daily-playlist-icon-btn svg {
-    width: 1.2rem;
-    height: 1.2rem;
-    pointer-events: none;
+.daily-playlist-start-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.15);
 }
 
 .daily-playlist-empty {
@@ -3146,7 +3171,6 @@ body.start-selection-active #start-overlay {
     .daily-playlist-row {
         grid-template-columns: 4.75rem minmax(0, 1fr) auto;
         column-gap: 0.6rem;
-        min-height: 5.4rem;
     }
 
     .daily-playlist-preview {
@@ -3160,14 +3184,15 @@ body.start-selection-active #start-overlay {
     }
 
     .daily-playlist-metrics {
-        grid-template-columns: minmax(3.25rem, 1fr) minmax(2rem, 0.6fr) minmax(2rem, 0.6fr);
+        grid-template-columns: minmax(3.25rem, 1.2fr) minmax(2.25rem, 1fr);
         gap: 0.55rem;
-        width: min(100%, 9.75rem);
+        width: min(100%, 7.5rem);
     }
 
-    .daily-playlist-icon-btn {
-        width: 2.65rem;
-        height: 2.65rem;
+    .daily-playlist-start-btn {
+        height: 2.15rem;
+        padding: 0 0.75rem;
+        font-size: 0.75rem;
     }
 }
 

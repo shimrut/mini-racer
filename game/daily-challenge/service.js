@@ -38,6 +38,13 @@ function getMockDailyUrlParams() {
     }
 }
 
+/** Standalone post preview card (`preview.html`) — always use local/mock daily data. */
+export function isPreviewPage() {
+    if (typeof window === 'undefined') return false;
+    const path = window.location?.pathname || '';
+    return /(?:^|\/)preview\.html$/i.test(path);
+}
+
 /** mockDaily=true → random track; mockDaily=<trackKey> → that track only */
 function resolveMockDailyTrackKey(params) {
     if (!params) return null;
@@ -56,6 +63,10 @@ function resolveMockDailyTrackKey(params) {
 }
 
 function shouldUseMockDailyChallenge() {
+    if (isPreviewPage()) {
+        return true;
+    }
+
     const params = getMockDailyUrlParams();
     if (params) {
         const mockDaily = params.get('mockDaily');
@@ -613,12 +624,15 @@ export function formatDailyChallengePlaylistAvailabilityLabel(challenge) {
         return `${totalMinutes}m`;
     }
 
-    const totalHours = Math.ceil(totalMinutes / 60);
+    const totalHours = Math.floor(totalMinutes / 60);
     if (totalHours < 24) {
-        return `${totalHours}h`;
+        const minutes = totalMinutes % 60;
+        return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
     }
 
-    return `${Math.ceil(totalHours / 24)}d`;
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
 }
 
 export function getDailyChallengeModifierBadges(challenge) {

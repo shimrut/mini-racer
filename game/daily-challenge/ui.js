@@ -20,6 +20,8 @@ import {
 } from '../car/sprite.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
+import { readTrackLastLapMedal } from '../medals/last-lap-medal-storage.js';
+import { createMedalIconSvg } from '../medals/medal-icon.js';
 
 export class DailyChallengeUi {
     constructor({
@@ -221,7 +223,7 @@ export class DailyChallengeUi {
         });
         document.body.classList.add('modal-open');
         requestAnimationFrame(() => {
-            const firstPlay = modal.querySelector('.daily-playlist-icon-btn--primary');
+            const firstPlay = modal.querySelector('.daily-playlist-start-btn');
             if (firstPlay instanceof HTMLButtonElement) {
                 firstPlay.focus();
             } else {
@@ -247,7 +249,7 @@ export class DailyChallengeUi {
     bindPlaylistModal() {
         configureReusableModal(this.dailyChallengePlaylistModal, {
             title: 'Tracks',
-            subtitle: 'Playable daily tracks',
+            subtitle: 'Last 7 Days',
             closeLabel: 'Close',
         });
         bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
@@ -314,7 +316,16 @@ export class DailyChallengeUi {
                 : getDailyChallengeBestDisplay(challenge);
             const best = document.createElement('span');
             best.className = 'daily-playlist-metric daily-playlist-metric--best';
-            best.textContent = bestLabel && bestLabel !== '--' ? bestLabel : '--';
+            
+            const medalTier = readTrackLastLapMedal(challenge.trackKey);
+            if (medalTier) {
+                const medalIcon = createMedalIconSvg(medalTier, { className: 'medal-svg--playlist' });
+                best.appendChild(medalIcon);
+            }
+            
+            const timeText = document.createTextNode(bestLabel && bestLabel !== '--' ? bestLabel : '--');
+            best.appendChild(timeText);
+
             if (isPending) {
                 best.setAttribute('aria-label', 'Pending best time verification');
             }
@@ -333,9 +344,9 @@ export class DailyChallengeUi {
             const availabilityLabel = formatDailyChallengePlaylistAvailabilityLabel(challenge);
             if (availabilityLabel) {
                 const availability = document.createElement('span');
-                availability.className = 'daily-playlist-metric daily-playlist-metric--time';
+                availability.className = 'daily-playlist-expiry';
                 availability.textContent = availabilityLabel;
-                stats.append(availability);
+                copy.append(availability);
             }
             copy.append(titleRow, stats);
 
@@ -343,14 +354,10 @@ export class DailyChallengeUi {
             actionsWrap.className = 'daily-playlist-actions';
 
             const play = document.createElement('button');
-            play.className = 'daily-playlist-icon-btn daily-playlist-icon-btn--primary';
+            play.className = 'daily-playlist-start-btn';
             play.type = 'button';
-            play.setAttribute('aria-label', `Play ${getDailyChallengeTrackName(challenge)}`);
-            play.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-                    <path d="M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z"/>
-                </svg>
-            `;
+            play.setAttribute('aria-label', `Start ${getDailyChallengeTrackName(challenge)}`);
+            play.textContent = 'START';
             play.addEventListener('click', () => {
                 this.closePlaylistModal();
                 onPlay?.(challenge);
