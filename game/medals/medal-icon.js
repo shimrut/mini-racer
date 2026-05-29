@@ -190,7 +190,13 @@ function getMedalTierCaption(tier) {
 function appendMedalSvgText(svg, className, content, y, emblemGradId = null) {
     const text = document.createElementNS(SVG_NS, 'text');
     text.setAttribute('class', className);
-    text.setAttribute('x', MEDAL_CENTER_X);
+    let xVal = MEDAL_CENTER_X;
+    if (className === 'medal-svg__emblem-text') {
+        xVal = '300';
+    } else if (className === 'medal-svg__tier-caption') {
+        xVal = '310';
+    }
+    text.setAttribute('x', xVal);
     text.setAttribute('y', y);
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');

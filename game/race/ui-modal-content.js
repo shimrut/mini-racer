@@ -905,6 +905,20 @@ export class ModalContentUi {
         return `${mins.toString().padStart(2, '0')}:${secs.toFixed(2).padStart(5, '0')}`;
     }
 
+    _resolveWinPriorPersonalBest(previousPersonalBestSec, fallbackPersonalBestSec) {
+        const priorCandidates = [
+            previousPersonalBestSec,
+            fallbackPersonalBestSec,
+        ];
+        for (const candidate of priorCandidates) {
+            if (candidate === null || candidate === undefined) continue;
+            const prior = Number(candidate);
+            if (!Number.isFinite(prior)) continue;
+            return prior;
+        }
+        return null;
+    }
+
     _resolveWinDeltaToPersonalBest(
         lapTimeSec,
         previousPersonalBestSec,
@@ -917,17 +931,8 @@ export class ModalContentUi {
         if (Number.isFinite(deltaToPersonalBest)) return deltaToPersonalBest;
         if (!Number.isFinite(lapTimeSec)) return null;
 
-        const priorCandidates = [
-            previousPersonalBestSec,
-            fallbackPersonalBestSec,
-        ];
-        for (const candidate of priorCandidates) {
-            if (candidate === null || candidate === undefined) continue;
-            const prior = Number(candidate);
-            if (!Number.isFinite(prior)) continue;
-            return lapTimeSec - prior;
-        }
-
+        const prior = this._resolveWinPriorPersonalBest(previousPersonalBestSec, fallbackPersonalBestSec);
+        if (Number.isFinite(prior)) return lapTimeSec - prior;
         return null;
     }
 
@@ -972,10 +977,18 @@ export class ModalContentUi {
         const deltaDisplay = buildModalDeltaDisplay({
             deltaToBest: deltaToPb,
         });
-
-        el.textContent = deltaDisplay.text;
         el.classList.add('combined-stat-value--pb-delta');
         el.classList.remove('is-gain', 'is-loss');
+        if (deltaToPb > 0.005) {
+            const composedText = `${deltaDisplay.text} vs PB`;
+            el.textContent = composedText;
+            if (typeof el.innerHTML === 'string') {
+                el.innerHTML = `<span class="combined-stat-best-time-delta">${deltaDisplay.text}</span> <span class="combined-stat-best-time-text">vs PB</span>`;
+            }
+            return;
+        }
+
+        el.textContent = deltaDisplay.text;
         if (deltaDisplay.valueClass === 'modal-stat-value--delta-negative') {
             el.classList.add('is-gain');
         } else if (deltaDisplay.valueClass === 'modal-stat-value--delta-positive') {

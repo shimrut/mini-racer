@@ -332,14 +332,13 @@ export class DailyChallengeUi {
             stats.append(best);
 
             const rankBtn = document.createElement('button');
-            rankBtn.className = 'daily-playlist-metric daily-playlist-rank-btn';
+            rankBtn.className = 'daily-playlist-rank-btn';
             rankBtn.type = 'button';
             this.applyPlaylistRankButton(rankBtn, challenge);
             rankBtn.addEventListener('click', () => {
                 this.closePlaylistModal();
                 onLeaderboard?.(challenge);
             });
-            stats.append(rankBtn);
 
             const availabilityLabel = formatDailyChallengePlaylistAvailabilityLabel(challenge);
             if (availabilityLabel) {
@@ -353,8 +352,12 @@ export class DailyChallengeUi {
             const actionsWrap = document.createElement('div');
             actionsWrap.className = 'daily-playlist-actions';
 
+            const isCurrentTrack = challenge.id === this._dailyChallengeSummary?.challengeId;
             const play = document.createElement('button');
             play.className = 'daily-playlist-start-btn';
+            if (!isCurrentTrack) {
+                play.classList.add('daily-playlist-start-btn--secondary');
+            }
             play.type = 'button';
             play.setAttribute('aria-label', `Start ${getDailyChallengeTrackName(challenge)}`);
             play.textContent = 'START';
@@ -362,7 +365,7 @@ export class DailyChallengeUi {
                 this.closePlaylistModal();
                 onPlay?.(challenge);
             });
-            actionsWrap.append(play);
+            actionsWrap.append(rankBtn, play);
 
             row.append(canvas, copy, actionsWrap);
             list.appendChild(row);

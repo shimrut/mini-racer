@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Mini Racer</title>
-    <link rel="stylesheet" href="styles.css?v=2.03">
+    <link rel="stylesheet" href="styles.css?v=2.04">
     <link rel="icon" href="public/favicon.ico" type="image/x-icon">
 </head>
 
@@ -44,21 +44,16 @@
                 </div>
 
             </div>
+
+            <div id="lap-flash" class="lap-flash" aria-live="polite" aria-atomic="true">
+                <span id="lap-flash-label" class="lap-flash-label">LAP 1</span>
+                <span id="lap-flash-time" class="lap-flash-time">0.00s</span>
+                <span id="lap-flash-delta" class="lap-flash-delta">FIRST LAP</span>
+            </div>
         </div>
 
         <canvas id="trackLayerCanvas" class="game-layer-canvas" aria-hidden="true"></canvas>
         <canvas id="gameCanvas" class="game-layer-canvas" aria-label="Racing track and car"></canvas>
-        <div id="desktop-speedometer" class="speedometer speedometer--desktop" aria-live="off"
-            aria-label="Current speed">
-            <div class="speedometer-content">
-                <div id="speed-bar" class="speedometer-bar"></div>
-                <div class="speedometer-text">
-                    <span id="speed-val" class="speedometer-value">0</span>
-                    <span class="speedometer-label">KPH</span>
-                </div>
-            </div>
-        </div>
-
         <div id="start-overlay" role="region" aria-label="Daily challenge start screen">
             <div id="start-group">
                 <header class="lobby-header">
@@ -126,13 +121,17 @@
         </div>
 
         <div id="go-message">GO!</div>
-        <div id="lap-flash" class="lap-flash" aria-live="polite" aria-atomic="true">
-            <span id="lap-flash-label" class="lap-flash-label">LAP 1</span>
-            <span id="lap-flash-time" class="lap-flash-time">0.00s</span>
-            <span id="lap-flash-delta" class="lap-flash-delta">FIRST LAP</span>
-        </div>
-
         <div class="mobile-hud-bar">
+            <div id="desktop-speedometer" class="speedometer speedometer--desktop" aria-live="off"
+                aria-label="Current speed">
+                <div class="speedometer-content">
+                    <div id="speed-bar" class="speedometer-bar"></div>
+                    <div class="speedometer-text">
+                        <span id="speed-val" class="speedometer-value">0</span>
+                        <span class="speedometer-label">KPH</span>
+                    </div>
+                </div>
+            </div>
             <div id="mobile-speedometer" class="mobile-speedometer" aria-live="off" aria-label="Current speed">
                 <div class="speedometer-content">
                     <div id="mobile-speed-bar" class="speedometer-bar"></div>
@@ -543,7 +542,7 @@
 
     </main>
 
-    <script type="module" src="game/index.js?v=2.05"></script>
+    <script type="module" src="game/index.js?v=2.06"></script>
 </body>
 
 </html>

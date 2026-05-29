@@ -126,7 +126,8 @@ body.start-selection-active .lap-flash {
     justify-content: space-between;
     padding: 0 0.5rem;
     pointer-events: none;
-    white-space: nowrap
+    white-space: nowrap;
+    overflow: visible;
 }
 
 .hud-left-cluster {
@@ -1722,11 +1723,45 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
 }
 
 .mobile-hud-bar {
-    display: none;
+    display: flex;
     position: absolute;
-    inset: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    inset: auto 0 max(1.5rem, env(safe-area-inset-bottom)) 0;
+    width: min(560px, calc(100vw - 2rem));
+    margin-inline: auto;
     z-index: calc(var(--z-hud) + 1);
     pointer-events: none;
+}
+
+.mobile-hud-bar .speedometer--desktop,
+.mobile-hud-bar .mobile-speedometer,
+.mobile-hud-bar .hud-pause-btn {
+    pointer-events: auto;
+}
+
+.mobile-hud-bar .speedometer--desktop {
+    position: static;
+    left: auto;
+    bottom: auto;
+    transform: none;
+}
+
+.mobile-hud-bar .hud-pause-btn {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    transform: none;
+}
+
+.mobile-hud-bar .hud-pause-btn:hover {
+    transform: scale(1.1);
+}
+
+.mobile-hud-bar .hud-pause-btn:active {
+    transform: scale(0.95);
 }
 
 .mobile-speedometer {
@@ -1876,26 +1911,38 @@ body.start-selection-active #start-overlay {
 
 .lap-flash {
     position: absolute;
-    top: 60%;
+    top: calc(100% + 3.75rem);
     left: 50%;
-    transform: translate(-50%, -50%) scale(.98);
+    transform: translateX(-50%) scale(.98);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: .08rem;
-    min-width: 7.5rem;
-    padding: .45rem .65rem;
+    min-width: 9.5rem;
+    padding: .6rem .8rem;
     border-radius: .8rem;
-    background: #020617e0;
+    background: rgba(2, 6, 23, 0.88);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .18s ease, transform .18s ease;
+    transition: opacity .18s ease, transform .18s ease, background-color .18s ease;
     z-index: var(--z-hud)
 }
 
 .lap-flash.visible {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1)
+    transform: translateX(-50%) scale(1)
+}
+
+.lap-flash.is-gain {
+    background: rgba(22, 101, 52, 0.92);
+}
+
+.lap-flash.is-loss {
+    background: rgba(153, 27, 27, 0.92);
+}
+
+.lap-flash.is-warning {
+    background: var(--warning);
 }
 
 .lap-flash-label {
@@ -1903,31 +1950,17 @@ body.start-selection-active #start-overlay {
 }
 
 .lap-flash-time {
-    order: 2;
-    color: #e2e8f070;
-    font-family: var(--mono-font);
-    font-size: 0.7rem;
-    font-weight: 500;
-    line-height: 1;
-    font-variant-numeric: tabular-nums
+    display: none
 }
 
 .lap-flash-delta {
     order: 1;
-    color: #e2e8f0b8;
+    color: #ffffff;
     font-family: var(--mono-font);
-    font-size: 1rem;
-    font-weight: 650;
+    font-size: 1.7rem;
+    font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums
-}
-
-.lap-flash-delta.is-gain {
-    color: #4ade80d1
-}
-
-.lap-flash-delta.is-loss {
-    color: #f87171c7
 }
 
 .modal {
@@ -2587,6 +2620,7 @@ body.start-selection-active #start-overlay {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 0.3rem;
     font-family: var(--mono-font);
     font-size: 0.95rem;
     font-weight: 700;
@@ -2599,6 +2633,14 @@ body.start-selection-active #start-overlay {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+}
+
+#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-best-time-text {
+    color: #ffffff;
+}
+
+#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-best-time-delta {
+    color: var(--accent-bright, #ff3e3e);
 }
 
 #modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--pb-delta.is-gain {
@@ -2668,6 +2710,20 @@ body.start-selection-active #start-overlay {
 }
 
 /* Crash path styles */
+#modal.modal--crash #modal-combined-view.is-crash .combined-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+#modal.modal--crash #modal-combined-view.is-crash .combined-rank-group,
+#modal.modal--crash #modal-combined-view.is-crash .combined-stats-group,
+#modal.modal--crash #modal-combined-view.is-crash .combined-stats-row-primary,
+#modal.modal--crash #modal-combined-view.is-crash .combined-stats-left {
+    width: auto;
+}
+
 #modal.modal--crash #modal-combined-view.is-crash .combined-stats-row-primary {
     display: flex;
     flex-direction: column;
@@ -3030,7 +3086,6 @@ body.start-selection-active #start-overlay {
 .daily-playlist-row {
     display: grid;
     grid-template-columns: 5.75rem minmax(0, 1fr) auto;
-    column-gap: 0.75rem;
     align-items: center;
     width: 100%;
     min-height: 4rem;
@@ -3089,8 +3144,7 @@ body.start-selection-active #start-overlay {
     justify-content: space-between;
 }
 
-.daily-playlist-metric,
-.daily-playlist-rank-btn {
+.daily-playlist-metric {
     display: inline-flex;
     min-width: 0;
     align-items: center;
@@ -3112,17 +3166,39 @@ body.start-selection-active #start-overlay {
 }
 
 .daily-playlist-rank-btn {
-    padding: 0;
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    color: var(--success);
+    font-family: var(--mono-font);
+    font-size: 1.25rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+    padding: 0 0.5rem;
     border: none;
     background: transparent;
     cursor: pointer;
-    transition: none;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.daily-playlist-rank-btn:hover {
+    color: var(--success-bright);
+    transform: scale(1.1);
+}
+
+.daily-playlist-rank-btn:active {
+    transform: scale(0.95);
 }
 
 .daily-playlist-rank-btn .rank-hash {
-    font-size: 0.68em;
-    opacity: 0.5;
+    font-size: 0.75em;
+    opacity: 0.7;
     font-weight: 700;
+    margin-right: 0.05rem;
 }
 
 .daily-playlist-start-btn {
@@ -3157,6 +3233,20 @@ body.start-selection-active #start-overlay {
     box-shadow: 0 2px 6px rgba(239, 68, 68, 0.15);
 }
 
+.daily-playlist-start-btn.daily-playlist-start-btn--secondary {
+    background: #334155;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.daily-playlist-start-btn.daily-playlist-start-btn--secondary:hover {
+    background: #475569;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.daily-playlist-start-btn.daily-playlist-start-btn--secondary:active {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.10);
+}
+
 .daily-playlist-empty {
     margin: auto;
     color: var(--text-dim);
@@ -3170,7 +3260,6 @@ body.start-selection-active #start-overlay {
 @media (max-width: 480px) {
     .daily-playlist-row {
         grid-template-columns: 4.75rem minmax(0, 1fr) auto;
-        column-gap: 0.6rem;
     }
 
     .daily-playlist-preview {
@@ -3193,6 +3282,11 @@ body.start-selection-active #start-overlay {
         height: 2.15rem;
         padding: 0 0.75rem;
         font-size: 0.75rem;
+    }
+
+    .daily-playlist-rank-btn {
+        font-size: 1.05rem;
+        padding: 0 0.3rem;
     }
 }
 
@@ -3884,28 +3978,7 @@ body.start-selection-active #start-overlay {
     }
 
     .mobile-hud-bar {
-        display: block;
-        pointer-events: none;
-    }
-
-    .mobile-hud-bar .mobile-speedometer {
-        display: none;
-    }
-
-    .mobile-hud-bar .hud-pause-btn {
-        position: absolute;
-        left: 50%;
-        bottom: calc(max(1.5rem, env(safe-area-inset-bottom)) + 3rem);
-        transform: translateX(-50%);
-        pointer-events: auto;
-    }
-
-    .mobile-hud-bar .hud-pause-btn:hover {
-        transform: translateX(-50%) scale(1.1);
-    }
-
-    .mobile-hud-bar .hud-pause-btn:active {
-        transform: translateX(-50%) scale(0.95);
+        padding-inline: 0;
     }
 
 }
@@ -3945,14 +4018,14 @@ body.start-selection-active #start-overlay {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 0.75rem;
         inset: auto 0 max(1.5rem, env(safe-area-inset-bottom)) 0;
         height: auto;
         padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
     }
 
-    .mobile-hud-bar .mobile-speedometer,
-    .mobile-hud-bar .hud-pause-btn {
-        pointer-events: auto;
+    .mobile-hud-bar .speedometer--desktop {
+        display: none;
     }
 
     .mobile-hud-bar .mobile-speedometer {
@@ -3983,17 +4056,17 @@ body.start-selection-active #start-overlay {
     }
 
     .lap-flash {
-        top: 55%;
-        min-width: 6.9rem;
-        padding: .38rem .56rem
+        top: calc(100% + 2.75rem);
+        min-width: 8.5rem;
+        padding: .5rem .7rem
     }
 
     .lap-flash-time {
-        font-size: .65rem
+        display: none
     }
 
     .lap-flash-delta {
-        font-size: 0.9rem
+        font-size: 1.45rem
     }
 
     .modal-btn-kbd {

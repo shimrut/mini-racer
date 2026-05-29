@@ -302,32 +302,40 @@ export class RaceHud {
             this._lapFlashTimer = null;
         }
 
+        if (!isNewBest && (deltaVsBest === null || deltaVsBest === undefined)) {
+            this.hideLapFlash();
+            return;
+        }
+
         this.lapFlashLabel.textContent = label;
         this.lapFlashTime.textContent = `${timeSec.toFixed(2)}s`;
+        this.lapFlash.classList.remove('is-gain', 'is-loss', 'is-warning');
+        const roundedDeltaAbs = deltaVsBest === null || deltaVsBest === undefined
+            ? null
+            : Number(Math.abs(deltaVsBest).toFixed(2));
 
         if (isNewBest) {
             this.lapFlashDelta.hidden = false;
             this.lapFlashDelta.textContent = 'New PB';
-            this.lapFlashDelta.classList.add('is-gain');
-            this.lapFlashDelta.classList.remove('is-loss');
+            this.lapFlash.classList.add('is-gain');
         } else if (deltaVsBest === null || deltaVsBest === undefined) {
             this.lapFlashDelta.textContent = '';
             this.lapFlashDelta.hidden = true;
-            this.lapFlashDelta.classList.remove('is-gain', 'is-loss');
+        } else if (roundedDeltaAbs === 0.01) {
+            this.lapFlashDelta.hidden = false;
+            this.lapFlashDelta.textContent = deltaVsBest < 0 ? `${deltaVsBest.toFixed(2)}s` : `+${deltaVsBest.toFixed(2)}s`;
+            this.lapFlash.classList.add('is-warning');
         } else if (deltaVsBest < -0.005) {
             this.lapFlashDelta.hidden = false;
             this.lapFlashDelta.textContent = `${deltaVsBest.toFixed(2)}s`;
-            this.lapFlashDelta.classList.add('is-gain');
-            this.lapFlashDelta.classList.remove('is-loss');
+            this.lapFlash.classList.add('is-gain');
         } else if (deltaVsBest > 0.005) {
             this.lapFlashDelta.hidden = false;
             this.lapFlashDelta.textContent = `+${deltaVsBest.toFixed(2)}s`;
-            this.lapFlashDelta.classList.add('is-loss');
-            this.lapFlashDelta.classList.remove('is-gain');
+            this.lapFlash.classList.add('is-loss');
         } else {
             this.lapFlashDelta.hidden = false;
             this.lapFlashDelta.textContent = evenDeltaText;
-            this.lapFlashDelta.classList.remove('is-gain', 'is-loss');
         }
 
         this.lapFlash.classList.add('visible');

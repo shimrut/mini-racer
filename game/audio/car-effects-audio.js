@@ -35,7 +35,7 @@ function makeDistortionCurve(amount) {
 }
 
 /**
- * Procedural motor: arcade racing synth-engine, drivetrain whine, tire noise,
+ * Procedural motor: high-speed racing synth-engine, drivetrain whine, tire noise,
  * slip screech, and light bus compression. Ducked when disabled / paused / hidden tab.
  */
 export function createCarEffectsAudio(externalCtx, externalOutput) {
@@ -46,6 +46,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
     let sawA = null;
     let sawB = null;
     let sawC = null;
+    let orderOsc = null;
     let subOsc = null;
     let motorBus = null;
     let motorHighpass = null;
@@ -120,7 +121,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
 
         motorLowpass = ctx.createBiquadFilter();
         motorLowpass.type = 'lowpass';
-        motorLowpass.frequency.value = 1800;
+        motorLowpass.frequency.value = 2400;
         motorLowpass.Q.value = 1.6;
 
         motorPeaking = ctx.createBiquadFilter();
@@ -148,25 +149,31 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         sawC = ctx.createOscillator();
         sawC.type = 'sine';
         sawC.detune.value = 0;
+        orderOsc = ctx.createOscillator();
+        orderOsc.type = 'triangle';
         subOsc = ctx.createOscillator();
         subOsc.type = 'sine';
 
         const sawGainA = ctx.createGain();
-        sawGainA.gain.value = 0.16;
+        sawGainA.gain.value = 0.13;
         const sawGainB = ctx.createGain();
-        sawGainB.gain.value = 0.08;
+        sawGainB.gain.value = 0.07;
         const sawGainC = ctx.createGain();
-        sawGainC.gain.value = 0.38;
+        sawGainC.gain.value = 0.34;
+        const orderGain = ctx.createGain();
+        orderGain.gain.value = 0.11;
         const subGain = ctx.createGain();
-        subGain.gain.value = 0.24;
+        subGain.gain.value = 0.18;
 
         sawA.connect(sawGainA);
         sawB.connect(sawGainB);
         sawC.connect(sawGainC);
+        orderOsc.connect(orderGain);
         subOsc.connect(subGain);
         sawGainA.connect(motorBus);
         sawGainB.connect(motorBus);
         sawGainC.connect(motorBus);
+        orderGain.connect(motorBus);
         subGain.connect(motorBus);
 
         motorBus.connect(motorHighpass);
@@ -204,6 +211,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         sawA.start();
         sawB.start();
         sawC.start();
+        orderOsc.start();
         subOsc.start();
         combustionPulseOsc.start();
         thrumLFO.start();
@@ -435,6 +443,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 || !sawA
                 || !sawB
                 || !sawC
+                || !orderOsc
                 || !subOsc
                 || !motorGain
                 || !motorLowpass
@@ -480,41 +489,42 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const slip = clamp(slipRatio, 0, 1);
             const load = throttleBlocked ? 0.35 : 1.0;
 
-            const gearCount = 4;
+            const gearCount = 6;
             const shiftedSpeed = clamp(speedNorm, 0, 0.995);
             const gearIndex = Math.min(gearCount - 1, Math.floor(shiftedSpeed * gearCount));
             const gearStart = gearIndex / gearCount;
             const gearEnd = (gearIndex + 1) / gearCount;
             const gearProgress = clamp((shiftedSpeed - gearStart) / (gearEnd - gearStart), 0, 1);
-            const rpmNorm = 0.28 + gearProgress * 0.72;
-            const powerCurve = clamp(0.18 + rpmNorm * 0.62 + speedNorm * 0.20, 0, 1);
-            const shimmer = 1 + Math.sin(t * 76) * 0.006 + Math.sin(t * 127) * 0.004;
-            const f0 = (72 + (rpmNorm ** 1.1) * 330 + speedNorm * 42) * shimmer;
+            const rpmNorm = 0.34 + gearProgress * 0.66;
+            const powerCurve = clamp(0.16 + rpmNorm * 0.60 + speedNorm * 0.24, 0, 1);
+            const shimmer = 1 + Math.sin(t * 94) * 0.004 + Math.sin(t * 151) * 0.003;
+            const f0 = (64 + (rpmNorm ** 1.16) * 370 + speedNorm * 58) * shimmer;
 
             sawA.frequency.setTargetAtTime(f0, t, smooth);
             sawB.frequency.setTargetAtTime(f0 * 2.02, t, smooth);
             sawC.frequency.setTargetAtTime(f0 * 0.5, t, smooth);
-            subOsc.frequency.setTargetAtTime(46 + speedNorm * 70, t, smooth);
-            combustionPulseOsc.frequency.setTargetAtTime(70 + rpmNorm * 180, t, smooth);
+            orderOsc.frequency.setTargetAtTime(f0 * 3.01, t, smooth);
+            subOsc.frequency.setTargetAtTime(42 + speedNorm * 62, t, smooth);
+            combustionPulseOsc.frequency.setTargetAtTime(85 + rpmNorm * 230, t, smooth);
 
-            motorPulseMod.gain.setTargetAtTime(0.004 + rpmNorm * 0.008, t, smooth);
-            exhaustPulseMod.gain.setTargetAtTime(0, t, smooth);
+            motorPulseMod.gain.setTargetAtTime(0.003 + rpmNorm * 0.006, t, smooth);
+            exhaustPulseMod.gain.setTargetAtTime((0.002 + rpmNorm * 0.006) * load, t, smooth);
 
-            thrumLFO.frequency.setTargetAtTime(5 + rpmNorm * 11, t, smooth);
-            thrumLFOMod.gain.setTargetAtTime(0.8 + rpmNorm * 2.0, t, smooth);
+            thrumLFO.frequency.setTargetAtTime(7 + rpmNorm * 15, t, smooth);
+            thrumLFOMod.gain.setTargetAtTime(0.45 + rpmNorm * 1.25, t, smooth);
 
-            const filterBase = 850 + (powerCurve ** 1.1) * 4300;
+            const filterBase = 1050 + (powerCurve ** 1.1) * 5600;
             motorLowpass.frequency.setTargetAtTime(filterBase, t, smooth);
-            motorLowpass.Q.setTargetAtTime(1.0 + powerCurve * 2.4, t, smooth);
+            motorLowpass.Q.setTargetAtTime(0.9 + powerCurve * 2.1, t, smooth);
 
-            const barkDb = clamp(1 + rpmNorm * 8, 1, 8);
+            const barkDb = clamp(1 + rpmNorm * 6.5 + speedNorm * 2.5, 1, 9);
             motorPeaking.gain.setTargetAtTime(barkDb, t, smooth);
-            motorPeaking.frequency.setTargetAtTime(620 + rpmNorm * 2300, t, smooth);
+            motorPeaking.frequency.setTargetAtTime(760 + rpmNorm * 3100, t, smooth);
 
-            const driveAmount = 0.7 + load * 0.35 + rpmNorm * 0.55;
+            const driveAmount = 0.62 + load * 0.30 + rpmNorm * 0.46;
             motorDrive.gain.setTargetAtTime(driveAmount, t, smooth);
 
-            const engineVol = (0.07 + rpmNorm * 0.08 + speedNorm * 0.04) * (0.62 + load * 0.38);
+            const engineVol = (0.065 + rpmNorm * 0.082 + speedNorm * 0.055) * (0.58 + load * 0.42);
             motorGain.gain.setTargetAtTime(engineVol, t, smooth);
 
             // Slip / Screech - Higher Q makes it a 'screech' instead of 'rustle' (foșnit)
@@ -524,14 +534,14 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             slipBandpass.Q.setTargetAtTime(5.0 + slip * 8.0, t, smooth);
             slipBandpass.frequency.setTargetAtTime(1000 + slip * 3000 + speedNorm * 1200, t, smooth);
 
-            const exh = (0.012 + speedNorm * 0.02) * (0.55 + load * 0.45);
+            const exh = (0.014 + rpmNorm * 0.012 + speedNorm * 0.024) * (0.50 + load * 0.50);
             exhaustGain.gain.setTargetAtTime(exh, t, smooth);
-            exhaustLowpass.frequency.setTargetAtTime(220 + speedNorm * 520, t, smooth);
+            exhaustLowpass.frequency.setTargetAtTime(260 + rpmNorm * 190 + speedNorm * 620, t, smooth);
 
-            const intk = (0.004 + speedNorm * 0.014) * (0.45 + rpmNorm * 0.55);
+            const intk = (0.006 + speedNorm * 0.024) * (0.35 + rpmNorm * 0.65);
             intakeGain.gain.setTargetAtTime(intk, t, smooth);
-            intakeBandpass.Q.setTargetAtTime(2.8, t, smooth);
-            intakeBandpass.frequency.setTargetAtTime(850 + rpmNorm * 3200, t, smooth);
+            intakeBandpass.Q.setTargetAtTime(3.4, t, smooth);
+            intakeBandpass.frequency.setTargetAtTime(1150 + rpmNorm * 4300 + speedNorm * 900, t, smooth);
 
             masterGain.gain.setTargetAtTime(0.42, t, smooth);
         },

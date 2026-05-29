@@ -6,6 +6,7 @@ import {
     drawTrackFinishLine,
     fillTrackPresentation
 } from './canvas.js';
+import { buildTrackGeometry } from './runtime.js';
 
 function drawCurbs(ctx, path, presentation) {
     ctx.save();
@@ -115,41 +116,13 @@ function traceMappedPath(ctx, points, mapPoint, closePath = false) {
 function buildMappedPath(points, mapPoint) {
     const path = new Path2D();
     if (points.length < 2) return path;
-    if (points.length === 2) {
-        const p0 = mapPoint(points[0]);
-        const p1 = mapPoint(points[1]);
-        path.moveTo(p0.x, p0.y);
-        path.lineTo(p1.x, p1.y);
-        return path;
+
+    const first = mapPoint(points[0]);
+    path.moveTo(first.x, first.y);
+    for (let i = 1; i < points.length; i++) {
+        const pt = mapPoint(points[i]);
+        path.lineTo(pt.x, pt.y);
     }
-
-    const p0 = mapPoint(points[0]);
-    const p1 = mapPoint(points[1]);
-    path.moveTo(p0.x, p0.y);
-
-    for (let i = 1; i < points.length - 1; i++) {
-        const curr = mapPoint(points[i]);
-        const next = mapPoint(points[i + 1]);
-        const midX = (curr.x + next.x) / 2;
-        const midY = (curr.y + next.y) / 2;
-        path.quadraticCurveTo(curr.x, curr.y, midX, midY);
-    }
-
-    const last = mapPoint(points[points.length - 1]);
-    const secondLast = mapPoint(points[points.length - 2]);
-    const lastMidX = (secondLast.x + last.x) / 2;
-    const lastMidY = (secondLast.y + last.y) / 2;
-    path.quadraticCurveTo(secondLast.x, secondLast.y, lastMidX, lastMidY);
-
-    path.lineTo(last.x, last.y);
-
-    const firstPoint = mapPoint(points[0]);
-    const lastPoint = mapPoint(points[points.length - 1]);
-    const closingMidX = (lastPoint.x + firstPoint.x) / 2;
-    const closingMidY = (lastPoint.y + firstPoint.y) / 2;
-    path.quadraticCurveTo(lastPoint.x, lastPoint.y, closingMidX, closingMidY);
-    path.quadraticCurveTo(firstPoint.x, firstPoint.y, p0.x, p0.y);
-
     path.closePath();
     return path;
 }
@@ -229,34 +202,41 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     const innerPath = buildMappedPath(inner, mapPoint);
 
     const roadColor = '#475569';
-    const infieldColor = transparentBackground ? '#0f172a' : '#1e293b';
     const edgeColor = '#f8fafc';
 
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
+    // 1. Fill track surface (asphalt) only using 'evenodd' (leaves infield transparent)
+    const surfacePath = new Path2D();
+    surfacePath.addPath(outerPath);
+    surfacePath.addPath(innerPath);
+
     ctx.fillStyle = roadColor;
-    ctx.fill(outerPath);
+    ctx.fill(surfacePath, 'evenodd');
 
-    ctx.fillStyle = infieldColor;
-    ctx.fill(innerPath);
+    // 2. Start/finish line (clipped to road surface so it doesn't draw over the edges)
+    if (startLine) {
+        const p1 = mapPoint(startLine.p1);
+        const p2 = mapPoint(startLine.p2);
+        const bandWidth = Math.max(5, Math.min(width, height) * 0.045);
+        ctx.save();
+        ctx.clip(surfacePath, 'evenodd');
+        drawCheckeredLine(ctx, p1, p2, bandWidth, {
+            primary: CONFIG.finishLineColor,
+            secondary: CONFIG.finishLineDarkColor
+        });
+        ctx.restore();
+    }
 
+    // 3. Draw track boundary borders
     ctx.strokeStyle = edgeColor;
     ctx.lineWidth = Math.max(2.25, Math.min(width, height) * 0.012);
     ctx.stroke(outerPath);
     ctx.stroke(innerPath);
 
-    if (startLine) {
-        const p1 = mapPoint(startLine.p1);
-        const p2 = mapPoint(startLine.p2);
-        const bandWidth = Math.max(5, Math.min(width, height) * 0.045);
-        drawCheckeredLine(ctx, p1, p2, bandWidth, {
-            primary: CONFIG.finishLineColor,
-            secondary: CONFIG.finishLineDarkColor
-        });
-    }
-
+    // 4. Direction marker
     if (startPos) {
         const mappedStart = mapPoint(startPos);
         const arrowScale = Math.min(width, height) / 420;
@@ -288,6 +268,13 @@ export function renderTrackPreviewCanvas(canvas, payload) {
 
     if (!trackGeometry?.outer || !trackGeometry?.inner) return;
 
+    // Smooth the track geometry so it matches the game's actual smooth curves
+    const smoothedGeometry = buildTrackGeometry({
+        outer: trackGeometry.outer,
+        inner: trackGeometry.inner,
+        cornerRadius: payload.cornerRadius ?? 3
+    });
+
     if (transparentBackground) {
         ctx.clearRect(0, 0, width, height);
     } else {
@@ -295,8 +282,8 @@ export function renderTrackPreviewCanvas(canvas, payload) {
     }
 
     if (previewRenderMode === 'schematic') {
-        const boundsLayout = getTrackBoundsLayout(trackGeometry, width, height);
-        drawSchematicTrackPreview(ctx, width, height, trackGeometry, boundsLayout.mapPoint, {
+        const boundsLayout = getTrackBoundsLayout(smoothedGeometry, width, height);
+        drawSchematicTrackPreview(ctx, width, height, smoothedGeometry, boundsLayout.mapPoint, {
             startLine,
             startPos,
             startAngle,
@@ -305,11 +292,11 @@ export function renderTrackPreviewCanvas(canvas, payload) {
         return;
     }
 
-    const layout = getReplayLayout(payload, width, height);
+    const layout = getReplayLayout({ ...payload, trackGeometry: smoothedGeometry }, width, height);
     const mapPoint = layout.mapPoint;
 
-    const outerPath = buildMappedPath(trackGeometry.outer, mapPoint);
-    const innerPath = buildMappedPath(trackGeometry.inner, mapPoint);
+    const outerPath = buildMappedPath(smoothedGeometry.outer, mapPoint);
+    const innerPath = buildMappedPath(smoothedGeometry.inner, mapPoint);
     const surfacePath = new Path2D();
     surfacePath.addPath(outerPath);
     surfacePath.addPath(innerPath);
