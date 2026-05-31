@@ -25,7 +25,7 @@ function drawCurbs(ctx, path, presentation) {
 }
 
 function getTrackBoundsLayout(trackGeometry, width, height, topInset = 0, bottomInset = 0, sideInset = 0) {
-    const padding = 24;
+    const padding = 16;
     const trackOuter = trackGeometry?.outer ?? [];
     const trackInner = trackGeometry?.inner ?? [];
     const points = [...trackOuter, ...trackInner];

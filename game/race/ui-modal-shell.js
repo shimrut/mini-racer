@@ -5,6 +5,11 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from '../track/presentation.js?v=1.91';
+import { createMedalIconSvg } from '../medals/medal-icon.js?v=2.04';
+import {
+    getMedalRowSlots,
+} from '../medals/medals.js?v=2.04';
+import { readTrackLastLapMedal } from '../medals/last-lap-medal-storage.js?v=1.92';
 import {
     buildModalRunsPayload,
     buildModalStatsPlan,
@@ -61,10 +66,12 @@ export class ModalShell {
 
     _syncGarageButtonToPanelState() {
         const garageOpen = Boolean(this.getGarageUi?.()?.isGarageOpen?.());
-        const btn = this.combinedGarageBtn;
-        if (!btn) return;
-        btn.classList.toggle('combined-action-btn--active', garageOpen);
-        btn.setAttribute('aria-expanded', garageOpen ? 'true' : 'false');
+        const buttons = [this.combinedGarageBtn, this.pauseGarageBtn].filter(Boolean);
+        if (!buttons.length) return;
+        for (const btn of buttons) {
+            btn.classList.toggle('combined-action-btn--active', garageOpen);
+            btn.setAttribute('aria-expanded', garageOpen ? 'true' : 'false');
+        }
     }
 
     _openGarageModal() {
@@ -75,49 +82,11 @@ export class ModalShell {
 
     _bindCombinedGarageBtn(btn) {
         if (!btn) return;
-        const newBtn = btn.cloneNode(true);
-        btn.replaceWith(newBtn);
-        let tapLocked = false;
-        const onGarageActivate = (event) => {
-            if (tapLocked) return;
-            tapLocked = true;
-            setTimeout(() => {
-                tapLocked = false;
-            }, 500);
+        btn.onclick = (event) => {
             event?.preventDefault?.();
             event?.stopPropagation?.();
             this._openGarageModal();
         };
-        if (typeof window !== 'undefined' && window.PointerEvent) {
-            let activePointerId = null;
-            newBtn.addEventListener('pointerdown', (event) => {
-                if (event.pointerType === 'mouse' && event.button !== 0) return;
-                activePointerId = event.pointerId;
-            });
-            newBtn.addEventListener('pointerup', (event) => {
-                if (event.pointerType === 'mouse' && event.button !== 0) return;
-                if (event.pointerId !== activePointerId) return;
-                activePointerId = null;
-                onGarageActivate(event);
-            });
-            newBtn.addEventListener('pointercancel', () => {
-                activePointerId = null;
-            });
-            newBtn.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-            }, true);
-            return;
-        }
-        if (typeof window !== 'undefined' && navigator.maxTouchPoints > 0) {
-            newBtn.addEventListener('touchend', onGarageActivate, { passive: false });
-            newBtn.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-            }, true);
-            return;
-        }
-        newBtn.addEventListener('click', onGarageActivate);
     }
 
     _hidePauseTrackPreview() {
@@ -142,6 +111,46 @@ export class ModalShell {
             ctx?.clearRect(0, 0, canvas.width, canvas.height);
             canvas.setAttribute('aria-label', 'Track layout');
         }
+    }
+
+    _renderPauseTrackProgress(container, payload) {
+        if (!container) return;
+
+        container.replaceChildren();
+        const trackKey = typeof payload?.trackKey === 'string' ? payload.trackKey : null;
+        if (!trackKey) {
+            container.hidden = true;
+            container.setAttribute('aria-hidden', 'true');
+            return;
+        }
+
+        const medals = document.createElement('div');
+        medals.className = 'pause-race-progress__medals';
+        medals.setAttribute('aria-label', 'Track medals');
+
+        const bestStoredMedal = readTrackLastLapMedal(trackKey);
+        const medalSlots = getMedalRowSlots(trackKey, bestStoredMedal);
+        if (medalSlots.length) {
+            for (const { tier, filled } of medalSlots) {
+                const slot = document.createElement('span');
+                slot.className = 'pause-race-progress__medal-slot';
+                if (!filled) slot.classList.add('pause-race-progress__medal-slot--locked');
+                slot.appendChild(createMedalIconSvg(tier, {
+                    className: 'medal-svg--pause',
+                    outline: !filled,
+                    showEmblem: filled,
+                    rowPlaceholder: !filled,
+                }));
+                medals.appendChild(slot);
+            }
+        } else {
+            medals.appendChild(createMedalIconSvg('white', { className: 'medal-svg--pause medal-svg--row-placeholder' }));
+        }
+
+        container.append(medals);
+        container.hidden = false;
+        container.setAttribute('aria-hidden', 'false');
+        container.setAttribute('aria-label', 'Unlocked medals for this track');
     }
 
     _syncPauseTrackPreview(payload) {
@@ -182,6 +191,11 @@ export class ModalShell {
             nameEl.textContent = labelName;
         }
 
+        this._renderPauseTrackProgress(
+            document.getElementById('modal-pause-race-stats'),
+            payload,
+        );
+
         canvas.setAttribute('aria-label', `Track layout: ${labelName}`);
 
         renderTrackPreviewCanvas(canvas, {
@@ -209,6 +223,7 @@ export class ModalShell {
     get modalCombinedView() { return document.getElementById('modal-combined-view'); }
     get modalPauseView() { return document.getElementById('modal-pause-view'); }
     get pauseSettingsBtn() { return document.getElementById('pause-settings-btn'); }
+    get pauseGarageBtn() { return document.getElementById('pause-garage-btn'); }
     get pausePlaylistBtn() { return document.getElementById('modal-pause-playlist-btn'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
     get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
@@ -333,6 +348,7 @@ export class ModalShell {
         this.cancelPendingModalClose();
         this._bindClickAction(this.modalMenuBtn, options.secondaryAction);
         this._bindClickAction(this.pauseSettingsBtn, options.settingsAction);
+        this._bindCombinedGarageBtn(this.pauseGarageBtn);
         this._bindClickAction(this.pausePlaylistBtn, options.playlistAction);
         this._bindClickAction(this.modalRestartBtn, options.restartAction);
         this._bindClickAction(this.modalResumeBtn, options.primaryAction);

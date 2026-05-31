@@ -1250,6 +1250,18 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
     gap: .8rem;
 }
 
+#garage-modal .garage-skin-layout {
+    gap: 1rem;
+}
+
+#garage-modal .garage-skin-section {
+    padding: 1rem .95rem 1.05rem;
+    border-radius: var(--radius-lg);
+    background: rgba(17, 24, 39, 0.42);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
 #garage-modal .garage-skin-section__title {
     font-family: var(--header-font);
     font-size: .9rem;
@@ -1258,13 +1270,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
 }
 
 #garage-modal .garage-skin-grid {
-    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-    gap: .75rem;
-}
-
-#garage-modal .garage-skin-option,
-#garage-modal .garage-trail-option {
-    background: #111827;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .95rem .75rem;
 }
 
 #garage-modal .garage-skin-option {
@@ -1658,30 +1665,68 @@ body.start-selection-active #start-overlay {
 
 #modal.modal--pause .pause-results-header {
     display: grid;
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-    column-gap: 0.75rem;
-    align-items: center;
-    padding: 1rem 0rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.9rem;
+    align-items: start;
+    padding: 0.85rem 0;
 }
 
 #modal.modal--pause .pause-track-column {
     grid-column: 1;
-    width: min(42vw, 8.5rem);
+    width: min(100%, 10.4rem);
     min-width: 0;
-    display: flex;
-    flex-direction: column-reverse;
-    gap: 0.35rem;
-    align-items: stretch;
+    display: block;
+    justify-self: center;
 }
 
-#modal.modal--pause .pause-stats-column {
+#modal.modal--pause .pause-track-info {
     grid-column: 2;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0.3rem;
+    padding-top: 0.15rem;
+}
+
+.pause-race-stats {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+}
+
+.pause-race-stats[hidden] {
+    display: none !important;
+}
+
+.pause-race-progress__medals {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.18rem;
+    min-height: 1.45rem;
+    flex-wrap: wrap;
+}
+
+.pause-race-progress__medal-slot {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    gap: 0.45rem;
+    width: 1.3rem;
+    height: 1.3rem;
+}
+
+.pause-race-progress__medal-slot--locked {
+    opacity: 0.55;
+}
+
+.medal-svg--pause {
+    width: 1.3rem;
+    height: 1.3rem;
+    flex: 0 0 auto;
 }
 
 #modal.modal--pause .pause-results-actions {
@@ -1700,17 +1745,17 @@ body.start-selection-active #start-overlay {
 }
 
 .modal-pause-track-name {
-    padding: 0.35rem 0.4rem 0;
-    font-size: 0.68rem;
+    padding: 0;
+    font-size: 1.25rem;
     font-weight: 800;
     font-style: italic;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--text-dim);
+    color: var(--text-color);
     text-align: left;
     line-height: 1.2;
     min-width: 0;
-    margin: auto;
+    margin: 0;
 }
 
 #modal-pause-track-preview {
@@ -2077,14 +2122,6 @@ body.start-selection-active #start-overlay {
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-}
-
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-best-time-text {
-    color: #ffffff;
-}
-
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-best-time-delta {
-    color: var(--accent-bright, #ff3e3e);
 }
 
 #modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--pb-delta.is-gain {

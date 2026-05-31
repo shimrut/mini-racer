@@ -309,7 +309,10 @@ export const raceEngineMethods = {
     this.clearSteeringInput();
     this.status = "paused";
 
-    const bestTime = this.bestLapTime;
+    const rawBestTime = this.bestLapTime;
+    const bestTime = Number.isFinite(rawBestTime) && rawBestTime > 0
+      ? rawBestTime
+      : null;
     const deltaToBest =
       bestTime === null || bestTime === undefined
         ? null
@@ -342,6 +345,7 @@ export const raceEngineMethods = {
           trackName: this.activeDailyChallenge
             ? getDailyChallengeTrackName(this.activeDailyChallenge)
             : (TRACKS[this.currentTrackKey]?.name || this.currentTrackKey),
+          bestTime,
         },
         settingsAction: () => this.settings.openSettings(),
         playlistAction: () => {

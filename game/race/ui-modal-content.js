@@ -977,15 +977,6 @@ export class ModalContentUi {
         });
         el.classList.add('combined-stat-value--pb-delta');
         el.classList.remove('is-gain', 'is-loss');
-        if (deltaToPb > 0.005) {
-            const composedText = `${deltaDisplay.text} vs PB`;
-            el.textContent = composedText;
-            if (typeof el.innerHTML === 'string') {
-                el.innerHTML = `<span class="combined-stat-best-time-delta">${deltaDisplay.text}</span> <span class="combined-stat-best-time-text">vs PB</span>`;
-            }
-            return;
-        }
-
         el.textContent = deltaDisplay.text;
         if (deltaDisplay.valueClass === 'modal-stat-value--delta-negative') {
             el.classList.add('is-gain');

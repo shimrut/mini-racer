@@ -5,11 +5,11 @@ export const DEFAULT_PHYSICS_TUNING = Object.freeze({
     accel: 400,
     brakePower: 118,
     maxSpeed: 310,
-    turnRate: 4.3,
+    turnRate: 4.25,
     grip: 4.3,
     steerGripScale: 0.97,
     downforceGrip: 0.72,
-    highSpeedSteerTrim: 0.32,
+    highSpeedSteerTrim: 0.3175,
     angularResponse: 22
 });
 
