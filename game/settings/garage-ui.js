@@ -53,7 +53,7 @@ export class GarageUi {
         configureReusableModal(this.garageModal, {
             title: 'Garage',
             subtitle: 'Car Style',
-            closeLabel: 'Close',
+            closeLabel: 'Back',
         });
         bindReusableModal(this.garageModal, () => this.setPanelVisible(false));
 

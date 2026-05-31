@@ -2856,7 +2856,7 @@ body.start-selection-active #start-overlay {
     flex: 0 0 auto;
 }
 
-/* When a subtitle is shown, align the X with the title line, not the full heading block */
+/* When a subtitle is shown, align the Back button with the title line, not the full heading block */
 .reusable-modal-header:has([data-modal-subtitle]:not([hidden])) {
     align-items: flex-start;
 }
@@ -2891,12 +2891,12 @@ body.start-selection-active #start-overlay {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    justify-content: flex-end;
-    width: 3.1rem;
+    justify-content: center;
+    width: auto;
     height: 3.1rem;
-    min-width: 3.1rem;
+    min-width: 5.4rem;
     min-height: 3.1rem;
-    padding: 0;
+    padding: 0 0.85rem;
     border: none;
     border-radius: var(--radius-full);
     background: transparent;
@@ -2910,6 +2910,16 @@ body.start-selection-active #start-overlay {
     height: 2rem;
     pointer-events: none;
     fill: var(--text-muted);
+}
+
+.reusable-modal-close__label {
+    font-family: var(--header-font);
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: currentColor;
+    pointer-events: none;
 }
 
 .reusable-modal-close:hover {

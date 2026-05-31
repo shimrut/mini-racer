@@ -150,7 +150,7 @@ export class SettingsUi {
     bindEvents() {
         configureReusableModal(this.settingsModal, {
             title: 'Settings',
-            closeLabel: 'Close',
+            closeLabel: 'Back',
         });
         bindReusableModal(this.settingsModal, () => this.closeSettings());
 

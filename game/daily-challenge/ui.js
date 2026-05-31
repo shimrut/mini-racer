@@ -218,7 +218,7 @@ export class DailyChallengeUi {
         configureReusableModal(modal, {
             title: 'Tracks',
             subtitle: 'Last 7 Days',
-            closeLabel: 'Close',
+            closeLabel: 'Back',
         });
         openModalElement(modal, () => {
             modal.style.display = 'flex';
@@ -259,7 +259,7 @@ export class DailyChallengeUi {
         configureReusableModal(this.dailyChallengePlaylistModal, {
             title: 'Tracks',
             subtitle: 'Last 7 Days',
-            closeLabel: 'Close',
+            closeLabel: 'Back',
         });
         bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
     }
@@ -393,7 +393,7 @@ export class DailyChallengeUi {
         configureReusableModal(modal, {
             title: 'Leaderboard',
             subtitle: 'Last 7 Days',
-            closeLabel: 'Close',
+            closeLabel: 'Back',
         });
         openModalElement(modal, () => {
             modal.style.display = 'flex';
