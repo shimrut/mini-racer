@@ -27,7 +27,6 @@ export class InteractionsUi {
     get dailyChallengeRankBtn() { return document.getElementById('daily-challenge-rank-btn'); }
     get dailyChallengePlaylistBtn() { return document.getElementById('daily-challenge-playlist-btn'); }
     get menuGarageBtn() { return document.getElementById('menu-btn-garage'); }
-    get menuLeaderboardBtn() { return document.getElementById('daily-challenge-rank-btn'); }
     get menuAchievementsBtn() { return document.getElementById('menu-btn-achievements'); }
     get desktopSpeedometer() { return document.getElementById('desktop-speedometer'); }
     get mobileSpeedometer() { return document.getElementById('mobile-speedometer'); }
@@ -82,7 +81,7 @@ export class InteractionsUi {
         if (this.dailyChallengeRankBtn) {
             this.dailyChallengeRankBtn.addEventListener("click", () => {
                 if (this.dailyChallengeRankBtn.disabled) return;
-                void this.leaderboards?.openDailyChallengeLeaderboard?.();
+                void this.leaderboards?.openDailyChallengeLeaderboardOverview?.();
             });
         }
         if (this.dailyChallengePlaylistBtn && this.onOpenDailyPlaylist) {
@@ -97,13 +96,6 @@ export class InteractionsUi {
                 }
             });
         }
-        if (this.menuLeaderboardBtn) {
-            this.menuLeaderboardBtn.addEventListener("click", () => {
-                void this.leaderboards?.openDailyChallengeLeaderboard?.();
-            });
-        }
-
-
         if (this.desktopSpeedometer && this.onPauseRun)
             this.desktopSpeedometer.addEventListener("click", this.onPauseRun);
         if (this.mobileSpeedometer && this.onPauseRun)

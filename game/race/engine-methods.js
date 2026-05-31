@@ -3,7 +3,6 @@ import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js?v=1.
 import { createModalActions } from "./result-flow.js?v=1.91";
 import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js?v=1.91";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
-import { readSkillPointAllocation } from "../car/skill-points.js?v=1.91";
 import {
   getDailyChallengeCopyLabels,
   getDailyChallengeTrackName,
@@ -247,10 +246,10 @@ export const raceEngineMethods = {
       isEscape &&
       this.status === "ready" &&
       this.startOverlay?.isStartOverlayVisible?.() &&
-      this.skillPoints?.isGarageOpen?.()
+      this.garage?.isGarageOpen?.()
     ) {
       event.preventDefault?.();
-      this.skillPoints.setPanelVisible(false);
+      this.garage.setPanelVisible(false);
       return;
     }
     if (
@@ -310,53 +309,6 @@ export const raceEngineMethods = {
     this.clearSteeringInput();
     this.status = "paused";
 
-    if (this.isCrashBudgetDailyChallenge()) {
-      const completedLaps = Math.max(
-        0,
-        Math.trunc(this.currentChallengeRun?.completedLaps || 0),
-      );
-      const crashesLeft = Math.max(
-        0,
-        (this.currentChallengeRun?.maxCrashes || 0) -
-        (this.currentChallengeRun?.crashCount || 0),
-      );
-      this.modal.showModal(
-        "PAUSED",
-        null,
-        {
-          variant: "daily-crash-budget-pause",
-          completedLaps,
-          crashesLeft,
-        },
-        {
-          ...createModalActions({
-            modalKind: "pause",
-            primaryActionLabel: "Resume",
-            primaryAction: () => this.resumeActiveRun(),
-            primaryActionIcon: "play",
-            restartAction: () => this.restartDailyChallenge(),
-            secondaryActionLabel: "Done",
-            secondaryActionIcon: "done",
-            secondaryAction: () => this.reset(false),
-          }),
-          pauseTrackPreview: {
-            trackKey: this.currentTrackKey,
-            skin: this.activeDailyChallenge?.skin ?? null,
-            trackName: this.activeDailyChallenge
-              ? getDailyChallengeTrackName(this.activeDailyChallenge)
-              : (TRACKS[this.currentTrackKey]?.name || this.currentTrackKey),
-            skillAllocation:
-              this.skillPoints?.getAllocation?.() ?? readSkillPointAllocation(),
-          },
-          settingsAction: () => this.settings.openSettings(),
-          playlistAction: () => {
-            void this.openDailyChallengePlaylist();
-          },
-        },
-      );
-      return;
-    }
-
     const bestTime = this.bestLapTime;
     const deltaToBest =
       bestTime === null || bestTime === undefined
@@ -390,8 +342,6 @@ export const raceEngineMethods = {
           trackName: this.activeDailyChallenge
             ? getDailyChallengeTrackName(this.activeDailyChallenge)
             : (TRACKS[this.currentTrackKey]?.name || this.currentTrackKey),
-          skillAllocation:
-            this.skillPoints?.getAllocation?.() ?? readSkillPointAllocation(),
         },
         settingsAction: () => this.settings.openSettings(),
         playlistAction: () => {
@@ -446,10 +396,6 @@ export const raceEngineMethods = {
     }
     if (events.challengeLapCompleted) {
       this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime);
-    }
-    if (events.challengeCrashReset) {
-      this.restartDailyChallengeAfterCrash();
-      return;
     }
     if (this.crashAutoRestartAfterCrash && events.crashEndedRun) {
       this.restartCurrentRunAfterHardCrash();

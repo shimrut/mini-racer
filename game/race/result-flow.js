@@ -29,14 +29,6 @@ export function isNewBestResult(policy, candidate, previous) {
 
     const candidateTime = hasFiniteValue(candidate.bestTime) ? Number(candidate.bestTime) : null;
     const previousTime = hasFiniteValue(previous?.bestTime) ? Number(previous.bestTime) : null;
-    if (policy.bestResultComparator === 'laps-then-time') {
-        const candidateLaps = Math.max(0, Math.trunc(candidate.completedLaps || 0));
-        const previousLaps = Math.max(0, Math.trunc(previous?.completedLaps || 0));
-        if (previousTime === null) return true;
-        if (candidateLaps > previousLaps) return true;
-        if (candidateLaps < previousLaps) return false;
-        return candidateTime !== null && candidateTime > previousTime;
-    }
 
     if (candidateTime === null) return false;
     return previousTime === null || candidateTime < previousTime;
@@ -174,23 +166,6 @@ export function formatCombinedRankOutOf(scoreboardSnapshot) {
 export function buildModalStatsPlan(lapData) {
     if (!lapData || typeof lapData !== 'object') return null;
 
-    if (lapData.variant === 'daily-crash-budget-pause') {
-        return {
-            kind: 'left-right',
-            display: 'flex',
-            hasRuns: null,
-            args: [
-                `${Math.max(0, Math.trunc(lapData.completedLaps || 0))}`,
-                '',
-                `${Math.max(0, Math.trunc(lapData.crashesLeft || 0))}`,
-                {
-                    leftLabel: 'Laps',
-                    rightLabel: 'Crashes Left'
-                }
-            ]
-        };
-    }
-
     if (lapData.variant === 'daily-pause') {
         return {
             kind: 'hide',
@@ -216,18 +191,6 @@ export function buildModalStatsPlan(lapData) {
             display: 'flex',
             hasRuns: '',
             args: ['Impact', `${lapData.impact} KPH`, 'modal-stat-value--crash']
-        };
-    }
-
-    if (lapData.variant === 'daily-crash-budget') {
-        return {
-            kind: 'daily-crash-budget',
-            display: 'grid',
-            hasRuns: null,
-            args: [
-                `${Math.max(0, Math.trunc(lapData.completedLaps || 0))}`
-            ],
-            rankSnapshot: lapData.scoreboardSnapshot || null
         };
     }
 

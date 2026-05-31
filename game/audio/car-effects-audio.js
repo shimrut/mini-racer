@@ -127,14 +127,14 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         motorPeaking = ctx.createBiquadFilter();
         motorPeaking.type = 'peaking';
         motorPeaking.frequency.value = 900;
-        motorPeaking.Q.value = 0.9;
+        motorPeaking.Q.value = 1.2;
         motorPeaking.gain.value = 0;
 
         motorDrive = ctx.createGain();
         motorDrive.gain.value = 1;
 
         motorShaper = ctx.createWaveShaper();
-        motorShaper.curve = makeDistortionCurve(14);
+        motorShaper.curve = makeDistortionCurve(10);
         motorShaper.oversampling = '4x';
 
         motorGain = ctx.createGain();
@@ -142,28 +142,28 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
 
         sawA = ctx.createOscillator();
         sawA.type = 'sawtooth';
-        sawA.detune.value = -2;
+        sawA.detune.value = -8;
         sawB = ctx.createOscillator();
-        sawB.type = 'sawtooth';
-        sawB.detune.value = 3;
+        sawB.type = 'triangle';
+        sawB.detune.value = 8;
         sawC = ctx.createOscillator();
-        sawC.type = 'sine';
-        sawC.detune.value = 0;
+        sawC.type = 'triangle';
+        sawC.detune.value = 4;
         orderOsc = ctx.createOscillator();
         orderOsc.type = 'triangle';
         subOsc = ctx.createOscillator();
         subOsc.type = 'sine';
 
         const sawGainA = ctx.createGain();
-        sawGainA.gain.value = 0.13;
+        sawGainA.gain.value = 0.26;
         const sawGainB = ctx.createGain();
-        sawGainB.gain.value = 0.07;
+        sawGainB.gain.value = 0.22;
         const sawGainC = ctx.createGain();
-        sawGainC.gain.value = 0.34;
+        sawGainC.gain.value = 0.18;
         const orderGain = ctx.createGain();
-        orderGain.gain.value = 0.11;
+        orderGain.gain.value = 0.15;
         const subGain = ctx.createGain();
-        subGain.gain.value = 0.18;
+        subGain.gain.value = 0.35;
 
         sawA.connect(sawGainA);
         sawB.connect(sawGainB);
@@ -498,30 +498,30 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const rpmNorm = 0.34 + gearProgress * 0.66;
             const powerCurve = clamp(0.16 + rpmNorm * 0.60 + speedNorm * 0.24, 0, 1);
             const shimmer = 1 + Math.sin(t * 94) * 0.004 + Math.sin(t * 151) * 0.003;
-            const f0 = (64 + (rpmNorm ** 1.16) * 370 + speedNorm * 58) * shimmer;
+            const f0 = (32 + (rpmNorm ** 1.3) * 105 + speedNorm * 18) * shimmer;
 
             sawA.frequency.setTargetAtTime(f0, t, smooth);
-            sawB.frequency.setTargetAtTime(f0 * 2.02, t, smooth);
-            sawC.frequency.setTargetAtTime(f0 * 0.5, t, smooth);
-            orderOsc.frequency.setTargetAtTime(f0 * 3.01, t, smooth);
-            subOsc.frequency.setTargetAtTime(42 + speedNorm * 62, t, smooth);
-            combustionPulseOsc.frequency.setTargetAtTime(85 + rpmNorm * 230, t, smooth);
+            sawB.frequency.setTargetAtTime(f0 * 2.0, t, smooth);
+            sawC.frequency.setTargetAtTime(f0 * 3.0, t, smooth);
+            orderOsc.frequency.setTargetAtTime(f0 * 6.0, t, smooth);
+            subOsc.frequency.setTargetAtTime(f0 * 0.5, t, smooth);
+            combustionPulseOsc.frequency.setTargetAtTime(35 + rpmNorm * 90, t, smooth);
 
-            motorPulseMod.gain.setTargetAtTime(0.003 + rpmNorm * 0.006, t, smooth);
-            exhaustPulseMod.gain.setTargetAtTime((0.002 + rpmNorm * 0.006) * load, t, smooth);
+            motorPulseMod.gain.setTargetAtTime(0.015 + rpmNorm * 0.025, t, smooth);
+            exhaustPulseMod.gain.setTargetAtTime((0.012 + rpmNorm * 0.028) * load, t, smooth);
 
-            thrumLFO.frequency.setTargetAtTime(7 + rpmNorm * 15, t, smooth);
-            thrumLFOMod.gain.setTargetAtTime(0.45 + rpmNorm * 1.25, t, smooth);
+            thrumLFO.frequency.setTargetAtTime(4 + rpmNorm * 8, t, smooth);
+            thrumLFOMod.gain.setTargetAtTime(0.5 + rpmNorm * 3.0, t, smooth);
 
-            const filterBase = 1050 + (powerCurve ** 1.1) * 5600;
+            const filterBase = 450 + (powerCurve ** 1.3) * 1850;
             motorLowpass.frequency.setTargetAtTime(filterBase, t, smooth);
-            motorLowpass.Q.setTargetAtTime(0.9 + powerCurve * 2.1, t, smooth);
+            motorLowpass.Q.setTargetAtTime(0.8 + powerCurve * 0.4, t, smooth);
 
-            const barkDb = clamp(1 + rpmNorm * 6.5 + speedNorm * 2.5, 1, 9);
+            const barkDb = clamp(1.5 + rpmNorm * 5.5 + speedNorm * 2.0, 1.5, 9.0);
             motorPeaking.gain.setTargetAtTime(barkDb, t, smooth);
-            motorPeaking.frequency.setTargetAtTime(760 + rpmNorm * 3100, t, smooth);
+            motorPeaking.frequency.setTargetAtTime(400 + rpmNorm * 1600, t, smooth);
 
-            const driveAmount = 0.62 + load * 0.30 + rpmNorm * 0.46;
+            const driveAmount = 0.55 + load * 0.25 + rpmNorm * 0.35;
             motorDrive.gain.setTargetAtTime(driveAmount, t, smooth);
 
             const engineVol = (0.065 + rpmNorm * 0.082 + speedNorm * 0.055) * (0.58 + load * 0.42);
@@ -534,14 +534,14 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             slipBandpass.Q.setTargetAtTime(5.0 + slip * 8.0, t, smooth);
             slipBandpass.frequency.setTargetAtTime(1000 + slip * 3000 + speedNorm * 1200, t, smooth);
 
-            const exh = (0.014 + rpmNorm * 0.012 + speedNorm * 0.024) * (0.50 + load * 0.50);
+            const exh = (0.012 + rpmNorm * 0.012 + speedNorm * 0.012) * (0.60 + load * 0.40);
             exhaustGain.gain.setTargetAtTime(exh, t, smooth);
-            exhaustLowpass.frequency.setTargetAtTime(260 + rpmNorm * 190 + speedNorm * 620, t, smooth);
+            exhaustLowpass.frequency.setTargetAtTime(120 + rpmNorm * 280 + speedNorm * 320, t, smooth);
 
-            const intk = (0.006 + speedNorm * 0.024) * (0.35 + rpmNorm * 0.65);
+            const intk = (0.006 + speedNorm * 0.012 + rpmNorm * 0.010) * (0.45 + load * 0.55);
             intakeGain.gain.setTargetAtTime(intk, t, smooth);
-            intakeBandpass.Q.setTargetAtTime(3.4, t, smooth);
-            intakeBandpass.frequency.setTargetAtTime(1150 + rpmNorm * 4300 + speedNorm * 900, t, smooth);
+            intakeBandpass.Q.setTargetAtTime(1.8, t, smooth);
+            intakeBandpass.frequency.setTargetAtTime(800 + rpmNorm * 1800 + speedNorm * 500, t, smooth);
 
             masterGain.gain.setTargetAtTime(0.42, t, smooth);
         },

@@ -1,16 +1,10 @@
-import { TRACK_MODE_DAILY_GP, CONFIG } from '../config.js?v=1.91';
+import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
 import { renderTrackPreviewCanvas } from '../track/preview-renderer.js?v=1.91';
 import { TRACKS } from '../track/tracks.js?v=1.91';
 import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from '../track/presentation.js?v=1.91';
-import {
-    getSkillPointDisplayValues,
-    normalizeSkillPointAllocation,
-    SKILL_POINT_DEFINITIONS,
-    SKILL_POINT_TOTAL,
-} from '../car/skill-points.js?v=1.91';
 import {
     buildModalRunsPayload,
     buildModalStatsPlan,
@@ -42,7 +36,7 @@ export class ModalShell {
         getDefaultPrimaryAction = () => null,
         cancelLeaderboardRequests = null,
         playUnlockSound = () => null,
-        getSkillPointsUi = null,
+        getGarageUi = null,
     } = {}) {
         this.content = content;
         this.getLeaderboards = getLeaderboards;
@@ -50,7 +44,7 @@ export class ModalShell {
         this.getDefaultPrimaryAction = getDefaultPrimaryAction;
         this.cancelLeaderboardRequests = cancelLeaderboardRequests;
         this.playUnlockSound = playUnlockSound;
-        this.getSkillPointsUi = getSkillPointsUi;
+        this.getGarageUi = getGarageUi;
         this._modalCloseFallbackTimer = null;
         this._modalCloseTransitionEndHandler = null;
         this._mainModalIsCrash = false;
@@ -66,16 +60,16 @@ export class ModalShell {
     }
 
     _syncGarageButtonToPanelState() {
-        const garageOpen = Boolean(this.getSkillPointsUi?.()?.isGarageOpen?.());
-        const btn = this.combinedTuneBtn;
+        const garageOpen = Boolean(this.getGarageUi?.()?.isGarageOpen?.());
+        const btn = this.combinedGarageBtn;
         if (!btn) return;
         btn.classList.toggle('combined-action-btn--active', garageOpen);
         btn.setAttribute('aria-expanded', garageOpen ? 'true' : 'false');
     }
 
     _openGarageModal() {
-        const skillPointsUi = this.getSkillPointsUi?.();
-        skillPointsUi?.setPanelVisible?.(true);
+        const garageUi = this.getGarageUi?.();
+        garageUi?.setPanelVisible?.(true);
         this._syncGarageButtonToPanelState();
     }
 
@@ -131,7 +125,6 @@ export class ModalShell {
         const canvas = document.getElementById('modal-pause-track-preview');
         const nameEl = document.getElementById('modal-pause-track-name');
         const raceStatsEl = document.getElementById('modal-pause-race-stats');
-        const tuningEl = document.getElementById('modal-pause-tuning');
         if (wrap) {
             wrap.hidden = true;
             wrap.setAttribute('aria-hidden', 'true');
@@ -144,82 +137,10 @@ export class ModalShell {
             raceStatsEl.hidden = true;
             raceStatsEl.setAttribute('aria-hidden', 'true');
         }
-        if (tuningEl) {
-            tuningEl.replaceChildren();
-        }
         if (canvas) {
             const ctx = canvas.getContext('2d');
             ctx?.clearRect(0, 0, canvas.width, canvas.height);
             canvas.setAttribute('aria-label', 'Track layout');
-        }
-    }
-
-    _createPauseCombinedStat(label, value) {
-        const stat = document.createElement('div');
-        stat.className = 'combined-stat';
-        const labelEl = document.createElement('span');
-        labelEl.className = 'combined-stat-label';
-        labelEl.textContent = label;
-        const valueEl = document.createElement('span');
-        valueEl.className = 'combined-stat-value';
-        valueEl.textContent = value;
-        stat.append(labelEl, valueEl);
-        return stat;
-    }
-
-    _renderPauseRaceStats(lapData) {
-        const raceStatsEl = document.getElementById('modal-pause-race-stats');
-        if (!raceStatsEl) return;
-
-        if (lapData?.variant !== 'daily-crash-budget-pause') {
-            raceStatsEl.replaceChildren();
-            raceStatsEl.hidden = true;
-            raceStatsEl.setAttribute('aria-hidden', 'true');
-            return;
-        }
-
-        const laps = `${Math.max(0, Math.trunc(lapData.completedLaps || 0))}`;
-        const crashesLeft = `${Math.max(0, Math.trunc(lapData.crashesLeft || 0))}`;
-        raceStatsEl.replaceChildren(
-            this._createPauseCombinedStat('Laps', laps),
-            this._createPauseCombinedStat('Crashes Left', crashesLeft)
-        );
-        raceStatsEl.hidden = false;
-        raceStatsEl.setAttribute('aria-hidden', 'false');
-    }
-
-    _renderPauseTuningReadonly(container, allocation) {
-        container.replaceChildren();
-        if (!allocation || typeof allocation !== 'object') return;
-        const alloc = normalizeSkillPointAllocation(allocation);
-        const statValues = getSkillPointDisplayValues(CONFIG, alloc);
-        for (const def of SKILL_POINT_DEFINITIONS) {
-            const row = document.createElement('div');
-            row.className = 'modal-pause-skill-row';
-            const labelEl = document.createElement('div');
-            labelEl.className = 'modal-pause-skill-label';
-            labelEl.textContent = def.label;
-            const value = Math.trunc(alloc[def.key] || 0);
-            const meter = document.createElement('div');
-            meter.className = 'modal-pause-meter';
-            meter.setAttribute('aria-label', `${def.label}: ${value} of ${SKILL_POINT_TOTAL}`);
-            for (let index = 0; index < SKILL_POINT_TOTAL; index += 1) {
-                const segment = document.createElement('span');
-                segment.className = 'modal-pause-meter__segment';
-                segment.classList.toggle('is-filled', index < value);
-                meter.appendChild(segment);
-            }
-            const effect = document.createElement('div');
-            effect.className = 'modal-pause-skill-effect';
-            if (def.key === 'accel') {
-                effect.textContent = statValues.accelNumber || statValues.accel || '';
-            } else if (def.key === 'speed') {
-                effect.textContent = statValues.speedNumber || statValues.speed || '';
-            } else {
-                effect.textContent = statValues.handlingNumber || statValues.handling || '';
-            }
-            row.append(labelEl, meter, effect);
-            container.appendChild(row);
         }
     }
 
@@ -261,15 +182,6 @@ export class ModalShell {
             nameEl.textContent = labelName;
         }
 
-        const tuningEl = document.getElementById('modal-pause-tuning');
-        if (tuningEl) {
-            if (payload.skillAllocation && typeof payload.skillAllocation === 'object') {
-                this._renderPauseTuningReadonly(tuningEl, payload.skillAllocation);
-            } else {
-                tuningEl.replaceChildren();
-            }
-        }
-
         canvas.setAttribute('aria-label', `Track layout: ${labelName}`);
 
         renderTrackPreviewCanvas(canvas, {
@@ -300,7 +212,7 @@ export class ModalShell {
     get pausePlaylistBtn() { return document.getElementById('modal-pause-playlist-btn'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
     get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
-    get combinedTuneBtn() { return document.getElementById('combined-tune-btn'); }
+    get combinedGarageBtn() { return document.getElementById('combined-garage-btn'); }
     get combinedPlaylistBtn() { return document.getElementById('combined-playlist-btn'); }
     get combinedRestartBtn() { return document.getElementById('combined-restart-btn'); }
     cancelPendingModalClose() {
@@ -358,13 +270,6 @@ export class ModalShell {
                         this.modalStatsRow.replaceChildren();
                     } else if (statsPlan.kind === 'crash') {
                         this.content.setModalStatCenter(...statsPlan.args);
-                    } else if (statsPlan.kind === 'daily-crash-budget') {
-                        this.modalStatsRow.replaceChildren();
-                        this.modalStatsRow.appendChild(this.content.createModalStat(
-                            'Laps',
-                            statsPlan.args[0],
-                            'modal-stat-value--best'
-                        ));
                     } else if (statsPlan.kind === 'win') {
                         this.content.setWinStats(...statsPlan.args, {
                             showDelta: statsPlan.showDelta !== false,
@@ -426,8 +331,6 @@ export class ModalShell {
         if (!this.modal || !this.modalPauseView) return;
 
         this.cancelPendingModalClose();
-        this._renderPauseRaceStats(lapData);
-
         this._bindClickAction(this.modalMenuBtn, options.secondaryAction);
         this._bindClickAction(this.pauseSettingsBtn, options.settingsAction);
         this._bindClickAction(this.pausePlaylistBtn, options.playlistAction);
@@ -488,7 +391,7 @@ export class ModalShell {
 
         this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
         this._bindClickAction(this.combinedSettingsBtn, options.settingsAction);
-        this._bindCombinedGarageBtn(this.combinedTuneBtn);
+        this._bindCombinedGarageBtn(this.combinedGarageBtn);
         this._bindClickAction(this.combinedPlaylistBtn, options.playlistAction);
         this._bindClickAction(this.combinedRestartBtn, finishResultModal(options.restartAction || options.primaryAction));
         this._syncGarageButtonToPanelState();
@@ -855,7 +758,7 @@ export class ModalShell {
             }
             if (trapRoot.id === 'garage-modal') {
                 event.preventDefault();
-                document.getElementById('skill-points-close-btn')?.click();
+                document.getElementById('garage-close-btn')?.click();
                 return;
             }
             if (

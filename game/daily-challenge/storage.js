@@ -20,18 +20,6 @@ function normalizeCompletedLaps(value) {
 
 function isBetterStoredResult(challenge, nextResult, previous) {
   if (!Number.isFinite(nextResult?.bestTime)) return false;
-
-  if (challenge?.objectiveType === "finish_with_crash_budget") {
-    const nextLaps = normalizeCompletedLaps(nextResult.completedLaps);
-    const previousLaps = normalizeCompletedLaps(previous?.completedLaps);
-    const previousTime = Number.isFinite(previous?.bestTime)
-      ? previous.bestTime
-      : null;
-    if (nextLaps > previousLaps) return true;
-    if (nextLaps < previousLaps) return false;
-    return previousTime === null || nextResult.bestTime > previousTime;
-  }
-
   const previousBest = Number.isFinite(previous?.bestTime)
     ? previous.bestTime
     : null;
@@ -118,12 +106,11 @@ export function saveDailyChallengeBestTime(
   )
     ? {
         bestTime,
-        completedLaps:
-          challenge?.objectiveType === "finish_with_crash_budget"
-            ? normalizeCompletedLaps(completedLaps)
-            : Number.isFinite(previous.completedLaps)
-              ? previous.completedLaps
-              : null,
+        completedLaps: Number.isFinite(completedLaps)
+          ? normalizeCompletedLaps(completedLaps)
+          : Number.isFinite(previous.completedLaps)
+            ? normalizeCompletedLaps(previous.completedLaps)
+            : null,
         checkpointTimesSec: normalizedCheckpoints,
       }
     : {
@@ -132,9 +119,7 @@ export function saveDailyChallengeBestTime(
           : bestTime,
         completedLaps: Number.isFinite(previous.completedLaps)
           ? normalizeCompletedLaps(previous.completedLaps)
-          : challenge?.objectiveType === "finish_with_crash_budget"
-            ? normalizeCompletedLaps(completedLaps)
-            : null,
+          : null,
         checkpointTimesSec: readStoredCheckpointTimesSec(previous),
       };
   const nextMap = pruneDailyChallengeMap({
@@ -179,12 +164,9 @@ export function setDailyChallengeBestTime(
       trackKey: challenge.trackKey || previous.trackKey || null,
       objectiveType: challenge.objectiveType || previous.objectiveType || null,
       bestTime,
-      completedLaps:
-        challenge?.objectiveType === "finish_with_crash_budget"
-          ? normalizeCompletedLaps(completedLaps)
-          : Number.isFinite(completedLaps)
-            ? normalizeCompletedLaps(completedLaps)
-            : null,
+      completedLaps: Number.isFinite(completedLaps)
+        ? normalizeCompletedLaps(completedLaps)
+        : null,
       checkpointTimesSec: normalizedCheckpoints,
       updatedAt: new Date().toISOString(),
     },

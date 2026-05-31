@@ -14,7 +14,6 @@ import {
   formatDailyChallengeResultLabel,
   getActiveDailyChallenge,
   getDailyChallengeCopyLabels,
-  getDailyChallengeMaxCrashes,
   getDailyChallengeModifierBadges,
   getDailyChallengeModifierLabel,
   getDailyChallengeObjectiveLabel,
@@ -25,11 +24,9 @@ import {
   getDailyChallengeTrackName,
   invalidateDailyChallengeSnapshot,
   isDailyChallengeStoredResultForChallenge,
-  isCrashBudgetDailyChallenge,
   prefetchDailyChallengeSnapshots,
 } from "./service.js?v=1.94";
 import { createVerificationSnapshot } from "../scoreboard/verification-queue.js";
-import { applySkillPointAllocation } from "../car/skill-points.js";
 import { getMedalForLapTime } from "../medals/medals.js?v=2.04";
 import {
   readTrackLastLapMedal,
@@ -37,6 +34,19 @@ import {
 } from "../medals/last-lap-medal-storage.js?v=1.92";
 
 export const dailyChallengeEngineMethods = {
+  syncTrackMedalFromChallengeBest(challenge, bestTime) {
+    if (
+      !challenge?.trackKey ||
+      !Number.isFinite(bestTime)
+    ) {
+      return null;
+    }
+
+    const medal = getMedalForLapTime(challenge.trackKey, Number(bestTime));
+    writeTrackLastLapMedal(challenge.trackKey, medal);
+    return medal;
+  },
+
   async syncReadyBackgroundTrack(challenge = this.activeDailyChallenge) {
     const fallbackTrackKey = "circuit";
     const targetTrackKey =
@@ -66,35 +76,8 @@ export const dailyChallengeEngineMethods = {
       : "Daily";
   },
 
-  isCrashBudgetDailyChallenge(challenge = this.activeDailyChallenge) {
-    return isCrashBudgetDailyChallenge(challenge);
-  },
-
   syncChallengeHudPrimaryStats() {
     const copyLabels = getDailyChallengeCopyLabels(this.activeDailyChallenge);
-    if (this.isCrashBudgetDailyChallenge()) {
-      const currentLaps = Math.max(
-        0,
-        Math.trunc(this.currentChallengeRun?.completedLaps || 0),
-      );
-      const bestLaps = Math.max(
-        0,
-        Math.trunc(this.dailyChallengeBestResult?.completedLaps || 0),
-      );
-      this.hud.setHudPrimaryMetric({
-        label: copyLabels.hudPrimaryLabel,
-        value: `${currentLaps}`,
-        useTimer: false,
-        visible: true,
-      });
-      this.hud.setHudBestMetric({
-        label: "BEST LAPS",
-        value: `${bestLaps}`,
-        visible: true,
-      });
-      return;
-    }
-
     this.hud.setHudPrimaryMetric({
       label: copyLabels.hudPrimaryLabel,
       useTimer: true,
@@ -107,14 +90,6 @@ export const dailyChallengeEngineMethods = {
     if (!this.currentChallengeRun) return "";
 
     const requiredLaps = this.currentChallengeRun.requiredLaps || 1;
-    if (this.currentChallengeRun.objectiveType === "finish_with_crash_budget") {
-      const crashesLeft = Math.max(
-        0,
-        this.currentChallengeRun.maxCrashes -
-        this.currentChallengeRun.crashCount,
-      );
-      return `${crashesLeft}`;
-    }
     if (requiredLaps > 1) {
       return `${Math.min(this.currentChallengeRun.completedLaps + 1, requiredLaps)} / ${requiredLaps}`;
     }
@@ -149,6 +124,7 @@ export const dailyChallengeEngineMethods = {
     this.bestLapTime = Number.isFinite(localData?.bestTime)
       ? localData.bestTime
       : null;
+    this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
     const objectiveLabel = getDailyChallengeObjectiveLabel(challenge);
 
     this.dailyChallengeUi.setDailyChallengeSummary({
@@ -227,20 +203,14 @@ export const dailyChallengeEngineMethods = {
       this.bestLapTime = Number.isFinite(localData?.bestTime)
         ? localData.bestTime
         : this.bestLapTime;
+      this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
     }
 
     const bestTime = Number.isFinite(localData?.bestTime)
       ? localData.bestTime
       : null;
     const rankLabel = snapshot?.playerRankLabel || "--";
-    const crashBudget = Math.max(
-      0,
-      Math.trunc(challenge.objectiveParams?.maxCrashes || 0),
-    );
-    const objectiveLabel =
-      challenge.objectiveType === "finish_with_crash_budget"
-        ? `${crashBudget} crash${crashBudget === 1 ? "" : "es"}`
-        : getDailyChallengeObjectiveLabel(challenge);
+    const objectiveLabel = getDailyChallengeObjectiveLabel(challenge);
     this.dailyChallengeUi.setDailyChallengeSummary({
       available: true,
       challengeId: challenge.id,
@@ -267,10 +237,7 @@ export const dailyChallengeEngineMethods = {
       trackKey: challenge.trackKey,
       objectiveType: challenge.objectiveType,
       requiredLaps: getDailyChallengeRequiredLaps(challenge),
-      maxCrashes: getDailyChallengeMaxCrashes(challenge),
       completedLaps: 0,
-      crashCount: 0,
-      elapsedTime: 0,
       lastLapAt: 0,
       bestLap: null,
       bestLapSecBeforeLastLap: null,
@@ -284,12 +251,7 @@ export const dailyChallengeEngineMethods = {
     this.hasTrackMedalBeforeLastLapWrite = false;
     this.currentChallengeRun = this.createDailyChallengeRun(challenge);
     this.syncCurrentRunPolicy();
-    this.setRuntimeConfig(
-      applySkillPointAllocation(
-        null,
-        this.skillPoints?.getAllocation?.(),
-      ),
-    );
+    this.setRuntimeConfig(null);
 
     const storedDailyRaw = getDailyChallengeData(challenge.id);
     const storedDaily = isDailyChallengeStoredResultForChallenge(challenge, storedDailyRaw)
@@ -299,6 +261,7 @@ export const dailyChallengeEngineMethods = {
     this.bestLapTime = Number.isFinite(storedDaily?.bestTime)
       ? storedDaily.bestTime
       : null;
+    this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
     const tk = challenge.trackKey;
     if (tk && Number.isFinite(storedDaily?.bestTime)) {
       const storedSec = Number(storedDaily.bestTime);
@@ -563,17 +526,14 @@ export const dailyChallengeEngineMethods = {
     const challenge = this.activeDailyChallenge;
     const completedLaps = Math.max(0, Math.trunc(winData.completedLaps || 0));
     const previousBest = this.dailyChallengeBestResult;
-    const isCrashBudget = this.isCrashBudgetDailyChallenge(challenge);
     const finishMedal = getMedalForLapTime(challenge.trackKey, finalTime);
-    const previousTrackMedal = isCrashBudget
-      ? null
-      : (this.hasTrackMedalBeforeLastLapWrite
-          ? this.trackMedalBeforeLastLapWrite
-          : readTrackLastLapMedal(challenge.trackKey));
+    const previousTrackMedal = this.hasTrackMedalBeforeLastLapWrite
+      ? this.trackMedalBeforeLastLapWrite
+      : readTrackLastLapMedal(challenge.trackKey);
     this.hasTrackMedalBeforeLastLapWrite = false;
     this.trackMedalBeforeLastLapWrite = null;
     writeTrackLastLapMedal(challenge.trackKey, finishMedal);
-    const lapMedal = isCrashBudget ? null : readTrackLastLapMedal(challenge.trackKey);
+    const lapMedal = readTrackLastLapMedal(challenge.trackKey);
     const isNewBest = isNewBestResult(
       this.currentRunPolicy,
       { bestTime: finalTime, completedLaps },
@@ -592,9 +552,7 @@ export const dailyChallengeEngineMethods = {
       previousBest != null && Number.isFinite(Number(previousBest.bestTime))
         ? Number(previousBest.bestTime)
         : null;
-    const previousPersonalBestSec = isCrashBudget
-      ? undefined
-      : storedChallengeBestSec != null
+    const previousPersonalBestSec = storedChallengeBestSec != null
         ? storedChallengeBestSec
         : Number.isFinite(runBestBeforeLastLap)
           ? runBestBeforeLastLap
@@ -612,7 +570,7 @@ export const dailyChallengeEngineMethods = {
             ? lastRunLap.deltaVsBest
             : null;
     this.hud.syncHud({ time: finalTime, speed: this.cachedSpeed, force: true });
-    this.hud.setBestTime(isCrashBudget ? null : this.bestLapTime, {
+    this.hud.setBestTime(this.bestLapTime, {
       persistToTrackCard: false,
     });
     this.hud.setHudPersonalBestsOpenAllowed(false);
@@ -645,7 +603,7 @@ export const dailyChallengeEngineMethods = {
         isNewBest,
         primaryStatLabel:
           getDailyChallengeCopyLabels(challenge).primaryStatLabel,
-        variant: isCrashBudget ? "daily-crash-budget" : null,
+        variant: null,
         scoreboardSnapshot: isNewBest
           ? {
               ...(existingScoreboardSnapshot || {}),
@@ -691,12 +649,10 @@ export const dailyChallengeEngineMethods = {
     );
     if (this.modal.modalMsg) {
       this.modal.modalMsg.style.display = "";
-      this.modal.modalMsg.textContent = isCrashBudget
-        ? `${completedLaps} lap${completedLaps === 1 ? "" : "s"} before the final crash`
-        : `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
+      this.modal.modalMsg.textContent = `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
     }
 
-    if (!isCrashBudget && trackKey && Number.isFinite(finalTime)) {
+    if (trackKey && Number.isFinite(finalTime)) {
       if (!this.sessionBestLapSecByTrackKey) {
         this.sessionBestLapSecByTrackKey = Object.create(null);
       }
@@ -712,19 +668,17 @@ export const dailyChallengeEngineMethods = {
 
     if (isNewBest) {
       invalidateDailyChallengeSnapshot(challenge.id);
-      if (!isCrashBudget) {
-        const saved = saveDailyChallengeBestTime(
-          challenge,
-          finalTime,
-          completedLaps,
-          lapCheckpointTimes,
-        );
-        if (saved) {
-          this.dailyChallengeBestResult = { ...saved };
-          this.bestLapTime = Number.isFinite(saved.bestTime)
-            ? saved.bestTime
-            : this.bestLapTime;
-        }
+      const saved = saveDailyChallengeBestTime(
+        challenge,
+        finalTime,
+        completedLaps,
+        lapCheckpointTimes,
+      );
+      if (saved) {
+        this.dailyChallengeBestResult = { ...saved };
+        this.bestLapTime = Number.isFinite(saved.bestTime)
+          ? saved.bestTime
+          : this.bestLapTime;
       }
 
       const replayPayload = this.scoreboardReplay.getPayload(1);
@@ -733,12 +687,7 @@ export const dailyChallengeEngineMethods = {
         bestTime: finalTime,
         completedLaps,
         checkpointTimesSec: lapCheckpointTimes,
-        replay: replayPayload
-          ? {
-            ...replayPayload,
-            skillPoints: this.skillPoints?.getAllocation?.() || null,
-          }
-          : null,
+        replay: replayPayload ? { ...replayPayload } : null,
       });
     }
   },
@@ -770,10 +719,7 @@ export const dailyChallengeEngineMethods = {
 
     const checkpointCount = this.currentTrack.checkpoints?.length || 0;
     if (winData.checkpointCount !== checkpointCount) return false;
-    const endedOnCrash = Boolean(
-      winData.challengeEndedOnCrash && this.isCrashBudgetDailyChallenge(),
-    );
-    if (!endedOnCrash && winData.completedCheckpointCount < checkpointCount) {
+    if (winData.completedCheckpointCount < checkpointCount) {
       return false;
     }
     if (!Number.isFinite(winData.lapTime) || winData.lapTime < 2.0) {

@@ -70,18 +70,6 @@ function cloneEntry(entry) {
 
 function isBetterDailyCandidate(nextEntry, previousEntry) {
   if (!previousEntry) return true;
-
-  if (nextEntry.objectiveType === "finish_with_crash_budget") {
-    const nextLaps = Math.max(0, Math.trunc(nextEntry.completedLaps || 0));
-    const previousLaps = Math.max(
-      0,
-      Math.trunc(previousEntry.completedLaps || 0),
-    );
-    if (nextLaps > previousLaps) return true;
-    if (nextLaps < previousLaps) return false;
-    return Number(nextEntry.bestTime) > Number(previousEntry.bestTime);
-  }
-
   return Number(nextEntry.bestTime) < Number(previousEntry.bestTime);
 }
 

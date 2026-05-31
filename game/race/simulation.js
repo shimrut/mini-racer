@@ -13,8 +13,6 @@ const _events = {
     challengeLapCompleted: false,
     challengeCompletedLapTime: null,
     challengeProgressLaps: 0,
-    challengeCrashReset: false,
-    challengeCrashCount: 0,
     challengeFailed: false,
     challengeFailureReason: null,
     crashImpact: null,
@@ -28,8 +26,6 @@ function resetEvents() {
     _events.challengeLapCompleted = false;
     _events.challengeCompletedLapTime = null;
     _events.challengeProgressLaps = 0;
-    _events.challengeCrashReset = false;
-    _events.challengeCrashCount = 0;
     _events.challengeFailed = false;
     _events.challengeFailureReason = null;
     _events.crashImpact = null;

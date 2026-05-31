@@ -33,13 +33,12 @@ import { LoadingScreen } from "./ui/loader.js";
 import { InteractionsUi } from "./race/ui-interactions.js?v=1.91";
 import { LeaderboardsUi } from "./scoreboard/ui.js?v=1.93";
 import { SettingsUi } from "./settings/ui.js?v=1.97";
-import { SkillPointsUi } from "./settings/skill-points-ui.js?v=1.01";
-import { applySkillPointAllocation } from "./car/skill-points.js?v=1.91";
+import { GarageUi } from "./settings/garage-ui.js?v=1.01";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
 import { AchievementsUi } from "./achievements/ui.js?v=1.92";
 import { trackEngineMethods } from "./track/engine-methods.js?v=1.91";
 import { raceEngineMethods } from "./race/engine-methods.js?v=1.91";
-import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=1.96";
+import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=1.97";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js?v=1.91";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js?v=1.97";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js?v=1.97";
@@ -191,7 +190,6 @@ export class RealTimeRacer {
       previewQualityLevel: this.qualityLevel,
       previewFrameSkip: this.frameSkip,
       onSummaryUpdated: () => {
-        this.skillPoints?.render();
         this.startOverlay?.updateStartOverlayMode(
           this.startOverlay.hasAnyData,
           this.startOverlay.isReturningPlayer,
@@ -224,7 +222,7 @@ export class RealTimeRacer {
       getDefaultPrimaryAction: () => () => this.reset(true),
       cancelLeaderboardRequests: () => this.leaderboards?.cancelPendingRequests(),
       playUnlockSound: (tier) => this.medalEffectsAudio?.scheduleMedalUnlock?.(tier),
-      getSkillPointsUi: () => this.skillPoints,
+      getGarageUi: () => this.garage,
     });
     this.leaderboards = new LeaderboardsUi({
       showRunsModal: (...args) => this.modal.showRunsModal(...args),
@@ -264,20 +262,8 @@ export class RealTimeRacer {
         });
       },
     });
-    this.skillPoints = new SkillPointsUi({
+    this.garage = new GarageUi({
       modal: this.modal,
-      getBaseConfig: () => CONFIG,
-      onAllocationChanged: () => {
-        if (this.status === "ready") {
-          this.requestRender();
-        }
-        if (this.status === "crashed" || this.status === "won") {
-          this.setRuntimeConfig(
-            applySkillPointAllocation(null, this.skillPoints?.getAllocation?.()),
-          );
-          this.requestRender();
-        }
-      },
       prefetchCarSpriteAsset: (name) => this.prefetchCarSpriteAsset(name),
       onCarSkinChanged: () => {
         void this.syncCarSpriteAsset();
@@ -309,7 +295,7 @@ export class RealTimeRacer {
     this.interactions.bindMenu();
     this.interactions.bindPrimaryActions();
     this.dailyChallengeUi.bindPlaylistModal();
-    this.skillPoints.bind();
+    this.garage.bind();
     this.hud.setPauseVisible(false);
 
     this.setLoadingStatus(30, "Fetching Profile...");
@@ -482,7 +468,6 @@ export class RealTimeRacer {
       },
       lapTime: Number(this.currentTime.toFixed(2)),
       challengeLaps: this.currentChallengeRun?.recentLaps?.length || 0,
-      skillPoints: this.skillPoints?.getAllocation?.() || null,
       startLine: this.currentTrack.startLine,
       routeTracePoints: this.routeTrace.length,
     });

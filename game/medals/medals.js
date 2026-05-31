@@ -150,12 +150,16 @@ function revealDeferredMedalIcon(
     if (!icon) return;
     if (icon.classList.contains('medal-svg--row-placeholder')) return;
     const run = () => {
+        const rowSlot = icon.parentElement?.classList?.contains('combined-medal-row-slot')
+            ? icon.parentElement
+            : null;
         icon.classList.remove('medal-pile-icon--deferred');
         if (!celebrate) return;
         const tier = icon.dataset?.tier;
         if (!reduced) {
-            icon.classList.add('medal-svg--medal-entrance');
-            icon.style.animationDelay = '0ms';
+            const animationTarget = rowSlot || icon;
+            animationTarget.classList.add('medal-svg--medal-entrance');
+            animationTarget.style.animationDelay = '0ms';
             playUnlockSound?.(tier);
         } else {
             playUnlockSound?.(tier);

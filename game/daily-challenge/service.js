@@ -248,6 +248,10 @@ function getDailyChallengeConfig() {
     return getBaseApiConfig();
 }
 
+function normalizeObjectiveType(value) {
+    return value === 'multi_lap_total' ? 'multi_lap_total' : 'single_lap_fastest';
+}
+
 function normalizeDailyChallenge(raw) {
     if (!raw || typeof raw !== 'object') return null;
     if (typeof raw.id !== 'string' || !raw.id) return null;
@@ -261,7 +265,7 @@ function normalizeDailyChallenge(raw) {
         endsAt: typeof raw.endsAt === 'string' ? raw.endsAt : null,
         availableUntil: typeof raw.availableUntil === 'string' ? raw.availableUntil : null,
         status: typeof raw.status === 'string' ? raw.status : 'active',
-        objectiveType: typeof raw.objectiveType === 'string' ? raw.objectiveType : 'single_lap_fastest',
+        objectiveType: normalizeObjectiveType(raw.objectiveType),
         objectiveParams: raw.objectiveParams && typeof raw.objectiveParams === 'object'
             ? raw.objectiveParams
             : {},
@@ -440,20 +444,6 @@ function mergeDailyChallengeBestResult(challenge) {
         return toDailyChallengeResultFromRow(row);
     }
 
-    if (challenge?.objectiveType === 'finish_with_crash_budget') {
-        const localLaps = Math.max(0, Math.trunc(local.completedLaps || 0));
-        const rowLaps = Math.max(0, Math.trunc(row.completedLaps || 0));
-        if (rowLaps > localLaps) {
-            return toDailyChallengeResultFromRow(row);
-        }
-        if (rowLaps < localLaps) {
-            return local;
-        }
-        return row.bestTime > local.bestTime
-            ? toDailyChallengeResultFromRow(row)
-            : local;
-    }
-
     return row.bestTime < local.bestTime
         ? {
             ...toDailyChallengeResultFromRow(row),
@@ -464,9 +454,14 @@ function mergeDailyChallengeBestResult(challenge) {
         : local;
 }
 
+export function getDailyChallengeBestResult(challenge) {
+    const result = mergeDailyChallengeBestResult(challenge);
+    return result && typeof result === 'object' ? { ...result } : null;
+}
+
 export function getDailyChallengeBestDisplay(challenge) {
     if (!challenge) return '--';
-    const merged = mergeDailyChallengeBestResult(challenge);
+    const merged = getDailyChallengeBestResult(challenge);
     return formatDailyChallengeBestLabel(
         challenge.objectiveType,
         merged?.bestTime,
@@ -527,10 +522,6 @@ function getObjectiveRequiredLaps(challenge) {
     return 1;
 }
 
-export function isCrashBudgetDailyChallenge(challenge) {
-    return challenge?.objectiveType === 'finish_with_crash_budget';
-}
-
 export function getDailyChallengeTrackName(challenge) {
     return TRACKS[challenge?.trackKey]?.name || 'Unknown Track';
 }
@@ -540,11 +531,6 @@ export function getDailyChallengeObjectiveLabel(challenge) {
 
     if (challenge.objectiveType === 'multi_lap_total') {
         return `${getObjectiveRequiredLaps(challenge)} laps`;
-    }
-
-    if (isCrashBudgetDailyChallenge(challenge)) {
-        const maxCrashes = Math.max(0, Math.trunc(challenge.objectiveParams?.maxCrashes || 0));
-        return `Most laps before ${maxCrashes} crash${maxCrashes === 1 ? '' : 'es'}`;
     }
 
     return '1 lap';
@@ -557,15 +543,6 @@ export function getDailyChallengeModeSelectObjectiveLine(challenge) {
 
 export function getDailyChallengeCopyLabels(challenge) {
     const objectiveType = challenge?.objectiveType || 'single_lap_fastest';
-
-    if (objectiveType === 'finish_with_crash_budget') {
-        return {
-            hudPrimaryLabel: 'LAPS',
-            primaryStatLabel: 'Laps',
-            bestSummaryLabel: 'Best Laps',
-            modeSelectLine: 'Most laps'
-        };
-    }
 
     if (objectiveType === 'multi_lap_total') {
         return {
@@ -589,23 +566,10 @@ export function formatDailyChallengeResultLabel(challenge, result) {
         return '--';
     }
     const bestTime = Number.isFinite(result?.bestTime) ? Number(result.bestTime) : null;
-    if (isCrashBudgetDailyChallenge(challenge)) {
-        const completedLaps = Math.max(0, Math.trunc(result?.completedLaps || 0));
-        if (completedLaps <= 0) {
-            return '--';
-        }
-        return `${completedLaps} lap${completedLaps === 1 ? '' : 's'}`;
-    }
-
     return bestTime !== null ? `${bestTime.toFixed(2)}s` : '--';
 }
 
 export function formatDailyChallengeBestLabel(objectiveType, bestTime, completedLaps = null) {
-    if (objectiveType === 'finish_with_crash_budget') {
-        const laps = Math.max(0, Math.trunc(completedLaps || 0));
-        return laps > 0 ? `${laps} lap${laps === 1 ? '' : 's'}` : '--';
-    }
-
     return Number.isFinite(bestTime) ? `${Number(bestTime).toFixed(2)}s` : '--';
 }
 
@@ -645,11 +609,6 @@ export function getDailyChallengeModifierLabel(challenge) {
 
 export function getDailyChallengeRequiredLaps(challenge) {
     return getObjectiveRequiredLaps(challenge);
-}
-
-export function getDailyChallengeMaxCrashes(challenge) {
-    if (challenge?.objectiveType !== 'finish_with_crash_budget') return null;
-    return Math.max(0, Math.trunc(challenge.objectiveParams?.maxCrashes || 0));
 }
 
 export async function getActiveDailyChallenge() {

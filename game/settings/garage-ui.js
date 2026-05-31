@@ -1,14 +1,4 @@
 import {
-    DEFAULT_SKILL_POINT_ALLOCATION,
-    SKILL_POINT_DEFINITIONS,
-    SKILL_POINT_TOTAL,
-    getSkillPointDisplayValues,
-    isDefaultSkillPointAllocation,
-    normalizeSkillPointAllocation,
-    readSkillPointAllocation,
-    writeSkillPointAllocation
-} from '../car/skill-points.js';
-import {
     PLAYER_CAR_SKIN_SECTIONS,
     PLAYER_CAR_SKINS,
     readPlayerCarSkinAssetName,
@@ -24,48 +14,37 @@ import { setCarAssetImageWithFallbacks } from '../car/sprite.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
-const GARAGE_TABS = Object.freeze(['tuning', 'skin', 'trails']);
+const GARAGE_TABS = Object.freeze(['skin', 'trails']);
 
-export class SkillPointsUi {
+export class GarageUi {
     constructor({
-        getBaseConfig = () => ({}),
-        onAllocationChanged = null,
         onCarSkinChanged = null,
         onTrailStrokeStyleChanged = null,
         prefetchCarSpriteAsset = null,
         modal = null,
     } = {}) {
-        this.getBaseConfig = getBaseConfig;
-        this.onAllocationChanged = onAllocationChanged;
         this.onCarSkinChanged = onCarSkinChanged;
         this.onTrailStrokeStyleChanged = onTrailStrokeStyleChanged;
         this.prefetchCarSpriteAsset = prefetchCarSpriteAsset;
         this.modal = modal;
-        this.allocation = readSkillPointAllocation();
-        this.activeGarageTab = 'tuning';
+        this.activeGarageTab = 'skin';
         this.skinOptionButtons = new Map();
         this.trailOptionButtons = new Map();
     }
 
-    get panel() { return document.getElementById('skill-points-panel'); }
+    get panel() { return document.getElementById('garage-panel'); }
     get garageModal() { return document.getElementById('garage-modal'); }
-    get rows() { return document.getElementById('skill-points-rows'); }
-    get remaining() { return document.getElementById('skill-points-remaining'); }
     get garageButton() { return document.getElementById('menu-btn-garage'); }
     get garageToggleButtons() { return document.querySelectorAll('[aria-controls="garage-modal"]'); }
-    get closeButton() { return document.getElementById('skill-points-close-btn'); }
-    get resetButton() { return document.getElementById('skill-points-reset-btn'); }
-    get tabTuning() { return document.getElementById('garage-tab-tuning'); }
+    get closeButton() { return document.getElementById('garage-close-btn'); }
     get tabSkin() { return document.getElementById('garage-tab-skin'); }
     get tabTrails() { return document.getElementById('garage-tab-trails'); }
-    get panelTuning() { return document.getElementById('garage-panel-tuning'); }
     get panelSkin() { return document.getElementById('garage-panel-skin'); }
     get panelTrails() { return document.getElementById('garage-panel-trails'); }
     get skinGrid() { return document.getElementById('garage-skin-grid'); }
     get trailGrid() { return document.getElementById('garage-trail-grid'); }
 
     bind() {
-        this.render();
         this.buildSkinGrid();
         this.buildTrailGrid();
         this.syncSkinSelection();
@@ -73,16 +52,12 @@ export class SkillPointsUi {
         this.setGarageTab(this.activeGarageTab, { focusTab: false });
         configureReusableModal(this.garageModal, {
             title: 'Garage',
-            subtitle: 'Tune Your Car',
+            subtitle: 'Car Style',
             closeLabel: 'Close',
         });
         bindReusableModal(this.garageModal, () => this.setPanelVisible(false));
 
         this.garageButton?.addEventListener('click', () => this.togglePanel());
-        this.resetButton?.addEventListener('click', () => {
-            this.setAllocation(DEFAULT_SKILL_POINT_ALLOCATION);
-        });
-        this.tabTuning?.addEventListener('click', () => this.setGarageTab('tuning'));
         this.tabSkin?.addEventListener('click', () => this.setGarageTab('skin'));
         this.tabTrails?.addEventListener('click', () => this.setGarageTab('trails'));
 
@@ -91,16 +66,6 @@ export class SkillPointsUi {
                 this.prefetchCarSpriteAsset(assetName);
             }
         }
-    }
-
-    getAllocation() {
-        return normalizeSkillPointAllocation(this.allocation);
-    }
-
-    setAllocation(allocation) {
-        this.allocation = writeSkillPointAllocation(allocation);
-        this.render();
-        this.onAllocationChanged?.(this.getAllocation());
     }
 
     setPanelVisible(isVisible) {
@@ -139,10 +104,9 @@ export class SkillPointsUi {
     }
 
     setGarageTab(tab, { focusTab = true } = {}) {
-        this.activeGarageTab = GARAGE_TABS.includes(tab) ? tab : 'tuning';
+        this.activeGarageTab = GARAGE_TABS.includes(tab) ? tab : 'skin';
 
         const tabButtons = [
-            ['tuning', this.tabTuning],
             ['skin', this.tabSkin],
             ['trails', this.tabTrails]
         ];
@@ -152,7 +116,6 @@ export class SkillPointsUi {
             el?.classList.toggle('is-selected', selected);
         }
 
-        this.panelTuning?.toggleAttribute('hidden', this.activeGarageTab !== 'tuning');
         this.panelSkin?.toggleAttribute('hidden', this.activeGarageTab !== 'skin');
         this.panelTrails?.toggleAttribute('hidden', this.activeGarageTab !== 'trails');
 
@@ -266,127 +229,5 @@ export class SkillPointsUi {
             btn.classList.toggle('is-selected', selected);
             btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
         }
-    }
-
-    adjustSkill(skillKey, delta) {
-        if (!SKILL_POINT_DEFINITIONS.some(({ key }) => key === skillKey)) return;
-
-        const next = { ...this.allocation };
-        const current = Math.trunc(next[skillKey] || 0);
-        const used = SKILL_POINT_DEFINITIONS.reduce((total, { key }) => total + Math.trunc(next[key] || 0), 0);
-        if (delta > 0 && used >= SKILL_POINT_TOTAL) return;
-        if (delta < 0 && current <= 0) return;
-
-        next[skillKey] = current + delta;
-        this.setAllocation(next);
-    }
-
-    createSkillRow({ key, label }, statValues, used) {
-        const row = document.createElement('div');
-        row.className = 'skill-points-row';
-
-        const labelEl = document.createElement('div');
-        labelEl.className = 'skill-points-row__label';
-        labelEl.textContent = label;
-
-        if (key === 'accel') {
-            row.classList.add('skill-points-row--accel');
-        } else if (key === 'speed') {
-            row.classList.add('skill-points-row--speed');
-        } else if (key === 'handling') {
-            row.classList.add('skill-points-row--handling');
-        }
-
-        const value = Math.trunc(this.allocation[key] || 0);
-        const meter = document.createElement('div');
-        meter.className = 'skill-points-meter';
-        meter.setAttribute('aria-label', `${label}: ${value} skill points`);
-        for (let index = 0; index < SKILL_POINT_TOTAL; index += 1) {
-            const segment = document.createElement('span');
-            segment.className = 'skill-points-meter__segment';
-            segment.classList.toggle('is-filled', index < value);
-            meter.appendChild(segment);
-        }
-
-        const effect = document.createElement('div');
-        effect.className = 'skill-points-row__effect';
-        if (key === 'accel') {
-            const desktopNum = document.createElement('span');
-            desktopNum.className = 'skill-points-row__effect-desktop';
-            desktopNum.textContent = statValues.accelNumber || statValues.accel || '';
-            const mobileFull = document.createElement('span');
-            mobileFull.className = 'skill-points-row__effect-mobile';
-            mobileFull.textContent = statValues.accelNumber || statValues.accel || '';
-            effect.append(desktopNum, mobileFull);
-        } else if (key === 'speed') {
-            const desktopNum = document.createElement('span');
-            desktopNum.className = 'skill-points-row__effect-desktop';
-            desktopNum.textContent = statValues.speedNumber || statValues.speed || '';
-            const mobileFull = document.createElement('span');
-            mobileFull.className = 'skill-points-row__effect-mobile';
-            mobileFull.textContent = statValues.speedNumber || statValues.speed || '';
-            effect.append(desktopNum, mobileFull);
-        } else {
-            const desktopNumber = document.createElement('span');
-            desktopNumber.className = 'skill-points-row__effect-desktop';
-            desktopNumber.textContent = statValues[`${key}Number`] || statValues[key] || '';
-            const mobileFull = document.createElement('span');
-            mobileFull.className = 'skill-points-row__effect-mobile';
-            mobileFull.textContent = statValues[`${key}Number`] || statValues[key] || '';
-            effect.append(desktopNumber, mobileFull);
-        }
-
-        const controls = document.createElement('div');
-        controls.className = 'skill-points-row__controls';
-
-        const minus = document.createElement('button');
-        minus.className = 'skill-points-stepper';
-        minus.type = 'button';
-        minus.textContent = '-';
-        minus.disabled = value <= 0;
-        minus.setAttribute('aria-label', `Remove one point from ${label}`);
-        minus.addEventListener('click', () => this.adjustSkill(key, -1));
-
-        const plus = document.createElement('button');
-        plus.className = 'skill-points-stepper';
-        plus.type = 'button';
-        plus.textContent = '+';
-        plus.disabled = used >= SKILL_POINT_TOTAL;
-        plus.setAttribute('aria-label', `Add one point to ${label}`);
-        plus.addEventListener('click', () => this.adjustSkill(key, 1));
-
-        controls.append(minus, plus);
-        row.append(labelEl, meter, effect, controls);
-        return row;
-    }
-
-    render() {
-        const rows = this.rows;
-        if (!rows) return;
-
-        this.allocation = normalizeSkillPointAllocation(this.allocation);
-        const used = SKILL_POINT_DEFINITIONS.reduce(
-            (total, { key }) => total + Math.trunc(this.allocation[key] || 0),
-            0
-        );
-        const statValues = getSkillPointDisplayValues(this.getBaseConfig?.() || {}, this.allocation);
-
-        rows.replaceChildren();
-        for (const definition of SKILL_POINT_DEFINITIONS) {
-            rows.appendChild(this.createSkillRow(definition, statValues, used));
-        }
-
-        if (this.remaining) {
-            const left = Math.max(0, SKILL_POINT_TOTAL - used);
-            this.remaining.textContent = `Points left: ${left}`;
-            this.remaining.setAttribute('aria-label', `${left} skill points remaining`);
-        }
-
-        if (this.resetButton) {
-            this.resetButton.disabled = isDefaultSkillPointAllocation(this.allocation);
-        }
-
-        this.syncSkinSelection();
-        this.syncTrailSelection();
     }
 }

@@ -515,9 +515,7 @@ export class ModalContentUi {
 
         const runTime = document.createElement('span');
         runTime.className = 'combined-row-time';
-        if (objectiveType === 'finish_with_crash_budget' && Number.isFinite(entry.completedLaps)) {
-            runTime.textContent = `${entry.completedLaps}L`;
-        } else if (entry.bestTime != null && Number.isFinite(entry.bestTime)) {
+        if (entry.bestTime != null && Number.isFinite(entry.bestTime)) {
             runTime.textContent = this.formatTime(entry.bestTime);
         } else {
             runTime.textContent = '--';

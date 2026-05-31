@@ -1,7 +1,10 @@
 import { TRACKS } from '../track/tracks.js?v=1.91';
 import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
 import {
+    getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
+    getDailyChallengePlaylist,
+    prefetchDailyChallengeSnapshots,
     getDailyChallengeSnapshot
 } from '../daily-challenge/service.js?v=1.94';
 import { getScoreboardSnapshot } from './service.js?v=1.91';
@@ -103,6 +106,63 @@ export class LeaderboardsUi {
             trackKey: summary.trackKey,
             scoreboardSnapshot: summary.scoreboardSnapshot,
         }, returnMode, options);
+    }
+
+    buildDailyChallengeLeaderboardRows(challenges = []) {
+        return (Array.isArray(challenges) ? challenges : [])
+            .filter((challenge) => challenge?.id && challenge.trackKey && TRACKS[challenge.trackKey])
+            .map((challenge) => ({
+                challenge,
+                trackKey: challenge.trackKey,
+                scoreboardSnapshot: this.resolveInitialDailyChallengeSnapshot(challenge) || { isLoading: true }
+            }));
+    }
+
+    openDailyChallengeLeaderboardOverviewModal(challenges, actions) {
+        const rows = this.buildDailyChallengeLeaderboardRows(challenges);
+        this.dailyChallengeUi.openLeaderboardTracksModal(rows.length ? rows : null, actions);
+        return rows;
+    }
+
+    async openDailyChallengeLeaderboardOverview() {
+        const requestId = ++this._requestVersion;
+        let loadedChallenges = getCachedDailyChallengePlaylist();
+        let currentRows = [];
+        const actions = {
+            onTrack: (challenge) => {
+                void this.openDailyChallengeLeaderboardForChallenge(challenge, 'close', {
+                    onClose: () => {
+                        if (loadedChallenges.length) {
+                            currentRows = this.buildDailyChallengeLeaderboardRows(loadedChallenges);
+                        }
+                        this.dailyChallengeUi.openLeaderboardTracksModal(currentRows, actions);
+                    }
+                });
+            }
+        };
+
+        currentRows = this.openDailyChallengeLeaderboardOverviewModal(
+            loadedChallenges.length ? loadedChallenges : null,
+            actions
+        );
+
+        try {
+            loadedChallenges = await getDailyChallengePlaylist();
+            await prefetchDailyChallengeSnapshots(
+                loadedChallenges.map((challenge) => challenge?.id).filter(Boolean)
+            );
+            currentRows = this.buildDailyChallengeLeaderboardRows(loadedChallenges);
+        } catch (error) {
+            console.error('Error loading leaderboard tracks:', error);
+            currentRows = [];
+        }
+
+        if (
+            requestId === this._requestVersion
+            && this.dailyChallengeUi.isLeaderboardTracksModalOpen?.()
+        ) {
+            this.dailyChallengeUi.renderLeaderboardTracks?.(currentRows, actions);
+        }
     }
 
     async openDailyChallengeLeaderboardForChallenge(challenge, returnMode = 'close', {

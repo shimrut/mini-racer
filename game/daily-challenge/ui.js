@@ -1,7 +1,7 @@
 import {
     formatDailyChallengeBestLabel,
     formatDailyChallengePlaylistAvailabilityLabel,
-    getCachedDailyChallengeSnapshot,
+    getDailyChallengeBestResult,
     getDailyChallengeBestDisplay,
     getDailyChallengeCopyLabels,
     getDailyChallengeTrackName
@@ -20,8 +20,8 @@ import {
 } from '../car/sprite.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
-import { readTrackLastLapMedal } from '../medals/last-lap-medal-storage.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
+import { getMedalForLapTime, getMedalRowSlots } from '../medals/medals.js?v=2.04';
 
 export class DailyChallengeUi {
     constructor({
@@ -34,6 +34,7 @@ export class DailyChallengeUi {
         this.onSummaryUpdated = onSummaryUpdated;
         this._dailyChallengeSummary = null;
         this._dailyChallengeCountdownInterval = null;
+        this._playlistModalMode = null;
     }
 
     get dailyChallengeTitle() { return document.getElementById('daily-challenge-title'); }
@@ -150,14 +151,11 @@ export class DailyChallengeUi {
             setCarAssetImageWithFallbacks(this.dailyChallengeCarImage, STOCK_CAR_ASSET_NAME);
         }
         if (this.dailyChallengeRankBtn) {
-            const trackName = this._dailyChallengeSummary?.trackName || "today's daily challenge";
-            this.dailyChallengeRankBtn.disabled = !hasChallenge;
+            this.dailyChallengeRankBtn.disabled = false;
             delete this.dailyChallengeRankBtn.dataset.rank;
             this.dailyChallengeRankBtn.setAttribute(
                 'aria-label',
-                hasChallenge
-                    ? `Open leaderboard for ${trackName}.`
-                    : 'Daily challenge leaderboard unavailable.'
+                'Open leaderboards for all tracks.'
             );
         }
         if (this.dailyChallengeStartBtn) {
@@ -216,12 +214,18 @@ export class DailyChallengeUi {
     openPlaylistModal(challenges = [], actions = null) {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
-        this.renderPlaylist(challenges, actions);
+        this._playlistModalMode = 'playlist';
+        configureReusableModal(modal, {
+            title: 'Tracks',
+            subtitle: 'Last 7 Days',
+            closeLabel: 'Close',
+        });
         openModalElement(modal, () => {
             modal.style.display = 'flex';
             modal.classList.add('active');
         });
         document.body.classList.add('modal-open');
+        this.renderPlaylist(challenges, actions);
         requestAnimationFrame(() => {
             const firstPlay = modal.querySelector('.daily-playlist-start-btn');
             if (firstPlay instanceof HTMLButtonElement) {
@@ -235,6 +239,7 @@ export class DailyChallengeUi {
     closePlaylistModal() {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
+        this._playlistModalMode = null;
         closeModalElement(modal, () => {
             modal.classList.remove('active');
             modal.style.display = '';
@@ -244,6 +249,10 @@ export class DailyChallengeUi {
 
     isPlaylistModalOpen() {
         return Boolean(this.dailyChallengePlaylistModal?.classList.contains('active'));
+    }
+
+    isLeaderboardTracksModalOpen() {
+        return this._playlistModalMode === 'leaderboard' && this.isPlaylistModalOpen();
     }
 
     bindPlaylistModal() {
@@ -262,7 +271,6 @@ export class DailyChallengeUi {
         const onPlay = typeof actions === 'function'
             ? actions
             : actions?.onPlay;
-        const onLeaderboard = actions?.onLeaderboard;
 
         if (challenges === null) {
             const loading = document.createElement('div');
@@ -316,29 +324,34 @@ export class DailyChallengeUi {
                 : getDailyChallengeBestDisplay(challenge);
             const best = document.createElement('span');
             best.className = 'daily-playlist-metric daily-playlist-metric--best';
-            
-            const medalTier = readTrackLastLapMedal(challenge.trackKey);
-            if (medalTier) {
-                const medalIcon = createMedalIconSvg(medalTier, { className: 'medal-svg--playlist' });
-                best.appendChild(medalIcon);
+
+            const bestResult = getDailyChallengeBestResult(challenge);
+            const bestTimeForMedals = isPending && Number.isFinite(pendingEntry.bestTime)
+                ? pendingEntry.bestTime
+                : bestResult?.bestTime;
+            const medalTier = getMedalForLapTime(challenge.trackKey, Number(bestTimeForMedals));
+            const earnedMedalSlots = getMedalRowSlots(challenge.trackKey, medalTier)
+                .filter((slot) => slot.filled);
+            if (earnedMedalSlots.length) {
+                const medals = document.createElement('span');
+                medals.className = 'daily-playlist-medals';
+                medals.setAttribute('aria-label', 'Unlocked medals');
+                for (const { tier } of earnedMedalSlots) {
+                    medals.appendChild(createMedalIconSvg(tier, { className: 'medal-svg--playlist' }));
+                }
+                best.appendChild(medals);
             }
-            
+
+            const bestTime = document.createElement('span');
+            bestTime.className = 'daily-playlist-best-time';
             const timeText = document.createTextNode(bestLabel && bestLabel !== '--' ? bestLabel : '--');
-            best.appendChild(timeText);
+            bestTime.appendChild(timeText);
+            best.appendChild(bestTime);
 
             if (isPending) {
                 best.setAttribute('aria-label', 'Pending best time verification');
             }
             stats.append(best);
-
-            const rankBtn = document.createElement('button');
-            rankBtn.className = 'daily-playlist-rank-btn';
-            rankBtn.type = 'button';
-            this.applyPlaylistRankButton(rankBtn, challenge);
-            rankBtn.addEventListener('click', () => {
-                this.closePlaylistModal();
-                onLeaderboard?.(challenge);
-            });
 
             const availabilityLabel = formatDailyChallengePlaylistAvailabilityLabel(challenge);
             if (availabilityLabel) {
@@ -365,7 +378,7 @@ export class DailyChallengeUi {
                 this.closePlaylistModal();
                 onPlay?.(challenge);
             });
-            actionsWrap.append(rankBtn, play);
+            actionsWrap.append(play);
 
             row.append(canvas, copy, actionsWrap);
             list.appendChild(row);
@@ -373,51 +386,118 @@ export class DailyChallengeUi {
         }
     }
 
-    resolvePlaylistRankSnapshot(challenge) {
-        const cached = getCachedDailyChallengeSnapshot(challenge?.id);
-        const pendingEntry = getDailyChallengeVerificationEntry(challenge?.id);
-        const isPending = getDailyChallengeVerificationState(challenge?.id) === 'pending'
-            && pendingEntry;
-        if (!isPending) {
-            return cached;
-        }
-        return {
-            ...(cached || {}),
-            playerRankLabel: null,
-            isLoading: true,
-            statusText: 'Pending verification',
-        };
+    openLeaderboardTracksModal(trackRows = [], actions = null) {
+        const modal = this.dailyChallengePlaylistModal;
+        if (!modal) return;
+        this._playlistModalMode = 'leaderboard';
+        configureReusableModal(modal, {
+            title: 'Leaderboard',
+            subtitle: 'Last 7 Days',
+            closeLabel: 'Close',
+        });
+        openModalElement(modal, () => {
+            modal.style.display = 'flex';
+            modal.classList.add('active');
+        });
+        document.body.classList.add('modal-open');
+        this.renderLeaderboardTracks(trackRows, actions);
+        requestAnimationFrame(() => {
+            const firstTrack = modal.querySelector('.daily-leaderboard-track-row');
+            if (firstTrack instanceof HTMLButtonElement) {
+                firstTrack.focus();
+            } else {
+                this.dailyChallengePlaylistCloseBtn?.focus?.();
+            }
+        });
     }
 
-    applyPlaylistRankButton(button, challenge) {
-        const trackName = getDailyChallengeTrackName(challenge);
-        const rankDisplay = buildScoreboardRankDisplay(
-            this.resolvePlaylistRankSnapshot(challenge),
-            { fallbackText: '--' }
-        );
-        button.replaceChildren();
-        button.classList.toggle('daily-playlist-rank-btn--loading', rankDisplay.isLoading);
+    renderLeaderboardTracks(trackRows = [], actions = null) {
+        const list = this.dailyChallengePlaylistList;
+        if (!list) return;
+        list.replaceChildren();
+        const onTrack = actions?.onTrack;
 
-        if (rankDisplay.isLoading) {
-            button.textContent = '--';
-            button.setAttribute('aria-busy', 'true');
-            button.setAttribute('aria-label', `Loading rank for ${trackName}. Open leaderboard.`);
+        if (trackRows === null) {
+            const loading = document.createElement('div');
+            loading.className = 'daily-playlist-empty';
+            loading.textContent = 'Loading tracks...';
+            list.appendChild(loading);
             return;
         }
 
-        button.removeAttribute('aria-busy');
+        const rows = Array.isArray(trackRows)
+            ? trackRows.filter((row) => row?.trackKey && TRACKS[row.trackKey])
+            : [];
+        if (!rows.length) {
+            const empty = document.createElement('div');
+            empty.className = 'daily-playlist-empty';
+            empty.textContent = 'No tracks available';
+            list.appendChild(empty);
+            return;
+        }
+
+        for (const rowData of rows) {
+            const track = TRACKS[rowData.trackKey];
+            const row = document.createElement('button');
+            row.className = 'daily-playlist-row daily-leaderboard-track-row';
+            row.type = 'button';
+            row.setAttribute('aria-label', `Open leaderboard for ${track.name}`);
+            row.addEventListener('click', () => {
+                this.closePlaylistModal();
+                onTrack?.(rowData.challenge || rowData);
+            });
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'daily-playlist-preview';
+            canvas.width = 176;
+            canvas.height = 108;
+            canvas.setAttribute('aria-hidden', 'true');
+
+            const copy = document.createElement('div');
+            copy.className = 'daily-playlist-copy';
+
+            const titleRow = document.createElement('div');
+            titleRow.className = 'daily-playlist-title-row';
+            const title = document.createElement('div');
+            title.className = 'daily-playlist-title';
+            title.textContent = track.name;
+            titleRow.append(title);
+            copy.append(titleRow);
+
+            const rank = document.createElement('span');
+            rank.className = 'daily-playlist-rank-btn daily-leaderboard-rank-value';
+            this.applyLeaderboardTrackRank(rank, rowData);
+
+            const actionsWrap = document.createElement('div');
+            actionsWrap.className = 'daily-playlist-actions';
+            actionsWrap.append(rank);
+
+            row.append(canvas, copy, actionsWrap);
+            list.appendChild(row);
+            this.renderPlaylistPreview(canvas, { trackKey: rowData.trackKey });
+        }
+    }
+
+    applyLeaderboardTrackRank(element, rowData) {
+        const rankDisplay = buildScoreboardRankDisplay(
+            rowData?.scoreboardSnapshot,
+            { fallbackText: '--' }
+        );
+        element.replaceChildren();
+        element.classList.toggle('daily-playlist-rank-btn--loading', rankDisplay.isLoading);
+        element.toggleAttribute('aria-busy', rankDisplay.isLoading);
+
+        if (rankDisplay.isLoading) {
+            element.textContent = '--';
+            return;
+        }
+
         const rankText = rankDisplay.text || '--';
         if (rankText.startsWith('#')) {
-            button.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
+            element.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
         } else {
-            button.textContent = rankText;
+            element.textContent = rankText;
         }
-        button.setAttribute(
-            'aria-label',
-            rankText && rankText !== 'N/A'
-                ? `Rank ${rankText} on ${trackName}. Open leaderboard.`
-                : `No rank on ${trackName}. Open leaderboard.`
-        );
     }
 
     renderPlaylistPreview(canvas, challenge) {
