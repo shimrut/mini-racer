@@ -104,7 +104,6 @@ export class LeaderboardsUi {
         await this.openDailyChallengeLeaderboardForChallenge({
             id: summary.challengeId,
             trackKey: summary.trackKey,
-            scoreboardSnapshot: summary.scoreboardSnapshot,
         }, returnMode, options);
     }
 
@@ -202,10 +201,19 @@ export class LeaderboardsUi {
         }
     }
 
-    async showTrackLeaderboardModal(trackKey, returnMode = 'close') {
+    async showTrackLeaderboardModal(trackKey, returnMode = 'close', {
+        scoreboardSnapshot = null
+    } = {}) {
         if (!trackKey || !TRACKS[trackKey]) return;
 
-        const cachedSnapshot = this.getCachedTrackCardScoreboardSnapshot(trackKey, TRACK_MODE_DAILY_GP);
+        const providedSnapshot =
+            scoreboardSnapshot
+            && typeof scoreboardSnapshot === 'object'
+            && !scoreboardSnapshot.isLoading
+                ? scoreboardSnapshot
+                : null;
+        const cachedSnapshot = providedSnapshot
+            || this.getCachedTrackCardScoreboardSnapshot(trackKey, TRACK_MODE_DAILY_GP);
         const requestId = ++this._requestVersion;
         this.showLeaderboardModalState(returnMode, {
             scoreboardSnapshot: cachedSnapshot || { isLoading: true },

@@ -805,6 +805,7 @@ export async function prefetchDailyChallengeSnapshots(challengeIds = []) {
 
 export async function submitDailyChallengeBestTime({
     challengeId,
+    trackKey = null,
     bestTime,
     replay,
     checkpointTimesSec = null,
@@ -814,6 +815,8 @@ export async function submitDailyChallengeBestTime({
     if (
         typeof challengeId !== 'string'
         || !challengeId
+        || typeof trackKey !== 'string'
+        || !trackKey
         || !Number.isFinite(bestTime)
         || bestTime < MIN_DAILY_TIME
         || bestTime > MAX_DAILY_TIME
@@ -839,6 +842,7 @@ export async function submitDailyChallengeBestTime({
         body: JSON.stringify({
             playerId: getOrCreatePlayerId('daily challenge'),
             challengeId,
+            trackKey,
             leaderboardIdentity: getLeaderboardIdentityPreference(),
             bestTime,
             replay,

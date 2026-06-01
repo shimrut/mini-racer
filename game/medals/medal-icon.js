@@ -31,6 +31,74 @@ const MEDAL_CAPTION_Y = '398';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HEX_CENTER = '320 320';
 const CRASH_ICON_GRAD_ID = 'medal-crash-icon-grad';
+const medalIconTemplateCache = new Map();
+const MEDAL_ICON_TEMPLATE_CACHE_LIMIT = 80;
+let medalIconCloneId = 0;
+
+function walkElementTree(node, callback) {
+    if (!node) return;
+    callback(node);
+    for (const child of Array.from(node.children || [])) {
+        walkElementTree(child, callback);
+    }
+}
+
+function uniquifyClonedSvgIds(root) {
+    const idMap = new Map();
+    const suffix = `clone-${++medalIconCloneId}`;
+
+    walkElementTree(root, (node) => {
+        const id = typeof node.getAttribute === 'function' ? node.getAttribute('id') : null;
+        if (!id) return;
+        const nextId = `${id}-${suffix}`;
+        idMap.set(id, nextId);
+        node.setAttribute('id', nextId);
+    });
+
+    if (!idMap.size) return;
+
+    walkElementTree(root, (node) => {
+        if (!node.attributes || typeof node.setAttribute !== 'function') return;
+        for (const attr of Array.from(node.attributes)) {
+            let nextValue = attr.value;
+            for (const [oldId, nextId] of idMap) {
+                nextValue = nextValue.replaceAll(`url(#${oldId})`, `url(#${nextId})`);
+            }
+            if (nextValue !== attr.value) {
+                node.setAttribute(attr.name, nextValue);
+            }
+        }
+    });
+}
+
+function getMedalTemplateCacheKey(tier, { className, outline, centerText, showEmblem, rowPlaceholder }) {
+    return [
+        tier,
+        className || '',
+        outline ? 'outline' : 'filled',
+        centerText ?? '',
+        showEmblem ? 'emblem' : 'no-emblem',
+        rowPlaceholder ? 'row-placeholder' : 'standard'
+    ].join('|');
+}
+
+function rememberMedalIconTemplate(key, template) {
+    if (medalIconTemplateCache.has(key)) {
+        medalIconTemplateCache.delete(key);
+    }
+    medalIconTemplateCache.set(key, template);
+    while (medalIconTemplateCache.size > MEDAL_ICON_TEMPLATE_CACHE_LIMIT) {
+        const oldestKey = medalIconTemplateCache.keys().next().value;
+        medalIconTemplateCache.delete(oldestKey);
+    }
+}
+
+function cloneCachedMedalIcon(template) {
+    if (!template || typeof template.cloneNode !== 'function') return null;
+    const clone = template.cloneNode(true);
+    uniquifyClonedSvgIds(clone);
+    return clone;
+}
 
 /**
  * Darken a hex color for inset grooves (tinted shadow, not pure black).
@@ -481,5 +549,13 @@ export function createMedalIconSvg(medal, { className = '', outline = false, cen
         || medal === 'bronze'
         || medal === 'personal-best';
     const tier = isKnownTier ? medal : 'white';
-    return buildMedalIcon(tier, { className, outline, centerText, showEmblem, rowPlaceholder });
+    const options = { className, outline, centerText, showEmblem, rowPlaceholder };
+    const cacheKey = getMedalTemplateCacheKey(tier, options);
+    const cached = cloneCachedMedalIcon(medalIconTemplateCache.get(cacheKey));
+    if (cached) return cached;
+
+    const template = buildMedalIcon(tier, options);
+    if (typeof template.cloneNode !== 'function') return template;
+    rememberMedalIconTemplate(cacheKey, template);
+    return cloneCachedMedalIcon(template) || buildMedalIcon(tier, options);
 }

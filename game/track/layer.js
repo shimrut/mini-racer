@@ -4,10 +4,10 @@ import { drawViewportPresentationBackground } from "./canvas.js?v=1.91";
 /**
  * Manages the two-canvas track-layer rendering system.
  *
- * On capable desktop browsers the track is rendered into an OffscreenCanvas
+ * On capable browsers the track is rendered into an OffscreenCanvas
  * on a dedicated worker thread so the main thread never blocks on large blits.
- * On coarse-pointer (mobile/tablet) devices or when OffscreenCanvas is
- * unavailable the renderer falls back to a regular main-thread 2D context.
+ * When OffscreenCanvas is unavailable the renderer falls back to a regular
+ * main-thread 2D context.
  *
  * The engine holds one instance and delegates setup, viewport resizing,
  * bitmap sync, and per-frame drawing through this class.
@@ -30,6 +30,16 @@ export class TrackLayerRenderer {
     this.bitmapPromise = null;
     /** Callback for when the worker has received the track bitmap. */
     this.onTrackReady = null;
+    this.renderMessage = {
+      type: "render",
+      camera: { x: 0, y: 0 },
+      zoom: 1,
+      viewport: {
+        width: 0,
+        height: 0,
+        devicePixelRatio: 1,
+      },
+    };
   }
 
   /**
@@ -37,12 +47,10 @@ export class TrackLayerRenderer {
    * falls back to a regular 2D context on the main thread.
    * Must be called once during engine construction.
    *
-   * @param {boolean} isCoarsePointer - true on touch/mobile devices.
    */
-  setup(isCoarsePointer) {
+  setup() {
     const canUseOffscreenWorker = Boolean(
-      !isCoarsePointer &&
-        this.canvas &&
+      this.canvas &&
         typeof Worker !== "undefined" &&
         typeof this.canvas.transferControlToOffscreen === "function" &&
         typeof createImageBitmap === "function",
@@ -222,24 +230,27 @@ export class TrackLayerRenderer {
     const worldLeft = camera.x;
     const worldTop = camera.y;
 
+    const fallbackCssWidth =
+      fallbackWidth > 0 ? fallbackWidth / Math.max(devicePixelRatio || 1, 1) : 0;
+    const fallbackCssHeight =
+      fallbackHeight > 0 ? fallbackHeight / Math.max(devicePixelRatio || 1, 1) : 0;
+
     const canvasWidth = this.workerReady
       ? viewportWidth || container.clientWidth
-      : viewportWidth || this.canvas?.width || fallbackWidth;
+      : viewportWidth || container.clientWidth || fallbackCssWidth;
     const canvasHeight = this.workerReady
       ? viewportHeight || container.clientHeight
-      : viewportHeight || this.canvas?.height || fallbackHeight;
+      : viewportHeight || container.clientHeight || fallbackCssHeight;
 
     if (this.workerReady && this.worker) {
-      this.worker.postMessage({
-        type: "render",
-        camera: { x: worldLeft, y: worldTop },
-        zoom,
-        viewport: {
-          width: canvasWidth,
-          height: canvasHeight,
-          devicePixelRatio,
-        },
-      });
+      const message = this.renderMessage;
+      message.camera.x = worldLeft;
+      message.camera.y = worldTop;
+      message.zoom = zoom;
+      message.viewport.width = canvasWidth;
+      message.viewport.height = canvasHeight;
+      message.viewport.devicePixelRatio = devicePixelRatio;
+      this.worker.postMessage(message);
       return;
     }
 

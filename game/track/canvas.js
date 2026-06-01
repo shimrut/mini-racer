@@ -17,114 +17,9 @@ function createSeededRandom(seedInput = 'default') {
     };
 }
 
-function buildLinearGradient(ctx, x0, y0, x1, y1, stops, fallback) {
-    const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
-    for (const [offset, color] of stops) {
-        gradient.addColorStop(offset, color);
-    }
-    return gradient || fallback;
-}
-
-function resolveBackgroundParallaxFactor(presentation = {}) {
-    const rawFactor = presentation.backgroundParallaxFactor;
-    if (!Number.isFinite(rawFactor)) return 1;
-    return Math.max(0, Math.min(1, rawFactor));
-}
-
-function drawDesertBackdrop(ctx, width, height, presentation = {}, {
-    camera = null,
-    zoom = 1
-} = {}) {
-    void camera;
-    void zoom;
+function drawDesertBackdrop(ctx, width, height, presentation = {}) {
     ctx.fillStyle = presentation.offTrackColor || '#8d6a3b';
     ctx.fillRect(0, 0, width, height);
-}
-
-const BIOMES = {
-    meadow: {
-        base: '#f1f5f9',
-        blobs: ['#e2e8f0', '#cbd5e1'],
-        blobScale: 400,
-        density: 0.45
-    },
-    desert: {
-        base: '#fef3c7',
-        blobs: ['#fde68a', '#fcd34d'],
-        blobScale: 350,
-        density: 0.4
-    },
-    forest: {
-        base: '#f0fdf4',
-        blobs: ['#dcfce7', '#bbf7d0'],
-        blobScale: 300,
-        density: 0.55
-    },
-    prairie: {
-        base: '#fdfcf0',
-        blobs: ['#f8f7e5', '#f1f0d1'],
-        blobScale: 500,
-        density: 0.35
-    },
-    hills: {
-        base: '#f8fafc',
-        blobs: ['#f1f5f9', '#e2e8f0'],
-        blobScale: 450,
-        density: 0.4
-    }
-};
-
-function drawBlobbyBackground(ctx, width, height, presentation, camera, zoom, isStatic, seedSource) {
-    const biomeKey = presentation.biome || 'meadow';
-    const biome = BIOMES[biomeKey] || BIOMES.meadow;
-    
-    ctx.fillStyle = presentation.offTrackColor || biome.base;
-    ctx.fillRect(0, 0, width, height);
-
-    const safeZoom = isStatic ? 1 : Math.max(zoom || 1, 0.001);
-    const parallaxFactor = isStatic ? 1 : resolveBackgroundParallaxFactor(presentation);
-    const worldLeft = isStatic ? 0 : (Number.isFinite(camera?.x) ? camera.x * parallaxFactor : 0);
-    const worldTop = isStatic ? 0 : (Number.isFinite(camera?.y) ? camera.y * parallaxFactor : 0);
-    const worldWidth = width / safeZoom;
-    const worldHeight = height / safeZoom;
-
-    const cellSize = biome.blobScale || 300;
-    const startCellX = Math.floor(worldLeft / cellSize) - 1;
-    const endCellX = Math.floor((worldLeft + worldWidth) / cellSize) + 1;
-    const startCellY = Math.floor(worldTop / cellSize) - 1;
-    const endCellY = Math.floor((worldTop + worldHeight) / cellSize) + 1;
-
-    for (let cellX = startCellX; cellX <= endCellX; cellX++) {
-        for (let cellY = startCellY; cellY <= endCellY; cellY++) {
-            const random = createSeededRandom(`${seedSource}:${cellX}:${cellY}`);
-            if (random() > (biome.density || 0.4)) continue;
-
-            const worldX = (cellX + random()) * cellSize;
-            const worldY = (cellY + random()) * cellSize;
-            const radius = (0.5 + random() * 0.7) * cellSize * 0.65;
-            
-            const screenX = (worldX - worldLeft) * safeZoom;
-            const screenY = (worldY - worldTop) * safeZoom;
-            const screenRadius = radius * safeZoom;
-
-            ctx.fillStyle = biome.blobs[Math.floor(random() * biome.blobs.length)];
-            
-            // Draw an organic-ish blob using overlapping circles
-            ctx.beginPath();
-            ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            const subCount = 1 + Math.floor(random() * 3);
-            for (let s = 0; s < subCount; s++) {
-                const subRadius = screenRadius * (0.4 + random() * 0.5);
-                const angle = random() * Math.PI * 2;
-                const dist = screenRadius * (0.3 + random() * 0.4);
-                ctx.beginPath();
-                ctx.arc(screenX + Math.cos(angle) * dist, screenY + Math.sin(angle) * dist, subRadius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-    }
 }
 
 export function drawCheckeredLine(ctx, p1, p2, width, colors = {}) {
@@ -169,119 +64,6 @@ export function drawCheckeredLine(ctx, p1, p2, width, colors = {}) {
             ctx.closePath();
             ctx.fill();
         }
-    }
-
-    ctx.restore();
-}
-
-function drawNeonGateFinishLine(ctx, p1, p2, width, presentation = {}) {
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const length = Math.hypot(dx, dy);
-    if (length < 1) return;
-
-    const tx = dx / length;
-    const ty = dy / length;
-    const nx = -ty;
-    const ny = tx;
-    const primaryColor = presentation.finishLineColor || '#e0f2fe';
-    const secondaryColor = presentation.finishLineAltColor || 'rgba(125, 211, 252, 0.92)';
-    const glowColor = presentation.finishLineGlowColor || 'rgba(56, 189, 248, 0.32)';
-    const beaconColor = presentation.finishLineBeaconColor || primaryColor;
-    const glowWidth = Math.max(width * 1.5, 12);
-    const beamWidth = Math.max(width * 0.42, 3.5);
-    const segmentWidth = Math.max(width * 0.2, 1.75);
-    const beaconRadius = Math.max(width * 0.42, 3.5);
-    const dashPattern = [width * 0.9, width * 0.45];
-    const beamGradient = buildLinearGradient(
-        ctx,
-        p1.x,
-        p1.y,
-        p2.x,
-        p2.y,
-        [
-            [0, secondaryColor],
-            [0.28, primaryColor],
-            [0.5, beaconColor],
-            [0.72, primaryColor],
-            [1, secondaryColor]
-        ],
-        primaryColor
-    );
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = glowWidth;
-    ctx.strokeStyle = glowColor;
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = beamWidth;
-    ctx.strokeStyle = beamGradient;
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = segmentWidth;
-    ctx.setLineDash(dashPattern);
-    ctx.strokeStyle = beaconColor;
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-
-    ctx.lineDashOffset = dashPattern[0] * 0.5;
-    ctx.strokeStyle = secondaryColor;
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-    ctx.lineDashOffset = 0;
-
-    const edgeHalfWidth = width * 0.62;
-    for (const point of [p1, p2]) {
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-        ctx.lineWidth = Math.max(width * 0.22, 1.75);
-        ctx.strokeStyle = beaconColor;
-        ctx.beginPath();
-        ctx.moveTo(point.x - nx * edgeHalfWidth, point.y - ny * edgeHalfWidth);
-        ctx.lineTo(point.x + nx * edgeHalfWidth, point.y + ny * edgeHalfWidth);
-        ctx.stroke();
-
-        ctx.shadowBlur = 0;
-        const beaconGlow = ctx.createRadialGradient(
-            point.x,
-            point.y,
-            0,
-            point.x,
-            point.y,
-            beaconRadius * 1.7
-        );
-        beaconGlow.addColorStop(0, beaconColor);
-        beaconGlow.addColorStop(0.56, glowColor);
-        beaconGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = beaconGlow;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, beaconRadius * 1.7, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = primaryColor;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, beaconRadius * 0.62, 0, Math.PI * 2);
-        ctx.fill();
     }
 
     ctx.restore();
@@ -339,151 +121,23 @@ function buildClosedPath(points, mapPoint) {
 }
 
 export function drawPresentationBackground(ctx, width, height, presentation = {}, seed = 'default') {
-    if (presentation.backgroundStyle === 'procedural') {
-        drawBlobbyBackground(ctx, width, height, presentation, null, 1, true, seed);
-        return;
-    }
-
     if (presentation.backgroundStyle === 'desert') {
         drawDesertBackdrop(ctx, width, height, presentation);
         return;
     }
 
-    if (presentation.backgroundStyle !== 'space') {
-        ctx.fillStyle = presentation.offTrackColor || CONFIG.offTrackColor;
-        ctx.fillRect(0, 0, width, height);
-        return;
-    }
-
-    ctx.fillStyle = presentation.offTrackColor || '#050816';
+    ctx.fillStyle = presentation.offTrackColor || CONFIG.offTrackColor;
     ctx.fillRect(0, 0, width, height);
-
-    const random = createSeededRandom(seed);
-    const starDensity = Math.max(0.4, presentation.starDensity || 1);
-    const stars = Math.max(42, Math.round((width * height) / 12000 * starDensity));
-    for (let i = 0; i < stars; i += 1) {
-        const x = random() * width;
-        const y = random() * height;
-        const isBright = random() < 0.14;
-        const radius = isBright ? 1.3 + random() * 1.1 : 0.35 + random() * 0.8;
-        ctx.globalAlpha = isBright ? 0.78 + random() * 0.18 : 0.42 + random() * 0.28;
-        ctx.fillStyle = random() < 0.1
-            ? (presentation.starAccentColor || 'rgba(125, 211, 252, 0.55)')
-            : (presentation.starColor || 'rgba(255, 255, 255, 0.95)');
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    ctx.globalAlpha = 1;
 }
 
 export function drawViewportPresentationBackground(ctx, width, height, camera = { x: 0, y: 0 }, zoom = 1, presentation = {}) {
-    if (presentation.backgroundStyle === 'procedural') {
-        drawBlobbyBackground(ctx, width, height, presentation, camera, zoom, false, presentation.key || 'procedural');
-        return;
-    }
-
     if (presentation.backgroundStyle === 'desert') {
         drawDesertBackdrop(ctx, width, height, presentation, { camera, zoom });
         return;
     }
 
-    if (presentation.backgroundStyle !== 'space') {
-        ctx.fillStyle = presentation.offTrackColor || CONFIG.offTrackColor;
-        ctx.fillRect(0, 0, width, height);
-        return;
-    }
-
-    ctx.fillStyle = presentation.offTrackColor || '#050816';
+    ctx.fillStyle = presentation.offTrackColor || CONFIG.offTrackColor;
     ctx.fillRect(0, 0, width, height);
-
-    const safeZoom = Math.max(zoom || 1, 0.001);
-    const parallaxFactor = resolveBackgroundParallaxFactor(presentation);
-    const starDensity = Math.max(0.4, presentation.starDensity || 1);
-    const worldLeft = Number.isFinite(camera?.x) ? camera.x * parallaxFactor : 0;
-    const worldTop = Number.isFinite(camera?.y) ? camera.y * parallaxFactor : 0;
-    const worldWidth = width / safeZoom;
-    const worldHeight = height / safeZoom;
-    const cellSize = 128;
-    const startCellX = Math.floor(worldLeft / cellSize) - 1;
-    const endCellX = Math.floor((worldLeft + worldWidth) / cellSize) + 1;
-    const startCellY = Math.floor(worldTop / cellSize) - 1;
-    const endCellY = Math.floor((worldTop + worldHeight) / cellSize) + 1;
-
-    for (let cellX = startCellX; cellX <= endCellX; cellX += 1) {
-        for (let cellY = startCellY; cellY <= endCellY; cellY += 1) {
-            const random = createSeededRandom(`${presentation.key || 'space'}:${cellX}:${cellY}`);
-            const starCount = 1 + Math.floor(random() * 2 * starDensity);
-            for (let i = 0; i < starCount; i += 1) {
-                const worldX = (cellX * cellSize) + random() * cellSize;
-                const worldY = (cellY * cellSize) + random() * cellSize;
-                const screenX = (worldX - worldLeft) * safeZoom;
-                const screenY = (worldY - worldTop) * safeZoom;
-                if (screenX < -4 || screenX > width + 4 || screenY < -4 || screenY > height + 4) continue;
-
-                const isBright = random() > 0.86;
-                const radius = isBright ? 1.2 + random() * 1.1 : 0.35 + random() * 0.75;
-                ctx.globalAlpha = isBright ? 0.78 + random() * 0.18 : 0.42 + random() * 0.26;
-                ctx.fillStyle = random() > 0.92
-                    ? (presentation.starAccentColor || 'rgba(125, 211, 252, 0.55)')
-                    : (presentation.starColor || 'rgba(255, 255, 255, 0.95)');
-                ctx.beginPath();
-                ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-    }
-    ctx.globalAlpha = 1;
-}
-
-function drawCorridorBands(ctx, surfacePath, width, height, presentation) {
-    ctx.save();
-    ctx.clip(surfacePath, 'evenodd');
-
-    const fieldGlow = ctx.createRadialGradient(
-        width * 0.52,
-        height * 0.5,
-        Math.min(width, height) * 0.08,
-        width * 0.52,
-        height * 0.5,
-        Math.max(width, height) * 0.58
-    );
-    fieldGlow.addColorStop(0, presentation.hyperspaceFieldMidColor || 'rgba(37, 99, 235, 0.18)');
-    fieldGlow.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
-    fieldGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = 0.42;
-    ctx.fillStyle = fieldGlow;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.12;
-    const coreGlow = ctx.createLinearGradient(width * 0.32, 0, width * 0.68, 0);
-    coreGlow.addColorStop(0, 'rgba(255, 255, 255, 0)');
-    coreGlow.addColorStop(0.5, presentation.hyperspaceFieldBrightColor || 'rgba(248, 250, 252, 0.9)');
-    coreGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = coreGlow;
-    ctx.fillRect(width * 0.32, 0, width * 0.36, height);
-
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-
-    ctx.restore();
-}
-
-function drawLaneGuide(ctx, surfacePath, presentation, width, height) {
-    if (!presentation.centerLineColor) return;
-    ctx.save();
-    ctx.clip(surfacePath, 'evenodd');
-    ctx.strokeStyle = presentation.centerLineColor;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([10, 12]);
-    ctx.beginPath();
-    ctx.moveTo(width * 0.06, height * 0.5);
-    ctx.lineTo(width * 0.94, height * 0.5);
-    ctx.stroke();
-    ctx.restore();
-    ctx.setLineDash([]);
 }
 
 function drawBoundaryDebris(ctx, points, mapTrackPoint, presentation, {
@@ -588,105 +242,16 @@ export function drawInnerDebris(ctx, inner, mapTrackPoint, presentation) {
 }
 
 export function fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, width, height, presentation = {}) {
-    if (presentation.trackStyle === 'rails') {
-        return;
-    }
-
-    if (presentation.trackStyle !== 'hyperspace-corridor') {
-        ctx.fillStyle = presentation.trackColor || CONFIG.trackColor;
-        ctx.fill(surfacePath, 'evenodd');
-        ctx.fillStyle = presentation.infieldColor || CONFIG.offTrackColor;
-        ctx.fill(innerPath);
-        return;
-    }
-
-    const corridorGradient = buildLinearGradient(
-        ctx,
-        0,
-        height * 0.18,
-        width,
-        height * 0.82,
-        [
-            [0, '#08101d'],
-            [0.22, presentation.hyperspaceFieldDarkColor || '#07101f'],
-            [0.5, presentation.trackColor || '#586273'],
-            [0.78, presentation.hyperspaceFieldDarkColor || '#07101f'],
-            [1, '#08101d']
-        ],
-        presentation.trackColor || '#586273'
-    );
-
-    ctx.fillStyle = corridorGradient;
+    void outerPath;
+    void width;
+    void height;
+    ctx.fillStyle = presentation.trackColor || CONFIG.trackColor;
     ctx.fill(surfacePath, 'evenodd');
-    drawCorridorBands(ctx, surfacePath, width, height, presentation);
-    drawLaneGuide(ctx, surfacePath, presentation, width, height);
+    ctx.fillStyle = presentation.infieldColor || CONFIG.offTrackColor;
+    ctx.fill(innerPath);
 }
 
 export function drawTrackBoundaries(ctx, outerPath, innerPath, presentation = {}) {
-    if (presentation.trackStyle === 'hyperspace-corridor') {
-        ctx.save();
-        ctx.lineJoin = 'round';
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = presentation.outerStrokeColor || '#f8feff';
-        ctx.stroke(outerPath);
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = presentation.innerStrokeColor || 'rgba(125, 211, 252, 0.96)';
-        ctx.stroke(innerPath);
-        ctx.restore();
-        return;
-    }
-
-    if (presentation.trackStyle === 'rails') {
-        ctx.save();
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        const vaporLayers = Array.isArray(presentation.railVaporLayers)
-            ? presentation.railVaporLayers
-            : [];
-        if (vaporLayers.length > 0) {
-            for (const layer of vaporLayers) {
-                if (!layer?.color || !Number.isFinite(layer.width) || layer.width <= 0) continue;
-                ctx.shadowColor = "transparent";
-                ctx.shadowBlur = 0;
-                ctx.lineWidth = layer.width;
-                ctx.strokeStyle = layer.color;
-                ctx.stroke(outerPath);
-                ctx.stroke(innerPath);
-            }
-            ctx.shadowColor = "transparent";
-            ctx.shadowBlur = 0;
-        } else if (presentation.railHazeColor && Number.isFinite(presentation.railHazeWidth) && presentation.railHazeWidth > 0) {
-            ctx.shadowColor = "transparent";
-            ctx.shadowBlur = 0;
-            ctx.lineWidth = presentation.railHazeWidth;
-            ctx.strokeStyle = presentation.railHazeColor;
-            ctx.stroke(outerPath);
-            ctx.stroke(innerPath);
-            ctx.shadowColor = "transparent";
-            ctx.shadowBlur = 0;
-        }
-
-        ctx.lineWidth = presentation.railBandWidth || 10;
-        ctx.strokeStyle = presentation.railBandColor || 'rgba(125, 211, 252, 0.18)';
-        ctx.stroke(outerPath);
-        ctx.stroke(innerPath);
-
-        ctx.lineWidth = presentation.railMidWidth || 6;
-        ctx.strokeStyle = presentation.railMidColor || 'rgba(224, 242, 254, 0.28)';
-        ctx.stroke(outerPath);
-        ctx.stroke(innerPath);
-
-        ctx.lineWidth = presentation.railCoreWidth || 2.5;
-        ctx.strokeStyle = presentation.railCoreColor || presentation.outerStrokeColor || '#f8fafc';
-        ctx.stroke(outerPath);
-        ctx.strokeStyle = presentation.railCoreColor || presentation.innerStrokeColor || '#cbd5e1';
-        ctx.stroke(innerPath);
-        ctx.restore();
-        return;
-    }
-
     if (presentation.trackStyle === 'canyon') {
         ctx.save();
         ctx.lineJoin = 'round';
@@ -710,7 +275,7 @@ export function drawTrackBoundaries(ctx, outerPath, innerPath, presentation = {}
         return;
     }
 
-    ctx.lineWidth = presentation.trackStyle === 'rails' ? 3 : 4;
+    ctx.lineWidth = 4;
     ctx.strokeStyle = presentation.outerStrokeColor || '#f8fafc';
     ctx.lineJoin = 'round';
     ctx.stroke(outerPath);
@@ -720,24 +285,10 @@ export function drawTrackBoundaries(ctx, outerPath, innerPath, presentation = {}
 }
 
 export function drawTrackFinishLine(ctx, p1, p2, width, presentation = {}) {
-    if (presentation.finishLineStyle === 'neon-gate') {
-        drawNeonGateFinishLine(ctx, p1, p2, width, presentation);
-        return;
-    }
-
-    if (presentation.trackStyle === 'hyperspace-corridor') {
-        ctx.save();
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-        drawCheckeredLine(ctx, p1, p2, width, {
-            primary: presentation.finishLineColor,
-            secondary: presentation.finishLineAltColor
-        });
-        ctx.restore();
-        return;
-    }
-
-    drawCheckeredLine(ctx, p1, p2, width);
+    drawCheckeredLine(ctx, p1, p2, width, {
+        primary: presentation.finishLineColor,
+        secondary: presentation.finishLineAltColor
+    });
 }
 
 function findClosestPointIndex(points, target) {
@@ -789,7 +340,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     canvas.width = Math.ceil((maxX - minX) + padding * 2);
     canvas.height = Math.ceil((maxY - minY) + padding * 2);
 
-    const useTransparentCanvas = presentation.backgroundStyle === 'space' || presentation.backgroundStyle === 'desert' || presentation.backgroundStyle === 'procedural';
+    const useTransparentCanvas = presentation.backgroundStyle === 'desert';
     const ctx = canvas.getContext('2d', { alpha: useTransparentCanvas });
     const offsetX = -origin.x;
     const offsetY = -origin.y;
@@ -856,11 +407,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
         drawCurb(innerPath);
     }
 
-    if (
-        presentation.trackStyle === 'hyperspace-corridor'
-        || presentation.trackStyle === 'rails'
-        || presentation.trackStyle === 'canyon'
-    ) {
+    if (presentation.trackStyle === 'canyon') {
         drawTrackBoundaries(ctx, outerPath, innerPath, presentation);
     }
 

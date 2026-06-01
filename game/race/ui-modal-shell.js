@@ -1,5 +1,5 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
-import { renderTrackPreviewCanvas } from '../track/preview-renderer.js?v=1.91';
+import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js?v=1.91';
 import { TRACKS } from '../track/tracks.js?v=1.91';
 import {
     resolveTrackPresentation,
@@ -62,6 +62,7 @@ export class ModalShell {
         this._focusBeforeModal = null;
         this._activeTrapModal = null;
         this._modalTrapKeydown = null;
+        this._lastPauseTrackPreviewKey = '';
     }
 
     _syncGarageButtonToPanelState() {
@@ -90,6 +91,7 @@ export class ModalShell {
     }
 
     _hidePauseTrackPreview() {
+        this._lastPauseTrackPreviewKey = '';
         const wrap = document.getElementById('modal-pause-track-preview-wrap');
         const canvas = document.getElementById('modal-pause-track-preview');
         const nameEl = document.getElementById('modal-pause-track-name');
@@ -198,7 +200,12 @@ export class ModalShell {
 
         canvas.setAttribute('aria-label', `Track layout: ${labelName}`);
 
-        renderTrackPreviewCanvas(canvas, {
+        const previewKey = `${payload.trackKey}:${payload.skin || 'default'}:${canvas.width}x${canvas.height}`;
+        if (this._lastPauseTrackPreviewKey === previewKey) return;
+        this._lastPauseTrackPreviewKey = previewKey;
+
+        renderCachedTrackPreviewCanvas(canvas, {
+            cacheKey: `pause:${payload.trackKey}:${payload.skin || 'default'}`,
             trackGeometry: { outer: track.outer, inner: track.inner },
             presentation,
             startLine: track.startLine,
@@ -841,7 +848,7 @@ export class ModalShell {
 
         value.replaceChildren();
         value.toggleAttribute('aria-busy', rankDisplay.isLoading);
-        value.textContent = rankDisplay.text;
+        value.textContent = rankDisplay.text || (rankDisplay.isLoading ? rankDisplay.statusText || '' : '');
         if (rankDisplay.isLoading) {
             const spinner = document.createElement('span');
             spinner.className = 'modal-rank-spinner';
@@ -1009,7 +1016,11 @@ export class ModalShell {
 
     showModalLeaderboardPayload() {
         if (this._modalRunsPayload?.scoreboardChallengeId) {
-            void this.getLeaderboards()?.openDailyChallengeLeaderboard('back');
+            void this.getLeaderboards()?.openDailyChallengeLeaderboardForChallenge?.({
+                id: this._modalRunsPayload.scoreboardChallengeId,
+                trackKey: this._modalRunsPayload.scoreboardTrackKey,
+                scoreboardSnapshot: this._modalRunsPayload.scoreboardSnapshot,
+            }, 'back');
             return;
         }
 
@@ -1060,7 +1071,6 @@ export class ModalShell {
         }
 
         if (!trackKey) return false;
-        if (this._modalRunsPayload.scoreboardChallengeId) return false;
 
         return this._modalRunsPayload.scoreboardTrackKey === trackKey
             && this._modalRunsPayload.scoreboardMode === TRACK_MODE_DAILY_GP;

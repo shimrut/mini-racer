@@ -7,6 +7,7 @@ export class RingBuffer {
         }
         this.length = 0;
         this._head = 0;
+        this.version = 0;
     }
 
     write() {
@@ -16,6 +17,7 @@ export class RingBuffer {
         } else {
             this._head = (this._head + 1) % this.capacity;
         }
+        this.version++;
         return this._items[idx];
     }
 
@@ -34,6 +36,7 @@ export class RingBuffer {
     clear() {
         this.length = 0;
         this._head = 0;
+        this.version++;
     }
 
     /** Create a plain-object snapshot array (for serialization/share — NOT hot path). */

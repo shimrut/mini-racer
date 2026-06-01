@@ -413,7 +413,30 @@ export class ModalContentUi {
     const nearbyRows = Array.isArray(scoreboardSnapshot?.nearbyRows)
         ? scoreboardSnapshot.nearbyRows
         : [];
-    const currentPlayerRow = scoreboardSnapshot?.currentPlayerRow || null;
+    const snapshotRank = Number(scoreboardSnapshot?.playerRank);
+    const snapshotRankLabel = scoreboardSnapshot?.playerRankLabel != null
+        ? String(scoreboardSnapshot.playerRankLabel)
+        : null;
+    const currentPlayerRow = scoreboardSnapshot?.currentPlayerRow
+        ? {
+            ...scoreboardSnapshot.currentPlayerRow,
+            displayName: scoreboardSnapshot.currentPlayerRow.displayName
+                || (scoreboardSnapshot.currentPlayerRow.isCurrentPlayer || Number.isFinite(snapshotRank) || snapshotRankLabel
+                    ? 'You'
+                    : scoreboardSnapshot.currentPlayerRow.displayName),
+            rank: Number.isFinite(scoreboardSnapshot.currentPlayerRow.rank)
+                ? scoreboardSnapshot.currentPlayerRow.rank
+                : (Number.isFinite(snapshotRank) ? snapshotRank : scoreboardSnapshot.currentPlayerRow.rank),
+            rankLabel: scoreboardSnapshot.currentPlayerRow.rankLabel || snapshotRankLabel,
+        }
+        : (Number.isFinite(snapshotRank) || snapshotRankLabel
+            ? {
+                isCurrentPlayer: true,
+                rank: Number.isFinite(snapshotRank) ? snapshotRank : null,
+                rankLabel: snapshotRankLabel,
+                displayName: 'You',
+            }
+            : null);
     const objectiveType = typeof scoreboardSnapshot?.objectiveType === 'string'
         ? scoreboardSnapshot.objectiveType
         : null;

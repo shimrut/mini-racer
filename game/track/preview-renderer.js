@@ -8,6 +8,64 @@ import {
 } from './canvas.js';
 import { buildTrackGeometry } from './runtime.js';
 
+const previewGeometryCache = new WeakMap();
+const previewCanvasCache = new Map();
+const PREVIEW_CANVAS_CACHE_LIMIT = 48;
+
+function getPreviewGeometry(trackGeometry, cornerRadius) {
+    const outer = trackGeometry?.outer;
+    const inner = trackGeometry?.inner;
+    if (!outer || !inner) return null;
+
+    let innerCache = previewGeometryCache.get(outer);
+    if (!innerCache) {
+        innerCache = new WeakMap();
+        previewGeometryCache.set(outer, innerCache);
+    }
+
+    let radiusCache = innerCache.get(inner);
+    if (!radiusCache) {
+        radiusCache = new Map();
+        innerCache.set(inner, radiusCache);
+    }
+
+    const radiusKey = Number.isFinite(cornerRadius) ? cornerRadius : 3;
+    let geometry = radiusCache.get(radiusKey);
+    if (!geometry) {
+        geometry = buildTrackGeometry({
+            outer,
+            inner,
+            cornerRadius: radiusKey
+        });
+        radiusCache.set(radiusKey, geometry);
+    }
+    return geometry;
+}
+
+function touchPreviewCanvasCache(key, value) {
+    if (previewCanvasCache.has(key)) {
+        previewCanvasCache.delete(key);
+    }
+    previewCanvasCache.set(key, value);
+    while (previewCanvasCache.size > PREVIEW_CANVAS_CACHE_LIMIT) {
+        const oldestKey = previewCanvasCache.keys().next().value;
+        previewCanvasCache.delete(oldestKey);
+    }
+}
+
+function getPreviewCanvasCacheKey(canvas, payload) {
+    if (!payload?.cacheKey) return null;
+    return [
+        payload.cacheKey,
+        canvas.width,
+        canvas.height,
+        payload.previewRenderMode || 'full',
+        payload.transparentBackground ? 'transparent' : 'solid',
+        payload.presentation?.key || 'default',
+        payload.cornerRadius ?? 3
+    ].join(':');
+}
+
 function drawCurbs(ctx, path, presentation) {
     ctx.save();
     ctx.lineWidth = 4;
@@ -268,12 +326,9 @@ export function renderTrackPreviewCanvas(canvas, payload) {
 
     if (!trackGeometry?.outer || !trackGeometry?.inner) return;
 
-    // Smooth the track geometry so it matches the game's actual smooth curves
-    const smoothedGeometry = buildTrackGeometry({
-        outer: trackGeometry.outer,
-        inner: trackGeometry.inner,
-        cornerRadius: payload.cornerRadius ?? 3
-    });
+    // Smooth the track geometry so it matches the game's actual smooth curves.
+    const smoothedGeometry = getPreviewGeometry(trackGeometry, payload.cornerRadius ?? 3);
+    if (!smoothedGeometry) return;
 
     if (transparentBackground) {
         ctx.clearRect(0, 0, width, height);
@@ -320,7 +375,7 @@ export function renderTrackPreviewCanvas(canvas, payload) {
         drawCurbs(ctx, innerPath, presentation);
     }
 
-    // 4. Track boundary strokes (rails / canyon / default edge)
+    // 4. Track boundary strokes (canyon / default edge)
     drawTrackBoundaries(ctx, outerPath, innerPath, presentation);
 
     // 5. Draw run history (the neon line)
@@ -335,3 +390,26 @@ export function renderTrackPreviewCanvas(canvas, payload) {
     }
 }
 
+export function renderCachedTrackPreviewCanvas(canvas, payload) {
+    const cacheKey = getPreviewCanvasCacheKey(canvas, payload);
+    if (!cacheKey) {
+        renderTrackPreviewCanvas(canvas, payload);
+        return;
+    }
+
+    let cachedCanvas = previewCanvasCache.get(cacheKey);
+    if (!cachedCanvas) {
+        cachedCanvas = document.createElement('canvas');
+        cachedCanvas.width = canvas.width;
+        cachedCanvas.height = canvas.height;
+        renderTrackPreviewCanvas(cachedCanvas, payload);
+        touchPreviewCanvasCache(cacheKey, cachedCanvas);
+    } else {
+        touchPreviewCanvasCache(cacheKey, cachedCanvas);
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(cachedCanvas, 0, 0);
+}

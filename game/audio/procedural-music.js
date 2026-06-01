@@ -61,6 +61,7 @@ const LOBBY_CHORDS = [
 const CHORD_PROGRESSION_LENGTH = RACE_CHORDS.length;
 
 let registeredApi = null;
+const FRAME_SYNC_INTERVAL_SEC = 0.1;
 
 export function userGesturePrepareMusic() {
     registeredApi?.prepareOnUserGesture?.();
@@ -76,6 +77,9 @@ export function createProceduralMusic(externalCtx, externalOutput) {
     let noiseBuffer = null;
     let graphBuilt = false;
     let tabHidden = false;
+    let enabledCache = getMusicEnabled();
+    let lastFrameSyncTime = -Infinity;
+    let lastFrameStateKey = '';
 
     // State parameters (only what scheduling / filter use)
     const gameState = {
@@ -87,8 +91,8 @@ export function createProceduralMusic(externalCtx, externalOutput) {
     // Scheduler state
     let schedulerIntervalId = null;
     let nextStepTime = 0.0;
-    const scheduleAheadTime = 0.12; // Schedule 120ms ahead
-    const lookaheadInterval = 30;   // Check every 30ms
+    const scheduleAheadTime = 0.18; // Schedule 180ms ahead
+    const lookaheadInterval = 60;   // Check every 60ms
 
     // Musical clock
     const bpm = 122;
@@ -448,6 +452,10 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         }
     }
 
+    function shouldRunScheduler(status, enabled) {
+        return Boolean(enabled) && !tabHidden && (status === 'starting' || status === 'playing');
+    }
+
     function updateVolume(time, enabled) {
         if (!musicGain) return;
         const g = musicGain.gain;
@@ -482,23 +490,32 @@ export function createProceduralMusic(externalCtx, externalOutput) {
 
     const api = {
         syncFrame({ status, speed, maxSpeedKph }) {
+            if (!graphBuilt && !externalCtx) return;
             buildGraph();
             if (!ctx) return;
 
-            const enabled = getMusicEnabled();
+            const enabled = enabledCache;
             const t = ctx.currentTime;
 
             gameState.status = status;
             gameState.speed = speed;
             gameState.maxSpeedKph = maxSpeedKph || 220;
 
-            if (enabled) {
+            if (shouldRunScheduler(status, enabled)) {
                 if (!schedulerIntervalId && ctx.state === 'running') {
                     start();
                 }
             } else {
                 stop();
             }
+
+            const frameStateKey = `${status}:${enabled}:${tabHidden}`;
+            const forceFrameUpdate = frameStateKey !== lastFrameStateKey;
+            if (!forceFrameUpdate && t - lastFrameSyncTime < FRAME_SYNC_INTERVAL_SEC) {
+                return;
+            }
+            lastFrameStateKey = frameStateKey;
+            lastFrameSyncTime = t;
 
             updateVolume(t, enabled);
             updateFilter(t, status);
@@ -508,7 +525,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             tabHidden = Boolean(hidden);
             if (hidden) {
                 stop();
-            } else if (getMusicEnabled()) {
+            } else if (shouldRunScheduler(gameState.status, enabledCache)) {
                 start();
             }
         },
@@ -516,13 +533,13 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         prepareOnUserGesture() {
             buildGraph();
             if (!ctx) return;
-            if (!getMusicEnabled()) return;
+            if (!enabledCache) return;
             if (ctx.state === 'suspended') {
                 void ctx.resume().then(() => {
-                    if (getMusicEnabled()) start();
+                    if (shouldRunScheduler(gameState.status, enabledCache)) start();
                 });
             } else {
-                start();
+                if (shouldRunScheduler(gameState.status, enabledCache)) start();
             }
         },
 
@@ -533,6 +550,15 @@ export function createProceduralMusic(externalCtx, externalOutput) {
                 const g = musicGain.gain;
                 g.cancelScheduledValues(t);
                 g.setValueAtTime(0, t);
+            }
+        },
+
+        setEnabled(enabled) {
+            enabledCache = Boolean(enabled);
+            if (enabledCache) {
+                api.prepareOnUserGesture();
+            } else {
+                api.stop();
             }
         }
     };

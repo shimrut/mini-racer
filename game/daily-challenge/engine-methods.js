@@ -19,6 +19,7 @@ import {
   getDailyChallengeObjectiveLabel,
   getDailyChallengeRequiredLaps,
   getCachedDailyChallengePlaylist,
+  getCachedDailyChallengeSnapshot,
   getDailyChallengePlaylist,
   getDailyChallengeSnapshot,
   getDailyChallengeTrackName,
@@ -151,7 +152,7 @@ export const dailyChallengeEngineMethods = {
       this.setLoadingStatus(40, "Checking Challenge...");
       const challenge = await getActiveDailyChallenge();
       this.currentDailyChallenge = challenge || null;
-      this.activeDailyChallenge = challenge || null;
+      this.activeDailyChallenge = null;
       this.setDailyChallengeLobbySummary(challenge);
       await this.syncReadyBackgroundTrack(challenge);
       return challenge;
@@ -291,7 +292,7 @@ export const dailyChallengeEngineMethods = {
     this.trackMedalBeforeLastLapWrite = null;
     this.hasTrackMedalBeforeLastLapWrite = false;
     this.currentChallengeRun = null;
-    this.activeDailyChallenge = this.currentDailyChallenge || this.activeDailyChallenge;
+    this.activeDailyChallenge = null;
     this.dailyChallengeBestResult = null;
     this.syncCurrentRunPolicy();
     this.setRuntimeConfig(null);
@@ -482,7 +483,9 @@ export const dailyChallengeEngineMethods = {
     this.hud.setPauseVisible(false);
     this.hud.setHudPersonalBestsOpenAllowed(true);
 
-    const existingScoreboardSnapshot = this.dailyChallengeUi.getDailyChallengeScoreboardSnapshot();
+    const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(
+      this.activeDailyChallenge?.id,
+    );
 
     this.modal.showModal(
       "CRASHED",
@@ -590,8 +593,7 @@ export const dailyChallengeEngineMethods = {
         ? this.sessionBestLapSecByTrackKey[trackKey] ?? null
         : null;
 
-    const existingScoreboardSnapshot =
-      this.dailyChallengeUi.getDailyChallengeScoreboardSnapshot();
+    const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(challenge.id);
     this.modal.showModal(
       "Daily challenge complete",
       null,
@@ -606,9 +608,8 @@ export const dailyChallengeEngineMethods = {
         variant: null,
         scoreboardSnapshot: isNewBest
           ? {
-              ...(existingScoreboardSnapshot || {}),
               ...createVerificationSnapshot({
-                statusText: "Submitting...",
+                statusText: "Verifying...",
                 verificationState: "pending",
                 isLoading: true,
               }),
@@ -621,6 +622,7 @@ export const dailyChallengeEngineMethods = {
             }
           : existingScoreboardSnapshot,
         scoreboardChallengeId: challenge.id,
+        scoreboardTrackKey: challenge.trackKey,
         showGlobalLeaderboard: false,
         allowLeaderboardOpen: true,
         lapMedal,

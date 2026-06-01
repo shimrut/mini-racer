@@ -236,7 +236,7 @@ export function buildModalRunsPayload(source, {
         bestTime: source.bestTime ?? source.lapTime ?? null,
         currentTime: source.currentTime ?? source.lapTime ?? null,
         scoreboardChallengeId: source.scoreboardChallengeId || null,
-        scoreboardTrackKey: source.scoreboardTrackKey || currentTrackKey || null,
+        scoreboardTrackKey: source.scoreboardTrackKey || source.trackKey || currentTrackKey || null,
         scoreboardSnapshot: source.scoreboardSnapshot ?? null,
         scoreboardMode: source.scoreboardMode || 'daily',
         scoreboardSubhead: source.scoreboardSubhead || null,

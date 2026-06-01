@@ -48,7 +48,7 @@ The start overlay loads today’s challenge from `GET /api/daily/active` and sho
 | **Personal best** | Browser storage (`game/daily-challenge/storage.js`) | Lower lap time wins; only your best is kept for today’s challenge |
 | **Rank** | Host API | Shown as `#N` and optionally “of total”; **#1 is fastest**. The client does not calculate place |
 
-When you beat your stored best, the client sends the lap time and replay to `POST /api/daily/submit`, then refreshes `GET /api/daily/snapshot` for rank and the leaderboard list. While that runs, the UI may show “Submitting…” or “Verifying…”.
+When you beat your stored best, the client sends the replay to `POST /api/daily/submit`, then refreshes `GET /api/daily/snapshot` for rank and the leaderboard list. The host API must compute the accepted time from the replay. While that runs, the UI may show “Submitting…” or “Verifying…”.
 
 ### Medals
 
@@ -60,7 +60,7 @@ Medals (bronze → author) are **not** leaderboard rank. They use fixed time tar
 | --- | --- |
 | `GET /api/daily/active` | Today’s challenge |
 | `GET /api/daily/snapshot` | Leaderboard and your rank |
-| `POST /api/daily/submit` | New personal best (with replay) |
+| `POST /api/daily/submit` | New personal best candidate; host validates replay and computes the accepted time |
 | `GET /api/player/bootstrap` | Player identity bootstrap |
 
 Tracks are defined in `game/track/tracks.js`. `CONFIG.visibleTrackKeys` is an allowlist for the host and tests, not a track picker in the game UI.

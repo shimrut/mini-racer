@@ -2,6 +2,7 @@ export const PLAYER_TRAIL_STORAGE_KEY = 'MiniRacerPlayerTrail';
 
 /** Trail paint for the route line behind the car (canvas strokeStyle). */
 export const PLAYER_TRAIL_COLORS = Object.freeze([
+    Object.freeze({ id: 'none', label: 'No Trail', strokeStyle: 'rgba(15, 23, 42, 0)', swatch: '#0f172a' }),
     Object.freeze({ id: 'sky', label: 'Sky', strokeStyle: 'rgba(56, 189, 248, 0.5)', swatch: '#38bdf8' }),
     Object.freeze({ id: 'cyan', label: 'Cyan', strokeStyle: 'rgba(34, 211, 238, 0.5)', swatch: '#22d3ee' }),
     Object.freeze({ id: 'lime', label: 'Lime', strokeStyle: 'rgba(163, 230, 53, 0.5)', swatch: '#a3e635' }),
@@ -16,6 +17,7 @@ const DEFAULT_TRAIL_ID = 'sky';
 const BY_ID = new Map(PLAYER_TRAIL_COLORS.map((entry) => [entry.id, entry]));
 
 export function trailStrokeStyleForId(id) {
+    if (id === 'none') return null;
     return BY_ID.get(id)?.strokeStyle ?? BY_ID.get(DEFAULT_TRAIL_ID).strokeStyle;
 }
 

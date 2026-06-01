@@ -30,11 +30,10 @@ export function readCanvasDevicePixelRatio() {
 }
 
 /**
- * Measures canvas fill-rect throughput and checks the user-agent string to
- * estimate whether this is a low-end or mobile device.
+ * Measures canvas fill-rect throughput to estimate low-end rendering capacity.
  *
- * Returns 1 (low quality) or 0 (high quality).
- * Called once at engine startup before the first track load.
+ * Returns 1 (low quality) or 0 (high quality). Called once at engine startup
+ * before the first track load.
  */
 export function detectDevicePerformance() {
   const testCanvas = document.createElement("canvas");
@@ -48,11 +47,7 @@ export function detectDevicePerformance() {
   }
   const elapsed = performance.now() - start;
 
-  const isMobile =
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent,
-    );
-  const isLowEnd = elapsed > 1 || isMobile;
+  const isLowEnd = elapsed > 1;
 
   return isLowEnd ? 1 : 0; // 1 = low quality, 0 = high quality
 }

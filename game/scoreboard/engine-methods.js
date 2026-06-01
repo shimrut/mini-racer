@@ -11,7 +11,11 @@ import {
   VERIFICATION_REJECTED_SNAPSHOT,
 } from "./verification-queue.js";
 import { setDailyChallengeBestTime } from "../daily-challenge/storage.js?v=1.91";
-import { invalidateDailyChallengeSnapshot, submitDailyChallengeBestTime } from "../daily-challenge/service.js?v=1.94";
+import {
+  getDailyChallengeSnapshot,
+  invalidateDailyChallengeSnapshot,
+  submitDailyChallengeBestTime,
+} from "../daily-challenge/service.js?v=1.94";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js?v=1.91";
 
 export const scoreboardEngineMethods = {
@@ -82,6 +86,7 @@ export const scoreboardEngineMethods = {
     try {
       const result = await submitDailyChallengeBestTime({
         challengeId: entry.challengeId,
+        trackKey: entry.trackKey,
         bestTime: entry.bestTime,
         replay: entry.replay,
         checkpointTimesSec: entry.checkpointTimesSec,
@@ -163,18 +168,18 @@ export const scoreboardEngineMethods = {
       );
       clearDailyChallengeVerification(entry.challengeId);
 
-      if (this.activeDailyChallenge?.id === entry.challengeId) {
-        const scoreboardSnapshot = await this.refreshDailyChallengeSummary();
-        if (
-          this.modal.matchesModalScoreboardContext({
-            challengeId: entry.challengeId,
-          })
-        ) {
-          this.modal.updateModalScoreboardSnapshot(scoreboardSnapshot);
-        }
-      } else {
-        this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
+      const scoreboardSnapshot = await getDailyChallengeSnapshot({
+        challengeId: entry.challengeId,
+        forceRefresh: true,
+      });
+      if (
+        this.modal.matchesModalScoreboardContext({
+          challengeId: entry.challengeId,
+        })
+      ) {
+        this.modal.updateModalScoreboardSnapshot(scoreboardSnapshot);
       }
+      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       return;
     }
 
@@ -196,9 +201,7 @@ export const scoreboardEngineMethods = {
       Date.now() + getVerificationRetryDelayMs(),
     );
     this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-    if (
-      this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })
-    ) {
+    if (this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })) {
       this.modal.updateModalScoreboardSnapshot(
         createVerificationSnapshot({
           statusText: "Queued for retry",
@@ -216,6 +219,15 @@ export const scoreboardEngineMethods = {
     replay,
     checkpointTimesSec = null,
   } = {}) {
+    if (
+      !challenge?.id ||
+      challenge.trackKey !== this.currentTrackKey ||
+      this.currentChallengeRun?.challengeId !== challenge.id ||
+      this.currentChallengeRun?.trackKey !== challenge.trackKey
+    ) {
+      return false;
+    }
+
     const { enqueued } = enqueueDailyChallengeVerification({
       challengeId: challenge?.id,
       bestTime,

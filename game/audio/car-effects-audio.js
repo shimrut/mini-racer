@@ -3,6 +3,8 @@ import { getCarProceduralAudioEnabled } from '../settings/car-audio-preference.j
 import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js?v=1.97';
 
 let registeredApi = null;
+const PARAMETER_SYNC_INTERVAL_SEC = 1 / 30;
+const IDLE_AUDIO_SUSPEND_MS = 250;
 
 export function userGesturePrepareCarEffects() {
     registeredApi?.prepareOnUserGesture?.();
@@ -77,6 +79,10 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
 
     let graphBuilt = false;
     let tabHidden = false;
+    let enabledCache = getCarProceduralAudioEnabled();
+    let lastParameterSyncTime = -Infinity;
+    let lastImmediateStateKey = '';
+    let idleSuspendTimer = null;
     let lastFrame = {
         status: 'ready',
         speed: 0,
@@ -269,6 +275,30 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         graphBuilt = true;
     }
 
+    function clearIdleSuspendTimer() {
+        if (idleSuspendTimer === null) return;
+        clearTimeout(idleSuspendTimer);
+        idleSuspendTimer = null;
+    }
+
+    function scheduleIdleSuspend(delayMs = IDLE_AUDIO_SUSPEND_MS) {
+        if (!ctx || externalCtx || ctx.state !== 'running') return;
+        clearIdleSuspendTimer();
+        idleSuspendTimer = setTimeout(() => {
+            idleSuspendTimer = null;
+            if (ctx && ctx.state === 'running') {
+                void ctx.suspend();
+            }
+        }, Math.max(0, delayMs));
+    }
+
+    function resumeContextIfNeeded() {
+        clearIdleSuspendTimer();
+        if (ctx && ctx.state === 'suspended') {
+            void ctx.resume();
+        }
+    }
+
     const api = {
         prepareOnUserGesture() {
             buildGraph();
@@ -285,16 +315,18 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         setTabHidden(hidden) {
             tabHidden = Boolean(hidden);
             if (hidden && ctx && ctx.state === 'running') {
+                clearIdleSuspendTimer();
                 void ctx.suspend();
-            } else if (!hidden && ctx && ctx.state === 'suspended' && getCarProceduralAudioEnabled()) {
+            } else if (!hidden && ctx && ctx.state === 'suspended' && enabledCache) {
                 void ctx.resume();
             }
         },
 
         scheduleCrash(impact) {
-            if (!getCarProceduralAudioEnabled() || tabHidden) return;
+            if (!enabledCache || tabHidden) return;
             buildGraph();
             if (!ctx || !masterGain) return;
+            resumeContextIfNeeded();
             const intensity = clamp(Number(impact) || 0, 0, 2000);
             if (intensity < 1) return;
 
@@ -381,9 +413,10 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         },
 
         scheduleCountdownLight(index) {
-            if (!getCarProceduralAudioEnabled() || tabHidden) return;
+            if (!enabledCache || tabHidden) return;
             buildGraph();
             if (!ctx || !masterGain) return;
+            resumeContextIfNeeded();
 
             const t = ctx.currentTime;
             const osc = ctx.createOscillator();
@@ -405,9 +438,10 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         },
 
         scheduleGo() {
-            if (!getCarProceduralAudioEnabled() || tabHidden) return;
+            if (!enabledCache || tabHidden) return;
             buildGraph();
             if (!ctx || !masterGain) return;
+            resumeContextIfNeeded();
 
             const t = ctx.currentTime;
             const osc = ctx.createOscillator();
@@ -436,6 +470,8 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             throttleBlocked,
         }) {
             lastFrame = { status, speed, maxSpeedKph, slipRatio, throttleBlocked };
+            const enabled = enabledCache;
+            if (!graphBuilt && !externalCtx) return;
             buildGraph();
             if (
                 !ctx
@@ -461,12 +497,14 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 return;
             }
 
-            const enabled = getCarProceduralAudioEnabled();
             const t = ctx.currentTime;
             const smooth = 0.055;
 
             const isPlaying = status === 'playing' && !tabHidden && enabled;
             const isAudible = !tabHidden && enabled;
+            const immediateStateKey = `${status}:${tabHidden}:${enabled}:${throttleBlocked}`;
+            const forceImmediateUpdate = immediateStateKey !== lastImmediateStateKey;
+            lastImmediateStateKey = immediateStateKey;
             const masterSmooth = isPlaying ? smooth : 0;
             masterGain.gain.setTargetAtTime(isAudible ? 0.42 : 0, t, masterSmooth);
 
@@ -477,12 +515,20 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 intakeGain.gain.setTargetAtTime(0, t, smooth);
                 motorPulseMod.gain.setTargetAtTime(0, t, smooth);
                 exhaustPulseMod.gain.setTargetAtTime(0, t, smooth);
+                lastParameterSyncTime = t;
+                scheduleIdleSuspend();
                 return;
             }
 
             if (ctx.state === 'suspended') {
                 void ctx.resume();
             }
+            clearIdleSuspendTimer();
+
+            if (!forceImmediateUpdate && t - lastParameterSyncTime < PARAMETER_SYNC_INTERVAL_SEC) {
+                return;
+            }
+            lastParameterSyncTime = t;
 
             const maxWorld = Math.max(0.001, (Number(maxSpeedKph) || 220) / KPH_PER_WORLD_UNIT);
             const speedNorm = clamp(speed / maxWorld, 0, 1);
@@ -544,6 +590,14 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             intakeBandpass.frequency.setTargetAtTime(800 + rpmNorm * 1800 + speedNorm * 500, t, smooth);
 
             masterGain.gain.setTargetAtTime(0.42, t, smooth);
+        },
+
+        setEnabled(enabled) {
+            enabledCache = Boolean(enabled);
+            api.syncFrame(lastFrame);
+            if (!enabledCache) {
+                scheduleIdleSuspend(0);
+            }
         },
     };
 

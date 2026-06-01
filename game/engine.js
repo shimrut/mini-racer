@@ -20,6 +20,7 @@ import {
 } from "./track/environment.js?v=1.91";
 import { ReplayRecorder } from "./race/replay.js?v=1.91";
 import { SteeringInput } from "./race/steering-input.js?v=1.91";
+import { getCarRearAxleWorldPoint } from "./race/simulation.js?v=1.92";
 import { createCarSprite } from "./car/sprite.js?v=1.92";
 import { CarSpriteLoader } from "./car/sprite.js?v=1.92";
 import { normalizePhysicsConfig } from "./car/handling.js";
@@ -32,12 +33,12 @@ import { ModalShell } from "./race/ui-modal-shell.js?v=2.06";
 import { LoadingScreen } from "./ui/loader.js";
 import { InteractionsUi } from "./race/ui-interactions.js?v=1.91";
 import { LeaderboardsUi } from "./scoreboard/ui.js?v=1.93";
-import { SettingsUi } from "./settings/ui.js?v=1.97";
+import { SettingsUi } from "./settings/ui.js?v=1.98";
 import { GarageUi } from "./settings/garage-ui.js?v=1.01";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
 import { AchievementsUi } from "./achievements/ui.js?v=1.92";
 import { trackEngineMethods } from "./track/engine-methods.js?v=1.91";
-import { raceEngineMethods } from "./race/engine-methods.js?v=1.91";
+import { raceEngineMethods } from "./race/engine-methods.js?v=1.92";
 import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=1.97";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js?v=1.91";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js?v=1.97";
@@ -57,7 +58,7 @@ export class RealTimeRacer {
     this.container = document.getElementById("game-container");
     this.isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
     this.trackLayer = new TrackLayerRenderer(this.trackLayerCanvas);
-    this.trackLayer.setup(this.isCoarsePointer);
+    this.trackLayer.setup();
     this.viewportWidth = 0;
     this.viewportHeight = 0;
     this.viewportDevicePixelRatio = 1;
@@ -120,10 +121,6 @@ export class RealTimeRacer {
     this.carEffectsAudio = createCarEffectsAudio();
     this.medalEffectsAudio = createMedalEffectsAudio();
     this.proceduralMusic = createProceduralMusic();
-
-    this.carEffectsAudio?.prepareOnUserGesture?.();
-    this.medalEffectsAudio?.prepareOnUserGesture?.();
-    this.proceduralMusic?.prepareOnUserGesture?.();
 
     this.carEffectsAudio?.syncFrame?.({
       status: this.status,
@@ -241,6 +238,7 @@ export class RealTimeRacer {
         this.crashRestartDelaySec = value;
       },
       onCarAudioChanged: (enabled) => {
+        this.carEffectsAudio?.setEnabled?.(enabled);
         const cs = this.cachedSpeed;
         const vx = Math.cos(this.angle);
         const vy = Math.sin(this.angle);
@@ -254,7 +252,8 @@ export class RealTimeRacer {
           throttleBlocked: this.relaunchDelayRemaining > 0,
         });
       },
-      onMusicChanged: () => {
+      onMusicChanged: (enabled) => {
+        this.proceduralMusic?.setEnabled?.(enabled);
         this.proceduralMusic?.syncFrame?.({
           status: this.status,
           speed: this.cachedSpeed,
@@ -273,9 +272,19 @@ export class RealTimeRacer {
       },
       onTrailStrokeStyleChanged: (strokeStyle) => {
         this.routeTraceStrokeStyle = strokeStyle;
-        if (this.status === "ready") {
-          this.requestRender();
+        this.routeTrace.clear();
+        this.trailTimer = 0;
+        if (strokeStyle) {
+          const { x, y } = getCarRearAxleWorldPoint(
+            this.pos,
+            this.angle,
+            this.runtimeConfig,
+          );
+          const slot = this.routeTrace.write();
+          slot.x = x;
+          slot.y = y;
         }
+        this.requestRender();
       },
     });
     this.achievements = new AchievementsUi({

@@ -634,8 +634,6 @@ body.start-selection-active .lap-flash {
     border-radius: var(--radius-md);
     background: var(--hud-panel-bg);
     text-align: center;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
@@ -799,8 +797,7 @@ body.start-selection-active .lap-flash {
 
 #trackLayerCanvas,
 #gameCanvas {
-    opacity: 1;
-    transition: opacity .32s cubic-bezier(.25, .82, .2, 1)
+    opacity: 1
 }
 
 #trackLayerCanvas {
@@ -860,24 +857,24 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
 @keyframes slideInLeft {
     from {
         opacity: 0;
-        transform: translateX(-120px) skewX(-20deg);
+        transform: translate3d(-120px, 0, 0) skewX(-20deg);
     }
 
     to {
         opacity: 1;
-        transform: translateX(0) skewX(0);
+        transform: translate3d(0, 0, 0) skewX(0);
     }
 }
 
 @keyframes slideInRight {
     from {
         opacity: 0;
-        transform: translateX(120px) skewX(20deg);
+        transform: translate3d(120px, 0, 0) skewX(20deg);
     }
 
     to {
         opacity: 1;
-        transform: translateX(0) skewX(0);
+        transform: translate3d(0, 0, 0) skewX(0);
     }
 }
 
@@ -885,6 +882,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
     font-size: clamp(3rem, 15vw, 4.5rem);
     letter-spacing: -0.02em;
     opacity: 0;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
 }
 
 #start-overlay.is-ready .lobby-title__mini {
@@ -896,6 +895,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
     letter-spacing: -0.04em;
     color: var(--accent-color);
     opacity: 0;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
 }
 
 #start-overlay.is-ready .lobby-title__racer {
@@ -1186,6 +1187,14 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
     border-radius: 50%;
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
     pointer-events: none;
+}
+
+.garage-trail-option__swatch--none {
+    position: relative;
+    background:
+        linear-gradient(135deg, transparent 44%, rgba(248, 113, 113, 0.95) 44%, rgba(248, 113, 113, 0.95) 56%, transparent 56%),
+        rgba(15, 23, 42, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.2);
 }
 
 .garage-trail-option__label {
@@ -2552,6 +2561,7 @@ body.start-selection-active #start-overlay {
 .daily-playlist-copy {
     display: block;
     min-width: 0;
+    max-width: 85%;
     max-height: 3.55rem;
     overflow: hidden;
 }

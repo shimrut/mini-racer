@@ -348,13 +348,15 @@ export function updateSimulation(
                 slot.sin = vy;
             }
 
-            state.trailTimer += dt;
-            const traceInterval = (state.frameSkip > 0 || state.qualityLevel > 0) ? 0.08 : 0.05;
-            if (state.trailTimer > traceInterval) {
-                const slot = state.routeTrace.write();
-                slot.x = rearX;
-                slot.y = rearY;
-                state.trailTimer %= traceInterval;
+            if (state.routeTraceStrokeStyle !== null) {
+                state.trailTimer += dt;
+                const traceInterval = (state.frameSkip > 0 || state.qualityLevel > 0) ? 0.08 : 0.05;
+                if (state.trailTimer > traceInterval) {
+                    const slot = state.routeTrace.write();
+                    slot.x = rearX;
+                    slot.y = rearY;
+                    state.trailTimer %= traceInterval;
+                }
             }
 
             state.runHistoryTimer += dt;

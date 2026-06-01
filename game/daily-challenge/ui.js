@@ -11,7 +11,7 @@ import {
     getDailyChallengeVerificationEntry,
     getDailyChallengeVerificationState
 } from '../scoreboard/verification-queue.js';
-import { renderTrackPreviewCanvas } from '../track/preview-renderer.js';
+import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { TRACKS } from '../track/tracks.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../track/presentation.js';
 import {
@@ -22,6 +22,12 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { getMedalForLapTime, getMedalRowSlots } from '../medals/medals.js?v=2.04';
+
+function scheduleAfterModalPaint(callback) {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(callback);
+    });
+}
 
 export class DailyChallengeUi {
     constructor({
@@ -35,6 +41,7 @@ export class DailyChallengeUi {
         this._dailyChallengeSummary = null;
         this._dailyChallengeCountdownInterval = null;
         this._playlistModalMode = null;
+        this._dailyPreviewKey = '';
     }
 
     get dailyChallengeTitle() { return document.getElementById('daily-challenge-title'); }
@@ -184,6 +191,7 @@ export class DailyChallengeUi {
 
         const summary = this._dailyChallengeSummary;
         if (!summary?.available || !summary?.trackKey) {
+            this._dailyPreviewKey = '';
             const ctx = canvas.getContext('2d');
             ctx?.clearRect(0, 0, canvas.width, canvas.height);
             return;
@@ -196,8 +204,12 @@ export class DailyChallengeUi {
             surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
             event: summary.skin ? { key: 'daily-challenge', trackKey: summary.trackKey, skin: summary.skin } : null
         });
+        const previewKey = `${summary.trackKey}:${summary.skin || 'default'}:${canvas.width}x${canvas.height}`;
+        if (this._dailyPreviewKey === previewKey) return;
+        this._dailyPreviewKey = previewKey;
 
-        renderTrackPreviewCanvas(canvas, {
+        renderCachedTrackPreviewCanvas(canvas, {
+            cacheKey: `daily-card:${summary.trackKey}:${summary.skin || 'default'}`,
             trackGeometry: {
                 outer: track.outer,
                 inner: track.inner
@@ -225,8 +237,8 @@ export class DailyChallengeUi {
             modal.classList.add('active');
         });
         document.body.classList.add('modal-open');
-        this.renderPlaylist(challenges, actions);
-        requestAnimationFrame(() => {
+        scheduleAfterModalPaint(() => {
+            this.renderPlaylist(challenges, actions);
             const firstPlay = modal.querySelector('.daily-playlist-start-btn');
             if (firstPlay instanceof HTMLButtonElement) {
                 firstPlay.focus();
@@ -400,8 +412,8 @@ export class DailyChallengeUi {
             modal.classList.add('active');
         });
         document.body.classList.add('modal-open');
-        this.renderLeaderboardTracks(trackRows, actions);
-        requestAnimationFrame(() => {
+        scheduleAfterModalPaint(() => {
+            this.renderLeaderboardTracks(trackRows, actions);
             const firstTrack = modal.querySelector('.daily-leaderboard-track-row');
             if (firstTrack instanceof HTMLButtonElement) {
                 firstTrack.focus();
@@ -474,7 +486,10 @@ export class DailyChallengeUi {
 
             row.append(canvas, copy, actionsWrap);
             list.appendChild(row);
-            this.renderPlaylistPreview(canvas, { trackKey: rowData.trackKey });
+            this.renderPlaylistPreview(canvas, {
+                trackKey: rowData.trackKey,
+                skin: rowData.skin
+            });
         }
     }
 
@@ -507,7 +522,8 @@ export class DailyChallengeUi {
             surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
             event: challenge.skin ? { key: 'daily-challenge', trackKey: challenge.trackKey, skin: challenge.skin } : null
         });
-        renderTrackPreviewCanvas(canvas, {
+        renderCachedTrackPreviewCanvas(canvas, {
+            cacheKey: `daily-row:${challenge.trackKey}:${challenge.skin || 'default'}`,
             trackGeometry: {
                 outer: track.outer,
                 inner: track.inner

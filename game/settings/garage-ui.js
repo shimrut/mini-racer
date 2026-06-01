@@ -203,7 +203,11 @@ export class GarageUi {
 
             const swatch = document.createElement('span');
             swatch.className = 'garage-trail-option__swatch';
-            swatch.style.backgroundColor = trail.swatch;
+            if (trail.id !== 'none') {
+                swatch.style.backgroundColor = trail.swatch;
+            } else {
+                swatch.classList.add('garage-trail-option__swatch--none');
+            }
 
             const label = document.createElement('span');
             label.className = 'garage-trail-option__label';

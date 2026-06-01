@@ -38,11 +38,27 @@ export function getLeaderboardPlayerName(playerId) {
 
 function normalizeScoreboardRpcPayload(raw) {
     if (!raw || typeof raw !== 'object') return null;
+    const normalizeRow = (row) => {
+        if (!row || typeof row !== 'object') return null;
+        const bestTime = Number(row.bestTime);
+        const bestTimeSec = Number(row.bestTimeSec);
+        const bestTimeMs = Number(row.bestTimeMs);
+        return {
+            ...row,
+            bestTime: Number.isFinite(bestTime)
+                ? bestTime
+                : Number.isFinite(bestTimeSec)
+                    ? bestTimeSec
+                    : Number.isFinite(bestTimeMs)
+                        ? bestTimeMs / 1000
+                        : row.bestTime,
+        };
+    };
     return {
-        topRows: Array.isArray(raw.topRows) ? raw.topRows : [],
-        nearbyRows: Array.isArray(raw.nearbyRows) ? raw.nearbyRows : [],
+        topRows: Array.isArray(raw.topRows) ? raw.topRows.map(normalizeRow).filter(Boolean) : [],
+        nearbyRows: Array.isArray(raw.nearbyRows) ? raw.nearbyRows.map(normalizeRow).filter(Boolean) : [],
         currentPlayerRow: raw.currentPlayerRow && typeof raw.currentPlayerRow === 'object'
-            ? raw.currentPlayerRow
+            ? normalizeRow(raw.currentPlayerRow)
             : null,
         totalCount: Number(raw.totalCount) || 0,
         leaderboardEntryCount: raw.leaderboardEntryCount != null && Number.isFinite(Number(raw.leaderboardEntryCount))
@@ -56,7 +72,10 @@ function normalizeScoreboardRpcPayload(raw) {
 }
 
 async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeLimit) {
-    const url = new URL(config.scoreboardSnapshotUrl, window.location.origin);
+    const origin = typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : 'http://localhost';
+    const url = new URL(config.scoreboardSnapshotUrl, origin);
     url.searchParams.set('trackKey', trackKey);
     url.searchParams.set('playerId', playerId);
     url.searchParams.set('leaderboardIdentity', getLeaderboardIdentityPreference());

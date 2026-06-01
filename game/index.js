@@ -1,46 +1,8 @@
-import { RealTimeRacer } from './engine.js?v=2.05';
+import { RealTimeRacer } from './engine.js?v=2.06';
 import { RUNTIME_SCOREBOARD_CONFIG } from './runtime-config.js?v=1.91';
 
 if (typeof window !== 'undefined' && !window.VECTORGP_SCOREBOARD_CONFIG) {
     window.VECTORGP_SCOREBOARD_CONFIG = RUNTIME_SCOREBOARD_CONFIG;
-}
-
-function setupButtonDownActivation() {
-    if (!window.PointerEvent) return;
-
-    let suppressNextTrustedClick = false;
-    let dispatchingDownClick = false;
-    let suppressClickTimer = 0;
-
-    document.addEventListener('pointerdown', (event) => {
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        if (event.isPrimary === false) return;
-        if (!(event.target instanceof Element)) return;
-
-        const button = event.target.closest('button');
-        if (!(button instanceof HTMLButtonElement) || button.disabled) return;
-        if (button.classList.contains('touch-btn')) return;
-
-        event.preventDefault();
-        event.stopImmediatePropagation();
-
-        window.clearTimeout(suppressClickTimer);
-        suppressNextTrustedClick = true;
-        suppressClickTimer = window.setTimeout(() => {
-            suppressNextTrustedClick = false;
-        }, 750);
-        dispatchingDownClick = true;
-        button.click();
-        dispatchingDownClick = false;
-    }, true);
-
-    document.addEventListener('click', (event) => {
-        if (dispatchingDownClick || !suppressNextTrustedClick) return;
-        suppressNextTrustedClick = false;
-        window.clearTimeout(suppressClickTimer);
-        event.preventDefault();
-        event.stopImmediatePropagation();
-    }, true);
 }
 
 function setupMobileViewportGuards() {
@@ -85,7 +47,6 @@ function setupMobileViewportGuards() {
     document.addEventListener('dblclick', preventDefault, { passive: false });
 }
 
-setupButtonDownActivation();
 setupMobileViewportGuards();
 new RealTimeRacer();
 // Local-only debug/test hooks are exposed on window.__RACER_DEBUG__.

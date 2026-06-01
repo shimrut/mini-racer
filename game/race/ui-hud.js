@@ -23,41 +23,72 @@ export class RaceHud {
         this._maxSpeed = 240;
         this._speedTicks = [];
         this._mobileSpeedTicks = [];
+        this._lastActiveSpeedTicks = -1;
+        this.elements = {
+            header: document.querySelector('header'),
+            hudBar: document.querySelector('.hud-bar'),
+            timeVal: document.getElementById('time-val'),
+            speedVal: document.getElementById('speed-val'),
+            mobileSpeedVal: document.getElementById('mobile-speed-val'),
+            speedBar: document.getElementById('speed-bar'),
+            mobileSpeedBar: document.getElementById('mobile-speed-bar'),
+            bestTimeDisplay: document.getElementById('best-time-display'),
+            bestTimeVal: document.getElementById('best-time-val'),
+            bestTimeLabel: document.getElementById('best-time-label'),
+            bestTimeMedal: document.getElementById('best-time-medal'),
+            desktopSpeedometer: document.getElementById('desktop-speedometer'),
+            mobileSpeedometer: document.getElementById('mobile-speedometer'),
+            pauseBtn: document.getElementById('pause-btn'),
+            hudStatsBtn: document.getElementById('hud-stats-btn'),
+            startLights: document.getElementById('start-lights'),
+            countdownLights: [
+                document.getElementById('light-1'),
+                document.getElementById('light-2'),
+                document.getElementById('light-3')
+            ],
+            goMessage: document.getElementById('go-message'),
+            lapFlash: document.getElementById('lap-flash'),
+            lapFlashLabel: document.getElementById('lap-flash-label'),
+            lapFlashTime: document.getElementById('lap-flash-time'),
+            lapFlashDelta: document.getElementById('lap-flash-delta'),
+        };
+        this.elements.timeDisplay =
+            typeof this.elements.timeVal?.closest === 'function'
+                ? this.elements.timeVal.closest('.hud-stat')
+                : null;
+        this.elements.timeLabel =
+            typeof this.elements.timeDisplay?.querySelector === 'function'
+                ? this.elements.timeDisplay.querySelector('.hud-label')
+                : null;
 
         this.anchorHudBar();
         this.initSpeedBars();
     }
 
-    get header() { return document.querySelector('header'); }
-    get hudBar() { return document.querySelector('.hud-bar'); }
-    get timeVal() { return document.getElementById('time-val'); }
-    get speedVal() { return document.getElementById('speed-val'); }
-    get mobileSpeedVal() { return document.getElementById('mobile-speed-val'); }
-    get speedBar() { return document.getElementById('speed-bar'); }
-    get mobileSpeedBar() { return document.getElementById('mobile-speed-bar'); }
-    get timeDisplay() { return this.timeVal?.closest('.hud-stat') || null; }
-    get timeLabel() { return this.timeDisplay?.querySelector('.hud-label') || null; }
-    get bestTimeDisplay() { return document.getElementById('best-time-display'); }
-    get bestTimeVal() { return document.getElementById('best-time-val'); }
-    get bestTimeLabel() { return document.getElementById('best-time-label'); }
-    get bestTimeMedal() { return document.getElementById('best-time-medal'); }
-    get desktopSpeedometer() { return document.getElementById('desktop-speedometer'); }
-    get mobileSpeedometer() { return document.getElementById('mobile-speedometer'); }
-    get pauseBtn() { return document.getElementById('pause-btn'); }
-    get hudStatsBtn() { return document.getElementById('hud-stats-btn'); }
-    get startLights() { return document.getElementById('start-lights'); }
-    get countdownLights() {
-        return [
-            document.getElementById('light-1'),
-            document.getElementById('light-2'),
-            document.getElementById('light-3')
-        ];
-    }
-    get goMessage() { return document.getElementById('go-message'); }
-    get lapFlash() { return document.getElementById('lap-flash'); }
-    get lapFlashLabel() { return document.getElementById('lap-flash-label'); }
-    get lapFlashTime() { return document.getElementById('lap-flash-time'); }
-    get lapFlashDelta() { return document.getElementById('lap-flash-delta'); }
+    get header() { return this.elements.header; }
+    get hudBar() { return this.elements.hudBar; }
+    get timeVal() { return this.elements.timeVal; }
+    get speedVal() { return this.elements.speedVal; }
+    get mobileSpeedVal() { return this.elements.mobileSpeedVal; }
+    get speedBar() { return this.elements.speedBar; }
+    get mobileSpeedBar() { return this.elements.mobileSpeedBar; }
+    get timeDisplay() { return this.elements.timeDisplay; }
+    get timeLabel() { return this.elements.timeLabel; }
+    get bestTimeDisplay() { return this.elements.bestTimeDisplay; }
+    get bestTimeVal() { return this.elements.bestTimeVal; }
+    get bestTimeLabel() { return this.elements.bestTimeLabel; }
+    get bestTimeMedal() { return this.elements.bestTimeMedal; }
+    get desktopSpeedometer() { return this.elements.desktopSpeedometer; }
+    get mobileSpeedometer() { return this.elements.mobileSpeedometer; }
+    get pauseBtn() { return this.elements.pauseBtn; }
+    get hudStatsBtn() { return this.elements.hudStatsBtn; }
+    get startLights() { return this.elements.startLights; }
+    get countdownLights() { return this.elements.countdownLights; }
+    get goMessage() { return this.elements.goMessage; }
+    get lapFlash() { return this.elements.lapFlash; }
+    get lapFlashLabel() { return this.elements.lapFlashLabel; }
+    get lapFlashTime() { return this.elements.lapFlashTime; }
+    get lapFlashDelta() { return this.elements.lapFlashDelta; }
 
 
     anchorHudBar() {
@@ -152,6 +183,8 @@ export class RaceHud {
         // Scaling: we use the car's actual max speed for precise filling.
         const maxSpeed = this._maxSpeed || 240; 
         const activeTicks = Math.min(totalTicks, Math.ceil((speedKph / maxSpeed) * totalTicks));
+        if (activeTicks === this._lastActiveSpeedTicks) return;
+        this._lastActiveSpeedTicks = activeTicks;
 
         const updateBar = (ticks) => {
             ticks.forEach((tick, i) => {
@@ -172,6 +205,7 @@ export class RaceHud {
     if (this.timeVal) this.timeVal.textContent = '0.00';
     if (this.speedVal) this.speedVal.textContent = '0';
     if (this.mobileSpeedVal) this.mobileSpeedVal.textContent = '0';
+    this._lastActiveSpeedTicks = -1;
     this.updateSpeedTicks(0);
     this._hudPrimaryMetricMode = 'time';
     this._lastTimeText = '0.00';

@@ -1,5 +1,5 @@
 import { CONFIG } from "../config.js?v=1.91";
-import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js?v=1.91";
+import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js?v=1.92";
 import { createModalActions } from "./result-flow.js?v=1.91";
 import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js?v=1.91";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
@@ -18,6 +18,67 @@ function lerpAngle(a, b, t) {
   while (delta > Math.PI) delta -= 2 * Math.PI;
   while (delta < -Math.PI) delta += 2 * Math.PI;
   return a + delta * t;
+}
+
+function getSkidMarkStartIndex(skidMarks, frameSkip) {
+  return frameSkip > 0 ? Math.max(0, skidMarks.length - 50) : 0;
+}
+
+function addSkidMarkSidePath(path, skidMarks, startIdx, gs, side) {
+  const tw = 0.17;
+  const m0 = skidMarks.get(startIdx);
+  path.moveTo((m0.x + side * m0.sin * tw) * gs, (m0.y - side * m0.cos * tw) * gs);
+  for (let i = startIdx + 1; i < skidMarks.length; i++) {
+    const prev = skidMarks.get(i - 1);
+    const mark = skidMarks.get(i);
+    const dx = mark.x - prev.x;
+    const dy = mark.y - prev.y;
+    const x = (mark.x + side * mark.sin * tw) * gs;
+    const y = (mark.y - side * mark.cos * tw) * gs;
+    if (dx * dx + dy * dy > SKID_GAP_BREAK_DIST_SQ) path.moveTo(x, y);
+    else path.lineTo(x, y);
+  }
+}
+
+function drawSkidMarksImmediate(ctx, skidMarks, startIdx, gs) {
+  ctx.beginPath();
+  addSkidMarkSidePath(ctx, skidMarks, startIdx, gs, -1);
+  ctx.stroke();
+
+  ctx.beginPath();
+  addSkidMarkSidePath(ctx, skidMarks, startIdx, gs, 1);
+  ctx.stroke();
+}
+
+function getSkidMarkPathCache(engine, skidMarks, frameSkip, gs, startIdx) {
+  const version = skidMarks.version ?? -1;
+  const cache = engine._skidMarkPathCache;
+  if (
+    cache &&
+    cache.version === version &&
+    cache.length === skidMarks.length &&
+    cache.frameSkip === frameSkip &&
+    cache.gridSize === gs &&
+    cache.startIdx === startIdx
+  ) {
+    return cache;
+  }
+
+  const leftPath = new Path2D();
+  const rightPath = new Path2D();
+  addSkidMarkSidePath(leftPath, skidMarks, startIdx, gs, -1);
+  addSkidMarkSidePath(rightPath, skidMarks, startIdx, gs, 1);
+
+  engine._skidMarkPathCache = {
+    version,
+    length: skidMarks.length,
+    frameSkip,
+    gridSize: gs,
+    startIdx,
+    leftPath,
+    rightPath,
+  };
+  return engine._skidMarkPathCache;
 }
 
 export const raceEngineMethods = {
@@ -144,6 +205,7 @@ export const raceEngineMethods = {
   restartCurrentRunAfterHardCrash() {
     this.dailyGpRaceStats.crash++;
     this.status = "playing";
+    this.scoreboardReplay.reset();
     this.resetRunToTrackStart({
       currentTime: 0,
       relaunchDelay: this.crashRestartDelaySec,
@@ -612,10 +674,7 @@ export const raceEngineMethods = {
     ctx.translate(-this.camera.x, -this.camera.y);
 
     if (this.skidMarks.length > 0) {
-      const startIdx =
-        this.frameSkip > 0 ? Math.max(0, this.skidMarks.length - 50) : 0;
-      const len = this.skidMarks.length;
-      const tw = 0.17;
+      const startIdx = getSkidMarkStartIndex(this.skidMarks, this.frameSkip);
       const z = this.zoom;
 
       ctx.save();
@@ -624,38 +683,23 @@ export const raceEngineMethods = {
       ctx.lineCap = "round";
       ctx.lineWidth = Math.max(3.4, 4.2 / z);
 
-      const m0 = this.skidMarks.get(startIdx);
-      ctx.beginPath();
-      ctx.moveTo((m0.x - m0.sin * tw) * gs, (m0.y + m0.cos * tw) * gs);
-      for (let i = startIdx + 1; i < len; i++) {
-        const prev = this.skidMarks.get(i - 1);
-        const mark = this.skidMarks.get(i);
-        const dx = mark.x - prev.x;
-        const dy = mark.y - prev.y;
-        const lx = (mark.x - mark.sin * tw) * gs;
-        const ly = (mark.y + mark.cos * tw) * gs;
-        if (dx * dx + dy * dy > SKID_GAP_BREAK_DIST_SQ) ctx.moveTo(lx, ly);
-        else ctx.lineTo(lx, ly);
+      if (typeof Path2D === "function") {
+        const skidPathCache = getSkidMarkPathCache(
+          this,
+          this.skidMarks,
+          this.frameSkip,
+          gs,
+          startIdx,
+        );
+        ctx.stroke(skidPathCache.leftPath);
+        ctx.stroke(skidPathCache.rightPath);
+      } else {
+        drawSkidMarksImmediate(ctx, this.skidMarks, startIdx, gs);
       }
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo((m0.x + m0.sin * tw) * gs, (m0.y - m0.cos * tw) * gs);
-      for (let i = startIdx + 1; i < len; i++) {
-        const prev = this.skidMarks.get(i - 1);
-        const mark = this.skidMarks.get(i);
-        const dx = mark.x - prev.x;
-        const dy = mark.y - prev.y;
-        const rx = (mark.x + mark.sin * tw) * gs;
-        const ry = (mark.y - mark.cos * tw) * gs;
-        if (dx * dx + dy * dy > SKID_GAP_BREAK_DIST_SQ) ctx.moveTo(rx, ry);
-        else ctx.lineTo(rx, ry);
-      }
-      ctx.stroke();
       ctx.restore();
     }
 
-    if (this.routeTrace.length > 1) {
+    if (this.routeTraceStrokeStyle !== null && this.routeTrace.length > 1) {
       ctx.beginPath();
       ctx.strokeStyle =
         this.routeTraceStrokeStyle ?? "rgba(56, 189, 248, 0.5)";
@@ -720,10 +764,12 @@ export const raceEngineMethods = {
     const renderScale = CONFIG.carSpriteRenderScale ?? 1;
     const drawWidth = this.carSpriteDrawWidth * renderScale;
     const drawHeight = this.carSpriteDrawHeight * renderScale;
-    ctx.shadowColor = CONFIG.carSpriteShadowColor;
-    ctx.shadowBlur = CONFIG.carSpriteShadowBlur;
-    ctx.shadowOffsetX = CONFIG.carSpriteShadowOffsetX;
-    ctx.shadowOffsetY = CONFIG.carSpriteShadowOffsetY;
+    if (this.qualityLevel <= 0) {
+      ctx.shadowColor = CONFIG.carSpriteShadowColor;
+      ctx.shadowBlur = CONFIG.carSpriteShadowBlur;
+      ctx.shadowOffsetX = CONFIG.carSpriteShadowOffsetX;
+      ctx.shadowOffsetY = CONFIG.carSpriteShadowOffsetY;
+    }
     ctx.drawImage(
       this.carSprite,
       -drawWidth / 2,
