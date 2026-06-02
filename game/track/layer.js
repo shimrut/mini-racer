@@ -1,5 +1,5 @@
-import { configureCanvasViewport } from "./canvas-resolution.js?v=1.91";
-import { drawViewportPresentationBackground } from "./canvas.js?v=1.91";
+import { configureCanvasViewport } from "./canvas-resolution.js?v=2.09";
+import { drawViewportPresentationBackground } from "./canvas.js?v=2.09";
 
 /**
  * Manages the two-canvas track-layer rendering system.

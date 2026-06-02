@@ -1,11 +1,11 @@
-import { hasAnyDailyChallengeStoredData } from "./daily-challenge/storage.js?v=1.91";
-import { getLeaderboardIdentityPreference } from "./scoreboard/display-preference.js?v=1.91";
+import { hasAnyDailyChallengeStoredData } from "./daily-challenge/storage.js?v=2.09";
+import { getLeaderboardIdentityPreference } from "./scoreboard/display-preference.js?v=2.09";
 import {
   buildServiceHeaders,
   getBaseApiConfig,
   getOrCreatePlayerId,
-} from "./scoreboard/api-client.js?v=1.91";
-import { isLocalEnvironment } from "./track/environment.js?v=1.91";
+} from "./scoreboard/api-client.js?v=2.09";
+import { isLocalEnvironment } from "./track/environment.js?v=2.09";
 
 async function fetchRemotePlayerProgressState() {
   const config = getBaseApiConfig();

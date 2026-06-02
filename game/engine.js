@@ -1,51 +1,51 @@
-import { CONFIG } from "./config.js?v=1.91";
-import { TRACKS } from "./track/tracks.js?v=1.91";
+import { CONFIG } from "./config.js?v=2.09";
+import { TRACKS } from "./track/tracks.js?v=2.09";
 import {
   resolveTrackPresentation,
   TRACK_PRESENTATION_SURFACES,
-} from "./track/presentation.js?v=1.91";
-import { RingBuffer } from "./race/ring-buffer.js?v=1.91";
+} from "./track/presentation.js?v=2.09";
+import { RingBuffer } from "./race/ring-buffer.js?v=2.09";
 import {
   getPlayerProgressState,
-} from "./storage.js?v=1.91";
-import { createRunPolicy } from "./race/run-policy.js?v=1.91";
+} from "./storage.js?v=2.09";
+import { createRunPolicy } from "./race/run-policy.js?v=2.09";
 import {
   AnalyticsService,
   SessionFlagStore,
-} from "./player/service.js?v=1.91";
+} from "./player/service.js?v=2.09";
 import {
   detectDevicePerformance,
   shouldExposeDebugHooks,
   readCanvasDevicePixelRatio,
-} from "./track/environment.js?v=1.91";
-import { ReplayRecorder } from "./race/replay.js?v=1.91";
-import { SteeringInput } from "./race/steering-input.js?v=1.91";
-import { getCarRearAxleWorldPoint } from "./race/simulation.js?v=1.92";
-import { createCarSprite } from "./car/sprite.js?v=1.92";
-import { CarSpriteLoader } from "./car/sprite.js?v=1.92";
+} from "./track/environment.js?v=2.09";
+import { ReplayRecorder } from "./race/replay.js?v=2.09";
+import { SteeringInput } from "./race/steering-input.js?v=2.09";
+import { getCarRearAxleWorldPoint } from "./race/simulation.js?v=2.09";
+import { createCarSprite } from "./car/sprite.js?v=2.09";
+import { CarSpriteLoader } from "./car/sprite.js?v=2.09";
 import { normalizePhysicsConfig } from "./car/handling.js";
-import { TrackLayerRenderer } from "./track/layer.js?v=1.91";
-import { RaceHud } from "./race/ui-hud.js?v=1.91";
-import { StartOverlay } from "./race/ui-start-overlay.js?v=1.91";
-import { DailyChallengeUi } from "./daily-challenge/ui.js?v=1.94";
-import { ModalContentUi } from "./race/ui-modal-content.js?v=1.92";
-import { ModalShell } from "./race/ui-modal-shell.js?v=2.06";
+import { TrackLayerRenderer } from "./track/layer.js?v=2.09";
+import { RaceHud } from "./race/ui-hud.js?v=2.09";
+import { StartOverlay } from "./race/ui-start-overlay.js?v=2.09";
+import { DailyChallengeUi } from "./daily-challenge/ui.js?v=2.09";
+import { ModalContentUi } from "./race/ui-modal-content.js?v=2.09";
+import { ModalShell } from "./race/ui-modal-shell.js?v=2.09";
 import { LoadingScreen } from "./ui/loader.js";
-import { InteractionsUi } from "./race/ui-interactions.js?v=1.91";
-import { LeaderboardsUi } from "./scoreboard/ui.js?v=1.93";
-import { SettingsUi } from "./settings/ui.js?v=1.98";
-import { GarageUi } from "./settings/garage-ui.js?v=1.01";
+import { InteractionsUi } from "./race/ui-interactions.js?v=2.09";
+import { LeaderboardsUi } from "./scoreboard/ui.js?v=2.09";
+import { SettingsUi } from "./settings/ui.js?v=2.09";
+import { GarageUi } from "./settings/garage-ui.js?v=2.09";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
-import { AchievementsUi } from "./achievements/ui.js?v=1.92";
-import { trackEngineMethods } from "./track/engine-methods.js?v=1.91";
-import { raceEngineMethods } from "./race/engine-methods.js?v=1.92";
-import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=1.97";
-import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js?v=1.91";
-import { createCarEffectsAudio } from "./audio/car-effects-audio.js?v=1.97";
-import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js?v=1.97";
-import { createProceduralMusic } from "./audio/procedural-music.js?v=1.97";
-import { getCrashAutoRestartAfterCrashEnabled } from "./settings/crash-auto-restart-preference.js?v=1.91";
-import { getCrashRestartDelaySec } from "./settings/crash-restart-delay-preference.js?v=1.91";
+import { AchievementsUi } from "./achievements/ui.js?v=2.09";
+import { trackEngineMethods } from "./track/engine-methods.js?v=2.09";
+import { raceEngineMethods } from "./race/engine-methods.js?v=2.09";
+import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js?v=2.09";
+import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js?v=2.09";
+import { createCarEffectsAudio } from "./audio/car-effects-audio.js?v=2.09";
+import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js?v=2.09";
+import { createProceduralMusic } from "./audio/procedural-music.js?v=2.09";
+import { getCrashAutoRestartAfterCrashEnabled } from "./settings/crash-auto-restart-preference.js?v=2.09";
+import { getCrashRestartDelaySec } from "./settings/crash-restart-delay-preference.js?v=2.09";
 
 export class RealTimeRacer {
   constructor() {

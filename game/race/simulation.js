@@ -1,10 +1,10 @@
-import { clamp, KPH_PER_WORLD_UNIT } from '../car/handling.js?v=1.91';
-import { segmentsIntersect } from '../config.js?v=1.91';
+import { clamp, KPH_PER_WORLD_UNIT } from '../car/handling.js?v=2.09';
+import { segmentsIntersect } from '../config.js?v=2.09';
 import {
     handleFinishCrossing,
     handleHardCrash,
     resolveRunPolicy
-} from './run-policy.js?v=1.91';
+} from './run-policy.js?v=2.09';
 
 const _nextPos = { x: 0, y: 0 };
 const _events = {

@@ -1,5 +1,5 @@
-import { RealTimeRacer } from './engine.js?v=2.06';
-import { RUNTIME_SCOREBOARD_CONFIG } from './runtime-config.js?v=1.91';
+import { RealTimeRacer } from './engine.js?v=2.09';
+import { RUNTIME_SCOREBOARD_CONFIG } from './runtime-config.js?v=2.09';
 
 if (typeof window !== 'undefined' && !window.VECTORGP_SCOREBOARD_CONFIG) {
     window.VECTORGP_SCOREBOARD_CONFIG = RUNTIME_SCOREBOARD_CONFIG;
@@ -13,6 +13,12 @@ function setupMobileViewportGuards() {
 
     let lastTouchEndAt = 0;
     const preventDefault = (event) => event.preventDefault();
+    const isInteractiveTouchTarget = (event) => {
+        if (!(event.target instanceof Element)) return false;
+        return Boolean(event.target.closest(
+            'button, [role="button"], a, input, select, textarea, label, summary, .modal, #start-overlay'
+        ));
+    };
     const shouldSuppressSafariLoupe = (event) => {
         if (!(event.target instanceof Element)) return false;
         return Boolean(event.target.closest('.mobile-controls'));
@@ -29,6 +35,10 @@ function setupMobileViewportGuards() {
     };
     const preventDoubleTapZoom = (event) => {
         const now = Date.now();
+        if (isInteractiveTouchTarget(event)) {
+            lastTouchEndAt = now;
+            return;
+        }
         if (now - lastTouchEndAt < 300) {
             event.preventDefault();
         }

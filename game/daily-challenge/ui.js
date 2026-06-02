@@ -5,8 +5,8 @@ import {
     getDailyChallengeBestDisplay,
     getDailyChallengeCopyLabels,
     getDailyChallengeTrackName
-} from './service.js?v=1.94';
-import { buildScoreboardRankDisplay } from '../race/result-flow.js?v=1.91';
+} from './service.js?v=2.09';
+import { buildScoreboardRankDisplay } from '../race/result-flow.js?v=2.09';
 import {
     getDailyChallengeVerificationEntry,
     getDailyChallengeVerificationState
@@ -21,7 +21,7 @@ import {
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
-import { getMedalForLapTime, getMedalRowSlots } from '../medals/medals.js?v=2.04';
+import { getMedalForLapTime, getMedalRowSlots } from '../medals/medals.js?v=2.09';
 
 function scheduleAfterModalPaint(callback) {
     requestAnimationFrame(() => {
@@ -232,10 +232,7 @@ export class DailyChallengeUi {
             subtitle: 'Last 7 Days',
             closeLabel: 'Back',
         });
-        openModalElement(modal, () => {
-            modal.style.display = 'flex';
-            modal.classList.add('active');
-        });
+        openModalElement(modal, () => modal.classList.add('active'));
         document.body.classList.add('modal-open');
         scheduleAfterModalPaint(() => {
             this.renderPlaylist(challenges, actions);
@@ -254,7 +251,6 @@ export class DailyChallengeUi {
         this._playlistModalMode = null;
         closeModalElement(modal, () => {
             modal.classList.remove('active');
-            modal.style.display = '';
             document.body.classList.remove('modal-open');
         });
     }
@@ -407,10 +403,7 @@ export class DailyChallengeUi {
             subtitle: 'Last 7 Days',
             closeLabel: 'Back',
         });
-        openModalElement(modal, () => {
-            modal.style.display = 'flex';
-            modal.classList.add('active');
-        });
+        openModalElement(modal, () => modal.classList.add('active'));
         document.body.classList.add('modal-open');
         scheduleAfterModalPaint(() => {
             this.renderLeaderboardTracks(trackRows, actions);

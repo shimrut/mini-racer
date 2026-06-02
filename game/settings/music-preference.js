@@ -1,4 +1,4 @@
-import { parseStoredBooleanToggle } from './parse-stored-boolean-toggle.js?v=1.91';
+import { parseStoredBooleanToggle } from './parse-stored-boolean-toggle.js?v=2.09';
 
 export const MUSIC_STORAGE_KEY = 'VectorGpMusicEnabled';
 

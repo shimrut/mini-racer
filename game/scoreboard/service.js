@@ -1,18 +1,18 @@
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
-import { TRACKS } from '../track/tracks.js?v=1.91';
-import { isLocalEnvironment } from '../track/environment.js?v=1.91';
+import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
+import { TRACKS } from '../track/tracks.js?v=2.09';
+import { isLocalEnvironment } from '../track/environment.js?v=2.09';
 import {
     buildServiceHeaders,
     clampRequestLimit,
     getBaseApiConfig,
     getOrCreatePlayerId,
-} from './api-client.js?v=1.91';
+} from './api-client.js?v=2.09';
 import {
     getConstructedLeaderboardName,
 } from '../shared/leaderboard-identity.js';
 import {
     getLeaderboardIdentityPreference,
-} from './display-preference.js?v=1.91';
+} from './display-preference.js?v=2.09';
 
 const MIN_SCOREBOARD_TIME = 2.0;
 const MAX_SCOREBOARD_TIME = 60 * 60;

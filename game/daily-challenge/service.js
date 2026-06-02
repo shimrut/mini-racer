@@ -1,23 +1,25 @@
-import { TRACKS } from '../track/tracks.js?v=1.91';
-import { isLocalEnvironment } from '../track/environment.js?v=1.91';
+import { TRACKS } from '../track/tracks.js?v=2.09';
+import { isLocalEnvironment } from '../track/environment.js?v=2.09';
 import {
     buildServiceHeaders,
     clampRequestLimit,
     getBaseApiConfig,
     getOrCreatePlayerId,
-} from '../scoreboard/api-client.js?v=1.92';
+} from '../scoreboard/api-client.js?v=2.09';
 import {
     getLeaderboardIdentityPreference,
-} from '../scoreboard/display-preference.js?v=1.91';
+} from '../scoreboard/display-preference.js?v=2.09';
 import {
     getDailyChallengeData,
     setDailyChallengeBestTime,
-} from './storage.js?v=1.91';
+} from './storage.js?v=2.09';
 
 const MIN_DAILY_TIME = 2.0;
 const MAX_DAILY_TIME = 60 * 60;
 const DEFAULT_DAILY_LIMIT = 10;
 const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
+const DAILY_PLAYLIST_CACHE_KEY = 'VectorGpDailyChallengePlaylistCache';
+const DAILY_SNAPSHOT_CACHE_KEY = 'VectorGpDailyChallengeSnapshotCache';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_PLAYLIST_DAYS = 7;
 const DAILY_TRACK_STEP_SEED = 17;
@@ -28,6 +30,8 @@ let dailyPlaylistCache = {
 };
 const dailySnapshotCache = new Map();
 const dailySnapshotInflight = new Map();
+let dailyPlaylistStorageHydrated = false;
+let dailySnapshotStorageHydrated = false;
 
 function getMockDailyUrlParams() {
     if (typeof window === 'undefined' || !window.location?.search) return null;
@@ -289,6 +293,112 @@ function cloneDailyPlaylist(challenges) {
         : [];
 }
 
+function getChallengeTimeMs(challenge, field) {
+    const value = challenge?.[field];
+    if (typeof value !== 'string') return NaN;
+    return Date.parse(value);
+}
+
+function isChallengeStillUsable(challenge, nowMs = Date.now()) {
+    const availableUntilMs = getChallengeTimeMs(challenge, 'availableUntil');
+    if (Number.isFinite(availableUntilMs)) {
+        return availableUntilMs > nowMs;
+    }
+    const endsAtMs = getChallengeTimeMs(challenge, 'endsAt');
+    return Number.isFinite(endsAtMs) ? endsAtMs > nowMs : true;
+}
+
+function sortDailyPlaylist(challenges) {
+    return cloneDailyPlaylist(challenges)
+        .sort((a, b) => {
+            const aStart = getChallengeTimeMs(a, 'startsAt');
+            const bStart = getChallengeTimeMs(b, 'startsAt');
+            if (Number.isFinite(aStart) && Number.isFinite(bStart) && aStart !== bStart) {
+                return bStart - aStart;
+            }
+            return String(b.id).localeCompare(String(a.id));
+        });
+}
+
+function normalizeDailyPlaylistForCache(challenges, nowMs = Date.now()) {
+    const byId = new Map();
+    for (const challenge of cloneDailyPlaylist(challenges)) {
+        if (!isChallengeStillUsable(challenge, nowMs)) continue;
+        byId.set(challenge.id, challenge);
+    }
+    return sortDailyPlaylist([...byId.values()]).slice(0, DAILY_PLAYLIST_DAYS);
+}
+
+function readDailyPlaylistCacheStorage() {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    try {
+        const raw = window.localStorage.getItem(DAILY_PLAYLIST_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (error) {
+        console.error('Error reading daily playlist cache:', error);
+        return null;
+    }
+}
+
+function writeDailyPlaylistCacheStorage(challenges) {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+        window.localStorage.setItem(
+            DAILY_PLAYLIST_CACHE_KEY,
+            JSON.stringify({ challenges: cloneDailyPlaylist(challenges) })
+        );
+    } catch (error) {
+        console.error('Error writing daily playlist cache:', error);
+    }
+}
+
+function hydrateDailyPlaylistCache() {
+    if (dailyPlaylistStorageHydrated) return;
+    dailyPlaylistStorageHydrated = true;
+    const stored = readDailyPlaylistCacheStorage();
+    const challenges = normalizeDailyPlaylistForCache(stored?.challenges);
+    if (!challenges.length) return;
+    dailyPlaylistCache = {
+        challenges,
+        expiresAt: resolveDailyPlaylistCacheExpiresAt(challenges),
+        promise: dailyPlaylistCache.promise
+    };
+}
+
+function getUsableCachedDailyPlaylist(nowMs = Date.now()) {
+    hydrateDailyPlaylistCache();
+    const challenges = normalizeDailyPlaylistForCache(dailyPlaylistCache.challenges, nowMs);
+    if (
+        dailyPlaylistCache.challenges
+        && challenges.length !== dailyPlaylistCache.challenges.length
+    ) {
+        dailyPlaylistCache = {
+            ...dailyPlaylistCache,
+            challenges,
+            expiresAt: resolveDailyPlaylistCacheExpiresAt(challenges, nowMs),
+        };
+        writeDailyPlaylistCacheStorage(challenges);
+    }
+    return challenges;
+}
+
+export function cacheDailyChallengePlaylist(challenges = []) {
+    hydrateDailyPlaylistCache();
+    const merged = normalizeDailyPlaylistForCache([
+        ...cloneDailyPlaylist(dailyPlaylistCache.challenges),
+        ...cloneDailyPlaylist(challenges),
+    ]);
+    dailyPlaylistCache = {
+        challenges: merged,
+        expiresAt: resolveDailyPlaylistCacheExpiresAt(merged),
+        promise: dailyPlaylistCache.promise
+    };
+    writeDailyPlaylistCacheStorage(merged);
+    return cloneDailyPlaylist(merged);
+}
+
 function resolveDailyPlaylistCacheExpiresAt(challenges, nowMs = Date.now()) {
     const nextKnownChange = cloneDailyPlaylist(challenges)
         .flatMap((challenge) => [
@@ -395,12 +505,64 @@ function resolveDailySnapshotCacheExpiresAt(challengeId, nowMs = Date.now()) {
     return getNextUtcDayStartMs(new Date(nowMs));
 }
 
+function readDailySnapshotCacheStorage() {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    try {
+        const raw = window.localStorage.getItem(DAILY_SNAPSHOT_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (error) {
+        console.error('Error reading daily snapshot cache:', error);
+        return null;
+    }
+}
+
+function writeDailySnapshotCacheStorage() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+        const nowMs = Date.now();
+        const entries = {};
+        for (const [challengeId, entry] of dailySnapshotCache.entries()) {
+            if (!entry || entry.expiresAt <= nowMs) continue;
+            entries[challengeId] = {
+                snapshot: cloneSnapshot(entry.snapshot),
+                expiresAt: entry.expiresAt,
+            };
+        }
+        window.localStorage.setItem(DAILY_SNAPSHOT_CACHE_KEY, JSON.stringify({ entries }));
+    } catch (error) {
+        console.error('Error writing daily snapshot cache:', error);
+    }
+}
+
+function hydrateDailySnapshotCache() {
+    if (dailySnapshotStorageHydrated) return;
+    dailySnapshotStorageHydrated = true;
+    const stored = readDailySnapshotCacheStorage();
+    const entries = stored?.entries && typeof stored.entries === 'object'
+        ? stored.entries
+        : {};
+    const nowMs = Date.now();
+    for (const [challengeId, entry] of Object.entries(entries)) {
+        if (!entry || typeof entry !== 'object') continue;
+        const expiresAt = Number(entry.expiresAt);
+        if (!Number.isFinite(expiresAt) || expiresAt <= nowMs) continue;
+        dailySnapshotCache.set(challengeId, {
+            snapshot: cloneSnapshot(entry.snapshot),
+            expiresAt,
+        });
+    }
+}
+
 function readCachedDailySnapshot(challengeId) {
     if (!challengeId) return null;
+    hydrateDailySnapshotCache();
     const entry = dailySnapshotCache.get(challengeId);
     if (!entry) return null;
     if (entry.expiresAt <= Date.now()) {
         dailySnapshotCache.delete(challengeId);
+        writeDailySnapshotCacheStorage();
         return null;
     }
     return cloneSnapshot(entry.snapshot);
@@ -408,10 +570,12 @@ function readCachedDailySnapshot(challengeId) {
 
 function writeCachedDailySnapshot(challengeId, snapshot) {
     if (!challengeId || !snapshot) return;
+    hydrateDailySnapshotCache();
     dailySnapshotCache.set(challengeId, {
         snapshot: cloneSnapshot(snapshot),
         expiresAt: resolveDailySnapshotCacheExpiresAt(challengeId)
     });
+    writeDailySnapshotCacheStorage();
     syncDailyChallengeStoredBestFromSnapshot(challengeId, snapshot);
 }
 
@@ -473,10 +637,19 @@ export function getCachedDailyChallengeSnapshot(challengeId) {
     return readCachedDailySnapshot(challengeId);
 }
 
+export function getMissingDailyChallengeSnapshotIds(challengeIds = []) {
+    return [...new Set(
+        (Array.isArray(challengeIds) ? challengeIds : [])
+            .filter((challengeId) => typeof challengeId === 'string' && challengeId)
+    )].filter((challengeId) => !readCachedDailySnapshot(challengeId));
+}
+
 export function invalidateDailyChallengeSnapshot(challengeId) {
     if (!challengeId) return;
+    hydrateDailySnapshotCache();
     dailySnapshotCache.delete(challengeId);
     dailySnapshotInflight.delete(challengeId);
+    writeDailySnapshotCacheStorage();
 }
 
 function normalizeSnapshot(raw) {
@@ -571,6 +744,42 @@ export function formatDailyChallengeResultLabel(challenge, result) {
 
 export function formatDailyChallengeBestLabel(objectiveType, bestTime, completedLaps = null) {
     return Number.isFinite(bestTime) ? `${Number(bestTime).toFixed(2)}s` : '--';
+}
+
+function formatDailyChallengeStatusDate(isoString) {
+    const timeMs = Date.parse(isoString);
+    if (!Number.isFinite(timeMs)) return '';
+
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: '2-digit',
+        timeZone: 'UTC'
+    }).format(new Date(timeMs));
+}
+
+export function getDailyChallengeCardStatus(challenge, nowMs = Date.now()) {
+    const endsAtMs = getChallengeTimeMs(challenge, 'endsAt');
+    const availableUntilMs = getChallengeTimeMs(challenge, 'availableUntil');
+
+    if (Number.isFinite(endsAtMs) && nowMs < endsAtMs) {
+        return {
+            key: 'featured',
+            label: 'Featured',
+        };
+    }
+
+    if (Number.isFinite(availableUntilMs) && nowMs < availableUntilMs) {
+        const formattedDate = formatDailyChallengeStatusDate(challenge?.availableUntil);
+        return {
+            key: 'available',
+            label: formattedDate ? `Available until ${formattedDate}` : 'Available',
+        };
+    }
+
+    return {
+        key: 'expired',
+        label: 'Expired',
+    };
 }
 
 export function formatDailyChallengePlaylistAvailabilityLabel(challenge) {
@@ -682,8 +891,9 @@ async function loadDailyChallengePlaylist() {
 export async function getDailyChallengePlaylist({ forceRefresh = false } = {}) {
     const nowMs = Date.now();
     if (!forceRefresh) {
-        if (dailyPlaylistCache.challenges && dailyPlaylistCache.expiresAt > nowMs) {
-            return cloneDailyPlaylist(dailyPlaylistCache.challenges);
+        const cachedChallenges = getUsableCachedDailyPlaylist(nowMs);
+        if (cachedChallenges.length >= DAILY_PLAYLIST_DAYS) {
+            return cachedChallenges;
         }
         if (dailyPlaylistCache.promise) {
             return cloneDailyPlaylist(await dailyPlaylistCache.promise);
@@ -692,12 +902,10 @@ export async function getDailyChallengePlaylist({ forceRefresh = false } = {}) {
 
     const requestPromise = loadDailyChallengePlaylist()
         .then((challenges) => {
-            dailyPlaylistCache = {
-                challenges,
-                expiresAt: resolveDailyPlaylistCacheExpiresAt(challenges),
-                promise: null
-            };
-            return challenges;
+            const fetchedChallenges = cloneDailyPlaylist(challenges);
+            cacheDailyChallengePlaylist(fetchedChallenges);
+            dailyPlaylistCache.promise = null;
+            return fetchedChallenges;
         })
         .catch((error) => {
             dailyPlaylistCache.promise = null;
@@ -709,9 +917,7 @@ export async function getDailyChallengePlaylist({ forceRefresh = false } = {}) {
 }
 
 export function getCachedDailyChallengePlaylist() {
-    return dailyPlaylistCache.challenges && dailyPlaylistCache.expiresAt > Date.now()
-        ? cloneDailyPlaylist(dailyPlaylistCache.challenges)
-        : [];
+    return getUsableCachedDailyPlaylist();
 }
 
 async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_LIMIT } = {}) {
@@ -791,10 +997,7 @@ export async function getDailyChallengeSnapshot({
 }
 
 export async function prefetchDailyChallengeSnapshots(challengeIds = []) {
-    const uniqueIds = [...new Set(
-        (Array.isArray(challengeIds) ? challengeIds : [])
-            .filter((challengeId) => typeof challengeId === 'string' && challengeId)
-    )];
+    const uniqueIds = getMissingDailyChallengeSnapshotIds(challengeIds);
 
     if (!uniqueIds.length) return;
 

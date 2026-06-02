@@ -1,12 +1,12 @@
-import { buildTrackCanvas } from './canvas.js?v=1.91';
-import { buildCollisionRuntime, buildTrackGeometry } from './runtime.js?v=1.91';
+import { buildTrackCanvas } from './canvas.js?v=2.09';
+import { buildCollisionRuntime, buildTrackGeometry } from './runtime.js?v=2.09';
 
 const geometryCache = new Map();
 const runtimeCache = new Map();
 const canvasCache = new Map();
 const GEOMETRY_CACHE_LIMIT = 16;
 const RUNTIME_CACHE_LIMIT = 8;
-const CANVAS_CACHE_LIMIT = 3;
+const CANVAS_CACHE_LIMIT = 7;
 
 function getGeometryCacheKey(trackKey, { qualityLevel = 0, frameSkip = 0 } = {}) {
     return `${trackKey}:${qualityLevel}:${frameSkip}`;

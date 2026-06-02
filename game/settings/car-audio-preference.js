@@ -1,4 +1,4 @@
-import { parseStoredBooleanToggle } from './parse-stored-boolean-toggle.js?v=1.91';
+import { parseStoredBooleanToggle } from './parse-stored-boolean-toggle.js?v=2.09';
 
 export const CAR_PROCEDURAL_AUDIO_STORAGE_KEY = 'VectorGpCarProceduralAudioEnabled';
 

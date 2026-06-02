@@ -1,66 +1,59 @@
 # Mini Racer
 
-Browser arcade racing game (Daily GP). This repo is the **game client** only: rendering, physics, UI, tracks, and assets.
+Mini Racer is a fast, one-lap arcade racing game built for Reddit.
 
-The host app (not in this repo) serves `/api` for today’s challenge, leaderboard, and rank. See `game/scoreboard/api-client.js` and `game/runtime-config.js`.
+Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put down a cleaner lap than everyone else. The game is built around short sessions, quick restarts, and visible improvement from run to run.
 
-## Play locally
+## What players can do
 
-1. `npm install`
-2. `npm run generate:car-assets` (also runs before tests)
-3. Serve the project root with any static file server and open `game.html`
-4. Optional: `?mockDaily=true` for a random track, or `?mockDaily=<trackKey>` (e.g. `circuit`) — UI only; rank stays `--` without the host API
+- Race a featured track and chase the fastest lap.
+- Improve a personal best and climb the leaderboard.
+- Replay recent tracks from the in-game `Tracks` screen.
+- Unlock medals on each track by beating target times.
+- Customize the car look in the Garage.
 
-## Commands
+## Track release cadence
 
-- `npm test` — unit tests
-- `npm run test:watch` — watch mode
-- `npm run mutation` — Stryker mutation tests
+- Mini Racer rotates in a new featured track every day.
+- The featured slot updates on the UTC day reset.
+- The `Tracks` screen keeps the last 7 days available to play.
+- Each track card shows the track preview, your best time, earned medals, and how long that track is still available.
 
-## Project layout
+## Track availability
 
-| Path | Purpose |
-| --- | --- |
-| `game/` | Game logic, UI, audio, tracks |
-| `game.html` | Main entry |
-| `public/assets/` | Cars, medals, fonts |
-| `tools/` | Map maker, runner, TikTok studio, asset generators |
-| `tests/` | Vitest |
+- A new track becomes the featured race each day.
+- Older tracks do not disappear immediately.
+- Tracks remain playable for 7 days, then expire and drop out of the list.
+- If a track is close to expiring, the game shows the remaining time directly on the track card.
 
-## How the game works
+## Garage options
 
-### Lobby
+The Garage lets players change how their car looks without changing handling.
 
-The start overlay loads today’s challenge from `GET /api/daily/active` and shows the track, your best time, and **Rank** (today’s leaderboard).
+- `Car skins`: 12 selectable skins grouped into Mini, Cyberpunk, and Steampunk sets.
+- `Trails`: 8 route-trail options, including `No Trail`.
+- Selections are saved, so the car keeps its look between sessions on the same device.
 
-**Start Race** loads that track. **Garage** and **Settings** are also on the overlay.
+## How a run works
 
-### A run
+- Every attempt is a single lap.
+- Crossing the finish line completes the run.
+- Crashing ends the attempt.
+- If a completed lap is better than your previous best on that track, it becomes your new best time.
 
-- **One lap** — crossing the finish line ends the run.
-- **Crash** — run fails; that attempt does not submit a new best.
-- **Win** — your lap time is recorded.
+## Progress and competition
 
-### Personal best vs rank
+- Your best time is shown for each available track.
+- Leaderboards show where your lap stands against other players.
+- Medals are earned by beating fixed target times on each track.
+- The game is designed for fast retries, so improvement comes from learning braking points, corner shape, and clean exits.
 
-| | Where it lives | Rule |
-| --- | --- | --- |
-| **Personal best** | Browser storage (`game/daily-challenge/storage.js`) | Lower lap time wins; only your best is kept for today’s challenge |
-| **Rank** | Host API | Shown as `#N` and optionally “of total”; **#1 is fastest**. The client does not calculate place |
+## First-time experience
 
-When you beat your stored best, the client sends the replay to `POST /api/daily/submit`, then refreshes `GET /api/daily/snapshot` for rank and the leaderboard list. The host API must compute the accepted time from the replay. While that runs, the UI may show “Submitting…” or “Verifying…”.
+- The post preview shows the current track and a `Race Now` button.
+- The full game opens with the featured track ready to play.
+- The controls and goal are immediate: finish one clean lap as fast as possible.
 
-### Medals
+## For moderators
 
-Medals (bronze → author) are **not** leaderboard rank. They use fixed time targets per track in `game/medals/medal-times.json`.
-
-### API (client)
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/daily/active` | Today’s challenge |
-| `GET /api/daily/snapshot` | Leaderboard and your rank |
-| `POST /api/daily/submit` | New personal best candidate; host validates replay and computes the accepted time |
-| `GET /api/player/bootstrap` | Player identity bootstrap |
-
-Tracks are defined in `game/track/tracks.js`. `CONFIG.visibleTrackKeys` is an allowlist for the host and tests, not a track picker in the game UI.
+Mini Racer is meant to be installed in a subreddit and used to create playable posts for that community. Once installed, moderators can create a Mini Racer post from the subreddit menu.

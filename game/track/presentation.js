@@ -1,4 +1,4 @@
-import { CONFIG } from '../config.js?v=1.91';
+import { CONFIG } from '../config.js?v=2.09';
 
 export const TRACK_PRESENTATION_SURFACES = Object.freeze({
     RACE: 'race',

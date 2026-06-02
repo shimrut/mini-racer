@@ -1,6 +1,6 @@
-import { KPH_PER_WORLD_UNIT } from '../car/handling.js?v=1.91';
-import { getCarProceduralAudioEnabled } from '../settings/car-audio-preference.js?v=1.91';
-import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js?v=1.97';
+import { KPH_PER_WORLD_UNIT } from '../car/handling.js?v=2.09';
+import { getCarProceduralAudioEnabled } from '../settings/car-audio-preference.js?v=2.09';
+import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js?v=2.09';
 
 let registeredApi = null;
 const PARAMETER_SYNC_INTERVAL_SEC = 1 / 30;

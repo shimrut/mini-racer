@@ -1,37 +1,37 @@
 import {
     getLeaderboardIdentityPreference,
     setLeaderboardIdentityPreference,
-} from '../scoreboard/display-preference.js?v=1.91';
+} from '../scoreboard/display-preference.js?v=2.09';
 import {
     LEADERBOARD_IDENTITY_CONSTRUCTED,
     LEADERBOARD_IDENTITY_REDDIT,
     getConstructedLeaderboardName,
     sanitizeRedditUsername,
 } from '../shared/leaderboard-identity.js';
-import { getPlayerProgressState } from '../storage.js?v=1.91';
-import { getOrCreatePlayerId } from '../scoreboard/api-client.js?v=1.91';
+import { getPlayerProgressState } from '../storage.js?v=2.09';
+import { getOrCreatePlayerId } from '../scoreboard/api-client.js?v=2.09';
 import {
     getCarProceduralAudioEnabled,
     setCarProceduralAudioEnabled,
-} from './car-audio-preference.js?v=1.91';
+} from './car-audio-preference.js?v=2.09';
 import {
     getCrashAutoRestartAfterCrashEnabled,
     setCrashAutoRestartAfterCrashEnabled,
-} from './crash-auto-restart-preference.js?v=1.91';
+} from './crash-auto-restart-preference.js?v=2.09';
 import {
     CRASH_RESTART_DELAY_METER_TICKS,
     CRASH_RESTART_DELAY_STEP,
     crashRestartDelayToMeterStep,
     getCrashRestartDelaySec,
     setCrashRestartDelaySec,
-} from './crash-restart-delay-preference.js?v=1.91';
-import { userGesturePrepareCarEffects } from '../audio/car-effects-audio.js?v=1.97';
-import { userGesturePrepareMedalEffects } from '../audio/medal-effects-audio.js?v=1.97';
-import { userGesturePrepareMusic } from '../audio/procedural-music.js?v=1.97';
+} from './crash-restart-delay-preference.js?v=2.09';
+import { userGesturePrepareCarEffects } from '../audio/car-effects-audio.js?v=2.09';
+import { userGesturePrepareMedalEffects } from '../audio/medal-effects-audio.js?v=2.09';
+import { userGesturePrepareMusic } from '../audio/procedural-music.js?v=2.09';
 import {
     getMusicEnabled,
     setMusicEnabled,
-} from './music-preference.js?v=1.91';
+} from './music-preference.js?v=2.09';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 

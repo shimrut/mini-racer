@@ -1,8 +1,8 @@
-import { CONFIG } from '../game/config.js?v=1.81';
-import { TRACKS } from '../game/track/tracks.js?v=1.81';
-import { getTrackCanvasAsset, getTrackRuntimeAsset } from '../game/track/assets.js?v=1.81';
-import { updateSimulation } from '../game/race/simulation.js?v=1.81';
-import { RingBuffer } from '../game/race/ring-buffer.js?v=1.81';
+import { CONFIG } from '../game/config.js?v=2.09';
+import { TRACKS } from '../game/track/tracks.js?v=2.09';
+import { getTrackCanvasAsset, getTrackRuntimeAsset } from '../game/track/assets.js?v=2.09';
+import { updateSimulation } from '../game/race/simulation.js?v=2.09';
+import { RingBuffer } from '../game/race/ring-buffer.js?v=2.09';
 
 const MP4_MUXER_CDN = 'https://esm.sh/mp4-muxer@5.2.3';
 

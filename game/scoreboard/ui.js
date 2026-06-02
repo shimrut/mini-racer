@@ -1,13 +1,13 @@
-import { TRACKS } from '../track/tracks.js?v=1.91';
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
+import { TRACKS } from '../track/tracks.js?v=2.09';
+import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
 import {
     getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
     getDailyChallengePlaylist,
     prefetchDailyChallengeSnapshots,
     getDailyChallengeSnapshot
-} from '../daily-challenge/service.js?v=1.94';
-import { getScoreboardSnapshot } from './service.js?v=1.91';
+} from '../daily-challenge/service.js?v=2.09';
+import { getScoreboardSnapshot } from './service.js?v=2.09';
 
 export class LeaderboardsUi {
     constructor({

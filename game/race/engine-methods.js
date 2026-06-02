@@ -1,13 +1,13 @@
-import { CONFIG } from "../config.js?v=1.91";
-import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js?v=1.92";
-import { createModalActions } from "./result-flow.js?v=1.91";
-import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js?v=1.91";
+import { CONFIG } from "../config.js?v=2.09";
+import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js?v=2.09";
+import { createModalActions } from "./result-flow.js?v=2.09";
+import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js?v=2.09";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
 import {
   getDailyChallengeCopyLabels,
   getDailyChallengeTrackName,
-} from "../daily-challenge/service.js?v=1.91";
-import { TRACKS } from "../track/tracks.js?v=1.91";
+} from "../daily-challenge/service.js?v=2.09";
+import { TRACKS } from "../track/tracks.js?v=2.09";
 
 const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;

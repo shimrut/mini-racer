@@ -1,4 +1,4 @@
-import { TRACKS } from '../game/track/tracks.js?v=1.81';
+import { TRACKS } from '../game/track/tracks.js?v=2.09';
 
 const TOOL_LABELS = {
     draw: 'line build',

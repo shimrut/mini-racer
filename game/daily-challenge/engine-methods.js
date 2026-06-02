@@ -2,14 +2,14 @@ import {
   getDailyChallengeData,
   saveDailyChallengeBestTime,
   setDailyChallengeBestTime,
-} from "./storage.js?v=1.91";
-import { normalizeCheckpointTimesSec } from "./checkpoint-times.js?v=1.92";
+} from "./storage.js?v=2.09";
+import { normalizeCheckpointTimesSec } from "./checkpoint-times.js?v=2.09";
 import {
   buildLapRecord,
   createModalActions,
   isNewBestResult,
   pushRecentLap,
-} from "../race/result-flow.js?v=1.91";
+} from "../race/result-flow.js?v=2.09";
 import {
   formatDailyChallengeResultLabel,
   getActiveDailyChallenge,
@@ -18,7 +18,9 @@ import {
   getDailyChallengeModifierLabel,
   getDailyChallengeObjectiveLabel,
   getDailyChallengeRequiredLaps,
+  cacheDailyChallengePlaylist,
   getCachedDailyChallengePlaylist,
+  getMissingDailyChallengeSnapshotIds,
   getCachedDailyChallengeSnapshot,
   getDailyChallengePlaylist,
   getDailyChallengeSnapshot,
@@ -26,15 +28,76 @@ import {
   invalidateDailyChallengeSnapshot,
   isDailyChallengeStoredResultForChallenge,
   prefetchDailyChallengeSnapshots,
-} from "./service.js?v=1.94";
+} from "./service.js?v=2.09";
 import { createVerificationSnapshot } from "../scoreboard/verification-queue.js";
-import { getMedalForLapTime } from "../medals/medals.js?v=2.04";
+import { getMedalForLapTime } from "../medals/medals.js?v=2.09";
 import {
   readTrackLastLapMedal,
   writeTrackLastLapMedal,
-} from "../medals/last-lap-medal-storage.js?v=1.92";
+} from "../medals/last-lap-medal-storage.js?v=2.09";
+import { getTrackCanvasAsset } from "../track/assets.js?v=2.09";
+import { TRACKS } from "../track/tracks.js?v=2.09";
+import {
+  createDailyChallengePresentationEvent,
+  resolveTrackPresentation,
+  TRACK_PRESENTATION_SURFACES,
+} from "../track/presentation.js?v=2.09";
 
 export const dailyChallengeEngineMethods = {
+  waitForPlaylistModalPaint() {
+    return new Promise((resolve) => {
+      if (typeof requestAnimationFrame !== "function") {
+        setTimeout(resolve, 0);
+        return;
+      }
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  },
+
+  waitForTrackPrewarmIdle() {
+    return new Promise((resolve) => {
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(resolve, { timeout: 500 });
+        return;
+      }
+      setTimeout(resolve, 32);
+    });
+  },
+
+  prewarmDailyPlaylistTracks(challenges = []) {
+    const prewarmId = (this._dailyPlaylistTrackPrewarmId || 0) + 1;
+    this._dailyPlaylistTrackPrewarmId = prewarmId;
+    const queue = (Array.isArray(challenges) ? challenges : [])
+      .filter((challenge) => challenge?.trackKey && TRACKS[challenge.trackKey]);
+
+    const prewarmNext = async () => {
+      if (this._dailyPlaylistTrackPrewarmId !== prewarmId) return;
+      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+      if (this.status === "playing" || this.status === "starting") return;
+      const challenge = queue.shift();
+      if (!challenge) return;
+
+      await this.waitForTrackPrewarmIdle();
+      if (this._dailyPlaylistTrackPrewarmId !== prewarmId) return;
+      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+      if (this.status === "playing" || this.status === "starting") return;
+
+      const track = TRACKS[challenge.trackKey];
+      const presentation = resolveTrackPresentation(challenge.trackKey, {
+        surface: TRACK_PRESENTATION_SURFACES.RACE,
+        event: createDailyChallengePresentationEvent(challenge),
+      });
+      getTrackCanvasAsset(challenge.trackKey, track, {
+        qualityLevel: this.qualityLevel,
+        frameSkip: this.frameSkip,
+        presentation,
+      });
+      void prewarmNext();
+    };
+
+    void prewarmNext();
+  },
+
   syncTrackMedalFromChallengeBest(challenge, bestTime) {
     if (
       !challenge?.trackKey ||
@@ -369,6 +432,7 @@ export const dailyChallengeEngineMethods = {
 
   async openDailyChallengePlaylist() {
     let loadedChallenges = [];
+    let playlistRequestNeeded = false;
     const playlistActions = {
       onPlay: (challenge) => {
         void this.handleStartDailyChallenge(challenge);
@@ -383,24 +447,47 @@ export const dailyChallengeEngineMethods = {
         );
       },
     };
-    loadedChallenges = getCachedDailyChallengePlaylist();
+
+    if (this.currentDailyChallenge) {
+      loadedChallenges = cacheDailyChallengePlaylist([this.currentDailyChallenge]);
+    } else {
+      loadedChallenges = getCachedDailyChallengePlaylist();
+    }
+    playlistRequestNeeded = loadedChallenges.length < 7;
     this.dailyChallengeUi.openPlaylistModal(
       loadedChallenges.length ? loadedChallenges : null,
       playlistActions,
     );
+    await this.waitForPlaylistModalPaint();
+    if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+    this.prewarmDailyPlaylistTracks(loadedChallenges);
 
-    try {
-      const challenges = await getDailyChallengePlaylist();
-      loadedChallenges = challenges;
-      await prefetchDailyChallengeSnapshots(
-        challenges.map((challenge) => challenge?.id).filter(Boolean),
-      );
+    if (playlistRequestNeeded) {
+      try {
+        loadedChallenges = await getDailyChallengePlaylist();
+        if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+        this.dailyChallengeUi.renderPlaylist(loadedChallenges, playlistActions);
+        this.prewarmDailyPlaylistTracks(loadedChallenges);
+      } catch (error) {
+        console.error("Error loading daily challenge playlist:", error);
+        if (!loadedChallenges.length && this.dailyChallengeUi.isPlaylistModalOpen?.()) {
+          this.dailyChallengeUi.openPlaylistModal([], null);
+        }
+        return;
+      }
+    }
+
+    const missingSnapshotIds = getMissingDailyChallengeSnapshotIds(
+      loadedChallenges.map((challenge) => challenge?.id).filter(Boolean),
+    );
+    for (const challengeId of missingSnapshotIds) {
+      try {
+        await getDailyChallengeSnapshot({ challengeId });
+      } catch (error) {
+        console.error("Error loading daily challenge snapshot:", error);
+      }
       if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
-      this.dailyChallengeUi.openPlaylistModal(challenges, playlistActions);
-    } catch (error) {
-      console.error("Error loading daily challenge playlist:", error);
-      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
-      this.dailyChallengeUi.openPlaylistModal([], null);
+      this.dailyChallengeUi.renderPlaylist(loadedChallenges, playlistActions);
     }
   },
 

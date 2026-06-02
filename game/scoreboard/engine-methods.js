@@ -10,13 +10,13 @@ import {
   createVerificationSnapshot,
   VERIFICATION_REJECTED_SNAPSHOT,
 } from "./verification-queue.js";
-import { setDailyChallengeBestTime } from "../daily-challenge/storage.js?v=1.91";
+import { setDailyChallengeBestTime } from "../daily-challenge/storage.js?v=2.09";
 import {
   getDailyChallengeSnapshot,
   invalidateDailyChallengeSnapshot,
   submitDailyChallengeBestTime,
-} from "../daily-challenge/service.js?v=1.94";
-import { shouldAutoRetryVerificationQueue } from "../track/environment.js?v=1.91";
+} from "../daily-challenge/service.js?v=2.09";
+import { shouldAutoRetryVerificationQueue } from "../track/environment.js?v=2.09";
 
 export const scoreboardEngineMethods = {
   scheduleVerificationQueueProcessing(delayMs = null) {

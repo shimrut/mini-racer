@@ -1,4 +1,4 @@
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
+import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
 
 function createWinData(state, checkpointCount, extra = {}) {
     return Object.freeze({

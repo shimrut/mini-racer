@@ -1,5 +1,5 @@
 import _medalTimesRaw from './medal-times.json' with { type: 'json' };
-import { createMedalIconSvg } from './medal-icon.js?v=2.04';
+import { createMedalIconSvg } from './medal-icon.js?v=2.09';
 
 /** Display / ordering rank for standard lap medals (bronze → author). */
 const STANDARD_MEDAL_TIER_RANK = Object.freeze({ bronze: 0, silver: 1, gold: 2, author: 3 });

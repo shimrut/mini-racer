@@ -1,5 +1,5 @@
-import { CONFIG } from '../game/config.js?v=1.81';
-import { getIntersection } from '../game/config.js?v=1.81';
+import { CONFIG } from '../game/config.js?v=2.09';
+import { getIntersection } from '../game/config.js?v=2.09';
 
 const DT = 1 / 60;
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };

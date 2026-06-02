@@ -1,25 +1,25 @@
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=1.91';
-import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js?v=1.91';
-import { TRACKS } from '../track/tracks.js?v=1.91';
+import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
+import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js?v=2.09';
+import { TRACKS } from '../track/tracks.js?v=2.09';
 import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
-} from '../track/presentation.js?v=1.91';
-import { createMedalIconSvg } from '../medals/medal-icon.js?v=2.04';
+} from '../track/presentation.js?v=2.09';
+import { createMedalIconSvg } from '../medals/medal-icon.js?v=2.09';
 import {
     getMedalRowSlots,
-} from '../medals/medals.js?v=2.04';
-import { readTrackLastLapMedal } from '../medals/last-lap-medal-storage.js?v=1.92';
+} from '../medals/medals.js?v=2.09';
+import { readTrackLastLapMedal } from '../medals/last-lap-medal-storage.js?v=2.09';
 import {
     buildModalRunsPayload,
     buildModalStatsPlan,
     buildModalRunsViewOptions,
     buildScoreboardRankDisplay
-} from './result-flow.js?v=1.91';
+} from './result-flow.js?v=2.09';
 import {
     scheduleCombinedMedalEntranceAfterModal,
     shouldCelebrateMedalTier
-} from '../medals/medals.js?v=2.04';
+} from '../medals/medals.js?v=2.09';
 import { closeModalElement, openModalElement, runModalHandoff } from '../ui/modal-handoff.js';
 import { configureReusableModal } from '../ui/reusable-modal.js';
 
