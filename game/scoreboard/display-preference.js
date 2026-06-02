@@ -5,6 +5,8 @@ import {
 
 const LEADERBOARD_IDENTITY_STORAGE_KEY = 'VectorGpLeaderboardIdentityPreference';
 
+export { normalizeLeaderboardIdentityPreference };
+
 export function getLeaderboardIdentityPreference() {
     if (typeof window === 'undefined' || !window.localStorage) {
         return LEADERBOARD_IDENTITY_CONSTRUCTED;

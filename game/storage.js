@@ -1,5 +1,9 @@
 import { hasAnyDailyChallengeStoredData } from "./daily-challenge/storage.js?v=2.09";
-import { getLeaderboardIdentityPreference } from "./scoreboard/display-preference.js?v=2.09";
+import {
+  getLeaderboardIdentityPreference,
+  normalizeLeaderboardIdentityPreference,
+  setLeaderboardIdentityPreference,
+} from "./scoreboard/display-preference.js?v=2.09";
 import {
   buildServiceHeaders,
   getBaseApiConfig,
@@ -15,7 +19,6 @@ async function fetchRemotePlayerProgressState() {
 
   const url = new URL(config.playerBootstrapUrl, window.location.origin);
   url.searchParams.set("playerId", getOrCreatePlayerId("player bootstrap"));
-  url.searchParams.set("leaderboardIdentity", getLeaderboardIdentityPreference());
 
   const response = await fetch(url.toString(), {
     method: "GET",
@@ -34,6 +37,9 @@ async function fetchRemotePlayerProgressState() {
       typeof payload?.redditUsername === "string" && payload.redditUsername.trim()
         ? payload.redditUsername.trim()
         : null,
+    leaderboardIdentity: normalizeLeaderboardIdentityPreference(
+      payload?.leaderboardIdentity
+    ),
     leaderboardPlayerId:
       typeof payload?.playerId === "string" && payload.playerId.trim()
         ? payload.playerId.trim()
@@ -47,6 +53,7 @@ function getLocalPlayerProgressState() {
     hasAnyData,
     isReturningPlayer: false,
     redditUsername: null,
+    leaderboardIdentity: getLeaderboardIdentityPreference(),
     leaderboardPlayerId: getOrCreatePlayerId("player bootstrap"),
   };
 }
@@ -58,6 +65,7 @@ export async function getPlayerProgressState() {
     }
     const remoteState = await fetchRemotePlayerProgressState();
     if (remoteState) {
+      setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
       return remoteState;
     }
   } catch (error) {

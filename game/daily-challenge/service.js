@@ -938,7 +938,6 @@ async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_L
     const url = new URL(config.dailySnapshotUrl, origin);
     url.searchParams.set('challengeId', challengeId);
     url.searchParams.set('playerId', getOrCreatePlayerId('daily challenge'));
-    url.searchParams.set('leaderboardIdentity', getLeaderboardIdentityPreference());
     url.searchParams.set('limit', safeLimit.toString());
 
     const response = await fetch(url.toString(), {

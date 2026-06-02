@@ -6,10 +6,15 @@ import {
     LEADERBOARD_IDENTITY_CONSTRUCTED,
     LEADERBOARD_IDENTITY_REDDIT,
     getConstructedLeaderboardName,
+    normalizeLeaderboardIdentityPreference,
     sanitizeRedditUsername,
 } from '../shared/leaderboard-identity.js';
 import { getPlayerProgressState } from '../storage.js?v=2.09';
-import { getOrCreatePlayerId } from '../scoreboard/api-client.js?v=2.09';
+import {
+    buildServiceHeaders,
+    getBaseApiConfig,
+    getOrCreatePlayerId,
+} from '../scoreboard/api-client.js?v=2.09';
 import {
     getCarProceduralAudioEnabled,
     setCarProceduralAudioEnabled,
@@ -160,12 +165,11 @@ export class SettingsUi {
             });
         }
         if (this.redditIdentitySwitch) {
-            this.redditIdentitySwitch.addEventListener('change', () => {
+            this.redditIdentitySwitch.addEventListener('change', async () => {
                 const next = this.redditIdentitySwitch.checked
                     ? LEADERBOARD_IDENTITY_REDDIT
                     : LEADERBOARD_IDENTITY_CONSTRUCTED;
-                setLeaderboardIdentityPreference(next);
-                this.refreshIdentityPanel();
+                await this.persistIdentityPreference(next);
             });
         }
         if (this.carAudioSwitch) {
@@ -219,6 +223,50 @@ export class SettingsUi {
                 this.identityDesc.textContent = getConstructedLeaderboardName(playerId);
             }
         }
+    }
+
+    async persistIdentityPreference(nextPreference) {
+        const previousPreference = getLeaderboardIdentityPreference();
+        const normalizedNextPreference = normalizeLeaderboardIdentityPreference(nextPreference);
+
+        setLeaderboardIdentityPreference(normalizedNextPreference);
+        this.refreshIdentityPanel();
+
+        try {
+            const config = getBaseApiConfig();
+            if (!config?.playerIdentityUrl || typeof fetch !== 'function') {
+                return;
+            }
+
+            const response = await fetch(config.playerIdentityUrl, {
+                method: 'POST',
+                headers: {
+                    ...buildServiceHeaders(config),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    playerId: getOrCreatePlayerId('player identity'),
+                    leaderboardIdentity: normalizedNextPreference,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Identity update failed: ${response.status}`);
+            }
+
+            const payload = await response.json().catch(() => null);
+            const storedPreference = normalizeLeaderboardIdentityPreference(
+                payload?.leaderboardIdentity ?? normalizedNextPreference,
+            );
+            setLeaderboardIdentityPreference(storedPreference);
+        } catch (error) {
+            setLeaderboardIdentityPreference(previousPreference);
+            this.refreshIdentityPanel();
+            console.error('Error saving leaderboard identity preference:', error);
+            return;
+        }
+
+        this.refreshIdentityPanel();
     }
 
     refreshCarAudioPanel() {

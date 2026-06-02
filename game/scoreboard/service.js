@@ -78,7 +78,6 @@ async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeL
     const url = new URL(config.scoreboardSnapshotUrl, origin);
     url.searchParams.set('trackKey', trackKey);
     url.searchParams.set('playerId', playerId);
-    url.searchParams.set('leaderboardIdentity', getLeaderboardIdentityPreference());
     url.searchParams.set('limit', safeLimit.toString());
 
     const response = await fetch(url.toString(), {
