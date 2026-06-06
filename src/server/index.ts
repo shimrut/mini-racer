@@ -1,10 +1,12 @@
 import express from 'express';
 import { createServer, getServerPort } from '@devvit/server';
-import { context, reddit } from '@devvit/web/server';
+import { context, reddit, redis } from '@devvit/web/server';
 import type { MenuItemRequest } from '@devvit/shared/types/menu-item.js';
+import { TRACKS } from '../../game/track/tracks.js';
 import {
     buildDailyGpChallengeById,
     buildDailyGpPlaylist,
+    type DailyGpChallenge,
 } from './daily-gp-model.js';
 import {
     getServerDailyGpChallenge,
@@ -13,9 +15,22 @@ import {
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
 } from './daily-gp-store.js';
+import { formatDailyMiniRacerPostTitle } from './reddit-post-title.js';
 
 const app = express();
 app.use(express.json({ limit: '4mb' }));
+
+const DAILY_AUTPOST_SUBREDDITS_KEY = 'dailygp:autopost:subreddits';
+
+type DailyAutopostSubscription = {
+    subredditName: string;
+    enabled: boolean;
+    enabledAt: string | null;
+    updatedAt: string;
+    lastPostedChallengeId: string | null;
+    lastPostedAt: string | null;
+    lastPostUrl: string | null;
+};
 
 function getRequestUsername(): string | null {
     return typeof context.username === 'string' && context.username.trim()
@@ -39,6 +54,14 @@ function readContextPostId(): string | null {
 }
 
 async function getPostBoundDailyGpChallenge() {
+    const contextPostData = (context as { postData?: unknown }).postData;
+    const contextChallengeId = contextPostData && typeof contextPostData === 'object'
+        ? (contextPostData as { challengeId?: unknown }).challengeId
+        : null;
+    if (typeof contextChallengeId === 'string' && contextChallengeId) {
+        return buildDailyGpChallengeById(contextChallengeId);
+    }
+
     const postId = readContextPostId();
     if (!postId) {
         return null;
@@ -55,6 +78,147 @@ async function getPostBoundDailyGpChallenge() {
         console.error('Failed to resolve post-bound Mini Racer challenge:', error);
         return null;
     }
+}
+
+function parseDailyAutopostSubscription(
+    subredditName: string,
+    raw: string | null | undefined,
+): DailyAutopostSubscription | null {
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') {
+            return null;
+        }
+
+        return {
+            subredditName,
+            enabled: parsed.enabled !== false,
+            enabledAt: typeof parsed.enabledAt === 'string' && parsed.enabledAt ? parsed.enabledAt : null,
+            updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt
+                ? parsed.updatedAt
+                : new Date(0).toISOString(),
+            lastPostedChallengeId: typeof parsed.lastPostedChallengeId === 'string' && parsed.lastPostedChallengeId
+                ? parsed.lastPostedChallengeId
+                : null,
+            lastPostedAt: typeof parsed.lastPostedAt === 'string' && parsed.lastPostedAt
+                ? parsed.lastPostedAt
+                : null,
+            lastPostUrl: typeof parsed.lastPostUrl === 'string' && parsed.lastPostUrl
+                ? parsed.lastPostUrl
+                : null,
+        };
+    } catch (_error) {
+        return null;
+    }
+}
+
+async function readDailyAutopostSubscription(
+    subredditName: string,
+): Promise<DailyAutopostSubscription | null> {
+    const raw = await redis.hGet(DAILY_AUTPOST_SUBREDDITS_KEY, subredditName);
+    return parseDailyAutopostSubscription(subredditName, raw);
+}
+
+async function readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]> {
+    const rawMap = await redis.hGetAll(DAILY_AUTPOST_SUBREDDITS_KEY);
+    return Object.entries(rawMap)
+        .map(([subredditName, raw]) => parseDailyAutopostSubscription(subredditName, raw))
+        .filter((entry): entry is DailyAutopostSubscription => Boolean(entry));
+}
+
+async function writeDailyAutopostSubscription(
+    subscription: DailyAutopostSubscription,
+): Promise<void> {
+    await redis.hSet(
+        DAILY_AUTPOST_SUBREDDITS_KEY,
+        { [subscription.subredditName]: JSON.stringify(subscription) },
+    );
+}
+
+async function deleteDailyAutopostSubscription(subredditName: string): Promise<void> {
+    await redis.hDel(DAILY_AUTPOST_SUBREDDITS_KEY, [subredditName]);
+}
+
+async function upsertDailyAutopostSubscription(
+    subredditName: string,
+    updater: (previous: DailyAutopostSubscription | null) => DailyAutopostSubscription,
+): Promise<DailyAutopostSubscription> {
+    const previous = await readDailyAutopostSubscription(subredditName);
+    const next = updater(previous);
+    await writeDailyAutopostSubscription(next);
+    return next;
+}
+
+async function submitDailyMiniRacerPost(
+    subredditName: string,
+    challenge: DailyGpChallenge,
+) {
+    return reddit.submitCustomPost({
+        subredditName,
+        title: formatDailyMiniRacerPostTitle(challenge),
+        entry: 'default',
+        postData: {
+            challengeId: challenge.id,
+            challenge,
+        },
+        textFallback: {
+            text: [
+                '# Mini Racer Daily',
+                '',
+                `Track: ${TRACKS[challenge.trackKey]?.name || challenge.trackKey}`,
+                `Date: ${challenge.challengeDate}`,
+                '',
+                'Playable Reddit racing challenge.',
+                '',
+                '- One featured track per day',
+                '- Fast retries',
+                '- Personal best plus live leaderboard',
+            ].join('\n'),
+        },
+    });
+}
+
+async function ensureDailyMiniRacerPostForSubreddit(
+    subredditName: string,
+    challenge: DailyGpChallenge,
+) {
+    const current = await readDailyAutopostSubscription(subredditName);
+    if (current?.lastPostedChallengeId === challenge.id) {
+        return {
+            created: false,
+            postUrl: current.lastPostUrl,
+        };
+    }
+
+    const post = await submitDailyMiniRacerPost(subredditName, challenge);
+    await upsertDailyAutopostSubscription(subredditName, (previous) => ({
+        subredditName,
+        enabled: previous?.enabled ?? false,
+        enabledAt: previous?.enabledAt ?? null,
+        updatedAt: new Date().toISOString(),
+        lastPostedChallengeId: challenge.id,
+        lastPostedAt: new Date().toISOString(),
+        lastPostUrl: post.url,
+    }));
+
+    return {
+        created: true,
+        postUrl: post.url,
+    };
+}
+
+async function resolveMenuTargetSubredditName(targetId: string): Promise<string | null> {
+    const subredditInfo = targetId.startsWith('t5_')
+        ? await reddit.getSubredditInfoById(targetId as `t5_${string}`)
+        : null;
+    const subredditName = subredditInfo?.name || context.subredditName || null;
+    return typeof subredditName === 'string' && subredditName.trim()
+        ? subredditName.trim()
+        : null;
 }
 
 /** Reddit sometimes returns counts as strings; treat any finite number ≥ 1 as valid. */
@@ -327,10 +491,7 @@ app.post('/internal/menu/post-create', async (req, res) => {
     try {
         const input = (req.body ?? {}) as Partial<MenuItemRequest>;
         const targetId = typeof input.targetId === 'string' ? input.targetId : '';
-        const subredditInfo = targetId.startsWith('t5_')
-            ? await reddit.getSubredditInfoById(targetId as `t5_${string}`)
-            : null;
-        const subredditName = subredditInfo?.name || context.subredditName || null;
+        const subredditName = await resolveMenuTargetSubredditName(targetId);
 
         if (!subredditName) {
             res.json({
@@ -343,25 +504,16 @@ app.post('/internal/menu/post-create', async (req, res) => {
         }
 
         const challenge = await getServerDailyGpChallenge();
-        const post = await reddit.submitCustomPost({
+        const post = await submitDailyMiniRacerPost(subredditName, challenge);
+        await upsertDailyAutopostSubscription(subredditName, (previous) => ({
             subredditName,
-            title: 'Mini Racer',
-            entry: 'default',
-            postData: {
-                challengeId: challenge.id,
-            },
-            textFallback: {
-                text: [
-                    '# Mini Racer',
-                    '',
-                    'Playable Reddit racing challenge.',
-                    '',
-                    '- One featured event at a time',
-                    '- Fast retries',
-                    '- Personal best plus live leaderboard'
-                ].join('\n')
-            }
-        });
+            enabled: previous?.enabled ?? false,
+            enabledAt: previous?.enabledAt ?? null,
+            updatedAt: new Date().toISOString(),
+            lastPostedChallengeId: challenge.id,
+            lastPostedAt: new Date().toISOString(),
+            lastPostUrl: post.url,
+        }));
 
         res.json({
             navigateTo: post.url
@@ -377,6 +529,133 @@ app.post('/internal/menu/post-create', async (req, res) => {
                 appearance: 'neutral'
             }
         });
+    }
+});
+
+app.post('/internal/menu/post-enable-daily', async (req, res) => {
+    try {
+        const input = (req.body ?? {}) as Partial<MenuItemRequest>;
+        const targetId = typeof input.targetId === 'string' ? input.targetId : '';
+        const subredditName = await resolveMenuTargetSubredditName(targetId);
+
+        if (!subredditName) {
+            res.json({
+                showToast: {
+                    text: 'Reddit did not provide a subreddit context for this install.',
+                    appearance: 'neutral',
+                },
+            });
+            return;
+        }
+
+        await upsertDailyAutopostSubscription(subredditName, (previous) => ({
+            subredditName,
+            enabled: true,
+            enabledAt: previous?.enabledAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastPostedChallengeId: previous?.lastPostedChallengeId ?? null,
+            lastPostedAt: previous?.lastPostedAt ?? null,
+            lastPostUrl: previous?.lastPostUrl ?? null,
+        }));
+
+        const challenge = await getServerDailyGpChallenge();
+        const result = await ensureDailyMiniRacerPostForSubreddit(subredditName, challenge);
+
+        res.json({
+            showToast: {
+                text: result.created
+                    ? `Daily Mini Racer posts enabled for r/${subredditName}. Today's post is live.`
+                    : `Daily Mini Racer posts enabled for r/${subredditName}. Today's post already exists.`,
+                appearance: 'success',
+            },
+            ...(result.created && result.postUrl ? { navigateTo: result.postUrl } : {}),
+        });
+    } catch (error) {
+        console.error('Failed to enable daily Mini Racer posts:', error);
+        const message = error instanceof Error && error.message
+            ? error.message
+            : 'Unknown error';
+        res.json({
+            showToast: {
+                text: `Could not enable daily Mini Racer posts: ${message}`,
+                appearance: 'neutral',
+            },
+        });
+    }
+});
+
+app.post('/internal/menu/post-disable-daily', async (req, res) => {
+    try {
+        const input = (req.body ?? {}) as Partial<MenuItemRequest>;
+        const targetId = typeof input.targetId === 'string' ? input.targetId : '';
+        const subredditName = await resolveMenuTargetSubredditName(targetId);
+
+        if (!subredditName) {
+            res.json({
+                showToast: {
+                    text: 'Reddit did not provide a subreddit context for this install.',
+                    appearance: 'neutral',
+                },
+            });
+            return;
+        }
+
+        await deleteDailyAutopostSubscription(subredditName);
+        res.json({
+            showToast: {
+                text: `Daily Mini Racer posts disabled for r/${subredditName}.`,
+                appearance: 'success',
+            },
+        });
+    } catch (error) {
+        console.error('Failed to disable daily Mini Racer posts:', error);
+        const message = error instanceof Error && error.message
+            ? error.message
+            : 'Unknown error';
+        res.json({
+            showToast: {
+                text: `Could not disable daily Mini Racer posts: ${message}`,
+                appearance: 'neutral',
+            },
+        });
+    }
+});
+
+app.post('/internal/scheduler/daily-posts', async (_req, res) => {
+    try {
+        const challenge = await getServerDailyGpChallenge();
+        const subscriptions = await readAllDailyAutopostSubscriptions();
+        let createdCount = 0;
+
+        for (const subscription of subscriptions) {
+            if (!subscription.enabled) {
+                continue;
+            }
+
+            try {
+                const result = await ensureDailyMiniRacerPostForSubreddit(
+                    subscription.subredditName,
+                    challenge,
+                );
+                if (result.created) {
+                    createdCount += 1;
+                }
+            } catch (error) {
+                console.error(
+                    `Failed scheduled Mini Racer post for r/${subscription.subredditName}:`,
+                    error,
+                );
+            }
+        }
+
+        res.status(200).json({
+            ok: true,
+            challengeId: challenge.id,
+            createdCount,
+        });
+    } catch (error) {
+        console.error('Failed scheduled Mini Racer daily post run:', error);
+        res.status(500).json({ ok: false, error: 'Scheduled daily post run failed' });
     }
 });
 

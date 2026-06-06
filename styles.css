@@ -1224,7 +1224,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-moda
 }
 
 #garage-modal .leaderboard-hero-track {
-    font-size: 2rem;
+    font-size: 1.75rem;
 }
 
 #garage-modal .garage-tabs {
@@ -1673,7 +1673,8 @@ body.start-selection-active #start-overlay {
 }
 
 #modal.modal--pause .pause-results-header {
-    display: grid;
+    display: flex;
+    flex-direction: row-reverse;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 0.9rem;
     align-items: start;
@@ -1702,7 +1703,7 @@ body.start-selection-active #start-overlay {
 .pause-race-stats {
     display: flex;
     align-items: flex-start;
-    justify-content: flex-start;
+    justify-content: center;
     width: 100%;
     min-width: 0;
 }
@@ -1765,6 +1766,7 @@ body.start-selection-active #start-overlay {
     line-height: 1.2;
     min-width: 0;
     margin: 0;
+    text-align: center;
 }
 
 #modal-pause-track-preview {
@@ -2287,7 +2289,7 @@ body.start-selection-active #start-overlay {
 }
 
 #settings-modal .leaderboard-hero-track {
-    font-size: 1.85rem;
+    font-size: 1.75rem;
     margin-bottom: 0.15rem;
     font-family: var(--header-font);
     font-weight: 900;
@@ -2535,6 +2537,21 @@ body.start-selection-active #start-overlay {
 }
 
 .daily-leaderboard-track-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.daily-leaderboard-track-main {
+    display: grid;
+    grid-template-columns: 3.1rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
     padding: 0;
     border: none;
     background: transparent;
@@ -2544,8 +2561,8 @@ body.start-selection-active #start-overlay {
     cursor: pointer;
 }
 
-.daily-leaderboard-track-row:hover .daily-playlist-title,
-.daily-leaderboard-track-row:focus-visible .daily-playlist-title {
+.daily-leaderboard-track-main:hover .daily-playlist-title,
+.daily-leaderboard-track-main:focus-visible .daily-playlist-title {
     color: var(--accent-color);
 }
 
@@ -2644,6 +2661,19 @@ body.start-selection-active #start-overlay {
     text-align: right;
 }
 
+.daily-leaderboard-best-time {
+    display: block;
+    margin-top: 0.35rem;
+    margin-left: 0;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.76rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-align: left;
+}
+
 .daily-playlist-actions {
     display: flex;
     align-items: center;
@@ -2687,7 +2717,15 @@ body.start-selection-active #start-overlay {
 }
 
 .daily-leaderboard-rank-value {
+    align-self: center;
+    width: 3.1rem;
+    min-width: 3.1rem;
+    height: 2.35rem;
     pointer-events: none;
+}
+
+.daily-playlist-start-btn.daily-leaderboard-improve-btn {
+    min-width: 6.15rem;
 }
 
 .daily-playlist-start-btn {
@@ -2761,6 +2799,11 @@ body.start-selection-active #start-overlay {
         height: 3rem;
     }
 
+    .daily-leaderboard-track-main {
+        grid-template-columns: 2.25rem minmax(0, 1fr);
+        gap: 0.5rem;
+    }
+
     .daily-playlist-title {
         line-height: 1.05;
     }
@@ -2781,6 +2824,28 @@ body.start-selection-active #start-overlay {
     .daily-playlist-rank-btn {
         font-size: 1.05rem;
         padding: 0 0.3rem;
+    }
+
+    .daily-leaderboard-rank-value {
+        width: 2.25rem;
+        min-width: 2.25rem;
+        height: 2.15rem;
+    }
+
+    .daily-leaderboard-track-row {
+        grid-template-columns: minmax(0, 1fr) 5.6rem;
+        column-gap: 0.5rem;
+    }
+
+    .daily-leaderboard-track-row .daily-playlist-copy {
+        max-width: none;
+    }
+
+    .daily-playlist-start-btn.daily-leaderboard-improve-btn {
+        width: 5.6rem;
+        min-width: 5.6rem;
+        padding: 0 0.35rem;
+        font-size: 0.66rem;
     }
 }
 
@@ -2880,13 +2945,13 @@ body.start-selection-active #start-overlay {
     flex: 1 1 auto;
     min-width: 0;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: flex-end;
     gap: 0.25rem;
-    text-align: left;
+    text-align: right;
 }
 
 .reusable-modal-heading .leaderboard-hero-track {
-    text-align: left;
+    text-align: right;
 }
 
 .reusable-modal-content {
@@ -2902,11 +2967,11 @@ body.start-selection-active #start-overlay {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: auto;
+    width: 3.1rem;
     height: 3.1rem;
-    min-width: 5.4rem;
+    min-width: 3.1rem;
     min-height: 3.1rem;
-    padding: 0 0.85rem;
+    padding: 0;
     border: none;
     border-radius: var(--radius-full);
     background: transparent;
@@ -3045,7 +3110,7 @@ body.start-selection-active #start-overlay {
 .leaderboard-hero-track {
     width: 100%;
     font-family: var(--header-font);
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: 900;
     font-style: italic;
     line-height: 1;

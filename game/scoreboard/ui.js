@@ -13,6 +13,7 @@ export class LeaderboardsUi {
     constructor({
         showRunsModal,
         dailyChallengeUi,
+        onStartDailyChallenge = null,
         getCachedTrackCardScoreboardSnapshot = () => null,
         getScoreboardSnapshot: loadScoreboardSnapshot = getScoreboardSnapshot,
         isRunsViewActive = () => true,
@@ -20,6 +21,7 @@ export class LeaderboardsUi {
     } = {}) {
         this.showRunsModal = showRunsModal;
         this.dailyChallengeUi = dailyChallengeUi;
+        this.onStartDailyChallenge = onStartDailyChallenge;
         this.getCachedTrackCardScoreboardSnapshot = getCachedTrackCardScoreboardSnapshot;
         this.loadScoreboardSnapshot = loadScoreboardSnapshot;
         this.isRunsViewActive = isRunsViewActive;
@@ -128,6 +130,9 @@ export class LeaderboardsUi {
         let loadedChallenges = getCachedDailyChallengePlaylist();
         let currentRows = [];
         const actions = {
+            onPlay: (challenge) => {
+                this.onStartDailyChallenge?.(challenge);
+            },
             onTrack: (challenge) => {
                 void this.openDailyChallengeLeaderboardForChallenge(challenge, 'close', {
                     onClose: () => {

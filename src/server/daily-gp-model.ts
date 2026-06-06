@@ -1,4 +1,5 @@
 import { TRACKS } from '../../game/track/tracks.js';
+import { getDailyGpScheduledTrackPoolForDayIndex } from '../../game/shared/daily-gp-track-schedule.js';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
@@ -30,6 +31,7 @@ export type DailyGpChallenge = {
 
 export type DailyGpLeaderboardEntry = {
     playerId: string;
+    trackKey: string;
     bestTimeMs: number;
     updatedAt: string;
     completedLaps: null;
@@ -80,7 +82,8 @@ export function createDailyChallengeId(challengeDate: string): string {
 }
 
 export function getDailyGpTrackKeyForDayIndex(dayIndex: number): string {
-    const trackKeys = SUPPORTED_TRACK_KEYS.length ? SUPPORTED_TRACK_KEYS : ['circuit'];
+    const scheduledTrackKeys = getDailyGpScheduledTrackPoolForDayIndex(dayIndex, SUPPORTED_TRACK_KEYS);
+    const trackKeys = scheduledTrackKeys.length ? scheduledTrackKeys : ['circuit'];
     const step = getStepForTrackCount(trackKeys.length);
     const index = Math.abs(dayIndex * step) % trackKeys.length;
     return trackKeys[index] || 'circuit';

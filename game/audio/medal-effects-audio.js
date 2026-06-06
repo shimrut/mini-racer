@@ -8,6 +8,12 @@ export function userGesturePrepareMedalEffects() {
 }
 
 export function createMedalEffectsAudio(externalCtx, externalOutput) {
+    const activeNodes = new Set();
+    function keepAlive(node) {
+        activeNodes.add(node);
+        node.onended = () => activeNodes.delete(node);
+    }
+
     let ctx = null;
     let masterGain = null;
     let graphBuilt = false;
@@ -84,6 +90,7 @@ export function createMedalEffectsAudio(externalCtx, externalOutput) {
 
             osc.connect(g);
             g.connect(masterGain);
+            keepAlive(osc);
             osc.start(t);
             osc.stop(t + 1.0);
 
@@ -98,6 +105,7 @@ export function createMedalEffectsAudio(externalCtx, externalOutput) {
                 chimeG.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
                 chime.connect(chimeG);
                 chimeG.connect(masterGain);
+                keepAlive(chime);
                 chime.start(t + 0.02);
                 chime.stop(t + 0.5);
             }

@@ -94,7 +94,10 @@ function normalizeLimit(limit: unknown): number {
     return Math.min(Math.max(Math.trunc(Number(limit)), 1), 100);
 }
 
-function parseStoredEntry(raw: string | null | undefined): DailyGpLeaderboardEntry | null {
+function parseStoredEntry(
+    raw: string | null | undefined,
+    expectedTrackKey?: string,
+): DailyGpLeaderboardEntry | null {
     if (!raw) return null;
 
     try {
@@ -111,6 +114,13 @@ function parseStoredEntry(raw: string | null | undefined): DailyGpLeaderboardEnt
             return null;
         }
 
+        const parsedTrackKey = typeof parsed.trackKey === 'string' && parsed.trackKey
+            ? parsed.trackKey
+            : null;
+        if (expectedTrackKey && parsedTrackKey && parsedTrackKey !== expectedTrackKey) {
+            return null;
+        }
+
         const bestTimeMs = Number(parsed.bestTimeMs);
         const checkpointTimesSec = normalizeCheckpointTimesSec(
             bestTimeMs / 1000,
@@ -119,6 +129,7 @@ function parseStoredEntry(raw: string | null | undefined): DailyGpLeaderboardEnt
 
     return {
         playerId: parsed.playerId,
+        trackKey: parsedTrackKey || expectedTrackKey || '',
         bestTimeMs,
         updatedAt: parsed.updatedAt,
         completedLaps: null,
@@ -284,6 +295,7 @@ function toSnapshotRow(
 
 async function readRowsByRankRange(
     challengeId: string,
+    trackKey: string,
     start: number,
     stop: number,
     currentPlayerId: string | null,
@@ -309,7 +321,7 @@ async function readRowsByRankRange(
 
     return rankedMembers
         .map((member, index) => {
-            const storedEntry = parseStoredEntry(rawEntries[index]);
+            const storedEntry = parseStoredEntry(rawEntries[index], trackKey);
             if (!storedEntry) return null;
             return toSnapshotRow(storedEntry, start + index + 1, currentPlayerId, profileMap);
         })
@@ -318,10 +330,11 @@ async function readRowsByRankRange(
 
 async function readEntryByPlayerId(
     challengeId: string,
+    trackKey: string,
     playerId: string,
 ): Promise<DailyGpLeaderboardEntry | null> {
     const rawEntry = await redis.hGet(createRedisChallengeEntryHashKey(challengeId), playerId);
-    return parseStoredEntry(rawEntry);
+    return parseStoredEntry(rawEntry, trackKey);
 }
 
 async function ensureLeaderboardTtl(challengeId: string): Promise<void> {
@@ -532,7 +545,7 @@ export async function getServerDailyGpSnapshot({
         });
     }
     const topRows = leaderboardEntryCount
-        ? await readRowsByRankRange(challenge.id, 0, safeLimit - 1, normalizedPlayerId)
+        ? await readRowsByRankRange(challenge.id, challenge.trackKey, 0, safeLimit - 1, normalizedPlayerId)
         : [];
     const playerRankZeroBased = normalizedPlayerId && leaderboardEntryCount
         ? await redis.zRank(leaderboardKey, normalizedPlayerId)
@@ -563,7 +576,7 @@ export async function getServerDailyGpSnapshot({
 
     let currentPlayerRow: SnapshotRow | null = null;
     if (normalizedPlayerId && playerRank) {
-        const storedEntry = await readEntryByPlayerId(challenge.id, normalizedPlayerId);
+        const storedEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
         if (storedEntry) {
             const profileMap = await readPlayerProfileMap([normalizedPlayerId]);
             currentPlayerRow = toSnapshotRow(storedEntry, playerRank, normalizedPlayerId, profileMap);
@@ -575,7 +588,13 @@ export async function getServerDailyGpSnapshot({
     if (playerRank && playerRank > safeLimit && leaderboardEntryCount) {
         const nearbyStart = Math.max(0, playerRank - DAILY_GP_NEARBY_RADIUS - 1);
         const nearbyStop = nearbyStart + (DAILY_GP_NEARBY_RADIUS * 2);
-        nearbyRows = await readRowsByRankRange(challenge.id, nearbyStart, nearbyStop, normalizedPlayerId);
+        nearbyRows = await readRowsByRankRange(
+            challenge.id,
+            challenge.trackKey,
+            nearbyStart,
+            nearbyStop,
+            normalizedPlayerId,
+        );
     }
 
     return {
@@ -691,7 +710,7 @@ export async function submitServerDailyGpRun({
     const nextBestTimeMs = strictReplayPassed
         ? strictReplayOutcome.run.bestTimeMs
         : basicValidation.bestTimeMs;
-    const previousEntry = await readEntryByPlayerId(challenge.id, normalizedPlayerId);
+    const previousEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
     if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
         return {
             status: 200,
@@ -711,6 +730,7 @@ export async function submitServerDailyGpRun({
 
     const nextEntry: DailyGpLeaderboardEntry = {
         playerId: normalizedPlayerId,
+        trackKey: challenge.trackKey,
         bestTimeMs: nextBestTimeMs,
         updatedAt: new Date().toISOString(),
         completedLaps: null,

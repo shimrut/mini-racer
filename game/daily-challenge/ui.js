@@ -323,13 +323,6 @@ export class DailyChallengeUi {
             const pendingEntry = getDailyChallengeVerificationEntry(challenge.id);
             const isPending = getDailyChallengeVerificationState(challenge.id) === 'pending'
                 && pendingEntry;
-            const bestLabel = isPending
-                ? formatDailyChallengeBestLabel(
-                    challenge.objectiveType,
-                    pendingEntry.bestTime,
-                    pendingEntry.completedLaps
-                )
-                : getDailyChallengeBestDisplay(challenge);
             const best = document.createElement('span');
             best.className = 'daily-playlist-metric daily-playlist-metric--best';
 
@@ -349,12 +342,6 @@ export class DailyChallengeUi {
                 }
                 best.appendChild(medals);
             }
-
-            const bestTime = document.createElement('span');
-            bestTime.className = 'daily-playlist-best-time';
-            const timeText = document.createTextNode(bestLabel && bestLabel !== '--' ? bestLabel : '--');
-            bestTime.appendChild(timeText);
-            best.appendChild(bestTime);
 
             if (isPending) {
                 best.setAttribute('aria-label', 'Pending best time verification');
@@ -407,7 +394,7 @@ export class DailyChallengeUi {
         document.body.classList.add('modal-open');
         scheduleAfterModalPaint(() => {
             this.renderLeaderboardTracks(trackRows, actions);
-            const firstTrack = modal.querySelector('.daily-leaderboard-track-row');
+            const firstTrack = modal.querySelector('.daily-leaderboard-track-main');
             if (firstTrack instanceof HTMLButtonElement) {
                 firstTrack.focus();
             } else {
@@ -421,6 +408,7 @@ export class DailyChallengeUi {
         if (!list) return;
         list.replaceChildren();
         const onTrack = actions?.onTrack;
+        const onPlay = actions?.onPlay;
 
         if (trackRows === null) {
             const loading = document.createElement('div');
@@ -443,20 +431,17 @@ export class DailyChallengeUi {
 
         for (const rowData of rows) {
             const track = TRACKS[rowData.trackKey];
-            const row = document.createElement('button');
+            const challenge = rowData.challenge || rowData;
+            const row = document.createElement('div');
             row.className = 'daily-playlist-row daily-leaderboard-track-row';
-            row.type = 'button';
-            row.setAttribute('aria-label', `Open leaderboard for ${track.name}`);
-            row.addEventListener('click', () => {
+            const trackMain = document.createElement('button');
+            trackMain.className = 'daily-leaderboard-track-main';
+            trackMain.type = 'button';
+            trackMain.setAttribute('aria-label', `Open leaderboard for ${track.name}`);
+            trackMain.addEventListener('click', () => {
                 this.closePlaylistModal();
-                onTrack?.(rowData.challenge || rowData);
+                onTrack?.(challenge);
             });
-
-            const canvas = document.createElement('canvas');
-            canvas.className = 'daily-playlist-preview';
-            canvas.width = 176;
-            canvas.height = 108;
-            canvas.setAttribute('aria-hidden', 'true');
 
             const copy = document.createElement('div');
             copy.className = 'daily-playlist-copy';
@@ -467,7 +452,10 @@ export class DailyChallengeUi {
             title.className = 'daily-playlist-title';
             title.textContent = track.name;
             titleRow.append(title);
-            copy.append(titleRow);
+            const bestTime = document.createElement('span');
+            bestTime.className = 'daily-playlist-best-time daily-leaderboard-best-time';
+            bestTime.textContent = getDailyChallengeBestDisplay(challenge) || '--';
+            copy.append(titleRow, bestTime);
 
             const rank = document.createElement('span');
             rank.className = 'daily-playlist-rank-btn daily-leaderboard-rank-value';
@@ -475,14 +463,23 @@ export class DailyChallengeUi {
 
             const actionsWrap = document.createElement('div');
             actionsWrap.className = 'daily-playlist-actions';
-            actionsWrap.append(rank);
-
-            row.append(canvas, copy, actionsWrap);
-            list.appendChild(row);
-            this.renderPlaylistPreview(canvas, {
-                trackKey: rowData.trackKey,
-                skin: rowData.skin
+            const improve = document.createElement('button');
+            improve.className = 'daily-playlist-start-btn daily-leaderboard-improve-btn';
+            if (challenge.id !== this._dailyChallengeSummary?.challengeId) {
+                improve.classList.add('daily-playlist-start-btn--secondary');
+            }
+            improve.type = 'button';
+            improve.textContent = 'IMPROVE';
+            improve.setAttribute('aria-label', `Improve ${track.name}`);
+            improve.addEventListener('click', () => {
+                this.closePlaylistModal();
+                onPlay?.(challenge);
             });
+            actionsWrap.append(improve);
+
+            trackMain.append(rank, copy);
+            row.append(trackMain, actionsWrap);
+            list.appendChild(row);
         }
     }
 

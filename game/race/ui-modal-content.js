@@ -7,6 +7,13 @@ import { formatSplitTimeDeltaSec } from '../race/lap-speed.js?v=2.09';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
+function getFinitePositiveRank(value) {
+    const rank = Number(value);
+    return Number.isFinite(rank) && rank > 0
+        ? rank
+        : null;
+}
+
 export function bindPopoverOverlayEscapeDismiss(onDismiss) {
     if (typeof document === 'undefined') return () => {};
 
@@ -413,7 +420,7 @@ export class ModalContentUi {
     const nearbyRows = Array.isArray(scoreboardSnapshot?.nearbyRows)
         ? scoreboardSnapshot.nearbyRows
         : [];
-    const snapshotRank = Number(scoreboardSnapshot?.playerRank);
+    const snapshotRank = getFinitePositiveRank(scoreboardSnapshot?.playerRank);
     const snapshotRankLabel = scoreboardSnapshot?.playerRankLabel != null
         ? String(scoreboardSnapshot.playerRankLabel)
         : null;
@@ -421,18 +428,18 @@ export class ModalContentUi {
         ? {
             ...scoreboardSnapshot.currentPlayerRow,
             displayName: scoreboardSnapshot.currentPlayerRow.displayName
-                || (scoreboardSnapshot.currentPlayerRow.isCurrentPlayer || Number.isFinite(snapshotRank) || snapshotRankLabel
+                || (scoreboardSnapshot.currentPlayerRow.isCurrentPlayer || snapshotRank !== null || snapshotRankLabel
                     ? 'You'
                     : scoreboardSnapshot.currentPlayerRow.displayName),
             rank: Number.isFinite(scoreboardSnapshot.currentPlayerRow.rank)
                 ? scoreboardSnapshot.currentPlayerRow.rank
-                : (Number.isFinite(snapshotRank) ? snapshotRank : scoreboardSnapshot.currentPlayerRow.rank),
+                : (snapshotRank !== null ? snapshotRank : scoreboardSnapshot.currentPlayerRow.rank),
             rankLabel: scoreboardSnapshot.currentPlayerRow.rankLabel || snapshotRankLabel,
         }
-        : (Number.isFinite(snapshotRank) || snapshotRankLabel
+        : (snapshotRank !== null || snapshotRankLabel
             ? {
                 isCurrentPlayer: true,
-                rank: Number.isFinite(snapshotRank) ? snapshotRank : null,
+                rank: snapshotRank,
                 rankLabel: snapshotRankLabel,
                 displayName: 'You',
             }

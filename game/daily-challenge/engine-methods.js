@@ -229,7 +229,7 @@ export const dailyChallengeEngineMethods = {
     }
   },
 
-  async refreshDailyChallengeSummary() {
+  async refreshDailyChallengeSummary({ forceRefresh = false } = {}) {
     const challenge = this.currentDailyChallenge || this.activeDailyChallenge;
     if (!challenge) {
       this.dailyChallengeUi.setDailyChallengeSummary(null);
@@ -244,9 +244,15 @@ export const dailyChallengeEngineMethods = {
     this.bestLapTime = Number.isFinite(localData?.bestTime)
       ? localData.bestTime
       : null;
+    if (forceRefresh) {
+      invalidateDailyChallengeSnapshot(challenge.id);
+    }
     let snapshot = null;
     try {
-      snapshot = await getDailyChallengeSnapshot({ challengeId: challenge.id });
+      snapshot = await getDailyChallengeSnapshot({
+        challengeId: challenge.id,
+        forceRefresh,
+      });
     } catch (error) {
       console.error("Error loading daily challenge snapshot:", error);
     }

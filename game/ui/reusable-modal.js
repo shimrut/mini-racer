@@ -1,14 +1,22 @@
 const ACTIVE_MODAL_SELECTOR = '.modal.active[data-reusable-modal]';
 const CLOSE_SELECTOR = '[data-modal-close]';
-const MODAL_CLOSE_LABEL_CLASS = 'reusable-modal-close__label';
+const MODAL_CLOSE_ICON_CLASS = 'reusable-modal-close__icon';
+const BACK_ICON_PATH = 'M576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320zM188.7 308.7L292.7 204.7C297.3 200.1 304.2 198.8 310.1 201.2C316 203.6 320 209.5 320 216L320 272L416 272C433.7 272 448 286.3 448 304L448 336C448 353.7 433.7 368 416 368L320 368L320 424C320 430.5 316.1 436.3 310.1 438.8C304.1 441.3 297.2 439.9 292.7 435.3L188.7 331.3C182.5 325.1 182.5 314.9 188.7 308.7z';
 
 export function applyModalCloseButton(closeEl, ariaLabel = 'Close') {
     if (!closeEl) return;
     closeEl.setAttribute('aria-label', ariaLabel);
-    const label = document.createElement('span');
-    label.className = MODAL_CLOSE_LABEL_CLASS;
-    label.textContent = ariaLabel;
-    closeEl.replaceChildren(label);
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.classList.add(MODAL_CLOSE_ICON_CLASS);
+    icon.setAttribute('viewBox', '0 0 640 640');
+    icon.setAttribute('fill', 'currentColor');
+    icon.setAttribute('aria-hidden', 'true');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', BACK_ICON_PATH);
+    icon.appendChild(path);
+
+    closeEl.replaceChildren(icon);
 }
 
 const closeHandlers = new WeakMap();

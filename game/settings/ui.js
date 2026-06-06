@@ -41,12 +41,13 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
-    constructor({ modal, onCrashAutoRestartChanged, onCrashRestartDelayChanged, onCarAudioChanged, onMusicChanged } = {}) {
+    constructor({ modal, onCrashAutoRestartChanged, onCrashRestartDelayChanged, onCarAudioChanged, onMusicChanged, onLeaderboardIdentityChanged } = {}) {
         this.modal = modal;
         this.onCrashAutoRestartChanged = onCrashAutoRestartChanged;
         this.onCrashRestartDelayChanged = onCrashRestartDelayChanged;
         this.onCarAudioChanged = onCarAudioChanged;
         this.onMusicChanged = onMusicChanged;
+        this.onLeaderboardIdentityChanged = onLeaderboardIdentityChanged;
         this.identityBootstrap = null;
         this.bindEvents();
         this.refreshIdentityPanel();
@@ -214,7 +215,7 @@ export class SettingsUi {
             this.redditIdentitySwitch.checked = isReddit;
         }
         if (this.redditHeading) {
-            this.redditHeading.textContent = `Reddit Username: ${isReddit ? 'On' : 'Off'}`;
+            this.redditHeading.textContent = `Username: ${isReddit ? 'On' : 'Off'}`;
         }
         if (this.identityDesc) {
             if (isReddit && safeReddit) {
@@ -267,6 +268,7 @@ export class SettingsUi {
         }
 
         this.refreshIdentityPanel();
+        await this.onLeaderboardIdentityChanged?.(normalizedNextPreference);
     }
 
     refreshCarAudioPanel() {

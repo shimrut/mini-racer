@@ -60,7 +60,6 @@ export class TrackLayerRenderer {
       this.ctx =
         this.canvas?.getContext("2d", {
           alpha: false,
-          desynchronized: true,
         }) ||
         this.canvas?.getContext("2d") ||
         null;
@@ -100,7 +99,6 @@ export class TrackLayerRenderer {
       this.ctx =
         this.canvas?.getContext("2d", {
           alpha: false,
-          desynchronized: true,
         }) ||
         this.canvas?.getContext("2d") ||
         null;

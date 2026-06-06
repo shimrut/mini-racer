@@ -41,6 +41,12 @@ function makeDistortionCurve(amount) {
  * slip screech, and light bus compression. Ducked when disabled / paused / hidden tab.
  */
 export function createCarEffectsAudio(externalCtx, externalOutput) {
+    const activeNodes = new Set();
+    function keepAlive(node) {
+        activeNodes.add(node);
+        node.onended = () => activeNodes.delete(node);
+    }
+
     let ctx = null;
     let masterGain = null;
     let compressor = null;
@@ -344,6 +350,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 thudG.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
                 thud.connect(thudG);
                 thudG.connect(masterGain);
+                keepAlive(thud);
                 thud.start(t);
                 thud.stop(t + 0.12);
                 return;
@@ -363,6 +370,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             kickG.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
             kick.connect(kickG);
             kickG.connect(masterGain);
+            keepAlive(kick);
             kick.start(t);
             kick.stop(t + 0.5);
 
@@ -394,6 +402,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             lowpass.connect(distortion);
             distortion.connect(rumbleG);
             rumbleG.connect(masterGain);
+            keepAlive(rumbleSrc);
             rumbleSrc.start(t);
             rumbleSrc.stop(t + 1.0);
 
@@ -408,6 +417,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             infraG.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
             infra.connect(infraG);
             infraG.connect(masterGain);
+            keepAlive(infra);
             infra.start(t);
             infra.stop(t + 1.0);
         },
@@ -433,6 +443,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             osc.connect(g);
             g.connect(masterGain);
 
+            keepAlive(osc);
             osc.start(t);
             osc.stop(t + 0.15);
         },
@@ -458,6 +469,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             osc.connect(g);
             g.connect(masterGain);
 
+            keepAlive(osc);
             osc.start(t);
             osc.stop(t + 0.5);
         },

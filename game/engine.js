@@ -53,7 +53,7 @@ export class RealTimeRacer {
     this.canvas = document.getElementById("gameCanvas");
     this.setLoadingStatus(10, "Initializing Engine...");
     this.ctx =
-      this.canvas.getContext("2d", { alpha: true, desynchronized: true }) ||
+      this.canvas.getContext("2d", { alpha: true }) ||
       this.canvas.getContext("2d");
     this.container = document.getElementById("game-container");
     this.isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
@@ -224,6 +224,9 @@ export class RealTimeRacer {
     this.leaderboards = new LeaderboardsUi({
       showRunsModal: (...args) => this.modal.showRunsModal(...args),
       dailyChallengeUi: this.dailyChallengeUi,
+      onStartDailyChallenge: (challenge) => {
+        void this.handleStartDailyChallenge(challenge);
+      },
       isRunsViewActive: () => this.modal.isRunsViewActive?.(),
       updateModalScoreboardSnapshot: (snapshot) => this.modal.updateModalScoreboardSnapshot?.(snapshot),
     });
@@ -259,6 +262,9 @@ export class RealTimeRacer {
           speed: this.cachedSpeed,
           maxSpeedKph: this.runtimeConfig.maxSpeed,
         });
+      },
+      onLeaderboardIdentityChanged: async () => {
+        await this.refreshDailyChallengeSummary({ forceRefresh: true });
       },
     });
     this.garage = new GarageUi({

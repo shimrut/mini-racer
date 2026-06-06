@@ -9,6 +9,7 @@ import {
 import {
     getLeaderboardIdentityPreference,
 } from '../scoreboard/display-preference.js?v=2.09';
+import { getDailyGpScheduledTrackPoolForDayIndex } from '../shared/daily-gp-track-schedule.js?v=2.09';
 import {
     getDailyChallengeData,
     setDailyChallengeBestTime,
@@ -20,6 +21,7 @@ const DEFAULT_DAILY_LIMIT = 10;
 const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
 const DAILY_PLAYLIST_CACHE_KEY = 'VectorGpDailyChallengePlaylistCache';
 const DAILY_SNAPSHOT_CACHE_KEY = 'VectorGpDailyChallengeSnapshotCache';
+const DAILY_START_OVERRIDE_KEY = 'VectorGpDailyStartOverride';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_PLAYLIST_DAYS = 7;
 const DAILY_TRACK_STEP_SEED = 17;
@@ -42,7 +44,7 @@ function getMockDailyUrlParams() {
     }
 }
 
-/** Standalone post preview card (`preview.html`) — always use local/mock daily data. */
+/** Standalone local preview card (`preview.html`) — use mock data only outside Reddit hosting. */
 export function isPreviewPage() {
     if (typeof window === 'undefined') return false;
     const path = window.location?.pathname || '';
@@ -67,10 +69,6 @@ function resolveMockDailyTrackKey(params) {
 }
 
 function shouldUseMockDailyChallenge() {
-    if (isPreviewPage()) {
-        return true;
-    }
-
     const params = getMockDailyUrlParams();
     if (params) {
         const mockDaily = params.get('mockDaily');
@@ -163,7 +161,10 @@ function getStepForTrackCount(trackCount) {
 }
 
 function getDailyTrackKeyForDayIndex(dayIndex) {
-    const trackKeys = Object.keys(TRACKS);
+    const trackKeys = getDailyGpScheduledTrackPoolForDayIndex(
+        dayIndex,
+        Object.keys(TRACKS),
+    );
     const step = getStepForTrackCount(trackKeys.length);
     const index = Math.abs(dayIndex * step) % trackKeys.length;
     return trackKeys[index] || 'circuit';
@@ -185,6 +186,30 @@ function buildLocalDailyChallenge(date = new Date()) {
         objectiveParams: {},
         skin: 'default'
     });
+}
+
+function buildLocalDailyChallengeById(challengeId) {
+    if (typeof challengeId !== 'string') return null;
+    const match = /^daily-gp-(\d{4}-\d{2}-\d{2})$/.exec(challengeId);
+    if (!match) return null;
+    const date = new Date(`${match[1]}T00:00:00.000Z`);
+    if (!Number.isFinite(date.getTime())) return null;
+    return buildLocalDailyChallenge(date);
+}
+
+function readDevvitPostData() {
+    const postData = globalThis?.devvit?.context?.postData;
+    return postData && typeof postData === 'object' ? postData : null;
+}
+
+function getPostBoundDailyChallengeFromContext() {
+    const postData = readDevvitPostData();
+    if (!postData) return null;
+
+    const challenge = normalizeDailyChallenge(postData.challenge);
+    if (challenge) return challenge;
+
+    return buildLocalDailyChallengeById(postData.challengeId);
 }
 
 function getLocalDailyPlaylist(now = new Date()) {
@@ -233,7 +258,7 @@ function writeActiveDailyCacheStorable(challenge) {
     }
 }
 
-function isCachedChallengeStillActive(challenge) {
+function isCachedActiveChallengeStillCurrent(challenge) {
     if (!challenge?.endsAt || typeof challenge.endsAt !== 'string') return false;
     const endsMs = Date.parse(challenge.endsAt);
     if (!Number.isFinite(endsMs)) return false;
@@ -244,8 +269,55 @@ function getValidCachedActiveDailyChallenge() {
     const stored = readActiveDailyCacheStorable();
     if (!stored?.challenge || typeof stored.challenge !== 'object') return null;
     const challenge = normalizeDailyChallenge(stored.challenge);
-    if (!challenge || !isCachedChallengeStillActive(challenge)) return null;
+    if (!challenge || !isCachedActiveChallengeStillCurrent(challenge)) return null;
+    if (!isChallengeTrackCurrentForSchedule(challenge)) return null;
     return challenge;
+}
+
+function readDailyStartOverride() {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    try {
+        const raw = window.localStorage.getItem(DAILY_START_OVERRIDE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        if (Number.isFinite(parsed.expiresAt) && Date.now() > parsed.expiresAt) {
+            window.localStorage.removeItem(DAILY_START_OVERRIDE_KEY);
+            return null;
+        }
+        return parsed;
+    } catch (error) {
+        console.error('Error reading daily start override:', error);
+        return null;
+    }
+}
+
+function clearDailyStartOverride() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+        window.localStorage.removeItem(DAILY_START_OVERRIDE_KEY);
+    } catch (error) {
+        console.error('Error clearing daily start override:', error);
+    }
+}
+
+export function requestFeaturedDailyChallengeStart() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+        window.localStorage.setItem(
+            DAILY_START_OVERRIDE_KEY,
+            JSON.stringify({
+                mode: 'featured',
+                expiresAt: Date.now() + 5 * 60 * 1000
+            })
+        );
+    } catch (error) {
+        console.error('Error writing daily start override:', error);
+    }
+}
+
+export function getFeaturedDailyChallenge() {
+    return buildLocalDailyChallenge(new Date());
 }
 
 function getDailyChallengeConfig() {
@@ -308,6 +380,12 @@ function isChallengeStillUsable(challenge, nowMs = Date.now()) {
     return Number.isFinite(endsAtMs) ? endsAtMs > nowMs : true;
 }
 
+function isChallengeTrackCurrentForSchedule(challenge) {
+    const expectedChallenge = buildLocalDailyChallengeById(challenge?.id);
+    if (!expectedChallenge) return true;
+    return expectedChallenge.trackKey === challenge.trackKey;
+}
+
 function sortDailyPlaylist(challenges) {
     return cloneDailyPlaylist(challenges)
         .sort((a, b) => {
@@ -324,6 +402,7 @@ function normalizeDailyPlaylistForCache(challenges, nowMs = Date.now()) {
     const byId = new Map();
     for (const challenge of cloneDailyPlaylist(challenges)) {
         if (!isChallengeStillUsable(challenge, nowMs)) continue;
+        if (!isChallengeTrackCurrentForSchedule(challenge)) continue;
         byId.set(challenge.id, challenge);
     }
     return sortDailyPlaylist([...byId.values()]).slice(0, DAILY_PLAYLIST_DAYS);
@@ -820,13 +899,33 @@ export function getDailyChallengeRequiredLaps(challenge) {
     return getObjectiveRequiredLaps(challenge);
 }
 
-export async function getActiveDailyChallenge() {
+export async function getActiveDailyChallenge({ allowExpiredPost = false } = {}) {
     if (shouldUseMockDailyChallenge()) {
         console.log('Using mock daily challenge for local development');
         return getMockDailyChallenge();
     }
 
+    const startOverride = readDailyStartOverride();
+    if (startOverride?.mode === 'featured') {
+        clearDailyStartOverride();
+        const featuredChallenge = buildLocalDailyChallenge(new Date());
+        writeActiveDailyCacheStorable(featuredChallenge);
+        return featuredChallenge;
+    }
+
+    const postChallenge = getPostBoundDailyChallengeFromContext();
+    if (postChallenge) {
+        cacheDailyChallengePlaylist([postChallenge]);
+        if (!allowExpiredPost && !isChallengeStillUsable(postChallenge)) {
+            const featuredChallenge = buildLocalDailyChallenge(new Date());
+            writeActiveDailyCacheStorable(featuredChallenge);
+            return featuredChallenge;
+        }
+        return postChallenge;
+    }
+
     const cachedChallenge = getValidCachedActiveDailyChallenge();
+    if (cachedChallenge) return cachedChallenge;
 
     const config = getDailyChallengeConfig();
     if (!config || typeof fetch !== 'function') return cachedChallenge;

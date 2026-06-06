@@ -291,19 +291,86 @@ export function drawTrackFinishLine(ctx, p1, p2, width, presentation = {}) {
     });
 }
 
-function findClosestPointIndex(points, target) {
-    let minDist = Infinity;
-    let minIndex = 0;
+function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+}
+
+function distanceSq(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return dx * dx + dy * dy;
+}
+
+function findClosestBoundaryPlacement(points, target) {
+    let best = null;
+
     for (let i = 0; i < points.length; i++) {
-        const dx = points[i].x - target.x;
-        const dy = points[i].y - target.y;
-        const dist = dx * dx + dy * dy;
-        if (dist < minDist) {
-            minDist = dist;
-            minIndex = i;
+        const start = points[i];
+        const end = points[(i + 1) % points.length];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq < 1e-9) continue;
+
+        const t = clamp01(((target.x - start.x) * dx + (target.y - start.y) * dy) / lenSq);
+        const point = {
+            x: start.x + dx * t,
+            y: start.y + dy * t
+        };
+        const dist = distanceSq(point, target);
+        if (!best || dist < best.dist) {
+            best = {
+                point,
+                angle: Math.atan2(dy, dx),
+                dist
+            };
         }
     }
-    return minIndex;
+
+    return best || {
+        point: target,
+        angle: 0,
+        dist: 0
+    };
+}
+
+function findCheckpointBoundaryPlacement(points, checkpointStart, checkpointEnd, target) {
+    const lineDx = checkpointEnd.x - checkpointStart.x;
+    const lineDy = checkpointEnd.y - checkpointStart.y;
+    if (lineDx * lineDx + lineDy * lineDy < 1e-9) {
+        return findClosestBoundaryPlacement(points, target);
+    }
+
+    let best = null;
+
+    for (let i = 0; i < points.length; i++) {
+        const start = points[i];
+        const end = points[(i + 1) % points.length];
+        const segmentDx = end.x - start.x;
+        const segmentDy = end.y - start.y;
+        const denominator = lineDx * segmentDy - lineDy * segmentDx;
+        if (Math.abs(denominator) < 1e-9) continue;
+
+        const relX = start.x - checkpointStart.x;
+        const relY = start.y - checkpointStart.y;
+        const segmentT = (relX * lineDy - relY * lineDx) / denominator;
+        if (segmentT < -1e-6 || segmentT > 1 + 1e-6) continue;
+
+        const point = {
+            x: start.x + segmentDx * segmentT,
+            y: start.y + segmentDy * segmentT
+        };
+        const dist = distanceSq(point, target);
+        if (!best || dist < best.dist) {
+            best = {
+                point,
+                angle: Math.atan2(segmentDy, segmentDx),
+                dist
+            };
+        }
+    }
+
+    return best || findClosestBoundaryPlacement(points, target);
 }
 
 export function buildTrackCanvas(track, geometry, presentation = {}) {
@@ -414,20 +481,11 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     if (presentation.showTireWalls !== false) {
         const checkpoints = track.checkpoints || [];
         for (const cp of checkpoints) {
-            const outerIdx = findClosestPointIndex(outer, cp.p1);
-            const innerIdx = findClosestPointIndex(inner, cp.p2);
+            const outerPlacement = findCheckpointBoundaryPlacement(outer, cp.p1, cp.p2, cp.p1);
+            const innerPlacement = findCheckpointBoundaryPlacement(inner, cp.p1, cp.p2, cp.p2);
 
-            const outerPoint = outer[outerIdx];
-            const outerPrev = outer[(outerIdx - 1 + outer.length) % outer.length];
-            const outerNext = outer[(outerIdx + 1) % outer.length];
-            const outerAngle = Math.atan2(outerNext.y - outerPrev.y, outerNext.x - outerPrev.x);
-            drawTireBarrier(ctx, outerPoint.x * gs + offsetX, outerPoint.y * gs + offsetY, outerAngle, presentation);
-
-            const innerPoint = inner[innerIdx];
-            const innerPrev = inner[(innerIdx - 1 + inner.length) % inner.length];
-            const innerNext = inner[(innerIdx + 1) % inner.length];
-            const innerAngle = Math.atan2(innerNext.y - innerPrev.y, innerNext.x - innerPrev.x);
-            drawTireBarrier(ctx, innerPoint.x * gs + offsetX, innerPoint.y * gs + offsetY, innerAngle, presentation);
+            drawTireBarrier(ctx, outerPlacement.point.x * gs + offsetX, outerPlacement.point.y * gs + offsetY, outerPlacement.angle, presentation);
+            drawTireBarrier(ctx, innerPlacement.point.x * gs + offsetX, innerPlacement.point.y * gs + offsetY, innerPlacement.angle, presentation);
         }
     }
 

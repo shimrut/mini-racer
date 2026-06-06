@@ -184,5 +184,95 @@
     "gold": 10.03,
     "silver": 10.35,
     "bronze": 10.72
+  },
+  "sundayMarket": {
+    "author": 11.65,
+    "gold": 11.72,
+    "silver": 11.89,
+    "bronze": 12.02
+  },
+  "ironHook": {
+    "author": 13.80,
+    "gold": 13.98,
+    "silver": 14.21,
+    "bronze": 14.43
+  },
+  "greatBazaar": {
+    "author": 12.02,
+    "gold": 12.31,
+    "silver": 12.56,
+    "bronze": 12.88
+  },
+  "circuitPromax": {
+    "author": 14.77,
+    "gold": 14.91,
+    "silver": 15.19,
+    "bronze": 15.42
+  },
+  "stretchingCat": {
+    "author": 16.25,
+    "gold": 16.47,
+    "silver": 16.81,
+    "bronze": 17.05
+  },
+  "turboShell": {
+    "author": 19.20,
+    "gold": 19.42,
+    "silver": 19.63,
+    "bronze": 19.89
+  },
+  "redLagoon": {
+    "author": 14.95,
+    "gold": 15.12,
+    "silver": 15.38,
+    "bronze": 15.61
+  },
+  "obsidianRidge": {
+    "author": 11.95,
+    "gold": 12.10,
+    "silver": 12.23,
+    "bronze": 12.41
+  },
+  "copperVale": {
+    "author": 11.82,
+    "gold": 11.97,
+    "silver": 12.14,
+    "bronze": 12.33
+  },
+  "auroraRing": {
+    "author": 11.17,
+    "gold": 11.31,
+    "silver": 11.52,
+    "bronze": 11.74
+  },
+  "lanternPier": {
+    "author": 12.05,
+    "gold": 12.27,
+    "silver": 12.43,
+    "bronze": 12.68
+  },
+  "quartzHollow": {
+    "author": 8.72,
+    "gold": 8.85,
+    "silver": 8.99,
+    "bronze": 9.12
+  },
+  "needleChicane": {
+    "author": 12.75,
+    "gold": 12.98,
+    "silver": 13.19,
+    "bronze": 13.47
+  },
+  "cinderSpine": {
+    "author": 14.25,
+    "gold": 14.37,
+    "silver": 14.59,
+    "bronze": 14.84
+  },
+   "glassSerpent": {
+    "author": 17.25,
+    "gold": 17.59,
+    "silver": 17.81,
+    "bronze": 18.09
   }
 }

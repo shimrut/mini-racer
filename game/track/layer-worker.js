@@ -73,7 +73,7 @@ self.onmessage = (event) => {
     switch (data.type) {
     case 'init':
         canvas = data.canvas || null;
-        ctx = canvas?.getContext('2d', { alpha: false, desynchronized: true })
+        ctx = canvas?.getContext('2d', { alpha: false })
             || canvas?.getContext('2d')
             || null;
         viewportWidth = canvas?.width || 0;
