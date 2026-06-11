@@ -6,6 +6,15 @@ const BACK_ICON_PATH = 'M576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 
 export function applyModalCloseButton(closeEl, ariaLabel = 'Close') {
     if (!closeEl) return;
     closeEl.setAttribute('aria-label', ariaLabel);
+
+    if (closeEl.classList.contains('combined-action-btn')) {
+        const span = document.createElement('span');
+        span.classList.add('combined-action-btn-label');
+        span.textContent = ariaLabel;
+        closeEl.replaceChildren(span);
+        return;
+    }
+
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     icon.classList.add(MODAL_CLOSE_ICON_CLASS);
     icon.setAttribute('viewBox', '0 0 640 640');

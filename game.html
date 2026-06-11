@@ -70,7 +70,10 @@
                             <path
                                 d="M353.8 118.1L330.2 70.3C326.3 62 314.1 61.7 309.8 70.3L286.2 118.1L233.9 125.6C224.6 127 220.6 138.5 227.5 145.4L265.5 182.4L256.5 234.5C255.1 243.8 264.7 251 273.3 246.7L320.2 221.9L366.8 246.3C375.4 250.6 385.1 243.4 383.6 234.1L374.6 182L412.6 145.4C419.4 138.6 415.5 127.1 406.2 125.6L353.9 118.1zM288 320C261.5 320 240 341.5 240 368L240 528C240 554.5 261.5 576 288 576L352 576C378.5 576 400 554.5 400 528L400 368C400 341.5 378.5 320 352 320L288 320zM80 384C53.5 384 32 405.5 32 432L32 528C32 554.5 53.5 576 80 576L144 576C170.5 576 192 554.5 192 528L192 432C192 405.5 170.5 384 144 384L80 384zM448 496L448 528C448 554.5 469.5 576 496 576L560 576C586.5 576 608 554.5 608 528L608 496C608 469.5 586.5 448 560 448L496 448C469.5 448 448 469.5 448 496z" />
                         </svg>
-                        <span class="main-menu__label">Leaderboard</span>
+                        <span class="main-menu__text">
+                            <span class="main-menu__label">Leaderboard</span>
+                            <span id="daily-challenge-rank-status" class="main-menu__detail" aria-live="polite" hidden></span>
+                        </span>
                     </button>
                     <button id="daily-challenge-playlist-btn" class="main-menu__item" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" class="main-menu__icon" viewBox="0 0 640 640"
@@ -78,7 +81,7 @@
                             <path
                                 d="M287.9 96L211.7 96C182.3 96 156.6 116.1 149.6 144.6L65.4 484.5C57.9 514.7 80.8 544 112 544L287.9 544L287.9 480C287.9 462.3 302.2 448 319.9 448C337.6 448 351.9 462.3 351.9 480L351.9 544L528 544C559.2 544 582.1 514.7 574.6 484.5L490.5 144.6C483.4 116.1 457.8 96 428.3 96L351.9 96L351.9 160C351.9 177.7 337.6 192 319.9 192C302.2 192 287.9 177.7 287.9 160L287.9 96zM351.9 288L351.9 352C351.9 369.7 337.6 384 319.9 384C302.2 384 287.9 369.7 287.9 352L287.9 288C287.9 270.3 302.2 256 319.9 256C337.6 256 351.9 270.3 351.9 288z" />
                         </svg>
-                        <span class="main-menu__label">Tracks</span>
+                        <span class="main-menu__label">Week</span>
                     </button>
                     <button id="menu-btn-achievements" class="main-menu__item" type="button" hidden>
                         <svg xmlns="http://www.w3.org/2000/svg" class="main-menu__icon" viewBox="0 0 640 640"
@@ -156,81 +159,46 @@
 
         <div id="modal" class="modal result-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
             <div class="modal-card">
-                <div id="modal-main-view" class="modal-view active-view">
-                    <div class="modal-card-section modal-card-section--header">
-                        <h2 id="modal-title">CRASH</h2>
-                        <p id="modal-msg">Terminal Damage</p>
-                        <div id="modal-stats-row" class="modal-stats-row" style="display: none;"></div>
+                <div id="modal-main-view" class="modal-view" style="flex: 1; min-height: 85vh;">
+                    <div class="modal-card-section" style="background: transparent; border: none; box-shadow: none; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2rem 0; width: 100%;">
+                        <div class="pause-header" style="text-align: center; margin-top: 1rem; display: flex; flex-direction: column; align-items: center;">
+                            <div id="modal-crash-icon-container" style="display: flex; justify-content: center; align-items: center; margin-bottom: 0.5rem; width: 100%;"></div>
+                            <h2 id="modal-title" class="leaderboard-hero-track" style="margin-bottom: 1.5rem; font-size: 2rem; letter-spacing: 0.15em;">CRASHED</h2>
+                            <div class="combined-hero-time-group" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; flex-direction: column; align-items: center;">
+                                <span style="opacity: 0.6; text-transform: uppercase; font-size: 0.9rem; font-weight: 800; letter-spacing: 0.1em; margin-bottom: 0.25rem;">IMPACT</span>
+                                <div id="modal-msg" style="font-size: 3.5rem; font-weight: 900; font-style: italic; letter-spacing: 0.05em; line-height: 1; text-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--accent-color); text-transform: uppercase;">SPEED</div>
+                            </div>
+                        </div>
+                        <div class="combined-actions" style="display: flex; flex-direction: column; width: 100%; max-width: 320px; gap: 0.75rem; margin: 0 auto;">
+                            <button id="modal-crash-retry-btn" class="combined-action-btn combined-action-btn--primary" type="button" aria-label="Retry race" style="width: 100%; border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">RETRY</span>
+                            </button>
+                            <button id="modal-crash-playlist-btn" class="combined-action-btn" type="button" aria-label="Change day" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">CHANGE DAY</span>
+                            </button>
+                            <button id="modal-crash-menu-btn" class="combined-action-btn" type="button" aria-label="Quit to main menu" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">QUIT</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div id="modal-pause-view" class="modal-view">
-                    <div class="modal-card-section combined-results-section pause-results-section">
-                        <div class="combined-sheet-topbar">
-                            <div class="combined-sheet-topbar__actions" role="group" aria-label="Race sheet tools">
-                                <button id="pause-settings-btn" class="combined-action-btn" type="button"
-                                    aria-label="Settings">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                        d="M259.1 73.5C262.1 58.7 275.2 48 290.4 48L350.2 48C365.4 48 378.5 58.7 381.5 73.5L396 143.5C410.1 149.5 423.3 157.2 435.3 166.3L503.1 143.8C517.5 139 533.3 145 540.9 158.2L570.8 210C578.4 223.2 575.7 239.8 564.3 249.9L511 297.3C511.9 304.7 512.3 312.3 512.3 320C512.3 327.7 511.8 335.3 511 342.7L564.4 390.2C575.8 400.3 578.4 417 570.9 430.1L541 481.9C533.4 495 517.6 501.1 503.2 496.3L435.4 473.8C423.3 482.9 410.1 490.5 396.1 496.6L381.7 566.5C378.6 581.4 365.5 592 350.4 592L290.6 592C275.4 592 262.3 581.3 259.3 566.5L244.9 496.6C230.8 490.6 217.7 482.9 205.6 473.8L137.5 496.3C123.1 501.1 107.3 495.1 99.7 481.9L69.8 430.1C62.2 416.9 64.9 400.3 76.3 390.2L129.7 342.7C128.8 335.3 128.4 327.7 128.4 320C128.4 312.3 128.9 304.7 129.7 297.3L76.3 249.8C64.9 239.7 62.3 223 69.8 209.9L99.7 158.1C107.3 144.9 123.1 138.9 137.5 143.7L205.3 166.2C217.4 157.1 230.6 149.5 244.6 143.4L259.1 73.5zM320.3 400C364.5 399.8 400.2 363.9 400 319.7C399.8 275.5 363.9 239.8 319.7 240C275.5 240.2 239.8 276.1 240 320.3C240.2 364.5 276.1 400.2 320.3 400z" />
-                                    </svg>
-                                </button>
-                                <button id="pause-garage-btn" class="combined-action-btn" type="button"
-                                    aria-label="Garage" aria-expanded="false" aria-controls="garage-modal">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M32 206.1L32 544C32 561.7 46.3 576 64 576C81.7 576 96 561.7 96 544L96 304C96 286.3 110.3 272 128 272L512 272C529.7 272 544 286.3 544 304L544 544C544 561.7 558.3 576 576 576C593.7 576 608 561.7 608 544L608 206.1C608 178.6 590.4 154.1 564.2 145.4L335.2 69.1C325.3 65.8 314.7 65.8 304.8 69.1L75.8 145.4C49.6 154.1 32 178.6 32 206.1zM496 320L144 320L144 384L496 384L496 320zM144 480L496 480L496 416L144 416L144 480zM496 512L144 512L144 576L496 576L496 512z" />
-                                    </svg>
-                                </button>
-                                <button id="modal-pause-playlist-btn" class="combined-action-btn" type="button"
-                                    aria-label="Tracks">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M287.9 96L211.7 96C182.3 96 156.6 116.1 149.6 144.6L65.4 484.5C57.9 514.7 80.8 544 112 544L287.9 544L287.9 480C287.9 462.3 302.2 448 319.9 448C337.6 448 351.9 462.3 351.9 480L351.9 544L528 544C559.2 544 582.1 514.7 574.6 484.5L490.5 144.6C483.4 116.1 457.8 96 428.3 96L351.9 96L351.9 160C351.9 177.7 337.6 192 319.9 192C302.2 192 287.9 177.7 287.9 160L287.9 96zM351.9 288L351.9 352C351.9 369.7 337.6 384 319.9 384C302.2 384 287.9 369.7 287.9 352L287.9 288C287.9 270.3 302.2 256 319.9 256C337.6 256 351.9 270.3 351.9 288z" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <button id="modal-menu-btn" class="combined-action-btn combined-sheet-topbar__close"
-                                type="button" aria-label="Main menu">
-                                <span class="combined-action-btn-label">MAIN MENU</span>
-                            </button>
+                <div id="modal-pause-view" class="modal-view" style="flex: 1; min-height: 85vh;">
+                    <div class="modal-card-section" style="background: transparent; border: none; box-shadow: none; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2rem 0; width: 100%;">
+                        <div class="pause-header" style="text-align: center; margin-top: 1rem;">
+                            <h2 class="leaderboard-hero-track" style="margin-bottom: 0.5rem; font-size: 2.5rem; letter-spacing: 0.15em;">PAUSED</h2>
+                            <div id="modal-pause-track-name" style="font-size: 1.1rem; opacity: 0.8; text-transform: uppercase; font-style: italic; font-weight: 800; letter-spacing: 0.05em; color: var(--text-color);"></div>
                         </div>
-                        <div class="combined-results-body">
-                            <div class="combined-header pause-results-header">
-                                <div id="modal-pause-track-preview-wrap" class="pause-track-column" hidden
-                                    aria-hidden="true">
-                                    <canvas id="modal-pause-track-preview" width="320" height="180" role="img"
-                                        aria-label="Track layout"></canvas>
-                                </div>
-                                <div class="pause-track-info">
-                                    <div id="modal-pause-track-name" class="modal-pause-track-name"></div>
-                                    <div id="modal-pause-race-stats" class="pause-race-stats" hidden
-                                        aria-hidden="true"></div>
-                                </div>
-                            </div>
-                            <div class="combined-actions pause-results-actions">
-                                <button id="modal-restart-btn" class="combined-action-btn" type="button"
-                                    aria-label="Restart race">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M500.7 138.7L512 149.4L512 96C512 78.3 526.3 64 544 64C561.7 64 576 78.3 576 96L576 224C576 241.7 561.7 256 544 256L416 256C398.3 256 384 241.7 384 224C384 206.3 398.3 192 416 192L463.9 192L456.3 184.8C456.1 184.6 455.9 184.4 455.7 184.2C380.7 109.2 259.2 109.2 184.2 184.2C109.2 259.2 109.2 380.7 184.2 455.7C259.2 530.7 380.7 530.7 455.7 455.7C463.9 447.5 471.2 438.8 477.6 429.6C487.7 415.1 507.7 411.6 522.2 421.7C536.7 431.8 540.2 451.8 530.1 466.3C521.6 478.5 511.9 490.1 501 501C401 601 238.9 601 139 501C39.1 401 39 239 139 139C238.9 39.1 400.7 39 500.7 138.7z" />
-                                    </svg>
-                                    <span class="combined-action-btn-label">RESTART</span>
-                                </button>
-                                <button id="modal-resume-btn" class="combined-action-btn combined-action-btn--primary"
-                                    type="button" aria-label="Resume race">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z" />
-                                    </svg>
-                                    <span class="combined-action-btn-label">RESUME</span>
-                                </button>
-                            </div>
+                        <div class="combined-actions" style="display: flex; flex-direction: column; width: 100%; max-width: 320px; gap: 0.75rem; margin: 0 auto;">
+                            <button id="modal-resume-btn" class="combined-action-btn combined-action-btn--primary" type="button" aria-label="Resume race" style="width: 100%; border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">RESUME</span>
+                            </button>
+                            <button id="modal-restart-btn" class="combined-action-btn" type="button" aria-label="Restart race" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">RESTART</span>
+                            </button>
+                            <button id="modal-menu-btn" class="combined-action-btn" type="button" aria-label="Quit to main menu" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">QUIT</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -238,14 +206,6 @@
                 <div id="modal-runs-view" class="modal-view">
                     <div class="modal-card-section modal-card-section--runs reusable-modal-sheet">
                         <div class="reusable-modal-header">
-                            <button id="back-to-main-btn" class="reusable-modal-close" type="button"
-                                aria-label="Back" data-modal-close>
-                                <svg class="reusable-modal-close__icon" xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320zM188.7 308.7L292.7 204.7C297.3 200.1 304.2 198.8 310.1 201.2C316 203.6 320 209.5 320 216L320 272L416 272C433.7 272 448 286.3 448 304L448 336C448 353.7 433.7 368 416 368L320 368L320 424C320 430.5 316.1 436.3 310.1 438.8C304.1 441.3 297.2 439.9 292.7 435.3L188.7 331.3C182.5 325.1 182.5 314.9 188.7 308.7z" />
-                                </svg>
-                            </button>
                             <div class="reusable-modal-heading">
                                 <span id="modal-runs-title" class="leaderboard-hero-track" data-modal-title>Your 5 PBs</span>
                                 <span id="modal-runs-subtitle" class="leaderboard-subhead" data-modal-subtitle hidden></span>
@@ -253,98 +213,59 @@
                         </div>
                         <div id="modal-lap-times" class="modal-lap-times-container reusable-modal-content"
                             data-modal-content></div>
+                        <div class="modal-action-row modal-action-row--stack">
+                            <button id="modal-runs-primary-btn" class="combined-action-btn combined-action-btn--primary" type="button" hidden>
+                                <span class="combined-action-btn-label">Race This Day</span>
+                            </button>
+                            <button id="back-to-main-btn" class="combined-action-btn modal-sheet-dismiss" type="button" aria-label="Back" data-modal-close>
+                                <span class="combined-action-btn-label">Back</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div id="modal-combined-view" class="modal-view">
-                    <div class="modal-card-section combined-results-section">
-                        <div class="combined-sheet-topbar">
-                            <div class="combined-sheet-topbar__actions" role="group" aria-label="Race sheet tools">
-                                <button id="combined-settings-btn" class="combined-action-btn" type="button"
-                                    aria-label="Settings">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M259.1 73.5C262.1 58.7 275.2 48 290.4 48L350.2 48C365.4 48 378.5 58.7 381.5 73.5L396 143.5C410.1 149.5 423.3 157.2 435.3 166.3L503.1 143.8C517.5 139 533.3 145 540.9 158.2L570.8 210C578.4 223.2 575.7 239.8 564.3 249.9L511 297.3C511.9 304.7 512.3 312.3 512.3 320C512.3 327.7 511.8 335.3 511 342.7L564.4 390.2C575.8 400.3 578.4 417 570.9 430.1L541 481.9C533.4 495 517.6 501.1 503.2 496.3L435.4 473.8C423.3 482.9 410.1 490.5 396.1 496.6L381.7 566.5C378.6 581.4 365.5 592 350.4 592L290.6 592C275.4 592 262.3 581.3 259.3 566.5L244.9 496.6C230.8 490.6 217.7 482.9 205.6 473.8L137.5 496.3C123.1 501.1 107.3 495.1 99.7 481.9L69.8 430.1C62.2 416.9 64.9 400.3 76.3 390.2L129.7 342.7C128.8 335.3 128.4 327.7 128.4 320C128.4 312.3 128.9 304.7 129.7 297.3L76.3 249.8C64.9 239.7 62.3 223 69.8 209.9L99.7 158.1C107.3 144.9 123.1 138.9 137.5 143.7L205.3 166.2C217.4 157.1 230.6 149.5 244.6 143.4L259.1 73.5zM320.3 400C364.5 399.8 400.2 363.9 400 319.7C399.8 275.5 363.9 239.8 319.7 240C275.5 240.2 239.8 276.1 240 320.3C240.2 364.5 276.1 400.2 320.3 400z" />
-                                    </svg>
-                                </button>
-                                <button id="combined-garage-btn" class="combined-action-btn" type="button"
-                                    aria-label="Garage" aria-expanded="false" aria-controls="garage-modal">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M32 206.1L32 544C32 561.7 46.3 576 64 576C81.7 576 96 561.7 96 544L96 304C96 286.3 110.3 272 128 272L512 272C529.7 272 544 286.3 544 304L544 544C544 561.7 558.3 576 576 576C593.7 576 608 561.7 608 544L608 206.1C608 178.6 590.4 154.1 564.2 145.4L335.2 69.1C325.3 65.8 314.7 65.8 304.8 69.1L75.8 145.4C49.6 154.1 32 178.6 32 206.1zM496 320L144 320L144 384L496 384L496 320zM144 480L496 480L496 416L144 416L144 480zM496 512L144 512L144 576L496 576L496 512z" />
-                                    </svg>
-                                </button>
-                                <button id="combined-playlist-btn" class="combined-action-btn" type="button"
-                                    aria-label="Tracks">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                        fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M287.9 96L211.7 96C182.3 96 156.6 116.1 149.6 144.6L65.4 484.5C57.9 514.7 80.8 544 112 544L287.9 544L287.9 480C287.9 462.3 302.2 448 319.9 448C337.6 448 351.9 462.3 351.9 480L351.9 544L528 544C559.2 544 582.1 514.7 574.6 484.5L490.5 144.6C483.4 116.1 457.8 96 428.3 96L351.9 96L351.9 160C351.9 177.7 337.6 192 319.9 192C302.2 192 287.9 177.7 287.9 160L287.9 96zM351.9 288L351.9 352C351.9 369.7 337.6 384 319.9 384C302.2 384 287.9 369.7 287.9 352L287.9 288C287.9 270.3 302.2 256 319.9 256C337.6 256 351.9 270.3 351.9 288z" />
-                                    </svg>
-                                </button>
+                <div id="modal-combined-view" class="modal-view" style="flex: 1; min-height: 85vh;">
+                    <div class="modal-card-section">
+                        <div class="pause-header">
+                            <div class="combined-hero-time-group">
+                                <span id="combined-time">--</span>
                             </div>
-                            <button id="combined-menu-btn" class="combined-action-btn combined-sheet-topbar__close"
-                                type="button" aria-label="Main menu">
-                                <span class="combined-action-btn-label">MAIN MENU</span>
-                            </button>
-                        </div>
-                        <div class="combined-results-body">
-                        <div class="combined-header">
-                            <div class="combined-rank-group">
-                                <div id="combined-next-medal-stat" class="combined-stat combined-stat--next-medal" hidden
-                                     aria-hidden="true">
-                                    <span id="combined-stat-label-next" class="combined-stat-label" hidden
-                                        aria-hidden="true">NEXT MEDAL</span>
-                                    <div class="combined-stat-value combined-stat-value--next">
-                                        <span id="combined-next-medal-time">--</span>
-                                        <span id="combined-next-medal-icon-slot"
-                                            class="combined-next-medal-icon-slot"></span>
+                            <div id="combined-hero-medal"></div>
+
+                            <div class="combined-stats-grid">
+                                <div class="stat-floating-item">
+                                    <span id="combined-stat-label-2" class="combined-stat-label" hidden aria-hidden="true"></span>
+                                    <span id="combined-best-lap" class="combined-stat-value--pb-delta">--</span>
+                                </div>
+                                <div id="combined-stats-right-group" class="stat-floating-item" hidden aria-hidden="true">
+                                    <span class="combined-stat-label">RANK</span>
+                                    <div class="combined-rank-container">
+                                        <div id="combined-rank-value"></div>
+                                        <div id="combined-rank-total"></div>
                                     </div>
                                 </div>
-                                <div id="combined-hero-medal" class="combined-hero-medal"></div>
-                            </div>
-                            <div class="combined-stats-group">
-                                <div class="combined-stats-row-primary">
-                                    <div class="combined-stats-left">
-                                        <div class="combined-stat combined-stat--this-lap">
-                                            <span id="combined-stat-label-1" class="combined-stat-label">THIS LAP</span>
-                                            <span id="combined-time" class="combined-stat-value">--</span>
-                                        </div>
-                                        <div class="combined-stat combined-stat--best-lap combined-stat--pb-delta">
-                                            <span id="combined-stat-label-2" class="combined-stat-label" hidden
-                                                aria-hidden="true"></span>
-                                            <span id="combined-best-lap"
-                                                class="combined-stat-value combined-stat-value--pb-delta">--</span>
-                                        </div>
-                                    </div>
-                                    <div id="combined-stats-right-group" class="combined-stats-right-group" hidden aria-hidden="true">
-                                        <div id="combined-rank-value" class="combined-rank-value"></div>
-                                        <div id="combined-rank-total" class="combined-rank-total"></div>
+                                <div id="combined-next-medal-stat" class="stat-floating-item" hidden aria-hidden="true">
+                                    <span id="combined-stat-label-next" class="combined-stat-label">NEXT</span>
+                                    <div class="combined-next-medal-container">
+                                        <span id="combined-next-medal-time">--</span>
+                                        <span id="combined-next-medal-icon-slot"></span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="combined-actions">
-<button id="combined-restart-btn" class="combined-action-btn combined-action-btn--primary"
-                                type="button" aria-label="Improve time">
-                                <svg class="combined-restart-svg combined-restart-svg--improve"
-                                    xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                    fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M264.5 64C251.2 64 240.5 74.7 240.5 88C240.5 101.3 251.2 112 264.5 112L296.5 112L296.5 137.3C188.5 149.2 104.5 240.8 104.5 352C104.5 471.3 201.2 568 320.5 568C439.8 568 536.5 471.3 536.5 352C536.5 312.2 525.7 274.9 506.9 242.8L535.1 214.6C547.6 202.1 547.6 181.8 535.1 169.3C522.6 156.8 502.3 156.8 489.8 169.3L466.4 192.7C433.5 162.5 391.2 142.4 344.4 137.2L344.4 111.9L376.4 111.9C389.7 111.9 400.4 101.2 400.4 87.9C400.4 74.6 389.7 63.9 376.4 63.9L264.4 63.9zM344.5 248L344.5 352C344.5 365.3 333.8 376 320.5 376C307.2 376 296.5 365.3 296.5 352L296.5 248C296.5 234.7 307.2 224 320.5 224C333.8 224 344.5 234.7 344.5 248z" />
-                                </svg>
-                                <svg class="combined-restart-svg combined-restart-svg--retry"
-                                    xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 640 640"
-                                    fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M500.7 138.7L512 149.4L512 96C512 78.3 526.3 64 544 64C561.7 64 576 78.3 576 96L576 224C576 241.7 561.7 256 544 256L416 256C398.3 256 384 241.7 384 224C384 206.3 398.3 192 416 192L463.9 192L456.3 184.8C456.1 184.6 455.9 184.4 455.7 184.2C380.7 109.2 259.2 109.2 184.2 184.2C109.2 259.2 109.2 380.7 184.2 455.7C259.2 530.7 380.7 530.7 455.7 455.7C463.9 447.5 471.2 438.8 477.6 429.6C487.7 415.1 507.7 411.6 522.2 421.7C536.7 431.8 540.2 451.8 530.1 466.3C521.6 478.5 511.9 490.1 501 501C401 601 238.9 601 139 501C39.1 401 39 239 139 139C238.9 39.1 400.7 39 500.7 138.7z" />
-                                </svg>
-                                <span class="combined-action-btn-label">IMPROVE</span>
+                            <button id="combined-restart-btn" class="combined-action-btn combined-action-btn--primary" type="button" aria-label="Improve time">
+                                <span class="combined-action-btn-label">RETRY</span>
                             </button>
-                        </div>
+                            <button id="combined-playlist-btn" class="combined-action-btn" type="button" aria-label="Change day">
+                                <span class="combined-action-btn-label">CHANGE DAY</span>
+                            </button>
+                            <button id="combined-garage-btn" class="combined-action-btn" type="button" aria-label="Garage" style="display: none;"></button>
+                            <button id="combined-menu-btn" class="combined-action-btn" type="button" aria-label="Main menu">
+                                <span class="combined-action-btn-label">QUIT</span>
+                            </button>
+                            <button id="combined-settings-btn" class="combined-action-btn" type="button" aria-label="Settings" style="display: none;"></button>
                         </div>
                     </div>
                 </div>
@@ -357,14 +278,6 @@
                 <div id="modal-settings-view" class="modal-view active-view">
                     <div class="modal-card-section modal-card-section--sheet reusable-modal-sheet">
                         <div class="reusable-modal-header">
-                            <button id="settings-back-btn" class="reusable-modal-close" type="button"
-                                aria-label="Close" data-modal-close>
-                                <svg class="reusable-modal-close__icon" xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320zM188.7 308.7L292.7 204.7C297.3 200.1 304.2 198.8 310.1 201.2C316 203.6 320 209.5 320 216L320 272L416 272C433.7 272 448 286.3 448 304L448 336C448 353.7 433.7 368 416 368L320 368L320 424C320 430.5 316.1 436.3 310.1 438.8C304.1 441.3 297.2 439.9 292.7 435.3L188.7 331.3C182.5 325.1 182.5 314.9 188.7 308.7z" />
-                                </svg>
-                            </button>
                             <div class="reusable-modal-heading">
                                 <span id="modal-settings-title" class="leaderboard-hero-track"
                                     data-modal-title>Settings</span>
@@ -427,6 +340,9 @@
                         </div>
 
                         </div>
+                        <button id="settings-back-btn" class="combined-action-btn modal-sheet-dismiss" type="button" aria-label="Close" data-modal-close>
+                            <span class="combined-action-btn-label">Close</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -460,22 +376,17 @@
                 <div id="modal-daily-playlist-view" class="modal-view active-view">
                     <div class="modal-card-section modal-card-section--sheet daily-playlist-sheet reusable-modal-sheet">
                         <div class="reusable-modal-header">
-                            <button id="daily-playlist-close-btn" class="reusable-modal-close" type="button"
-                                aria-label="Close" data-modal-close>
-                                <svg class="reusable-modal-close__icon" xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320zM188.7 308.7L292.7 204.7C297.3 200.1 304.2 198.8 310.1 201.2C316 203.6 320 209.5 320 216L320 272L416 272C433.7 272 448 286.3 448 304L448 336C448 353.7 433.7 368 416 368L320 368L320 424C320 430.5 316.1 436.3 310.1 438.8C304.1 441.3 297.2 439.9 292.7 435.3L188.7 331.3C182.5 325.1 182.5 314.9 188.7 308.7z" />
-                                </svg>
-                            </button>
                             <div class="reusable-modal-heading">
                                 <span id="modal-daily-playlist-title" class="leaderboard-hero-track"
-                                    data-modal-title>Tracks</span>
-                                <span class="leaderboard-subhead" data-modal-subtitle>Last 7 Days</span>
+                                    data-modal-title>Week</span>
+                                <span class="leaderboard-subhead" data-modal-subtitle hidden></span>
                             </div>
                         </div>
                         <div id="daily-playlist-list" class="daily-playlist-list reusable-modal-content"
                             data-modal-content></div>
+                        <button id="daily-playlist-close-btn" class="combined-action-btn modal-sheet-dismiss" type="button" aria-label="Close" data-modal-close>
+                            <span class="combined-action-btn-label">Close</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -489,14 +400,6 @@
                         class="modal-card-section modal-card-section--sheet garage-sheet reusable-modal-sheet"
                         aria-label="Garage" hidden>
                         <div class="reusable-modal-header">
-                            <button id="garage-close-btn" class="reusable-modal-close" type="button"
-                                aria-label="Close" data-modal-close>
-                                <svg class="reusable-modal-close__icon" xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320zM188.7 308.7L292.7 204.7C297.3 200.1 304.2 198.8 310.1 201.2C316 203.6 320 209.5 320 216L320 272L416 272C433.7 272 448 286.3 448 304L448 336C448 353.7 433.7 368 416 368L320 368L320 424C320 430.5 316.1 436.3 310.1 438.8C304.1 441.3 297.2 439.9 292.7 435.3L188.7 331.3C182.5 325.1 182.5 314.9 188.7 308.7z" />
-                                </svg>
-                            </button>
                             <div class="reusable-modal-heading">
                                 <span id="modal-garage-title" class="leaderboard-hero-track"
                                     data-modal-title>Garage</span>
@@ -519,6 +422,9 @@
                             <div id="garage-trail-grid" class="garage-trail-grid"></div>
                         </div>
                         </div>
+                        <button id="garage-close-btn" class="combined-action-btn modal-sheet-dismiss" type="button" aria-label="Close" data-modal-close>
+                            <span class="combined-action-btn-label">Close</span>
+                        </button>
                     </section>
                 </div>
             </div>

@@ -6,9 +6,8 @@ import {
   getNextVerificationAttemptAt,
   getVerificationRetryDelayMs,
   markDailyChallengeVerificationPending,
-  markDailyChallengeVerificationRejected,
+  markDailyChallengeVerificationError,
   createVerificationSnapshot,
-  VERIFICATION_REJECTED_SNAPSHOT,
 } from "./verification-queue.js";
 import { setDailyChallengeBestTime } from "../daily-challenge/storage.js?v=2.09";
 import {
@@ -17,6 +16,12 @@ import {
   submitDailyChallengeBestTime,
 } from "../daily-challenge/service.js?v=2.09";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js?v=2.09";
+
+function isRetryableVerificationFailure(result) {
+  const status = Number(result?.status);
+  if (!Number.isFinite(status)) return true;
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
 
 export const scoreboardEngineMethods = {
   scheduleVerificationQueueProcessing(delayMs = null) {
@@ -76,12 +81,17 @@ export const scoreboardEngineMethods = {
     ) {
       this.modal.updateModalScoreboardSnapshot(
         createVerificationSnapshot({
-          statusText: "Verifying...",
           verificationState: "pending",
           isLoading: true,
+          submissionStage: "verifying",
         }),
       );
     }
+    markDailyChallengeVerificationPending(entry.challengeId, Date.now(), {
+      submissionStage: "verifying",
+      preserveUpdatedAt: true,
+    });
+    this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
 
     try {
       const result = await submitDailyChallengeBestTime({
@@ -97,6 +107,10 @@ export const scoreboardEngineMethods = {
       markDailyChallengeVerificationPending(
         entry.challengeId,
         Date.now() + getVerificationRetryDelayMs(),
+        {
+          submissionStage: "retrying",
+          preserveUpdatedAt: true,
+        },
       );
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       if (
@@ -106,9 +120,9 @@ export const scoreboardEngineMethods = {
       ) {
         this.modal.updateModalScoreboardSnapshot(
           createVerificationSnapshot({
-            statusText: "Queued for retry",
             verificationState: "pending",
             isLoading: true,
+            submissionStage: "retrying",
           }),
         );
       }
@@ -130,6 +144,10 @@ export const scoreboardEngineMethods = {
       markDailyChallengeVerificationPending(
         entry.challengeId,
         Date.now() + (Number(body?.retryAfterSeconds) || 1) * 1000,
+        {
+          submissionStage: "retrying",
+          preserveUpdatedAt: true,
+        },
       );
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       if (
@@ -139,9 +157,9 @@ export const scoreboardEngineMethods = {
       ) {
         this.modal.updateModalScoreboardSnapshot(
           createVerificationSnapshot({
-            statusText: "Retrying soon",
             verificationState: "pending",
             isLoading: true,
+            submissionStage: "retrying",
           }),
         );
       }
@@ -183,30 +201,70 @@ export const scoreboardEngineMethods = {
       return;
     }
 
-    if (result?.status === 422) {
-      markDailyChallengeVerificationRejected(entry.challengeId);
+    if (result && !result.ok && isRetryableVerificationFailure(result)) {
+      markDailyChallengeVerificationPending(
+        entry.challengeId,
+        Date.now() + getVerificationRetryDelayMs(),
+        {
+          submissionStage: "retrying",
+          statusText: typeof body?.error === "string" ? body.error : null,
+          preserveUpdatedAt: true,
+        },
+      );
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       if (
         this.modal.matchesModalScoreboardContext({
           challengeId: entry.challengeId,
         })
       ) {
-        this.modal.updateModalScoreboardSnapshot(VERIFICATION_REJECTED_SNAPSHOT);
+        this.modal.updateModalScoreboardSnapshot(
+          createVerificationSnapshot({
+            verificationState: "pending",
+            isLoading: true,
+            submissionStage: "retrying",
+            statusText: typeof body?.error === "string" ? body.error : null,
+          }),
+        );
       }
       return;
     }
 
-    markDailyChallengeVerificationPending(
+    if (result && !result.ok) {
+      markDailyChallengeVerificationError(
+        entry.challengeId,
+        typeof body?.error === "string" ? body.error : "Submission failed",
+      );
+      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
+      if (
+        this.modal.matchesModalScoreboardContext({
+          challengeId: entry.challengeId,
+        })
+      ) {
+        this.modal.updateModalScoreboardSnapshot(
+          createVerificationSnapshot({
+            verificationState: "error",
+            isLoading: false,
+            submissionStage: "error",
+            statusText:
+              typeof body?.error === "string" ? body.error : "Submission failed",
+          }),
+        );
+      }
+      return;
+    }
+
+    markDailyChallengeVerificationError(
       entry.challengeId,
-      Date.now() + getVerificationRetryDelayMs(),
+      "Submission unavailable",
     );
     this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
     if (this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })) {
       this.modal.updateModalScoreboardSnapshot(
         createVerificationSnapshot({
-          statusText: "Queued for retry",
-          verificationState: "pending",
-          isLoading: true,
+          verificationState: "error",
+          isLoading: false,
+          submissionStage: "error",
+          statusText: "Submission unavailable",
         }),
       );
     }

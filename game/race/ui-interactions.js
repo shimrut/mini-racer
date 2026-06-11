@@ -81,7 +81,7 @@ export class InteractionsUi {
         if (this.dailyChallengeRankBtn) {
             this.dailyChallengeRankBtn.addEventListener("click", () => {
                 if (this.dailyChallengeRankBtn.disabled) return;
-                void this.leaderboards?.openDailyChallengeLeaderboardOverview?.();
+                void this.leaderboards?.openDailyChallengeLeaderboard?.();
             });
         }
         if (this.dailyChallengePlaylistBtn && this.onOpenDailyPlaylist) {

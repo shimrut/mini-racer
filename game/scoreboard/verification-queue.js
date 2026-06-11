@@ -2,6 +2,21 @@ import { TRACK_MODE_DAILY_GP } from "../config.js?v=2.09";
 
 const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
+const VERIFICATION_STAGE_SUBMITTING = "submitting";
+const VERIFICATION_STAGE_VERIFYING = "verifying";
+const VERIFICATION_STAGE_PENDING = "pending";
+const VERIFICATION_STAGE_RETRYING = "retrying";
+const VERIFICATION_STAGE_REJECTED = "rejected";
+const VERIFICATION_STAGE_ERROR = "error";
+
+const VERIFICATION_STAGE_TEXT = {
+  [VERIFICATION_STAGE_SUBMITTING]: "Submitting...",
+  [VERIFICATION_STAGE_VERIFYING]: "Verifying...",
+  [VERIFICATION_STAGE_PENDING]: "Pending",
+  [VERIFICATION_STAGE_RETRYING]: "Retrying...",
+  [VERIFICATION_STAGE_REJECTED]: "Rejected",
+  [VERIFICATION_STAGE_ERROR]: "Submission failed",
+};
 
 function createEmptyState() {
   return {
@@ -57,10 +72,47 @@ function normalizeNextAttemptAt(value) {
   return Number.isFinite(nextAttemptAt) ? nextAttemptAt : Date.now();
 }
 
+function normalizeVerificationState(value) {
+  if (value === "rejected" || value === "error") return value;
+  return "pending";
+}
+
+function normalizeVerificationStage(value, verificationState = "pending") {
+  if (
+    value === VERIFICATION_STAGE_SUBMITTING ||
+    value === VERIFICATION_STAGE_VERIFYING ||
+    value === VERIFICATION_STAGE_PENDING ||
+    value === VERIFICATION_STAGE_RETRYING ||
+    value === VERIFICATION_STAGE_REJECTED ||
+    value === VERIFICATION_STAGE_ERROR
+  ) {
+    return value;
+  }
+
+  if (verificationState === "rejected") return VERIFICATION_STAGE_REJECTED;
+  if (verificationState === "error") return VERIFICATION_STAGE_ERROR;
+  return VERIFICATION_STAGE_PENDING;
+}
+
+function resolveVerificationStatusText(stage, fallback = "") {
+  if (typeof fallback === "string" && fallback.trim()) {
+    return fallback.trim();
+  }
+  return VERIFICATION_STAGE_TEXT[stage] || "";
+}
+
 function cloneEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
+  const verificationState = normalizeVerificationState(entry.verificationState);
+  const submissionStage = normalizeVerificationStage(
+    entry.submissionStage,
+    verificationState,
+  );
   return {
     ...entry,
+    verificationState,
+    submissionStage,
+    statusText: resolveVerificationStatusText(submissionStage, entry.statusText),
     replay:
       entry.replay && typeof entry.replay === "object"
         ? JSON.parse(JSON.stringify(entry.replay))
@@ -161,6 +213,8 @@ export function enqueueScoreboardVerification({
     bestTime,
     replay,
     verificationState: "pending",
+    submissionStage: VERIFICATION_STAGE_SUBMITTING,
+    statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
     nextAttemptAt: Date.now(),
     updatedAt: new Date().toISOString(),
   };
@@ -212,6 +266,8 @@ export function enqueueDailyChallengeVerification({
     challengeDate: typeof challengeDate === "string" ? challengeDate : null,
     trackKey: typeof trackKey === "string" ? trackKey : null,
     verificationState: "pending",
+    submissionStage: VERIFICATION_STAGE_SUBMITTING,
+    statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
     nextAttemptAt: Date.now(),
     updatedAt: new Date().toISOString(),
   };
@@ -243,14 +299,23 @@ export function clearDailyChallengeVerification(challengeId) {
 export function markScoreboardVerificationPending(
   trackKey,
   nextAttemptAt = Date.now(),
+  {
+    submissionStage = VERIFICATION_STAGE_PENDING,
+    statusText = null,
+    preserveUpdatedAt = false,
+  } = {},
 ) {
   return updateScoreboardEntry(trackKey, (previousEntry) => {
     if (!previousEntry) return null;
     return {
       ...previousEntry,
       verificationState: "pending",
+      submissionStage: normalizeVerificationStage(submissionStage, "pending"),
+      statusText: resolveVerificationStatusText(submissionStage, statusText),
       nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
-      updatedAt: new Date().toISOString(),
+      updatedAt: preserveUpdatedAt
+        ? previousEntry.updatedAt
+        : new Date().toISOString(),
     };
   });
 }
@@ -258,14 +323,23 @@ export function markScoreboardVerificationPending(
 export function markDailyChallengeVerificationPending(
   challengeId,
   nextAttemptAt = Date.now(),
+  {
+    submissionStage = VERIFICATION_STAGE_PENDING,
+    statusText = null,
+    preserveUpdatedAt = false,
+  } = {},
 ) {
   return updateDailyEntry(challengeId, (previousEntry) => {
     if (!previousEntry) return null;
     return {
       ...previousEntry,
       verificationState: "pending",
+      submissionStage: normalizeVerificationStage(submissionStage, "pending"),
+      statusText: resolveVerificationStatusText(submissionStage, statusText),
       nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
-      updatedAt: new Date().toISOString(),
+      updatedAt: preserveUpdatedAt
+        ? previousEntry.updatedAt
+        : new Date().toISOString(),
     };
   });
 }
@@ -278,6 +352,8 @@ export function markScoreboardVerificationRejected(
     return {
       ...previousEntry,
       verificationState: "rejected",
+      submissionStage: VERIFICATION_STAGE_REJECTED,
+      statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_REJECTED],
       nextAttemptAt: null,
       updatedAt: new Date().toISOString(),
     };
@@ -290,6 +366,28 @@ export function markDailyChallengeVerificationRejected(challengeId) {
     return {
       ...previousEntry,
       verificationState: "rejected",
+      submissionStage: VERIFICATION_STAGE_REJECTED,
+      statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_REJECTED],
+      nextAttemptAt: null,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
+export function markDailyChallengeVerificationError(
+  challengeId,
+  errorMessage = null,
+) {
+  return updateDailyEntry(challengeId, (previousEntry) => {
+    if (!previousEntry) return null;
+    return {
+      ...previousEntry,
+      verificationState: "error",
+      submissionStage: VERIFICATION_STAGE_ERROR,
+      statusText: resolveVerificationStatusText(
+        VERIFICATION_STAGE_ERROR,
+        errorMessage,
+      ),
       nextAttemptAt: null,
       updatedAt: new Date().toISOString(),
     };
@@ -345,11 +443,21 @@ export function createVerificationSnapshot({
   statusText = "",
   verificationState = "pending",
   isLoading = true,
+  submissionStage = null,
 } = {}) {
+  const normalizedVerificationState = normalizeVerificationState(verificationState);
+  const normalizedSubmissionStage = normalizeVerificationStage(
+    submissionStage,
+    normalizedVerificationState,
+  );
   return {
     isLoading,
-    verificationState,
-    statusText,
+    verificationState: normalizedVerificationState,
+    submissionStage: normalizedSubmissionStage,
+    statusText: resolveVerificationStatusText(
+      normalizedSubmissionStage,
+      statusText,
+    ),
   };
 }
 
@@ -357,19 +465,23 @@ export const VERIFICATION_REJECTED_SNAPSHOT = createVerificationSnapshot({
   statusText: "Rejected",
   verificationState: "rejected",
   isLoading: false,
+  submissionStage: VERIFICATION_STAGE_REJECTED,
 });
 
 export const VERIFICATION_ACCEPTED_PENDING_SNAPSHOT =
   createVerificationSnapshot({
-    statusText: "Pending verification",
+    statusText: "Pending",
     verificationState: "pending",
-    isLoading: false,
+    isLoading: true,
+    submissionStage: VERIFICATION_STAGE_PENDING,
   });
 
 export function getVerificationSnapshotFromQueueEntry(entry) {
   if (!entry) return null;
-  if (entry.verificationState === "rejected") {
-    return VERIFICATION_REJECTED_SNAPSHOT;
-  }
-  return VERIFICATION_ACCEPTED_PENDING_SNAPSHOT;
+  return createVerificationSnapshot({
+    statusText: entry.statusText,
+    verificationState: entry.verificationState,
+    isLoading: entry.verificationState !== "error" && entry.verificationState !== "rejected",
+    submissionStage: entry.submissionStage,
+  });
 }

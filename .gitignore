@@ -6,16 +6,13 @@ node_modules/
 dist/
 .venv/
 
-# Hosting backend (local only — not published to GitHub)
-devvit.json
+# Local-only config and non-publish folders
 package.devvit.local.json
-vite.config.js
-src/
-preview.html
-preview.js
-preview.css
-tools/daily-challenge-admin.css
-tests/reddit-daily-gp-model.test.js
+IGNORE SUPABASE/
+tools/*
+!tools/generate-player-car-assets.js
+public/assets/logo/
+public/assets/medals/
 
 # IDE / agent / internal notes (not part of the game repo)
 .cursor/

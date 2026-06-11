@@ -1,0 +1,317 @@
+@import url('fonts.css');
+
+:root {
+    color-scheme: dark;
+
+    /* Colors */
+    --bg-color: #02061740;
+    --bg-color-darker: #010410;
+    --bg-surface: #0f172a;
+    --text-color: #f8fafc;
+    --text-dim: #94a3b8;
+    --text-muted: #64748b;
+    --accent-color: #ef4444;
+    --accent-bright: #ff3e3e;
+    --accent-hover: #f87171;
+    --bronze: #cd7f32;
+    --bronze-dim: color-mix(in oklab, #cd7f32 60%, transparent);
+
+    /* Typography */
+    --header-font: "Outfit", sans-serif;
+    --mono-font: "JetBrains Mono", monospace;
+
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+
+    /* Border Radius */
+    --radius-sm: 0.5rem;
+    --radius-md: 1rem;
+    --radius-lg: 1.25rem;
+    --radius-full: 999px;
+
+    --post-height: 512px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    font-family: var(--header-font);
+    background: var(--bg-color-darker);
+    color: var(--text-color);
+    overflow: hidden;
+}
+
+/* ─── Shell ─────────────────────────────────────────── */
+
+.preview-shell {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-md);
+    box-sizing: border-box;
+}
+
+/* ─── Card ───────────────────────────────────────────── */
+
+.start-daily-card {
+    position: relative;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: var(--space-md);
+}
+
+/* ─── Top bar: game title + availability dots ─────────── */
+
+.card-topbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    background: var(--bg-color);
+    backdrop-filter: blur(10px);
+    border-radius: 1rem;
+    padding: 0.5rem;
+}
+
+.track-title {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    line-height: 0.82;
+    font-family: var(--header-font);
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    color: var(--text-color);
+    pointer-events: none;
+    user-select: none;
+    text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.track-title__first {
+    font-size: clamp(1.8rem, 6vw, 2.5rem);
+    letter-spacing: -0.02em;
+    color: var(--text-color);
+}
+
+.track-title__second {
+    font-size: clamp(2.6rem, 9.5vw, 3.6rem);
+    letter-spacing: -0.04em;
+    color: var(--accent-color);
+}
+
+.challenge-status {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-family: var(--header-font);
+    font-size: 0.8rem;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    max-width: min(48vw, 14rem);
+}
+
+.challenge-status--featured {
+    background: #dc2626;
+    color: var(--text-color);
+}
+
+.challenge-status--available {
+    background: transparent;
+    color: var(--accent-color);
+    padding-right: 0;
+}
+
+.challenge-status--expired {
+    background: #475569;
+    color: var(--text-color);
+}
+
+/* ─── Track canvas ────────────────────────────────────── */
+
+.track-visual-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: -16px;
+}
+
+#track-preview {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ─── Info row: track name + time to beat ─────────────── */
+
+/* ─── HUD Styles (Same as gameplay HUD) ──────────────── */
+
+.hud-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    font-family: var(--mono-font);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.hud-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.hud-stat {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+}
+
+.hud-medal {
+    display: flex;
+    align-items: center;
+    line-height: 0;
+}
+
+.time-to-beat__medal {
+    width: clamp(1.2rem, 3.5vw, 1.6rem);
+    height: clamp(1.2rem, 3.5vw, 1.6rem);
+    flex-shrink: 0;
+    color: var(--bronze);
+}
+
+.hud-value {
+    font-size: clamp(1.6rem, 5vw, 2.2rem);
+    font-weight: 800;
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+/* ─── Play button ─────────────────────────────────────── */
+
+.preview-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 4.25rem;
+    padding: 0.8rem 1.5rem;
+    background: var(--accent-color);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 1.5rem;
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.preview-play:hover {
+    background: var(--accent-hover);
+}
+
+.preview-play:active {
+    transform: translateY(1px);
+}
+
+.expired-message {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(8px);
+}
+
+.expired-message__text {
+    width: 100%;
+    padding: var(--space-md);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.expired-message__ok {
+    min-height: 3.5rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--accent-color);
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 1.1rem;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+/* ─── Responsive ──────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .preview-shell {
+        padding: var(--space-md);
+    }
+
+    .challenge-status {
+        font-size: 0.7rem;
+        min-height: 1.8rem;
+        padding: 0.35rem 0.6rem;
+        max-width: 52vw;
+    }
+
+    .preview-play {
+        min-height: 3.5rem;
+        font-size: 1.25rem;
+    }
+}

@@ -3,11 +3,98 @@ import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
 import {
     getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
+    getDailyChallengeTrackName,
     getDailyChallengePlaylist,
     prefetchDailyChallengeSnapshots,
     getDailyChallengeSnapshot
 } from '../daily-challenge/service.js?v=2.09';
 import { getScoreboardSnapshot } from './service.js?v=2.09';
+
+function isValidDailyChallenge(challenge) {
+    return Boolean(challenge?.id && challenge.trackKey && TRACKS[challenge.trackKey]);
+}
+
+function getDailyChallengeDateSource(challenge) {
+    if (typeof challenge?.startsAt === 'string' && challenge.startsAt) {
+        return challenge.startsAt;
+    }
+    if (typeof challenge?.challengeDate === 'string' && challenge.challengeDate) {
+        return `${challenge.challengeDate}T00:00:00.000Z`;
+    }
+    return '';
+}
+
+function getDailyChallengeLeaderboardTitle(challenge, activeChallengeId = null) {
+    if (challenge?.id && activeChallengeId && challenge.id === activeChallengeId) {
+        return 'Today';
+    }
+
+    const source = getDailyChallengeDateSource(challenge);
+    const timeMs = Date.parse(source);
+    if (!Number.isFinite(timeMs)) {
+        return 'Leaderboard';
+    }
+
+    const date = new Date(timeMs);
+    const weekday = new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        timeZone: 'UTC'
+    }).format(date);
+    const dateLabel = new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC'
+    }).format(date);
+    return `${weekday} ${dateLabel}`;
+}
+
+function buildDailyChallengeLeaderboardDayOption(challenge, activeChallengeId = null) {
+    if (!isValidDailyChallenge(challenge)) return null;
+
+    const source = getDailyChallengeDateSource(challenge);
+    const timeMs = Date.parse(source);
+    if (!Number.isFinite(timeMs)) {
+        return {
+            challengeId: challenge.id,
+            dayLabel: challenge.id === activeChallengeId ? 'Today' : 'Day',
+            dateLabel: '--'
+        };
+    }
+
+    const date = new Date(timeMs);
+    return {
+        challengeId: challenge.id,
+        dayLabel: challenge.id === activeChallengeId
+            ? 'Today'
+            : new Intl.DateTimeFormat('en-US', {
+                weekday: 'short',
+                timeZone: 'UTC'
+            }).format(date),
+        dateLabel: new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'UTC'
+        }).format(date)
+    };
+}
+
+function mergeDailyChallengeHistory(challenges = [], fallbackChallenge = null) {
+    const merged = [];
+    const seen = new Set();
+    const pushChallenge = (challenge) => {
+        if (!isValidDailyChallenge(challenge) || seen.has(challenge.id)) return;
+        seen.add(challenge.id);
+        merged.push(challenge);
+    };
+
+    for (const challenge of Array.isArray(challenges) ? challenges : []) {
+        pushChallenge(challenge);
+    }
+    if (isValidDailyChallenge(fallbackChallenge)) {
+        pushChallenge(fallbackChallenge);
+    }
+    return merged;
+}
 
 export class LeaderboardsUi {
     constructor({
@@ -33,7 +120,13 @@ export class LeaderboardsUi {
         scoreboardSnapshot = null,
         scoreboardChallengeId = null,
         scoreboardTrackKey = null,
+        scoreboardTitle = null,
         scoreboardSubhead = null,
+        leaderboardDayOptions = null,
+        selectedLeaderboardDayId = null,
+        onSelectLeaderboardDay = null,
+        primaryActionLabel = null,
+        primaryAction = null,
         onClose = null
     } = {}) {
         const payload = {
@@ -46,8 +139,26 @@ export class LeaderboardsUi {
         if (scoreboardChallengeId !== null) {
             payload.scoreboardChallengeId = scoreboardChallengeId;
         }
+        if (scoreboardTitle !== null) {
+            payload.scoreboardTitle = scoreboardTitle;
+        }
         if (scoreboardSubhead !== null) {
             payload.scoreboardSubhead = scoreboardSubhead;
+        }
+        if (Array.isArray(leaderboardDayOptions) && leaderboardDayOptions.length) {
+            payload.leaderboardDayOptions = leaderboardDayOptions;
+        }
+        if (selectedLeaderboardDayId !== null) {
+            payload.selectedLeaderboardDayId = selectedLeaderboardDayId;
+        }
+        if (typeof onSelectLeaderboardDay === 'function') {
+            payload.onSelectLeaderboardDay = onSelectLeaderboardDay;
+        }
+        if (primaryActionLabel !== null) {
+            payload.primaryActionLabel = primaryActionLabel;
+        }
+        if (typeof primaryAction === 'function') {
+            payload.primaryAction = primaryAction;
         }
         if (typeof onClose === 'function') {
             payload.onClose = onClose;
@@ -103,10 +214,28 @@ export class LeaderboardsUi {
         const summary = this.dailyChallengeUi.getSummary();
         if (!summary?.challengeId || !summary.trackKey) return;
 
-        await this.openDailyChallengeLeaderboardForChallenge({
+        const fallbackChallenge = {
             id: summary.challengeId,
             trackKey: summary.trackKey,
-        }, returnMode, options);
+            startsAt: summary.startsAt || null,
+            challengeDate: summary.challengeDate || null
+        };
+        const playlistChallenges = mergeDailyChallengeHistory(
+            getCachedDailyChallengePlaylist(),
+            fallbackChallenge
+        );
+        const currentChallenge = playlistChallenges.find(
+            (challenge) => challenge.id === summary.challengeId
+        ) || fallbackChallenge;
+
+        await this.openDailyChallengeLeaderboardForChallenge(
+            currentChallenge,
+            returnMode,
+            {
+                ...options,
+                playlistChallenges
+            }
+        );
     }
 
     buildDailyChallengeLeaderboardRows(challenges = []) {
@@ -130,9 +259,6 @@ export class LeaderboardsUi {
         let loadedChallenges = getCachedDailyChallengePlaylist();
         let currentRows = [];
         const actions = {
-            onPlay: (challenge) => {
-                this.onStartDailyChallenge?.(challenge);
-            },
             onTrack: (challenge) => {
                 void this.openDailyChallengeLeaderboardForChallenge(challenge, 'close', {
                     onClose: () => {
@@ -170,15 +296,44 @@ export class LeaderboardsUi {
     }
 
     async openDailyChallengeLeaderboardForChallenge(challenge, returnMode = 'close', {
-        onClose = null
+        onClose = null,
+        playlistChallenges = null
     } = {}) {
         if (!challenge?.id || !challenge.trackKey || !TRACKS[challenge.trackKey]) return;
 
         const requestId = ++this._requestVersion;
+        const activeChallengeId = this.dailyChallengeUi.getSummary?.()?.challengeId || null;
+        const historyChallenges = mergeDailyChallengeHistory(
+            playlistChallenges ?? getCachedDailyChallengePlaylist(),
+            challenge
+        );
+        const leaderboardDayOptions = historyChallenges
+            .map((entry) => buildDailyChallengeLeaderboardDayOption(entry, activeChallengeId))
+            .filter(Boolean);
         const sharedOptions = {
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: challenge.trackKey,
-            scoreboardSubhead: TRACKS[challenge.trackKey].name,
+            scoreboardTitle: getDailyChallengeLeaderboardTitle(challenge, activeChallengeId),
+            scoreboardSubhead: getDailyChallengeTrackName(challenge),
+            leaderboardDayOptions,
+            selectedLeaderboardDayId: challenge.id,
+            onSelectLeaderboardDay: leaderboardDayOptions.length > 1
+                ? (selectedChallengeId) => {
+                    if (!selectedChallengeId || selectedChallengeId === challenge.id) return;
+                    const nextChallenge = historyChallenges.find(
+                        (entry) => entry.id === selectedChallengeId
+                    );
+                    if (!nextChallenge) return;
+                    void this.openDailyChallengeLeaderboardForChallenge(
+                        nextChallenge,
+                        returnMode,
+                        {
+                            onClose,
+                            playlistChallenges: historyChallenges
+                        }
+                    );
+                }
+                : null
         };
         const initialSnapshot = this.resolveInitialDailyChallengeSnapshot(challenge);
 

@@ -224,8 +224,8 @@ export class RealTimeRacer {
     this.leaderboards = new LeaderboardsUi({
       showRunsModal: (...args) => this.modal.showRunsModal(...args),
       dailyChallengeUi: this.dailyChallengeUi,
-      onStartDailyChallenge: (challenge) => {
-        void this.handleStartDailyChallenge(challenge);
+      onStartDailyChallenge: (challenge, options = {}) => {
+        void this.handleStartDailyChallenge(challenge, options);
       },
       isRunsViewActive: () => this.modal.isRunsViewActive?.(),
       updateModalScoreboardSnapshot: (snapshot) => this.modal.updateModalScoreboardSnapshot?.(snapshot),
@@ -300,7 +300,9 @@ export class RealTimeRacer {
       modal: this.modal,
       startOverlay: this.startOverlay,
       leaderboards: this.leaderboards,
-      onStartDailyChallenge: () => this.handleStartDailyChallenge(),
+      onStartDailyChallenge: () => this.handleStartDailyChallenge(null, {
+        startSource: "main_menu",
+      }),
       onOpenDailyPlaylist: () => this.openDailyChallengePlaylist(),
       onPauseRun: () => this.pauseActiveRun(),
       onHeaderMenuOpen: () => this.analytics.trackHeaderMenuOpen(),
@@ -363,6 +365,7 @@ export class RealTimeRacer {
     });
     window.addEventListener("pagehide", () => {
       this.sendMapEvent();
+      this.analytics.trackGameClosed();
     });
     window.addEventListener("online", () => {
       this.scheduleVerificationQueueProcessing(0);
@@ -406,10 +409,16 @@ export class RealTimeRacer {
     this.analytics.trackMapEvent(this.mapStats);
   }
 
-  getModeAnalyticsPayload({ trackKey = this.currentTrackKey } = {}) {
+  getModeAnalyticsPayload({
+    trackKey = this.currentTrackKey,
+    challengeId = null,
+    source = null,
+  } = {}) {
     return {
       mode: "daily",
       trackKey: trackKey || null,
+      challengeId: challengeId || null,
+      source: source || null,
     };
   }
 
@@ -419,6 +428,7 @@ export class RealTimeRacer {
   }
 
   trackModeStart(options = {}) {
+    if (!options.source) return;
     this.analytics.trackModeStarted(this.getModeAnalyticsPayload(options));
   }
 

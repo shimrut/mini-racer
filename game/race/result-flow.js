@@ -91,24 +91,30 @@ export function buildModalDeltaDisplay({
 export function buildScoreboardRankDisplay(scoreboardSnapshot, { fallbackText = 'N/A' } = {}) {
     const hasRank = Boolean(scoreboardSnapshot?.playerRankLabel);
     const isLoading = Boolean(scoreboardSnapshot?.isLoading);
+    const verificationState = typeof scoreboardSnapshot?.verificationState === 'string'
+        ? scoreboardSnapshot.verificationState.trim().toLowerCase()
+        : '';
+    const submissionStage = typeof scoreboardSnapshot?.submissionStage === 'string'
+        ? scoreboardSnapshot.submissionStage.trim().toLowerCase()
+        : '';
     const rawStatusText = typeof scoreboardSnapshot?.statusText === 'string'
         ? scoreboardSnapshot.statusText.trim()
         : '';
     const normalizedStatusText = rawStatusText.toLowerCase().replace(/\.+$/, '');
     let labelText = 'Rank';
 
-    if (normalizedStatusText === 'verifying') {
-        labelText = 'Verifying rank';
-    } else if (normalizedStatusText === 'submitting') {
-        labelText = 'Submitting rank';
-    } else if (normalizedStatusText === 'pending verification') {
-        labelText = 'Rank pending';
-    } else if (normalizedStatusText === 'queued for retry') {
-        labelText = 'Rank queued';
-    } else if (normalizedStatusText === 'retrying soon') {
-        labelText = 'Retrying rank';
-    } else if (normalizedStatusText === 'rejected') {
+    if (verificationState === 'error' || submissionStage === 'error') {
+        labelText = 'Rank error';
+    } else if (verificationState === 'rejected' || submissionStage === 'rejected' || normalizedStatusText === 'rejected') {
         labelText = 'Rank rejected';
+    } else if (submissionStage === 'verifying' || normalizedStatusText === 'verifying') {
+        labelText = 'Verifying rank';
+    } else if (submissionStage === 'submitting' || normalizedStatusText === 'submitting') {
+        labelText = 'Submitting rank';
+    } else if (submissionStage === 'pending' || normalizedStatusText === 'pending' || normalizedStatusText === 'pending verification') {
+        labelText = 'Rank pending';
+    } else if (submissionStage === 'retrying' || normalizedStatusText === 'retrying' || normalizedStatusText === 'queued for retry' || normalizedStatusText === 'retrying soon') {
+        labelText = 'Retrying rank';
     } else if (isLoading) {
         labelText = 'Loading rank';
     }
@@ -239,7 +245,17 @@ export function buildModalRunsPayload(source, {
         scoreboardTrackKey: source.scoreboardTrackKey || source.trackKey || currentTrackKey || null,
         scoreboardSnapshot: source.scoreboardSnapshot ?? null,
         scoreboardMode: source.scoreboardMode || 'daily',
+        scoreboardTitle: source.scoreboardTitle || null,
         scoreboardSubhead: source.scoreboardSubhead || null,
+        leaderboardDayOptions: Array.isArray(source.leaderboardDayOptions)
+            ? source.leaderboardDayOptions
+            : null,
+        selectedLeaderboardDayId: source.selectedLeaderboardDayId || null,
+        onSelectLeaderboardDay: typeof source.onSelectLeaderboardDay === 'function'
+            ? source.onSelectLeaderboardDay
+            : null,
+        primaryActionLabel: source.primaryActionLabel || null,
+        primaryAction: typeof source.primaryAction === 'function' ? source.primaryAction : null,
         showGlobalLeaderboard: source.showGlobalLeaderboard !== false,
         allowLeaderboardOpen: source.allowLeaderboardOpen !== false
     };
@@ -272,7 +288,17 @@ export function buildModalRunsViewOptions(payload) {
         scoreboardSnapshot: payload.scoreboardSnapshot || null,
         scoreboardMode: payload.scoreboardMode || 'daily',
         scoreboardTrackKey: payload.scoreboardTrackKey || null,
+        scoreboardTitle: payload.scoreboardTitle || null,
         scoreboardSubhead: payload.scoreboardSubhead || null,
+        leaderboardDayOptions: Array.isArray(payload.leaderboardDayOptions)
+            ? payload.leaderboardDayOptions
+            : null,
+        selectedLeaderboardDayId: payload.selectedLeaderboardDayId || null,
+        onSelectLeaderboardDay: typeof payload.onSelectLeaderboardDay === 'function'
+            ? payload.onSelectLeaderboardDay
+            : null,
+        primaryActionLabel: payload.primaryActionLabel || null,
+        primaryAction: typeof payload.primaryAction === 'function' ? payload.primaryAction : null,
         showGlobalLeaderboard: payload.showGlobalLeaderboard !== false,
         allowLeaderboardOpen: payload.allowLeaderboardOpen !== false
     };

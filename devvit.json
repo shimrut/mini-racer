@@ -1,0 +1,76 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "mini-racer",
+  "permissions": {
+    "reddit": true,
+    "redis": true
+  },
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "inline": true,
+        "height": "tall",
+        "entry": "preview.html"
+      },
+      "game": {
+        "entry": "game.html"
+      },
+      "mod-analytics": {
+        "height": "tall",
+        "entry": "mod-tool.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create Mini Racer post",
+        "description": "Publish a playable Mini Racer game post in this subreddit",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "Enable daily Mini Racer posts",
+        "description": "Create a new Mini Racer custom post every UTC day for the featured track",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-enable-daily"
+      },
+      {
+        "label": "Disable daily Mini Racer posts",
+        "description": "Stop creating daily Mini Racer custom posts for this subreddit",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-disable-daily"
+      },
+      {
+        "label": "Open Mini Racer analytics",
+        "description": "Open the moderator-only analytics tool for this subreddit",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/mod-analytics-open"
+      }
+    ]
+  },
+  "scheduler": {
+    "tasks": {
+      "daily-mini-racer-posts": {
+        "endpoint": "/internal/scheduler/daily-posts",
+        "cron": "5 0 * * *"
+      }
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dev": {
+    "subreddit": "mini_racer_dev"
+  }
+}

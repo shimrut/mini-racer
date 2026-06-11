@@ -66,16 +66,21 @@ export class StartOverlay {
         if (startBtn) {
             startBtn.style.display = "inline-flex";
             startBtn.disabled = !hasChallenge;
-            
+
             const labelSpan = startBtn.querySelector(".main-menu__label");
             if (labelSpan) {
                 if (hasChallenge) {
                     const summary = this.dailyChallengeUi?.getSummary?.();
                     const trackName = summary?.trackName || "Daily challenge";
-                    labelSpan.innerHTML = `
-                        <div class="start-btn-main">Start Race</div>
-                        <div class="start-btn-sub">${trackName}</div>
-                    `;
+                    const primaryLabel = document.createElement("span");
+                    primaryLabel.className = "start-btn-main";
+                    primaryLabel.textContent = "Start Race";
+
+                    const secondaryLabel = document.createElement("span");
+                    secondaryLabel.className = "start-btn-sub";
+                    secondaryLabel.textContent = trackName;
+
+                    labelSpan.replaceChildren(primaryLabel, secondaryLabel);
                 } else {
                     labelSpan.textContent = "Challenge unavailable";
                 }

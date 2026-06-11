@@ -374,7 +374,7 @@ export const dailyChallengeEngineMethods = {
     this.updateDailyChallengeHud();
   },
 
-  async handleStartDailyChallenge(challengeOverride = null) {
+  async handleStartDailyChallenge(challengeOverride = null, options = {}) {
     const challenge = challengeOverride || this.currentDailyChallenge || this.activeDailyChallenge;
     const replacesCurrentRun = Boolean(challengeOverride) && this.status !== "ready";
     if (
@@ -422,9 +422,14 @@ export const dailyChallengeEngineMethods = {
       }
 
       this.applyDailyChallenge(challenge);
-      this.trackModeStart({
+      const modeStartPayload = {
         trackKey: challenge.trackKey,
-      });
+      };
+      if (options.startSource) {
+        modeStartPayload.challengeId = challenge.id;
+        modeStartPayload.source = options.startSource;
+      }
+      this.trackModeStart(modeStartPayload);
       if (this.currentTrackMapSelectionPending) {
         this.bumpMapSelectionForCurrentTrack();
         this.currentTrackMapSelectionPending = false;
@@ -441,7 +446,9 @@ export const dailyChallengeEngineMethods = {
     let playlistRequestNeeded = false;
     const playlistActions = {
       onPlay: (challenge) => {
-        void this.handleStartDailyChallenge(challenge);
+        void this.handleStartDailyChallenge(challenge, {
+          startSource: "track_modal",
+        });
       },
       onLeaderboard: (challenge) => {
         void this.leaderboards?.openDailyChallengeLeaderboardForChallenge?.(
@@ -666,6 +673,12 @@ export const dailyChallengeEngineMethods = {
             ? lastRunLap.deltaVsBest
             : null;
     this.hud.syncHud({ time: finalTime, speed: this.cachedSpeed, force: true });
+    this.analytics?.trackRaceEnded?.({
+      cause: "finish",
+      trackKey: challenge.trackKey,
+      challengeId: challenge.id,
+      runTimeSec: finalTime,
+    });
     this.hud.setBestTime(this.bestLapTime, {
       persistToTrackCard: false,
     });
@@ -702,9 +715,9 @@ export const dailyChallengeEngineMethods = {
         scoreboardSnapshot: isNewBest
           ? {
               ...createVerificationSnapshot({
-                statusText: "Verifying...",
                 verificationState: "pending",
                 isLoading: true,
+                submissionStage: "submitting",
               }),
               currentPlayerRow: {
                 isCurrentPlayer: true,
@@ -826,6 +839,20 @@ export const dailyChallengeEngineMethods = {
 
   restartDailyChallenge() {
     if (!this.activeDailyChallenge) return;
+
+    if (this.status === "crashed") {
+      this.analytics?.trackRaceRestarted?.({
+        source: "manual_restart_after_crash",
+        trackKey: this.activeDailyChallenge.trackKey,
+        challengeId: this.activeDailyChallenge.id,
+      });
+    } else if (this.status === "won") {
+      this.analytics?.trackRaceRestarted?.({
+        source: "improve_restart_after_win",
+        trackKey: this.activeDailyChallenge.trackKey,
+        challengeId: this.activeDailyChallenge.id,
+      });
+    }
 
     this.trackModeStart({
       trackKey: this.activeDailyChallenge.trackKey,

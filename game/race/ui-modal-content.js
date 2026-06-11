@@ -652,17 +652,9 @@ export class ModalContentUi {
         trackKey = null,
         lapCheckpointTimes = null,
         pbCheckpointTimes = null,
-        pbFinishSec = null,
-        crashImpact = null,
-        crashElapsedSec = null,
-        crashCombined = false
+        pbFinishSec = null
     } = {}) {
         if (!container) return;
-
-        const isCrashCombined =
-            crashCombined === true
-            || (typeof title === 'string' && title.toUpperCase().includes('CRASH'));
-        container.classList.toggle('is-crash', isCrashCombined);
 
         const heroMedalEl = container.querySelector('#combined-hero-medal');
         const rightGroupEl = container.querySelector('#combined-stats-right-group');
@@ -678,13 +670,6 @@ export class ModalContentUi {
 
         if (heroMedalEl) {
             heroMedalEl.replaceChildren();
-        }
-
-        if (isCrashCombined) {
-            if (heroMedalEl) {
-                heroMedalEl.appendChild(createCrashMedalHeroIcon());
-            }
-        } else if (heroMedalEl) {
             renderWinCombinedMedalOverlay(heroMedalEl, {
                 trackKey,
                 lapTimeSec: time,
@@ -694,226 +679,171 @@ export class ModalContentUi {
             });
         }
         
-        const formatStat = (val, label) => {
-            if (!Number.isFinite(val)) return '--';
-            if (label.includes('TIME') || label.includes('LAP')) {
-                // Special case: 'TOTAL LAPS' is not a time
-                if (label === 'TOTAL LAPS') return val.toString();
-                return this.formatTime(val);
-            }
-            return val.toString();
-        };
-
-        if (isCrashCombined) {
-            if (label1El) {
-                label1El.hidden = true;
-                label1El.setAttribute('hidden', '');
-                label1El.setAttribute('aria-hidden', 'true');
-            }
-            if (label2El) {
-                label2El.hidden = true;
-                label2El.setAttribute('hidden', '');
-                label2El.setAttribute('aria-hidden', 'true');
-            }
-            if (rightGroupEl) {
-                rightGroupEl.hidden = true;
-                rightGroupEl.setAttribute('hidden', '');
-                rightGroupEl.setAttribute('aria-hidden', 'true');
-            }
-            if (rankValueEl) rankValueEl.textContent = '';
-            if (rankTotalEl) rankTotalEl.textContent = '';
-            if (nextMedalStatEl) {
-                nextMedalStatEl.hidden = true;
-                nextMedalStatEl.setAttribute('hidden', '');
-                nextMedalStatEl.setAttribute('aria-hidden', 'true');
-                nextMedalStatEl.removeAttribute('aria-label');
-            }
-            if (nextMedalIconSlot) nextMedalIconSlot.replaceChildren();
-            if (nextMedalTimeEl) nextMedalTimeEl.textContent = '';
-            if (timeEl) {
-                timeEl.textContent = Number.isFinite(crashImpact) ? `${Math.round(crashImpact)} KPH` : '—';
-                timeEl.classList.add('combined-stat-value--impact');
-            }
-            if (bestLapEl) {
-                const crashStatRow = bestLapEl.closest('.combined-stat--pb-delta');
-                if (crashStatRow) {
-                    crashStatRow.hidden = true;
-                    crashStatRow.setAttribute('hidden', '');
-                    crashStatRow.setAttribute('aria-hidden', 'true');
+        if (label2El) {
+            label2El.hidden = false;
+            label2El.removeAttribute('hidden');
+            label2El.removeAttribute('aria-hidden');
+            label2El.textContent = 'BEST LAP';
+        }
+        if (rankValueEl) {
+            const rankDisplay = buildScoreboardRankDisplay(scoreboardSnapshot);
+            if (rankDisplay.isLoading) {
+                if (rightGroupEl) {
+                    rightGroupEl.hidden = false;
+                    rightGroupEl.removeAttribute('hidden');
+                    rightGroupEl.removeAttribute('aria-hidden');
                 }
-                bestLapEl.textContent = '';
-            }
-        } else {
-            if (label1El) {
-                label1El.hidden = true;
-                label1El.setAttribute('hidden', '');
-                label1El.setAttribute('aria-hidden', 'true');
-            }
-            if (label2El) {
-                label2El.hidden = true;
-                label2El.setAttribute('hidden', '');
-                label2El.setAttribute('aria-hidden', 'true');
-            }
-            if (rankValueEl) {
-                const rankDisplay = buildScoreboardRankDisplay(scoreboardSnapshot);
-                if (rankDisplay.isLoading) {
-                    if (rightGroupEl) {
-                        rightGroupEl.hidden = false;
-                        rightGroupEl.removeAttribute('hidden');
-                        rightGroupEl.removeAttribute('aria-hidden');
-                    }
-                    rankValueEl.textContent = '--';
-                    if (rankTotalEl) {
+                rankValueEl.textContent = '--';
+                if (rankTotalEl) {
+                    rankTotalEl.textContent = '';
+                    rankTotalEl.hidden = true;
+                    rankTotalEl.setAttribute('hidden', '');
+                }
+            } else if (!rankDisplay.text || rankDisplay.text === 'N/A') {
+                if (rightGroupEl) {
+                    rightGroupEl.hidden = true;
+                    rightGroupEl.setAttribute('hidden', '');
+                    rightGroupEl.setAttribute('aria-hidden', 'true');
+                }
+                rankValueEl.textContent = '';
+                if (rankTotalEl) rankTotalEl.textContent = '';
+            } else {
+                if (rightGroupEl) {
+                    rightGroupEl.hidden = false;
+                    rightGroupEl.removeAttribute('hidden');
+                    rightGroupEl.removeAttribute('aria-hidden');
+                }
+                const rankText = rankDisplay.text || '';
+                if (rankText.startsWith('#')) {
+                    rankValueEl.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
+                } else {
+                    rankValueEl.textContent = rankText;
+                }
+                
+                const totalRaw = Number(scoreboardSnapshot?.totalCount);
+                const totalVal = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
+                if (rankTotalEl) {
+                    if (totalVal > 0) {
+                        rankTotalEl.textContent = `of ${totalVal.toLocaleString()}`;
+                        rankTotalEl.hidden = false;
+                        rankTotalEl.removeAttribute('hidden');
+                    } else {
                         rankTotalEl.textContent = '';
                         rankTotalEl.hidden = true;
                         rankTotalEl.setAttribute('hidden', '');
                     }
-                } else if (!rankDisplay.text || rankDisplay.text === 'N/A') {
-                    if (rightGroupEl) {
-                        rightGroupEl.hidden = true;
-                        rightGroupEl.setAttribute('hidden', '');
-                        rightGroupEl.setAttribute('aria-hidden', 'true');
-                    }
-                    rankValueEl.textContent = '';
-                    if (rankTotalEl) rankTotalEl.textContent = '';
-                } else {
-                    if (rightGroupEl) {
-                        rightGroupEl.hidden = false;
-                        rightGroupEl.removeAttribute('hidden');
-                        rightGroupEl.removeAttribute('aria-hidden');
-                    }
-                    const rankText = rankDisplay.text || '';
-                    if (rankText.startsWith('#')) {
-                        rankValueEl.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
-                    } else {
-                        rankValueEl.textContent = rankText;
-                    }
-                    
-                    const totalRaw = Number(scoreboardSnapshot?.totalCount);
-                    const totalVal = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
-                    if (rankTotalEl) {
-                        if (totalVal > 0) {
-                            rankTotalEl.textContent = `of ${totalVal.toLocaleString()}`;
-                            rankTotalEl.hidden = false;
-                            rankTotalEl.removeAttribute('hidden');
-                        } else {
-                            rankTotalEl.textContent = '';
-                            rankTotalEl.hidden = true;
-                            rankTotalEl.setAttribute('hidden', '');
-                        }
-                    }
                 }
             }
-            if (timeEl) {
-                timeEl.innerHTML = Number.isFinite(time)
-                    ? `<span class="time-num">${time.toFixed(2)}</span><span class="time-unit">s</span>`
-                    : '--';
-                timeEl.classList.remove('combined-stat-value--impact');
+        }
+        if (timeEl) {
+            timeEl.innerHTML = Number.isFinite(time)
+                ? `<span class="time-num">${time.toFixed(2)}</span><span class="time-unit">s</span>`
+                : '--';
+            timeEl.classList.remove('combined-stat-value--impact');
 
-                const checkpointTimes = Array.isArray(lapCheckpointTimes)
-                    ? lapCheckpointTimes
-                    : [];
-                const pbCheckpoints = Array.isArray(pbCheckpointTimes)
-                    ? pbCheckpointTimes
-                    : [];
-                const hasSplits =
-                    checkpointTimes.length > 0 || Number.isFinite(time);
-                if (hasSplits) {
-                    timeEl.classList.add('combined-stat-value--interactive');
-                    timeEl.setAttribute('role', 'button');
-                    timeEl.setAttribute('tabindex', '0');
-                    timeEl.setAttribute('aria-label', 'View checkpoint split times');
+            const checkpointTimes = Array.isArray(lapCheckpointTimes)
+                ? lapCheckpointTimes
+                : [];
+            const pbCheckpoints = Array.isArray(pbCheckpointTimes)
+                ? pbCheckpointTimes
+                : [];
+            const hasSplits =
+                checkpointTimes.length > 0 || Number.isFinite(time);
+            if (hasSplits) {
+                timeEl.classList.add('combined-stat-value--interactive');
+                timeEl.setAttribute('role', 'button');
+                timeEl.setAttribute('tabindex', '0');
+                timeEl.setAttribute('aria-label', 'View checkpoint split times');
 
-                    const openSplitsPopover = () => {
-                        mountCombinedPopoverOverlay(container, {
-                            title: 'SPLIT TIMES',
-                            overlayClass: 'combined-lap-splits-overlay',
-                            buildRows: (listEl) => {
-                                const addSplitRow = (labelText, valueText, deltaSec) => {
-                                    const row = document.createElement('div');
-                                    row.className = 'combined-medal-times-row combined-medal-times-row--split';
+                const openSplitsPopover = () => {
+                    mountCombinedPopoverOverlay(container, {
+                        title: 'SPLIT TIMES',
+                        overlayClass: 'combined-lap-splits-overlay',
+                        buildRows: (listEl) => {
+                            const addSplitRow = (labelText, valueText, deltaSec) => {
+                                const row = document.createElement('div');
+                                row.className = 'combined-medal-times-row combined-medal-times-row--split';
 
-                                    const label = document.createElement('span');
-                                    label.className = 'combined-medal-times-label';
-                                    label.textContent = labelText;
+                                const label = document.createElement('span');
+                                label.className = 'combined-medal-times-label';
+                                label.textContent = labelText;
 
-                                    const valueEl = document.createElement('span');
-                                    valueEl.className = 'combined-medal-times-time';
-                                    valueEl.textContent = valueText;
+                                const valueEl = document.createElement('span');
+                                valueEl.className = 'combined-medal-times-time';
+                                valueEl.textContent = valueText;
 
-                                    const deltaEl = document.createElement('span');
-                                    deltaEl.className = 'combined-lap-speed-delta';
-                                    const deltaDisplay = formatSplitTimeDeltaSec(deltaSec);
-                                    if (deltaDisplay) {
-                                        deltaEl.textContent = deltaDisplay.text;
-                                        if (deltaDisplay.isGain) deltaEl.classList.add('is-gain');
-                                        if (deltaDisplay.isLoss) deltaEl.classList.add('is-loss');
-                                    } else {
-                                        deltaEl.textContent = '—';
-                                        deltaEl.classList.add('combined-lap-speed-delta--empty');
-                                    }
-
-                                    row.appendChild(label);
-                                    row.appendChild(valueEl);
-                                    row.appendChild(deltaEl);
-                                    listEl.appendChild(row);
-                                };
-
-                                checkpointTimes.forEach((splitSec, index) => {
-                                    const pbSec = pbCheckpoints[index];
-                                    const deltaSec =
-                                        Number.isFinite(splitSec) && Number.isFinite(pbSec)
-                                            ? splitSec - pbSec
-                                            : null;
-                                    addSplitRow(
-                                        `CP ${index + 1}`,
-                                        Number.isFinite(splitSec)
-                                            ? `${splitSec.toFixed(2)}s`
-                                            : '--',
-                                        deltaSec,
-                                    );
-                                });
-
-                                if (Number.isFinite(time)) {
-                                    const deltaFinish =
-                                        Number.isFinite(pbFinishSec)
-                                            ? time - pbFinishSec
-                                            : null;
-                                    addSplitRow(
-                                        'FINISH',
-                                        `${time.toFixed(2)}s`,
-                                        deltaFinish,
-                                    );
+                                const deltaEl = document.createElement('span');
+                                deltaEl.className = 'combined-lap-speed-delta';
+                                const deltaDisplay = formatSplitTimeDeltaSec(deltaSec);
+                                if (deltaDisplay) {
+                                    deltaEl.textContent = deltaDisplay.text;
+                                    if (deltaDisplay.isGain) deltaEl.classList.add('is-gain');
+                                    if (deltaDisplay.isLoss) deltaEl.classList.add('is-loss');
+                                } else {
+                                    deltaEl.textContent = '—';
+                                    deltaEl.classList.add('combined-lap-speed-delta--empty');
                                 }
-                            },
-                        });
-                    };
 
-                    timeEl.onclick = openSplitsPopover;
-                    timeEl.onkeydown = (event) => {
-                        if (event.key !== 'Enter' && event.key !== ' ') return;
-                        event.preventDefault();
-                        openSplitsPopover();
-                    };
-                } else {
-                    timeEl.classList.remove('combined-stat-value--interactive');
-                    timeEl.removeAttribute('role');
-                    timeEl.removeAttribute('tabindex');
-                    timeEl.removeAttribute('aria-label');
-                    timeEl.onclick = null;
-                    timeEl.onkeydown = null;
-                }
+                                row.appendChild(label);
+                                row.appendChild(valueEl);
+                                row.appendChild(deltaEl);
+                                listEl.appendChild(row);
+                            };
+
+                            checkpointTimes.forEach((splitSec, index) => {
+                                const pbSec = pbCheckpoints[index];
+                                const deltaSec =
+                                    Number.isFinite(splitSec) && Number.isFinite(pbSec)
+                                        ? splitSec - pbSec
+                                        : null;
+                                addSplitRow(
+                                    `CP ${index + 1}`,
+                                    Number.isFinite(splitSec)
+                                        ? `${splitSec.toFixed(2)}s`
+                                        : '--',
+                                    deltaSec,
+                                );
+                            });
+
+                            if (Number.isFinite(time)) {
+                                const deltaFinish =
+                                    Number.isFinite(pbFinishSec)
+                                        ? time - pbFinishSec
+                                        : null;
+                                addSplitRow(
+                                    'FINISH',
+                                    `${time.toFixed(2)}s`,
+                                    deltaFinish,
+                                );
+                            }
+                        },
+                    });
+                };
+
+                timeEl.onclick = openSplitsPopover;
+                timeEl.onkeydown = (event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    openSplitsPopover();
+                };
+            } else {
+                timeEl.classList.remove('combined-stat-value--interactive');
+                timeEl.removeAttribute('role');
+                timeEl.removeAttribute('tabindex');
+                timeEl.removeAttribute('aria-label');
+                timeEl.onclick = null;
+                timeEl.onkeydown = null;
             }
-            if (bestLapEl) {
-                this._applyCombinedWinPbDelta(
-                    bestLapEl,
-                    time,
-                    previousPersonalBestSec,
-                    bestLap,
-                    deltaToPersonalBest,
-                );
-                bestLapEl.classList.remove('combined-stat-value--impact');
-            }
+        }
+        if (bestLapEl) {
+            this._applyCombinedWinPbDelta(
+                bestLapEl,
+                time,
+                previousPersonalBestSec,
+                bestLap,
+                deltaToPersonalBest,
+            );
+            bestLapEl.classList.remove('combined-stat-value--impact');
         }
 
         if (nextMedalStatEl) {

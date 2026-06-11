@@ -5,7 +5,7 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from '../track/presentation.js?v=2.09';
-import { createMedalIconSvg } from '../medals/medal-icon.js?v=2.09';
+import { createMedalIconSvg, createCrashMedalHeroIcon } from '../medals/medal-icon.js?v=2.09';
 import {
     getMedalRowSlots,
 } from '../medals/medals.js?v=2.09';
@@ -158,7 +158,8 @@ export class ModalShell {
     _syncPauseTrackPreview(payload) {
         const wrap = document.getElementById('modal-pause-track-preview-wrap');
         const canvas = document.getElementById('modal-pause-track-preview');
-        if (!wrap || !canvas) return;
+        const nameEl = document.getElementById('modal-pause-track-name');
+
         if (!payload?.trackKey) {
             this._hidePauseTrackPreview();
             return;
@@ -168,6 +169,21 @@ export class ModalShell {
             this._hidePauseTrackPreview();
             return;
         }
+
+        const labelName = (typeof payload.trackName === 'string' && payload.trackName.trim())
+            ? payload.trackName.trim()
+            : (track.name || payload.trackKey);
+
+        if (nameEl) {
+            nameEl.textContent = labelName;
+        }
+
+        this._renderPauseTrackProgress(
+            document.getElementById('modal-pause-race-stats'),
+            payload,
+        );
+
+        if (!wrap || !canvas) return;
 
         const presentation = payload.skin
             ? resolveTrackPresentation(payload.trackKey, {
@@ -184,19 +200,6 @@ export class ModalShell {
 
         wrap.hidden = false;
         wrap.setAttribute('aria-hidden', 'false');
-
-        const nameEl = document.getElementById('modal-pause-track-name');
-        const labelName = (typeof payload.trackName === 'string' && payload.trackName.trim())
-            ? payload.trackName.trim()
-            : (track.name || payload.trackKey);
-        if (nameEl) {
-            nameEl.textContent = labelName;
-        }
-
-        this._renderPauseTrackProgress(
-            document.getElementById('modal-pause-race-stats'),
-            payload,
-        );
 
         canvas.setAttribute('aria-label', `Track layout: ${labelName}`);
 
@@ -221,6 +224,7 @@ export class ModalShell {
     get modalMsg() { return document.getElementById('modal-msg'); }
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
     get modalStatsRow() { return document.getElementById('modal-stats-row'); }
+    get modalRunsPrimaryBtn() { return document.getElementById('modal-runs-primary-btn'); }
     get backToMainBtn() { return document.getElementById('back-to-main-btn'); }
     get modalMainView() { return document.getElementById('modal-main-view'); }
     get modalRunsView() { return document.getElementById('modal-runs-view'); }
@@ -331,8 +335,13 @@ export class ModalShell {
             this.modalLapTimes.replaceChildren();
         }
 
-        if (this._modalKind === 'win' || this._modalKind === 'crash') {
+        if (this._modalKind === 'win') {
             this.showCombinedResults(lapData, options);
+            return;
+        }
+
+        if (this._modalKind === 'crash') {
+            this.showCrashResults(lapData, options);
             return;
         }
 
@@ -373,29 +382,58 @@ export class ModalShell {
         });
     }
 
+    showCrashResults(lapData, options = {}) {
+        if (!this.modal || !this.modalMainView) return;
+
+        this.cancelPendingModalClose();
+        this._bindClickAction(document.getElementById('modal-crash-menu-btn'), options.secondaryAction);
+        this._bindClickAction(document.getElementById('modal-crash-playlist-btn'), options.playlistAction);
+        this._bindClickAction(document.getElementById('modal-crash-retry-btn'), options.restartAction || options.primaryAction);
+
+        const msgEl = document.getElementById('modal-msg');
+        if (msgEl) {
+            msgEl.hidden = false;
+            msgEl.removeAttribute('hidden');
+            msgEl.style.display = 'block';
+            msgEl.textContent = `${Math.round(lapData?.impact || 0)} KPH`;
+        }
+
+        const iconContainer = document.getElementById('modal-crash-icon-container');
+        if (iconContainer) {
+            iconContainer.replaceChildren(createCrashMedalHeroIcon({ className: 'medal-svg--crash-modal' }));
+        }
+
+        this.modalRunsView?.classList.remove('active-view');
+        this.modalPauseView?.classList.remove('active-view');
+        this.modalCombinedView?.classList.remove('active-view');
+        this.modalMainView.classList.add('active-view');
+
+        openModalElement(this.modal, () => this.modal.classList.add('active'));
+        scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
+    }
+
     showCombinedResults(lapData, options = {}) {
         if (!this.modal || !this.modalCombinedView) return;
 
         this.cancelPendingModalClose();
-        const isCrash = this._modalKind === 'crash';
 
         this.content.renderCombinedResults(this.modalCombinedView, {
             time: lapData.lapTime,
             bestLap: lapData.bestTime,
-            crashImpact: isCrash ? lapData.impact : null,
-            crashElapsedSec: isCrash ? lapData.currentTime : null,
+            crashImpact: null,
+            crashElapsedSec: null,
             scoreboardSnapshot: lapData.scoreboardSnapshot,
-            title: isCrash ? 'CRASHED' : 'RACE COMPLETE',
-            statLabels: isCrash ? ['IMPACT', 'RUN TIME'] : ['THIS LAP'],
-            lapMedal: isCrash ? null : (lapData.lapMedal ?? null),
-            previousPersonalBestSec: isCrash ? undefined : lapData.previousPersonalBestSec,
-            deltaToPersonalBest: isCrash ? undefined : lapData.deltaToPersonalBest,
-            previousTrackMedal: isCrash ? null : (lapData.previousTrackMedal ?? null),
+            title: 'RACE COMPLETE',
+            statLabels: ['THIS LAP'],
+            lapMedal: lapData.lapMedal ?? null,
+            previousPersonalBestSec: lapData.previousPersonalBestSec,
+            deltaToPersonalBest: lapData.deltaToPersonalBest,
+            previousTrackMedal: lapData.previousTrackMedal ?? null,
             trackKey: lapData.trackKey || this.getCurrentTrackKey(),
-            lapCheckpointTimes: isCrash ? null : lapData.lapCheckpointTimes,
-            pbCheckpointTimes: isCrash ? null : lapData.pbCheckpointTimes,
-            pbFinishSec: isCrash ? null : lapData.pbFinishSec,
-            crashCombined: isCrash
+            lapCheckpointTimes: lapData.lapCheckpointTimes,
+            pbCheckpointTimes: lapData.pbCheckpointTimes,
+            pbFinishSec: lapData.pbFinishSec,
+            crashCombined: false
         });
 
         const finishResultModal = (fn) => {
@@ -405,10 +443,10 @@ export class ModalShell {
 
         if (this.combinedRestartBtn) {
             const labelSpan = this.combinedRestartBtn.querySelector('.combined-action-btn-label');
-            if (labelSpan) labelSpan.textContent = isCrash ? 'RETRY' : 'IMPROVE';
+            if (labelSpan) labelSpan.textContent = 'IMPROVE';
             this.combinedRestartBtn.setAttribute(
                 'aria-label',
-                isCrash ? 'Restart race' : 'Improve time'
+                'Improve time'
             );
         }
 
@@ -445,7 +483,7 @@ export class ModalShell {
         openModalElement(this.modal, () => this.modal.classList.add('active'));
 
         const heroMedalEl = this.modalCombinedView?.querySelector('#combined-hero-medal');
-        const previousTrackMedal = isCrash ? null : (lapData.previousTrackMedal ?? null);
+        const previousTrackMedal = lapData.previousTrackMedal ?? null;
         const trackKey = lapData.trackKey || this.getCurrentTrackKey();
         const shouldCelebrateTier = (tier) => shouldCelebrateMedalTier(tier, previousTrackMedal, {
             trackKey,
@@ -473,7 +511,13 @@ export class ModalShell {
         scoreboardSnapshot = null,
         scoreboardChallengeId = null,
         scoreboardTrackKey = null,
+        scoreboardTitle = null,
         scoreboardSubhead = null,
+        leaderboardDayOptions = null,
+        selectedLeaderboardDayId = null,
+        onSelectLeaderboardDay = null,
+        primaryActionLabel = null,
+        primaryAction = null,
         showGlobalLeaderboard = true,
         allowLeaderboardOpen = true,
         onClose = null
@@ -515,7 +559,13 @@ export class ModalShell {
             scoreboardTrackKey,
             scoreboardSnapshot,
             scoreboardMode: TRACK_MODE_DAILY_GP,
+            scoreboardTitle,
             scoreboardSubhead,
+            leaderboardDayOptions,
+            selectedLeaderboardDayId,
+            onSelectLeaderboardDay,
+            primaryActionLabel,
+            primaryAction,
             showGlobalLeaderboard,
             allowLeaderboardOpen
         }, {
@@ -524,6 +574,8 @@ export class ModalShell {
         this._runsViewMode = returnMode === 'back' ? 'back' : 'close';
         this._runsCloseAction = typeof onClose === 'function' ? onClose : null;
         this.configureRunsModalHeader?.();
+        this.configureRunsModalActions?.();
+        this.renderLeaderboardStandaloneIntro?.();
         if (this._modalRunsPayload.showGlobalLeaderboard) {
             this.content.renderScoreboardList(
                 this.modalLapTimes,
@@ -534,6 +586,12 @@ export class ModalShell {
                 { showHeader: hasPersonalBestList }
             );
         }
+
+        const rail = this.modalLapTimes.querySelector('.leaderboard-day-rail');
+        if (rail) {
+            this.modalLapTimes.appendChild(rail);
+        }
+
         if (this.backToMainBtn) {
             const labelText = this._runsViewMode === 'back' ? 'Back' : 'Close';
             this.backToMainBtn.setAttribute('aria-label', labelText);
@@ -546,7 +604,11 @@ export class ModalShell {
         if (wasActive) {
             scheduleAfterModalPaint(() => {
                 this.content.centerLeaderboardCurrentRow();
-                if (this.backToMainBtn) this.backToMainBtn.focus();
+                if (this.modalRunsPrimaryBtn && !this.modalRunsPrimaryBtn.hidden) {
+                    this.modalRunsPrimaryBtn.focus();
+                } else if (this.backToMainBtn) {
+                    this.backToMainBtn.focus();
+                }
             });
             return;
         }
@@ -559,6 +621,7 @@ export class ModalShell {
     closeModal() {
         if (!this.modal) return;
 
+        this._leaderboardRailScrollLeft = null;
         const modal = this.modal;
         closeModalElement(modal, () => modal.classList.remove('active'));
         this.cancelLeaderboardRequests?.();
@@ -584,6 +647,10 @@ export class ModalShell {
             this._savedModalKind = null;
             this._savedMainModalIsCrash = false;
             this.releaseModalFocusTrap(modal);
+            if (this.modalRunsPrimaryBtn) {
+                this.modalRunsPrimaryBtn.hidden = true;
+                this._bindClickAction(this.modalRunsPrimaryBtn, null);
+            }
         };
 
         const onTransitionEnd = (event) => {
@@ -846,9 +913,20 @@ export class ModalShell {
             label.textContent = rankDisplay.labelText;
         }
 
+        const shouldShowStatusText = Boolean(rankDisplay.statusText)
+            && (
+                rankDisplay.isLoading
+                || !rankDisplay.text
+                || rankDisplay.text === 'N/A'
+                || scoreboardSnapshot?.verificationState === 'error'
+                || scoreboardSnapshot?.verificationState === 'rejected'
+            );
+
         value.replaceChildren();
         value.toggleAttribute('aria-busy', rankDisplay.isLoading);
-        value.textContent = rankDisplay.text || (rankDisplay.isLoading ? rankDisplay.statusText || '' : '');
+        value.textContent = shouldShowStatusText
+            ? rankDisplay.statusText || ''
+            : rankDisplay.text || (rankDisplay.isLoading ? rankDisplay.statusText || '' : '');
         if (rankDisplay.isLoading) {
             const spinner = document.createElement('span');
             spinner.className = 'modal-rank-spinner';
@@ -908,13 +986,34 @@ export class ModalShell {
             }
 
             const rankDisplay = buildScoreboardRankDisplay(scoreboardSnapshot);
+            const shouldShowStatusText = Boolean(rankDisplay.statusText)
+                && (
+                    rankDisplay.isLoading
+                    || !rankDisplay.text
+                    || rankDisplay.text === 'N/A'
+                    || scoreboardSnapshot?.verificationState === 'error'
+                    || scoreboardSnapshot?.verificationState === 'rejected'
+                );
+            rankValueEl.classList.toggle('combined-rank-value--status', shouldShowStatusText);
             if (rankDisplay.isLoading) {
                 if (rightGroupEl) {
                     rightGroupEl.hidden = false;
                     rightGroupEl.removeAttribute('hidden');
                     rightGroupEl.removeAttribute('aria-hidden');
                 }
-                rankValueEl.textContent = '--';
+                rankValueEl.textContent = rankDisplay.statusText || '--';
+                if (rankTotalEl) {
+                    rankTotalEl.textContent = '';
+                    rankTotalEl.hidden = true;
+                    rankTotalEl.setAttribute('hidden', '');
+                }
+            } else if (shouldShowStatusText) {
+                if (rightGroupEl) {
+                    rightGroupEl.hidden = false;
+                    rightGroupEl.removeAttribute('hidden');
+                    rightGroupEl.removeAttribute('aria-hidden');
+                }
+                rankValueEl.textContent = rankDisplay.statusText || '';
                 if (rankTotalEl) {
                     rankTotalEl.textContent = '';
                     rankTotalEl.hidden = true;
@@ -1044,6 +1143,97 @@ export class ModalShell {
         );
     }
 
+    renderLeaderboardStandaloneIntro() {
+        if (!this.modalLapTimes) return;
+
+        const payload = this._modalRunsPayload;
+        const hasPersonalBestList = Array.isArray(payload?.lapTimesArray);
+        const isLeaderboardOnly = Boolean(payload?.showGlobalLeaderboard) && !hasPersonalBestList;
+        const isDailyChallengeLeaderboard = Boolean(payload?.scoreboardChallengeId)
+            || Array.isArray(payload?.leaderboardDayOptions);
+        if (!isLeaderboardOnly || !isDailyChallengeLeaderboard) return;
+
+        const trackName = payload?.scoreboardTrackKey && TRACKS[payload.scoreboardTrackKey]
+            ? TRACKS[payload.scoreboardTrackKey].name
+            : 'This track';
+        const rankDisplay = buildScoreboardRankDisplay(
+            payload?.scoreboardSnapshot,
+            { fallbackText: '—' }
+        );
+        const totalCount = Math.max(0, Math.trunc(Number(payload?.scoreboardSnapshot?.totalCount)));
+        const hero = document.createElement('section');
+        hero.className = 'leaderboard-spotlight';
+
+        const heroContext = document.createElement('div');
+        heroContext.className = 'leaderboard-spotlight__context';
+        heroContext.style.flexDirection = 'row';
+        heroContext.style.alignItems = 'center';
+        heroContext.style.gap = '0.5rem';
+
+        const heroTitle = document.createElement('span');
+        heroTitle.className = 'leaderboard-spotlight__title';
+        heroTitle.textContent = payload?.scoreboardSubhead || trackName;
+
+        const heroMeta = document.createElement('span');
+        heroMeta.className = 'leaderboard-spotlight__meta';
+        heroMeta.style.marginLeft = 'auto';
+        if (totalCount > 0) {
+            heroMeta.innerHTML = `<svg style="height: 0.85em; margin-right: 4px; vertical-align: -0.125em;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><path fill="currentColor" d="M320 16a104 104 0 1 1 0 208 104 104 0 1 1 0-208zM96 88a72 72 0 1 1 0 144 72 72 0 1 1 0-144zM0 416c0-70.7 57.3-128 128-128 12.8 0 25.2 1.9 36.9 5.4-32.9 36.8-52.9 85.4-52.9 138.6l0 16c0 11.4 2.4 22.2 6.7 32L32 480c-17.7 0-32-14.3-32-32l0-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32l0-16c0-53.2-20-101.8-52.9-138.6 11.7-3.5 24.1-5.4 36.9-5.4 70.7 0 128 57.3 128 128l0 32c0 17.7-14.3 32-32 32l-86.7 0zM472 160a72 72 0 1 1 144 0 72 72 0 1 1 -144 0zM160 432c0-88.4 71.6-160 160-160s160 71.6 160 160l0 16c0 17.7-14.3 32-32 32l-256 0c-17.7 0-32-14.3-32-32l0-16z"/></svg>${totalCount.toLocaleString()}`;
+        } else {
+            heroMeta.textContent = rankDisplay.isLoading ? 'Loading standings...' : '0';
+        }
+
+        heroContext.append(heroTitle, heroMeta);
+        hero.append(heroContext);
+        this.modalLapTimes.appendChild(hero);
+
+        if (
+            !Array.isArray(payload?.leaderboardDayOptions)
+            || payload.leaderboardDayOptions.length <= 1
+        ) {
+            return;
+        }
+
+        const rail = document.createElement('div');
+        rail.className = 'leaderboard-day-rail';
+        rail.setAttribute('role', 'tablist');
+        rail.setAttribute('aria-label', 'Leaderboard days');
+
+        for (const option of payload.leaderboardDayOptions) {
+            const button = document.createElement('button');
+            const isSelected = option?.challengeId === payload?.selectedLeaderboardDayId;
+            button.className = `leaderboard-day-chip${isSelected ? ' is-selected' : ''}`;
+            button.type = 'button';
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+            button.setAttribute(
+                'aria-label',
+                `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
+            );
+            button.disabled = isSelected;
+            button.addEventListener('click', () => {
+                this._leaderboardRailScrollLeft = rail.scrollLeft;
+                payload?.onSelectLeaderboardDay?.(option?.challengeId);
+            });
+
+            const dayLabel = document.createElement('span');
+            dayLabel.className = 'leaderboard-day-chip__day';
+            if (option?.dayLabel === 'Today') {
+                dayLabel.textContent = 'Today';
+            } else {
+                dayLabel.textContent = option?.dateLabel || '--';
+            }
+
+            button.append(dayLabel);
+            rail.appendChild(button);
+        }
+
+        this.modalLapTimes.appendChild(rail);
+        if (typeof this._leaderboardRailScrollLeft === 'number') {
+            rail.scrollLeft = this._leaderboardRailScrollLeft;
+        }
+    }
+
     configureRunsModalHeader() {
         if (!this.modalRunsView) return;
 
@@ -1055,11 +1245,46 @@ export class ModalShell {
             : null;
 
         configureReusableModal(this.modalRunsView, {
-            title: isLeaderboardOnly ? 'Leaderboard' : 'Your 5 PBs',
+            title: isLeaderboardOnly
+                ? 'Leaderboard'
+                : 'Your 5 PBs',
             subtitle: isLeaderboardOnly
-                ? (payload?.scoreboardSubhead || trackName || 'This track')
+                ? ''
                 : 'Personal Bests',
             closeLabel: this._runsViewMode === 'back' ? 'Back' : 'Close',
+        });
+    }
+
+    configureRunsModalActions() {
+        const primaryBtn = this.modalRunsPrimaryBtn;
+        if (!primaryBtn) return;
+
+        const payload = this._modalRunsPayload;
+        const hasPersonalBestList = Array.isArray(payload?.lapTimesArray);
+        const showPrimaryAction = Boolean(payload?.showGlobalLeaderboard)
+            && !hasPersonalBestList
+            && typeof payload?.primaryAction === 'function';
+
+        primaryBtn.hidden = !showPrimaryAction;
+        if (!showPrimaryAction) {
+            this._bindClickAction(primaryBtn, null);
+            return;
+        }
+
+        const label = payload?.primaryActionLabel || 'Race This Day';
+        primaryBtn.setAttribute('aria-label', label);
+        const labelEl = primaryBtn.querySelector('.combined-action-btn-label');
+        if (labelEl) {
+            labelEl.textContent = label;
+        } else {
+            primaryBtn.textContent = label;
+        }
+        this._bindClickAction(primaryBtn, () => {
+            const action = this._modalRunsPayload?.primaryAction;
+            runModalHandoff(() => {
+                this.closeModal();
+                action?.();
+            });
         });
     }
 

@@ -15,12 +15,17 @@ import {
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
 } from './daily-gp-store.js';
+import {
+    getServerAnalyticsSummary,
+    submitServerAnalyticsEvent,
+} from './analytics-store.js';
 import { formatDailyMiniRacerPostTitle } from './reddit-post-title.js';
 
 const app = express();
 app.use(express.json({ limit: '4mb' }));
 
 const DAILY_AUTPOST_SUBREDDITS_KEY = 'dailygp:autopost:subreddits';
+const MOD_ANALYTICS_POSTS_KEY = 'dailygp:mod-analytics:posts';
 
 type DailyAutopostSubscription = {
     subredditName: string;
@@ -30,6 +35,13 @@ type DailyAutopostSubscription = {
     lastPostedChallengeId: string | null;
     lastPostedAt: string | null;
     lastPostUrl: string | null;
+};
+
+type ModAnalyticsPostRecord = {
+    subredditName: string;
+    postId: `t3_${string}` | null;
+    postUrl: string | null;
+    updatedAt: string;
 };
 
 function getRequestUsername(): string | null {
@@ -53,11 +65,21 @@ function readContextPostId(): string | null {
     return typeof id === 'string' && id.startsWith('t3_') ? id : null;
 }
 
-async function getPostBoundDailyGpChallenge() {
-    const contextPostData = (context as { postData?: unknown }).postData;
-    const contextChallengeId = contextPostData && typeof contextPostData === 'object'
-        ? (contextPostData as { challengeId?: unknown }).challengeId
+function readContextPostData(): Record<string, unknown> | null {
+    const postData = (context as { postData?: unknown }).postData;
+    return postData && typeof postData === 'object'
+        ? postData as Record<string, unknown>
         : null;
+}
+
+function setAnalyticsCorsHeaders(res: express.Response): void {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+async function getPostBoundDailyGpChallenge() {
+    const contextChallengeId = readContextPostData()?.challengeId;
     if (typeof contextChallengeId === 'string' && contextChallengeId) {
         return buildDailyGpChallengeById(contextChallengeId);
     }
@@ -153,6 +175,54 @@ async function upsertDailyAutopostSubscription(
     return next;
 }
 
+function parseModAnalyticsPostRecord(
+    subredditName: string,
+    raw: string | null | undefined,
+): ModAnalyticsPostRecord | null {
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') {
+            return null;
+        }
+
+        const postId = typeof parsed.postId === 'string' && parsed.postId.startsWith('t3_')
+            ? parsed.postId as `t3_${string}`
+            : null;
+        const postUrl = typeof parsed.postUrl === 'string' && parsed.postUrl.trim()
+            ? parsed.postUrl.trim()
+            : null;
+
+        return {
+            subredditName,
+            postId,
+            postUrl,
+            updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt
+                ? parsed.updatedAt
+                : new Date(0).toISOString(),
+        };
+    } catch (_error) {
+        return null;
+    }
+}
+
+async function readModAnalyticsPostRecord(
+    subredditName: string,
+): Promise<ModAnalyticsPostRecord | null> {
+    const raw = await redis.hGet(MOD_ANALYTICS_POSTS_KEY, subredditName);
+    return parseModAnalyticsPostRecord(subredditName, raw);
+}
+
+async function writeModAnalyticsPostRecord(record: ModAnalyticsPostRecord): Promise<void> {
+    await redis.hSet(
+        MOD_ANALYTICS_POSTS_KEY,
+        { [record.subredditName]: JSON.stringify(record) },
+    );
+}
+
 async function submitDailyMiniRacerPost(
     subredditName: string,
     challenge: DailyGpChallenge,
@@ -180,6 +250,43 @@ async function submitDailyMiniRacerPost(
             ].join('\n'),
         },
     });
+}
+
+async function submitModeratorAnalyticsPost(subredditName: string) {
+    const post = await reddit.submitCustomPost({
+        subredditName,
+        title: 'Mini Racer Moderator Analytics',
+        entry: 'mod-analytics',
+        sendreplies: false,
+        postData: {
+            tool: 'mod-analytics',
+            subredditName,
+        },
+        textFallback: {
+            text: [
+                '# Mini Racer Moderator Analytics',
+                '',
+                `Subreddit: r/${subredditName}`,
+                '',
+                'This custom post hosts the moderator-only analytics tool for Mini Racer.',
+                'Open it from the subreddit moderator menu to review and export analytics.',
+            ].join('\n'),
+        },
+    });
+
+    try {
+        await post.lock();
+    } catch (error) {
+        console.error(`Failed to lock moderator analytics post for r/${subredditName}:`, error);
+    }
+
+    try {
+        await post.remove(false);
+    } catch (error) {
+        console.error(`Failed to remove moderator analytics post for r/${subredditName}:`, error);
+    }
+
+    return post;
 }
 
 async function ensureDailyMiniRacerPostForSubreddit(
@@ -219,6 +326,99 @@ async function resolveMenuTargetSubredditName(targetId: string): Promise<string 
     return typeof subredditName === 'string' && subredditName.trim()
         ? subredditName.trim()
         : null;
+}
+
+async function isModeratorForSubreddit(
+    subredditName: string,
+    username: string,
+): Promise<boolean> {
+    try {
+        const subreddit = await reddit.getSubredditByName(subredditName);
+        const moderators = await subreddit.getModerators({ limit: 1000, pageSize: 100 }).all();
+        return moderators.some((moderator) => (
+            typeof moderator?.username === 'string'
+            && moderator.username.trim().toLowerCase() === username.trim().toLowerCase()
+        ));
+    } catch (error) {
+        console.error(`Failed to verify moderator access for r/${subredditName}:`, error);
+        return false;
+    }
+}
+
+async function assertModeratorForSubreddit(subredditName: string): Promise<string> {
+    const username = getRequestUsername();
+    if (!username) {
+        throw new Error('Reddit did not provide the acting username.');
+    }
+
+    const isModerator = await isModeratorForSubreddit(subredditName, username);
+    if (!isModerator) {
+        throw new Error(`Moderator access required for r/${subredditName}.`);
+    }
+
+    return username;
+}
+
+async function resolveAnalyticsToolSubredditName(): Promise<string | null> {
+    const contextName = readContextSubredditName();
+    if (contextName) {
+        return contextName;
+    }
+
+    const postDataName = readContextPostData()?.subredditName;
+    if (typeof postDataName === 'string' && postDataName.trim()) {
+        return postDataName.trim();
+    }
+
+    const postContext = await getPostSubredditContext();
+    return postContext?.name || null;
+}
+
+async function ensureModeratorAnalyticsPostForSubreddit(
+    subredditName: string,
+): Promise<{ created: boolean; postUrl: string | null }> {
+    const current = await readModAnalyticsPostRecord(subredditName);
+    if (current?.postId) {
+        try {
+            const post = await reddit.getPostById(current.postId);
+            const postUrl = typeof post?.url === 'string' && post.url.trim()
+                ? post.url.trim()
+                : current.postUrl;
+            if (postUrl) {
+                if (postUrl !== current.postUrl) {
+                    await writeModAnalyticsPostRecord({
+                        subredditName,
+                        postId: current.postId,
+                        postUrl,
+                        updatedAt: new Date().toISOString(),
+                    });
+                }
+                return { created: false, postUrl };
+            }
+        } catch (error) {
+            console.error(`Stored moderator analytics post lookup failed for r/${subredditName}:`, error);
+        }
+    }
+
+    const post = await submitModeratorAnalyticsPost(subredditName);
+    const postId = typeof post.id === 'string' && post.id.startsWith('t3_')
+        ? post.id as `t3_${string}`
+        : null;
+    const postUrl = typeof post.url === 'string' && post.url.trim()
+        ? post.url.trim()
+        : null;
+
+    await writeModAnalyticsPostRecord({
+        subredditName,
+        postId,
+        postUrl,
+        updatedAt: new Date().toISOString(),
+    });
+
+    return {
+        created: true,
+        postUrl,
+    };
 }
 
 /** Reddit sometimes returns counts as strings; treat any finite number ≥ 1 as valid. */
@@ -487,6 +687,49 @@ app.post('/api/daily/submit', async (req, res) => {
     }
 });
 
+app.post('/api/analytics/event', async (req, res) => {
+    try {
+        const result = await submitServerAnalyticsEvent({
+            ...(req.body ?? {}),
+            context: {
+                redditUsername: getRequestUsername(),
+                postId: readContextPostId(),
+                subredditName: readContextSubredditName(),
+            },
+        });
+        res.status(result.accepted ? 200 : 400).json(result);
+    } catch (error) {
+        console.error('Failed to record Reddit Mini Racer analytics event:', error);
+        res.status(500).json({ accepted: false, error: 'Analytics event failed' });
+    }
+});
+
+app.options('/api/analytics/summary', (_req, res) => {
+    setAnalyticsCorsHeaders(res);
+    res.status(204).end();
+});
+
+app.get('/api/analytics/summary', async (req, res) => {
+    try {
+        setAnalyticsCorsHeaders(res);
+        const subredditName = await resolveAnalyticsToolSubredditName();
+        if (!subredditName) {
+            res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+            return;
+        }
+
+        await assertModeratorForSubreddit(subredditName);
+        const { from, to, range } = req.query ?? {};
+        const summary = await getServerAnalyticsSummary({ from, to, range });
+        res.status(200).json(summary);
+    } catch (error) {
+        console.error('Failed to load Reddit Mini Racer analytics summary:', error);
+        const message = error instanceof Error ? error.message : 'Analytics summary failed';
+        const status = message.includes('Moderator access required') ? 403 : 500;
+        res.status(status).json({ error: message });
+    }
+});
+
 app.post('/internal/menu/post-create', async (req, res) => {
     try {
         const input = (req.body ?? {}) as Partial<MenuItemRequest>;
@@ -615,6 +858,58 @@ app.post('/internal/menu/post-disable-daily', async (req, res) => {
         res.json({
             showToast: {
                 text: `Could not disable daily Mini Racer posts: ${message}`,
+                appearance: 'neutral',
+            },
+        });
+    }
+});
+
+app.post('/internal/menu/mod-analytics-open', async (req, res) => {
+    try {
+        const input = (req.body ?? {}) as Partial<MenuItemRequest>;
+        const targetId = typeof input.targetId === 'string' ? input.targetId : '';
+        const subredditName = await resolveMenuTargetSubredditName(targetId);
+
+        if (!subredditName) {
+            res.json({
+                showToast: {
+                    text: 'Reddit did not provide a subreddit context for this tool.',
+                    appearance: 'neutral',
+                },
+            });
+            return;
+        }
+
+        await assertModeratorForSubreddit(subredditName);
+        const result = await ensureModeratorAnalyticsPostForSubreddit(subredditName);
+
+        if (!result.postUrl) {
+            res.json({
+                showToast: {
+                    text: `Mini Racer analytics could not open for r/${subredditName}.`,
+                    appearance: 'neutral',
+                },
+            });
+            return;
+        }
+
+        res.json({
+            showToast: {
+                text: result.created
+                    ? `Mini Racer analytics is ready for r/${subredditName}.`
+                    : `Opening Mini Racer analytics for r/${subredditName}.`,
+                appearance: 'success',
+            },
+            navigateTo: result.postUrl,
+        });
+    } catch (error) {
+        console.error('Failed to open moderator analytics tool:', error);
+        const message = error instanceof Error && error.message
+            ? error.message
+            : 'Unknown error';
+        res.json({
+            showToast: {
+                text: `Could not open Mini Racer analytics: ${message}`,
                 appearance: 'neutral',
             },
         });

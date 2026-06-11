@@ -28,7 +28,7 @@ export const TRACKS = {
             Point(7.949, 13.063),
             Point(6, 10)
         ],
-        startLine: { p1: Point(10.036, 2.012), p2: Point(10.004, 5.977) },
+        startLine: { p1: Point(10.002, 1.177), p2: Point(10.057, 6.583) },
         startPos: Point(8, 4),
         startAngle: 0,
         checkpoints: [
@@ -79,7 +79,7 @@ export const TRACKS = {
             Point(9, 15),
             Point(9.124, 22.031)
         ],
-        startLine: { p1: Point(15.027, 25.991), p2: Point(15.014, 29.979) },
+        startLine: { p1: Point(15.023, 25.658), p2: Point(15.028, 30.422) },
         startPos: Point(12, 28),
         startAngle: 0,
         checkpoints: [
@@ -124,7 +124,7 @@ export const TRACKS = {
             Point(13, 27),
             Point(15, 31)
         ],
-        startLine: { p1: Point(19.997, 31), p2: Point(20.002, 34.954) },
+        startLine: { p1: Point(20.024, 30.381), p2: Point(19.964, 35.997) },
         startPos: Point(18, 33),
         startAngle: 0,
         checkpoints: [
@@ -163,7 +163,7 @@ export const TRACKS = {
             Point(35, 31),
             Point(20, 31)
         ],
-        startLine: { p1: Point(18.98, 31.772), p2: Point(19.01, 35.564) },
+        startLine: { p1: Point(19.01, 31.068), p2: Point(19.016, 36.243) },
         startPos: Point(20.538, 33.079),
         startAngle: 2.66,
         checkpoints: [
@@ -244,7 +244,7 @@ export const TRACKS = {
             Point(31, 32),
             Point(37, 32)
         ],
-        startLine: { p1: Point(25.047, 32.038), p2: Point(25.037, 35.965) },
+        startLine: { p1: Point(25.077, 31.56), p2: Point(25.064, 36.984) },
         startPos: Point(27, 34),
         startAngle: 3.142,
         checkpoints: [
@@ -354,7 +354,7 @@ export const TRACKS = {
             Point(27.024, 34.37),
             Point(21.139, 33.475)
         ],
-        startLine: { p1: Point(12.894, 29.385), p2: Point(7.982, 29.374) },
+        startLine: { p1: Point(13.685, 29.346), p2: Point(7.338, 29.338) },
         startPos: Point(10.149, 32.429),
         startAngle: -1.48,
         checkpoints: [
@@ -436,7 +436,7 @@ export const TRACKS = {
             Point(30.605, 8.699),
             Point(33, 8.721)
         ],
-        startLine: { p1: Point(38.975, 4.412), p2: Point(38.934, 9.339) },
+        startLine: { p1: Point(38.92, 3.904), p2: Point(38.907, 9.897) },
         startPos: Point(36, 7),
         startAngle: 0.1,
         checkpoints: [
@@ -566,7 +566,7 @@ export const TRACKS = {
             Point(71.167, 36.803),
             Point(66.988, 42.167)
         ],
-        startLine: { p1: Point(31.859, 54.053), p2: Point(31.928, 50.158) },
+        startLine: { p1: Point(31.904, 54.228), p2: Point(31.913, 50.006) },
         startPos: Point(35.557, 52.221),
         startAngle: -3.104,
         checkpoints: [
@@ -665,7 +665,7 @@ export const TRACKS = {
             Point(48.549, 43.307),
             Point(44.131, 43.213)
         ],
-        startLine: { p1: Point(39.521, 48.029), p2: Point(39.864, 43.121) },
+        startLine: { p1: Point(39.906, 48.346), p2: Point(39.905, 42.727) },
         startPos: Point(43.466, 46.033),
         startAngle: 9.53,
         checkpoints: [
@@ -847,7 +847,7 @@ export const TRACKS = {
             Point(17.508, 20.842),
             Point(15.915, 20.463)
         ],
-        startLine: { p1: Point(13.655, 23.009), p2: Point(14.294, 20.077) },
+        startLine: { p1: Point(13.597, 23.319), p2: Point(14.353, 19.86) },
         startPos: Point(15.939, 22.045),
         startAngle: -2.946,
         checkpoints: [
@@ -1302,7 +1302,7 @@ export const TRACKS = {
             Point(15.664, 13.326),
             Point(14.567, 14.383)
         ],
-        startLine: { p1: Point(10.044, 13.188), p2: Point(13.133, 15.766) },
+        startLine: { p1: Point(9.629, 12.956), p2: Point(13.441, 15.97) },
         startPos: Point(13.551, 11.981),
         startAngle: 2.158,
         checkpoints: [
@@ -1687,7 +1687,7 @@ export const TRACKS = {
         checkpoints: [
             { p1: Point(54.666, 16.182), p2: Point(54.849, 9.245) },
             { p1: Point(44.902, 33.147), p2: Point(44.305, 37.413) },
-            { p1: Point(18.139, 37.125), p2: Point(13.234, 42.055) },
+            { p1: Point(19.101, 37.252), p2: Point(13.234, 42.055) },
             { p1: Point(5.304, 23.649), p2: Point(11.456, 23.49) }
         ]
     },
@@ -2526,7 +2526,7 @@ export const TRACKS = {
         startAngle: -0.006,
         checkpoints: [
             { p1: Point(52.091, 35.595), p2: Point(47.285, 33.319) },
-            { p1: Point(37.853, 17.641), p2: Point(43.745, 17.652) },
+            { p1: Point(37.853, 17.641), p2: Point(44.807, 17.723) },
             { p1: Point(21.73, 17.195), p2: Point(21.716, 24.183) }
         ]
     },
@@ -2626,9 +2626,9 @@ export const TRACKS = {
         startPos: Point(39.881, 46.315),
         startAngle: 3,
         checkpoints: [
-            { p1: Point(15.483, 42.435), p2: Point(13.644, 38.882) },
-            { p1: Point(47.262, 20.645), p2: Point(44.945, 17.385) },
-            { p1: Point(88.263, 30.227), p2: Point(92.218, 29.625) }
+            { p1: Point(15.767, 42.896), p2: Point(13.218, 38.566) },
+            { p1: Point(47.764, 21.457), p2: Point(44.363, 16.755) },
+            { p1: Point(87.613, 30.492), p2: Point(93.08, 29.574) }
         ]
     },
     turboShell: {
@@ -2756,9 +2756,9 @@ export const TRACKS = {
         startPos: Point(64.064, 42.465),
         startAngle: 0.05,
         checkpoints: [
-            { p1: Point(84.25, 25.498), p2: Point(79.3, 26.206) },
+            { p1: Point(85.203, 25.287), p2: Point(78.531, 26.209) },
             { p1: Point(42.119, 19.103), p2: Point(42.337, 24.459) },
-            { p1: Point(9.909, 42.725), p2: Point(13.838, 39.632) }
+            { p1: Point(9.909, 42.725), p2: Point(14.596, 38.924) }
         ]
     },
     copperVale: {

@@ -27,7 +27,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 
 ### Reddit-specific setup
 
-- [ ] A dedicated production subreddit exists for Mini Racer. Do not launch from `mini_racer_dev`.
+- [ ] A dedicated production subreddit exists for Mini Racer: `MiniRacerGame`. Do not launch from `mini_racer_dev`.
 - [ ] The moderator install flow is confirmed in the target subreddit.
 - [ ] The **Create Mini Racer post** menu item successfully creates a playable post.
 - [ ] At least one example post has been created and reviewed end to end.
@@ -74,6 +74,6 @@ Mini Racer is a subreddit-specific racing game with:
 
 ## Open decision before launch
 
-- [ ] Confirm the production subreddit name
+- [x] Confirm the production subreddit name: `MiniRacerGame`
 - [ ] Confirm who owns launch-day moderation and player support
 - [ ] Confirm the first publish version number and release date

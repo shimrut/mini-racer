@@ -204,6 +204,11 @@ export const raceEngineMethods = {
 
   restartCurrentRunAfterHardCrash() {
     this.dailyGpRaceStats.crash++;
+    this.analytics?.trackRaceRestarted?.({
+      source: "auto_restart_after_crash",
+      trackKey: this.currentTrackKey,
+      challengeId: this.activeDailyChallenge?.id || null,
+    });
     this.status = "playing";
     this.scoreboardReplay.reset();
     this.resetRunToTrackStart({
@@ -463,6 +468,14 @@ export const raceEngineMethods = {
     if (events.challengeLapCompleted) {
       this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime);
     }
+    if (events.crashEndedRun) {
+      this.analytics?.trackRaceEnded?.({
+        cause: "crash",
+        trackKey: this.currentTrackKey,
+        challengeId: this.activeDailyChallenge?.id || null,
+        runTimeSec: this.currentTime,
+      });
+    }
     if (this.crashAutoRestartAfterCrash && events.crashEndedRun) {
       this.restartCurrentRunAfterHardCrash();
       return;
@@ -494,7 +507,14 @@ export const raceEngineMethods = {
           ...createModalActions({
             modalKind: "crash",
             primaryActionLabel: "Retry",
-            primaryAction: () => this.reset(true),
+            primaryAction: () => {
+              this.analytics?.trackRaceRestarted?.({
+                source: "manual_restart_after_crash",
+                trackKey: this.currentTrackKey,
+                challengeId: this.activeDailyChallenge?.id || null,
+              });
+              this.reset(true);
+            },
             primaryActionIcon: "retry",
             secondaryActionLabel: "Done",
             secondaryAction: () => this.reset(false),

@@ -1,0 +1,115 @@
+
+#combined-time 
+    font-size: 4rem;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+
+#combined-hero-medal 
+    margin-bottom: var(--space-xl);
+    transform: scale(0.75);
+    transform-origin: top center;
+
+.combined-stats-grid 
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    max-width: 400px;
+    font-size: 1.25rem;
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+
+.stat-floating-item 
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+.stat-floating-label 
+    opacity: 0.5;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+    letter-spacing: 0.1em;
+
+#combined-rank-total 
+    opacity: 0.6;
+    font-size: 0.8em;
+
+.combined-rank-container 
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+
+.combined-next-medal-container 
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+/* ==========================================================================
+   Responsive Compact Layout for Small Windows / iFrames (<640px height)
+   ========================================================================== */
+@media (max-height: 640px) {
+    /* 1. Leaderboard Modal */
+    .leaderboard-spotlight__rank 
+        font-size: clamp(2rem, 6vw, 2.5rem);
+    
+    .leaderboard-row 
+        padding: 0.35rem 0.5rem;
+    
+    .leaderboard-day-rail 
+        padding: 0.4rem 0;
+    
+    .leaderboard-day-chip 
+        padding: 0.4rem 0.6rem;
+
+    /* 2. Daily Playlist Modal */
+    .daily-playlist-entry 
+        padding: 0.4rem 0.5rem;
+        min-height: 3rem;
+    
+    .daily-playlist-title 
+        font-size: 1.1rem;
+    
+    #daily-playlist-modal .modal-card-section--sheet 
+        gap: 0.4rem;
+
+    /* 3. Finish Screen */
+    #modal.modal--win #modal-combined-view:not(.is-crash) :is(.combined-rank-value, .combined-stat--this-lap .combined-stat-value) 
+        font-size: clamp(2rem, 8vw, 2.5rem);
+    
+    .combined-title 
+        font-size: 1.5rem;
+    
+    .win-stats-medals 
+        margin-bottom: 0.4rem;
+        gap: 0.25rem;
+    
+    .win-stats-medals .medal-svg--win 
+        height: 2.25rem;
+    
+    .combined-header 
+        gap: 0.var(--space-xl);
+    
+    .combined-results-section 
+        margin-bottom: 0.25rem;
+
+    /* 4. Global Modals & Buttons */
+    .modal .modal-card 
+        padding: 0.8rem;
+    
+    .combined-action-btn 
+        height: 3rem;
+        font-size: 0.72rem;
+    
+    .combined-actions 
+        gap: 0.4rem;
+    
+    .result-modal .modal-card-section--runs .modal-action-row--stack 
+        margin-top: 0.5rem;
+    
+}

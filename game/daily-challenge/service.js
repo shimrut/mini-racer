@@ -9,7 +9,10 @@ import {
 import {
     getLeaderboardIdentityPreference,
 } from '../scoreboard/display-preference.js?v=2.09';
-import { getDailyGpScheduledTrackPoolForDayIndex } from '../shared/daily-gp-track-schedule.js?v=2.09';
+import {
+    getDailyGpScheduledTrackPoolForDayIndex,
+    getPinnedDailyGpTrackKeyForDayIndex,
+} from '../shared/daily-gp-track-schedule.js?v=2.09';
 import {
     getDailyChallengeData,
     setDailyChallengeBestTime,
@@ -161,10 +164,11 @@ function getStepForTrackCount(trackCount) {
 }
 
 function getDailyTrackKeyForDayIndex(dayIndex) {
-    const trackKeys = getDailyGpScheduledTrackPoolForDayIndex(
-        dayIndex,
-        Object.keys(TRACKS),
-    );
+    const pinnedTrackKey = getPinnedDailyGpTrackKeyForDayIndex(dayIndex);
+    if (pinnedTrackKey) {
+        return pinnedTrackKey;
+    }
+    const trackKeys = getDailyGpScheduledTrackPoolForDayIndex(dayIndex);
     const step = getStepForTrackCount(trackKeys.length);
     const index = Math.abs(dayIndex * step) % trackKeys.length;
     return trackKeys[index] || 'circuit';
