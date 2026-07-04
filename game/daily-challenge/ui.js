@@ -157,19 +157,11 @@ export class DailyChallengeUi {
             setCarAssetImageWithFallbacks(this.dailyChallengeCarImage, STOCK_CAR_ASSET_NAME);
         }
         if (this.dailyChallengeRankBtn) {
-            const rankDisplay = buildScoreboardRankDisplay(
-                this._dailyChallengeSummary?.scoreboardSnapshot,
-                { fallbackText: '--' }
-            );
-            const rankStatusText = rankDisplay.statusText || '';
-            const spokenRankStatusText = rankStatusText.replace(/[.\s]+$/, '');
             this.dailyChallengeRankBtn.disabled = false;
             delete this.dailyChallengeRankBtn.dataset.rank;
             this.dailyChallengeRankBtn.setAttribute(
                 'aria-label',
-                spokenRankStatusText
-                    ? `${spokenRankStatusText}. Open leaderboards for all tracks.`
-                    : 'Open leaderboards for all tracks.'
+                'Open standings for all tracks.'
             );
             this.dailyChallengeRankBtn.classList.toggle(
                 'main-menu__item--status-error',
@@ -177,16 +169,11 @@ export class DailyChallengeUi {
                     || this._dailyChallengeSummary?.scoreboardSnapshot?.verificationState === 'rejected'
             );
             if (this.dailyChallengeRankStatus) {
-                this.dailyChallengeRankStatus.textContent = rankStatusText;
-                this.dailyChallengeRankStatus.hidden = !rankStatusText;
-                this.dailyChallengeRankStatus.classList.toggle(
+                this.dailyChallengeRankStatus.textContent = '';
+                this.dailyChallengeRankStatus.hidden = true;
+                this.dailyChallengeRankStatus.classList.remove(
                     'main-menu__detail--loading',
-                    rankDisplay.isLoading
-                );
-                this.dailyChallengeRankStatus.classList.toggle(
-                    'main-menu__detail--error',
-                    this._dailyChallengeSummary?.scoreboardSnapshot?.verificationState === 'error'
-                        || this._dailyChallengeSummary?.scoreboardSnapshot?.verificationState === 'rejected'
+                    'main-menu__detail--error'
                 );
             }
         }
@@ -253,13 +240,13 @@ export class DailyChallengeUi {
         if (!modal) return;
         this._playlistModalMode = 'playlist';
         configureReusableModal(modal, {
-            title: 'Week',
+            title: 'Tracks',
             closeLabel: 'Back',
         });
+        this.renderPlaylist(challenges, actions);
         openModalElement(modal, () => modal.classList.add('active'));
         document.body.classList.add('modal-open');
         scheduleAfterModalPaint(() => {
-            this.renderPlaylist(challenges, actions);
             const firstPlay = modal.querySelector('.daily-playlist-entry--hero');
             if (firstPlay instanceof HTMLButtonElement) {
                 firstPlay.focus();
@@ -289,7 +276,7 @@ export class DailyChallengeUi {
 
     bindPlaylistModal() {
         configureReusableModal(this.dailyChallengePlaylistModal, {
-            title: 'Week',
+            title: 'Tracks',
             closeLabel: 'Back',
         });
         bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
@@ -430,13 +417,13 @@ export class DailyChallengeUi {
         if (!modal) return;
         this._playlistModalMode = 'leaderboard';
         configureReusableModal(modal, {
-            title: 'Leaderboard',
+            title: 'Standings',
             closeLabel: 'Back',
         });
+        this.renderLeaderboardTracks(trackRows, actions);
         openModalElement(modal, () => modal.classList.add('active'));
         document.body.classList.add('modal-open');
         scheduleAfterModalPaint(() => {
-            this.renderLeaderboardTracks(trackRows, actions);
             const firstTrack = modal.querySelector('.daily-playlist-entry--hero');
             if (firstTrack instanceof HTMLButtonElement) {
                 firstTrack.focus();

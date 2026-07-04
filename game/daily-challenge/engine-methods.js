@@ -64,6 +64,29 @@ export const dailyChallengeEngineMethods = {
     });
   },
 
+  scheduleDailyPlaylistPrewarm(challenges = []) {
+    const modal = this.dailyChallengeUi?.dailyChallengePlaylistModal;
+    if (!modal) {
+      this.prewarmDailyPlaylistTracks(challenges);
+      return;
+    }
+
+    let finished = false;
+    const startPrewarm = () => {
+      if (finished) return;
+      finished = true;
+      modal.removeEventListener("transitionend", onTransitionEnd);
+      this.prewarmDailyPlaylistTracks(challenges);
+    };
+    const onTransitionEnd = (event) => {
+      if (event.target !== modal || event.propertyName !== "opacity") return;
+      startPrewarm();
+    };
+
+    modal.addEventListener("transitionend", onTransitionEnd);
+    setTimeout(startPrewarm, 200);
+  },
+
   prewarmDailyPlaylistTracks(challenges = []) {
     const prewarmId = (this._dailyPlaylistTrackPrewarmId || 0) + 1;
     this._dailyPlaylistTrackPrewarmId = prewarmId;
@@ -471,16 +494,15 @@ export const dailyChallengeEngineMethods = {
       loadedChallenges.length ? loadedChallenges : null,
       playlistActions,
     );
-    await this.waitForPlaylistModalPaint();
     if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
-    this.prewarmDailyPlaylistTracks(loadedChallenges);
+    this.scheduleDailyPlaylistPrewarm(loadedChallenges);
 
     if (playlistRequestNeeded) {
       try {
         loadedChallenges = await getDailyChallengePlaylist();
         if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
         this.dailyChallengeUi.renderPlaylist(loadedChallenges, playlistActions);
-        this.prewarmDailyPlaylistTracks(loadedChallenges);
+        this.scheduleDailyPlaylistPrewarm(loadedChallenges);
       } catch (error) {
         console.error("Error loading daily challenge playlist:", error);
         if (!loadedChallenges.length && this.dailyChallengeUi.isPlaylistModalOpen?.()) {
