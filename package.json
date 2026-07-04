@@ -19,11 +19,11 @@
     "mutation:dry-run": "stryker run --dryRunOnly"
   },
   "dependencies": {
-    "@devvit/server": "0.13.3",
-    "@devvit/start": "0.13.3",
-    "@devvit/web": "0.13.3",
+    "@devvit/server": "0.13.6",
+    "@devvit/start": "0.13.6",
+    "@devvit/web": "0.13.6",
     "chart.js": "^4.5.1",
-    "devvit": "0.13.3",
+    "devvit": "0.13.6",
     "express": "^5.1.0",
     "flatpickr": "^4.6.13"
   },
