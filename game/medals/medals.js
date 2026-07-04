@@ -584,59 +584,31 @@ export function playWinCombinedMedalOverlayEntrance(
  * @param {{ secondaryStaggerMs?: number, secondaryBaseDelayMs?: number, reduced?: boolean, fallbackMs?: number, playUnlockSound?: (tier: string) => void }} [options]
  */
 function scheduleWinOverlayMedalEntranceWithSheetIntro(
-    combinedViewEl,
+    _combinedViewEl,
     winOverlayRoot,
     {
         reduced = false,
-        fallbackMs = 200,
         shouldCelebrateTier = null,
         playUnlockSound = null,
     } = {},
 ) {
     if (!winOverlayRoot) return;
 
+    const reveal = () => {
+        revealWinOverlayMedalRow(winOverlayRoot, {
+            reduced,
+            shouldCelebrateTier,
+            playUnlockSound,
+        });
+    };
+
     if (reduced) {
-        revealWinOverlayMedalRow(winOverlayRoot, { reduced: true, shouldCelebrateTier, playUnlockSound });
+        reveal();
         return;
     }
 
-    let finished = false;
-    const run = () => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(fallbackTimer);
-        if (combinedViewEl) {
-            combinedViewEl.removeEventListener('animationstart', onAnimationStart);
-        }
-        revealWinOverlayMedalRow(winOverlayRoot, { reduced: false, shouldCelebrateTier, playUnlockSound });
-    };
-
-    const onAnimationStart = (e) => {
-        if (e.target !== combinedViewEl) return;
-        if (!String(e.animationName || '').includes('fadeIn')) return;
-        run();
-    };
-
-    const fallbackTimer = setTimeout(run, fallbackMs);
-
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            if (!combinedViewEl) {
-                run();
-                return;
-            }
-            combinedViewEl.addEventListener('animationstart', onAnimationStart);
-            try {
-                const anims = combinedViewEl.getAnimations?.({ subtree: false }) ?? [];
-                const fade = anims.find((a) => String(a.animationName || '').includes('fadeIn'));
-                if (fade && fade.playState === 'running') {
-                    run();
-                }
-            } catch {
-                /* getAnimations may be unavailable */
-            }
-        });
-    });
+    // Reveal on next paint. Embedded WebViews (Reddit app) often skip fadeIn / animationstart.
+    requestAnimationFrame(reveal);
 }
 
 /**

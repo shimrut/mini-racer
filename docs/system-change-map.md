@@ -68,12 +68,16 @@ flowchart LR
 - `game/scoreboard/service.js` fetches leaderboard snapshots and submits best times.
 - `game/scoreboard/engine-methods.js` handles deferred verification and retry behavior after a local best run is recorded.
 - `game/storage.js` fetches player bootstrap state and falls back to local data when needed.
+- `game/shared/daily-gp-track-schedule.js` reads all current `game/track/tracks.js` keys when a new challenge is generated.
+- Published Daily GP playlist rows come from server-side challenge history, not from recalculating old dates against the current track file.
+- Explicit mock modes and standalone preview pages can still build local Daily GP challenges, but normal local game runs use `/api/daily/*` or Devvit post data so they match the server-published track.
 
 ### Server And Shared Validation
 
 - `src/server/index.ts` exposes all `/api/*` endpoints and Devvit moderator/internal actions.
 - `src/server/daily-gp-model.ts` defines the challenge schedule, IDs, playable window, and Redis key model.
-- `src/server/daily-gp-store.ts` persists challenge entries, player profiles, snapshots, and accepted runs.
+- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, snapshots, and accepted runs. The published challenge history hash uses the same TTL as the installed Devvit server.
+- `game/shared/daily-gp-history-backfill.js` isolates the June 2-11, 2026 published-history seed used to backfill the server history store.
 - `src/server/replay-validator.ts` replays submitted inputs against shared track/physics logic before the server accepts a run.
 - Important implication: track geometry, finish/checkpoint logic, and physics tuning are not frontend-only. The server uses the same contracts.
 
@@ -145,9 +149,9 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Car size or render look | `game/config.js`, `game/car/sprite.js`, sometimes `public/assets/cars/*` | `game/race/engine-methods.js`, `styles.css` | Car scale is visual, but shadow and draw sizing live in config/orchestrator flow |
 | Car handling / physics tuning | `game/car/handling.js`, `game/config.js`, `game/race/simulation.js` | `src/server/replay-validator.ts`, `game/race/run-policy.js`, `game/race/engine-methods.js` | Server validation reuses shared gameplay logic, so tuning changes affect accepted runs |
 | Crash rules, win rules, checkpoint behavior | `game/race/simulation.js`, `game/race/run-policy.js` | `src/server/replay-validator.ts`, `game/daily-challenge/engine-methods.js`, `game/race/result-flow.js` | Finish and failure logic drive both local UX and server acceptance |
-| Track layout or new track | `game/track/tracks.js`, `game/track/runtime.js` if geometry handling changes | `game/shared/daily-gp-track-schedule.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-model.ts`, `src/server/reddit-post-title.ts` | Track data is used by gameplay, scheduling, previews, and server validation |
+| Track layout or new track | `game/track/tracks.js`, `game/track/runtime.js` if geometry handling changes | `game/shared/daily-gp-track-schedule.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-model.ts`, `src/server/reddit-post-title.ts` | Track data is used by gameplay, future Daily GP generation, previews, and server validation |
 | Track visual treatment only | `game/track/presentation.js`, `game/track/canvas.js`, `styles.css` | `game/daily-challenge/ui.js`, `game/race/ui-modal-shell.js`, `game/track/preview-renderer.js` | One presentation system feeds race view, previews, and modal thumbnails |
-| Daily challenge schedule or availability window | `game/shared/daily-gp-track-schedule.js`, `src/server/daily-gp-model.ts`, `game/daily-challenge/service.js` | `src/server/index.ts`, `README.md` if player-facing behavior changes | Schedule logic exists on both client and server for consistency |
+| Daily challenge schedule or availability window | `game/shared/daily-gp-track-schedule.js`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-store.ts`, `game/daily-challenge/service.js` | `src/server/index.ts`, `README.md` if player-facing behavior changes | New challenge generation reads the track registry; playlist availability reads persisted published history so past days do not shift |
 | Start screen or daily card copy/layout | `game/daily-challenge/ui.js`, `game.html`, `styles.css` | `game/daily-challenge/service.js` | The UI is driven by API summary fields and modal launch actions |
 | Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/ui.js` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
@@ -164,13 +168,13 @@ These are the places where a "small" change can create regressions outside the v
 1. `game/race/simulation.js`
    Changes driving feel, crashes, checkpoints, finish detection, and replay outcomes.
 2. `game/track/tracks.js`
-   Changes race geometry, previews, schedule eligibility, and replay validation.
+   Changes race geometry, previews, future Daily GP generation eligibility, and replay validation.
 3. `game/track/runtime.js`
    Changes collision smoothing and collision segment generation for both client and server.
 4. `game/config.js`
    Changes baseline physics and render-related car constants used broadly across runtime behavior.
 5. `src/server/daily-gp-model.ts`
-   Changes challenge lifecycle, playlist inclusion, Redis key strategy, and scheduling rules.
+   Changes challenge lifecycle, generated challenge shape, Redis key strategy, and scheduling rules.
 
 ## Secondary Tooling Areas
 

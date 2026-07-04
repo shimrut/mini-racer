@@ -224,7 +224,6 @@ export class ModalShell {
     get modalMsg() { return document.getElementById('modal-msg'); }
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
     get modalStatsRow() { return document.getElementById('modal-stats-row'); }
-    get modalRunsPrimaryBtn() { return document.getElementById('modal-runs-primary-btn'); }
     get backToMainBtn() { return document.getElementById('back-to-main-btn'); }
     get modalMainView() { return document.getElementById('modal-main-view'); }
     get modalRunsView() { return document.getElementById('modal-runs-view'); }
@@ -516,8 +515,6 @@ export class ModalShell {
         leaderboardDayOptions = null,
         selectedLeaderboardDayId = null,
         onSelectLeaderboardDay = null,
-        primaryActionLabel = null,
-        primaryAction = null,
         showGlobalLeaderboard = true,
         allowLeaderboardOpen = true,
         onClose = null
@@ -564,8 +561,6 @@ export class ModalShell {
             leaderboardDayOptions,
             selectedLeaderboardDayId,
             onSelectLeaderboardDay,
-            primaryActionLabel,
-            primaryAction,
             showGlobalLeaderboard,
             allowLeaderboardOpen
         }, {
@@ -574,7 +569,6 @@ export class ModalShell {
         this._runsViewMode = returnMode === 'back' ? 'back' : 'close';
         this._runsCloseAction = typeof onClose === 'function' ? onClose : null;
         this.configureRunsModalHeader?.();
-        this.configureRunsModalActions?.();
         this.renderLeaderboardStandaloneIntro?.();
         if (this._modalRunsPayload.showGlobalLeaderboard) {
             this.content.renderScoreboardList(
@@ -587,14 +581,8 @@ export class ModalShell {
             );
         }
 
-        const rail = this.modalLapTimes.querySelector('.leaderboard-day-rail');
-        if (rail) {
-            this.modalLapTimes.appendChild(rail);
-        }
-
         if (this.backToMainBtn) {
-            const labelText = this._runsViewMode === 'back' ? 'Back' : 'Close';
-            this.backToMainBtn.setAttribute('aria-label', labelText);
+            this.backToMainBtn.setAttribute('aria-label', 'Back');
         }
         this.modalMainView.classList.remove('active-view');
         if (this.modalCombinedView) this.modalCombinedView.classList.remove('active-view');
@@ -604,9 +592,7 @@ export class ModalShell {
         if (wasActive) {
             scheduleAfterModalPaint(() => {
                 this.content.centerLeaderboardCurrentRow();
-                if (this.modalRunsPrimaryBtn && !this.modalRunsPrimaryBtn.hidden) {
-                    this.modalRunsPrimaryBtn.focus();
-                } else if (this.backToMainBtn) {
+                if (this.backToMainBtn) {
                     this.backToMainBtn.focus();
                 }
             });
@@ -647,10 +633,6 @@ export class ModalShell {
             this._savedModalKind = null;
             this._savedMainModalIsCrash = false;
             this.releaseModalFocusTrap(modal);
-            if (this.modalRunsPrimaryBtn) {
-                this.modalRunsPrimaryBtn.hidden = true;
-                this._bindClickAction(this.modalRunsPrimaryBtn, null);
-            }
         };
 
         const onTransitionEnd = (event) => {
@@ -1160,78 +1142,104 @@ export class ModalShell {
             payload?.scoreboardSnapshot,
             { fallbackText: '—' }
         );
-        const totalCount = Math.max(0, Math.trunc(Number(payload?.scoreboardSnapshot?.totalCount)));
-        const hero = document.createElement('section');
-        hero.className = 'leaderboard-spotlight';
-
-        const heroContext = document.createElement('div');
-        heroContext.className = 'leaderboard-spotlight__context';
-        heroContext.style.flexDirection = 'row';
-        heroContext.style.alignItems = 'center';
-        heroContext.style.gap = '0.5rem';
-
-        const heroTitle = document.createElement('span');
-        heroTitle.className = 'leaderboard-spotlight__title';
-        heroTitle.textContent = payload?.scoreboardSubhead || trackName;
-
-        const heroMeta = document.createElement('span');
-        heroMeta.className = 'leaderboard-spotlight__meta';
-        heroMeta.style.marginLeft = 'auto';
-        if (totalCount > 0) {
-            heroMeta.innerHTML = `<svg style="height: 0.85em; margin-right: 4px; vertical-align: -0.125em;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><path fill="currentColor" d="M320 16a104 104 0 1 1 0 208 104 104 0 1 1 0-208zM96 88a72 72 0 1 1 0 144 72 72 0 1 1 0-144zM0 416c0-70.7 57.3-128 128-128 12.8 0 25.2 1.9 36.9 5.4-32.9 36.8-52.9 85.4-52.9 138.6l0 16c0 11.4 2.4 22.2 6.7 32L32 480c-17.7 0-32-14.3-32-32l0-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32l0-16c0-53.2-20-101.8-52.9-138.6 11.7-3.5 24.1-5.4 36.9-5.4 70.7 0 128 57.3 128 128l0 32c0 17.7-14.3 32-32 32l-86.7 0zM472 160a72 72 0 1 1 144 0 72 72 0 1 1 -144 0zM160 432c0-88.4 71.6-160 160-160s160 71.6 160 160l0 16c0 17.7-14.3 32-32 32l-256 0c-17.7 0-32-14.3-32-32l0-16z"/></svg>${totalCount.toLocaleString()}`;
-        } else {
-            heroMeta.textContent = rankDisplay.isLoading ? 'Loading standings...' : '0';
-        }
-
-        heroContext.append(heroTitle, heroMeta);
-        hero.append(heroContext);
-        this.modalLapTimes.appendChild(hero);
-
         if (
-            !Array.isArray(payload?.leaderboardDayOptions)
-            || payload.leaderboardDayOptions.length <= 1
+            Array.isArray(payload?.leaderboardDayOptions)
+            && payload.leaderboardDayOptions.length > 1
         ) {
-            return;
-        }
+            const rail = document.createElement('div');
+            rail.className = 'leaderboard-day-rail';
+            rail.setAttribute('role', 'tablist');
+            rail.setAttribute('aria-label', 'Leaderboard days');
 
-        const rail = document.createElement('div');
-        rail.className = 'leaderboard-day-rail';
-        rail.setAttribute('role', 'tablist');
-        rail.setAttribute('aria-label', 'Leaderboard days');
+            for (const option of payload.leaderboardDayOptions) {
+                const button = document.createElement('button');
+                const isSelected = option?.challengeId === payload?.selectedLeaderboardDayId;
+                button.className = `leaderboard-day-chip${isSelected ? ' is-selected' : ''}`;
+                button.type = 'button';
+                button.setAttribute('role', 'tab');
+                button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+                button.setAttribute(
+                    'aria-label',
+                    `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
+                );
+                button.disabled = isSelected;
+                button.addEventListener('click', () => {
+                    this._leaderboardRailScrollLeft = rail.scrollLeft;
+                    payload?.onSelectLeaderboardDay?.(option?.challengeId);
+                });
 
-        for (const option of payload.leaderboardDayOptions) {
-            const button = document.createElement('button');
-            const isSelected = option?.challengeId === payload?.selectedLeaderboardDayId;
-            button.className = `leaderboard-day-chip${isSelected ? ' is-selected' : ''}`;
-            button.type = 'button';
-            button.setAttribute('role', 'tab');
-            button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-            button.setAttribute(
-                'aria-label',
-                `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
-            );
-            button.disabled = isSelected;
-            button.addEventListener('click', () => {
-                this._leaderboardRailScrollLeft = rail.scrollLeft;
-                payload?.onSelectLeaderboardDay?.(option?.challengeId);
-            });
+                const dayLabel = document.createElement('span');
+                dayLabel.className = 'leaderboard-day-chip__day';
+                dayLabel.textContent = option?.dayLabel === 'Today'
+                    ? 'Today'
+                    : option?.dateLabel || '--';
 
-            const dayLabel = document.createElement('span');
-            dayLabel.className = 'leaderboard-day-chip__day';
-            if (option?.dayLabel === 'Today') {
-                dayLabel.textContent = 'Today';
-            } else {
-                dayLabel.textContent = option?.dateLabel || '--';
+                button.append(dayLabel);
+                rail.appendChild(button);
             }
 
-            button.append(dayLabel);
-            rail.appendChild(button);
+            this.modalLapTimes.appendChild(rail);
+            if (typeof this._leaderboardRailScrollLeft === 'number') {
+                rail.scrollLeft = this._leaderboardRailScrollLeft;
+            }
         }
 
-        this.modalLapTimes.appendChild(rail);
-        if (typeof this._leaderboardRailScrollLeft === 'number') {
-            rail.scrollLeft = this._leaderboardRailScrollLeft;
+        const rawEntryCount = payload?.scoreboardSnapshot?.leaderboardEntryCount;
+        const submittedRacerCount = rawEntryCount != null && Number.isFinite(Number(rawEntryCount))
+            ? Math.max(0, Math.trunc(Number(rawEntryCount)))
+            : Math.max(0, Math.trunc(Number(payload?.scoreboardSnapshot?.totalCount)));
+
+        const header = this.modalRunsView?.querySelector('.reusable-modal-header');
+        if (header) {
+            header.querySelector('.leaderboard-summary')?.remove();
         }
+
+        const summary = document.createElement('section');
+        summary.className = 'leaderboard-summary leaderboard-summary--header';
+        summary.setAttribute('aria-label', 'Your leaderboard standing');
+
+        const summaryValue = document.createElement('span');
+        summaryValue.className = 'leaderboard-summary__value';
+        summaryValue.toggleAttribute('aria-busy', rankDisplay.isLoading);
+        if (rankDisplay.isLoading) {
+            summaryValue.textContent = 'Loading';
+            const spinner = document.createElement('span');
+            spinner.className = 'modal-rank-spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+            summaryValue.appendChild(spinner);
+        } else if (rankDisplay.text && rankDisplay.text !== 'N/A') {
+            summaryValue.textContent = rankDisplay.text;
+        } else {
+            summaryValue.textContent = 'No time yet';
+        }
+
+        const summaryMeta = document.createElement('span');
+        summaryMeta.className = 'leaderboard-summary__meta';
+        if (submittedRacerCount > 0) {
+            const racerCountText = submittedRacerCount.toLocaleString();
+            summaryMeta.setAttribute(
+                'aria-label',
+                `${racerCountText} racer${submittedRacerCount === 1 ? '' : 's'}`
+            );
+            const racerCount = document.createElement('span');
+            racerCount.textContent = racerCountText;
+
+            const racerIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            racerIcon.classList.add('leaderboard-summary__racer-icon');
+            racerIcon.setAttribute('viewBox', '0 0 640 512');
+            racerIcon.setAttribute('fill', 'currentColor');
+            racerIcon.setAttribute('aria-hidden', 'true');
+            racerIcon.setAttribute('focusable', 'false');
+            const racerIconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            racerIconPath.setAttribute('d', 'M320 16a104 104 0 1 1 0 208 104 104 0 1 1 0-208zM96 88a72 72 0 1 1 0 144 72 72 0 1 1 0-144zM0 416c0-70.7 57.3-128 128-128 12.8 0 25.2 1.9 36.9 5.4-32.9 36.8-52.9 85.4-52.9 138.6l0 16c0 11.4 2.4 22.2 6.7 32L32 480c-17.7 0-32-14.3-32-32l0-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32l0-16c0-53.2-20-101.8-52.9-138.6 11.7-3.5 24.1-5.4 36.9-5.4 70.7 0 128 57.3 128 128l0 32c0 17.7-14.3 32-32 32l-86.7 0zM472 160a72 72 0 1 1 144 0 72 72 0 1 1 -144 0zM160 432c0-88.4 71.6-160 160-160s160 71.6 160 160l0 16c0 17.7-14.3 32-32 32l-256 0c-17.7 0-32-14.3-32-32l0-16z');
+            racerIcon.appendChild(racerIconPath);
+            summaryMeta.append(racerCount, racerIcon);
+        } else {
+            summaryMeta.textContent = rankDisplay.isLoading ? 'Loading racers' : 'No racers yet';
+        }
+
+        summary.append(summaryValue, summaryMeta);
+        header?.appendChild(summary);
     }
 
     configureRunsModalHeader() {
@@ -1246,45 +1254,12 @@ export class ModalShell {
 
         configureReusableModal(this.modalRunsView, {
             title: isLeaderboardOnly
-                ? 'Leaderboard'
+                ? payload?.scoreboardTitle || 'Standings'
                 : 'Your 5 PBs',
             subtitle: isLeaderboardOnly
-                ? ''
+                ? (trackName || '')
                 : 'Personal Bests',
             closeLabel: this._runsViewMode === 'back' ? 'Back' : 'Close',
-        });
-    }
-
-    configureRunsModalActions() {
-        const primaryBtn = this.modalRunsPrimaryBtn;
-        if (!primaryBtn) return;
-
-        const payload = this._modalRunsPayload;
-        const hasPersonalBestList = Array.isArray(payload?.lapTimesArray);
-        const showPrimaryAction = Boolean(payload?.showGlobalLeaderboard)
-            && !hasPersonalBestList
-            && typeof payload?.primaryAction === 'function';
-
-        primaryBtn.hidden = !showPrimaryAction;
-        if (!showPrimaryAction) {
-            this._bindClickAction(primaryBtn, null);
-            return;
-        }
-
-        const label = payload?.primaryActionLabel || 'Race This Day';
-        primaryBtn.setAttribute('aria-label', label);
-        const labelEl = primaryBtn.querySelector('.combined-action-btn-label');
-        if (labelEl) {
-            labelEl.textContent = label;
-        } else {
-            primaryBtn.textContent = label;
-        }
-        this._bindClickAction(primaryBtn, () => {
-            const action = this._modalRunsPayload?.primaryAction;
-            runModalHandoff(() => {
-                this.closeModal();
-                action?.();
-            });
         });
     }
 

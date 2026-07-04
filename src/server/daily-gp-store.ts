@@ -8,23 +8,28 @@ import {
 import { normalizeCheckpointTimesSec } from '../shared/checkpoint-times.js';
 import {
     buildDailyGpChallenge,
+    buildDailyGpChallengeById,
+    createDailyChallengeId,
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
     createRedisPlayerProfileHashKey,
     DAILY_GP_DEFAULT_LIMIT,
     DAILY_GP_NEARBY_RADIUS,
+    DAILY_GP_PLAYLIST_DAYS,
     DAILY_GP_PLAYER_PROFILE_TTL_SECONDS,
     DAILY_GP_REDIS_TTL_SECONDS,
     DAILY_GP_TOP_ROWS_LIMIT,
     encodeDailyGpLeaderboardScore,
     formatRankLabel,
-    getDailyGpPlayableChallengeById,
+    getUtcDayIndex,
+    isDailyGpChallengePlayable,
     isValidDailyGpTime,
     toBestTimeMs,
     type DailyGpChallenge,
     type DailyGpLeaderboardEntry,
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
+import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 
 type SnapshotRow = {
@@ -64,6 +69,8 @@ type PlayerBootstrapPayload = {
 };
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
+const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function createEmptySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
     return {
@@ -76,6 +83,92 @@ function createEmptySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
         playerRank: null,
         playerRankLabel: null,
     };
+}
+
+function getUtcDayStart(dayIndex: number): Date {
+    return new Date(dayIndex * DAY_MS);
+}
+
+function parseStoredChallenge(raw: string | null | undefined): DailyGpChallenge | null {
+    if (!raw) return null;
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') {
+            return null;
+        }
+
+        const id = typeof parsed.id === 'string' ? parsed.id : '';
+        const challengeDate = typeof parsed.challengeDate === 'string' ? parsed.challengeDate : '';
+        if (!/^daily-gp-\d{4}-\d{2}-\d{2}$/.test(id) || !challengeDate) {
+            return null;
+        }
+
+        const trackKey = typeof parsed.trackKey === 'string' ? parsed.trackKey : '';
+        if (!trackKey || !TRACKS[trackKey]) {
+            return null;
+        }
+
+        const startsAt = typeof parsed.startsAt === 'string' ? parsed.startsAt : '';
+        const endsAt = typeof parsed.endsAt === 'string' ? parsed.endsAt : '';
+        const availableUntil = typeof parsed.availableUntil === 'string' ? parsed.availableUntil : '';
+        if (
+            !Number.isFinite(Date.parse(startsAt))
+            || !Number.isFinite(Date.parse(endsAt))
+            || !Number.isFinite(Date.parse(availableUntil))
+        ) {
+            return null;
+        }
+
+        return {
+            id,
+            challengeDate,
+            trackKey,
+            startsAt,
+            endsAt,
+            availableUntil,
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+    } catch (_error) {
+        return null;
+    }
+}
+
+async function readStoredDailyGpChallenge(challengeId: string): Promise<DailyGpChallenge | null> {
+    const raw = await redis.hGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, challengeId);
+    return parseStoredChallenge(raw);
+}
+
+async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise<DailyGpChallenge> {
+    await redis.hSet(
+        DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
+        { [challenge.id]: JSON.stringify(challenge) },
+    );
+    await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_REDIS_TTL_SECONDS);
+    return challenge;
+}
+
+async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Promise<DailyGpChallenge | null> {
+    const stored = await readStoredDailyGpChallenge(challengeId);
+    if (stored) {
+        return stored;
+    }
+
+    const backfilled = getBackfilledDailyGpChallenge(challengeId);
+    if (!backfilled) {
+        return null;
+    }
+
+    return writeStoredDailyGpChallenge(backfilled);
+}
+
+export async function persistServerDailyGpChallenge(
+    challenge: DailyGpChallenge,
+): Promise<DailyGpChallenge> {
+    return writeStoredDailyGpChallenge(challenge);
 }
 
 function normalizeCommunityMemberTotal(value: unknown): number | null {
@@ -414,11 +507,74 @@ function validateBasicDailyGpSubmission({
 }
 
 export async function getServerDailyGpChallenge(): Promise<DailyGpChallenge> {
-    return buildDailyGpChallenge();
+    const challenge = buildDailyGpChallenge();
+    const stored = await readStoredOrBackfilledDailyGpChallenge(challenge.id);
+    if (stored) {
+        return stored;
+    }
+    return writeStoredDailyGpChallenge(challenge);
+}
+
+export async function getServerDailyGpChallengeById(
+    challengeId?: string | null,
+    { persistFallback = true }: { persistFallback?: boolean } = {},
+): Promise<DailyGpChallenge | null> {
+    if (typeof challengeId !== 'string' || !challengeId) {
+        return null;
+    }
+
+    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId);
+    if (stored) {
+        return stored;
+    }
+
+    const challenge = buildDailyGpChallengeById(challengeId);
+    if (!challenge) {
+        return null;
+    }
+
+    const activeChallenge = buildDailyGpChallenge();
+    if (challenge.id !== activeChallenge.id) {
+        return null;
+    }
+
+    if (persistFallback) {
+        return writeStoredDailyGpChallenge(challenge);
+    }
+    return challenge;
 }
 
 export async function getServerDailyGpPlayableChallenge(challengeId?: string | null): Promise<DailyGpChallenge | null> {
-    return getDailyGpPlayableChallengeById(challengeId);
+    const challenge = await getServerDailyGpChallengeById(challengeId, { persistFallback: false });
+    if (challenge && isDailyGpChallengePlayable(challenge)) {
+        return challenge;
+    }
+
+    const activeChallenge = buildDailyGpChallenge();
+    if (challengeId === activeChallenge.id && isDailyGpChallengePlayable(activeChallenge)) {
+        return writeStoredDailyGpChallenge(activeChallenge);
+    }
+
+    return null;
+}
+
+export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyGpChallenge[]> {
+    const todayIndex = getUtcDayIndex(now);
+    const challenges: DailyGpChallenge[] = [];
+    const activeChallenge = await getServerDailyGpChallenge();
+
+    for (let offset = 0; offset < DAILY_GP_PLAYLIST_DAYS; offset += 1) {
+        const challengeDate = getUtcDayStart(todayIndex - offset).toISOString().slice(0, 10);
+        const challengeId = createDailyChallengeId(challengeDate);
+        const challenge = challengeId === activeChallenge.id
+            ? activeChallenge
+            : await readStoredOrBackfilledDailyGpChallenge(challengeId);
+        if (challenge && isDailyGpChallengePlayable(challenge, now)) {
+            challenges.push(challenge);
+        }
+    }
+
+    return challenges;
 }
 
 export async function getServerPlayerBootstrap({

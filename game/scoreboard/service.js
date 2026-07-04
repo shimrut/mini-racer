@@ -103,34 +103,39 @@ export async function submitScoreboardBestTime({ trackKey, bestTime, replay } = 
         return null;
     }
 
-    if (isLocalEnvironment()) {
+    try {
+        const response = await fetch(config.scoreboardSubmitUrl, {
+            method: 'POST',
+            headers: {
+                ...buildServiceHeaders(config),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                playerId: getOrCreatePlayerId('scoreboard'),
+                trackKey,
+                mode: TRACK_MODE_DAILY_GP,
+                leaderboardIdentity: getLeaderboardIdentityPreference(),
+                bestTime,
+                replay
+            })
+        });
+
         return {
-            ok: false,
-            status: 403,
-            body: { error: 'Writing to the scoreboard is prohibited from localhost.' }
+            ok: response.ok,
+            status: response.status,
+            body: await response.json().catch(() => null)
         };
+    } catch (error) {
+        console.warn('Failed to submit score to server, trying fallbacks:', error);
+        if (!isLocalEnvironment()) {
+            throw error;
+        }
     }
 
-    const response = await fetch(config.scoreboardSubmitUrl, {
-        method: 'POST',
-        headers: {
-            ...buildServiceHeaders(config),
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            playerId: getOrCreatePlayerId('scoreboard'),
-            trackKey,
-            mode: TRACK_MODE_DAILY_GP,
-            leaderboardIdentity: getLeaderboardIdentityPreference(),
-            bestTime,
-            replay
-        })
-    });
-
     return {
-        ok: response.ok,
-        status: response.status,
-        body: await response.json().catch(() => null)
+        ok: false,
+        status: 403,
+        body: { error: 'Writing to the scoreboard is prohibited from localhost.' }
     };
 }
 
@@ -162,9 +167,6 @@ export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOA
     if (inflight) return inflight;
 
     const promise = (async () => {
-        if (isLocalEnvironment()) {
-            return emptySnapshot();
-        }
         const currentPlayerId = getOrCreatePlayerId('scoreboard');
 
         try {
@@ -176,7 +178,11 @@ export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOA
             );
             return normalizeScoreboardRpcPayload(raw) || emptySnapshot();
         } catch (error) {
-            console.error('Scoreboard snapshot fetch failed:', error);
+            if (isLocalEnvironment()) {
+                console.warn('Scoreboard snapshot fetch failed, falling back to empty:', error);
+            } else {
+                console.error('Scoreboard snapshot fetch failed:', error);
+            }
             return emptySnapshot();
         }
     })();

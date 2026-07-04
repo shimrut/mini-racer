@@ -21,13 +21,13 @@ function skinLabelForAsset(assetName) {
     if (!m) return 'Car';
     const rest = m[1];
     if (rest.toLowerCase().startsWith('mr_')) {
-        return `Mini ${titleCaseUnderscored(rest.slice(3))}`;
+        return titleCaseUnderscored(rest.slice(3));
     }
     if (rest.toLowerCase().startsWith('cyber_')) {
-        return `Cyber ${titleCaseUnderscored(rest.slice(6))}`;
+        return titleCaseUnderscored(rest.slice(6));
     }
     if (rest.toLowerCase().startsWith('steam_')) {
-        return `Steam ${titleCaseUnderscored(rest.slice(6))}`;
+        return titleCaseUnderscored(rest.slice(6));
     }
     return titleCaseUnderscored(rest);
 }

@@ -3,15 +3,14 @@ import { createServer, getServerPort } from '@devvit/server';
 import { context, reddit, redis } from '@devvit/web/server';
 import type { MenuItemRequest } from '@devvit/shared/types/menu-item.js';
 import { TRACKS } from '../../game/track/tracks.js';
-import {
-    buildDailyGpChallengeById,
-    buildDailyGpPlaylist,
-    type DailyGpChallenge,
-} from './daily-gp-model.js';
+import { type DailyGpChallenge } from './daily-gp-model.js';
 import {
     getServerDailyGpChallenge,
+    getServerDailyGpChallengeById,
+    getServerDailyGpPlaylist,
     getServerDailyGpSnapshot,
     getServerPlayerBootstrap,
+    persistServerDailyGpChallenge,
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
 } from './daily-gp-store.js';
@@ -78,10 +77,55 @@ function setAnalyticsCorsHeaders(res: express.Response): void {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+function normalizePostBoundDailyGpChallenge(value: unknown): DailyGpChallenge | null {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const record = value as Record<string, unknown>;
+    const id = typeof record.id === 'string' ? record.id : '';
+    const challengeDate = typeof record.challengeDate === 'string' ? record.challengeDate : '';
+    const trackKey = typeof record.trackKey === 'string' ? record.trackKey : '';
+    const startsAt = typeof record.startsAt === 'string' ? record.startsAt : '';
+    const endsAt = typeof record.endsAt === 'string' ? record.endsAt : '';
+    const availableUntil = typeof record.availableUntil === 'string' ? record.availableUntil : '';
+
+    if (
+        !/^daily-gp-\d{4}-\d{2}-\d{2}$/.test(id)
+        || !challengeDate
+        || !trackKey
+        || !TRACKS[trackKey]
+        || !startsAt
+        || !endsAt
+        || !availableUntil
+    ) {
+        return null;
+    }
+
+    return {
+        id,
+        challengeDate,
+        trackKey,
+        startsAt,
+        endsAt,
+        availableUntil,
+        status: 'active',
+        objectiveType: 'single_lap_fastest',
+        objectiveParams: {},
+        skin: 'default',
+    };
+}
+
 async function getPostBoundDailyGpChallenge() {
-    const contextChallengeId = readContextPostData()?.challengeId;
+    const contextPostData = readContextPostData();
+    const contextChallenge = normalizePostBoundDailyGpChallenge(contextPostData?.challenge);
+    if (contextChallenge) {
+        return persistServerDailyGpChallenge(contextChallenge);
+    }
+
+    const contextChallengeId = contextPostData?.challengeId;
     if (typeof contextChallengeId === 'string' && contextChallengeId) {
-        return buildDailyGpChallengeById(contextChallengeId);
+        return getServerDailyGpChallengeById(contextChallengeId);
     }
 
     const postId = readContextPostId();
@@ -92,10 +136,14 @@ async function getPostBoundDailyGpChallenge() {
     try {
         const post = await reddit.getPostById(postId as `t3_${string}`);
         const postData = await post.getPostData();
+        const challenge = normalizePostBoundDailyGpChallenge(postData?.challenge);
+        if (challenge) {
+            return persistServerDailyGpChallenge(challenge);
+        }
         const challengeId = typeof postData?.challengeId === 'string' && postData.challengeId
             ? postData.challengeId
             : null;
-        return challengeId ? buildDailyGpChallengeById(challengeId) : null;
+        return challengeId ? getServerDailyGpChallengeById(challengeId) : null;
     } catch (error) {
         console.error('Failed to resolve post-bound Mini Racer challenge:', error);
         return null;
@@ -580,7 +628,7 @@ app.get('/api/scoreboard/snapshot', async (req, res) => {
         const activeChallenge = await getServerDailyGpChallenge();
         const challenge = trackKey === activeChallenge.trackKey
             ? activeChallenge
-            : buildDailyGpPlaylist().find((entry) => entry.trackKey === trackKey) || null;
+            : (await getServerDailyGpPlaylist()).find((entry) => entry.trackKey === trackKey) || null;
         if (!challenge) {
             res.status(200).json({
                 topRows: [],
@@ -648,7 +696,7 @@ app.get('/api/daily/active', async (_req, res) => {
 app.get('/api/daily/playlist', async (_req, res) => {
     try {
         res.status(200).json({
-            challenges: buildDailyGpPlaylist(),
+            challenges: await getServerDailyGpPlaylist(),
         });
     } catch (error) {
         console.error('Failed to load Reddit Mini Racer daily playlist:', error);

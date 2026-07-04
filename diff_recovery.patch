@@ -1,0 +1,342 @@
+Created At: 2026-06-12T11:47:56Z
+Completed At: 2026-06-12T11:47:56Z
+
+				The command completed successfully.
+				Output:
+				<truncated 10894 lines>
++    align-items: center;
++    flex: 1 1 auto;
++    min-width: 0;
++    gap: 1rem;
++    padding: 1rem 1.05rem;
++}
++
++.daily-playlist-hero-info {
++    display: flex;
++    flex-direction: column;
++    gap: 0.25rem;
++    min-width: 0;
++}
++
++.daily-playlist-hero-title {
++    font-size: 1.25rem;
++    font-weight: 900;
++    letter-spacing: 0.05em;
++    color: var(--text-color);
++    font-style: italic;
++    line-height: 1.05;
++    overflow-wrap: anywhere;
++}
++
++.daily-playlist-hero-day {
++    font-size: 0.65rem;
++    color: var(--accent-color);
++    text-transform: uppercase;
++    font-weight: 800;
++    letter-spacing: 0.15em;
++}
++
++.daily-playlist-entry--hero.current .daily-playlist-hero-day {
++    background: var(--accent-color);
++    color: var(--text-color);
++    padding: 0.2rem 0.6rem;
++    border-radius: var(--radius-lg);
++    align-self: flex-start;
++}
++
++.daily-playlist-hero-medal {
++    flex: 0 0 auto;
++    width: 2.5rem;
++    height: 2.5rem;
++}
++.daily-playlist-hero-medal .medal-svg--hero {
++    width: 100%;
++    height: 100%;
++}
++
++@media (max-width: 560px) {
++    #modal:has(#modal-runs-view.active-view) .modal-card,
++    #settings-modal .modal-card,
++    #daily-playlist-modal .modal-card,
++    #garage-modal .modal-card {
++        width: 100%;
++        max-width: 100%;
++    }
++
++    .reusable-modal-header {
++        padding: 1rem 1rem 0;
++    }
++
++    .reusable-modal-content,
++    #modal:has(#modal-runs-view.active-view) .reusable-modal-content {
++        padding-inline: 0.75rem;
++        gap: 0.75rem;
++    }
++
++    .result-modal .modal-card-section--runs .modal-action-row--stack {
++        padding-inline: 0.75rem;
++        padding-bottom: 0.75rem;
++    }
++
++    .result-modal .modal-card-section--sheet .modal-sheet-dismiss,
++    .result-modal .modal-card-section--runs .modal-sheet-dismiss {
++        width: calc(100% - 1.5rem);
++        margin-bottom: 0.75rem;
++    }
++
++    #settings-modal .modal-sheet-panel {
++        padding: 0.8rem;
++    }
++
++    #settings-modal .modal-sheet-settings-identity-head,
++    #settings-modal .modal-sheet-settings-row--crash-delay {
++        gap: 0.55rem;
++    }
++
++    #settings-modal .settings-crash-delay-control-row {
++        gap: 0.5rem;
++    }
++
++    #settings-modal .settings-crash-delay-stepper {
++        width: 2.15rem;
++        min-width: 2.15rem;
++        height: 2.15rem;
++    }
++
++    #settings-modal .settings-crash-delay-meter {
++        gap: 0.2rem;
++    }
++
++    #garage-modal .garage-tab {
++        min-height: 2.85rem;
++        font-size: 0.9rem;
++    }
++
++    #garage-modal .garage-skin-section {
++        padding: 0.85rem 0.75rem;
++    }
++
++    #garage-modal .garage-skin-grid {
++        grid-template-columns: repeat(2, minmax(0, 1fr));
++        gap: 0.65rem;
++    }
++
++    #garage-modal .garage-skin-option {
++        min-height: 6.7rem;
++    }
++
++    #garage-modal .garage-skin-option__thumb {
++        height: 3.6rem;
++    }
++
++    #garage-modal .garage-trail-grid {
++        grid-template-columns: repeat(3, minmax(0, 1fr));
++        gap: 0.55rem;
++    }
++
++    #garage-modal .garage-trail-option {
++        min-height: 5.85rem;
++    }
++
++    .daily-playlist-entry--hero {
++        flex-direction: column;
++        min-height: 0;
++    }
++
++    .daily-playlist-hero-preview {
++        width: 100%;
++        min-width: 0;
++        height: 7rem;
++    }
++
++    .daily-playlist-hero-content {
++        align-items: flex-end;
++        padding: 0.85rem;
++    }
++
++    .daily-playlist-hero-title {
++        font-size: 1.1rem;
++    }
++
++    .leaderboard-spotlight {
++        padding: 0.75rem;
++    }
++}
+diff --git a/temp_additions.css b/temp_additions.css
+new file mode 100644
+index 0000000..fdd1424
+--- /dev/null
++++ b/temp_additions.css
+@@ -0,0 +1,115 @@
++
++#combined-time 
++    font-size: 4rem;
++    font-weight: 900;
++    font-style: italic;
++    letter-spacing: 0.05em;
++    line-height: 1;
++    text-shadow: 0 4px 12px rgba(0,0,0,0.3);
++
++#combined-hero-medal 
++    margin-bottom: var(--space-xl);
++    transform: scale(0.75);
++    transform-origin: top center;
++
++.combined-stats-grid 
++    display: grid;
++    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
++    gap: 1rem;
++    width: 100%;
++    max-width: 400px;
++    font-size: 1.25rem;
++    font-style: italic;
++    font-weight: 900;
++    letter-spacing: 0.05em;
++
++.stat-floating-item 
++    display: flex;
++    flex-direction: column;
++    justify-content: center;
++    align-items: center;
++
++.stat-floating-label 
++    opacity: 0.5;
++    font-size: 0.75rem;
++    text-transform: uppercase;
++    margin-bottom: 0.25rem;
++    letter-spacing: 0.1em;
++
++#combined-rank-total 
++    opacity: 0.6;
++    font-size: 0.8em;
++
++.combined-rank-container 
++    display: flex;
++    align-items: baseline;
++    gap: 0.25rem;
++
++.combined-next-medal-container 
++    display: flex;
++    align-items: center;
++    gap: 0.5rem;
++
++/* ==========================================================================
++   Responsive Compact Layout for Small Windows / iFrames (<640px height)
++   ========================================================================== */
++@media (max-height: 640px) {
++    /* 1. Leaderboard Modal */
++    .leaderboard-spotlight__rank 
++        font-size: clamp(2rem, 6vw, 2.5rem);
++    
++    .leaderboard-row 
++        padding: 0.35rem 0.5rem;
++    
++    .leaderboard-day-rail 
++        padding: 0.4rem 0;
++    
++    .leaderboard-day-chip 
++        padding: 0.4rem 0.6rem;
++
++    /* 2. Daily Playlist Modal */
++    .daily-playlist-entry 
++        padding: 0.4rem 0.5rem;
++        min-height: 3rem;
++    
++    .daily-playlist-title 
++        font-size: 1.1rem;
++    
++    #daily-playlist-modal .modal-card-section--sheet 
++        gap: 0.4rem;
++
++    /* 3. Finish Screen */
++    #modal.modal--win #modal-combined-view:not(.is-crash) :is(.combined-rank-value, .combined-stat--this-lap .combined-stat-value) 
++        font-size: clamp(2rem, 8vw, 2.5rem);
++    
++    .combined-title 
++        font-size: 1.5rem;
++    
++    .win-stats-medals 
++        margin-bottom: 0.4rem;
++        gap: 0.25rem;
++    
++    .win-stats-medals .medal-svg--win 
++        height: 2.25rem;
++    
++    .combined-header 
++        gap: 0.var(--space-xl);
++    
++    .combined-results-section 
++        margin-bottom: 0.25rem;
++
++    /* 4. Global Modals & Buttons */
++    .modal .modal-card 
++        padding: 0.8rem;
++    
++    .combined-action-btn 
++        height: 3rem;
++        font-size: 0.72rem;
++    
++    .combined-actions 
++        gap: 0.4rem;
++    
++    .result-modal .modal-card-section--runs .modal-action-row--stack 
++        margin-top: 0.5rem;
++    
++}
+diff --git a/vite.config.js b/vite.config.js
+new file mode 100644
+index 0000000..76acbcc
+--- /dev/null
++++ b/vite.config.js
+@@ -0,0 +1,49 @@
++import { readFile, writeFile } from 'node:fs/promises';
++import { resolve } from 'node:path';
++import { defineConfig } from 'vite';
++import { devvit } from '@devvit/start/vite';
++
++function fixDevvitHtmlEntrypoints() {
++    const clientDir = resolve('dist/client');
++
++    async function rewriteFile(filename, replacements) {
++        const filePath = resolve(clientDir, filename);
++        let content = await readFile(filePath, 'utf8');
++
++        for (const [from, to] of replacements) {
++            content = content.replace(from, to);
++        }
++
++        await writeFile(filePath, content);
++    }
++
++    return {
++        name: 'fix-devvit-html-entrypoints',
++        apply: 'build',
++        async closeBundle() {
++            await rewriteFile('preview.html', [
++                ['href="preview.css"', 'href="default.css"'],
++                ['src="preview.js"', 'src="default.js"']
++            ]);
++
++            await rewriteFile('game.html', [
++                ['href="styles.css?v=1.90"', 'href="styles.css"'],
++                ['src="game/index.js?v=1.90"', 'src="game.js"']
++            ]);
++        }
++    };
++}
++
++export default defineConfig({
++    root: '.',
++    plugins: [
++        fixDevvitHtmlEntrypoints(),
++        devvit({
++            client: {
++                build: {
++                    chunkSizeWarningLimit: 2000
++                }
++            }
++        })
++    ]
++});
+
+

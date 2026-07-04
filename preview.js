@@ -3,7 +3,6 @@ import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
 import {
     getActiveDailyChallenge,
-    getFeaturedDailyChallenge,
     getDailyChallengeCardStatus,
     requestFeaturedDailyChallengeStart
 } from './game/daily-challenge/service.js';
@@ -52,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const status = getDailyChallengeCardStatus(currentChallenge);
         if (status.key === 'expired') {
             event.preventDefault();
-            showExpiredChallengeMessage(currentChallenge);
+            await showExpiredChallengeMessage(currentChallenge);
             return;
         }
 
@@ -74,9 +73,9 @@ async function openGame(event) {
     }
 }
 
-function showExpiredChallengeMessage(expiredChallenge) {
+async function showExpiredChallengeMessage(expiredChallenge) {
     const expiredTrackName = getChallengeTrackName(expiredChallenge);
-    const featuredChallenge = getFeaturedDailyChallenge();
+    const featuredChallenge = await getActiveDailyChallenge().catch(() => null);
     const featuredTrackName = getChallengeTrackName(featuredChallenge);
     const existing = document.getElementById('expired-challenge-message');
     if (existing) existing.remove();

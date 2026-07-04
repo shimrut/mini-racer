@@ -11,8 +11,10 @@ import {
 } from '../scoreboard/display-preference.js?v=2.09';
 import {
     getDailyGpScheduledTrackPoolForDayIndex,
-    getPinnedDailyGpTrackKeyForDayIndex,
 } from '../shared/daily-gp-track-schedule.js?v=2.09';
+import {
+    getBackfilledDailyGpTrackKeyForDate,
+} from '../shared/daily-gp-history-backfill.js?v=2.09';
 import {
     getDailyChallengeData,
     setDailyChallengeBestTime,
@@ -82,7 +84,7 @@ function shouldUseMockDailyChallenge() {
             return true;
         }
     }
-    return isLocalEnvironment();
+    return isPreviewPage() && !readDevvitPostData();
 }
 
 function getMockDailyChallenge() {
@@ -164,10 +166,6 @@ function getStepForTrackCount(trackCount) {
 }
 
 function getDailyTrackKeyForDayIndex(dayIndex) {
-    const pinnedTrackKey = getPinnedDailyGpTrackKeyForDayIndex(dayIndex);
-    if (pinnedTrackKey) {
-        return pinnedTrackKey;
-    }
     const trackKeys = getDailyGpScheduledTrackPoolForDayIndex(dayIndex);
     const step = getStepForTrackCount(trackKeys.length);
     const index = Math.abs(dayIndex * step) % trackKeys.length;
@@ -178,10 +176,13 @@ function buildLocalDailyChallenge(date = new Date()) {
     const dayIndex = getUtcDayIndex(date);
     const startsAt = getUtcDayStart(dayIndex);
     const challengeDate = formatUtcChallengeDate(startsAt);
+    const backfilledTrackKey = getBackfilledDailyGpTrackKeyForDate(challengeDate);
     return normalizeDailyChallenge({
         id: `daily-gp-${challengeDate}`,
         challengeDate,
-        trackKey: getDailyTrackKeyForDayIndex(dayIndex),
+        trackKey: backfilledTrackKey && TRACKS[backfilledTrackKey]
+            ? backfilledTrackKey
+            : getDailyTrackKeyForDayIndex(dayIndex),
         objectiveType: 'single_lap_fastest',
         startsAt: startsAt.toISOString(),
         endsAt: new Date(startsAt.getTime() + DAY_MS).toISOString(),
@@ -385,9 +386,7 @@ function isChallengeStillUsable(challenge, nowMs = Date.now()) {
 }
 
 function isChallengeTrackCurrentForSchedule(challenge) {
-    const expectedChallenge = buildLocalDailyChallengeById(challenge?.id);
-    if (!expectedChallenge) return true;
-    return expectedChallenge.trackKey === challenge.trackKey;
+    return Boolean(challenge?.trackKey && TRACKS[challenge.trackKey]);
 }
 
 function sortDailyPlaylist(challenges) {
@@ -904,91 +903,91 @@ export function getDailyChallengeRequiredLaps(challenge) {
 }
 
 export async function getActiveDailyChallenge({ allowExpiredPost = false } = {}) {
-    if (shouldUseMockDailyChallenge()) {
-        console.log('Using mock daily challenge for local development');
-        return getMockDailyChallenge();
-    }
-
     const startOverride = readDailyStartOverride();
     if (startOverride?.mode === 'featured') {
         clearDailyStartOverride();
-        const featuredChallenge = buildLocalDailyChallenge(new Date());
-        writeActiveDailyCacheStorable(featuredChallenge);
-        return featuredChallenge;
     }
 
     const postChallenge = getPostBoundDailyChallengeFromContext();
     if (postChallenge) {
         cacheDailyChallengePlaylist([postChallenge]);
-        if (!allowExpiredPost && !isChallengeStillUsable(postChallenge)) {
-            const featuredChallenge = buildLocalDailyChallenge(new Date());
-            writeActiveDailyCacheStorable(featuredChallenge);
-            return featuredChallenge;
+        if (allowExpiredPost || isChallengeStillUsable(postChallenge)) {
+            return postChallenge;
         }
-        return postChallenge;
     }
-
-    const cachedChallenge = getValidCachedActiveDailyChallenge();
-    if (cachedChallenge) return cachedChallenge;
 
     const config = getDailyChallengeConfig();
-    if (!config || typeof fetch !== 'function') return cachedChallenge;
+    const cachedChallenge = getValidCachedActiveDailyChallenge();
 
-    try {
-        const response = await fetch(config.dailyActiveUrl, {
-            method: 'GET',
-            headers: buildServiceHeaders(config),
-        });
+    if (config && typeof fetch === 'function') {
+        try {
+            const response = await fetch(config.dailyActiveUrl, {
+                method: 'GET',
+                headers: buildServiceHeaders(config),
+            });
 
-        if (!response.ok) {
-            throw new Error(`Active daily challenge fetch failed: ${response.status}`);
+            if (response.ok) {
+                const payload = await response.json();
+                const challenge = normalizeDailyChallenge(payload);
+                if (challenge) {
+                    writeActiveDailyCacheStorable(challenge);
+                    return challenge;
+                }
+            } else {
+                throw new Error(`Server returned status ${response.status}`);
+            }
+        } catch (error) {
+            console.warn('Failed to fetch active daily challenge from server, trying fallbacks:', error);
+            if (!shouldUseMockDailyChallenge()) {
+                if (cachedChallenge) {
+                    return cachedChallenge;
+                }
+                throw error;
+            }
         }
-
-        const payload = await response.json();
-        const challenge = normalizeDailyChallenge(payload);
-        if (challenge) {
-            writeActiveDailyCacheStorable(challenge);
-        } else {
-            clearActiveDailyCacheStorage();
-        }
-
-        return challenge;
-    } catch (error) {
-        if (cachedChallenge) {
-            return cachedChallenge;
-        }
-        throw error;
     }
+
+    if (cachedChallenge) {
+        return cachedChallenge;
+    }
+
+    return getMockDailyChallenge();
 }
 
 async function loadDailyChallengePlaylist() {
-    if (shouldUseMockDailyChallenge()) {
-        return getLocalDailyPlaylist();
-    }
-
     const config = getDailyChallengeConfig();
-    if (!config || typeof fetch !== 'function') {
-        return getLocalDailyPlaylist();
+    if (config && typeof fetch === 'function') {
+        try {
+            const response = await fetch(config.dailyPlaylistUrl, {
+                method: 'GET',
+                headers: buildServiceHeaders(config),
+            });
+
+            if (response.ok) {
+                const payload = await response.json();
+                const rawChallenges = Array.isArray(payload)
+                    ? payload
+                    : Array.isArray(payload?.challenges)
+                        ? payload.challenges
+                        : [];
+                const parsed = rawChallenges
+                    .map((challenge) => normalizeDailyChallenge(challenge))
+                    .filter(Boolean);
+                if (parsed.length > 0) {
+                    return parsed;
+                }
+            } else {
+                throw new Error(`Server returned status ${response.status}`);
+            }
+        } catch (error) {
+            console.warn('Failed to fetch daily challenge playlist from server, trying fallbacks:', error);
+            if (!shouldUseMockDailyChallenge()) {
+                throw error;
+            }
+        }
     }
 
-    const response = await fetch(config.dailyPlaylistUrl, {
-        method: 'GET',
-        headers: buildServiceHeaders(config),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Daily challenge playlist fetch failed: ${response.status}`);
-    }
-
-    const payload = await response.json();
-    const rawChallenges = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.challenges)
-            ? payload.challenges
-            : [];
-    return rawChallenges
-        .map((challenge) => normalizeDailyChallenge(challenge))
-        .filter(Boolean);
+    return getLocalDailyPlaylist();
 }
 
 export async function getDailyChallengePlaylist({ forceRefresh = false } = {}) {
@@ -1024,36 +1023,38 @@ export function getCachedDailyChallengePlaylist() {
 }
 
 async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_LIMIT } = {}) {
-    if (shouldUseMockDailyChallenge() || isLocalEnvironment()) {
-        console.log('Using mock daily challenge snapshot for local development');
-        return getMockDailyChallengeSnapshot();
-    }
-
     const config = getDailyChallengeConfig();
-    if (!config || typeof fetch !== 'function' || !challengeId) {
-        return normalizeSnapshot(null);
+    if (config && typeof fetch === 'function' && challengeId) {
+        try {
+            const safeLimit = clampRequestLimit(limit, { defaultLimit: DEFAULT_DAILY_LIMIT });
+            const origin = typeof window !== 'undefined' && window.location?.origin
+                ? window.location.origin
+                : 'http://localhost';
+            const url = new URL(config.dailySnapshotUrl, origin);
+            url.searchParams.set('challengeId', challengeId);
+            url.searchParams.set('playerId', getOrCreatePlayerId('daily challenge'));
+            url.searchParams.set('limit', safeLimit.toString());
+
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                headers: buildServiceHeaders(config),
+            });
+
+            if (response.ok) {
+                const payload = await response.json();
+                return normalizeSnapshot(payload);
+            } else {
+                throw new Error(`Server returned status ${response.status}`);
+            }
+        } catch (error) {
+            console.warn('Failed to fetch daily challenge snapshot from server, trying fallbacks:', error);
+            if (!shouldUseMockDailyChallenge() && !isLocalEnvironment()) {
+                throw error;
+            }
+        }
     }
 
-    const safeLimit = clampRequestLimit(limit, { defaultLimit: DEFAULT_DAILY_LIMIT });
-    const origin = typeof window !== 'undefined' && window.location?.origin
-        ? window.location.origin
-        : 'http://localhost';
-    const url = new URL(config.dailySnapshotUrl, origin);
-    url.searchParams.set('challengeId', challengeId);
-    url.searchParams.set('playerId', getOrCreatePlayerId('daily challenge'));
-    url.searchParams.set('limit', safeLimit.toString());
-
-    const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: buildServiceHeaders(config),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Daily challenge snapshot fetch failed: ${response.status}`);
-    }
-
-    const payload = await response.json();
-    return normalizeSnapshot(payload);
+    return getMockDailyChallengeSnapshot();
 }
 
 export async function getDailyChallengeSnapshot({
