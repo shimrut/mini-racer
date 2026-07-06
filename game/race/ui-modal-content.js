@@ -913,18 +913,21 @@ export class ModalContentUi {
 
         if (deltaToPb === undefined || deltaToPb === null) {
             if (statRow) {
-                statRow.hidden = true;
-                statRow.setAttribute('hidden', '');
-                statRow.setAttribute('aria-hidden', 'true');
+                statRow.hidden = false;
+                statRow.removeAttribute('hidden');
+                statRow.removeAttribute('aria-hidden');
             }
-            el.textContent = '';
+            el.textContent = 'No lap times yet';
             el.classList.remove(
                 'combined-stat-value--pb-delta',
                 'is-gain',
                 'is-loss',
             );
+            el.classList.add('combined-stat-value--placeholder');
             return;
         }
+
+        el.classList.remove('combined-stat-value--placeholder');
 
         if (statRow) {
             statRow.hidden = false;

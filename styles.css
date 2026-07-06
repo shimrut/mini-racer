@@ -2214,6 +2214,13 @@ body.start-selection-active #start-overlay {
     color: var(--accent-bright, var(--accent-bright));
 }
 
+#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--placeholder {
+    font-size: 0.7rem;
+    font-weight: 500;
+    opacity: 0.6;
+    font-variant-numeric: normal;
+}
+
 #modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat--pb-delta[hidden] {
     display: flex !important;
     visibility: hidden;
