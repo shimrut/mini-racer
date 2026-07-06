@@ -464,18 +464,24 @@ body.start-selection-active .lap-flash {
     gap: clamp(1.25rem, 4vw, 2.25rem);
     flex-shrink: 0;
     max-width: 100%;
+    padding-bottom: 1.5rem;
 }
 
 .combined-medal-row-slot {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.4rem;
     min-width: 0;
     flex: 0 1 auto;
 }
 
 .combined-medal-row-slot__time {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 0.4rem;
     font-family: var(--header-font), "Outfit", sans-serif;
     font-size: clamp(0.8rem, 2.6vw, 1.05rem);
     font-weight: 700;
