@@ -4,7 +4,7 @@ import {
     normalizeLeaderboardIdentityPreference,
     resolveLeaderboardDisplayName,
     sanitizeRedditUsername,
-} from '../shared/leaderboard-identity.js';
+} from '../../game/shared/leaderboard-identity.js';
 import { normalizeCheckpointTimesSec } from '../shared/checkpoint-times.js';
 import {
     buildDailyGpChallenge,
