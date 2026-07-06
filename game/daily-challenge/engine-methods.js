@@ -3,7 +3,7 @@ import {
   saveDailyChallengeBestTime,
   setDailyChallengeBestTime,
 } from "./storage.js?v=2.09";
-import { normalizeCheckpointTimesSec } from "./checkpoint-times.js?v=2.09";
+import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js?v=2.09";
 import {
   buildLapRecord,
   createModalActions,

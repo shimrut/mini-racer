@@ -1,4 +1,4 @@
-import { normalizeCheckpointTimesSec } from "./checkpoint-times.js";
+import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js";
 
 const DAILY_CHALLENGE_STORAGE_KEY = "VectorGpDailyChallengeData";
 const MAX_STORED_DAILY_CHALLENGES = 7;
