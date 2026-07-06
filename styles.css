@@ -2000,7 +2000,7 @@ body.start-selection-active #start-overlay {
     flex-direction: column;
     align-items: center;
     gap: 0.55rem;
-    width: min(92vw, 22rem);
+    width: min(92vw, 25rem);
     max-width: 100%;
 }
 
@@ -2018,7 +2018,7 @@ body.start-selection-active #start-overlay {
 }
 
 .combined-hero-medal .win-combined-medal-overlay__row .combined-medal-row-slot .medal-svg--hero {
-    width: min(21vw, 3.5rem);
+    width: min(24vw, 4rem);
     aspect-ratio: 1;
     height: auto;
 }
