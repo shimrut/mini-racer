@@ -461,7 +461,7 @@ body.start-selection-active .lap-flash {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: clamp(1.25rem, 4vw, 2.25rem);
+    gap: clamp(0.6rem, 3vw, 1.4rem);
     flex-shrink: 0;
     max-width: 100%;
     padding-bottom: 1.5rem;
@@ -498,7 +498,7 @@ body.start-selection-active .lap-flash {
 }
 
 .combined-medal-row-slot .medal-svg--hero {
-    width: min(22vw, 3.25rem);
+    width: min(20vw, 4.75rem);
     aspect-ratio: 1;
     height: auto;
     display: block;
@@ -2018,7 +2018,7 @@ body.start-selection-active #start-overlay {
 }
 
 .combined-hero-medal .win-combined-medal-overlay__row .combined-medal-row-slot .medal-svg--hero {
-    width: min(24vw, 4rem);
+    width: min(21vw, 3.5rem);
     aspect-ratio: 1;
     height: auto;
 }
