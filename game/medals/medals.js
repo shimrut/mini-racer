@@ -422,13 +422,19 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
                 : 'medal-svg--hero medal-svg--row-placeholder',
             outline: !filled,
             showEmblem: filled,
-            centerText,
+            centerText: null,
             rowPlaceholder: !filled,
         });
         if (!filled && centerText) {
             icon.setAttribute('aria-label', `${formatMedalLabel(tier)} locked, unlock at ${centerText}`);
         }
         slot.appendChild(icon);
+        if (!filled && centerText) {
+            const timeLabel = document.createElement('span');
+            timeLabel.className = 'combined-medal-row-slot__time';
+            timeLabel.textContent = centerText;
+            slot.appendChild(timeLabel);
+        }
 
         row.appendChild(slot);
     }

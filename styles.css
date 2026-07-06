@@ -461,7 +461,7 @@ body.start-selection-active .lap-flash {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: clamp(0.var(--space-xl), 1.5vw, 0.55rem);
+    gap: clamp(1.25rem, 4vw, 2.25rem);
     flex-shrink: 0;
     max-width: 100%;
 }
@@ -470,9 +470,21 @@ body.start-selection-active .lap-flash {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.var(--space-xl);
+    gap: 0.4rem;
     min-width: 0;
     flex: 0 1 auto;
+}
+
+.combined-medal-row-slot__time {
+    font-family: var(--header-font), "Outfit", sans-serif;
+    font-size: clamp(0.8rem, 2.6vw, 1.05rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: var(--text-dim);
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .combined-medal-row-slot.medal-svg--medal-entrance {
