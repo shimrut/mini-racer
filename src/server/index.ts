@@ -3,7 +3,7 @@ import { createServer, getServerPort } from '@devvit/server';
 import { context, reddit, redis } from '@devvit/web/server';
 import type { MenuItemRequest } from '@devvit/shared/types/menu-item.js';
 import { TRACKS } from '../../game/track/tracks.js';
-import { type DailyGpChallenge } from './daily-gp-model.js';
+import { type DailyGpChallenge, isDailyGpChallengePlayable } from './daily-gp-model.js';
 import {
     getServerDailyGpChallenge,
     getServerDailyGpChallengeById,
@@ -663,7 +663,10 @@ app.get('/api/scoreboard/snapshot', async (req, res) => {
 
 app.get('/api/daily/active', async (_req, res) => {
     try {
-        const challenge = await getPostBoundDailyGpChallenge() || await getServerDailyGpChallenge();
+        const postBound = await getPostBoundDailyGpChallenge();
+        const challenge = postBound && isDailyGpChallengePlayable(postBound)
+            ? postBound
+            : await getServerDailyGpChallenge();
         res.status(200).json(challenge);
     } catch (error) {
         console.error('Failed to load Reddit Mini Racer active challenge:', error);

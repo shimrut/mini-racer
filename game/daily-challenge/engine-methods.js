@@ -447,37 +447,12 @@ export const dailyChallengeEngineMethods = {
 
     const availableUntilMs = Date.parse(challenge.availableUntil || "");
     if (Number.isFinite(availableUntilMs) && Date.now() >= availableUntilMs) {
-      await this.loadDailyChallengeCritical();
-      this.modal.showModal(
-        "CHALLENGE EXPIRED",
-        null,
-        {
-          bestTime: this.bestLapTime,
-          lapTime: null,
-          deltaToBest: null,
-          primaryStatLabel: "Daily Challenge",
-        },
-        {
-          ...createModalActions({
-            modalKind: "expired",
-            primaryActionLabel: "Refresh",
-            primaryAction: () => {
-              void this.loadDailyChallengeCritical();
-              this.modal.closeModal();
-            },
-            primaryActionIcon: "retry",
-            secondaryActionLabel: "Done",
-            secondaryAction: () => this.modal.closeModal(),
-            secondaryActionIcon: "done",
-          }),
-          playlistAction: () => {
-            void this.openDailyChallengePlaylist();
-          },
-        },
-      );
-      if (this.modal.modalMsg) {
-        this.modal.modalMsg.style.display = "";
-        this.modal.modalMsg.textContent = "Refresh the featured track before racing.";
+      const refreshed = await this.loadDailyChallengeCritical();
+      const refreshedUntil = Date.parse(refreshed?.availableUntil || "");
+      const refreshedPlayable = refreshed
+        && (!Number.isFinite(refreshedUntil) || Date.now() < refreshedUntil);
+      if (refreshedPlayable && refreshed.id !== challenge.id) {
+        return this.handleStartDailyChallenge(refreshed, options);
       }
       return;
     }
