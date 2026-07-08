@@ -6,7 +6,6 @@ import { createRunPolicy } from '../../game/race/run-policy.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
 
 export const MAX_REPLAY_FRAMES = 12_000;
-const EPSILON = 1e-9;
 
 type ReplaySegment = {
     frames: number;
@@ -206,7 +205,11 @@ export function validateDailyGpReplayDetailed({
             state.keys.left = segment.left;
             state.keys.right = segment.right;
             if (segment.relaunchDelay) {
-                state.relaunchDelayRemaining = Math.max(state.relaunchDelayRemaining, fixedDt + EPSILON);
+                // Set exactly fixedDt so updateSimulation decrements it to exactly 0 in
+                // one step (fixedDt - fixedDt === 0 in IEEE 754). A residual here would
+                // freeze one extra frame after the client's launch delay ends, shifting
+                // every subsequent steering input by one frame and diverging the replay.
+                state.relaunchDelayRemaining = fixedDt;
             }
 
             const events = updateSimulation(
