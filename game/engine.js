@@ -174,6 +174,8 @@ export class RealTimeRacer {
     this.activeRunId = 0;
     this.scoreboardReplay = new ReplayRecorder();
     this.lapCheckpointTimesSec = [];
+    this.runHadTimingAnomaly = false;
+    this.rankedSubmissionBlockedReason = null;
 
     this.dailyGpRaceStats = { start: 0, crash: 0, win: 0 };
     this.playerTypeSent = false;

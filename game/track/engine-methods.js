@@ -122,6 +122,7 @@ export const trackEngineMethods = {
       trackPageview = true,
       countMapSelection = true,
       loadPlayerProgress = true,
+      preserveDailyChallengeContext = false,
     } = {},
   ) {
     const nextTrack = TRACKS[trackKey];
@@ -137,7 +138,9 @@ export const trackEngineMethods = {
     const requestId = ++this.trackLoadRequestId;
     this.currentTrack = nextTrack;
     this.currentTrackKey = trackKey;
-    this.clearDailyChallengeRun();
+    if (!preserveDailyChallengeContext) {
+      this.clearDailyChallengeRun();
+    }
 
 
     const runtime = getTrackRuntimeAsset(trackKey, this.currentTrack, {

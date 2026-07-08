@@ -1,5 +1,4 @@
 import { TRACKS } from '../track/tracks.js?v=2.09';
-import { getLeaderboardPlayerName } from '../scoreboard/service.js?v=2.09';
 import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/result-flow.js?v=2.09';
 import { createCrashMedalHeroIcon, createMedalIconSvg } from '../medals/medal-icon.js?v=2.09';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js?v=2.09';
@@ -540,7 +539,7 @@ export class ModalContentUi {
         rowLabel.className = 'combined-row-name';
         rowLabel.textContent = typeof entry.displayName === 'string' && entry.displayName.trim()
             ? entry.displayName
-            : getLeaderboardPlayerName(entry.playerId);
+            : 'Anonymous Racer';
         item.appendChild(rowLabel);
 
         const runTime = document.createElement('span');
@@ -592,7 +591,7 @@ export class ModalContentUi {
     } else if (
         currentPlayerRow
         && (Number.isFinite(currentPlayerRow.rank) || currentPlayerRow.rankLabel)
-        && !topRows.some((entry) => entry.playerId === currentPlayerRow.playerId)
+        && !topRows.some((entry) => entry.isCurrentPlayer)
     ) {
         appendScoreboardRow(currentPlayerRow);
     }

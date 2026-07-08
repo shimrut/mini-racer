@@ -7,8 +7,7 @@ import {
 } from '../../game/shared/leaderboard-identity.js';
 import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
 import {
-    buildDailyGpChallenge,
-    buildDailyGpChallengeById,
+    buildDailyGpChallengeForDayIndexWithTrack,
     createDailyChallengeId,
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
@@ -21,21 +20,20 @@ import {
     DAILY_GP_TOP_ROWS_LIMIT,
     encodeDailyGpLeaderboardScore,
     formatRankLabel,
+    formatUtcChallengeDate,
     getUtcDayIndex,
     isDailyGpChallengePlayable,
-    isValidDailyGpTime,
-    toBestTimeMs,
     type DailyGpChallenge,
     type DailyGpLeaderboardEntry,
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
 import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
+import { mintGuestPlayerToken, verifyGuestPlayerToken } from './player-token.js';
 
 type SnapshotRow = {
     rank: number;
     rankLabel: string;
-    playerId: string;
     displayName: string;
     bestTime: number;
     bestTimeMs: number;
@@ -60,6 +58,7 @@ type SnapshotPayload = {
 
 type PlayerBootstrapPayload = {
     playerId: string | null;
+    guestToken: string | null;
     redditUsername: string | null;
     leaderboardIdentity: 'constructed' | 'reddit';
     hasAnyData: boolean;
@@ -70,7 +69,18 @@ type PlayerBootstrapPayload = {
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';
+const DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
+const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
+const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 5_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+function createSubmissionRateLimitKey(challengeId: string, playerId: string): string {
+    return `dailygp:submit-rate-limit:${challengeId}:${playerId}`;
+}
+
+function createSubmissionLockKey(challengeId: string, playerId: string): string {
+    return `dailygp:submit-lock:${challengeId}:${playerId}`;
+}
 
 function createEmptySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
     return {
@@ -165,6 +175,114 @@ async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Prom
     return writeStoredDailyGpChallenge(backfilled);
 }
 
+async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
+    const rawMap = await redis.hGetAll(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY);
+    if (!rawMap) {
+        return [];
+    }
+    const entries: DailyGpChallenge[] = [];
+    for (const raw of Object.values(rawMap)) {
+        const parsed = parseStoredChallenge(typeof raw === 'string' ? raw : null);
+        if (parsed) {
+            entries.push(parsed);
+        }
+    }
+    return entries;
+}
+
+/**
+ * File-order pointer selection. tracks.js is the schedule: walk its key order
+ * one track per day, wrapping at the end. The playhead is the most-recent ledger
+ * entry before today (its trackKey). Tomorrow plays the next key after the
+ * playhead in the current Object.keys(TRACKS) order, wrapping to index 0.
+ *
+ * Editing tracks.js (append, insert, reorder, remove) only affects days that have
+ * not been written yet; past days are frozen in the ledger. If the playhead
+ * trackKey is no longer in the file (removed) or the ledger is empty, fall back
+ * to the first key.
+ */
+async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
+    const pool = Object.keys(TRACKS);
+    if (pool.length === 0) {
+        return 'circuit';
+    }
+
+    const todayMs = todayStartsAt.getTime();
+    const priorEntries = (await readStoredChallengeEntries())
+        .filter((entry) => Number.isFinite(Date.parse(entry.startsAt)) && Date.parse(entry.startsAt) < todayMs)
+        .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
+
+    const playhead = priorEntries[0]?.trackKey;
+    if (!playhead) {
+        return pool[0];
+    }
+
+    const playheadIndex = pool.indexOf(playhead);
+    if (playheadIndex === -1) {
+        return pool[0];
+    }
+
+    const nextIndex = (playheadIndex + 1) % pool.length;
+    return pool[nextIndex] || pool[0];
+}
+
+function getTodayChallengeId(): string {
+    const dayIndex = getUtcDayIndex(new Date());
+    const startsAt = getUtcDayStart(dayIndex);
+    return createDailyChallengeId(formatUtcChallengeDate(startsAt));
+}
+
+/**
+ * Resolve today's challenge without writing it. Used by callers that only need
+ * to inspect/playability-check today's track without committing it to the ledger.
+ */
+async function pickTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
+    const dayIndex = getUtcDayIndex(new Date());
+    const startsAt = getUtcDayStart(dayIndex);
+    const challengeId = createDailyChallengeId(formatUtcChallengeDate(startsAt));
+
+    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId);
+    if (stored) {
+        return stored;
+    }
+
+    const trackKey = await pickNextTrackKeyForToday(startsAt);
+    return buildDailyGpChallengeForDayIndexWithTrack(dayIndex, trackKey);
+}
+
+/**
+ * Resolve today's challenge, creating it via the append-only ledger if it does
+ * not exist yet. First-writer-wins via hSetNX so concurrent requests and the
+ * 00:05 UTC scheduler cannot create duplicate entries for the same day.
+ */
+async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
+    const dayIndex = getUtcDayIndex(new Date());
+    const startsAt = getUtcDayStart(dayIndex);
+    const challengeId = createDailyChallengeId(formatUtcChallengeDate(startsAt));
+
+    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId);
+    if (stored) {
+        return stored;
+    }
+
+    const trackKey = await pickNextTrackKeyForToday(startsAt);
+    const challenge = buildDailyGpChallengeForDayIndexWithTrack(dayIndex, trackKey);
+
+    const didSet = await redis.hSetNX(
+        DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
+        challengeId,
+        JSON.stringify(challenge),
+    );
+    if (didSet) {
+        await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_REDIS_TTL_SECONDS);
+        return challenge;
+    }
+
+    // Lost the race to another request/scheduler: return the winning entry.
+    const reread = await readStoredDailyGpChallenge(challengeId);
+    return reread ?? challenge;
+}
+
 export async function persistServerDailyGpChallenge(
     challenge: DailyGpChallenge,
 ): Promise<DailyGpChallenge> {
@@ -227,7 +345,7 @@ function parseStoredEntry(
         updatedAt: parsed.updatedAt,
         completedLaps: null,
         checkpointTimesSec,
-        validationMethod: parsed.validationMethod === 'strict-replay' || parsed.validationMethod === 'basic-sanity'
+        validationMethod: parsed.validationMethod === 'strict-replay'
             ? parsed.validationMethod
             : undefined,
         strictReplayFailureReason: typeof parsed.strictReplayFailureReason === 'string'
@@ -303,6 +421,89 @@ function resolveCanonicalPlayerId({
     return null;
 }
 
+function normalizeGuestPlayerId(playerId: unknown): string | null {
+    return typeof playerId === 'string' && playerId.trim()
+        ? playerId.trim()
+        : null;
+}
+
+async function resolveAuthorizedPlayerIdentity({
+    playerId,
+    redditUsername,
+    guestToken,
+    allowUnsignedGuest = false,
+}: {
+    playerId?: unknown;
+    redditUsername?: unknown;
+    guestToken?: unknown;
+    allowUnsignedGuest?: boolean;
+}): Promise<{
+    canonicalPlayerId: string | null;
+    guestPlayerId: string | null;
+    guestToken: string | null;
+}> {
+    const safeUsername = sanitizeRedditUsername(redditUsername);
+    if (safeUsername) {
+        return {
+            canonicalPlayerId: `reddit:${safeUsername.toLowerCase()}`,
+            guestPlayerId: null,
+            guestToken: null,
+        };
+    }
+
+    const normalizedGuestToken = typeof guestToken === 'string' && guestToken.trim()
+        ? guestToken.trim()
+        : null;
+    if (normalizedGuestToken) {
+        const verifiedGuestPlayerId = await verifyGuestPlayerToken(normalizedGuestToken);
+        if (!verifiedGuestPlayerId) {
+            return {
+                canonicalPlayerId: null,
+                guestPlayerId: null,
+                guestToken: null,
+            };
+        }
+
+        const normalizedGuestPlayerId = normalizeGuestPlayerId(playerId);
+        if (normalizedGuestPlayerId && normalizedGuestPlayerId !== verifiedGuestPlayerId) {
+            return {
+                canonicalPlayerId: null,
+                guestPlayerId: null,
+                guestToken: null,
+            };
+        }
+
+        return {
+            canonicalPlayerId: `guest:${verifiedGuestPlayerId}`,
+            guestPlayerId: verifiedGuestPlayerId,
+            guestToken: normalizedGuestToken,
+        };
+    }
+
+    if (!allowUnsignedGuest) {
+        return {
+            canonicalPlayerId: null,
+            guestPlayerId: null,
+            guestToken: null,
+        };
+    }
+
+    const normalizedGuestPlayerId = normalizeGuestPlayerId(playerId);
+    if (!normalizedGuestPlayerId) {
+        return {
+            canonicalPlayerId: null,
+            guestPlayerId: null,
+            guestToken: null,
+        };
+    }
+
+    return {
+        canonicalPlayerId: `guest:${normalizedGuestPlayerId}`,
+        guestPlayerId: normalizedGuestPlayerId,
+        guestToken: await mintGuestPlayerToken(normalizedGuestPlayerId),
+    };
+}
+
 async function readPlayerProfile(playerId: string): Promise<DailyGpPlayerProfile | null> {
     const rawProfile = await redis.hGet(createRedisPlayerProfileHashKey(), playerId);
     return parseStoredPlayerProfile(rawProfile);
@@ -371,7 +572,6 @@ function toSnapshotRow(
     return {
         rank,
         rankLabel: formatRankLabel(rank) || '--',
-        playerId: entry.playerId,
         displayName: resolveLeaderboardDisplayName({
             playerId: entry.playerId,
             preference: profile?.leaderboardIdentity,
@@ -437,82 +637,56 @@ async function ensureLeaderboardTtl(challengeId: string): Promise<void> {
     ]);
 }
 
-function getReplayRaceClockFrameCount(replay: unknown): number | null {
-    if (!replay || typeof replay !== 'object') return null;
-    const inputs = (replay as { inputs?: unknown }).inputs;
-    if (!Array.isArray(inputs) || inputs.length === 0) return null;
-
-    let frameCount = 0;
-    let raceClockFrameCount = 0;
-    for (const rawSegment of inputs) {
-        if (!rawSegment || typeof rawSegment !== 'object') return null;
-        const segment = rawSegment as Record<string, unknown>;
-        const frames = Number(segment.frames);
-        if (!Number.isInteger(frames) || frames < 1) return null;
-        if (typeof segment.left !== 'boolean') return null;
-        if (typeof segment.right !== 'boolean') return null;
-        if (typeof segment.relaunchDelay !== 'boolean') return null;
-        frameCount += frames;
-        if (frameCount > 20_000) return null;
-        if (!segment.relaunchDelay) {
-            raceClockFrameCount += frames;
-        }
+async function checkSubmissionRateLimit(
+    challengeId: string,
+    playerId: string,
+): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number }> {
+    const rateLimitKey = createSubmissionRateLimitKey(challengeId, playerId);
+    const attemptCount = await redis.incrBy(rateLimitKey, 1);
+    if (attemptCount === 1) {
+        await redis.expire(rateLimitKey, DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
     }
-    return raceClockFrameCount;
-}
-
-function validateBasicDailyGpSubmission({
-    challenge,
-    bestTime,
-    replay,
-    checkpointTimesSec,
-}: {
-    challenge: DailyGpChallenge;
-    bestTime?: unknown;
-    replay?: unknown;
-    checkpointTimesSec?: unknown;
-}): { ok: true; bestTimeSec: number; bestTimeMs: number; checkpointTimesSec: number[] | null } | { ok: false; reason: string } {
-    if (!isValidDailyGpTime(bestTime)) {
-        return { ok: false, reason: 'invalid_time' };
+    if (attemptCount <= DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS) {
+        return { allowed: true };
     }
 
-    const bestTimeSec = Number(bestTime);
-    const replayRaceClockFrameCount = getReplayRaceClockFrameCount(replay);
-    if (!Number.isFinite(replayRaceClockFrameCount)) {
-        return { ok: false, reason: 'invalid_replay' };
-    }
-
-    const replayRaceClockSec = replayRaceClockFrameCount / 60;
-    if (Math.abs(replayRaceClockSec - bestTimeSec) > 0.25) {
-        return { ok: false, reason: 'time_replay_mismatch' };
-    }
-
-    const track = TRACKS[challenge.trackKey];
-    const requiredCheckpointCount = Array.isArray(track?.checkpoints)
-        ? track.checkpoints.length
-        : 0;
-    const normalizedCheckpoints = normalizeCheckpointTimesSec(bestTimeSec, checkpointTimesSec);
-    if (requiredCheckpointCount > 0) {
-        if (!normalizedCheckpoints || normalizedCheckpoints.length !== requiredCheckpointCount) {
-            return { ok: false, reason: 'checkpoint_mismatch' };
-        }
-    }
-
+    const expiresAt = await redis.expireTime(rateLimitKey);
+    const retryAfterSeconds = Number.isFinite(expiresAt) && expiresAt > 0
+        ? Math.max(1, expiresAt - Math.floor(Date.now() / 1000))
+        : DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS;
     return {
-        ok: true,
-        bestTimeSec,
-        bestTimeMs: toBestTimeMs(bestTimeSec),
-        checkpointTimesSec: normalizedCheckpoints ?? null,
+        allowed: false,
+        retryAfterSeconds,
     };
 }
 
-export async function getServerDailyGpChallenge(): Promise<DailyGpChallenge> {
-    const challenge = buildDailyGpChallenge();
-    const stored = await readStoredOrBackfilledDailyGpChallenge(challenge.id);
-    if (stored) {
-        return stored;
+async function acquireSubmissionLock(
+    challengeId: string,
+    playerId: string,
+): Promise<{ key: string; value: string } | null> {
+    const key = createSubmissionLockKey(challengeId, playerId);
+    const value = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const response = await redis.set(
+        key,
+        value,
+        { nx: true, expiration: new Date(Date.now() + DAILY_GP_SUBMISSION_LOCK_TTL_MS) },
+    );
+    return response ? { key, value } : null;
+}
+
+async function releaseSubmissionLock(lock: { key: string; value: string } | null): Promise<void> {
+    if (!lock) {
+        return;
     }
-    return writeStoredDailyGpChallenge(challenge);
+
+    const currentValue = await redis.get(lock.key);
+    if (currentValue === lock.value) {
+        await redis.del(lock.key);
+    }
+}
+
+export async function getServerDailyGpChallenge(): Promise<DailyGpChallenge> {
+    return resolveTodayDailyGpChallenge();
 }
 
 export async function getServerDailyGpChallengeById(
@@ -528,20 +702,14 @@ export async function getServerDailyGpChallengeById(
         return stored;
     }
 
-    const challenge = buildDailyGpChallengeById(challengeId);
-    if (!challenge) {
-        return null;
-    }
-
-    const activeChallenge = buildDailyGpChallenge();
-    if (challenge.id !== activeChallenge.id) {
+    if (challengeId !== getTodayChallengeId()) {
         return null;
     }
 
     if (persistFallback) {
-        return writeStoredDailyGpChallenge(challenge);
+        return resolveTodayDailyGpChallenge();
     }
-    return challenge;
+    return pickTodayDailyGpChallenge();
 }
 
 export async function getServerDailyGpPlayableChallenge(challengeId?: string | null): Promise<DailyGpChallenge | null> {
@@ -550,9 +718,11 @@ export async function getServerDailyGpPlayableChallenge(challengeId?: string | n
         return challenge;
     }
 
-    const activeChallenge = buildDailyGpChallenge();
-    if (challengeId === activeChallenge.id && isDailyGpChallengePlayable(activeChallenge)) {
-        return writeStoredDailyGpChallenge(activeChallenge);
+    if (challengeId === getTodayChallengeId()) {
+        const activeChallenge = await resolveTodayDailyGpChallenge();
+        if (isDailyGpChallengePlayable(activeChallenge)) {
+            return activeChallenge;
+        }
     }
 
     return null;
@@ -581,17 +751,26 @@ export async function getServerPlayerBootstrap({
     playerId,
     redditUsername,
     leaderboardIdentity,
+    guestToken,
 }: {
     playerId?: unknown;
     redditUsername?: unknown;
     leaderboardIdentity?: unknown;
+    guestToken?: unknown;
 } = {}): Promise<PlayerBootstrapPayload> {
-    const canonicalPlayerId = resolveCanonicalPlayerId({ playerId, redditUsername });
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+        allowUnsignedGuest: true,
+    });
+    const canonicalPlayerId = identity.canonicalPlayerId;
     const safeRequestRedditUsername = sanitizeRedditUsername(redditUsername);
 
     if (!canonicalPlayerId) {
         return {
             playerId: null,
+            guestToken: null,
             redditUsername: safeRequestRedditUsername,
             leaderboardIdentity: 'constructed',
             hasAnyData: false,
@@ -616,6 +795,7 @@ export async function getServerPlayerBootstrap({
 
     return {
         playerId: canonicalPlayerId,
+        guestToken: identity.guestToken,
         redditUsername: safeRequestRedditUsername,
         leaderboardIdentity: profile.leaderboardIdentity,
         hasAnyData: previousProfile ? (profile.hasSeenGame || profile.hasAnyData) : false,
@@ -629,15 +809,24 @@ export async function updateServerPlayerIdentity({
     playerId,
     redditUsername,
     leaderboardIdentity,
+    guestToken,
 }: {
     playerId?: unknown;
     redditUsername?: unknown;
     leaderboardIdentity?: unknown;
-} = {}): Promise<{ playerId: string | null; leaderboardIdentity: 'constructed' | 'reddit' }> {
-    const canonicalPlayerId = resolveCanonicalPlayerId({ playerId, redditUsername });
+    guestToken?: unknown;
+} = {}): Promise<{ playerId: string | null; guestToken: string | null; leaderboardIdentity: 'constructed' | 'reddit' }> {
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+        allowUnsignedGuest: true,
+    });
+    const canonicalPlayerId = identity.canonicalPlayerId;
     if (!canonicalPlayerId) {
         return {
             playerId: null,
+            guestToken: null,
             leaderboardIdentity: 'constructed',
         };
     }
@@ -651,6 +840,7 @@ export async function updateServerPlayerIdentity({
 
     return {
         playerId: canonicalPlayerId,
+        guestToken: identity.guestToken,
         leaderboardIdentity: profile.leaderboardIdentity,
     };
 }
@@ -660,6 +850,7 @@ export async function getServerDailyGpSnapshot({
     playerId,
     leaderboardIdentity,
     redditUsername,
+    guestToken,
     limit = DAILY_GP_DEFAULT_LIMIT,
     communityMemberTotal,
 }: {
@@ -667,6 +858,7 @@ export async function getServerDailyGpSnapshot({
     playerId?: string | null;
     leaderboardIdentity?: unknown;
     redditUsername?: unknown;
+    guestToken?: unknown;
     limit?: unknown;
     /** Subreddit subscriber count (or similar) for rank denominator and unfilled leaderboard slots. */
     communityMemberTotal?: unknown;
@@ -691,7 +883,14 @@ export async function getServerDailyGpSnapshot({
         return createEmptySnapshot(challenge);
     }
 
-    const normalizedPlayerId = resolveCanonicalPlayerId({ playerId, redditUsername });
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+        allowUnsignedGuest: true,
+    });
+    const normalizedPlayerId = identity.canonicalPlayerId
+        || resolveCanonicalPlayerId({ playerId, redditUsername });
     if (normalizedPlayerId) {
         await upsertPlayerProfile({
             playerId: normalizedPlayerId,
@@ -711,7 +910,7 @@ export async function getServerDailyGpSnapshot({
         : null;
 
     const playerInTop = normalizedPlayerId
-        ? topRows.find((row) => row.playerId === normalizedPlayerId) || null
+        ? topRows.find((row) => row.isCurrentPlayer) || null
         : null;
 
     if (playerInTop) {
@@ -772,6 +971,7 @@ export async function submitServerDailyGpRun({
     challengeId,
     leaderboardIdentity,
     redditUsername,
+    guestToken,
     bestTime,
     replay,
     checkpointTimesSec,
@@ -781,6 +981,7 @@ export async function submitServerDailyGpRun({
     challengeId?: unknown;
     leaderboardIdentity?: unknown;
     redditUsername?: unknown;
+    guestToken?: unknown;
     bestTime?: unknown;
     replay?: unknown;
     checkpointTimesSec?: unknown;
@@ -812,7 +1013,13 @@ export async function submitServerDailyGpRun({
         };
     }
 
-    if (!resolveCanonicalPlayerId({ playerId, redditUsername })) {
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+        allowUnsignedGuest: false,
+    });
+    if (!identity.canonicalPlayerId) {
         return {
             status: 400,
             body: {
@@ -822,29 +1029,32 @@ export async function submitServerDailyGpRun({
         };
     }
 
+    const rateLimitResult = await checkSubmissionRateLimit(challenge.id, identity.canonicalPlayerId);
+    if (!rateLimitResult.allowed) {
+        return {
+            status: 429,
+            body: {
+                accepted: false,
+                error: 'Too many submission attempts. Try again soon.',
+                retryAfterSeconds: rateLimitResult.retryAfterSeconds,
+            },
+        };
+    }
+
     const strictReplayOutcome = validateDailyGpReplayDetailed({ challenge, replay });
-    const strictReplayPassed = strictReplayOutcome.ok;
-    const basicValidation = strictReplayPassed
-        ? null
-        : validateBasicDailyGpSubmission({
-            challenge,
-            bestTime,
-            replay,
-            checkpointTimesSec,
-        });
-    if (!strictReplayPassed && !basicValidation?.ok) {
+    if (!strictReplayOutcome.ok) {
         return {
             status: 422,
             body: {
                 accepted: false,
-                error: 'Submission sanity checks failed.',
-                reason: basicValidation?.reason || strictReplayOutcome.failure.reason,
+                error: 'Submission replay validation failed.',
+                reason: strictReplayOutcome.failure.reason,
                 strictReplayFailureReason: strictReplayOutcome.failure.reason,
             },
         };
     }
 
-    const normalizedPlayerId = resolveCanonicalPlayerId({ playerId, redditUsername });
+    const normalizedPlayerId = identity.canonicalPlayerId;
     if (!normalizedPlayerId) {
         return {
             status: 400,
@@ -860,29 +1070,12 @@ export async function submitServerDailyGpRun({
         redditUsername,
         hasAnyData: true,
     });
-    const nextBestTimeSec = strictReplayPassed
-        ? strictReplayOutcome.run.bestTimeSec
-        : basicValidation.bestTimeSec;
-    const nextBestTimeMs = strictReplayPassed
-        ? strictReplayOutcome.run.bestTimeMs
-        : basicValidation.bestTimeMs;
-    const previousEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
-    if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
-        return {
-            status: 200,
-            body: {
-                accepted: true,
-                bestTimeMs: previousEntry.bestTimeMs,
-                completedLaps: null,
-                checkpointTimesSec: previousEntry.checkpointTimesSec ?? null,
-            },
-        };
-    }
-
+    const nextBestTimeSec = strictReplayOutcome.run.bestTimeSec;
+    const nextBestTimeMs = strictReplayOutcome.run.bestTimeMs;
     const normalizedCheckpointTimesSec = normalizeCheckpointTimesSec(
         nextBestTimeSec,
-        strictReplayPassed ? strictReplayOutcome.run.checkpointTimesSec : basicValidation.checkpointTimesSec,
-    ) ?? basicValidation.checkpointTimesSec ?? null;
+        strictReplayOutcome.run.checkpointTimesSec,
+    ) ?? strictReplayOutcome.run.checkpointTimesSec ?? null;
 
     const nextEntry: DailyGpLeaderboardEntry = {
         playerId: normalizedPlayerId,
@@ -891,29 +1084,66 @@ export async function submitServerDailyGpRun({
         updatedAt: new Date().toISOString(),
         completedLaps: null,
         checkpointTimesSec: normalizedCheckpointTimesSec,
-        validationMethod: strictReplayPassed ? 'strict-replay' : 'basic-sanity',
-        strictReplayFailureReason: strictReplayPassed ? null : strictReplayOutcome.failure.reason,
+        validationMethod: 'strict-replay',
+        strictReplayFailureReason: null,
     };
 
-    await redis.hSet(
-        createRedisChallengeEntryHashKey(challenge.id),
-        { [normalizedPlayerId]: JSON.stringify(nextEntry) },
-    );
-    await redis.zAdd(
-        createRedisChallengeLeaderboardKey(challenge.id),
-        {
-            member: normalizedPlayerId,
-            score: encodeDailyGpLeaderboardScore(nextBestTimeMs),
-        },
-    );
-    await ensureLeaderboardTtl(challenge.id);
+    const submissionLock = await acquireSubmissionLock(challenge.id, normalizedPlayerId);
+    if (!submissionLock) {
+        return {
+            status: 429,
+            body: {
+                accepted: false,
+                error: 'Submission already in progress. Try again in a moment.',
+                retryAfterSeconds: 1,
+            },
+        };
+    }
+
+    try {
+        const previousEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
+        if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
+            return {
+                status: 200,
+                body: {
+                    accepted: true,
+                    bestTimeMs: previousEntry.bestTimeMs,
+                    completedLaps: null,
+                    checkpointTimesSec: previousEntry.checkpointTimesSec ?? null,
+                    validationMethod: previousEntry.validationMethod ?? 'strict-replay',
+                    strictReplayFailureReason: previousEntry.strictReplayFailureReason ?? null,
+                },
+            };
+        }
+
+        const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
+        const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
+        const tx = await redis.watch(entryHashKey, leaderboardKey);
+        await tx.multi();
+        await tx.hSet(
+            entryHashKey,
+            { [normalizedPlayerId]: JSON.stringify(nextEntry) },
+        );
+        await tx.zAdd(
+            leaderboardKey,
+            {
+                member: normalizedPlayerId,
+                score: encodeDailyGpLeaderboardScore(nextBestTimeMs),
+            },
+        );
+        await tx.expire(leaderboardKey, DAILY_GP_REDIS_TTL_SECONDS);
+        await tx.expire(entryHashKey, DAILY_GP_REDIS_TTL_SECONDS);
+        await tx.exec();
+    } finally {
+        await releaseSubmissionLock(submissionLock);
+    }
 
     return {
         status: 200,
         body: {
             accepted: true,
             bestTimeMs: nextBestTimeMs,
-            completedLaps: strictReplayPassed ? strictReplayOutcome.run.completedLaps : null,
+            completedLaps: strictReplayOutcome.run.completedLaps,
             checkpointTimesSec: nextEntry.checkpointTimesSec,
             validationMethod: nextEntry.validationMethod,
             strictReplayFailureReason: nextEntry.strictReplayFailureReason,

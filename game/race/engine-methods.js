@@ -115,6 +115,8 @@ export const raceEngineMethods = {
     this.hud.setHudPersonalBestsOpenAllowed(false);
     this.hud.setPauseVisible(false);
     this.scoreboardReplay.reset();
+    this.runHadTimingAnomaly = false;
+    this.rankedSubmissionBlockedReason = null;
     this.syncChallengeHudPrimaryStats();
     this.runHistory.clear();
     this.runHistoryTimer = 0;
@@ -211,6 +213,8 @@ export const raceEngineMethods = {
     });
     this.status = "playing";
     this.scoreboardReplay.reset();
+    this.runHadTimingAnomaly = false;
+    this.rankedSubmissionBlockedReason = null;
     this.resetRunToTrackStart({
       currentTime: 0,
       relaunchDelay: this.crashRestartDelaySec,
@@ -235,6 +239,8 @@ export const raceEngineMethods = {
     this.angularVelocity = 0;
     this.currentTime = currentTime;
     this.lapCheckpointTimesSec = [];
+    this.runHadTimingAnomaly = false;
+    this.rankedSubmissionBlockedReason = null;
     this.armRelaunchDelay(relaunchDelay);
     this.nextCheckpointIndex = 0;
     this.skidMarks.clear();
@@ -555,6 +561,8 @@ export const raceEngineMethods = {
     this.nextCheckpointIndex = 0;
     this.accumulator = 0;
     this.currentTime = 0;
+    this.runHadTimingAnomaly = false;
+    this.rankedSubmissionBlockedReason = null;
     this.skidMarks.clear();
     this.routeTrace.clear();
     this.runHistory.clear();
@@ -811,6 +819,12 @@ export const raceEngineMethods = {
 
     const animateFrame = this.shouldAnimateFrame();
     const shouldUpdate = this.status === "playing";
+    const timingAnomalyMessage = "Leaderboard rank disabled because the run had severe frame stalls.";
+
+    if (shouldUpdate && frameTime >= 250) {
+      this.runHadTimingAnomaly = true;
+      this.rankedSubmissionBlockedReason = timingAnomalyMessage;
+    }
 
     if (frameTime < 250) {
       this.frameTimeTotal -= this.frameTimeHistory[this.frameTimeHistoryIndex] || 0;
@@ -838,6 +852,8 @@ export const raceEngineMethods = {
         stepCount++;
       }
       if (this.accumulator >= this.FIXED_DT) {
+        this.runHadTimingAnomaly = true;
+        this.rankedSubmissionBlockedReason = timingAnomalyMessage;
         this.accumulator = 0;
       }
     }

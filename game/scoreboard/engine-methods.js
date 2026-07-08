@@ -70,9 +70,29 @@ export const scoreboardEngineMethods = {
   async processDailyChallengeVerificationEntry(entry) {
     if (
       !entry?.challengeId ||
-      !Number.isFinite(entry?.bestTime) ||
-      !entry?.replay
+      !Number.isFinite(entry?.bestTime)
     ) {
+      return;
+    }
+
+    if (!entry?.replay) {
+      markDailyChallengeVerificationError(
+        entry.challengeId,
+        "Submission replay is missing. Finish another run to rank it.",
+      );
+      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
+      if (
+        this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })
+      ) {
+        this.modal.updateModalScoreboardSnapshot(
+          createVerificationSnapshot({
+            verificationState: "error",
+            isLoading: false,
+            submissionStage: "error",
+            statusText: "Submission replay is missing. Finish another run to rank it.",
+          }),
+        );
+      }
       return;
     }
 

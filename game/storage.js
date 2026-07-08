@@ -6,8 +6,10 @@ import {
 } from "./scoreboard/display-preference.js?v=2.09";
 import {
   buildServiceHeaders,
+  getGuestPlayerToken,
   getBaseApiConfig,
   getOrCreatePlayerId,
+  setGuestPlayerToken,
 } from "./scoreboard/api-client.js?v=2.09";
 import { isLocalEnvironment } from "./track/environment.js?v=2.09";
 
@@ -19,6 +21,10 @@ async function fetchRemotePlayerProgressState() {
 
   const url = new URL(config.playerBootstrapUrl, window.location.origin);
   url.searchParams.set("playerId", getOrCreatePlayerId("player bootstrap"));
+  const guestToken = getGuestPlayerToken();
+  if (guestToken) {
+    url.searchParams.set("guestToken", guestToken);
+  }
 
   const response = await fetch(url.toString(), {
     method: "GET",
@@ -44,6 +50,10 @@ async function fetchRemotePlayerProgressState() {
       typeof payload?.playerId === "string" && payload.playerId.trim()
         ? payload.playerId.trim()
         : null,
+    guestToken:
+      typeof payload?.guestToken === "string" && payload.guestToken.trim()
+        ? payload.guestToken.trim()
+        : null,
   };
 }
 
@@ -65,6 +75,7 @@ export async function getPlayerProgressState() {
     }
     const remoteState = await fetchRemotePlayerProgressState();
     if (remoteState) {
+      setGuestPlayerToken(remoteState.guestToken);
       setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
       return remoteState;
     }

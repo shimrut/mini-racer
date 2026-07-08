@@ -21,7 +21,7 @@ import {
 import { formatDailyMiniRacerPostTitle } from './reddit-post-title.js';
 
 const app = express();
-app.use(express.json({ limit: '4mb' }));
+app.use(express.json({ limit: '256kb' }));
 
 const DAILY_AUTPOST_SUBREDDITS_KEY = 'dailygp:autopost:subreddits';
 const MOD_ANALYTICS_POSTS_KEY = 'dailygp:mod-analytics:posts';
@@ -595,9 +595,10 @@ async function getCommunityMemberTotalForLeaderboard(): Promise<number | undefin
 
 app.get('/api/player/bootstrap', async (req, res) => {
     try {
-        const { playerId } = req.query ?? {};
+        const { playerId, guestToken } = req.query ?? {};
         const payload = await getServerPlayerBootstrap({
             playerId: playerId as string,
+            guestToken: guestToken as string,
             redditUsername: getRequestUsername(),
         });
         res.status(200).json(payload);
@@ -609,9 +610,10 @@ app.get('/api/player/bootstrap', async (req, res) => {
 
 app.post('/api/player/identity', async (req, res) => {
     try {
-        const { playerId, leaderboardIdentity } = req.body ?? {};
+        const { playerId, guestToken, leaderboardIdentity } = req.body ?? {};
         const payload = await updateServerPlayerIdentity({
             playerId,
+            guestToken,
             leaderboardIdentity,
             redditUsername: getRequestUsername(),
         });
@@ -624,7 +626,7 @@ app.post('/api/player/identity', async (req, res) => {
 
 app.get('/api/scoreboard/snapshot', async (req, res) => {
     try {
-        const { trackKey, playerId, limit } = req.query ?? {};
+        const { trackKey, playerId, guestToken, limit } = req.query ?? {};
         const activeChallenge = await getServerDailyGpChallenge();
         const challenge = trackKey === activeChallenge.trackKey
             ? activeChallenge
@@ -647,6 +649,7 @@ app.get('/api/scoreboard/snapshot', async (req, res) => {
         const snapshot = await getServerDailyGpSnapshot({
             challengeId: challenge.id,
             playerId: playerId as string,
+            guestToken: guestToken as string,
             redditUsername: getRequestUsername(),
             limit: limit ? parseInt(limit as string, 10) : undefined,
             communityMemberTotal,
@@ -660,7 +663,7 @@ app.get('/api/scoreboard/snapshot', async (req, res) => {
 
 app.post('/api/scoreboard/submit', async (req, res) => {
     try {
-        const { trackKey, playerId, leaderboardIdentity, replay, checkpointTimesSec } = req.body ?? {};
+        const { trackKey, playerId, guestToken, leaderboardIdentity, replay, checkpointTimesSec } = req.body ?? {};
         const challenge = await getServerDailyGpChallenge();
         if (trackKey !== challenge.trackKey) {
             res.status(404).json({ accepted: false, error: 'Track is not the active Mini Racer challenge.' });
@@ -669,6 +672,7 @@ app.post('/api/scoreboard/submit', async (req, res) => {
 
         const result = await submitServerDailyGpRun({
             playerId,
+            guestToken,
             challengeId: challenge.id,
             trackKey: challenge.trackKey,
             leaderboardIdentity,
@@ -706,11 +710,12 @@ app.get('/api/daily/playlist', async (_req, res) => {
 
 app.get('/api/daily/snapshot', async (req, res) => {
     try {
-        const { challengeId, playerId, limit } = req.query ?? {};
+        const { challengeId, playerId, guestToken, limit } = req.query ?? {};
         const communityMemberTotal = await getCommunityMemberTotalForLeaderboard();
         const snapshot = await getServerDailyGpSnapshot({
             challengeId: challengeId as string,
             playerId: playerId as string,
+            guestToken: guestToken as string,
             redditUsername: getRequestUsername(),
             limit: limit ? parseInt(limit as string, 10) : undefined,
             communityMemberTotal,

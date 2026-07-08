@@ -1,4 +1,7 @@
 const PLAYER_ID_STORAGE_KEY = 'VectorGpScoreboardPlayerId';
+const GUEST_PLAYER_TOKEN_STORAGE_KEY = 'VectorGpGuestPlayerToken';
+let ephemeralPlayerId = null;
+let ephemeralGuestPlayerToken = null;
 
 function trimTrailingSlashes(value) {
     return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
@@ -32,7 +35,8 @@ function createPlayerId() {
 
 export function getOrCreatePlayerId(logLabel = 'scoreboard') {
     if (typeof window === 'undefined' || !window.localStorage) {
-        return createPlayerId();
+        ephemeralPlayerId ||= createPlayerId();
+        return ephemeralPlayerId;
     }
 
     try {
@@ -44,8 +48,48 @@ export function getOrCreatePlayerId(logLabel = 'scoreboard') {
         return nextId;
     } catch (error) {
         console.error(`Error accessing ${logLabel} player id:`, error);
-        return createPlayerId();
+        ephemeralPlayerId ||= createPlayerId();
+        return ephemeralPlayerId;
     }
+}
+
+export function getGuestPlayerToken() {
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return ephemeralGuestPlayerToken;
+    }
+
+    try {
+        const storedToken = window.localStorage.getItem(GUEST_PLAYER_TOKEN_STORAGE_KEY);
+        return storedToken && storedToken.trim()
+            ? storedToken.trim()
+            : ephemeralGuestPlayerToken;
+    } catch (error) {
+        console.error('Error reading guest player token:', error);
+        return ephemeralGuestPlayerToken;
+    }
+}
+
+export function setGuestPlayerToken(token) {
+    const normalizedToken = typeof token === 'string' && token.trim()
+        ? token.trim()
+        : null;
+    ephemeralGuestPlayerToken = normalizedToken;
+
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return normalizedToken;
+    }
+
+    try {
+        if (normalizedToken) {
+            window.localStorage.setItem(GUEST_PLAYER_TOKEN_STORAGE_KEY, normalizedToken);
+        } else {
+            window.localStorage.removeItem(GUEST_PLAYER_TOKEN_STORAGE_KEY);
+        }
+    } catch (error) {
+        console.error('Error writing guest player token:', error);
+    }
+
+    return normalizedToken;
 }
 
 export function buildServiceHeaders(_config, extraHeaders = {}) {

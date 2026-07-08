@@ -14,12 +14,12 @@ Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put 
 
 ## Track release cadence
 
-- Mini Racer rotates in a new featured track every day.
+- Mini Racer features a new track every day.
 - The featured slot updates on the UTC day reset.
-- Every track in `game/track/tracks.js` is automatically eligible for future Daily GP generation.
-- The `Tracks` screen is driven by server-side published history, so adding new tracks does not reshuffle days that were already published.
+- The schedule walks `game/track/tracks.js` in key order, one track per day, wrapping at the end of the list. A server-side ledger records each day's track, so days that were already published never change.
+- Add a new track anywhere in `tracks.js` and it takes that slot in the rotation; days already published are not reshuffled. Past days are frozen in the ledger; only days not yet written reflect the current file order.
 - The server includes a one-time June 2-11, 2026 published-history backfill for the launch window.
-- Local game runs use the Daily GP API/post-bound challenge path; only explicit mock modes and standalone preview pages manufacture local mock challenges.
+- Local game runs use the Daily GP API/post-bound challenge path; only explicit mock modes and standalone preview pages use a local mock challenge (the first track in `tracks.js`, or a specific track forced via `?mockDaily=<trackKey>`).
 - The local active-challenge cache is only a fallback when the API cannot be reached, not the source of truth for today's featured track.
 - The `Tracks` screen keeps the last 7 days available to play.
 - Each track card shows the track preview, your best time, earned medals, and how long that track is still available.

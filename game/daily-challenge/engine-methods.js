@@ -43,6 +43,43 @@ import {
   TRACK_PRESENTATION_SURFACES,
 } from "../track/presentation.js?v=2.09";
 
+function getInvalidDailyChallengeWinReason(engine, winData) {
+  if (!winData || typeof winData !== "object") return "Finish data missing.";
+  if (engine.status !== "won") return "Run did not end in a winning state.";
+  if (winData.trackKey !== engine.currentTrackKey) return "Finish track did not match the active track.";
+  if (
+    engine.activeDailyChallenge?.trackKey &&
+    winData.trackKey !== engine.activeDailyChallenge.trackKey
+  ) {
+    return "Finish track did not match the active challenge.";
+  }
+  if (
+    engine.currentChallengeRun?.challengeId &&
+    engine.activeDailyChallenge?.id &&
+    engine.currentChallengeRun.challengeId !== engine.activeDailyChallenge.id
+  ) {
+    return "Challenge context changed before the finish was confirmed.";
+  }
+  if (
+    engine.currentChallengeRun?.trackKey &&
+    winData.trackKey !== engine.currentChallengeRun.trackKey
+  ) {
+    return "Run track context changed before the finish was confirmed.";
+  }
+  if (winData.runId !== engine.activeRunId) return "Run confirmation arrived for the wrong attempt.";
+
+  const checkpointCount = engine.currentTrack?.checkpoints?.length || 0;
+  if (winData.checkpointCount !== checkpointCount) return "Checkpoint count did not match the loaded track.";
+  if (winData.completedCheckpointCount < checkpointCount) {
+    return "The lap finished before every checkpoint was confirmed.";
+  }
+  if (!Number.isFinite(winData.lapTime) || winData.lapTime < 2.0) {
+    return "Lap time was too short to rank.";
+  }
+
+  return null;
+}
+
 export const dailyChallengeEngineMethods = {
   waitForPlaylistModalPaint() {
     return new Promise((resolve) => {
@@ -408,6 +445,43 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
+    const availableUntilMs = Date.parse(challenge.availableUntil || "");
+    if (Number.isFinite(availableUntilMs) && Date.now() >= availableUntilMs) {
+      await this.loadDailyChallengeCritical();
+      this.modal.showModal(
+        "CHALLENGE EXPIRED",
+        null,
+        {
+          bestTime: this.bestLapTime,
+          lapTime: null,
+          deltaToBest: null,
+          primaryStatLabel: "Daily Challenge",
+        },
+        {
+          ...createModalActions({
+            modalKind: "expired",
+            primaryActionLabel: "Refresh",
+            primaryAction: () => {
+              void this.loadDailyChallengeCritical();
+              this.modal.closeModal();
+            },
+            primaryActionIcon: "retry",
+            secondaryActionLabel: "Done",
+            secondaryAction: () => this.modal.closeModal(),
+            secondaryActionIcon: "done",
+          }),
+          playlistAction: () => {
+            void this.openDailyChallengePlaylist();
+          },
+        },
+      );
+      if (this.modal.modalMsg) {
+        this.modal.modalMsg.style.display = "";
+        this.modal.modalMsg.textContent = "Refresh the featured track before racing.";
+      }
+      return;
+    }
+
     this.resetCanvasPresentation();
     this.startButtonPending = true;
     const playerTypeAlreadySent = this.sessionFlags.get("playerTypeSent");
@@ -421,6 +495,7 @@ export const dailyChallengeEngineMethods = {
           trackPageview: false,
           countMapSelection: true,
           loadPlayerProgress: false,
+          preserveDailyChallengeContext: true,
         });
       }
 
@@ -636,12 +711,66 @@ export const dailyChallengeEngineMethods = {
     );
   },
 
+  getInvalidWinDataReason(winData) {
+    return getInvalidDailyChallengeWinReason(this, winData);
+  },
+
+  handleInvalidDailyChallengeWin(reason = "Finish could not be verified.") {
+    console.warn("Daily challenge win validation failed:", reason);
+    this.status = "ready";
+    this.hud.setPauseVisible(false);
+    this.hud.setHudPersonalBestsOpenAllowed(true);
+
+    const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(
+      this.activeDailyChallenge?.id,
+    );
+
+    this.modal.showModal(
+      "RUN REJECTED",
+      null,
+      {
+        bestTime: this.bestLapTime,
+        lapTime: this.currentTime,
+        deltaToBest: null,
+        primaryStatLabel: this.activeDailyChallenge
+          ? getDailyChallengeCopyLabels(this.activeDailyChallenge).primaryStatLabel
+          : "Lap Time",
+        scoreboardSnapshot: existingScoreboardSnapshot,
+      },
+      {
+        ...createModalActions({
+          modalKind: "rejected",
+          primaryActionLabel: "Retry",
+          primaryAction: () => this.restartDailyChallenge(),
+          primaryActionIcon: "retry",
+          secondaryActionLabel: "Done",
+          secondaryAction: () => this.reset(false),
+          secondaryActionIcon: "done",
+        }),
+        playlistAction: () => {
+          void this.openDailyChallengePlaylist();
+        },
+      },
+    );
+    if (this.modal.modalMsg) {
+      this.modal.modalMsg.style.display = "";
+      this.modal.modalMsg.textContent = reason;
+    }
+  },
+
   handleDailyChallengeWin(winData) {
-    if (
-      !this.isValidatedWinData(winData) ||
-      !this.currentChallengeRun ||
-      !this.activeDailyChallenge
-    ) {
+    if (!this.currentChallengeRun || !this.activeDailyChallenge) {
+      return;
+    }
+
+    const invalidReason = (
+      typeof this.isValidatedWinData === "function"
+      && this.isValidatedWinData !== dailyChallengeEngineMethods.isValidatedWinData
+    )
+      ? (this.isValidatedWinData(winData) ? null : "Finish could not be verified.")
+      : getInvalidDailyChallengeWinReason(this, winData);
+    if (invalidReason) {
+      this.handleInvalidDailyChallengeWin(invalidReason);
       return;
     }
 
@@ -720,6 +849,35 @@ export const dailyChallengeEngineMethods = {
       trackKey && this.sessionBestLapSecByTrackKey
         ? this.sessionBestLapSecByTrackKey[trackKey] ?? null
         : null;
+    const runSubmissionBlockedReason = this.rankedSubmissionBlockedReason || null;
+    const optimisticVerificationSnapshot = runSubmissionBlockedReason
+      ? {
+          ...createVerificationSnapshot({
+            verificationState: "error",
+            isLoading: false,
+            submissionStage: "error",
+            statusText: runSubmissionBlockedReason,
+          }),
+          currentPlayerRow: {
+            isCurrentPlayer: true,
+            bestTime: finalTime,
+            rank: null,
+            displayName: "You",
+          },
+        }
+      : {
+          ...createVerificationSnapshot({
+            verificationState: "pending",
+            isLoading: true,
+            submissionStage: "submitting",
+          }),
+          currentPlayerRow: {
+            isCurrentPlayer: true,
+            bestTime: finalTime,
+            rank: null,
+            displayName: "You",
+          },
+        };
 
     const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(challenge.id);
     this.modal.showModal(
@@ -735,19 +893,7 @@ export const dailyChallengeEngineMethods = {
           getDailyChallengeCopyLabels(challenge).primaryStatLabel,
         variant: null,
         scoreboardSnapshot: isNewBest
-          ? {
-              ...createVerificationSnapshot({
-                verificationState: "pending",
-                isLoading: true,
-                submissionStage: "submitting",
-              }),
-              currentPlayerRow: {
-                isCurrentPlayer: true,
-                bestTime: finalTime,
-                rank: null,
-                displayName: "You",
-              },
-            }
+          ? optimisticVerificationSnapshot
           : existingScoreboardSnapshot,
         scoreboardChallengeId: challenge.id,
         scoreboardTrackKey: challenge.trackKey,
@@ -812,51 +958,45 @@ export const dailyChallengeEngineMethods = {
       }
 
       const replayPayload = this.scoreboardReplay.getPayload(1);
-      this.enqueueDailyChallengeVerificationSubmission({
-        challenge,
-        bestTime: finalTime,
-        completedLaps,
-        checkpointTimesSec: lapCheckpointTimes,
-        replay: replayPayload ? { ...replayPayload } : null,
-      });
+      const submissionError = runSubmissionBlockedReason
+        || (replayPayload
+          ? null
+          : this.scoreboardReplay.overflowed
+            ? "Replay was too long to submit. Finish a cleaner run to rank it."
+            : "Submission replay was unavailable for this run.");
+      const didEnqueue = submissionError
+        ? false
+        : this.enqueueDailyChallengeVerificationSubmission({
+            challenge,
+            bestTime: finalTime,
+            completedLaps,
+            checkpointTimesSec: lapCheckpointTimes,
+            replay: replayPayload ? { ...replayPayload } : null,
+          });
+
+      if (submissionError || !didEnqueue) {
+        this.modal.updateModalScoreboardSnapshot?.(
+          {
+            ...createVerificationSnapshot({
+              verificationState: "error",
+              isLoading: false,
+              submissionStage: "error",
+              statusText: submissionError || "Leaderboard submission could not be queued.",
+            }),
+            currentPlayerRow: {
+              isCurrentPlayer: true,
+              bestTime: finalTime,
+              rank: null,
+              displayName: "You",
+            },
+          },
+        );
+      }
     }
   },
 
   isValidatedWinData(winData) {
-    if (!winData || typeof winData !== "object") return false;
-    if (this.status !== "won") return false;
-    if (winData.trackKey !== this.currentTrackKey) return false;
-    if (
-      this.activeDailyChallenge?.trackKey &&
-      winData.trackKey !== this.activeDailyChallenge.trackKey
-    ) {
-      return false;
-    }
-    if (
-      this.currentChallengeRun?.challengeId &&
-      this.activeDailyChallenge?.id &&
-      this.currentChallengeRun.challengeId !== this.activeDailyChallenge.id
-    ) {
-      return false;
-    }
-    if (
-      this.currentChallengeRun?.trackKey &&
-      winData.trackKey !== this.currentChallengeRun.trackKey
-    ) {
-      return false;
-    }
-    if (winData.runId !== this.activeRunId) return false;
-
-    const checkpointCount = this.currentTrack.checkpoints?.length || 0;
-    if (winData.checkpointCount !== checkpointCount) return false;
-    if (winData.completedCheckpointCount < checkpointCount) {
-      return false;
-    }
-    if (!Number.isFinite(winData.lapTime) || winData.lapTime < 2.0) {
-      return false;
-    }
-
-    return true;
+    return getInvalidDailyChallengeWinReason(this, winData) === null;
   },
 
   restartDailyChallenge() {

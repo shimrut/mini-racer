@@ -3,18 +3,13 @@ import { isLocalEnvironment } from '../track/environment.js?v=2.09';
 import {
     buildServiceHeaders,
     clampRequestLimit,
+    getGuestPlayerToken,
     getBaseApiConfig,
     getOrCreatePlayerId,
 } from '../scoreboard/api-client.js?v=2.09';
 import {
     getLeaderboardIdentityPreference,
 } from '../scoreboard/display-preference.js?v=2.09';
-import {
-    getDailyGpScheduledTrackPoolForDayIndex,
-} from '../shared/daily-gp-track-schedule.js?v=2.09';
-import {
-    getBackfilledDailyGpTrackKeyForDate,
-} from '../shared/daily-gp-history-backfill.js?v=2.09';
 import {
     getDailyChallengeData,
     setDailyChallengeBestTime,
@@ -29,7 +24,6 @@ const DAILY_SNAPSHOT_CACHE_KEY = 'VectorGpDailyChallengeSnapshotCache';
 const DAILY_START_OVERRIDE_KEY = 'VectorGpDailyStartOverride';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_PLAYLIST_DAYS = 7;
-const DAILY_TRACK_STEP_SEED = 17;
 let dailyPlaylistCache = {
     challenges: null,
     expiresAt: 0,
@@ -90,21 +84,22 @@ function shouldUseMockDailyChallenge() {
 function getMockDailyChallenge() {
     const params = getMockDailyUrlParams();
     const fixedTrackKey = resolveMockDailyTrackKey(params);
-    if (fixedTrackKey) {
-        const now = Date.now();
-        return normalizeDailyChallenge({
-            id: 'mock-daily-challenge-local',
-            trackKey: fixedTrackKey,
-            objectiveType: 'single_lap_fastest',
-            startsAt: new Date(now).toISOString(),
-            endsAt: new Date(now + DAY_MS).toISOString(),
-            availableUntil: new Date(now + DAILY_PLAYLIST_DAYS * DAY_MS).toISOString(),
-            status: 'active',
-            objectiveParams: {},
-            skin: 'default'
-        });
+    const trackKey = fixedTrackKey || Object.keys(TRACKS)[0];
+    if (!trackKey) {
+        return null;
     }
-    return buildLocalDailyChallenge(new Date());
+    const now = Date.now();
+    return normalizeDailyChallenge({
+        id: 'mock-daily-challenge-local',
+        trackKey,
+        objectiveType: 'single_lap_fastest',
+        startsAt: new Date(now).toISOString(),
+        endsAt: new Date(now + DAY_MS).toISOString(),
+        availableUntil: new Date(now + DAILY_PLAYLIST_DAYS * DAY_MS).toISOString(),
+        status: 'active',
+        objectiveParams: {},
+        skin: 'default'
+    });
 }
 
 function getMockDailyChallengeSnapshot() {
@@ -151,57 +146,6 @@ function getNextUtcDayStartMs(date = new Date()) {
     return getUtcDayStart(getUtcDayIndex(date) + 1).getTime();
 }
 
-function formatUtcChallengeDate(date = new Date()) {
-    return date.toISOString().slice(0, 10);
-}
-
-function getStepForTrackCount(trackCount) {
-    if (trackCount <= 1) return 1;
-    const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
-    let step = Math.min(DAILY_TRACK_STEP_SEED, trackCount - 1);
-    while (step > 1 && gcd(step, trackCount) !== 1) {
-        step -= 1;
-    }
-    return Math.max(1, step);
-}
-
-function getDailyTrackKeyForDayIndex(dayIndex) {
-    const trackKeys = getDailyGpScheduledTrackPoolForDayIndex(dayIndex);
-    const step = getStepForTrackCount(trackKeys.length);
-    const index = Math.abs(dayIndex * step) % trackKeys.length;
-    return trackKeys[index] || 'circuit';
-}
-
-function buildLocalDailyChallenge(date = new Date()) {
-    const dayIndex = getUtcDayIndex(date);
-    const startsAt = getUtcDayStart(dayIndex);
-    const challengeDate = formatUtcChallengeDate(startsAt);
-    const backfilledTrackKey = getBackfilledDailyGpTrackKeyForDate(challengeDate);
-    return normalizeDailyChallenge({
-        id: `daily-gp-${challengeDate}`,
-        challengeDate,
-        trackKey: backfilledTrackKey && TRACKS[backfilledTrackKey]
-            ? backfilledTrackKey
-            : getDailyTrackKeyForDayIndex(dayIndex),
-        objectiveType: 'single_lap_fastest',
-        startsAt: startsAt.toISOString(),
-        endsAt: new Date(startsAt.getTime() + DAY_MS).toISOString(),
-        availableUntil: new Date(startsAt.getTime() + DAILY_PLAYLIST_DAYS * DAY_MS).toISOString(),
-        status: 'active',
-        objectiveParams: {},
-        skin: 'default'
-    });
-}
-
-function buildLocalDailyChallengeById(challengeId) {
-    if (typeof challengeId !== 'string') return null;
-    const match = /^daily-gp-(\d{4}-\d{2}-\d{2})$/.exec(challengeId);
-    if (!match) return null;
-    const date = new Date(`${match[1]}T00:00:00.000Z`);
-    if (!Number.isFinite(date.getTime())) return null;
-    return buildLocalDailyChallenge(date);
-}
-
 function readDevvitPostData() {
     const postData = globalThis?.devvit?.context?.postData;
     return postData && typeof postData === 'object' ? postData : null;
@@ -214,14 +158,7 @@ function getPostBoundDailyChallengeFromContext() {
     const challenge = normalizeDailyChallenge(postData.challenge);
     if (challenge) return challenge;
 
-    return buildLocalDailyChallengeById(postData.challengeId);
-}
-
-function getLocalDailyPlaylist(now = new Date()) {
-    const todayIndex = getUtcDayIndex(now);
-    return Array.from({ length: DAILY_PLAYLIST_DAYS }, (_, index) => {
-        return buildLocalDailyChallenge(getUtcDayStart(todayIndex - index));
-    }).filter(Boolean);
+    return null;
 }
 
 function readActiveDailyCacheStorable() {
@@ -319,10 +256,6 @@ export function requestFeaturedDailyChallengeStart() {
     } catch (error) {
         console.error('Error writing daily start override:', error);
     }
-}
-
-export function getFeaturedDailyChallenge() {
-    return buildLocalDailyChallenge(new Date());
 }
 
 function getDailyChallengeConfig() {
@@ -987,7 +920,7 @@ async function loadDailyChallengePlaylist() {
         }
     }
 
-    return getLocalDailyPlaylist();
+    return [getMockDailyChallenge()].filter(Boolean);
 }
 
 export async function getDailyChallengePlaylist({ forceRefresh = false } = {}) {
@@ -1033,6 +966,10 @@ async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_L
             const url = new URL(config.dailySnapshotUrl, origin);
             url.searchParams.set('challengeId', challengeId);
             url.searchParams.set('playerId', getOrCreatePlayerId('daily challenge'));
+            const guestToken = getGuestPlayerToken();
+            if (guestToken) {
+                url.searchParams.set('guestToken', guestToken);
+            }
             url.searchParams.set('limit', safeLimit.toString());
 
             const response = await fetch(url.toString(), {
@@ -1147,6 +1084,7 @@ export async function submitDailyChallengeBestTime({
         },
         body: JSON.stringify({
             playerId: getOrCreatePlayerId('daily challenge'),
+            guestToken: getGuestPlayerToken(),
             challengeId,
             trackKey,
             leaderboardIdentity: getLeaderboardIdentityPreference(),

@@ -5,6 +5,7 @@ import {
     buildServiceHeaders,
     clampRequestLimit,
     getBaseApiConfig,
+    getGuestPlayerToken,
     getOrCreatePlayerId,
 } from './api-client.js?v=2.09';
 import {
@@ -78,6 +79,10 @@ async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeL
     const url = new URL(config.scoreboardSnapshotUrl, origin);
     url.searchParams.set('trackKey', trackKey);
     url.searchParams.set('playerId', playerId);
+    const guestToken = getGuestPlayerToken();
+    if (guestToken) {
+        url.searchParams.set('guestToken', guestToken);
+    }
     url.searchParams.set('limit', safeLimit.toString());
 
     const response = await fetch(url.toString(), {
@@ -112,6 +117,7 @@ export async function submitScoreboardBestTime({ trackKey, bestTime, replay } = 
             },
             body: JSON.stringify({
                 playerId: getOrCreatePlayerId('scoreboard'),
+                guestToken: getGuestPlayerToken(),
                 trackKey,
                 mode: TRACK_MODE_DAILY_GP,
                 leaderboardIdentity: getLeaderboardIdentityPreference(),

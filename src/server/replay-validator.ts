@@ -5,7 +5,7 @@ import { TRACKS } from '../../game/track/tracks.js';
 import { createRunPolicy } from '../../game/race/run-policy.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
 
-const MAX_REPLAY_FRAMES = 20_000;
+export const MAX_REPLAY_FRAMES = 12_000;
 const EPSILON = 1e-9;
 
 type ReplaySegment = {

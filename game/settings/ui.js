@@ -13,7 +13,9 @@ import { getPlayerProgressState } from '../storage.js?v=2.09';
 import {
     buildServiceHeaders,
     getBaseApiConfig,
+    getGuestPlayerToken,
     getOrCreatePlayerId,
+    setGuestPlayerToken,
 } from '../scoreboard/api-client.js?v=2.09';
 import {
     getCarProceduralAudioEnabled,
@@ -247,6 +249,7 @@ export class SettingsUi {
                 },
                 body: JSON.stringify({
                     playerId: getOrCreatePlayerId('player identity'),
+                    guestToken: getGuestPlayerToken(),
                     leaderboardIdentity: normalizedNextPreference,
                 }),
             });
@@ -259,6 +262,7 @@ export class SettingsUi {
             const storedPreference = normalizeLeaderboardIdentityPreference(
                 payload?.leaderboardIdentity ?? normalizedNextPreference,
             );
+            setGuestPlayerToken(payload?.guestToken ?? getGuestPlayerToken());
             setLeaderboardIdentityPreference(storedPreference);
         } catch (error) {
             setLeaderboardIdentityPreference(previousPreference);
