@@ -8,15 +8,7 @@ import {
     getGuestPlayerToken,
     getOrCreatePlayerId,
 } from './api-client.js?v=2.09';
-import {
-    getConstructedLeaderboardName,
-} from '../shared/leaderboard-identity.js';
-import {
-    getLeaderboardIdentityPreference,
-} from './display-preference.js?v=2.09';
 
-const MIN_SCOREBOARD_TIME = 2.0;
-const MAX_SCOREBOARD_TIME = 60 * 60;
 const MAX_SCOREBOARD_LIMIT = 100;
 const DEFAULT_SCOREBOARD_PREVIEW_LIMIT = 10;
 
@@ -25,16 +17,6 @@ const inflightScoreboardSnapshots = new Map();
 
 function getScoreboardConfig() {
     return getBaseApiConfig();
-}
-
-function isValidScoreboardBestTime(bestTime) {
-    return Number.isFinite(bestTime)
-        && bestTime >= MIN_SCOREBOARD_TIME
-        && bestTime <= MAX_SCOREBOARD_TIME;
-}
-
-export function getLeaderboardPlayerName(playerId) {
-    return getConstructedLeaderboardName(playerId);
 }
 
 function normalizeScoreboardRpcPayload(raw) {
@@ -95,54 +77,6 @@ async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeL
         throw err;
     }
     return response.json();
-}
-
-export async function submitScoreboardBestTime({ trackKey, bestTime, replay } = {}) {
-    const config = getScoreboardConfig();
-    if (!config || typeof fetch !== 'function') return null;
-    if (
-        !TRACKS[trackKey]
-        || !isValidScoreboardBestTime(bestTime)
-        || !replay
-    ) {
-        return null;
-    }
-
-    try {
-        const response = await fetch(config.scoreboardSubmitUrl, {
-            method: 'POST',
-            headers: {
-                ...buildServiceHeaders(config),
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                playerId: getOrCreatePlayerId('scoreboard'),
-                guestToken: getGuestPlayerToken(),
-                trackKey,
-                mode: TRACK_MODE_DAILY_GP,
-                leaderboardIdentity: getLeaderboardIdentityPreference(),
-                bestTime,
-                replay
-            })
-        });
-
-        return {
-            ok: response.ok,
-            status: response.status,
-            body: await response.json().catch(() => null)
-        };
-    } catch (error) {
-        console.warn('Failed to submit score to server, trying fallbacks:', error);
-        if (!isLocalEnvironment()) {
-            throw error;
-        }
-    }
-
-    return {
-        ok: false,
-        status: 403,
-        body: { error: 'Writing to the scoreboard is prohibited from localhost.' }
-    };
 }
 
 export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOARD_PREVIEW_LIMIT } = {}) {

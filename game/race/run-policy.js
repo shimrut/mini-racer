@@ -1,5 +1,3 @@
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
-
 function createWinData(state, checkpointCount, extra = {}) {
     return Object.freeze({
         lapTime: state.currentTime,
@@ -17,11 +15,8 @@ export function createRunPolicy({
     const objectiveType = challengeRun?.objectiveType || 'single_lap_fastest';
     return {
         id: `daily:${objectiveType}`,
-        modeKey: TRACK_MODE_DAILY_GP,
-        isDaily: true,
         objectiveType,
         requiredLaps: Math.max(1, Math.trunc(challengeRun?.requiredLaps || 1)),
-        bestResultComparator: 'time'
     };
 }
 

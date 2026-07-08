@@ -1,5 +1,3 @@
-import { TRACK_MODE_DAILY_GP } from "../config.js?v=2.09";
-
 const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
 const VERIFICATION_STAGE_SUBMITTING = "submitting";
@@ -20,7 +18,6 @@ const VERIFICATION_STAGE_TEXT = {
 
 function createEmptyState() {
   return {
-    scoreboard: {},
     daily: {},
   };
 }
@@ -35,10 +32,6 @@ function readQueueState() {
     if (!raw) return createEmptyState();
     const parsed = JSON.parse(raw);
     return {
-      scoreboard:
-        parsed?.scoreboard && typeof parsed.scoreboard === "object"
-          ? parsed.scoreboard
-          : {},
       daily:
         parsed?.daily && typeof parsed.daily === "object" ? parsed.daily : {},
     };
@@ -61,10 +54,6 @@ function writeQueueState(queueState) {
   } catch (error) {
     console.error("Error writing verification queue:", error);
   }
-}
-
-function createScoreboardEntryKey(trackKey) {
-  return `${trackKey}::${TRACK_MODE_DAILY_GP}`;
 }
 
 function normalizeNextAttemptAt(value) {
@@ -125,26 +114,6 @@ function isBetterDailyCandidate(nextEntry, previousEntry) {
   return Number(nextEntry.bestTime) < Number(previousEntry.bestTime);
 }
 
-function isBetterScoreboardCandidate(nextEntry, previousEntry) {
-  if (!previousEntry) return true;
-  return Number(nextEntry.bestTime) < Number(previousEntry.bestTime);
-}
-
-function updateScoreboardEntry(trackKey, updater) {
-  const queueState = readQueueState();
-  const entryKey = createScoreboardEntryKey(trackKey);
-  const nextEntry = updater(queueState.scoreboard[entryKey] || null);
-
-  if (nextEntry) {
-    queueState.scoreboard[entryKey] = nextEntry;
-  } else {
-    delete queueState.scoreboard[entryKey];
-  }
-
-  writeQueueState(queueState);
-  return cloneEntry(nextEntry);
-}
-
 function updateDailyEntry(challengeId, updater) {
   const queueState = readQueueState();
   const nextEntry = updater(queueState.daily[challengeId] || null);
@@ -163,74 +132,16 @@ export function getVerificationRetryDelayMs() {
   return DEFAULT_RETRY_DELAY_MS;
 }
 
-export function getScoreboardVerificationEntry(
-  trackKey
-) {
-  if (!trackKey) return null;
-  const queueState = readQueueState();
-  return cloneEntry(
-    queueState.scoreboard[createScoreboardEntryKey(trackKey)] || null,
-  );
-}
-
 export function getDailyChallengeVerificationEntry(challengeId) {
   if (!challengeId) return null;
   const queueState = readQueueState();
   return cloneEntry(queueState.daily[challengeId] || null);
 }
 
-export function getScoreboardVerificationState(
-  trackKey
-) {
-  return (
-    getScoreboardVerificationEntry(trackKey)?.verificationState || "none"
-  );
-}
-
 export function getDailyChallengeVerificationState(challengeId) {
   return (
     getDailyChallengeVerificationEntry(challengeId)?.verificationState || "none"
   );
-}
-
-export function enqueueScoreboardVerification({
-  trackKey,
-  bestTime,
-  replay,
-} = {}) {
-  if (
-    typeof trackKey !== "string" ||
-    !trackKey ||
-    !Number.isFinite(bestTime) ||
-    !replay
-  ) {
-    return { enqueued: false, entry: null };
-  }
-
-  const nextEntry = {
-    trackKey,
-    mode: TRACK_MODE_DAILY_GP,
-    bestTime,
-    replay,
-    verificationState: "pending",
-    submissionStage: VERIFICATION_STAGE_SUBMITTING,
-    statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
-    nextAttemptAt: Date.now(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  let didEnqueue = false;
-  const entry = updateScoreboardEntry(trackKey, (previousEntry) => {
-    if (!isBetterScoreboardCandidate(nextEntry, previousEntry)) {
-      return previousEntry;
-    }
-    didEnqueue = true;
-    return nextEntry;
-  });
-  return {
-    enqueued: didEnqueue,
-    entry,
-  };
 }
 
 export function enqueueDailyChallengeVerification({
@@ -286,38 +197,8 @@ export function enqueueDailyChallengeVerification({
   };
 }
 
-export function clearScoreboardVerification(
-  trackKey
-) {
-  return updateScoreboardEntry(trackKey, () => null);
-}
-
 export function clearDailyChallengeVerification(challengeId) {
   return updateDailyEntry(challengeId, () => null);
-}
-
-export function markScoreboardVerificationPending(
-  trackKey,
-  nextAttemptAt = Date.now(),
-  {
-    submissionStage = VERIFICATION_STAGE_PENDING,
-    statusText = null,
-    preserveUpdatedAt = false,
-  } = {},
-) {
-  return updateScoreboardEntry(trackKey, (previousEntry) => {
-    if (!previousEntry) return null;
-    return {
-      ...previousEntry,
-      verificationState: "pending",
-      submissionStage: normalizeVerificationStage(submissionStage, "pending"),
-      statusText: resolveVerificationStatusText(submissionStage, statusText),
-      nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
-      updatedAt: preserveUpdatedAt
-        ? previousEntry.updatedAt
-        : new Date().toISOString(),
-    };
-  });
 }
 
 export function markDailyChallengeVerificationPending(
@@ -340,22 +221,6 @@ export function markDailyChallengeVerificationPending(
       updatedAt: preserveUpdatedAt
         ? previousEntry.updatedAt
         : new Date().toISOString(),
-    };
-  });
-}
-
-export function markScoreboardVerificationRejected(
-  trackKey
-) {
-  return updateScoreboardEntry(trackKey, (previousEntry) => {
-    if (!previousEntry) return null;
-    return {
-      ...previousEntry,
-      verificationState: "rejected",
-      submissionStage: VERIFICATION_STAGE_REJECTED,
-      statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_REJECTED],
-      nextAttemptAt: null,
-      updatedAt: new Date().toISOString(),
     };
   });
 }
@@ -394,17 +259,6 @@ export function markDailyChallengeVerificationError(
   });
 }
 
-export function getDueScoreboardVerifications(now = Date.now()) {
-  const queueState = readQueueState();
-  return Object.values(queueState.scoreboard)
-    .filter(
-      (entry) =>
-        entry?.verificationState === "pending" &&
-        normalizeNextAttemptAt(entry.nextAttemptAt) <= now,
-    )
-    .map((entry) => cloneEntry(entry));
-}
-
 export function getDueDailyChallengeVerifications(now = Date.now()) {
   const queueState = readQueueState();
   return Object.values(queueState.daily)
@@ -418,10 +272,7 @@ export function getDueDailyChallengeVerifications(now = Date.now()) {
 
 export function getNextVerificationAttemptAt() {
   const queueState = readQueueState();
-  const nextAttemptValues = [
-    ...Object.values(queueState.scoreboard),
-    ...Object.values(queueState.daily),
-  ]
+  const nextAttemptValues = Object.values(queueState.daily)
     .filter(
       (entry) =>
         entry?.verificationState === "pending" &&
@@ -432,12 +283,6 @@ export function getNextVerificationAttemptAt() {
   if (!nextAttemptValues.length) return null;
   return Math.min(...nextAttemptValues);
 }
-
-export function resetVerificationQueueForTests() {
-  writeQueueState(createEmptyState());
-}
-
-
 
 export function createVerificationSnapshot({
   statusText = "",
@@ -461,27 +306,16 @@ export function createVerificationSnapshot({
   };
 }
 
-export const VERIFICATION_REJECTED_SNAPSHOT = createVerificationSnapshot({
-  statusText: "Rejected",
-  verificationState: "rejected",
-  isLoading: false,
-  submissionStage: VERIFICATION_STAGE_REJECTED,
-});
-
-export const VERIFICATION_ACCEPTED_PENDING_SNAPSHOT =
-  createVerificationSnapshot({
-    statusText: "Pending",
-    verificationState: "pending",
-    isLoading: true,
-    submissionStage: VERIFICATION_STAGE_PENDING,
-  });
-
 export function getVerificationSnapshotFromQueueEntry(entry) {
-  if (!entry) return null;
-  return createVerificationSnapshot({
-    statusText: entry.statusText,
-    verificationState: entry.verificationState,
-    isLoading: entry.verificationState !== "error" && entry.verificationState !== "rejected",
-    submissionStage: entry.submissionStage,
-  });
+    if (!entry) return null;
+    return createVerificationSnapshot({
+        statusText: entry.statusText,
+        verificationState: entry.verificationState,
+        isLoading: entry.verificationState !== "error" && entry.verificationState !== "rejected",
+        submissionStage: entry.submissionStage,
+    });
+}
+
+export function resetVerificationQueueForTests() {
+    writeQueueState(createEmptyState());
 }

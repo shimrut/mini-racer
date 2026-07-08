@@ -15,7 +15,6 @@ export function getBaseApiConfig() {
         apiBaseUrl,
         playerBootstrapUrl: `${apiBaseUrl}/player/bootstrap`,
         playerIdentityUrl: `${apiBaseUrl}/player/identity`,
-        scoreboardSubmitUrl: `${apiBaseUrl}/scoreboard/submit`,
         scoreboardSnapshotUrl: `${apiBaseUrl}/scoreboard/snapshot`,
         dailyActiveUrl: `${apiBaseUrl}/daily/active`,
         dailyPlaylistUrl: `${apiBaseUrl}/daily/playlist`,

@@ -1,9 +1,4 @@
 import { RealTimeRacer } from './engine.js?v=2.12';
-import { RUNTIME_SCOREBOARD_CONFIG } from './runtime-config.js?v=2.09';
-
-if (typeof window !== 'undefined' && !window.VECTORGP_SCOREBOARD_CONFIG) {
-    window.VECTORGP_SCOREBOARD_CONFIG = RUNTIME_SCOREBOARD_CONFIG;
-}
 
 function setupMobileViewportGuards() {
     const hasTouchInput = window.matchMedia('(pointer: coarse)').matches

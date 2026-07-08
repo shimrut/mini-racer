@@ -661,32 +661,6 @@ app.get('/api/scoreboard/snapshot', async (req, res) => {
     }
 });
 
-app.post('/api/scoreboard/submit', async (req, res) => {
-    try {
-        const { trackKey, playerId, guestToken, leaderboardIdentity, replay, checkpointTimesSec } = req.body ?? {};
-        const challenge = await getServerDailyGpChallenge();
-        if (trackKey !== challenge.trackKey) {
-            res.status(404).json({ accepted: false, error: 'Track is not the active Mini Racer challenge.' });
-            return;
-        }
-
-        const result = await submitServerDailyGpRun({
-            playerId,
-            guestToken,
-            challengeId: challenge.id,
-            trackKey: challenge.trackKey,
-            leaderboardIdentity,
-            redditUsername: getRequestUsername(),
-            replay,
-            checkpointTimesSec,
-        });
-        res.status(result.status).json(result.body);
-    } catch (error) {
-        console.error('Failed to submit Reddit Mini Racer scoreboard run:', error);
-        res.status(500).json({ accepted: false, error: 'Scoreboard submit failed' });
-    }
-});
-
 app.get('/api/daily/active', async (_req, res) => {
     try {
         const challenge = await getPostBoundDailyGpChallenge() || await getServerDailyGpChallenge();

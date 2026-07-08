@@ -59,10 +59,18 @@ export class ModalShell {
         this._modalRunsPayload = null;
         this._runsViewMode = 'close';
         this._runsCloseAction = null;
+        this._savedModalState = null;
         this._focusBeforeModal = null;
         this._activeTrapModal = null;
         this._modalTrapKeydown = null;
         this._lastPauseTrackPreviewKey = '';
+    }
+
+    _setActiveView(view) {
+        for (const v of [this.modalMainView, this.modalRunsView, this.modalCombinedView, this.modalPauseView]) {
+            v?.classList.remove('active-view');
+        }
+        view?.classList.add('active-view');
     }
 
     _syncGarageButtonToPanelState() {
@@ -369,10 +377,7 @@ export class ModalShell {
         this._bindClickAction(this.modalResumeBtn, options.primaryAction);
         this._syncGarageButtonToPanelState();
 
-        this.modalMainView?.classList.remove('active-view');
-        this.modalRunsView?.classList.remove('active-view');
-        this.modalCombinedView?.classList.remove('active-view');
-        this.modalPauseView.classList.add('active-view');
+        this._setActiveView(this.modalPauseView);
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => {
@@ -402,10 +407,7 @@ export class ModalShell {
             iconContainer.replaceChildren(createCrashMedalHeroIcon({ className: 'medal-svg--crash-modal' }));
         }
 
-        this.modalRunsView?.classList.remove('active-view');
-        this.modalPauseView?.classList.remove('active-view');
-        this.modalCombinedView?.classList.remove('active-view');
-        this.modalMainView.classList.add('active-view');
+        this._setActiveView(this.modalMainView);
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
@@ -474,10 +476,7 @@ export class ModalShell {
             }
         }
 
-        this.modalMainView?.classList.remove('active-view');
-        this.modalRunsView?.classList.remove('active-view');
-        this.modalPauseView?.classList.remove('active-view');
-        this.modalCombinedView.classList.add('active-view');
+        this._setActiveView(this.modalCombinedView);
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
 
@@ -529,16 +528,13 @@ export class ModalShell {
         const wasMainActive = this.modalMainView?.classList.contains('active-view');
         if (wasCombinedActive) {
             this._runsReturnView = 'combined';
-            this._savedModalKind = this._modalKind;
-            this._savedMainModalIsCrash = this._mainModalIsCrash;
+            this._savedModalState = { kind: this._modalKind, isCrash: this._mainModalIsCrash };
         } else if (wasMainActive) {
             this._runsReturnView = 'main';
-            this._savedModalKind = null;
-            this._savedMainModalIsCrash = false;
+            this._savedModalState = null;
         } else if (!this._runsReturnView) {
             this._runsReturnView = 'main';
-            this._savedModalKind = null;
-            this._savedMainModalIsCrash = false;
+            this._savedModalState = null;
         }
 
         this.modal.classList.remove('modal--crash', 'modal--win', 'modal--pause');
@@ -584,10 +580,7 @@ export class ModalShell {
         if (this.backToMainBtn) {
             this.backToMainBtn.setAttribute('aria-label', 'Back');
         }
-        this.modalMainView.classList.remove('active-view');
-        if (this.modalCombinedView) this.modalCombinedView.classList.remove('active-view');
-        if (this.modalPauseView) this.modalPauseView.classList.remove('active-view');
-        this.modalRunsView.classList.add('active-view');
+        this._setActiveView(this.modalRunsView);
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         if (wasActive) {
             scheduleAfterModalPaint(() => {
@@ -620,18 +613,14 @@ export class ModalShell {
             modal.classList.remove('modal--pause');
             modal.classList.remove('modal--win');
             this._hidePauseTrackPreview();
-            if (this.modalCombinedView) this.modalCombinedView.classList.remove('active-view');
-            if (this.modalPauseView) this.modalPauseView.classList.remove('active-view');
-            if (this.modalMainView) this.modalMainView.classList.remove('active-view');
-            if (this.modalRunsView) this.modalRunsView.classList.remove('active-view');
+            this._setActiveView(null);
             this._modalKind = null;
             this._modalPrimaryAction = this.getDefaultPrimaryAction();
             this._modalSecondaryAction = null;
             this._modalRunsPayload = null;
             this._runsReturnView = null;
             this._runsCloseAction = null;
-            this._savedModalKind = null;
-            this._savedMainModalIsCrash = false;
+            this._savedModalState = null;
             this.releaseModalFocusTrap(modal);
         };
 
@@ -677,29 +666,23 @@ export class ModalShell {
         this.configureRunsModalHeader?.();
 
         const isCombinedViewReturn = this._runsReturnView === 'combined'
-            || this._savedModalKind === 'win'
-            || this._savedModalKind === 'crash'
+            || this._savedModalState?.kind === 'win'
+            || this._savedModalState?.kind === 'crash'
             || this._modalKind === 'win'
             || this._modalKind === 'crash';
 
         if (isCombinedViewReturn) {
-            this._modalKind = this._savedModalKind || this._modalKind || 'win';
-            this._mainModalIsCrash = this._savedMainModalIsCrash || this._modalKind === 'crash';
+            this._modalKind = this._savedModalState?.kind || this._modalKind || 'win';
+            this._mainModalIsCrash = this._savedModalState?.isCrash || this._modalKind === 'crash';
             if (this.modal) {
                 this.modal.classList.toggle('modal--crash', this._mainModalIsCrash);
                 this.modal.classList.toggle('modal--win', this._modalKind === 'win');
                 this.modal.classList.toggle('modal--pause', this._modalKind === 'pause' || this._modalKind === 'crash');
             }
-            if (this.modalRunsView) this.modalRunsView.classList.remove('active-view');
-            if (this.modalPauseView) this.modalPauseView.classList.remove('active-view');
-            if (this.modalMainView) this.modalMainView.classList.remove('active-view');
-            if (this.modalCombinedView) this.modalCombinedView.classList.add('active-view');
+            this._setActiveView(this.modalCombinedView);
         } else {
             if (this.modal) this.modal.classList.toggle('modal--crash', this._mainModalIsCrash);
-            if (this.modalRunsView) this.modalRunsView.classList.remove('active-view');
-            if (this.modalCombinedView) this.modalCombinedView.classList.remove('active-view');
-            if (this.modalPauseView) this.modalPauseView.classList.remove('active-view');
-            if (this.modalMainView) this.modalMainView.classList.add('active-view');
+            this._setActiveView(this.modalMainView);
         }
     }
 
