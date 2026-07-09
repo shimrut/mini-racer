@@ -4,6 +4,10 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Removed unused JS helper exports and an unused player-status store left behind after earlier flow changes.
+- Removed an orphaned leaderboard next-target helper that was never wired into the tracked app UI.
+- Removed stale HTML IDs and modifier classes that no longer drive gameplay, modal, garage, analytics, or tool behavior.
+- Removed stale result-modal, playlist, preview, and moderator-tool CSS selectors that no longer match the shipped UI.
 - Start overlay spacing is tighter on the common Reddit desktop and mobile window sizes, so the title, utility actions, and primary CTA stay visible without feeling oversized.
 - Restored lobby menu width, utility icon/label sizing, and the three-column Garage car grid after a UI rollback.
 - Garage car names now omit Mini, Cyber, and Steam family prefixes.

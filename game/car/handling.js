@@ -78,16 +78,3 @@ export function simulateStraightLine(config = {}, {
         time: maxSteps * dt
     };
 }
-
-export function estimateTimeToSpeed(config = {}, targetSpeed, options = {}) {
-    if (!Number.isFinite(targetSpeed) || targetSpeed <= 0) {
-        return null;
-    }
-
-    const result = simulateStraightLine(config, {
-        ...options,
-        targetSpeed
-    });
-
-    return result.reached ? result.time : null;
-}

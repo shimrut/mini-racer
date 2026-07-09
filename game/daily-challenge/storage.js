@@ -174,11 +174,3 @@ export function setDailyChallengeBestTime(
   writeDailyChallengeMap(nextMap);
   return getDailyChallengeData(challenge.id);
 }
-
-/**
- * Async wrapper — returns true if the player has any stored data.
- * Async for forward-compatibility if storage becomes IndexedDB-backed.
- */
-export async function hasAnyPlayerData() {
-    return hasAnyDailyChallengeStoredData();
-}

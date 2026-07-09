@@ -2,7 +2,6 @@ import { DEFAULT_PHYSICS_TUNING } from './car/handling.js';
 
 // --- Mode Constants ---
 export const TRACK_MODE_DAILY_GP = 'daily';
-export const DEFAULT_TRACK_PREFERENCES = {};
 
 // --- Game Config ---
 export const CONFIG = {

@@ -202,19 +202,6 @@ body {
     gap: 0.45rem;
 }
 
-.hud-medal {
-    display: flex;
-    align-items: center;
-    line-height: 0;
-}
-
-.time-to-beat__medal {
-    width: clamp(1.2rem, 3.5vw, 1.6rem);
-    height: clamp(1.2rem, 3.5vw, 1.6rem);
-    flex-shrink: 0;
-    color: var(--bronze);
-}
-
 .hud-value {
     font-size: clamp(1.6rem, 5vw, 2.2rem);
     font-weight: 800;

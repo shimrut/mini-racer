@@ -72,7 +72,6 @@ input {
     box-shadow: 0 12px 32px rgba(5, 150, 105, 0.22);
 }
 
-.page-header__eyebrow,
 .section-eyebrow {
     margin: 0;
     color: var(--text-faint);
@@ -94,8 +93,6 @@ input {
     font-weight: 600;
 }
 
-.page-header__summary,
-.controls-panel__summary p,
 .panel__header p {
     margin: 0;
     color: var(--text-soft);
@@ -110,7 +107,6 @@ input {
     gap: 8px;
 }
 
-.live-badge,
 .range-pill,
 .panel-pill {
     display: inline-flex;
@@ -124,19 +120,6 @@ input {
     color: var(--text-soft);
     font-size: 0.75rem;
     font-weight: 600;
-}
-
-.live-badge {
-    border-color: #a7f3d0;
-    background: var(--accent-soft);
-    color: #047857;
-}
-
-.live-badge__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background: var(--accent);
 }
 
 .panel-pill {
@@ -194,18 +177,6 @@ input {
     gap: 16px;
     margin-bottom: 24px;
     padding: 16px;
-}
-
-.controls-panel__summary {
-    display: grid;
-    gap: 8px;
-}
-
-.controls-panel__meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
 }
 
 .controls-panel h2 {

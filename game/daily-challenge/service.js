@@ -638,16 +638,6 @@ export function getDailyChallengeBestResult(challenge) {
     return result && typeof result === 'object' ? { ...result } : null;
 }
 
-export function getDailyChallengeBestDisplay(challenge) {
-    if (!challenge) return '--';
-    const merged = getDailyChallengeBestResult(challenge);
-    return formatDailyChallengeBestLabel(
-        challenge.objectiveType,
-        merged?.bestTime,
-        merged?.completedLaps,
-    );
-}
-
 export function getCachedDailyChallengeSnapshot(challengeId) {
     return readCachedDailySnapshot(challengeId);
 }
