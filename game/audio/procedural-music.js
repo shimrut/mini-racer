@@ -1,5 +1,5 @@
-import { getMusicEnabled } from '../settings/music-preference.js?v=2.09';
-import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js?v=2.09';
+import { getMusicEnabled } from '../settings/music-preference.js';
+import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js';
 
 function clamp(val, min, max) {
     return Math.max(min, Math.min(max, val));

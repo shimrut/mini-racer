@@ -1,4 +1,4 @@
-import { getBaseApiConfig, getOrCreatePlayerId } from '../scoreboard/api-client.js?v=2.09';
+import { API_ROUTES, getOrCreatePlayerId } from '../scoreboard/api-client.js';
 
 export class SessionFlagStore {
     get(key) {
@@ -108,7 +108,7 @@ function getAnalyticsContextPayload() {
 
 export class AnalyticsService {
     constructor({
-        config = getBaseApiConfig(),
+        config = API_ROUTES,
         now = () => performance.now(),
     } = {}) {
         this.analyticsUrl = `${config.apiBaseUrl || '/api'}/analytics/event`;

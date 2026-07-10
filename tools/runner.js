@@ -441,37 +441,6 @@ function checkWallCollisionDetailed(prepared, p1, p2) {
     };
 }
 
-function findNearestCenterIndex(centerline, point, hintIndex) {
-    if (!centerline.length) {
-        return 0;
-    }
-
-    let bestIndex = 0;
-    let bestDistance = Infinity;
-
-    if (Number.isFinite(hintIndex)) {
-        const searchRadius = Math.min(40, centerline.length);
-        for (let offset = -searchRadius; offset <= searchRadius; offset++) {
-            const index = (hintIndex + offset + centerline.length) % centerline.length;
-            const currentDistance = distanceSq(centerline[index], point);
-            if (currentDistance < bestDistance) {
-                bestDistance = currentDistance;
-                bestIndex = index;
-            }
-        }
-        return bestIndex;
-    }
-
-    for (let i = 0; i < centerline.length; i++) {
-        const currentDistance = distanceSq(centerline[i], point);
-        if (currentDistance < bestDistance) {
-            bestDistance = currentDistance;
-            bestIndex = i;
-        }
-    }
-    return bestIndex;
-}
-
 function getTurnSeverity(centerline, index, lookAhead) {
     if (centerline.length < 6) {
         return 0;

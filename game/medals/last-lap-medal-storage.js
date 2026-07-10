@@ -1,4 +1,4 @@
-import { isStandardMedalTier, maxMedalTier } from './medals.js?v=2.09';
+import { isStandardMedalTier, maxMedalTier } from './medals.js';
 
 const STORAGE_KEY = 'VectorGpTrackLastLapMedal';
 

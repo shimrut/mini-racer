@@ -1,4 +1,4 @@
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
+import { TRACK_MODE_DAILY_GP } from '../config.js';
 
 /** Speed readout: cap DOM writes (lap timer updates every frame when centiseconds change). */
 const HUD_SPEED_MIN_MS = 1000 / 15;

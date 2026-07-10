@@ -1,58 +1,22 @@
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
-import { TRACKS } from '../track/tracks.js?v=2.09';
-import { isLocalEnvironment } from '../track/environment.js?v=2.09';
+import { TRACK_MODE_DAILY_GP } from '../config.js';
+import { TRACKS } from '../track/tracks.js';
+import { isLocalEnvironment } from '../track/environment.js';
 import {
-    buildServiceHeaders,
+    API_ROUTES,
     clampRequestLimit,
-    getBaseApiConfig,
     getGuestPlayerToken,
     getOrCreatePlayerId,
-} from './api-client.js?v=2.09';
+} from './api-client.js';
+import {
+    createEmptyScoreboardSnapshot,
+    normalizeScoreboardSnapshot,
+} from './snapshot.js';
 
 const MAX_SCOREBOARD_LIMIT = 100;
 const DEFAULT_SCOREBOARD_PREVIEW_LIMIT = 10;
 
 /** Same-key concurrent callers share one network round-trip. */
 const inflightScoreboardSnapshots = new Map();
-
-function getScoreboardConfig() {
-    return getBaseApiConfig();
-}
-
-function normalizeScoreboardRpcPayload(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-    const normalizeRow = (row) => {
-        if (!row || typeof row !== 'object') return null;
-        const bestTime = Number(row.bestTime);
-        const bestTimeSec = Number(row.bestTimeSec);
-        const bestTimeMs = Number(row.bestTimeMs);
-        return {
-            ...row,
-            bestTime: Number.isFinite(bestTime)
-                ? bestTime
-                : Number.isFinite(bestTimeSec)
-                    ? bestTimeSec
-                    : Number.isFinite(bestTimeMs)
-                        ? bestTimeMs / 1000
-                        : row.bestTime,
-        };
-    };
-    return {
-        topRows: Array.isArray(raw.topRows) ? raw.topRows.map(normalizeRow).filter(Boolean) : [],
-        nearbyRows: Array.isArray(raw.nearbyRows) ? raw.nearbyRows.map(normalizeRow).filter(Boolean) : [],
-        currentPlayerRow: raw.currentPlayerRow && typeof raw.currentPlayerRow === 'object'
-            ? normalizeRow(raw.currentPlayerRow)
-            : null,
-        totalCount: Number(raw.totalCount) || 0,
-        leaderboardEntryCount: raw.leaderboardEntryCount != null && Number.isFinite(Number(raw.leaderboardEntryCount))
-            ? Math.max(0, Math.trunc(Number(raw.leaderboardEntryCount)))
-            : (Number(raw.totalCount) || 0),
-        playerRank: raw.playerRank != null && Number.isFinite(Number(raw.playerRank))
-            ? Number(raw.playerRank)
-            : null,
-        playerRankLabel: raw.playerRankLabel != null ? String(raw.playerRankLabel) : null
-    };
-}
 
 async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeLimit) {
     const origin = typeof window !== 'undefined' && window.location?.origin
@@ -67,10 +31,7 @@ async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeL
     }
     url.searchParams.set('limit', safeLimit.toString());
 
-    const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: buildServiceHeaders(config)
-    });
+    const response = await fetch(url.toString(), { method: 'GET' });
     if (!response.ok) {
         const err = new Error(`Scoreboard proxy failed: ${response.status}`);
         err.status = response.status;
@@ -80,22 +41,12 @@ async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeL
 }
 
 export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOARD_PREVIEW_LIMIT } = {}) {
-    const emptySnapshot = () => ({
-        topRows: [],
-        nearbyRows: [],
-        currentPlayerRow: null,
-        totalCount: 0,
-        leaderboardEntryCount: 0,
-        playerRank: null,
-        playerRankLabel: null
-    });
-
-    const config = getScoreboardConfig();
+    const config = API_ROUTES;
     if (!config || typeof fetch !== 'function') {
-        return emptySnapshot();
+        return createEmptyScoreboardSnapshot();
     }
     if (!TRACKS[trackKey]) {
-        return emptySnapshot();
+        return createEmptyScoreboardSnapshot();
     }
 
     const safeLimit = clampRequestLimit(limit, {
@@ -116,14 +67,14 @@ export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOA
                 currentPlayerId,
                 safeLimit
             );
-            return normalizeScoreboardRpcPayload(raw) || emptySnapshot();
+            return normalizeScoreboardSnapshot(raw);
         } catch (error) {
             if (isLocalEnvironment()) {
                 console.warn('Scoreboard snapshot fetch failed, falling back to empty:', error);
             } else {
                 console.error('Scoreboard snapshot fetch failed:', error);
             }
-            return emptySnapshot();
+            return createEmptyScoreboardSnapshot();
         }
     })();
 

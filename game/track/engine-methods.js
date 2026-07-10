@@ -1,20 +1,20 @@
-import { CONFIG } from "../config.js?v=2.09";
-import { TRACK_MODE_DAILY_GP } from "../config.js?v=2.09";
-import { TRACKS } from "./tracks.js?v=2.09";
+import { CONFIG } from "../config.js";
+import { TRACK_MODE_DAILY_GP } from "../config.js";
+import { TRACKS } from "./tracks.js";
 import {
   getTrackCanvasAsset,
   getTrackRuntimeAsset,
-} from "./assets.js?v=2.09";
+} from "./assets.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
   TRACK_PRESENTATION_SURFACES,
-} from "./presentation.js?v=2.09";
-import { configureCanvasViewport } from "./canvas-resolution.js?v=2.09";
+} from "./presentation.js";
+import { configureCanvasViewport } from "./canvas-resolution.js";
 import {
   readCanvasDevicePixelRatio,
-} from "./environment.js?v=2.09";
-import { getPlayerProgressState } from "../storage.js?v=2.09";
+} from "./environment.js";
+import { getPlayerProgressState } from "../storage.js";
 
 const CANVAS_RESIZE_SETTLE_MS = 120;
 

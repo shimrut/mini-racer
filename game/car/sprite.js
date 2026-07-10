@@ -1,4 +1,4 @@
-import { CONFIG } from "../config.js?v=2.09";
+import { CONFIG } from "../config.js";
 import { GENERATED_PLAYER_SELECTABLE_CAR_ASSETS } from "./generated-player-selectable-car-assets.js";
 
 /** Canonical stock car art under `public/assets/cars/`. */

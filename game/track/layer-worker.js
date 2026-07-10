@@ -1,5 +1,5 @@
-import { configureCanvasViewport } from './canvas-resolution.js?v=2.09';
-import { drawViewportPresentationBackground } from './canvas.js?v=2.09';
+import { configureCanvasViewport } from './canvas-resolution.js';
+import { drawViewportPresentationBackground } from './canvas.js';
 
 let canvas = null;
 let ctx = null;

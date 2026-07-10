@@ -3,8 +3,8 @@ import {
     getDailyChallengeBestResult,
     getDailyChallengeCopyLabels,
     getDailyChallengeTrackName
-} from './service.js?v=2.09';
-import { buildScoreboardRankDisplay } from '../race/result-flow.js?v=2.09';
+} from './service.js';
+import { buildScoreboardRankDisplay } from '../race/result-flow.js';
 import {
     getDailyChallengeVerificationEntry,
     getVerificationSnapshotFromQueueEntry
@@ -19,7 +19,7 @@ import {
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
-import { getMedalForLapTime } from '../medals/medals.js?v=2.09';
+import { getMedalForLapTime } from '../medals/medals.js';
 
 function scheduleAfterModalPaint(callback) {
     requestAnimationFrame(() => {

@@ -1,5 +1,5 @@
-import { TRACKS } from '../track/tracks.js?v=2.09';
-import { TRACK_MODE_DAILY_GP } from '../config.js?v=2.09';
+import { TRACKS } from '../track/tracks.js';
+import { TRACK_MODE_DAILY_GP } from '../config.js';
 import {
     getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
@@ -7,8 +7,8 @@ import {
     getDailyChallengePlaylist,
     prefetchDailyChallengeSnapshots,
     getDailyChallengeSnapshot
-} from '../daily-challenge/service.js?v=2.09';
-import { getScoreboardSnapshot } from './service.js?v=2.09';
+} from '../daily-challenge/service.js';
+import { getScoreboardSnapshot } from './service.js';
 
 function isValidDailyChallenge(challenge) {
     return Boolean(challenge?.id && challenge.trackKey && TRACKS[challenge.trackKey]);

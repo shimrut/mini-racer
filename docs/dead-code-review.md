@@ -47,14 +47,32 @@ The attempted `/fonts/*` consolidation broke font loading in the hosted game and
 
 The unused `step66.txt`, `diff_recovery.patch`, stale `knip-report.json`, and generated `unused-css-report.json` were removed from the tracked product surface.
 
+### 7. Duplicate module identities and legacy proxy scaffolding
+
+JavaScript module imports under `game/` mixed canonical paths with manual `?v=` suffixes. Vite treated those as distinct module identities, duplicating shared modules in the production bundle. Module imports now use canonical relative paths; HTML asset query strings remain available for direct-page cache busting.
+
+The old proxy configuration layer also carried unused `serviceMode` state, empty request-header construction, and wrapper functions that only returned the same fixed `/api` routes. Those paths now read one immutable route map, omit empty GET headers, and keep explicit JSON headers for POST requests.
+
+### 8. Additional uncalled helpers
+
+Eight definition-only helpers were removed from the game preview and secondary runner/TikTok tools. They covered abandoned replay interpolation, centerline lookup, easing, and animation-beat calculations with no runtime or test callers.
+
+### 9. Shared snapshot and menu contracts
+
+The scoreboard and Daily GP services now use one client snapshot normalizer and clone path. Moderator menu routes use one registration wrapper for subreddit resolution and neutral error responses while preserving the existing endpoints, messages, navigation responses, and side effects.
+
 ## Validation performed
 
 - `npm test`: 52 files and 321 tests passed.
 - `npm run build`: passed.
+- The full test suite passes with 326 tests across 53 files after the simplification work.
 - Current production output was inspected to confirm the removed public assets are absent and the working root-level font files remain.
 - The client package excluding source maps is about 1.3 MB in this checkout, down from about 15 MB before cleanup.
+- The game entry and required JavaScript preloads are about 333 KB raw / 98 KB gzip, with no source-map duplicates caused by versioned module identities.
 - Runtime browser automation was not available because the local `playwright` package is not installed.
 
 ## Ongoing rule
 
 Keep local source artwork outside `public/`. Git ignore rules do not prevent Vite from copying ignored files into a build made from a developer checkout.
+
+Keep `?v=` cache-busting suffixes out of JavaScript module import specifiers. Vite already owns production asset generation, and query variants can cause one source module to be bundled more than once.

@@ -1,4 +1,4 @@
-import { RealTimeRacer } from './engine.js?v=2.12';
+import { RealTimeRacer } from './engine.js';
 
 function setupMobileViewportGuards() {
     const hasTouchInput = window.matchMedia('(pointer: coarse)').matches

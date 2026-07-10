@@ -1,7 +1,7 @@
 import {
     getLeaderboardIdentityPreference,
     setLeaderboardIdentityPreference,
-} from '../scoreboard/display-preference.js?v=2.09';
+} from '../scoreboard/display-preference.js';
 import {
     LEADERBOARD_IDENTITY_CONSTRUCTED,
     LEADERBOARD_IDENTITY_REDDIT,
@@ -9,36 +9,35 @@ import {
     normalizeLeaderboardIdentityPreference,
     sanitizeRedditUsername,
 } from '../shared/leaderboard-identity.js';
-import { getPlayerProgressState } from '../storage.js?v=2.09';
+import { getPlayerProgressState } from '../storage.js';
 import {
-    buildServiceHeaders,
-    getBaseApiConfig,
+    API_ROUTES,
     getGuestPlayerToken,
     getOrCreatePlayerId,
     setGuestPlayerToken,
-} from '../scoreboard/api-client.js?v=2.09';
+} from '../scoreboard/api-client.js';
 import {
     getCarProceduralAudioEnabled,
     setCarProceduralAudioEnabled,
-} from './car-audio-preference.js?v=2.09';
+} from './car-audio-preference.js';
 import {
     getCrashAutoRestartAfterCrashEnabled,
     setCrashAutoRestartAfterCrashEnabled,
-} from './crash-auto-restart-preference.js?v=2.09';
+} from './crash-auto-restart-preference.js';
 import {
     CRASH_RESTART_DELAY_METER_TICKS,
     CRASH_RESTART_DELAY_STEP,
     crashRestartDelayToMeterStep,
     getCrashRestartDelaySec,
     setCrashRestartDelaySec,
-} from './crash-restart-delay-preference.js?v=2.09';
-import { userGesturePrepareCarEffects } from '../audio/car-effects-audio.js?v=2.09';
-import { userGesturePrepareMedalEffects } from '../audio/medal-effects-audio.js?v=2.09';
-import { userGesturePrepareMusic } from '../audio/procedural-music.js?v=2.09';
+} from './crash-restart-delay-preference.js';
+import { userGesturePrepareCarEffects } from '../audio/car-effects-audio.js';
+import { userGesturePrepareMedalEffects } from '../audio/medal-effects-audio.js';
+import { userGesturePrepareMusic } from '../audio/procedural-music.js';
 import {
     getMusicEnabled,
     setMusicEnabled,
-} from './music-preference.js?v=2.09';
+} from './music-preference.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
@@ -236,7 +235,7 @@ export class SettingsUi {
         this.refreshIdentityPanel();
 
         try {
-            const config = getBaseApiConfig();
+            const config = API_ROUTES;
             if (!config?.playerIdentityUrl || typeof fetch !== 'function') {
                 return;
             }
@@ -244,7 +243,6 @@ export class SettingsUi {
             const response = await fetch(config.playerIdentityUrl, {
                 method: 'POST',
                 headers: {
-                    ...buildServiceHeaders(config),
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({

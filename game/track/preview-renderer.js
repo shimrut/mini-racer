@@ -1,4 +1,4 @@
-import { CONFIG } from '../config.js?v=2.09';
+import { CONFIG } from '../config.js';
 import {
     drawCheckeredLine,
     drawPresentationBackground,
@@ -135,24 +135,6 @@ function getReplayLayout(payload, width, height, topInset = 0, bottomInset = 0, 
             x: offsetX + (point.x - minX) * scale,
             y: offsetY + (point.y - minY) * scale
         })
-    };
-}
-
-function getReplayProgressPoint(run, progress) {
-    if (run.length === 1) {
-        return run[0];
-    }
-
-    const scaledIndex = progress * (run.length - 1);
-    const baseIndex = Math.floor(scaledIndex);
-    const nextIndex = Math.min(run.length - 1, baseIndex + 1);
-    const t = scaledIndex - baseIndex;
-    const start = run[baseIndex];
-    const end = run[nextIndex];
-
-    return {
-        x: start.x + (end.x - start.x) * t,
-        y: start.y + (end.y - start.y) * t
     };
 }
 

@@ -1,5 +1,5 @@
-import { getCarProceduralAudioEnabled } from '../settings/car-audio-preference.js?v=2.09';
-import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js?v=2.09';
+import { getCarProceduralAudioEnabled } from '../settings/car-audio-preference.js';
+import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js';
 
 let registeredApi = null;
 

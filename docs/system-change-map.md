@@ -66,6 +66,7 @@ flowchart LR
 - `game/daily-challenge/service.js` fetches the active challenge, playlist, snapshots, and daily result submission state.
 - `game/daily-challenge/ui.js` renders the start screen card, playlist modal, preview canvas, and challenge summary state, including local submission stages like submitting, verifying, retrying, and terminal errors.
 - `game/scoreboard/service.js` fetches leaderboard snapshots and submits best times.
+- `game/scoreboard/snapshot.js` owns the shared client-side snapshot shape, row/time normalization, empty state, and mutation-safe cache cloning used by both scoreboard and Daily GP flows.
 - `game/scoreboard/engine-methods.js` handles deferred verification and retry behavior after a local best run is recorded.
 - `game/storage.js` fetches player bootstrap state and falls back to local data when needed.
 - Daily GP track selection walks `game/track/tracks.js` in key order, one track per day, using the most-recent published day as the playhead; `src/server/daily-gp-store.ts` persists each new day to the `dailygp:challenges` Redis ledger (first-writer-wins) so past days never change.
@@ -91,7 +92,7 @@ flowchart LR
 | Race/physics | `game/race/simulation.js`, `game/race/engine-methods.js`, `game/car/handling.js` | Driving feel, crashes, finish logic, replay capture | Track runtime, config, HUD, modal flow |
 | Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js` | Car art, asset loading, garage selection, trail style | `public/assets/cars/*`, generated asset list, local storage |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
-| Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot display, submissions, verification retry flow | API client, daily challenge storage, server APIs |
+| Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization and display, submissions, verification retry flow | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js` | Identity, audio toggles, restart preferences | Browser storage, API identity endpoint, modal helpers |
 | Audio/analytics | `game/audio/*`, `game/player/service.js` | Sound playback and analytics events | Settings preferences, `/api/analytics/event` |
 | Server | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/daily-gp-model.ts`, `src/server/replay-validator.ts` | Persistence, validation, challenge scheduling, APIs | Redis, shared gameplay modules |
@@ -111,7 +112,7 @@ These client-facing routes are defined in `src/server/index.ts`:
 - `/api/analytics/event`
 - `/api/analytics/summary`
 
-The browser-side API entrypoint is `game/scoreboard/api-client.js`.
+The browser-side API route and player identity entrypoint is `game/scoreboard/api-client.js`. Both leaderboard snapshot endpoints normalize their responses through `game/scoreboard/snapshot.js` before UI or cache use.
 
 ## Dependency Inventory
 
@@ -153,7 +154,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Track visual treatment only | `game/track/presentation.js`, `game/track/canvas.js`, `styles.css` | `game/daily-challenge/ui.js`, `game/race/ui-modal-shell.js`, `game/track/preview-renderer.js` | One presentation system feeds race view, previews, and modal thumbnails |
 | Daily challenge schedule or availability window | `game/track/tracks.js`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-store.ts`, `game/daily-challenge/service.js` | `src/server/index.ts`, `README.md` if player-facing behavior changes | New challenge generation walks the track file in order; playlist availability reads persisted published history so past days do not shift |
 | Start screen or daily card copy/layout | `game/daily-challenge/ui.js`, `game.html`, `styles.css` | `game/daily-challenge/service.js` | The UI is driven by API summary fields and modal launch actions |
-| Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/ui.js` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned |
+| Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files | `game/storage.js`, `game/player/service.js`, `game.html`, `styles.css` | Settings mix UI, local storage, and some server-backed identity behavior |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |

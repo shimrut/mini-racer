@@ -3,7 +3,7 @@ import {
     PLAYER_CAR_SKINS,
     readPlayerCarSkinAssetName,
     writePlayerCarSkinAssetName
-} from '../car/player-car-skin.js?v=2.12';
+} from '../car/player-car-skin.js';
 import {
     PLAYER_TRAIL_COLORS,
     readPlayerTrailId,

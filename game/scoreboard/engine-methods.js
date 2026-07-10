@@ -9,13 +9,13 @@ import {
   markDailyChallengeVerificationError,
   createVerificationSnapshot,
 } from "./verification-queue.js";
-import { setDailyChallengeBestTime } from "../daily-challenge/storage.js?v=2.09";
+import { setDailyChallengeBestTime } from "../daily-challenge/storage.js";
 import {
   getDailyChallengeSnapshot,
   invalidateDailyChallengeSnapshot,
   submitDailyChallengeBestTime,
-} from "../daily-challenge/service.js?v=2.09";
-import { shouldAutoRetryVerificationQueue } from "../track/environment.js?v=2.09";
+} from "../daily-challenge/service.js";
+import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
 
 function isRetryableVerificationFailure(result) {
   const status = Number(result?.status);

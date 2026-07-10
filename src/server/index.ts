@@ -18,7 +18,10 @@ import {
     getServerAnalyticsSummary,
     submitServerAnalyticsEvent,
 } from './analytics-store.js';
-import { formatDailyMiniRacerPostTitle } from './reddit-post-title.js';
+import {
+    formatDailyMiniRacerPostTitle,
+    formatDailyMiniRacerTextFallback,
+} from './reddit-post-title.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -284,18 +287,7 @@ async function submitDailyMiniRacerPost(
             challenge,
         },
         textFallback: {
-            text: [
-                '# Mini Racer Daily',
-                '',
-                `Track: ${TRACKS[challenge.trackKey]?.name || challenge.trackKey}`,
-                `Date: ${challenge.challengeDate}`,
-                '',
-                'Playable Reddit racing challenge.',
-                '',
-                '- One featured track per day',
-                '- Fast retries',
-                '- Personal best plus live leaderboard',
-            ].join('\n'),
+            text: formatDailyMiniRacerTextFallback(challenge),
         },
     });
 }
@@ -760,22 +752,64 @@ app.get('/api/analytics/summary', async (req, res) => {
     }
 });
 
-app.post('/internal/menu/post-create', async (req, res) => {
-    try {
-        const input = (req.body ?? {}) as Partial<MenuItemRequest>;
-        const targetId = typeof input.targetId === 'string' ? input.targetId : '';
-        const subredditName = await resolveMenuTargetSubredditName(targetId);
+type MenuActionOptions = {
+    missingContextMessage: string;
+    failureLogMessage: string;
+    failureToastPrefix: string;
+};
 
-        if (!subredditName) {
-            res.json({
-                showToast: {
-                    text: 'Reddit did not provide a subreddit context for this install.',
-                    appearance: 'neutral'
-                }
-            });
-            return;
+type MenuActionHandler = (
+    subredditName: string,
+    res: express.Response,
+) => Promise<void>;
+
+function createMenuToast(text: string, appearance: 'neutral' | 'success' = 'neutral') {
+    return {
+        showToast: {
+            text,
+            appearance,
+        },
+    };
+}
+
+function getErrorMessage(error: unknown): string {
+    return error instanceof Error && error.message ? error.message : 'Unknown error';
+}
+
+function registerMenuAction(
+    path: string,
+    options: MenuActionOptions,
+    handler: MenuActionHandler,
+): void {
+    app.post(path, async (req, res) => {
+        try {
+            const input = (req.body ?? {}) as Partial<MenuItemRequest>;
+            const targetId = typeof input.targetId === 'string' ? input.targetId : '';
+            const subredditName = await resolveMenuTargetSubredditName(targetId);
+
+            if (!subredditName) {
+                res.json(createMenuToast(options.missingContextMessage));
+                return;
+            }
+
+            await handler(subredditName, res);
+        } catch (error) {
+            console.error(options.failureLogMessage, error);
+            res.json(createMenuToast(
+                `${options.failureToastPrefix}: ${getErrorMessage(error)}`,
+            ));
         }
+    });
+}
 
+registerMenuAction(
+    '/internal/menu/post-create',
+    {
+        missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
+        failureLogMessage: 'Failed to create Mini Racer post:',
+        failureToastPrefix: 'Could not create the Mini Racer post',
+    },
+    async (subredditName, res) => {
         const challenge = await getServerDailyGpChallenge();
         const post = await submitDailyMiniRacerPost(subredditName, challenge);
         await upsertDailyAutopostSubscription(subredditName, (previous) => ({
@@ -791,36 +825,17 @@ app.post('/internal/menu/post-create', async (req, res) => {
         res.json({
             navigateTo: post.url
         });
-    } catch (error) {
-        console.error('Failed to create Mini Racer post:', error);
-        const message = error instanceof Error && error.message
-            ? error.message
-            : 'Unknown error';
-        res.json({
-            showToast: {
-                text: `Could not create the Mini Racer post: ${message}`,
-                appearance: 'neutral'
-            }
-        });
-    }
-});
+    },
+);
 
-app.post('/internal/menu/post-enable-daily', async (req, res) => {
-    try {
-        const input = (req.body ?? {}) as Partial<MenuItemRequest>;
-        const targetId = typeof input.targetId === 'string' ? input.targetId : '';
-        const subredditName = await resolveMenuTargetSubredditName(targetId);
-
-        if (!subredditName) {
-            res.json({
-                showToast: {
-                    text: 'Reddit did not provide a subreddit context for this install.',
-                    appearance: 'neutral',
-                },
-            });
-            return;
-        }
-
+registerMenuAction(
+    '/internal/menu/post-enable-daily',
+    {
+        missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
+        failureLogMessage: 'Failed to enable daily Mini Racer posts:',
+        failureToastPrefix: 'Could not enable daily Mini Racer posts',
+    },
+    async (subredditName, res) => {
         await upsertDailyAutopostSubscription(subredditName, (previous) => ({
             subredditName,
             enabled: true,
@@ -843,73 +858,33 @@ app.post('/internal/menu/post-enable-daily', async (req, res) => {
             },
             ...(result.created && result.postUrl ? { navigateTo: result.postUrl } : {}),
         });
-    } catch (error) {
-        console.error('Failed to enable daily Mini Racer posts:', error);
-        const message = error instanceof Error && error.message
-            ? error.message
-            : 'Unknown error';
-        res.json({
-            showToast: {
-                text: `Could not enable daily Mini Racer posts: ${message}`,
-                appearance: 'neutral',
-            },
-        });
-    }
-});
+    },
+);
 
-app.post('/internal/menu/post-disable-daily', async (req, res) => {
-    try {
-        const input = (req.body ?? {}) as Partial<MenuItemRequest>;
-        const targetId = typeof input.targetId === 'string' ? input.targetId : '';
-        const subredditName = await resolveMenuTargetSubredditName(targetId);
-
-        if (!subredditName) {
-            res.json({
-                showToast: {
-                    text: 'Reddit did not provide a subreddit context for this install.',
-                    appearance: 'neutral',
-                },
-            });
-            return;
-        }
-
+registerMenuAction(
+    '/internal/menu/post-disable-daily',
+    {
+        missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
+        failureLogMessage: 'Failed to disable daily Mini Racer posts:',
+        failureToastPrefix: 'Could not disable daily Mini Racer posts',
+    },
+    async (subredditName, res) => {
         await deleteDailyAutopostSubscription(subredditName);
-        res.json({
-            showToast: {
-                text: `Daily Mini Racer posts disabled for r/${subredditName}.`,
-                appearance: 'success',
-            },
-        });
-    } catch (error) {
-        console.error('Failed to disable daily Mini Racer posts:', error);
-        const message = error instanceof Error && error.message
-            ? error.message
-            : 'Unknown error';
-        res.json({
-            showToast: {
-                text: `Could not disable daily Mini Racer posts: ${message}`,
-                appearance: 'neutral',
-            },
-        });
-    }
-});
+        res.json(createMenuToast(
+            `Daily Mini Racer posts disabled for r/${subredditName}.`,
+            'success',
+        ));
+    },
+);
 
-app.post('/internal/menu/mod-analytics-open', async (req, res) => {
-    try {
-        const input = (req.body ?? {}) as Partial<MenuItemRequest>;
-        const targetId = typeof input.targetId === 'string' ? input.targetId : '';
-        const subredditName = await resolveMenuTargetSubredditName(targetId);
-
-        if (!subredditName) {
-            res.json({
-                showToast: {
-                    text: 'Reddit did not provide a subreddit context for this tool.',
-                    appearance: 'neutral',
-                },
-            });
-            return;
-        }
-
+registerMenuAction(
+    '/internal/menu/mod-analytics-open',
+    {
+        missingContextMessage: 'Reddit did not provide a subreddit context for this tool.',
+        failureLogMessage: 'Failed to open moderator analytics tool:',
+        failureToastPrefix: 'Could not open Mini Racer analytics',
+    },
+    async (subredditName, res) => {
         await assertModeratorForSubreddit(subredditName);
         const result = await ensureModeratorAnalyticsPostForSubreddit(subredditName);
 
@@ -932,19 +907,8 @@ app.post('/internal/menu/mod-analytics-open', async (req, res) => {
             },
             navigateTo: result.postUrl,
         });
-    } catch (error) {
-        console.error('Failed to open moderator analytics tool:', error);
-        const message = error instanceof Error && error.message
-            ? error.message
-            : 'Unknown error';
-        res.json({
-            showToast: {
-                text: `Could not open Mini Racer analytics: ${message}`,
-                appearance: 'neutral',
-            },
-        });
-    }
-});
+    },
+);
 
 app.post('/internal/scheduler/daily-posts', async (_req, res) => {
     try {

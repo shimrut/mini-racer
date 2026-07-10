@@ -1,20 +1,19 @@
-import { hasAnyDailyChallengeStoredData } from "./daily-challenge/storage.js?v=2.09";
+import { hasAnyDailyChallengeStoredData } from "./daily-challenge/storage.js";
 import {
   getLeaderboardIdentityPreference,
   normalizeLeaderboardIdentityPreference,
   setLeaderboardIdentityPreference,
-} from "./scoreboard/display-preference.js?v=2.09";
+} from "./scoreboard/display-preference.js";
 import {
-  buildServiceHeaders,
+  API_ROUTES,
   getGuestPlayerToken,
-  getBaseApiConfig,
   getOrCreatePlayerId,
   setGuestPlayerToken,
-} from "./scoreboard/api-client.js?v=2.09";
-import { isLocalEnvironment } from "./track/environment.js?v=2.09";
+} from "./scoreboard/api-client.js";
+import { isLocalEnvironment } from "./track/environment.js";
 
 async function fetchRemotePlayerProgressState() {
-  const config = getBaseApiConfig();
+  const config = API_ROUTES;
   if (!config?.playerBootstrapUrl || typeof fetch !== "function") {
     return null;
   }
@@ -26,10 +25,7 @@ async function fetchRemotePlayerProgressState() {
     url.searchParams.set("guestToken", guestToken);
   }
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: buildServiceHeaders(config),
-  });
+  const response = await fetch(url.toString(), { method: "GET" });
 
   if (!response.ok) {
     throw new Error(`Player bootstrap failed: ${response.status}`);

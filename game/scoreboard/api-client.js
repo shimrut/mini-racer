@@ -3,25 +3,18 @@ const GUEST_PLAYER_TOKEN_STORAGE_KEY = 'VectorGpGuestPlayerToken';
 let ephemeralPlayerId = null;
 let ephemeralGuestPlayerToken = null;
 
-function trimTrailingSlashes(value) {
-    return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
-}
+const API_BASE_URL = '/api';
 
-export function getBaseApiConfig() {
-    const apiBaseUrl = '/api';
-
-    return {
-        serviceMode: 'proxy',
-        apiBaseUrl,
-        playerBootstrapUrl: `${apiBaseUrl}/player/bootstrap`,
-        playerIdentityUrl: `${apiBaseUrl}/player/identity`,
-        scoreboardSnapshotUrl: `${apiBaseUrl}/scoreboard/snapshot`,
-        dailyActiveUrl: `${apiBaseUrl}/daily/active`,
-        dailyPlaylistUrl: `${apiBaseUrl}/daily/playlist`,
-        dailySnapshotUrl: `${apiBaseUrl}/daily/snapshot`,
-        dailySubmitUrl: `${apiBaseUrl}/daily/submit`
-    };
-}
+export const API_ROUTES = Object.freeze({
+    apiBaseUrl: API_BASE_URL,
+    playerBootstrapUrl: `${API_BASE_URL}/player/bootstrap`,
+    playerIdentityUrl: `${API_BASE_URL}/player/identity`,
+    scoreboardSnapshotUrl: `${API_BASE_URL}/scoreboard/snapshot`,
+    dailyActiveUrl: `${API_BASE_URL}/daily/active`,
+    dailyPlaylistUrl: `${API_BASE_URL}/daily/playlist`,
+    dailySnapshotUrl: `${API_BASE_URL}/daily/snapshot`,
+    dailySubmitUrl: `${API_BASE_URL}/daily/submit`
+});
 
 function createPlayerId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -89,10 +82,6 @@ export function setGuestPlayerToken(token) {
     }
 
     return normalizedToken;
-}
-
-export function buildServiceHeaders(_config, extraHeaders = {}) {
-    return { ...extraHeaders };
 }
 
 export function clampRequestLimit(limit, { defaultLimit, maxLimit = 100 } = {}) {

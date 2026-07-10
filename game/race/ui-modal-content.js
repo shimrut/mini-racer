@@ -1,8 +1,8 @@
-import { TRACKS } from '../track/tracks.js?v=2.09';
-import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/result-flow.js?v=2.09';
-import { createCrashMedalHeroIcon, createMedalIconSvg } from '../medals/medal-icon.js?v=2.09';
-import { renderWinCombinedMedalOverlay } from '../medals/medals.js?v=2.09';
-import { formatSplitTimeDeltaSec } from '../race/lap-speed.js?v=2.09';
+import { TRACKS } from '../track/tracks.js';
+import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/result-flow.js';
+import { createCrashMedalHeroIcon, createMedalIconSvg } from '../medals/medal-icon.js';
+import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
+import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 

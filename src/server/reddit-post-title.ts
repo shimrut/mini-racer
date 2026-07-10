@@ -2,7 +2,7 @@ import { TRACKS } from '../../game/track/tracks.js';
 import medalTimes from '../../game/medals/medal-times.json' with { type: 'json' };
 import type { DailyGpChallenge } from './daily-gp-model.js';
 
-const DEFAULT_DAILY_POST_TITLE_FORMAT = 'Mini Racer Daily - {trackName}';
+const DEFAULT_DAILY_POST_TITLE_FORMAT = 'Mini Racer TOTD - {trackName}';
 
 type DailyPostTitleTokens = {
     authorMedalTime: string;
@@ -79,4 +79,19 @@ export function formatDailyMiniRacerPostTitle(
         trackName,
         ...getMedalTimeTokens(challenge.trackKey),
     });
+}
+
+export function formatDailyMiniRacerTextFallback(challenge: DailyGpChallenge): string {
+    return [
+        '# Mini Racer TOTD',
+        '',
+        `Track: ${TRACKS[challenge.trackKey]?.name || challenge.trackKey}`,
+        `Date: ${challenge.challengeDate}`,
+        '',
+        'Playable Reddit racing challenge.',
+        '',
+        '- One featured track per day',
+        '- Fast retries',
+        '- Personal best plus live leaderboard',
+    ].join('\n');
 }

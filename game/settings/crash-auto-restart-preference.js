@@ -1,4 +1,4 @@
-import { createBooleanPreference } from './parse-stored-boolean-toggle.js?v=2.09';
+import { createBooleanPreference } from './parse-stored-boolean-toggle.js';
 
 export const CRASH_AUTO_RESTART_STORAGE_KEY = 'VectorGpAutoRestartAfterCrash';
 

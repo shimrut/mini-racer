@@ -1,4 +1,4 @@
-import { CONFIG } from '../config.js?v=2.09';
+import { CONFIG } from '../config.js';
 
 function createSeededRandom(seedInput = 'default') {
     let hash = 2166136261;

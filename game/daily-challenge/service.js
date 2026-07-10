@@ -1,19 +1,22 @@
-import { TRACKS } from '../track/tracks.js?v=2.09';
-import { isLocalEnvironment } from '../track/environment.js?v=2.09';
+import { TRACKS } from '../track/tracks.js';
+import { isLocalEnvironment } from '../track/environment.js';
 import {
-    buildServiceHeaders,
+    API_ROUTES,
     clampRequestLimit,
     getGuestPlayerToken,
-    getBaseApiConfig,
     getOrCreatePlayerId,
-} from '../scoreboard/api-client.js?v=2.09';
+} from '../scoreboard/api-client.js';
 import {
     getLeaderboardIdentityPreference,
-} from '../scoreboard/display-preference.js?v=2.09';
+} from '../scoreboard/display-preference.js';
+import {
+    cloneScoreboardSnapshot,
+    normalizeScoreboardSnapshot,
+} from '../scoreboard/snapshot.js';
 import {
     getDailyChallengeData,
     setDailyChallengeBestTime,
-} from './storage.js?v=2.09';
+} from './storage.js';
 
 const MIN_DAILY_TIME = 2.0;
 const MAX_DAILY_TIME = 60 * 60;
@@ -103,7 +106,7 @@ function getMockDailyChallenge() {
 }
 
 function getMockDailyChallengeSnapshot() {
-    return normalizeSnapshot({
+    return normalizeScoreboardSnapshot({
         topRows: [],
         nearbyRows: [],
         currentPlayerRow: null,
@@ -256,10 +259,6 @@ export function requestFeaturedDailyChallengeStart() {
     } catch (error) {
         console.error('Error writing daily start override:', error);
     }
-}
-
-function getDailyChallengeConfig() {
-    return getBaseApiConfig();
 }
 
 function normalizeObjectiveType(value) {
@@ -430,52 +429,6 @@ function resolveDailyPlaylistCacheExpiresAt(challenges, nowMs = Date.now()) {
         : getNextUtcDayStartMs(new Date(nowMs));
 }
 
-function cloneSnapshot(snapshot) {
-    if (!snapshot || typeof snapshot !== 'object') return normalizeSnapshot(null);
-    return {
-        ...snapshot,
-        topRows: Array.isArray(snapshot.topRows) ? snapshot.topRows.slice() : [],
-        nearbyRows: Array.isArray(snapshot.nearbyRows) ? snapshot.nearbyRows.slice() : [],
-        currentPlayerRow: snapshot.currentPlayerRow && typeof snapshot.currentPlayerRow === 'object'
-            ? { ...snapshot.currentPlayerRow }
-            : null
-    };
-}
-
-function normalizeNumber(value) {
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-}
-
-function normalizeBestTimeSec(row) {
-    if (!row || typeof row !== 'object') return null;
-    const bestTime = normalizeNumber(row.bestTime);
-    if (bestTime !== null) return bestTime;
-    const bestTimeSec = normalizeNumber(row.bestTimeSec);
-    if (bestTimeSec !== null) return bestTimeSec;
-    const bestTimeMs = normalizeNumber(row.bestTimeMs);
-    return bestTimeMs !== null ? bestTimeMs / 1000 : null;
-}
-
-function normalizeCompletedLaps(value) {
-    const laps = Number(value);
-    return Number.isFinite(laps) ? Math.max(0, Math.trunc(laps)) : null;
-}
-
-function normalizeSnapshotRow(row) {
-    if (!row || typeof row !== 'object') return null;
-    const normalized = { ...row };
-    const bestTime = normalizeBestTimeSec(row);
-    if (bestTime !== null) {
-        normalized.bestTime = bestTime;
-    }
-    const completedLaps = normalizeCompletedLaps(row.completedLaps);
-    if (completedLaps !== null) {
-        normalized.completedLaps = completedLaps;
-    }
-    return normalized;
-}
-
 export function isDailyChallengeStoredResultForChallenge(challenge, result) {
     if (!challenge || !result || typeof result !== 'object') return false;
     if (!Number.isFinite(Number(result.bestTime))) return false;
@@ -541,7 +494,7 @@ function writeDailySnapshotCacheStorage() {
         for (const [challengeId, entry] of dailySnapshotCache.entries()) {
             if (!entry || entry.expiresAt <= nowMs) continue;
             entries[challengeId] = {
-                snapshot: cloneSnapshot(entry.snapshot),
+                snapshot: cloneScoreboardSnapshot(entry.snapshot),
                 expiresAt: entry.expiresAt,
             };
         }
@@ -564,7 +517,7 @@ function hydrateDailySnapshotCache() {
         const expiresAt = Number(entry.expiresAt);
         if (!Number.isFinite(expiresAt) || expiresAt <= nowMs) continue;
         dailySnapshotCache.set(challengeId, {
-            snapshot: cloneSnapshot(entry.snapshot),
+            snapshot: cloneScoreboardSnapshot(entry.snapshot),
             expiresAt,
         });
     }
@@ -580,14 +533,14 @@ function readCachedDailySnapshot(challengeId) {
         writeDailySnapshotCacheStorage();
         return null;
     }
-    return cloneSnapshot(entry.snapshot);
+    return cloneScoreboardSnapshot(entry.snapshot);
 }
 
 function writeCachedDailySnapshot(challengeId, snapshot) {
     if (!challengeId || !snapshot) return;
     hydrateDailySnapshotCache();
     dailySnapshotCache.set(challengeId, {
-        snapshot: cloneSnapshot(snapshot),
+        snapshot: cloneScoreboardSnapshot(snapshot),
         expiresAt: resolveDailySnapshotCacheExpiresAt(challengeId)
     });
     writeDailySnapshotCacheStorage();
@@ -655,42 +608,6 @@ export function invalidateDailyChallengeSnapshot(challengeId) {
     dailySnapshotCache.delete(challengeId);
     dailySnapshotInflight.delete(challengeId);
     writeDailySnapshotCacheStorage();
-}
-
-function normalizeSnapshot(raw) {
-    if (!raw || typeof raw !== 'object') {
-        return {
-            topRows: [],
-            nearbyRows: [],
-            currentPlayerRow: null,
-            totalCount: 0,
-            leaderboardEntryCount: 0,
-            objectiveType: null,
-            playerRank: null,
-            playerRankLabel: null
-        };
-    }
-
-    const totalCount = Number(raw.totalCount) || 0;
-    const rawEntryCount = raw.leaderboardEntryCount;
-    const leaderboardEntryCount = rawEntryCount != null && Number.isFinite(Number(rawEntryCount))
-        ? Math.max(0, Math.trunc(Number(rawEntryCount)))
-        : totalCount;
-
-    return {
-        topRows: Array.isArray(raw.topRows) ? raw.topRows.map(normalizeSnapshotRow).filter(Boolean) : [],
-        nearbyRows: Array.isArray(raw.nearbyRows) ? raw.nearbyRows.map(normalizeSnapshotRow).filter(Boolean) : [],
-        currentPlayerRow: raw.currentPlayerRow && typeof raw.currentPlayerRow === 'object'
-            ? normalizeSnapshotRow(raw.currentPlayerRow)
-            : null,
-        totalCount,
-        leaderboardEntryCount,
-        objectiveType: typeof raw.objectiveType === 'string' ? raw.objectiveType : null,
-        playerRank: raw.playerRank != null && Number.isFinite(Number(raw.playerRank))
-            ? Number(raw.playerRank)
-            : null,
-        playerRankLabel: raw.playerRankLabel != null ? String(raw.playerRankLabel) : null
-    };
 }
 
 function getObjectiveRequiredLaps(challenge) {
@@ -839,15 +756,12 @@ export async function getActiveDailyChallenge({ allowExpiredPost = false } = {})
         }
     }
 
-    const config = getDailyChallengeConfig();
+    const config = API_ROUTES;
     const cachedChallenge = getValidCachedActiveDailyChallenge();
 
     if (config && typeof fetch === 'function') {
         try {
-            const response = await fetch(config.dailyActiveUrl, {
-                method: 'GET',
-                headers: buildServiceHeaders(config),
-            });
+            const response = await fetch(config.dailyActiveUrl, { method: 'GET' });
 
             if (response.ok) {
                 const payload = await response.json();
@@ -878,13 +792,10 @@ export async function getActiveDailyChallenge({ allowExpiredPost = false } = {})
 }
 
 async function loadDailyChallengePlaylist() {
-    const config = getDailyChallengeConfig();
+    const config = API_ROUTES;
     if (config && typeof fetch === 'function') {
         try {
-            const response = await fetch(config.dailyPlaylistUrl, {
-                method: 'GET',
-                headers: buildServiceHeaders(config),
-            });
+            const response = await fetch(config.dailyPlaylistUrl, { method: 'GET' });
 
             if (response.ok) {
                 const payload = await response.json();
@@ -946,7 +857,7 @@ export function getCachedDailyChallengePlaylist() {
 }
 
 async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_LIMIT } = {}) {
-    const config = getDailyChallengeConfig();
+    const config = API_ROUTES;
     if (config && typeof fetch === 'function' && challengeId) {
         try {
             const safeLimit = clampRequestLimit(limit, { defaultLimit: DEFAULT_DAILY_LIMIT });
@@ -962,14 +873,11 @@ async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_L
             }
             url.searchParams.set('limit', safeLimit.toString());
 
-            const response = await fetch(url.toString(), {
-                method: 'GET',
-                headers: buildServiceHeaders(config),
-            });
+            const response = await fetch(url.toString(), { method: 'GET' });
 
             if (response.ok) {
                 const payload = await response.json();
-                return normalizeSnapshot(payload);
+                return normalizeScoreboardSnapshot(payload);
             } else {
                 throw new Error(`Server returned status ${response.status}`);
             }
@@ -990,7 +898,7 @@ export async function getDailyChallengeSnapshot({
     forceRefresh = false
 } = {}) {
     if (!challengeId) {
-        return normalizeSnapshot(null);
+        return normalizeScoreboardSnapshot(null);
     }
 
     if (!forceRefresh) {
@@ -1000,7 +908,7 @@ export async function getDailyChallengeSnapshot({
         }
         const inflight = dailySnapshotInflight.get(challengeId);
         if (inflight) {
-            return cloneSnapshot(await inflight);
+            return cloneScoreboardSnapshot(await inflight);
         }
     } else {
         invalidateDailyChallengeSnapshot(challengeId);
@@ -1018,7 +926,7 @@ export async function getDailyChallengeSnapshot({
 
     dailySnapshotInflight.set(challengeId, requestPromise);
     try {
-        return cloneSnapshot(await requestPromise);
+        return cloneScoreboardSnapshot(await requestPromise);
     } finally {
         if (dailySnapshotInflight.get(challengeId) === requestPromise) {
             dailySnapshotInflight.delete(challengeId);
@@ -1043,7 +951,7 @@ export async function submitDailyChallengeBestTime({
     replay,
     checkpointTimesSec = null,
 } = {}) {
-    const config = getDailyChallengeConfig();
+    const config = API_ROUTES;
     if (!config || typeof fetch !== 'function') return null;
     if (
         typeof challengeId !== 'string'
@@ -1069,7 +977,6 @@ export async function submitDailyChallengeBestTime({
     const response = await fetch(config.dailySubmitUrl, {
         method: 'POST',
         headers: {
-            ...buildServiceHeaders(config),
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({

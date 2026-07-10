@@ -4,6 +4,9 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Daily Reddit posts now use `Mini Racer TOTD` consistently in the post title and plain-text fallback.
+- Reduced the production game bundle by canonicalizing module imports, removing unused helpers, and deleting legacy proxy configuration scaffolding.
+- Consolidated client leaderboard snapshot normalization and moderator menu-action error handling without changing public routes or response shapes.
 - Removed unused JS helper exports and an unused player-status store left behind after earlier flow changes.
 - Removed an orphaned leaderboard next-target helper that was never wired into the tracked app UI.
 - Removed stale HTML IDs and modifier classes that no longer drive gameplay, modal, garage, analytics, or tool behavior.

@@ -448,59 +448,9 @@ function easeInOutCubic(t) {
         : 1 - Math.pow(-2 * clamped + 2, 3) / 2;
 }
 
-function easeInBack(t) {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return c3 * t * t * t - c1 * t * t;
-}
-
-function easeOutExpo(t) {
-    return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
-}
-
 function pseudoRand(seed) {
     const s = Math.sin(seed * 127.1) * 43758.5453;
     return s - Math.floor(s);
-}
-
-function computeBeats(progress) {
-    const p = clamp(progress, 0, 1);
-    const hookEnd = 0.14;
-    const revealEnd = 0.58;
-    const apexEnd = 0.82;
-    const hook = clamp(p / hookEnd, 0, 1);
-    const reveal = clamp((p - hookEnd) / (revealEnd - hookEnd), 0, 1);
-    const apex = clamp((p - revealEnd) / (apexEnd - revealEnd), 0, 1);
-    const payoff = clamp((p - apexEnd) / (1 - apexEnd), 0, 1);
-
-    const hookPunch = p < 0.1 ? Math.pow(1 - p / 0.1, 2) : 0;
-    const hookImpact = p < 0.04 ? Math.pow(1 - p / 0.04, 2) : 0;
-    const apexHit = (apex > 0 && apex < 0.35) ? Math.sin((apex / 0.35) * Math.PI) : 0;
-    const payoffPop = (payoff > 0 && payoff < 0.45) ? Math.sin((payoff / 0.45) * Math.PI) : 0;
-
-    const shake = Math.max(hookImpact * 0.9, apexHit * 0.55, payoffPop * 0.2);
-    const flash = Math.max(
-        p < 0.035 ? 1 - p / 0.035 : 0,
-        (apex > 0 && apex < 0.08) ? 1 - apex / 0.08 : 0
-    );
-
-    return {
-        progress: p,
-        hook,
-        reveal,
-        apex,
-        payoff,
-        hookPunch,
-        hookImpact,
-        apexHit,
-        payoffPop,
-        shake,
-        flash,
-        introProgress: hook,
-        actionProgress: clamp((p - 0.06) / 0.62, 0, 1),
-        routeProgress: clamp(reveal * 0.85 + apex * 0.18, 0, 1),
-        outroProgress: payoff
-    };
 }
 
 function easeOutBack(t) {
@@ -764,20 +714,6 @@ function mapTrackToRect(trackKey, rect) {
     };
 }
 
-function getProgressAngle(points, progress) {
-    if (points.length < 2) {
-        return 0;
-    }
-
-    const scaledIndex = clamp(progress, 0, 1) * (points.length - 1);
-    const baseIndex = Math.floor(scaledIndex);
-    const prevIndex = Math.max(0, baseIndex - 1);
-    const nextIndex = Math.min(points.length - 1, baseIndex + 1);
-    const from = points[prevIndex];
-    const to = points[nextIndex];
-    return Math.atan2(to.y - from.y, to.x - from.x);
-}
-
 function normalizeAngle(angle) {
     let result = angle;
     while (result > Math.PI) result -= Math.PI * 2;
@@ -939,21 +875,6 @@ function interpolateReplaySampleAtProgress(samples, progress) {
         speed: lerp(start.speed, end.speed, t),
         time: lerp(start.time, end.time, t)
     };
-}
-
-function getReplayPathUntilProgress(samples, progress) {
-    if (!samples.length) {
-        return [];
-    }
-    const scaledIndex = clamp(progress, 0, 1) * (samples.length - 1);
-    const baseIndex = Math.floor(scaledIndex);
-    const nextIndex = Math.min(samples.length - 1, baseIndex + 1);
-    const path = samples.slice(0, baseIndex + 1).map((sample) => ({ x: sample.x, y: sample.y }));
-    if (nextIndex !== baseIndex) {
-        const interpolated = interpolateReplaySampleAtProgress(samples, progress);
-        path.push({ x: interpolated.x, y: interpolated.y });
-    }
-    return path;
 }
 
 function simulateReplayCandidate(trackKey, durationSec, candidate) {

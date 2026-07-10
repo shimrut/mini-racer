@@ -2,14 +2,14 @@ import {
   getDailyChallengeData,
   saveDailyChallengeBestTime,
   setDailyChallengeBestTime,
-} from "./storage.js?v=2.09";
-import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js?v=2.09";
+} from "./storage.js";
+import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js";
 import {
   buildLapRecord,
   createModalActions,
   isNewBestResult,
   pushRecentLap,
-} from "../race/result-flow.js?v=2.09";
+} from "../race/result-flow.js";
 import {
   formatDailyChallengeResultLabel,
   getActiveDailyChallenge,
@@ -28,20 +28,20 @@ import {
   invalidateDailyChallengeSnapshot,
   isDailyChallengeStoredResultForChallenge,
   prefetchDailyChallengeSnapshots,
-} from "./service.js?v=2.09";
+} from "./service.js";
 import { createVerificationSnapshot } from "../scoreboard/verification-queue.js";
-import { getMedalForLapTime } from "../medals/medals.js?v=2.09";
+import { getMedalForLapTime } from "../medals/medals.js";
 import {
   readTrackLastLapMedal,
   writeTrackLastLapMedal,
-} from "../medals/last-lap-medal-storage.js?v=2.09";
-import { getTrackCanvasAsset } from "../track/assets.js?v=2.09";
-import { TRACKS } from "../track/tracks.js?v=2.09";
+} from "../medals/last-lap-medal-storage.js";
+import { getTrackCanvasAsset } from "../track/assets.js";
+import { TRACKS } from "../track/tracks.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
   TRACK_PRESENTATION_SURFACES,
-} from "../track/presentation.js?v=2.09";
+} from "../track/presentation.js";
 
 function getInvalidDailyChallengeWinReason(engine, winData) {
   if (!winData || typeof winData !== "object") return "Finish data missing.";
