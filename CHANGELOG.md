@@ -4,6 +4,7 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Standings now show cached results immediately and then refresh from the server, keeping web and mobile entry counts aligned without replacing usable cached results when a refresh fails.
 - Daily Reddit posts now use `Mini Racer TOTD` consistently in the post title and plain-text fallback.
 - Reduced the production game bundle by canonicalizing module imports, removing unused helpers, and deleting legacy proxy configuration scaffolding.
 - Consolidated client leaderboard snapshot normalization and moderator menu-action error handling without changing public routes or response shapes.

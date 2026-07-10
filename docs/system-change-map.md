@@ -72,6 +72,9 @@ flowchart LR
 - Daily GP track selection walks `game/track/tracks.js` in key order, one track per day, using the most-recent published day as the playhead; `src/server/daily-gp-store.ts` persists each new day to the `dailygp:challenges` Redis ledger (first-writer-wins) so past days never change.
 - Published Daily GP playlist rows come from server-side challenge history, not from recalculating old dates against the current track file.
 - Explicit mock modes and standalone preview pages use a local mock challenge (first track in `tracks.js`, or a track forced via `?mockDaily=<trackKey>`); normal local game runs use `/api/daily/*` or Devvit post data so they match the server-published track.
+- Moderator analytics "Players" and leaderboard entries measure different outcomes. Analytics counts a player after any accepted analytics event, while the leaderboard only gains a row after a finished run passes server replay validation and is accepted.
+- `leaderboardEntryCount` is the number of players with accepted times. `totalCount` can be larger because it may include the subreddit member total; the UI renders the difference as `No time yet` community placeholders, not as missing player scores.
+- Daily leaderboard snapshots are persisted separately in each client's local storage for fast initial rendering. Opening standings must always follow that cached render with a server refresh so web and mobile converge on the same accepted-entry count; if the refresh fails, an available cached snapshot remains visible.
 
 ### Server And Shared Validation
 

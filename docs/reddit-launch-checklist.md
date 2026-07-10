@@ -49,11 +49,11 @@ Mini Racer is a **game**, so the most important launch requirements are:
 
 ### Release operations
 
-- [ ] `README.md` still matches the shipped product and moderator flow.
-- [ ] `CHANGELOG.md` reflects the main launchable changes.
-- [ ] `npm test` passes on the version being published.
-- [ ] `devvit upload` succeeds.
-- [ ] `devvit publish` is run with the intended version bump strategy.
+- [x] `README.md` still matches the shipped product and moderator flow.
+- [x] `CHANGELOG.md` reflects the main launchable changes.
+- [x] `npm test` passes on the version being published.
+- [x] The `1.0.0` upload and remote build succeeded.
+- [x] `devvit publish --version 1.0.0` submitted the intended unlisted release.
 
 ## Publish notes
 
@@ -61,6 +61,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - Equivalent direct command: `npx devvit publish`
 - Recommended mode for this game: **unlisted publish**
 - Use `--public` only if the product direction changes and Mini Racer becomes a general-purpose app for any community
+- Version `1.0.0` was uploaded on July 10, 2026 and is pending Reddit review because the app creates custom posts.
 
 ## Reviewer summary
 
@@ -76,4 +77,4 @@ Mini Racer is a subreddit-specific racing game with:
 
 - [x] Confirm the production subreddit name: `MiniRacerGame`
 - [ ] Confirm who owns launch-day moderation and player support
-- [ ] Confirm the first publish version number and release date
+- [x] Confirm the first publish version number and release date: `1.0.0`, submitted July 10, 2026

@@ -344,10 +344,12 @@ export class LeaderboardsUi {
             onClose
         });
 
-        if (initialSnapshot) return;
-
-        const scoreboardSnapshot = await this.requestDailyChallengeLeaderboardSnapshot(challenge.id);
+        const scoreboardSnapshot = await this.requestDailyChallengeLeaderboardSnapshot(
+            challenge.id,
+            { forceRefresh: true }
+        );
         if (requestId !== this._requestVersion) return;
+        if (!scoreboardSnapshot && initialSnapshot) return;
 
         if (this.isRunsViewActive()) {
             this.showLeaderboardModalState(returnMode, {
@@ -380,10 +382,8 @@ export class LeaderboardsUi {
             scoreboardTrackKey: trackKey
         });
 
-        if (cachedSnapshot) return;
-
         try {
-            const scoreboardSnapshot = await this.loadScoreboardSnapshot({
+            const freshSnapshot = await this.loadScoreboardSnapshot({
                 trackKey,
                 limit: 10
             });
@@ -391,15 +391,16 @@ export class LeaderboardsUi {
 
             if (this.isRunsViewActive()) {
                 this.showLeaderboardModalState(returnMode, {
-                    scoreboardSnapshot,
+                    scoreboardSnapshot: freshSnapshot,
                     scoreboardTrackKey: trackKey
                 });
             } else {
-                this.updateModalScoreboardSnapshot(scoreboardSnapshot);
+                this.updateModalScoreboardSnapshot(freshSnapshot);
             }
         } catch (error) {
             console.error('Error loading track leaderboard:', error);
             if (requestId !== this._requestVersion) return;
+            if (cachedSnapshot) return;
 
             if (this.isRunsViewActive()) {
                 this.showLeaderboardModalState(returnMode, {
