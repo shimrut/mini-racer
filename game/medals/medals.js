@@ -444,37 +444,6 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
 }
 
 /**
- * Bronze → gold (→ author) icons: filled through earned tier, outline for the rest.
- * @param {HTMLElement|null|undefined} el
- * @param {string|null|undefined} trackKey
- * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} lapMedal
- * @param {{ iconClass?: string }} [options]
- */
-export function renderMedalTierStack(el, trackKey, lapMedal, { iconClass = 'medal-svg--combined-stack' } = {}) {
-    if (!el) return;
-    el.replaceChildren();
-    const stack = getCombinedMedalStackTiers(trackKey, lapMedal);
-    for (const { tier, filled } of stack) {
-        el.appendChild(createMedalIconSvg(tier, { className: iconClass, outline: !filled }));
-    }
-}
-
-/**
- * Combined results: horizontal medal row (all tiers; locked = outline + target time).
- * Icons start hidden for {@link playCombinedMedalRowEntrance}.
- * @param {HTMLElement|null|undefined} heroEl `#combined-hero-medal`
- * @param {string|null|undefined} trackKey
- * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} lapMedal
- */
-export function renderCombinedHeroMedalPile(heroEl, trackKey, lapMedal) {
-    if (!heroEl) return;
-    heroEl.replaceChildren();
-    appendMedalRowTo(heroEl, trackKey, lapMedal, {
-        ariaLabel: 'Medals unlocked for this track',
-    });
-}
-
-/**
  * Win combined overlay: horizontal row of all medal tiers for this track.
  * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
  * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|null, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
@@ -537,14 +506,6 @@ export function playCombinedMedalRowEntrance(
     revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound, firstUnlockHoldMs });
 }
 
-/** @deprecated Use {@link playCombinedMedalRowEntrance} */
-export function playCombinedHeroPileEntrance(
-    rowEl,
-    options = {},
-) {
-    playCombinedMedalRowEntrance(rowEl, options);
-}
-
 /**
  * Crash combined view: impact slam on the hero crash medal (starts when the crash modal opens).
  * @param {HTMLElement|null|undefined} heroMedalEl `#combined-hero-medal`
@@ -568,19 +529,6 @@ function revealWinOverlayMedalRow(
     if (row) {
         playCombinedMedalRowEntrance(row, { baseDelayMs: 0, reduced, shouldCelebrateTier, playUnlockSound });
     }
-}
-
-/**
- * Win overlay: reveal medal row left to right after sheet intro.
- * @param {HTMLElement|null|undefined} root `.win-combined-medal-overlay`
- * @param {{ reduced?: boolean, playUnlockSound?: (tier: string) => void }} [options]
- */
-export function playWinCombinedMedalOverlayEntrance(
-    root,
-    { reduced = false, shouldCelebrateTier = null, playUnlockSound = null } = {},
-) {
-    if (!root) return;
-    revealWinOverlayMedalRow(root, { reduced, shouldCelebrateTier, playUnlockSound });
 }
 
 /**
@@ -702,32 +650,6 @@ function scheduleAfterModalCombinedIntro(modalEl, combinedViewEl, onReady) {
             }
             tryFinish();
         });
-    });
-}
-
-/**
- * Waits for modal overlay + combined view intro motion, then runs {@link playMedalStackEntrance}.
- * @param {HTMLElement|null|undefined} modalEl `#modal`
- * @param {HTMLElement|null|undefined} combinedViewEl `#modal-combined-view` when shown
- * @param {HTMLElement|null|undefined} stackEl optional row container for {@link playMedalStackEntrance}
- * @param {{ staggerMs?: number, playUnlockSound?: (tier: string) => void }} [options]
- */
-export function scheduleMedalStackEntranceAfterModal(
-    modalEl,
-    combinedViewEl,
-    stackEl,
-    { staggerMs = 52, shouldCelebrateTier = null, playUnlockSound = null } = {},
-) {
-    if (!stackEl || stackEl.childElementCount === 0) return;
-    const reduced =
-        typeof globalThis !== 'undefined'
-        && globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-    if (reduced) {
-        playMedalStackEntrance(stackEl, { baseDelayMs: 0, shouldCelebrateTier, playUnlockSound });
-        return;
-    }
-    scheduleAfterModalCombinedIntro(modalEl, combinedViewEl, () => {
-        playMedalStackEntrance(stackEl, { baseDelayMs: 0, shouldCelebrateTier, playUnlockSound });
     });
 }
 

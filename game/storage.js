@@ -87,8 +87,3 @@ export async function getPlayerProgressState() {
 
   return getLocalPlayerProgressState();
 }
-
-export async function hasAnyTrackData() {
-  const state = await getPlayerProgressState();
-  return state.hasAnyData;
-}

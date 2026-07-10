@@ -126,8 +126,8 @@ The browser-side API entrypoint is `game/scoreboard/api-client.js`.
 
 | Dependency | Why it exists | Where it matters |
 | --- | --- | --- |
-| `chart.js` | Moderator analytics dashboard charts | `tools/analytics-dashboard.js` and analytics tooling |
-| `flatpickr` | Date selection for analytics tooling | `tools/analytics-dashboard.js` and related tool UI |
+| `chart.js` | Moderator analytics dashboard charts | `mod-tool.js` |
+| `flatpickr` | Date selection for moderator analytics | `mod-tool.js` |
 
 ### Build And Quality Dependencies
 
@@ -180,8 +180,8 @@ These are the places where a "small" change can create regressions outside the v
 
 These are useful, but they are not on the critical player path:
 
-- `tools/analytics-dashboard*`
-  Moderator analytics UI and reporting support.
+- `mod-tool.html`, `mod-tool.js`, `mod-tool.css`
+  Shipped moderator analytics UI and reporting support.
 - `tools/mapmaker.*`
   Track/content support tooling.
 - `tools/runner.*`

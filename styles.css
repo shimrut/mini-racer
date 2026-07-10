@@ -835,7 +835,7 @@ button:active {
     filter: none;
 }
 
-button:active:not(.main-menu__item):not(.combined-action-btn):not(.reusable-modal-close):not(.modal-btn):not(.hud-pause-btn):not(.daily-playlist-rank-btn):not(.touch-btn) {
+button:active:not(.main-menu__item):not(.combined-action-btn):not(.modal-btn):not(.hud-pause-btn):not(.daily-playlist-rank-btn):not(.touch-btn) {
     transform: none;
 }
 
@@ -1807,10 +1807,6 @@ body.start-selection-active #start-overlay {
         padding-inline: 0;
     }
 
-    .result-modal .modal-card-section--header {
-        padding-top: 0;
-    }
-
     .result-modal .modal-card-section--runs,
     .result-modal .modal-card-section--sheet {
         /* Padding is now handled by inner elements */
@@ -1978,7 +1974,7 @@ body.start-selection-active #start-overlay {
     font-weight: 900;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) :is(.combined-rank-value, .combined-stat--this-lap .combined-stat-value) {
+#modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-value {
     font-family: var(--mono-font);
     font-size: clamp(2.65rem, 8vw, 3.35rem);
     font-weight: 850;
@@ -1986,24 +1982,6 @@ body.start-selection-active #start-overlay {
     letter-spacing: -0.04em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-}
-
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat--this-lap .combined-stat-value {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-}
-
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat--this-lap .combined-stat-value .time-num {
-    color: #ffffff;
-}
-
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat--this-lap .combined-stat-value .time-unit {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.4);
-    margin-left: 0.05rem;
-    letter-spacing: -0.02em;
 }
 
 #modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--pb-delta {
@@ -2042,30 +2020,6 @@ body.start-selection-active #start-overlay {
     display: none !important;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat--next-medal {
-    display: inline-flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 0.25rem;
-}
-
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat--next-medal .combined-stat-label {
-    display: none !important;
-}
-
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--next {
-    display: inline-flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    line-height: 1;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.45);
-}
-
 #modal.modal--win #modal-combined-view:not(.is-crash) .combined-next-medal-icon-slot {
     display: inline-flex;
     align-items: center;
@@ -2088,27 +2042,6 @@ body.start-selection-active #start-overlay {
 
 .is-crash #combined-next-medal-stat {
     display: none !important;
-}
-
-.is-crash .combined-stat--this-lap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: auto;
-    padding: 0;
-    border: none;
-}
-
-.is-crash .combined-stat--this-lap .combined-stat-value--impact {
-    font-family: var(--mono-font);
-    font-size: clamp(2.4rem, 7.5vw, 3.00rem);
-    font-weight: 850;
-    color: var(--accent-bright, var(--accent-bright));
-    letter-spacing: -0.04em;
-    line-height: 1;
-    text-shadow: 0 4px 16px rgba(255, 62, 62, 0.3);
-    margin-top: 0;
 }
 
 #modal.modal--win .modal-view#modal-combined-view.active-view {
@@ -2535,11 +2468,6 @@ body.start-selection-active #start-overlay {
     padding-inline: var(--space-xl)
 }
 
-.result-modal .modal-card-section--header {
-    padding-top: var(--space-xl);
-    flex: 0 0 auto;
-}
-
 .result-modal .modal-card-section--runs,
 .result-modal .modal-card-section--sheet {
     padding: 0;
@@ -2578,10 +2506,6 @@ body.start-selection-active #start-overlay {
     align-items: flex-start;
 }
 
-.reusable-modal-header:has([data-modal-subtitle]:not([hidden])) .reusable-modal-close {
-    margin-top: calc((var(--space-xl) - 3.1rem) / 2);
-}
-
 .reusable-modal-heading {
     display: flex;
     flex: 1 1 auto;
@@ -2605,48 +2529,11 @@ body.start-selection-active #start-overlay {
     min-height: 0;
 }
 
-.reusable-modal-close {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 3.1rem;
-    height: 3.1rem;
-    min-width: 3.1rem;
-    min-height: 3.1rem;
-    padding: 0;
-    border: none;
-    border-radius: var(--radius-full);
-    background: transparent;
-    color: var(--text-color);
-    cursor: pointer;
-    transition: color 0.15s ease;
-}
-
 .reusable-modal-close__icon {
     width: 2rem;
     height: 2rem;
     pointer-events: none;
     fill: var(--text-muted);
-}
-
-.reusable-modal-close__label {
-    font-family: var(--header-font);
-    font-size: 0.85rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: currentColor;
-    pointer-events: none;
-}
-
-.reusable-modal-close:hover {
-    color: #ccc;
-}
-
-.reusable-modal-close:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
 }
 
 .result-modal .modal-card-section--sheet .achievements-list {
@@ -2801,17 +2688,6 @@ body.start-selection-active #start-overlay {
     gap: 0.2rem 0.85rem;
     width: 100%;
     padding: 0.2rem 0 0.35rem;
-}
-
-.leaderboard-summary__label {
-    grid-column: 1;
-    color: var(--text-dim);
-    font-family: var(--header-font);
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    line-height: 1;
-    text-transform: uppercase;
 }
 
 .leaderboard-summary__value {
@@ -3370,10 +3246,6 @@ body.start-selection-active #start-overlay {
         padding-inline: 1rem
     }
 
-    .result-modal .modal-card-section--header {
-        padding-top: 1rem
-    }
-
     .result-modal .modal-card-section--runs {
         padding-top: .75rem;
         padding-bottom: 1rem
@@ -3501,10 +3373,6 @@ body.start-selection-active #start-overlay {
         padding: .75rem 1rem;
         margin: 0 auto;
         --modal-stack-btn-min-height: 3.125rem
-    }
-
-    .result-modal .modal-card-section--header {
-        padding-top: .75rem
     }
 
     .result-modal .modal-card-section--runs {
@@ -3669,12 +3537,6 @@ body.start-selection-active #start-overlay {
 #modal.modal--win #combined-restart-btn,
 #modal.modal--crash #combined-restart-btn {
     width: 100%;
-}
-
-/* [hidden] on SVG is unreliable inside flex buttons; tie visibility to modal kind */
-#modal.modal--win #combined-restart-btn .combined-restart-svg--retry,
-#modal.modal--crash #combined-restart-btn .combined-restart-svg--improve {
-    display: none !important;
 }
 
 .combined-action-btn {
@@ -4213,7 +4075,7 @@ body:not(.loading-active) #loading-screen {
     }
 
     /* 3. Finish Screen */
-    #modal.modal--win #modal-combined-view:not(.is-crash) :is(.combined-rank-value, .combined-stat--this-lap .combined-stat-value) {
+    #modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-value {
         font-size: clamp(2rem, 8vw, 2.5rem);
     }
     /* 4. Global Modals & Buttons */
@@ -4269,19 +4131,6 @@ body:not(.loading-active) #loading-screen {
     width: 100%;
     height: 100%;
     object-fit: contain;
-}
-
-.daily-playlist-hero-meter {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background: rgba(0,0,0,0.5);
-}
-.daily-playlist-hero-meter-fill {
-    height: 100%;
-    background: var(--accent-color);
 }
 
 .daily-playlist-hero-content {
