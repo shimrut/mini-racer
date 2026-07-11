@@ -19,11 +19,9 @@
     "mutation:dry-run": "stryker run --dryRunOnly"
   },
   "dependencies": {
-    "@devvit/server": "0.13.6",
-    "@devvit/start": "0.13.6",
-    "@devvit/web": "0.13.6",
+    "@devvit/redis": "0.13.7",
+    "@devvit/web": "0.13.7",
     "chart.js": "^4.5.1",
-    "devvit": "0.13.6",
     "express": "^5.1.0",
     "flatpickr": "^4.6.13"
   },
@@ -31,11 +29,13 @@
     "node": ">=22.2.0"
   },
   "devDependencies": {
+    "@devvit/start": "0.13.7",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@tailwindcss/cli": "^4.3.0",
+    "devvit": "0.13.7",
     "tailwindcss": "^4.3.0",
-    "vite": "7.3.1",
+    "vite": "7.3.6",
     "vitest": "^3.1.1"
   }
 }

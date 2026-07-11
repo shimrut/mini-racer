@@ -1,7 +1,6 @@
 import express from 'express';
-import { createServer, getServerPort } from '@devvit/server';
-import { context, reddit, redis } from '@devvit/web/server';
-import type { MenuItemRequest } from '@devvit/shared/types/menu-item.js';
+import { context, createServer, getServerPort, reddit, redis } from '@devvit/web/server';
+import type { MenuItemRequest } from '@devvit/web/shared';
 import { TRACKS } from '../../game/track/tracks.js';
 import { type DailyGpChallenge, isDailyGpChallengePlayable } from './daily-gp-model.js';
 import {

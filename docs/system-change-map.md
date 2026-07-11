@@ -123,7 +123,7 @@ The browser-side API route and player identity entrypoint is `game/scoreboard/ap
 
 | Dependency | Why it exists | Where it matters |
 | --- | --- | --- |
-| `devvit`, `@devvit/server`, `@devvit/start`, `@devvit/web` | Reddit/Devvit hosting, server runtime, context, posting flows | `src/server/index.ts`, Devvit post/menu flows |
+| `@devvit/web`, `@devvit/redis` | Reddit/Devvit server runtime, context, Redis, shared request types, and posting flows | `src/server/*`, Devvit post/menu flows |
 | `express` | API routing inside the Devvit server | `src/server/index.ts` |
 
 ### Product-Adjacent Dependencies
@@ -137,6 +137,8 @@ The browser-side API route and player identity entrypoint is `game/scoreboard/ap
 
 | Dependency | Why it exists | Where it matters |
 | --- | --- | --- |
+| `@devvit/start` | Devvit integration for the Vite build | `vite.config.js` |
+| `devvit` | Local Devvit CLI for playtest, upload, and publish workflows | `package.json` scripts, `devvit.json` |
 | `vite` | Build and local packaging | `vite.config.js` |
 | `vitest` | Test runner | `vitest.config.js`, `npm test` |
 | `@stryker-mutator/*` | Mutation testing | `stryker.config.mjs` |

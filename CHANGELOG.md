@@ -4,6 +4,7 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Upgraded the Devvit toolchain to 0.13.7 with Vite 7.3.6, aligned server imports with declared Devvit packages, and removed the deprecated no-op inline entrypoint flag.
 - Standings now show cached results immediately and then refresh from the server, keeping web and mobile entry counts aligned without replacing usable cached results when a refresh fails.
 - Daily Reddit posts now use `Mini Racer TOTD` consistently in the post title and plain-text fallback.
 - Reduced the production game bundle by canonicalizing module imports, removing unused helpers, and deleting legacy proxy configuration scaffolding.

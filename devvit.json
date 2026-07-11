@@ -9,7 +9,6 @@
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "inline": true,
         "height": "tall",
         "entry": "preview.html"
       },
