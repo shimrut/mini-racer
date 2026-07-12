@@ -12,6 +12,7 @@ import {
     persistServerDailyGpChallenge,
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
+    updateServerPlayerPreferences,
 } from './daily-gp-store.js';
 import {
     getServerAnalyticsSummary,
@@ -612,6 +613,26 @@ app.post('/api/player/identity', async (req, res) => {
     } catch (error) {
         console.error('Failed to update Reddit Mini Racer player identity:', error);
         res.status(500).json({ error: 'Player identity update failed' });
+    }
+});
+
+app.post('/api/player/preferences', async (req, res) => {
+    try {
+        const { playerId, guestToken, playerPreferences } = req.body ?? {};
+        const payload = await updateServerPlayerPreferences({
+            playerId,
+            guestToken,
+            playerPreferences,
+            redditUsername: getRequestUsername(),
+        });
+        if (!payload.playerPreferences) {
+            res.status(400).json({ error: 'Invalid player preferences' });
+            return;
+        }
+        res.status(200).json(payload);
+    } catch (error) {
+        console.error('Failed to update Reddit Mini Racer player preferences:', error);
+        res.status(500).json({ error: 'Player preferences update failed' });
     }
 });
 

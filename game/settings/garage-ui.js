@@ -20,11 +20,13 @@ export class GarageUi {
     constructor({
         onCarSkinChanged = null,
         onTrailStrokeStyleChanged = null,
+        onPlayerPreferencesChanged = null,
         prefetchCarSpriteAsset = null,
         modal = null,
     } = {}) {
         this.onCarSkinChanged = onCarSkinChanged;
         this.onTrailStrokeStyleChanged = onTrailStrokeStyleChanged;
+        this.onPlayerPreferencesChanged = onPlayerPreferencesChanged;
         this.prefetchCarSpriteAsset = prefetchCarSpriteAsset;
         this.modal = modal;
         this.activeGarageTab = 'skin';
@@ -177,6 +179,7 @@ export class GarageUi {
         const next = writePlayerCarSkinAssetName(assetName);
         this.syncSkinSelection();
         this.onCarSkinChanged?.(next);
+        this.onPlayerPreferencesChanged?.();
     }
 
     syncSkinSelection() {
@@ -224,6 +227,7 @@ export class GarageUi {
         writePlayerTrailId(trailId);
         this.syncTrailSelection();
         this.onTrailStrokeStyleChanged?.(readPlayerTrailStrokeStyle());
+        this.onPlayerPreferencesChanged?.();
     }
 
     syncTrailSelection() {

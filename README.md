@@ -44,7 +44,7 @@ The Garage lets players change how their car looks without changing handling.
 
 - `Car skins`: 12 selectable skins grouped into Mini, Cyberpunk, and Steampunk sets.
 - `Trails`: 8 route-trail options, including `No Trail`.
-- Selections are saved, so the car keeps its look between sessions on the same device.
+- Selections and gameplay preferences are restored from the player's Reddit-scoped profile, so app updates do not reset them. Browser storage remains a fast local cache.
 
 ## How a run works
 

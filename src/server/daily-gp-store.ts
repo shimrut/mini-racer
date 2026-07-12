@@ -24,6 +24,7 @@ import {
     isDailyGpChallengePlayable,
     type DailyGpChallenge,
     type DailyGpLeaderboardEntry,
+    type DailyGpPlayerPreferences,
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
 import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
@@ -64,6 +65,7 @@ type PlayerBootstrapPayload = {
     guestToken: string | null;
     redditUsername: string | null;
     leaderboardIdentity: 'constructed' | 'reddit';
+    playerPreferences: DailyGpPlayerPreferences | null;
     hasAnyData: boolean;
     isReturningPlayer: boolean;
     firstSeenAt: string | null;
@@ -372,6 +374,40 @@ function parseStoredEntry(
     }
 }
 
+function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | null {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const preferences = value as Record<string, unknown>;
+    const carSkin = typeof preferences.carSkin === 'string' ? preferences.carSkin.trim() : '';
+    const trailId = typeof preferences.trailId === 'string' ? preferences.trailId.trim() : '';
+    const crashRestartDelaySec = Number(preferences.crashRestartDelaySec);
+    if (
+        !carSkin
+        || carSkin.length > 160
+        || !trailId
+        || trailId.length > 32
+        || typeof preferences.musicEnabled !== 'boolean'
+        || typeof preferences.carAudioEnabled !== 'boolean'
+        || typeof preferences.crashAutoRestartEnabled !== 'boolean'
+        || !Number.isFinite(crashRestartDelaySec)
+        || crashRestartDelaySec < 0
+        || crashRestartDelaySec > 1
+    ) {
+        return null;
+    }
+
+    return {
+        carSkin,
+        trailId,
+        musicEnabled: preferences.musicEnabled,
+        carAudioEnabled: preferences.carAudioEnabled,
+        crashAutoRestartEnabled: preferences.crashAutoRestartEnabled,
+        crashRestartDelaySec: Math.round(crashRestartDelaySec * 10) / 10,
+    };
+}
+
 function parseStoredPlayerProfile(raw: string | null | undefined): DailyGpPlayerProfile | null {
     if (!raw) return null;
 
@@ -385,6 +421,7 @@ function parseStoredPlayerProfile(raw: string | null | undefined): DailyGpPlayer
             playerId: parsed.playerId,
             leaderboardIdentity: normalizeLeaderboardIdentityPreference(parsed.leaderboardIdentity),
             redditUsername: sanitizeRedditUsername(parsed.redditUsername),
+            preferences: normalizePlayerPreferences(parsed.preferences),
             hasSeenGame: parsed.hasSeenGame !== false,
             hasAnyData: Boolean(parsed.hasAnyData),
             firstSeenAt: typeof parsed.firstSeenAt === 'string' && parsed.firstSeenAt
@@ -528,12 +565,14 @@ async function upsertPlayerProfile({
     playerId,
     leaderboardIdentity,
     redditUsername,
+    preferences,
     hasAnyData,
     previousProfile,
 }: {
     playerId: string;
     leaderboardIdentity?: unknown;
     redditUsername?: unknown;
+    preferences?: unknown;
     hasAnyData?: boolean;
     previousProfile?: DailyGpPlayerProfile | null;
 }): Promise<DailyGpPlayerProfile> {
@@ -543,6 +582,9 @@ async function upsertPlayerProfile({
         playerId,
         leaderboardIdentity: resolveStoredLeaderboardIdentity(leaderboardIdentity, resolvedPreviousProfile),
         redditUsername: sanitizeRedditUsername(redditUsername) || resolvedPreviousProfile?.redditUsername || null,
+        preferences: preferences === undefined
+            ? resolvedPreviousProfile?.preferences || null
+            : normalizePlayerPreferences(preferences),
         hasSeenGame: true,
         hasAnyData: Boolean(hasAnyData || resolvedPreviousProfile?.hasAnyData),
         firstSeenAt: resolvedPreviousProfile?.firstSeenAt || nowIso,
@@ -788,6 +830,7 @@ export async function getServerPlayerBootstrap({
             guestToken: null,
             redditUsername: safeRequestRedditUsername,
             leaderboardIdentity: 'constructed',
+            playerPreferences: null,
             hasAnyData: false,
             isReturningPlayer: false,
             firstSeenAt: null,
@@ -813,10 +856,58 @@ export async function getServerPlayerBootstrap({
         guestToken: identity.guestToken,
         redditUsername: safeRequestRedditUsername,
         leaderboardIdentity: profile.leaderboardIdentity,
+        playerPreferences: profile.preferences,
         hasAnyData: previousProfile ? (profile.hasSeenGame || profile.hasAnyData) : false,
         isReturningPlayer,
         firstSeenAt: profile.firstSeenAt,
         lastSeenAt: profile.lastSeenAt,
+    };
+}
+
+export async function updateServerPlayerPreferences({
+    playerId,
+    redditUsername,
+    guestToken,
+    playerPreferences,
+}: {
+    playerId?: unknown;
+    redditUsername?: unknown;
+    guestToken?: unknown;
+    playerPreferences?: unknown;
+} = {}): Promise<{
+    playerId: string | null;
+    guestToken: string | null;
+    playerPreferences: DailyGpPlayerPreferences | null;
+}> {
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+        allowUnsignedGuest: true,
+    });
+    if (!identity.canonicalPlayerId) {
+        return { playerId: null, guestToken: null, playerPreferences: null };
+    }
+
+    const normalizedPreferences = normalizePlayerPreferences(playerPreferences);
+    if (!normalizedPreferences) {
+        return {
+            playerId: identity.canonicalPlayerId,
+            guestToken: identity.guestToken,
+            playerPreferences: null,
+        };
+    }
+
+    const profile = await upsertPlayerProfile({
+        playerId: identity.canonicalPlayerId,
+        redditUsername,
+        preferences: normalizedPreferences,
+        hasAnyData: false,
+    });
+    return {
+        playerId: identity.canonicalPlayerId,
+        guestToken: identity.guestToken,
+        playerPreferences: profile.preferences,
     };
 }
 

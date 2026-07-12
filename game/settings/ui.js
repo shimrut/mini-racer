@@ -42,13 +42,14 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
-    constructor({ modal, onCrashAutoRestartChanged, onCrashRestartDelayChanged, onCarAudioChanged, onMusicChanged, onLeaderboardIdentityChanged } = {}) {
+    constructor({ modal, onCrashAutoRestartChanged, onCrashRestartDelayChanged, onCarAudioChanged, onMusicChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
         this.modal = modal;
         this.onCrashAutoRestartChanged = onCrashAutoRestartChanged;
         this.onCrashRestartDelayChanged = onCrashRestartDelayChanged;
         this.onCarAudioChanged = onCarAudioChanged;
         this.onMusicChanged = onMusicChanged;
         this.onLeaderboardIdentityChanged = onLeaderboardIdentityChanged;
+        this.onPlayerPreferencesChanged = onPlayerPreferencesChanged;
         this.identityBootstrap = null;
         this.bindEvents();
         this.refreshIdentityPanel();
@@ -130,6 +131,7 @@ export class SettingsUi {
     applyCrashRestartMeterStep(stepIndex) {
         const next = setCrashRestartDelaySec(stepIndex * CRASH_RESTART_DELAY_STEP);
         this.onCrashRestartDelayChanged?.(next);
+        this.onPlayerPreferencesChanged?.();
         this.refreshCrashRestartDelayPanel();
     }
 
@@ -182,6 +184,7 @@ export class SettingsUi {
                     userGesturePrepareMedalEffects();
                 }
                 this.onCarAudioChanged?.(on);
+                this.onPlayerPreferencesChanged?.();
                 this.refreshCarAudioPanel();
             });
         }
@@ -192,6 +195,7 @@ export class SettingsUi {
                     userGesturePrepareMusic();
                 }
                 this.onMusicChanged?.(on);
+                this.onPlayerPreferencesChanged?.();
                 this.refreshMusicPanel();
             });
         }
@@ -199,6 +203,7 @@ export class SettingsUi {
             this.crashAutoRestartSwitch.addEventListener('change', () => {
                 const next = setCrashAutoRestartAfterCrashEnabled(this.crashAutoRestartSwitch.checked);
                 this.onCrashAutoRestartChanged?.(next);
+                this.onPlayerPreferencesChanged?.();
                 this.refreshCrashAutoRestartPanel();
             });
         }

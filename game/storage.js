@@ -50,6 +50,10 @@ async function fetchRemotePlayerProgressState() {
       typeof payload?.guestToken === "string" && payload.guestToken.trim()
         ? payload.guestToken.trim()
         : null,
+    playerPreferences:
+      payload?.playerPreferences && typeof payload.playerPreferences === "object"
+        ? payload.playerPreferences
+        : null,
   };
 }
 
@@ -61,6 +65,7 @@ function getLocalPlayerProgressState() {
     redditUsername: null,
     leaderboardIdentity: getLeaderboardIdentityPreference(),
     leaderboardPlayerId: getOrCreatePlayerId("player bootstrap"),
+    playerPreferences: null,
   };
 }
 

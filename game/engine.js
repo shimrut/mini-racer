@@ -46,6 +46,12 @@ import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
 import { createProceduralMusic } from "./audio/procedural-music.js";
 import { getCrashAutoRestartAfterCrashEnabled } from "./settings/crash-auto-restart-preference.js";
 import { getCrashRestartDelaySec } from "./settings/crash-restart-delay-preference.js";
+import { getCarProceduralAudioEnabled } from "./settings/car-audio-preference.js";
+import { getMusicEnabled } from "./settings/music-preference.js";
+import {
+  applyPlayerPreferences,
+  queuePlayerPreferencesSave,
+} from "./player/preferences.js";
 
 export class RealTimeRacer {
   constructor() {
@@ -268,6 +274,7 @@ export class RealTimeRacer {
       onLeaderboardIdentityChanged: async () => {
         await this.refreshDailyChallengeSummary({ forceRefresh: true });
       },
+      onPlayerPreferencesChanged: () => queuePlayerPreferencesSave(),
     });
     this.garage = new GarageUi({
       modal: this.modal,
@@ -294,6 +301,7 @@ export class RealTimeRacer {
         }
         this.requestRender();
       },
+      onPlayerPreferencesChanged: () => queuePlayerPreferencesSave(),
     });
     this.achievements = new AchievementsUi({
       modal: this.modal,
@@ -319,10 +327,15 @@ export class RealTimeRacer {
 
     this.setLoadingStatus(30, "Fetching Profile...");
     this.playerHistoryPromise = getPlayerProgressState()
-      .then(({ hasAnyData, isReturningPlayer }) => {
+      .then(async ({ hasAnyData, isReturningPlayer, playerPreferences }) => {
         this.setLoadingStatus(50, "Profile Loaded...");
         this.hasAnyData = Boolean(hasAnyData);
         this.isReturningPlayer = Boolean(isReturningPlayer);
+        if (playerPreferences) {
+          await this.applyPersistedPlayerPreferences(playerPreferences);
+        } else {
+          queuePlayerPreferencesSave();
+        }
         return {
           hasAnyData,
           isReturningPlayer: this.isReturningPlayer,
@@ -337,6 +350,7 @@ export class RealTimeRacer {
       });
     this.dailyChallengePromise = this.loadDailyChallengeCritical();
     Promise.allSettled([
+      this.playerHistoryPromise,
       this.dailyChallengePromise,
       this.carAssetPromise,
       this.trackReadyPromise,
@@ -392,6 +406,26 @@ export class RealTimeRacer {
 
   get carSpriteAssetKey() {
     return this.carSpriteLoader.currentAssetKey;
+  }
+
+  async applyPersistedPlayerPreferences(playerPreferences) {
+    if (!applyPlayerPreferences(playerPreferences)) return;
+
+    this.crashAutoRestartAfterCrash = getCrashAutoRestartAfterCrashEnabled();
+    this.crashRestartDelaySec = getCrashRestartDelaySec();
+    this.carEffectsAudio?.setEnabled?.(getCarProceduralAudioEnabled());
+    this.proceduralMusic?.setEnabled?.(getMusicEnabled());
+    this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
+    this.routeTrace.clear();
+    this.trailTimer = 0;
+    this.settings.refreshCarAudioPanel();
+    this.settings.refreshMusicPanel();
+    this.settings.refreshCrashAutoRestartPanel();
+    this.settings.refreshCrashRestartDelayPanel();
+    this.garage.syncSkinSelection();
+    this.garage.syncTrailSelection();
+    await this.syncCarSpriteAsset();
+    this.requestRender();
   }
 
   bumpDailyGpRaceStart() {

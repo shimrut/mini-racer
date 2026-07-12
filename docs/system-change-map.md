@@ -27,11 +27,11 @@ flowchart LR
     C --> F["Car stack<br/>game/car/*"]
     C --> G["UI stack<br/>daily challenge, scoreboard, settings, garage, achievements"]
     C --> H["Audio + analytics<br/>game/audio/* + game/player/service.js"]
-    C --> I["Browser storage<br/>localStorage/sessionStorage"]
+    C --> I["Browser cache<br/>localStorage/sessionStorage"]
 
     G --> J["API client layer<br/>game/scoreboard/api-client.js"]
     J --> K["Devvit/Express server<br/>src/server/index.ts"]
-    K --> L["Redis-backed stores<br/>daily-gp-store.ts + analytics-store.ts"]
+    K --> L["Redis-backed stores<br/>player profiles, races, analytics"]
 
     K --> M["Shared challenge model<br/>src/server/daily-gp-model.ts"]
     K --> N["Shared gameplay validation<br/>game/config.js + game/race/simulation.js + game/track/runtime.js + game/track/tracks.js"]
@@ -83,7 +83,7 @@ flowchart LR
 
 - `src/server/index.ts` exposes all `/api/*` endpoints and Devvit moderator/internal actions.
 - `src/server/daily-gp-model.ts` defines the challenge schedule, IDs, playable window, and Redis key model.
-- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, snapshots, and accepted runs. The published challenge history hash uses the same TTL as the installed Devvit server.
+- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. The published challenge history hash uses the same TTL as the installed Devvit server.
 - `game/shared/daily-gp-history-backfill.js` isolates the June 2-11, 2026 published-history seed used to backfill the server history store.
 - `src/server/replay-validator.ts` replays submitted inputs against shared track/physics logic before the server accepts a run.
 - Important implication: track geometry, finish/checkpoint logic, and physics tuning are not frontend-only. The server uses the same contracts.
@@ -96,10 +96,10 @@ flowchart LR
 | Runtime orchestrator | `game/engine.js` | State ownership and feature wiring | Almost every `game/*` feature module |
 | Track system | `game/track/tracks.js`, `game/track/runtime.js`, `game/track/assets.js`, `game/track/engine-methods.js` | Track geometry, collision, cached canvases, presentation | `game/config.js`, `game/track/presentation.js` |
 | Race/physics | `game/race/simulation.js`, `game/race/engine-methods.js`, `game/car/handling.js` | Driving feel, crashes, finish logic, replay capture | Track runtime, config, HUD, modal flow |
-| Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js` | Car art, asset loading, garage selection, trail style | `public/assets/cars/*`, generated asset list, local storage |
+| Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js` | Car art, asset loading, garage selection, trail style | `public/assets/cars/*`, generated asset list, local cache, Redis player profile |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
 | Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow | API routes, daily challenge storage, server APIs |
-| Settings | `game/settings/ui.js`, `game/settings/*.js` | Identity, audio toggles, restart preferences | Browser storage, API identity endpoint, modal helpers |
+| Settings | `game/settings/ui.js`, `game/settings/*.js`, `game/player/preferences.js` | Identity, audio toggles, restart preferences, durable preference sync | Browser cache, player APIs, Redis profile, modal helpers |
 | Audio/analytics | `game/audio/*`, `game/player/service.js` | Sound playback and analytics events | Settings preferences, `/api/analytics/event` |
 | Server | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/daily-gp-model.ts`, `src/server/replay-validator.ts` | Persistence, validation, challenge scheduling, APIs | Redis, shared gameplay modules |
 
@@ -109,6 +109,7 @@ These client-facing routes are defined in `src/server/index.ts`:
 
 - `/api/player/bootstrap`
 - `/api/player/identity`
+- `/api/player/preferences`
 - `/api/scoreboard/snapshot`
 - `/api/scoreboard/submit`
 - `/api/daily/active`
@@ -154,7 +155,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Change request | Primary files | Review too | Why this area ripples |
 | --- | --- | --- | --- |
 | Car skin or new car art | `public/assets/cars/*`, `tools/generate-player-car-assets.js`, `game/car/generated-player-selectable-car-assets.js`, `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/settings/garage-ui.js` | `styles.css`, `game.html` | New art affects asset discovery, garage options, and fallback loading |
-| Car trail options | `game/car/player-trail.js`, `game/settings/garage-ui.js` | `styles.css`, `game/engine.js` | Trail choices are stored locally and rendered from engine state |
+| Car trail options | `game/car/player-trail.js`, `game/settings/garage-ui.js` | `styles.css`, `game/engine.js`, `game/player/preferences.js` | Trail choices are cached locally, persisted in the Redis player profile, and rendered from engine state |
 | Car size or render look | `game/config.js`, `game/car/sprite.js`, sometimes `public/assets/cars/*` | `game/race/engine-methods.js`, `styles.css` | Car scale is visual, but shadow and draw sizing live in config/orchestrator flow |
 | Car handling / physics tuning | `game/car/handling.js`, `game/config.js`, `game/race/simulation.js` | `src/server/replay-validator.ts`, `game/race/run-policy.js`, `game/race/engine-methods.js` | Server validation reuses shared gameplay logic, so tuning changes affect accepted runs |
 | Crash rules, win rules, checkpoint behavior | `game/race/simulation.js`, `game/race/run-policy.js` | `src/server/replay-validator.ts`, `game/daily-challenge/engine-methods.js`, `game/race/result-flow.js` | Finish and failure logic drive both local UX and server acceptance |
@@ -164,7 +165,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Start screen or daily card copy/layout | `game/daily-challenge/ui.js`, `game.html`, `styles.css` | `game/daily-challenge/service.js` | The UI is driven by API summary fields and modal launch actions |
 | Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
-| Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files | `game/storage.js`, `game/player/service.js`, `game.html`, `styles.css` | Settings mix UI, local storage, and some server-backed identity behavior |
+| Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the Reddit Redis player profile as the durable source |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |
 | Replay verification / anti-cheat changes | `src/server/replay-validator.ts`, `game/race/simulation.js`, `game/track/runtime.js`, `game/config.js` | `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | This is the highest-risk area because client and server must stay logically identical |
 | Analytics event changes | `game/player/service.js`, `src/server/analytics-store.ts` | `tools/analytics-dashboard.js`, `tools/analytics/schema.sql` | New event dimensions often need both collection and reporting updates |

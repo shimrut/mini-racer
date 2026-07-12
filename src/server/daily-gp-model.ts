@@ -37,11 +37,21 @@ export type DailyGpPlayerProfile = {
     playerId: string;
     leaderboardIdentity: 'constructed' | 'reddit';
     redditUsername: string | null;
+    preferences: DailyGpPlayerPreferences | null;
     hasSeenGame: boolean;
     hasAnyData: boolean;
     firstSeenAt: string;
     lastSeenAt: string;
     updatedAt: string;
+};
+
+export type DailyGpPlayerPreferences = {
+    carSkin: string;
+    trailId: string;
+    musicEnabled: boolean;
+    carAudioEnabled: boolean;
+    crashAutoRestartEnabled: boolean;
+    crashRestartDelaySec: number;
 };
 
 export function getUtcDayIndex(date = new Date()): number {

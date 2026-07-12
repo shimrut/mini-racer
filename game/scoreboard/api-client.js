@@ -9,6 +9,7 @@ export const API_ROUTES = Object.freeze({
     apiBaseUrl: API_BASE_URL,
     playerBootstrapUrl: `${API_BASE_URL}/player/bootstrap`,
     playerIdentityUrl: `${API_BASE_URL}/player/identity`,
+    playerPreferencesUrl: `${API_BASE_URL}/player/preferences`,
     scoreboardSnapshotUrl: `${API_BASE_URL}/scoreboard/snapshot`,
     dailyActiveUrl: `${API_BASE_URL}/daily/active`,
     dailyPlaylistUrl: `${API_BASE_URL}/daily/playlist`,
