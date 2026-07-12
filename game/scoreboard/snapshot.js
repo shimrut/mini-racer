@@ -57,6 +57,10 @@ export function createEmptyScoreboardSnapshot({ objectiveType = null } = {}) {
         objectiveType,
         playerRank: null,
         playerRankLabel: null,
+        pageOffset: 0,
+        pageLimit: 0,
+        hasMore: false,
+        nextOffset: null,
     };
 }
 
@@ -83,6 +87,10 @@ export function normalizeScoreboardSnapshot(raw) {
         objectiveType: typeof raw.objectiveType === 'string' ? raw.objectiveType : null,
         playerRank: raw.playerRank != null ? normalizeNumber(raw.playerRank) : null,
         playerRankLabel: raw.playerRankLabel != null ? String(raw.playerRankLabel) : null,
+        pageOffset: normalizeCount(raw.pageOffset),
+        pageLimit: normalizeCount(raw.pageLimit),
+        hasMore: raw.hasMore === true,
+        nextOffset: raw.nextOffset != null ? normalizeCount(raw.nextOffset) : null,
     };
 }
 

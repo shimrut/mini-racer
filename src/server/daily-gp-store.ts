@@ -17,7 +17,6 @@ import {
     DAILY_GP_PLAYLIST_DAYS,
     DAILY_GP_PLAYER_PROFILE_TTL_SECONDS,
     DAILY_GP_REDIS_TTL_SECONDS,
-    DAILY_GP_TOP_ROWS_LIMIT,
     encodeDailyGpLeaderboardScore,
     formatRankLabel,
     formatUtcChallengeDate,
@@ -54,6 +53,10 @@ type SnapshotPayload = {
     objectiveType: string;
     playerRank: number | null;
     playerRankLabel: string | null;
+    pageOffset: number;
+    pageLimit: number;
+    hasMore: boolean;
+    nextOffset: number | null;
 };
 
 type PlayerBootstrapPayload = {
@@ -92,6 +95,10 @@ function createEmptySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
         objectiveType: challenge.objectiveType,
         playerRank: null,
         playerRankLabel: null,
+        pageOffset: 0,
+        pageLimit: DAILY_GP_DEFAULT_LIMIT,
+        hasMore: false,
+        nextOffset: null,
     };
 }
 
@@ -303,6 +310,14 @@ function normalizeLimit(limit: unknown): number {
     }
 
     return Math.min(Math.max(Math.trunc(Number(limit)), 1), 100);
+}
+
+function normalizeOffset(offset: unknown): number {
+    if (!Number.isFinite(offset)) {
+        return 0;
+    }
+
+    return Math.max(Math.trunc(Number(offset)), 0);
 }
 
 function parseStoredEntry(
@@ -852,6 +867,7 @@ export async function getServerDailyGpSnapshot({
     redditUsername,
     guestToken,
     limit = DAILY_GP_DEFAULT_LIMIT,
+    offset = 0,
     communityMemberTotal,
 }: {
     challengeId?: string | null;
@@ -860,6 +876,7 @@ export async function getServerDailyGpSnapshot({
     redditUsername?: unknown;
     guestToken?: unknown;
     limit?: unknown;
+    offset?: unknown;
     /** Subreddit subscriber count (or similar) for rank denominator and unfilled leaderboard slots. */
     communityMemberTotal?: unknown;
 } = {}): Promise<SnapshotPayload> {
@@ -872,6 +889,7 @@ export async function getServerDailyGpSnapshot({
     }
 
     const safeLimit = normalizeLimit(limit);
+    const safeOffset = normalizeOffset(offset);
     const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
     const leaderboardEntryCount = await redis.zCard(leaderboardKey);
     const communityFloor = normalizeCommunityMemberTotal(communityMemberTotal);
@@ -900,7 +918,13 @@ export async function getServerDailyGpSnapshot({
         });
     }
     const topRows = leaderboardEntryCount
-        ? await readRowsByRankRange(challenge.id, challenge.trackKey, 0, safeLimit - 1, normalizedPlayerId)
+        ? await readRowsByRankRange(
+            challenge.id,
+            challenge.trackKey,
+            safeOffset,
+            safeOffset + safeLimit - 1,
+            normalizedPlayerId,
+        )
         : [];
     const playerRankZeroBased = normalizedPlayerId && leaderboardEntryCount
         ? await redis.zRank(leaderboardKey, normalizedPlayerId)
@@ -926,6 +950,12 @@ export async function getServerDailyGpSnapshot({
             objectiveType: challenge.objectiveType,
             playerRank,
             playerRankLabel: formatRankLabel(playerRank),
+            pageOffset: safeOffset,
+            pageLimit: safeLimit,
+            hasMore: safeOffset + safeLimit < leaderboardEntryCount,
+            nextOffset: safeOffset + safeLimit < leaderboardEntryCount
+                ? safeOffset + safeLimit
+                : null,
         };
     }
 
@@ -940,7 +970,11 @@ export async function getServerDailyGpSnapshot({
     }
 
     let nearbyRows: SnapshotRow[] = [];
-    if (playerRank && playerRank > safeLimit && leaderboardEntryCount) {
+    const playerOutsidePage = Boolean(
+        playerRank
+        && (playerRank <= safeOffset || playerRank > safeOffset + safeLimit)
+    );
+    if (playerOutsidePage && leaderboardEntryCount) {
         const nearbyStart = Math.max(0, playerRank - DAILY_GP_NEARBY_RADIUS - 1);
         const nearbyStop = nearbyStart + (DAILY_GP_NEARBY_RADIUS * 2);
         nearbyRows = await readRowsByRankRange(
@@ -953,9 +987,7 @@ export async function getServerDailyGpSnapshot({
     }
 
     return {
-        topRows: playerRank && playerRank > safeLimit
-            ? topRows.slice(0, DAILY_GP_TOP_ROWS_LIMIT)
-            : topRows,
+        topRows,
         nearbyRows,
         currentPlayerRow,
         totalCount,
@@ -963,6 +995,12 @@ export async function getServerDailyGpSnapshot({
         objectiveType: challenge.objectiveType,
         playerRank,
         playerRankLabel: formatRankLabel(playerRank),
+        pageOffset: safeOffset,
+        pageLimit: safeLimit,
+        hasMore: safeOffset + safeLimit < leaderboardEntryCount,
+        nextOffset: safeOffset + safeLimit < leaderboardEntryCount
+            ? safeOffset + safeLimit
+            : null,
     };
 }
 

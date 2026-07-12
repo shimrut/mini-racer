@@ -617,7 +617,7 @@ app.post('/api/player/identity', async (req, res) => {
 
 app.get('/api/scoreboard/snapshot', async (req, res) => {
     try {
-        const { trackKey, playerId, guestToken, limit } = req.query ?? {};
+        const { trackKey, playerId, guestToken, limit, offset } = req.query ?? {};
         const activeChallenge = await getServerDailyGpChallenge();
         const challenge = trackKey === activeChallenge.trackKey
             ? activeChallenge
@@ -632,6 +632,10 @@ app.get('/api/scoreboard/snapshot', async (req, res) => {
                 playerRank: null,
                 playerRankLabel: null,
                 objectiveType: activeChallenge.objectiveType,
+                pageOffset: 0,
+                pageLimit: 0,
+                hasMore: false,
+                nextOffset: null,
             });
             return;
         }
@@ -643,6 +647,7 @@ app.get('/api/scoreboard/snapshot', async (req, res) => {
             guestToken: guestToken as string,
             redditUsername: getRequestUsername(),
             limit: limit ? parseInt(limit as string, 10) : undefined,
+            offset: offset ? parseInt(offset as string, 10) : undefined,
             communityMemberTotal,
         });
         res.status(200).json(snapshot);
@@ -678,7 +683,7 @@ app.get('/api/daily/playlist', async (_req, res) => {
 
 app.get('/api/daily/snapshot', async (req, res) => {
     try {
-        const { challengeId, playerId, guestToken, limit } = req.query ?? {};
+        const { challengeId, playerId, guestToken, limit, offset } = req.query ?? {};
         const communityMemberTotal = await getCommunityMemberTotalForLeaderboard();
         const snapshot = await getServerDailyGpSnapshot({
             challengeId: challengeId as string,
@@ -686,6 +691,7 @@ app.get('/api/daily/snapshot', async (req, res) => {
             guestToken: guestToken as string,
             redditUsername: getRequestUsername(),
             limit: limit ? parseInt(limit as string, 10) : undefined,
+            offset: offset ? parseInt(offset as string, 10) : undefined,
             communityMemberTotal,
         });
         res.status(200).json(snapshot);

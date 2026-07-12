@@ -254,6 +254,9 @@ export function buildModalRunsPayload(source, {
         onSelectLeaderboardDay: typeof source.onSelectLeaderboardDay === 'function'
             ? source.onSelectLeaderboardDay
             : null,
+        onLoadMoreLeaderboard: typeof source.onLoadMoreLeaderboard === 'function'
+            ? source.onLoadMoreLeaderboard
+            : null,
         primaryActionLabel: source.primaryActionLabel || null,
         primaryAction: typeof source.primaryAction === 'function' ? source.primaryAction : null,
         showGlobalLeaderboard: source.showGlobalLeaderboard !== false,
@@ -296,6 +299,9 @@ export function buildModalRunsViewOptions(payload) {
         selectedLeaderboardDayId: payload.selectedLeaderboardDayId || null,
         onSelectLeaderboardDay: typeof payload.onSelectLeaderboardDay === 'function'
             ? payload.onSelectLeaderboardDay
+            : null,
+        onLoadMoreLeaderboard: typeof payload.onLoadMoreLeaderboard === 'function'
+            ? payload.onLoadMoreLeaderboard
             : null,
         primaryActionLabel: payload.primaryActionLabel || null,
         primaryAction: typeof payload.primaryAction === 'function' ? payload.primaryAction : null,

@@ -72,9 +72,12 @@ flowchart LR
 - Daily GP track selection walks `game/track/tracks.js` in key order, one track per day, using the most-recent published day as the playhead; `src/server/daily-gp-store.ts` persists each new day to the `dailygp:challenges` Redis ledger (first-writer-wins) so past days never change.
 - Published Daily GP playlist rows come from server-side challenge history, not from recalculating old dates against the current track file.
 - Explicit mock modes and standalone preview pages use a local mock challenge (first track in `tracks.js`, or a track forced via `?mockDaily=<trackKey>`); normal local game runs use `/api/daily/*` or Devvit post data so they match the server-published track.
+- Daily labels are calendar-based: `Today` is used only when a challenge's stored UTC date matches the current UTC date. Opening an older Reddit post keeps that post's challenge active and playable, but its Tracks and standings labels continue to show the original date.
 - Moderator analytics "Players" and leaderboard entries measure different outcomes. Analytics counts a player after any accepted analytics event, while the leaderboard only gains a row after a finished run passes server replay validation and is accepted.
 - `leaderboardEntryCount` is the number of players with accepted times. `totalCount` can be larger because it may include the subreddit member total; the UI renders the difference as `No time yet` community placeholders, not as missing player scores.
 - Daily leaderboard snapshots are persisted separately in each client's local storage for fast initial rendering. Opening standings must always follow that cached render with a server refresh so web and mobile converge on the same accepted-entry count; if the refresh fails, an available cached snapshot remains visible.
+- The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
+- Player standing is independent of loaded pages: every snapshot resolves `playerRank` and `currentPlayerRow`, and the standings header keeps that rank and best time visible even when the player's row is outside the loaded rank range.
 
 ### Server And Shared Validation
 
@@ -95,7 +98,7 @@ flowchart LR
 | Race/physics | `game/race/simulation.js`, `game/race/engine-methods.js`, `game/car/handling.js` | Driving feel, crashes, finish logic, replay capture | Track runtime, config, HUD, modal flow |
 | Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js` | Car art, asset loading, garage selection, trail style | `public/assets/cars/*`, generated asset list, local storage |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
-| Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization and display, submissions, verification retry flow | API routes, daily challenge storage, server APIs |
+| Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js` | Identity, audio toggles, restart preferences | Browser storage, API identity endpoint, modal helpers |
 | Audio/analytics | `game/audio/*`, `game/player/service.js` | Sound playback and analytics events | Settings preferences, `/api/analytics/event` |
 | Server | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/daily-gp-model.ts`, `src/server/replay-validator.ts` | Persistence, validation, challenge scheduling, APIs | Redis, shared gameplay modules |

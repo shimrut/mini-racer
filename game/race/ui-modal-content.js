@@ -419,6 +419,8 @@ export class ModalContentUi {
     const nearbyRows = Array.isArray(scoreboardSnapshot?.nearbyRows)
         ? scoreboardSnapshot.nearbyRows
         : [];
+    const isPaginated = Number(scoreboardSnapshot?.pageLimit) > 0;
+    const hasMore = scoreboardSnapshot?.hasMore === true;
     const snapshotRank = getFinitePositiveRank(scoreboardSnapshot?.playerRank);
     const snapshotRankLabel = scoreboardSnapshot?.playerRankLabel != null
         ? String(scoreboardSnapshot.playerRankLabel)
@@ -525,7 +527,7 @@ export class ModalContentUi {
 
     const appendScoreboardRow = (entry) => {
         const item = document.createElement('div');
-        item.className = `combined-row${entry.isCurrentPlayer ? ' is-player' : ''}`;
+        item.className = `combined-row leaderboard-row${entry.isCurrentPlayer ? ' is-player current' : ''}`;
 
         const runIndex = document.createElement('div');
         runIndex.className = 'combined-row-rank';
@@ -579,7 +581,7 @@ export class ModalContentUi {
 
     topRows.forEach((entry) => appendScoreboardRow(entry));
 
-    if (nearbyRows.length) {
+    if (!isPaginated && nearbyRows.length) {
         if (topRows.length > 0 && nearbyRows[0]?.rank > (topRows[topRows.length - 1]?.rank || 0) + 1) {
             const gapRow = document.createElement('div');
             gapRow.className = 'leaderboard-gap-row';
@@ -588,15 +590,15 @@ export class ModalContentUi {
             list.appendChild(gapRow);
         }
         nearbyRows.forEach((entry) => appendScoreboardRow(entry));
-    } else if (
+    } else if (!isPaginated && (
         currentPlayerRow
         && (Number.isFinite(currentPlayerRow.rank) || currentPlayerRow.rankLabel)
         && !topRows.some((entry) => entry.isCurrentPlayer)
-    ) {
+    )) {
         appendScoreboardRow(currentPlayerRow);
     }
 
-    if (openCommunitySlots > 0) {
+    if (openCommunitySlots > 0 && !hasMore) {
         const firstRank = leaderboardEntryCount + 1;
         let shown = 0;
         for (let rank = firstRank; rank <= poolTotal && shown < MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS; rank += 1) {
@@ -622,6 +624,14 @@ export class ModalContentUi {
             summary.appendChild(runTime);
             list.appendChild(summary);
         }
+    }
+
+    if (hasMore) {
+        const paginationState = document.createElement('div');
+        paginationState.className = 'leaderboard-pagination-state';
+        paginationState.setAttribute('role', 'status');
+        paginationState.setAttribute('aria-live', 'polite');
+        list.appendChild(paginationState);
     }
 
     section.appendChild(list);

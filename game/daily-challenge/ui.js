@@ -310,6 +310,19 @@ export class DailyChallengeUi {
         };
     }
 
+    isPlaylistEntryToday(challenge, nowMs = Date.now()) {
+        const source = typeof challenge?.startsAt === 'string' && challenge.startsAt
+            ? challenge.startsAt
+            : (typeof challenge?.challengeDate === 'string' && challenge.challengeDate
+                ? `${challenge.challengeDate}T00:00:00.000Z`
+                : '');
+        const challengeTimeMs = Date.parse(source);
+        if (!Number.isFinite(challengeTimeMs) || !Number.isFinite(nowMs)) return false;
+
+        return new Date(challengeTimeMs).toISOString().slice(0, 10)
+            === new Date(nowMs).toISOString().slice(0, 10);
+    }
+
     getPlaylistEntryAvailabilityProgress(challenge) {
         const startMs = Date.parse(challenge?.startsAt || '');
         const endMs = Date.parse(challenge?.availableUntil || '');
@@ -385,7 +398,7 @@ export class DailyChallengeUi {
 
             const day = document.createElement('span');
             day.className = 'daily-playlist-hero-day';
-            day.textContent = isCurrentTrack ? 'Today' : dateParts.dateLabel;
+            day.textContent = this.isPlaylistEntryToday(challenge) ? 'Today' : dateParts.dateLabel;
 
             const title = document.createElement('span');
             title.className = 'daily-playlist-hero-title';
@@ -494,7 +507,7 @@ export class DailyChallengeUi {
 
             const day = document.createElement('span');
             day.className = 'daily-playlist-hero-day';
-            day.textContent = isCurrentTrack ? 'Today' : dateParts.dateLabel;
+            day.textContent = this.isPlaylistEntryToday(challenge) ? 'Today' : dateParts.dateLabel;
 
             const title = document.createElement('span');
             title.className = 'daily-playlist-hero-title';

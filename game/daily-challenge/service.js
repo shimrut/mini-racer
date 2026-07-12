@@ -606,7 +606,11 @@ export function invalidateDailyChallengeSnapshot(challengeId) {
     if (!challengeId) return;
     hydrateDailySnapshotCache();
     dailySnapshotCache.delete(challengeId);
-    dailySnapshotInflight.delete(challengeId);
+    for (const requestKey of dailySnapshotInflight.keys()) {
+        if (requestKey.startsWith(`${challengeId}:`)) {
+            dailySnapshotInflight.delete(requestKey);
+        }
+    }
     writeDailySnapshotCacheStorage();
 }
 
@@ -856,11 +860,16 @@ export function getCachedDailyChallengePlaylist() {
     return getUsableCachedDailyPlaylist();
 }
 
-async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_LIMIT } = {}) {
+async function loadDailyChallengeSnapshot({
+    challengeId,
+    limit = DEFAULT_DAILY_LIMIT,
+    offset = 0,
+} = {}) {
     const config = API_ROUTES;
     if (config && typeof fetch === 'function' && challengeId) {
         try {
             const safeLimit = clampRequestLimit(limit, { defaultLimit: DEFAULT_DAILY_LIMIT });
+            const safeOffset = Math.max(0, Math.trunc(Number(offset) || 0));
             const origin = typeof window !== 'undefined' && window.location?.origin
                 ? window.location.origin
                 : 'http://localhost';
@@ -872,6 +881,7 @@ async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_L
                 url.searchParams.set('guestToken', guestToken);
             }
             url.searchParams.set('limit', safeLimit.toString());
+            url.searchParams.set('offset', safeOffset.toString());
 
             const response = await fetch(url.toString(), { method: 'GET' });
 
@@ -895,41 +905,53 @@ async function loadDailyChallengeSnapshot({ challengeId, limit = DEFAULT_DAILY_L
 export async function getDailyChallengeSnapshot({
     challengeId,
     limit = DEFAULT_DAILY_LIMIT,
+    offset = 0,
     forceRefresh = false
 } = {}) {
     if (!challengeId) {
         return normalizeScoreboardSnapshot(null);
     }
 
-    if (!forceRefresh) {
+    const safeOffset = Math.max(0, Math.trunc(Number(offset) || 0));
+    const safeLimit = clampRequestLimit(limit, { defaultLimit: DEFAULT_DAILY_LIMIT });
+    const requestKey = `${challengeId}:${safeOffset}:${safeLimit}`;
+    const isFirstPage = safeOffset === 0;
+
+    if (!forceRefresh && isFirstPage) {
         const cachedSnapshot = readCachedDailySnapshot(challengeId);
         if (cachedSnapshot) {
             return cachedSnapshot;
         }
-        const inflight = dailySnapshotInflight.get(challengeId);
+        const inflight = dailySnapshotInflight.get(requestKey);
         if (inflight) {
             return cloneScoreboardSnapshot(await inflight);
         }
-    } else {
+    } else if (forceRefresh && isFirstPage) {
         invalidateDailyChallengeSnapshot(challengeId);
     }
 
-    const requestPromise = loadDailyChallengeSnapshot({ challengeId, limit })
+    const requestPromise = loadDailyChallengeSnapshot({
+        challengeId,
+        limit: safeLimit,
+        offset: safeOffset,
+    })
         .then((snapshot) => {
-            writeCachedDailySnapshot(challengeId, snapshot);
+            if (isFirstPage) {
+                writeCachedDailySnapshot(challengeId, snapshot);
+            }
             return snapshot;
         })
         .catch((error) => {
-            dailySnapshotInflight.delete(challengeId);
+            dailySnapshotInflight.delete(requestKey);
             throw error;
         });
 
-    dailySnapshotInflight.set(challengeId, requestPromise);
+    dailySnapshotInflight.set(requestKey, requestPromise);
     try {
         return cloneScoreboardSnapshot(await requestPromise);
     } finally {
-        if (dailySnapshotInflight.get(challengeId) === requestPromise) {
-            dailySnapshotInflight.delete(challengeId);
+        if (dailySnapshotInflight.get(requestKey) === requestPromise) {
+            dailySnapshotInflight.delete(requestKey);
         }
     }
 }

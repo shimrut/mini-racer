@@ -4,6 +4,8 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Opening standings or Tracks from an older Reddit post now shows that challenge's original UTC date instead of incorrectly calling the post-bound track `Today`.
+- Standings now load every scored racer in 50-row pages as the list is scrolled, while the current player's rank and best time remain visible in the header regardless of which ranks have loaded; the initial rank-loading state is compact and aligned with that header.
 - Upgraded the Devvit toolchain to 0.13.7 with Vite 7.3.6, aligned server imports with declared Devvit packages, and removed the deprecated no-op inline entrypoint flag.
 - Standings now show cached results immediately and then refresh from the server, keeping web and mobile entry counts aligned without replacing usable cached results when a refresh fails.
 - Daily Reddit posts now use `Mini Racer TOTD` consistently in the post title and plain-text fallback.

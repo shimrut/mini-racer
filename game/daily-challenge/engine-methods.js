@@ -266,6 +266,8 @@ export const dailyChallengeEngineMethods = {
       rankLabel: "--",
       scoreboardSnapshot: null,
       objectiveType: challenge.objectiveType,
+      startsAt: challenge.startsAt,
+      challengeDate: challenge.challengeDate,
       endsAt: challenge.endsAt,
     });
   },

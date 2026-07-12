@@ -3,7 +3,6 @@ const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
 
 export const DAILY_GP_MIN_TIME_SECONDS = 2;
 export const DAILY_GP_MAX_TIME_SECONDS = 60 * 60;
-export const DAILY_GP_TOP_ROWS_LIMIT = 5;
 export const DAILY_GP_NEARBY_RADIUS = 2;
 export const DAILY_GP_DEFAULT_LIMIT = 10;
 export const DAILY_GP_REDIS_TTL_SECONDS = 45 * 24 * 60 * 60;

@@ -13,12 +13,12 @@ import {
 } from './snapshot.js';
 
 const MAX_SCOREBOARD_LIMIT = 100;
-const DEFAULT_SCOREBOARD_PREVIEW_LIMIT = 10;
+const DEFAULT_SCOREBOARD_LIMIT = 10;
 
 /** Same-key concurrent callers share one network round-trip. */
 const inflightScoreboardSnapshots = new Map();
 
-async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeLimit) {
+async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeLimit, safeOffset) {
     const origin = typeof window !== 'undefined' && window.location?.origin
         ? window.location.origin
         : 'http://localhost';
@@ -30,6 +30,7 @@ async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeL
         url.searchParams.set('guestToken', guestToken);
     }
     url.searchParams.set('limit', safeLimit.toString());
+    url.searchParams.set('offset', safeOffset.toString());
 
     const response = await fetch(url.toString(), { method: 'GET' });
     if (!response.ok) {
@@ -40,7 +41,11 @@ async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeL
     return response.json();
 }
 
-export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOARD_PREVIEW_LIMIT } = {}) {
+export async function getScoreboardSnapshot({
+    trackKey,
+    limit = DEFAULT_SCOREBOARD_LIMIT,
+    offset = 0,
+} = {}) {
     const config = API_ROUTES;
     if (!config || typeof fetch !== 'function') {
         return createEmptyScoreboardSnapshot();
@@ -50,10 +55,11 @@ export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOA
     }
 
     const safeLimit = clampRequestLimit(limit, {
-        defaultLimit: DEFAULT_SCOREBOARD_PREVIEW_LIMIT,
+        defaultLimit: DEFAULT_SCOREBOARD_LIMIT,
         maxLimit: MAX_SCOREBOARD_LIMIT
     });
-    const dedupeKey = `${trackKey}\u0000${TRACK_MODE_DAILY_GP}\u0000${safeLimit}`;
+    const safeOffset = Math.max(0, Math.trunc(Number(offset) || 0));
+    const dedupeKey = `${trackKey}\u0000${TRACK_MODE_DAILY_GP}\u0000${safeOffset}\u0000${safeLimit}`;
     const inflight = inflightScoreboardSnapshots.get(dedupeKey);
     if (inflight) return inflight;
 
@@ -65,7 +71,8 @@ export async function getScoreboardSnapshot({ trackKey, limit = DEFAULT_SCOREBOA
                 config,
                 trackKey,
                 currentPlayerId,
-                safeLimit
+                safeLimit,
+                safeOffset
             );
             return normalizeScoreboardSnapshot(raw);
         } catch (error) {

@@ -64,6 +64,8 @@ export class ModalShell {
         this._activeTrapModal = null;
         this._modalTrapKeydown = null;
         this._lastPauseTrackPreviewKey = '';
+        this._leaderboardScrollHandler = null;
+        this._leaderboardPageLoading = false;
     }
 
     _setActiveView(view) {
@@ -514,6 +516,7 @@ export class ModalShell {
         leaderboardDayOptions = null,
         selectedLeaderboardDayId = null,
         onSelectLeaderboardDay = null,
+        onLoadMoreLeaderboard = null,
         showGlobalLeaderboard = true,
         allowLeaderboardOpen = true,
         onClose = null
@@ -557,6 +560,7 @@ export class ModalShell {
             leaderboardDayOptions,
             selectedLeaderboardDayId,
             onSelectLeaderboardDay,
+            onLoadMoreLeaderboard,
             showGlobalLeaderboard,
             allowLeaderboardOpen
         }, {
@@ -576,6 +580,7 @@ export class ModalShell {
                 { showHeader: hasPersonalBestList }
             );
         }
+        this.bindLeaderboardPagination?.();
 
         if (this.backToMainBtn) {
             this.backToMainBtn.setAttribute('aria-label', 'Back');
@@ -601,6 +606,7 @@ export class ModalShell {
         if (!this.modal) return;
 
         this._leaderboardRailScrollLeft = null;
+        this.unbindLeaderboardPagination?.();
         const modal = this.modal;
         closeModalElement(modal, () => modal.classList.remove('active'));
         this.cancelLeaderboardRequests?.();
@@ -933,6 +939,26 @@ export class ModalShell {
             updates: { scoreboardSnapshot }
         });
 
+        if (this.modalRunsView?.classList.contains('active-view') && this.modalLapTimes) {
+            const scrollTop = this.modalLapTimes.scrollTop;
+            const hasPersonalBestList = Array.isArray(this._modalRunsPayload.lapTimesArray);
+            this.modalLapTimes.querySelector('.leaderboard-section')?.remove();
+            this.renderLeaderboardStandaloneIntro();
+            if (this._modalRunsPayload.showGlobalLeaderboard) {
+                this.content.renderScoreboardList(
+                    this.modalLapTimes,
+                    this._modalRunsPayload.scoreboardSnapshot,
+                    TRACK_MODE_DAILY_GP,
+                    this._modalRunsPayload.scoreboardTrackKey,
+                    this._modalRunsPayload.scoreboardSubhead,
+                    { showHeader: hasPersonalBestList }
+                );
+            }
+            this.bindLeaderboardPagination?.();
+            this.modalLapTimes.scrollTop = scrollTop;
+            return;
+        }
+
         if (this.modalCombinedView?.classList.contains('active-view')) {
             const rightGroupEl = this.modalCombinedView.querySelector('#combined-stats-right-group');
             const rankValueEl = this.modalCombinedView.querySelector('#combined-rank-value');
@@ -1125,6 +1151,7 @@ export class ModalShell {
             payload?.scoreboardSnapshot,
             { fallbackText: '—' }
         );
+        this.modalLapTimes.querySelector('.leaderboard-day-rail')?.remove();
         if (
             Array.isArray(payload?.leaderboardDayOptions)
             && payload.leaderboardDayOptions.length > 1
@@ -1185,11 +1212,14 @@ export class ModalShell {
         summaryValue.className = 'leaderboard-summary__value';
         summaryValue.toggleAttribute('aria-busy', rankDisplay.isLoading);
         if (rankDisplay.isLoading) {
-            summaryValue.textContent = 'Loading';
+            summaryValue.classList.add('is-loading');
+            summaryValue.setAttribute('aria-label', 'Loading your rank');
+            const loadingLabel = document.createElement('span');
+            loadingLabel.textContent = 'Rank';
             const spinner = document.createElement('span');
             spinner.className = 'modal-rank-spinner';
             spinner.setAttribute('aria-hidden', 'true');
-            summaryValue.appendChild(spinner);
+            summaryValue.append(loadingLabel, spinner);
         } else if (rankDisplay.text && rankDisplay.text !== 'N/A') {
             summaryValue.textContent = rankDisplay.text;
         } else {
@@ -1198,6 +1228,13 @@ export class ModalShell {
 
         const summaryMeta = document.createElement('span');
         summaryMeta.className = 'leaderboard-summary__meta';
+        const playerBestTime = Number(payload?.scoreboardSnapshot?.currentPlayerRow?.bestTime);
+        if (Number.isFinite(playerBestTime)) {
+            const playerTime = document.createElement('span');
+            playerTime.className = 'leaderboard-summary__time';
+            playerTime.textContent = this.content.formatTime(playerBestTime);
+            summaryMeta.appendChild(playerTime);
+        }
         if (submittedRacerCount > 0) {
             const racerCountText = submittedRacerCount.toLocaleString();
             summaryMeta.setAttribute(
@@ -1218,11 +1255,52 @@ export class ModalShell {
             racerIcon.appendChild(racerIconPath);
             summaryMeta.append(racerCount, racerIcon);
         } else {
-            summaryMeta.textContent = rankDisplay.isLoading ? 'Loading racers' : 'No racers yet';
+            summaryMeta.textContent = 'No racers yet';
+        }
+        if (rankDisplay.isLoading) {
+            summaryMeta.hidden = true;
+            summaryMeta.setAttribute('aria-hidden', 'true');
         }
 
         summary.append(summaryValue, summaryMeta);
         header?.appendChild(summary);
+    }
+
+    unbindLeaderboardPagination() {
+        if (this.modalLapTimes && this._leaderboardScrollHandler) {
+            this.modalLapTimes.removeEventListener('scroll', this._leaderboardScrollHandler);
+        }
+        this._leaderboardScrollHandler = null;
+        this._leaderboardPageLoading = false;
+    }
+
+    bindLeaderboardPagination() {
+        this.unbindLeaderboardPagination();
+        const onLoadMore = this._modalRunsPayload?.onLoadMoreLeaderboard;
+        if (!this.modalLapTimes || typeof onLoadMore !== 'function') return;
+
+        this._leaderboardScrollHandler = async () => {
+            if (this._leaderboardPageLoading) return;
+            if (!this._modalRunsPayload?.scoreboardSnapshot?.hasMore) return;
+            const remaining = this.modalLapTimes.scrollHeight
+                - this.modalLapTimes.scrollTop
+                - this.modalLapTimes.clientHeight;
+            if (remaining > 240) return;
+
+            this._leaderboardPageLoading = true;
+            const state = this.modalLapTimes.querySelector('.leaderboard-pagination-state');
+            state?.classList.add('is-loading');
+            if (state) state.textContent = 'Loading more racers…';
+            try {
+                await onLoadMore();
+            } catch (error) {
+                console.error('Error loading more leaderboard rows:', error);
+                if (state) state.textContent = 'Could not load more. Scroll to retry.';
+            } finally {
+                this._leaderboardPageLoading = false;
+            }
+        };
+        this.modalLapTimes.addEventListener('scroll', this._leaderboardScrollHandler, { passive: true });
     }
 
     configureRunsModalHeader() {

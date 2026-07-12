@@ -49,7 +49,7 @@ The Garage lets players change how their car looks without changing handling.
 ## Progress and competition
 
 - Your best time is shown for each available track.
-- Leaderboards show where your lap stands against other players.
+- Standings load the complete ranked field as you scroll and keep your own rank visible even when it is outside the currently loaded rows.
 - Medals are earned by beating fixed target times on each track.
 - The game is designed for fast retries, so improvement comes from learning braking points, corner shape, and clean exits.
 

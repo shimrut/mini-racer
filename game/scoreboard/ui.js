@@ -10,6 +10,35 @@ import {
 } from '../daily-challenge/service.js';
 import { getScoreboardSnapshot } from './service.js';
 
+const FULL_STANDINGS_PAGE_SIZE = 50;
+
+export function mergeLeaderboardPages(currentSnapshot, nextPage) {
+    if (!currentSnapshot || typeof currentSnapshot !== 'object') return nextPage || null;
+    if (!nextPage || typeof nextPage !== 'object') return currentSnapshot;
+
+    const rowsByRank = new Map();
+    for (const row of [
+        ...(Array.isArray(currentSnapshot.topRows) ? currentSnapshot.topRows : []),
+        ...(Array.isArray(nextPage.topRows) ? nextPage.topRows : []),
+    ]) {
+        const rank = Number(row?.rank);
+        if (!Number.isFinite(rank) || rank < 1) continue;
+        rowsByRank.set(rank, row);
+    }
+
+    return {
+        ...currentSnapshot,
+        ...nextPage,
+        topRows: [...rowsByRank.values()].sort((a, b) => a.rank - b.rank),
+        nearbyRows: Array.isArray(currentSnapshot.nearbyRows)
+            ? currentSnapshot.nearbyRows
+            : [],
+        currentPlayerRow: nextPage.currentPlayerRow || currentSnapshot.currentPlayerRow || null,
+        playerRank: nextPage.playerRank ?? currentSnapshot.playerRank ?? null,
+        playerRankLabel: nextPage.playerRankLabel ?? currentSnapshot.playerRankLabel ?? null,
+    };
+}
+
 function isValidDailyChallenge(challenge) {
     return Boolean(challenge?.id && challenge.trackKey && TRACKS[challenge.trackKey]);
 }
@@ -24,8 +53,16 @@ function getDailyChallengeDateSource(challenge) {
     return '';
 }
 
-function getDailyChallengeLeaderboardTitle(challenge, activeChallengeId = null) {
-    if (challenge?.id && activeChallengeId && challenge.id === activeChallengeId) {
+function isDailyChallengeToday(challenge, nowMs = Date.now()) {
+    const challengeTimeMs = Date.parse(getDailyChallengeDateSource(challenge));
+    if (!Number.isFinite(challengeTimeMs) || !Number.isFinite(nowMs)) return false;
+
+    return new Date(challengeTimeMs).toISOString().slice(0, 10)
+        === new Date(nowMs).toISOString().slice(0, 10);
+}
+
+function getDailyChallengeLeaderboardTitle(challenge) {
+    if (isDailyChallengeToday(challenge)) {
         return 'Today';
     }
 
@@ -48,7 +85,7 @@ function getDailyChallengeLeaderboardTitle(challenge, activeChallengeId = null) 
     return `${weekday} ${dateLabel}`;
 }
 
-function buildDailyChallengeLeaderboardDayOption(challenge, activeChallengeId = null) {
+function buildDailyChallengeLeaderboardDayOption(challenge) {
     if (!isValidDailyChallenge(challenge)) return null;
 
     const source = getDailyChallengeDateSource(challenge);
@@ -56,7 +93,7 @@ function buildDailyChallengeLeaderboardDayOption(challenge, activeChallengeId = 
     if (!Number.isFinite(timeMs)) {
         return {
             challengeId: challenge.id,
-            dayLabel: challenge.id === activeChallengeId ? 'Today' : 'Day',
+            dayLabel: 'Day',
             dateLabel: '--'
         };
     }
@@ -64,7 +101,7 @@ function buildDailyChallengeLeaderboardDayOption(challenge, activeChallengeId = 
     const date = new Date(timeMs);
     return {
         challengeId: challenge.id,
-        dayLabel: challenge.id === activeChallengeId
+        dayLabel: isDailyChallengeToday(challenge)
             ? 'Today'
             : new Intl.DateTimeFormat('en-US', {
                 weekday: 'short',
@@ -127,6 +164,7 @@ export class LeaderboardsUi {
         onSelectLeaderboardDay = null,
         primaryActionLabel = null,
         primaryAction = null,
+        onLoadMoreLeaderboard = null,
         onClose = null
     } = {}) {
         const payload = {
@@ -159,6 +197,9 @@ export class LeaderboardsUi {
         }
         if (typeof primaryAction === 'function') {
             payload.primaryAction = primaryAction;
+        }
+        if (typeof onLoadMoreLeaderboard === 'function') {
+            payload.onLoadMoreLeaderboard = onLoadMoreLeaderboard;
         }
         if (typeof onClose === 'function') {
             payload.onClose = onClose;
@@ -194,12 +235,18 @@ export class LeaderboardsUi {
         });
     }
 
-    async requestDailyChallengeLeaderboardSnapshot(challengeId, { forceRefresh = false } = {}) {
+    async requestDailyChallengeLeaderboardSnapshot(challengeId, {
+        forceRefresh = false,
+        limit = FULL_STANDINGS_PAGE_SIZE,
+        offset = 0,
+    } = {}) {
         if (!challengeId) return null;
 
         try {
             const scoreboardSnapshot = await getDailyChallengeSnapshot({
                 challengeId,
+                limit,
+                offset,
                 forceRefresh
             });
             this.syncDailyChallengeSummarySnapshot(challengeId, scoreboardSnapshot);
@@ -302,18 +349,17 @@ export class LeaderboardsUi {
         if (!challenge?.id || !challenge.trackKey || !TRACKS[challenge.trackKey]) return;
 
         const requestId = ++this._requestVersion;
-        const activeChallengeId = this.dailyChallengeUi.getSummary?.()?.challengeId || null;
         const historyChallenges = mergeDailyChallengeHistory(
             playlistChallenges ?? getCachedDailyChallengePlaylist(),
             challenge
         );
         const leaderboardDayOptions = historyChallenges
-            .map((entry) => buildDailyChallengeLeaderboardDayOption(entry, activeChallengeId))
+            .map((entry) => buildDailyChallengeLeaderboardDayOption(entry))
             .filter(Boolean);
         const sharedOptions = {
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: challenge.trackKey,
-            scoreboardTitle: getDailyChallengeLeaderboardTitle(challenge, activeChallengeId),
+            scoreboardTitle: getDailyChallengeLeaderboardTitle(challenge),
             scoreboardSubhead: getDailyChallengeTrackName(challenge),
             leaderboardDayOptions,
             selectedLeaderboardDayId: challenge.id,
@@ -336,6 +382,29 @@ export class LeaderboardsUi {
                 : null
         };
         const initialSnapshot = this.resolveInitialDailyChallengeSnapshot(challenge);
+        let currentSnapshot = initialSnapshot;
+        let pageRequest = null;
+        const loadMoreLeaderboard = async () => {
+            if (pageRequest) return pageRequest;
+            const nextOffset = Number(currentSnapshot?.nextOffset);
+            if (!currentSnapshot?.hasMore || !Number.isFinite(nextOffset)) {
+                return currentSnapshot;
+            }
+
+            pageRequest = this.requestDailyChallengeLeaderboardSnapshot(challenge.id, {
+                limit: FULL_STANDINGS_PAGE_SIZE,
+                offset: nextOffset,
+            }).then((page) => {
+                if (!page || requestId !== this._requestVersion) return currentSnapshot;
+                currentSnapshot = mergeLeaderboardPages(currentSnapshot, page);
+                this.updateModalScoreboardSnapshot(currentSnapshot);
+                return currentSnapshot;
+            }).finally(() => {
+                pageRequest = null;
+            });
+            return pageRequest;
+        };
+        sharedOptions.onLoadMoreLeaderboard = loadMoreLeaderboard;
 
         this.showLeaderboardModalState(returnMode, {
             ...sharedOptions,
@@ -346,10 +415,15 @@ export class LeaderboardsUi {
 
         const scoreboardSnapshot = await this.requestDailyChallengeLeaderboardSnapshot(
             challenge.id,
-            { forceRefresh: true }
+            {
+                forceRefresh: true,
+                limit: FULL_STANDINGS_PAGE_SIZE,
+                offset: 0,
+            }
         );
         if (requestId !== this._requestVersion) return;
         if (!scoreboardSnapshot && initialSnapshot) return;
+        currentSnapshot = scoreboardSnapshot;
 
         if (this.isRunsViewActive()) {
             this.showLeaderboardModalState(returnMode, {
@@ -377,22 +451,48 @@ export class LeaderboardsUi {
         const cachedSnapshot = providedSnapshot
             || this.getCachedTrackCardScoreboardSnapshot(trackKey, TRACK_MODE_DAILY_GP);
         const requestId = ++this._requestVersion;
+        let currentSnapshot = cachedSnapshot;
+        let pageRequest = null;
+        const loadMoreLeaderboard = async () => {
+            if (pageRequest) return pageRequest;
+            const nextOffset = Number(currentSnapshot?.nextOffset);
+            if (!currentSnapshot?.hasMore || !Number.isFinite(nextOffset)) {
+                return currentSnapshot;
+            }
+            pageRequest = this.loadScoreboardSnapshot({
+                trackKey,
+                limit: FULL_STANDINGS_PAGE_SIZE,
+                offset: nextOffset,
+            }).then((page) => {
+                if (!page || requestId !== this._requestVersion) return currentSnapshot;
+                currentSnapshot = mergeLeaderboardPages(currentSnapshot, page);
+                this.updateModalScoreboardSnapshot(currentSnapshot);
+                return currentSnapshot;
+            }).finally(() => {
+                pageRequest = null;
+            });
+            return pageRequest;
+        };
         this.showLeaderboardModalState(returnMode, {
             scoreboardSnapshot: cachedSnapshot || { isLoading: true },
-            scoreboardTrackKey: trackKey
+            scoreboardTrackKey: trackKey,
+            onLoadMoreLeaderboard: loadMoreLeaderboard,
         });
 
         try {
             const freshSnapshot = await this.loadScoreboardSnapshot({
                 trackKey,
-                limit: 10
+                limit: FULL_STANDINGS_PAGE_SIZE,
+                offset: 0,
             });
             if (requestId !== this._requestVersion) return;
+            currentSnapshot = freshSnapshot;
 
             if (this.isRunsViewActive()) {
                 this.showLeaderboardModalState(returnMode, {
                     scoreboardSnapshot: freshSnapshot,
-                    scoreboardTrackKey: trackKey
+                    scoreboardTrackKey: trackKey,
+                    onLoadMoreLeaderboard: loadMoreLeaderboard,
                 });
             } else {
                 this.updateModalScoreboardSnapshot(freshSnapshot);
