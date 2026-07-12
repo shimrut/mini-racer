@@ -24,6 +24,13 @@ Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put 
 - The `Tracks` screen keeps the last 7 days available to play.
 - Each track card shows the track preview, your best time, earned medals, and how long that track is still available.
 
+## Public Reddit posts and discoverability
+
+- Daily Reddit post titles use `Mini Racer, {D MMM}: {track name}`, for example `Mini Racer, 12 Jul: Neon Apex`.
+- The post text fallback provides a readable explanation of Mini Racer, its controls, leaderboard, medal targets, and seven-day track availability for Google, Reddit search, Reddit Answers, and clients that cannot render the interactive post.
+- The fallback is generated from existing challenge and medal data. Tracks do not require individually maintained marketing descriptions.
+- The richer discovery copy belongs to the text fallback; the visible Reddit title stays short and consistent.
+
 ## Track availability
 
 - A new track becomes the featured race each day.

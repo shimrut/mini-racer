@@ -8,7 +8,7 @@ How the game works today: [README.md](README.md#how-the-game-works).
 - Standings now load every scored racer in 50-row pages as the list is scrolled, while the current player's rank and best time remain visible in the header regardless of which ranks have loaded; the initial rank-loading state is compact and aligned with that header.
 - Upgraded the Devvit toolchain to 0.13.7 with Vite 7.3.6, aligned server imports with declared Devvit packages, and removed the deprecated no-op inline entrypoint flag.
 - Standings now show cached results immediately and then refresh from the server, keeping web and mobile entry counts aligned without replacing usable cached results when a refresh fails.
-- Daily Reddit posts now use `Mini Racer TOTD` consistently in the post title and plain-text fallback.
+- Daily Reddit posts now use the concise `Mini Racer, {D MMM}: {track name}` title format, while the text fallback supplies indexable product, control, medal, leaderboard, and availability information without requiring track-specific descriptions.
 - Reduced the production game bundle by canonicalizing module imports, removing unused helpers, and deleting legacy proxy configuration scaffolding.
 - Consolidated client leaderboard snapshot normalization and moderator menu-action error handling without changing public routes or response shapes.
 - Removed unused JS helper exports and an unused player-status store left behind after earlier flow changes.

@@ -168,7 +168,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |
 | Replay verification / anti-cheat changes | `src/server/replay-validator.ts`, `game/race/simulation.js`, `game/track/runtime.js`, `game/config.js` | `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | This is the highest-risk area because client and server must stay logically identical |
 | Analytics event changes | `game/player/service.js`, `src/server/analytics-store.ts` | `tools/analytics-dashboard.js`, `tools/analytics/schema.sql` | New event dimensions often need both collection and reporting updates |
-| Moderator workflows or daily autoposting | `src/server/index.ts`, `src/server/daily-gp-model.ts`, `src/server/reddit-post-title.ts` | `README.md`, analytics tooling if reporting changes | These flows are server-owned and tied to Devvit/Reddit context |
+| Moderator workflows, daily autoposting, or public post discovery copy | `src/server/index.ts`, `src/server/daily-gp-model.ts`, `src/server/reddit-post-title.ts` | `README.md`, `CHANGELOG.md`, `tests/reddit-post-title.test.js`, analytics tooling if reporting changes | These flows are server-owned and tied to Devvit/Reddit context; the outer post title and text fallback are the public search and Reddit Answers surfaces |
 
 ## High-Risk Shared Contracts
 

@@ -2,7 +2,11 @@ import { TRACKS } from '../../game/track/tracks.js';
 import medalTimes from '../../game/medals/medal-times.json' with { type: 'json' };
 import type { DailyGpChallenge } from './daily-gp-model.js';
 
-const DEFAULT_DAILY_POST_TITLE_FORMAT = 'Mini Racer TOTD - {trackName}';
+const DEFAULT_DAILY_POST_TITLE_FORMAT = 'Mini Racer, {displayDate}: {trackName}';
+const SHORT_MONTH_NAMES = Object.freeze([
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]);
 
 type DailyPostTitleTokens = {
     authorMedalTime: string;
@@ -10,6 +14,7 @@ type DailyPostTitleTokens = {
     challengeDate: string;
     challengeId: string;
     date: string;
+    displayDate: string;
     goldMedalTime: string;
     medalTimes: string;
     personalBest: string;
@@ -36,6 +41,19 @@ function formatSeconds(value: unknown): string {
         : '--';
 }
 
+function formatChallengeDate(value: string, includeYear = false): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return value;
+
+    const [, year, monthText, dayText] = match;
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const monthName = SHORT_MONTH_NAMES[month - 1];
+    if (!monthName || day < 1 || day > 31) return value;
+
+    return `${day} ${monthName}${includeYear ? ` ${year}` : ''}`;
+}
+
 function getMedalTimeTokens(trackKey: string) {
     const row = (medalTimes as Record<string, Record<string, unknown>>)[trackKey] || {};
     const authorMedalTime = formatSeconds(row.author);
@@ -59,7 +77,7 @@ function getMedalTimeTokens(trackKey: string) {
 }
 
 function applyTitleTemplate(template: string, tokens: DailyPostTitleTokens): string {
-    return template.replace(/\{(authorMedalTime|bronzeMedalTime|challengeDate|challengeId|date|goldMedalTime|medalTimes|personalBest|personalBestTime|silverMedalTime|trackName)\}/g, (_match, key: keyof DailyPostTitleTokens) => {
+    return template.replace(/\{(authorMedalTime|bronzeMedalTime|challengeDate|challengeId|date|displayDate|goldMedalTime|medalTimes|personalBest|personalBestTime|silverMedalTime|trackName)\}/g, (_match, key: keyof DailyPostTitleTokens) => {
         return tokens[key];
     });
 }
@@ -74,6 +92,7 @@ export function formatDailyMiniRacerPostTitle(
         challengeDate: challenge.challengeDate,
         challengeId: challenge.id,
         date: challenge.challengeDate,
+        displayDate: formatChallengeDate(challenge.challengeDate),
         personalBest: personalBestTime,
         personalBestTime,
         trackName,
@@ -82,16 +101,33 @@ export function formatDailyMiniRacerPostTitle(
 }
 
 export function formatDailyMiniRacerTextFallback(challenge: DailyGpChallenge): string {
+    const trackName = TRACKS[challenge.trackKey]?.name || challenge.trackKey;
+    const medalTimeTokens = getMedalTimeTokens(challenge.trackKey);
+
     return [
-        '# Mini Racer TOTD',
+        '# Mini Racer Track of the Day',
         '',
-        `Track: ${TRACKS[challenge.trackKey]?.name || challenge.trackKey}`,
-        `Date: ${challenge.challengeDate}`,
+        `Today's track: **${trackName}**`,
+        `Date: ${formatChallengeDate(challenge.challengeDate, true)}`,
         '',
-        'Playable Reddit racing challenge.',
+        'Mini Racer is a free, one-lap daily racing game played directly on Reddit. Race today\'s track, improve your personal best, earn medals, and compete on the live leaderboard.',
         '',
-        '- One featured track per day',
-        '- Fast retries',
-        '- Personal best plus live leaderboard',
+        '## How to play',
+        '',
+        '- Desktop: use Left/Right Arrow or A/D to steer.',
+        '- Mobile: use the on-screen left and right controls.',
+        '- There is no separate brake control. The car slows as you turn, so timing and a clean racing line matter.',
+        '- Crashing ends the attempt, but you can restart immediately.',
+        '- Your fastest verified lap appears on the daily leaderboard.',
+        '',
+        '## Today\'s medal times',
+        '',
+        `- Gold: ${medalTimeTokens.goldMedalTime}`,
+        `- Silver: ${medalTimeTokens.silverMedalTime}`,
+        `- Bronze: ${medalTimeTokens.bronzeMedalTime}`,
+        '',
+        'Open this post on Reddit and select **Race Now** to play.',
+        '',
+        'A new track is featured every day, and recent tracks remain playable for seven days.',
     ].join('\n');
 }
