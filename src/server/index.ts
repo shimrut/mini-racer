@@ -22,6 +22,7 @@ import {
     formatDailyMiniRacerPostTitle,
     formatDailyMiniRacerTextFallback,
 } from './reddit-post-title.js';
+import { getCommunityMemberCount } from './community-member-count.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -461,30 +462,6 @@ async function ensureModeratorAnalyticsPostForSubreddit(
     };
 }
 
-/** Reddit sometimes returns counts as strings; treat any finite number ≥ 1 as valid. */
-function coercePositiveSubscriberCount(raw: unknown): number | undefined {
-    if (raw == null) {
-        return undefined;
-    }
-    const n = typeof raw === 'number' ? raw : Number(raw);
-    if (!Number.isFinite(n) || n < 1) {
-        return undefined;
-    }
-    return Math.min(Math.trunc(n), 1_000_000);
-}
-
-function pickSubredditInfoSubscriberCount(info: object | null | undefined): number | undefined {
-    if (!info) {
-        return undefined;
-    }
-    const record = info as Record<string, unknown>;
-    return coercePositiveSubscriberCount(
-        record.subscribersCount
-        ?? record.subscribers
-        ?? record.subscriberCount,
-    );
-}
-
 async function getPostSubredditContext(): Promise<{ id?: `t5_${string}`; name?: string } | null> {
     const postId = readContextPostId();
     if (!postId) {
@@ -507,82 +484,19 @@ async function getPostSubredditContext(): Promise<{ id?: `t5_${string}`; name?: 
     }
 }
 
-async function countListingUsernames(listing: { all(): Promise<Array<{ username?: string }>> }): Promise<Set<string>> {
-    const users = await listing.all();
-    return new Set(
-        users
-            .map((user) => typeof user?.username === 'string' ? user.username.trim().toLowerCase() : '')
-            .filter(Boolean),
-    );
-}
-
-async function getListedCommunityUserCount(subredditName: string): Promise<number | undefined> {
-    try {
-        const subreddit = await reddit.getSubredditByName(subredditName);
-        const [approvedUsers, moderators] = await Promise.all([
-            countListingUsernames(subreddit.getApprovedUsers({ limit: 1000, pageSize: 100 })),
-            countListingUsernames(subreddit.getModerators({ limit: 1000, pageSize: 100 })),
-        ]);
-        const users = new Set([...approvedUsers, ...moderators]);
-        return users.size > 0 ? users.size : undefined;
-    } catch (error) {
-        console.error('Failed to list approved users/moderators for leaderboard community size:', error);
-        return undefined;
-    }
-}
-
 /**
  * Member count for "rank out of N" and open leaderboard slots.
- * Prefer exact accessible users/mods when available; otherwise use public subscriber count.
+ * Use Reddit's public subscriber count; leaderboard entries remain the store fallback.
  */
 async function getCommunityMemberTotalForLeaderboard(): Promise<number | undefined> {
-    const postSubreddit = await getPostSubredditContext();
-    const subredditId = readContextSubredditId() || postSubreddit?.id || null;
-    const subredditName = readContextSubredditName() || postSubreddit?.name || null;
-    const candidates: number[] = [];
-
-    if (subredditName) {
-        const listedCount = await getListedCommunityUserCount(subredditName);
-        if (listedCount != null) {
-            candidates.push(listedCount);
-        }
+    let subredditId = readContextSubredditId();
+    let subredditName = readContextSubredditName();
+    if (!subredditId && !subredditName) {
+        const postSubreddit = await getPostSubredditContext();
+        subredditId = postSubreddit?.id || null;
+        subredditName = postSubreddit?.name || null;
     }
-
-    if (subredditId) {
-        try {
-            const info = await reddit.getSubredditInfoById(subredditId as `t5_${string}`);
-            const n = pickSubredditInfoSubscriberCount(info);
-            if (n != null) {
-                candidates.push(n);
-            }
-        } catch (error) {
-            console.error('getSubredditInfoById failed for leaderboard community size:', error);
-        }
-    }
-
-    if (subredditName) {
-        try {
-            const info = await reddit.getSubredditInfoByName(subredditName);
-            const n = pickSubredditInfoSubscriberCount(info);
-            if (n != null) {
-                candidates.push(n);
-            }
-        } catch (error) {
-            console.error('getSubredditInfoByName failed for leaderboard community size:', error);
-        }
-    }
-
-    try {
-        const subreddit = await reddit.getCurrentSubreddit();
-        const n = coercePositiveSubscriberCount(subreddit?.numberOfSubscribers);
-        if (n != null) {
-            candidates.push(n);
-        }
-    } catch (error) {
-        console.error('getCurrentSubreddit failed for leaderboard community size:', error);
-    }
-
-    return candidates.length ? Math.max(...candidates) : undefined;
+    return getCommunityMemberCount({ subredditId, subredditName });
 }
 
 app.get('/api/player/bootstrap', async (req, res) => {
