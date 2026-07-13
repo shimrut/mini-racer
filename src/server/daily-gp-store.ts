@@ -1,4 +1,5 @@
 import { redis } from '@devvit/redis';
+import { createHash } from 'node:crypto';
 import { TRACKS } from '../../game/track/tracks.js';
 import {
     normalizeLeaderboardIdentityPreference,
@@ -439,8 +440,37 @@ function parseStoredPlayerProfile(raw: string | null | undefined): DailyGpPlayer
     }
 }
 
-async function ensurePlayerProfileTtl(): Promise<void> {
-    await redis.expire(createRedisPlayerProfileHashKey(), DAILY_GP_PLAYER_PROFILE_TTL_SECONDS);
+function createRedisPlayerProfileKey(playerId: string): string {
+    const playerKey = createHash('sha256')
+        .update(playerId, 'utf8')
+        .digest('base64url');
+    return `dailygp:player-profile:${playerKey}`;
+}
+
+function createPlayerProfileExpirationDate(): Date {
+    return new Date(Date.now() + DAILY_GP_PLAYER_PROFILE_TTL_SECONDS * 1000);
+}
+
+async function writePlayerProfile(profile: DailyGpPlayerProfile): Promise<void> {
+    await redis.set(
+        createRedisPlayerProfileKey(profile.playerId),
+        JSON.stringify(profile),
+        { expiration: createPlayerProfileExpirationDate() },
+    );
+}
+
+async function migrateLegacyPlayerProfiles(
+    profiles: DailyGpPlayerProfile[],
+): Promise<void> {
+    if (!profiles.length) {
+        return;
+    }
+
+    await Promise.all(profiles.map((profile) => writePlayerProfile(profile)));
+    await redis.hDel(
+        createRedisPlayerProfileHashKey(),
+        profiles.map((profile) => profile.playerId),
+    );
 }
 
 function resolveStoredLeaderboardIdentity(
@@ -557,8 +587,18 @@ async function resolveAuthorizedPlayerIdentity({
 }
 
 async function readPlayerProfile(playerId: string): Promise<DailyGpPlayerProfile | null> {
-    const rawProfile = await redis.hGet(createRedisPlayerProfileHashKey(), playerId);
-    return parseStoredPlayerProfile(rawProfile);
+    const rawProfile = await redis.get(createRedisPlayerProfileKey(playerId));
+    const profile = parseStoredPlayerProfile(rawProfile);
+    if (profile) {
+        return profile;
+    }
+
+    const legacyRawProfile = await redis.hGet(createRedisPlayerProfileHashKey(), playerId);
+    const legacyProfile = parseStoredPlayerProfile(legacyRawProfile);
+    if (legacyProfile) {
+        await migrateLegacyPlayerProfiles([legacyProfile]);
+    }
+    return legacyProfile;
 }
 
 async function upsertPlayerProfile({
@@ -592,11 +632,7 @@ async function upsertPlayerProfile({
         updatedAt: nowIso,
     };
 
-    await redis.hSet(
-        createRedisPlayerProfileHashKey(),
-        { [playerId]: JSON.stringify(nextProfile) },
-    );
-    await ensurePlayerProfileTtl();
+    await writePlayerProfile(nextProfile);
     return nextProfile;
 }
 
@@ -606,15 +642,30 @@ async function readPlayerProfileMap(playerIds: string[]): Promise<Map<string, Da
         return new Map();
     }
 
-    const rawProfiles = await redis.hMGet(createRedisPlayerProfileHashKey(), uniquePlayerIds);
+    const rawProfiles = await redis.mGet(uniquePlayerIds.map(createRedisPlayerProfileKey));
     const profileMap = new Map<string, DailyGpPlayerProfile>();
+    const missingPlayerIds: string[] = [];
 
     uniquePlayerIds.forEach((playerId, index) => {
         const parsed = parseStoredPlayerProfile(rawProfiles[index]);
         if (parsed) {
             profileMap.set(playerId, parsed);
+        } else {
+            missingPlayerIds.push(playerId);
         }
     });
+
+    if (missingPlayerIds.length) {
+        const legacyRawProfiles = await redis.hMGet(
+            createRedisPlayerProfileHashKey(),
+            missingPlayerIds,
+        );
+        const legacyProfiles = legacyRawProfiles
+            .map((rawProfile) => parseStoredPlayerProfile(rawProfile))
+            .filter((profile): profile is DailyGpPlayerProfile => Boolean(profile));
+        legacyProfiles.forEach((profile) => profileMap.set(profile.playerId, profile));
+        await migrateLegacyPlayerProfiles(legacyProfiles);
+    }
 
     return profileMap;
 }

@@ -37,6 +37,10 @@ class RedisTestDouble {
     return this.strings.get(key);
   }
 
+  async mGet(keys) {
+    return Promise.all(keys.map((key) => this.get(key) ?? null));
+  }
+
   async set(key, value, options = {}) {
     this._isExpired(key);
     if (options?.nx && this.strings.has(key)) {
@@ -78,6 +82,17 @@ class RedisTestDouble {
   async hGet(key, field) {
     this._isExpired(key);
     return this.hashes.get(key)?.get(field);
+  }
+
+  async hDel(key, fields) {
+    this._isExpired(key);
+    const hash = this.hashes.get(key);
+    if (!hash) return 0;
+    let removed = 0;
+    for (const field of fields) {
+      if (hash.delete(field)) removed += 1;
+    }
+    return removed;
   }
 
   async hSet(key, fieldValues) {

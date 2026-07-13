@@ -4,10 +4,12 @@ import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-ba
 
 const mockRedis = {
     get: vi.fn(),
+    mGet: vi.fn(),
     set: vi.fn(),
     del: vi.fn(),
     incrBy: vi.fn(),
     hGet: vi.fn(),
+    hDel: vi.fn(),
     hMGet: vi.fn(),
     hSet: vi.fn(),
     hSetNX: vi.fn(),
@@ -29,6 +31,21 @@ function checkpointSplitsForChallenge(challenge, bestTimeSec) {
     });
 }
 
+function findWrittenPlayerProfile(playerId) {
+    for (const [key, rawProfile, options] of [...mockRedis.set.mock.calls].reverse()) {
+        if (!String(key).startsWith('dailygp:player-profile:')) continue;
+        try {
+            const profile = JSON.parse(rawProfile);
+            if (profile.playerId === playerId) {
+                return { key, profile, options };
+            }
+        } catch (_error) {
+            // Ignore non-profile Redis values.
+        }
+    }
+    return null;
+}
+
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('../src/server/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
@@ -38,10 +55,12 @@ describe('server daily gp store submissions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockRedis.get.mockResolvedValue(null);
+        mockRedis.mGet.mockResolvedValue([]);
         mockRedis.set.mockResolvedValue('OK');
         mockRedis.del.mockResolvedValue(undefined);
         mockRedis.incrBy.mockResolvedValue(1);
         mockRedis.hGet.mockResolvedValue(null);
+        mockRedis.hDel.mockResolvedValue(0);
         mockRedis.hMGet.mockResolvedValue([]);
         mockRedis.hSet.mockResolvedValue(1);
         mockRedis.hSetNX.mockResolvedValue(1);
@@ -357,8 +376,9 @@ describe('server daily gp store submissions', () => {
         });
 
         expect(payload.leaderboardIdentity).toBe('reddit');
-        const storedProfile = JSON.parse(mockRedis.hSet.mock.calls[0][1]['reddit:pm-user']);
-        expect(storedProfile.leaderboardIdentity).toBe('reddit');
+        const storedProfile = findWrittenPlayerProfile('reddit:pm-user');
+        expect(storedProfile.profile.leaderboardIdentity).toBe('reddit');
+        expect(mockRedis.hDel).toHaveBeenCalledWith('dailygp:player-profiles', ['reddit:pm-user']);
     });
 
     it('updates stored identity only when the player explicitly changes it', async () => {
@@ -385,8 +405,8 @@ describe('server daily gp store submissions', () => {
             guestToken: null,
             leaderboardIdentity: 'reddit',
         });
-        const storedProfile = JSON.parse(mockRedis.hSet.mock.calls[0][1]['reddit:pm-user']);
-        expect(storedProfile.leaderboardIdentity).toBe('reddit');
+        const storedProfile = findWrittenPlayerProfile('reddit:pm-user');
+        expect(storedProfile.profile.leaderboardIdentity).toBe('reddit');
     });
 
     it('stores player preferences in Redis and restores them in the next bootstrap', async () => {
@@ -414,15 +434,33 @@ describe('server daily gp store submissions', () => {
             playerPreferences,
         });
 
-        const profileWrite = mockRedis.hSet.mock.calls.find((call) => call[1]?.['reddit:pm-user']);
-        const storedProfile = JSON.parse(profileWrite[1]['reddit:pm-user']);
+        const profileWrite = findWrittenPlayerProfile('reddit:pm-user');
+        const storedProfile = profileWrite.profile;
         expect(storedProfile.preferences).toEqual(playerPreferences);
 
-        mockRedis.hGet.mockResolvedValueOnce(JSON.stringify(storedProfile));
+        mockRedis.get.mockResolvedValueOnce(JSON.stringify(storedProfile));
         const bootstrap = await getServerPlayerBootstrap({
             playerId: 'new-browser-player-id-after-update',
             redditUsername: 'Pm-User',
         });
         expect(bootstrap.playerPreferences).toEqual(playerPreferences);
+    });
+
+    it('gives each player profile its own 180-day expiration', async () => {
+        const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+        const beforeWrite = Date.now();
+
+        await getServerPlayerBootstrap({ redditUsername: 'Player-One' });
+        await getServerPlayerBootstrap({ redditUsername: 'Player-Two' });
+
+        const first = findWrittenPlayerProfile('reddit:player-one');
+        const second = findWrittenPlayerProfile('reddit:player-two');
+        expect(first.key).not.toBe(second.key);
+        expect(first.options.expiration).toBeInstanceOf(Date);
+        expect(second.options.expiration).toBeInstanceOf(Date);
+        const minimumExpectedExpiry = beforeWrite + (179 * 24 * 60 * 60 * 1000);
+        expect(first.options.expiration.getTime()).toBeGreaterThan(minimumExpectedExpiry);
+        expect(second.options.expiration.getTime()).toBeGreaterThan(minimumExpectedExpiry);
+        expect(mockRedis.expire).not.toHaveBeenCalledWith('dailygp:player-profiles', expect.anything());
     });
 });
