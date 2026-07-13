@@ -83,7 +83,8 @@ flowchart LR
 
 - `src/server/index.ts` exposes all `/api/*` endpoints and Devvit moderator/internal actions.
 - `src/server/daily-gp-model.ts` defines the challenge schedule, IDs, playable window, and Redis key model.
-- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. Player profiles use derived per-player Redis keys with independent 180-day expiration; legacy shared-hash profiles migrate lazily when read. The published challenge history hash uses the same TTL as the installed Devvit server.
+- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. Player profiles use derived per-player Redis keys with independent 180-day expiration. The retired shared profile hash is not read or migrated, preventing stale records from replacing current preferences. The published challenge history hash uses the same TTL as the installed Devvit server.
+- Daily GP submission transactions watch the submitting player's existing Redis lock, not the shared leaderboard keys, so different players can commit concurrently. The server returns `accepted: true` only after `EXEC` returns a non-empty result; an empty or missing result becomes a retryable `503`, and the browser keeps the replay in its local verification queue.
 - `src/server/community-member-count.ts` reads the public `subscribersCount` through Reddit's community-info API and caches it in Redis for five minutes. Standings use accepted leaderboard entries when Reddit does not return a usable count.
 - `game/shared/daily-gp-history-backfill.js` isolates the June 2-11, 2026 published-history seed used to backfill the server history store.
 - `src/server/replay-validator.ts` replays submitted inputs against shared track/physics logic before the server accepts a run.

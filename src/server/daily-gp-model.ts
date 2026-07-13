@@ -132,7 +132,3 @@ export function createRedisChallengeLeaderboardKey(challengeId: string): string 
 export function createRedisChallengeEntryHashKey(challengeId: string): string {
     return `dailygp:leaderboard:${challengeId}:entries`;
 }
-
-export function createRedisPlayerProfileHashKey(): string {
-    return 'dailygp:player-profiles';
-}

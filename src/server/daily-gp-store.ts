@@ -12,7 +12,6 @@ import {
     createDailyChallengeId,
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
-    createRedisPlayerProfileHashKey,
     DAILY_GP_DEFAULT_LIMIT,
     DAILY_GP_NEARBY_RADIUS,
     DAILY_GP_PLAYLIST_DAYS,
@@ -459,20 +458,6 @@ async function writePlayerProfile(profile: DailyGpPlayerProfile): Promise<void> 
     );
 }
 
-async function migrateLegacyPlayerProfiles(
-    profiles: DailyGpPlayerProfile[],
-): Promise<void> {
-    if (!profiles.length) {
-        return;
-    }
-
-    await Promise.all(profiles.map((profile) => writePlayerProfile(profile)));
-    await redis.hDel(
-        createRedisPlayerProfileHashKey(),
-        profiles.map((profile) => profile.playerId),
-    );
-}
-
 function resolveStoredLeaderboardIdentity(
     leaderboardIdentity: unknown,
     previousProfile: DailyGpPlayerProfile | null,
@@ -588,17 +573,7 @@ async function resolveAuthorizedPlayerIdentity({
 
 async function readPlayerProfile(playerId: string): Promise<DailyGpPlayerProfile | null> {
     const rawProfile = await redis.get(createRedisPlayerProfileKey(playerId));
-    const profile = parseStoredPlayerProfile(rawProfile);
-    if (profile) {
-        return profile;
-    }
-
-    const legacyRawProfile = await redis.hGet(createRedisPlayerProfileHashKey(), playerId);
-    const legacyProfile = parseStoredPlayerProfile(legacyRawProfile);
-    if (legacyProfile) {
-        await migrateLegacyPlayerProfiles([legacyProfile]);
-    }
-    return legacyProfile;
+    return parseStoredPlayerProfile(rawProfile);
 }
 
 async function upsertPlayerProfile({
@@ -644,28 +619,13 @@ async function readPlayerProfileMap(playerIds: string[]): Promise<Map<string, Da
 
     const rawProfiles = await redis.mGet(uniquePlayerIds.map(createRedisPlayerProfileKey));
     const profileMap = new Map<string, DailyGpPlayerProfile>();
-    const missingPlayerIds: string[] = [];
 
     uniquePlayerIds.forEach((playerId, index) => {
         const parsed = parseStoredPlayerProfile(rawProfiles[index]);
         if (parsed) {
             profileMap.set(playerId, parsed);
-        } else {
-            missingPlayerIds.push(playerId);
         }
     });
-
-    if (missingPlayerIds.length) {
-        const legacyRawProfiles = await redis.hMGet(
-            createRedisPlayerProfileHashKey(),
-            missingPlayerIds,
-        );
-        const legacyProfiles = legacyRawProfiles
-            .map((rawProfile) => parseStoredPlayerProfile(rawProfile))
-            .filter((profile): profile is DailyGpPlayerProfile => Boolean(profile));
-        legacyProfiles.forEach((profile) => profileMap.set(profile.playerId, profile));
-        await migrateLegacyPlayerProfiles(legacyProfiles);
-    }
 
     return profileMap;
 }
@@ -1298,7 +1258,7 @@ export async function submitServerDailyGpRun({
 
         const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
         const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
-        const tx = await redis.watch(entryHashKey, leaderboardKey);
+        const tx = await redis.watch(submissionLock.key);
         await tx.multi();
         await tx.hSet(
             entryHashKey,
@@ -1313,7 +1273,16 @@ export async function submitServerDailyGpRun({
         );
         await tx.expire(leaderboardKey, DAILY_GP_REDIS_TTL_SECONDS);
         await tx.expire(entryHashKey, DAILY_GP_REDIS_TTL_SECONDS);
-        await tx.exec();
+        const transactionResults = await tx.exec();
+        if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
+            return {
+                status: 503,
+                body: {
+                    accepted: false,
+                    error: 'Submission save was interrupted. Retrying automatically.',
+                },
+            };
+        }
     } finally {
         await releaseSubmissionLock(submissionLock);
     }

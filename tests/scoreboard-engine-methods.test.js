@@ -30,16 +30,23 @@ describe("scoreboard engine verification retries", () => {
     delete globalThis.window;
   });
 
-  it("keeps retryable submit failures queued instead of converting them to terminal errors", async () => {
+  it.each([
+    [504, null],
+    [503, {
+      accepted: false,
+      error: "Submission save was interrupted. Retrying automatically.",
+    }],
+  ])("keeps retryable HTTP %i submit failures queued instead of converting them to terminal errors", async (status, body) => {
+    const challengeId = `daily-${status}`;
     enqueueDailyChallengeVerification({
-      challengeId: "daily-504",
+      challengeId,
       bestTime: 44,
       replay: REPLAY,
       objectiveType: "single_lap_fastest",
       trackKey: "circuit",
     });
 
-    const entry = getDailyChallengeVerificationEntry("daily-504");
+    const entry = getDailyChallengeVerificationEntry(challengeId);
     const engine = {
       dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
       modal: {
@@ -53,23 +60,24 @@ describe("scoreboard engine verification retries", () => {
       entry,
       {
         ok: false,
-        status: 504,
-        body: null,
+        status,
+        body,
       },
     );
 
-    expect(getDailyChallengeVerificationEntry("daily-504")).toMatchObject({
+    expect(getDailyChallengeVerificationEntry(challengeId)).toMatchObject({
       verificationState: "pending",
       submissionStage: "retrying",
     });
     expect(engine.dailyChallengeUi.refreshDailyChallengeVerificationState).toHaveBeenCalledWith(
-      "daily-504",
+      challengeId,
     );
     expect(engine.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
         verificationState: "pending",
         submissionStage: "retrying",
         isLoading: true,
+        ...(body?.error ? { statusText: body.error } : {}),
       }),
     );
   });

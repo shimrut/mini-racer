@@ -9,7 +9,6 @@ const mockRedis = {
     del: vi.fn(),
     incrBy: vi.fn(),
     hGet: vi.fn(),
-    hDel: vi.fn(),
     hMGet: vi.fn(),
     hSet: vi.fn(),
     hSetNX: vi.fn(),
@@ -46,6 +45,34 @@ function findWrittenPlayerProfile(playerId) {
     return null;
 }
 
+function createMockTransaction(options = {}) {
+    const commands = [];
+    const hasExecResult = Object.prototype.hasOwnProperty.call(options, 'execResult');
+    return {
+        multi: vi.fn().mockResolvedValue(undefined),
+        hSet: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.hSet(...args));
+        }),
+        zAdd: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.zAdd(...args));
+        }),
+        expire: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.expire(...args));
+        }),
+        exec: vi.fn(async () => {
+            if (hasExecResult) {
+                return options.execResult;
+            }
+
+            const results = [];
+            for (const command of commands) {
+                results.push(await command());
+            }
+            return results;
+        }),
+    };
+}
+
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('../src/server/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
@@ -60,7 +87,6 @@ describe('server daily gp store submissions', () => {
         mockRedis.del.mockResolvedValue(undefined);
         mockRedis.incrBy.mockResolvedValue(1);
         mockRedis.hGet.mockResolvedValue(null);
-        mockRedis.hDel.mockResolvedValue(0);
         mockRedis.hMGet.mockResolvedValue([]);
         mockRedis.hSet.mockResolvedValue(1);
         mockRedis.hSetNX.mockResolvedValue(1);
@@ -71,19 +97,7 @@ describe('server daily gp store submissions', () => {
         mockRedis.zCard.mockResolvedValue(0);
         mockRedis.zRange.mockResolvedValue([]);
         mockRedis.zRank.mockResolvedValue(undefined);
-        mockRedis.watch.mockImplementation(() => ({
-            multi: vi.fn().mockResolvedValue(undefined),
-            hSet: vi.fn(async (...args) => {
-                await mockRedis.hSet(...args);
-            }),
-            zAdd: vi.fn(async (...args) => {
-                await mockRedis.zAdd(...args);
-            }),
-            expire: vi.fn(async (...args) => {
-                await mockRedis.expire(...args);
-            }),
-            exec: vi.fn().mockResolvedValue([]),
-        }));
+        mockRedis.watch.mockImplementation(() => createMockTransaction());
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: true,
             run: {
@@ -139,6 +153,123 @@ describe('server daily gp store submissions', () => {
         expect(leaderboardEntry.bestTimeMs).toBe(12345);
         expect(leaderboardEntry.checkpointTimesSec).toEqual([4.2, 9.8]);
         expect(leaderboardEntry.validationMethod).toBe('strict-replay');
+    });
+
+    it('commits concurrent submissions from different players under separate submission locks', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        vi.clearAllMocks();
+
+        const submit = (redditUsername) => submitServerDailyGpRun({
+            playerId: `browser-${redditUsername}`,
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            leaderboardIdentity: 'constructed',
+            redditUsername,
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+        const results = await Promise.all([submit('Pm-A'), submit('Pm-B')]);
+
+        expect(results).toEqual([
+            expect.objectContaining({ status: 200, body: expect.objectContaining({ accepted: true }) }),
+            expect.objectContaining({ status: 200, body: expect.objectContaining({ accepted: true }) }),
+        ]);
+        expect(new Set(mockRedis.watch.mock.calls.map(([key]) => key))).toEqual(new Set([
+            `dailygp:submit-lock:${challenge.id}:reddit:pm-a`,
+            `dailygp:submit-lock:${challenge.id}:reddit:pm-b`,
+        ]));
+        expect(mockRedis.zAdd).toHaveBeenCalledWith(
+            expect.stringContaining(challenge.id),
+            expect.objectContaining({ member: 'reddit:pm-a', score: 12345 }),
+        );
+        expect(mockRedis.zAdd).toHaveBeenCalledWith(
+            expect.stringContaining(challenge.id),
+            expect.objectContaining({ member: 'reddit:pm-b', score: 12345 }),
+        );
+        const writtenLeaderboardPlayerIds = mockRedis.hSet.mock.calls.flatMap(([, entries]) => {
+            return entries && typeof entries === 'object' ? Object.keys(entries) : [];
+        });
+        expect(writtenLeaderboardPlayerIds).toEqual(expect.arrayContaining([
+            'reddit:pm-a',
+            'reddit:pm-b',
+        ]));
+    });
+
+    it('rejects a concurrent submission from the same player while its lock is held', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        vi.clearAllMocks();
+        let lockAttempts = 0;
+        mockRedis.set.mockImplementation(async (key) => {
+            if (!String(key).startsWith('dailygp:submit-lock:')) {
+                return 'OK';
+            }
+            lockAttempts += 1;
+            return lockAttempts === 1 ? 'OK' : null;
+        });
+
+        const submit = () => submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            leaderboardIdentity: 'constructed',
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+        const results = await Promise.all([submit(), submit()]);
+
+        expect(results.map((result) => result.status).sort()).toEqual([200, 429]);
+        expect(results).toContainEqual({
+            status: 429,
+            body: {
+                accepted: false,
+                error: 'Submission already in progress. Try again in a moment.',
+                retryAfterSeconds: 1,
+            },
+        });
+        expect(mockRedis.zAdd).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        { label: 'an empty result', execResult: [] },
+        { label: 'a null result', execResult: null },
+        { label: 'a missing result', execResult: undefined },
+    ])('returns a retryable failure and releases the lock when EXEC returns $label', async ({ execResult }) => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        vi.clearAllMocks();
+        let ownedLock = null;
+        mockRedis.set.mockImplementation(async (key, value) => {
+            if (String(key).startsWith('dailygp:submit-lock:')) {
+                ownedLock = { key, value };
+            }
+            return 'OK';
+        });
+        mockRedis.get.mockImplementation(async (key) => {
+            return key === ownedLock?.key ? ownedLock.value : null;
+        });
+        mockRedis.watch.mockImplementation(() => createMockTransaction({ execResult }));
+
+        const result = await submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            leaderboardIdentity: 'constructed',
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(result).toEqual({
+            status: 503,
+            body: {
+                accepted: false,
+                error: 'Submission save was interrupted. Retrying automatically.',
+            },
+        });
+        expect(mockRedis.zAdd).not.toHaveBeenCalled();
+        expect(mockRedis.hSet.mock.calls.some(([, entries]) => entries?.['reddit:pm-user'])).toBe(false);
+        expect(ownedLock).not.toBe(null);
+        expect(mockRedis.del).toHaveBeenCalledWith(ownedLock.key);
     });
 
     it('backfills published Daily GP history before building the playlist', async () => {
@@ -359,7 +490,7 @@ describe('server daily gp store submissions', () => {
 
     it('keeps the last stored identity on bootstrap reads until the player changes it', async () => {
         const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-        mockRedis.hGet.mockResolvedValueOnce(JSON.stringify({
+        mockRedis.get.mockResolvedValueOnce(JSON.stringify({
             playerId: 'reddit:pm-user',
             leaderboardIdentity: 'reddit',
             redditUsername: 'Pm-User',
@@ -378,12 +509,11 @@ describe('server daily gp store submissions', () => {
         expect(payload.leaderboardIdentity).toBe('reddit');
         const storedProfile = findWrittenPlayerProfile('reddit:pm-user');
         expect(storedProfile.profile.leaderboardIdentity).toBe('reddit');
-        expect(mockRedis.hDel).toHaveBeenCalledWith('dailygp:player-profiles', ['reddit:pm-user']);
     });
 
     it('updates stored identity only when the player explicitly changes it', async () => {
         const { updateServerPlayerIdentity } = await import('../src/server/daily-gp-store.ts');
-        mockRedis.hGet.mockResolvedValueOnce(JSON.stringify({
+        mockRedis.get.mockResolvedValueOnce(JSON.stringify({
             playerId: 'reddit:pm-user',
             leaderboardIdentity: 'constructed',
             redditUsername: 'Pm-User',
@@ -407,6 +537,40 @@ describe('server daily gp store submissions', () => {
         });
         const storedProfile = findWrittenPlayerProfile('reddit:pm-user');
         expect(storedProfile.profile.leaderboardIdentity).toBe('reddit');
+    });
+
+    it('ignores profiles left in the retired shared hash', async () => {
+        const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+        mockRedis.hGet.mockResolvedValueOnce(JSON.stringify({
+            playerId: 'reddit:pm-user',
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'Pm-User',
+            preferences: {
+                carSkin: 'assets/cars/retired.webp',
+                trailId: 'gold',
+                musicEnabled: false,
+                carAudioEnabled: false,
+                crashAutoRestartEnabled: false,
+                crashRestartDelaySec: 1,
+            },
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+            lastSeenAt: '2026-01-02T00:00:00.000Z',
+            updatedAt: '2026-01-02T00:00:00.000Z',
+        }));
+
+        const payload = await getServerPlayerBootstrap({
+            playerId: 'browser-player-id',
+            redditUsername: 'Pm-User',
+        });
+
+        expect(payload).toMatchObject({
+            leaderboardIdentity: 'constructed',
+            playerPreferences: null,
+            hasAnyData: false,
+        });
+        expect(mockRedis.hGet).not.toHaveBeenCalledWith('dailygp:player-profiles', 'reddit:pm-user');
     });
 
     it('stores player preferences in Redis and restores them in the next bootstrap', async () => {
