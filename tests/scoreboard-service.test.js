@@ -107,4 +107,11 @@ describe('scoreboard service', () => {
             nextOffset: null,
         });
     });
+
+    it('rejects network failures instead of returning an empty successful snapshot', async () => {
+        fetch.mockRejectedValue(new Error('Network error'));
+
+        await expect(getScoreboardSnapshot({ trackKey: 'circuit' }))
+            .rejects.toThrow('Network error');
+    });
 });

@@ -1247,6 +1247,7 @@ export async function submitServerDailyGpRun({
                 status: 200,
                 body: {
                     accepted: true,
+                    improved: false,
                     bestTimeMs: previousEntry.bestTimeMs,
                     completedLaps: null,
                     checkpointTimesSec: previousEntry.checkpointTimesSec ?? null,
@@ -1291,6 +1292,7 @@ export async function submitServerDailyGpRun({
         status: 200,
         body: {
             accepted: true,
+            improved: true,
             bestTimeMs: nextBestTimeMs,
             completedLaps: strictReplayOutcome.run.completedLaps,
             checkpointTimesSec: nextEntry.checkpointTimesSec,

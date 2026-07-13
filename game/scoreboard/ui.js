@@ -5,7 +5,6 @@ import {
     getCachedDailyChallengeSnapshot,
     getDailyChallengeTrackName,
     getDailyChallengePlaylist,
-    prefetchDailyChallengeSnapshots,
     getDailyChallengeSnapshot
 } from '../daily-challenge/service.js';
 import { getScoreboardSnapshot } from './service.js';
@@ -133,6 +132,15 @@ function mergeDailyChallengeHistory(challenges = [], fallbackChallenge = null) {
     return merged;
 }
 
+function createDailyLeaderboardRefreshSession() {
+    return {
+        refreshedChallengeIds: new Set(),
+        inFlightByChallengeId: new Map(),
+        snapshotByChallengeId: new Map(),
+        selectedChallengeId: null,
+    };
+}
+
 export class LeaderboardsUi {
     constructor({
         showRunsModal,
@@ -151,6 +159,8 @@ export class LeaderboardsUi {
         this.isRunsViewActive = isRunsViewActive;
         this.updateModalScoreboardSnapshot = updateModalScoreboardSnapshot;
         this._requestVersion = 0;
+        this._activeDailyLeaderboardRefreshSession = null;
+        this._pendingDailyLeaderboardRefreshChallengeIds = new Set();
     }
 
     showLeaderboardModalState(returnMode = 'close', {
@@ -209,6 +219,139 @@ export class LeaderboardsUi {
 
     cancelPendingRequests() {
         this._requestVersion += 1;
+        this._activeDailyLeaderboardRefreshSession = null;
+    }
+
+    startDailyLeaderboardRefreshSession() {
+        const session = createDailyLeaderboardRefreshSession();
+        this._activeDailyLeaderboardRefreshSession = session;
+        return session;
+    }
+
+    resolveDailyLeaderboardRefreshSession(refreshSession = null) {
+        const session = refreshSession || this.startDailyLeaderboardRefreshSession();
+        this._activeDailyLeaderboardRefreshSession = session;
+        return session;
+    }
+
+    isActiveDailyLeaderboardChallenge(refreshSession, challengeId) {
+        return Boolean(
+            refreshSession
+            && this._activeDailyLeaderboardRefreshSession === refreshSession
+            && refreshSession.selectedChallengeId === challengeId
+        );
+    }
+
+    requestDailyChallengeLeaderboardSessionRefresh(challengeId, refreshSession, {
+        forceRefresh = false,
+    } = {}) {
+        if (
+            !forceRefresh
+            && refreshSession.refreshedChallengeIds.has(challengeId)
+        ) {
+            return Promise.resolve(
+                refreshSession.snapshotByChallengeId.get(challengeId)
+                || getCachedDailyChallengeSnapshot(challengeId)
+            );
+        }
+        const existingRequest = refreshSession.inFlightByChallengeId.get(challengeId);
+        if (existingRequest) return existingRequest;
+
+        let requestPromise = null;
+        requestPromise = this.requestDailyChallengeLeaderboardSnapshot(challengeId, {
+            forceRefresh,
+            limit: FULL_STANDINGS_PAGE_SIZE,
+            offset: 0,
+        }).then((scoreboardSnapshot) => {
+            if (scoreboardSnapshot) {
+                refreshSession.refreshedChallengeIds.add(challengeId);
+                refreshSession.snapshotByChallengeId.set(challengeId, scoreboardSnapshot);
+                this._pendingDailyLeaderboardRefreshChallengeIds.delete(challengeId);
+            }
+            return scoreboardSnapshot;
+        }).finally(() => {
+            if (refreshSession.inFlightByChallengeId.get(challengeId) === requestPromise) {
+                refreshSession.inFlightByChallengeId.delete(challengeId);
+            }
+        });
+        refreshSession.inFlightByChallengeId.set(challengeId, requestPromise);
+        return requestPromise;
+    }
+
+    primeDailyLeaderboardRefreshSession(challenges, refreshSession) {
+        const challengeIds = [...new Set(
+            (Array.isArray(challenges) ? challenges : [])
+                .filter((challenge) => isValidDailyChallenge(challenge))
+                .map((challenge) => challenge.id)
+        )];
+        const requests = [];
+        for (const challengeId of challengeIds) {
+            const requiresRefresh = this._pendingDailyLeaderboardRefreshChallengeIds
+                .has(challengeId);
+            const cachedSnapshot = getCachedDailyChallengeSnapshot(challengeId);
+            if (cachedSnapshot && !requiresRefresh) {
+                refreshSession.refreshedChallengeIds.add(challengeId);
+                refreshSession.snapshotByChallengeId.set(challengeId, cachedSnapshot);
+                continue;
+            }
+            requests.push(this.requestDailyChallengeLeaderboardSessionRefresh(
+                challengeId,
+                refreshSession,
+                { forceRefresh: requiresRefresh },
+            ));
+        }
+        return Promise.allSettled(
+            requests
+        );
+    }
+
+    async refreshDailyChallengeAfterAcceptedSubmission(challengeId) {
+        if (!challengeId) return null;
+
+        this._pendingDailyLeaderboardRefreshChallengeIds.add(challengeId);
+        const refreshSession = this._activeDailyLeaderboardRefreshSession;
+        const olderRequest = refreshSession?.inFlightByChallengeId.get(challengeId) || null;
+        if (olderRequest) {
+            await olderRequest;
+        }
+        this._pendingDailyLeaderboardRefreshChallengeIds.add(challengeId);
+        refreshSession?.refreshedChallengeIds.delete(challengeId);
+
+        const cachedSnapshot = refreshSession?.snapshotByChallengeId.get(challengeId)
+            || getCachedDailyChallengeSnapshot(challengeId);
+        if (
+            cachedSnapshot
+            && this.isActiveDailyLeaderboardChallenge(refreshSession, challengeId)
+        ) {
+            this.updateModalScoreboardSnapshot({
+                ...cachedSnapshot,
+                isRefreshing: true,
+            });
+        }
+
+        const requestPromise = this.requestDailyChallengeLeaderboardSnapshot(challengeId, {
+            forceRefresh: true,
+            limit: FULL_STANDINGS_PAGE_SIZE,
+            offset: 0,
+        });
+        refreshSession?.inFlightByChallengeId.set(challengeId, requestPromise);
+
+        try {
+            const scoreboardSnapshot = await requestPromise;
+            if (scoreboardSnapshot) {
+                this._pendingDailyLeaderboardRefreshChallengeIds.delete(challengeId);
+                refreshSession?.refreshedChallengeIds.add(challengeId);
+                refreshSession?.snapshotByChallengeId.set(challengeId, scoreboardSnapshot);
+            }
+            if (this.isActiveDailyLeaderboardChallenge(refreshSession, challengeId)) {
+                this.updateModalScoreboardSnapshot(scoreboardSnapshot || cachedSnapshot);
+            }
+            return scoreboardSnapshot;
+        } finally {
+            if (refreshSession?.inFlightByChallengeId.get(challengeId) === requestPromise) {
+                refreshSession.inFlightByChallengeId.delete(challengeId);
+            }
+        }
     }
 
     resolveInitialDailyChallengeSnapshot(challenge) {
@@ -275,12 +418,19 @@ export class LeaderboardsUi {
             (challenge) => challenge.id === summary.challengeId
         ) || fallbackChallenge;
 
+        const refreshSession = this.startDailyLeaderboardRefreshSession();
+        void this.primeDailyLeaderboardRefreshSession(
+            playlistChallenges,
+            refreshSession,
+        );
+
         await this.openDailyChallengeLeaderboardForChallenge(
             currentChallenge,
             returnMode,
             {
                 ...options,
-                playlistChallenges
+                playlistChallenges,
+                refreshSession,
             }
         );
     }
@@ -303,11 +453,13 @@ export class LeaderboardsUi {
 
     async openDailyChallengeLeaderboardOverview() {
         const requestId = ++this._requestVersion;
+        const refreshSession = this.startDailyLeaderboardRefreshSession();
         let loadedChallenges = getCachedDailyChallengePlaylist();
         let currentRows = [];
         const actions = {
             onTrack: (challenge) => {
                 void this.openDailyChallengeLeaderboardForChallenge(challenge, 'close', {
+                    refreshSession,
                     onClose: () => {
                         if (loadedChallenges.length) {
                             currentRows = this.buildDailyChallengeLeaderboardRows(loadedChallenges);
@@ -322,11 +474,16 @@ export class LeaderboardsUi {
             loadedChallenges.length ? loadedChallenges : null,
             actions
         );
+        void this.primeDailyLeaderboardRefreshSession(
+            loadedChallenges,
+            refreshSession,
+        );
 
         try {
             loadedChallenges = await getDailyChallengePlaylist();
-            await prefetchDailyChallengeSnapshots(
-                loadedChallenges.map((challenge) => challenge?.id).filter(Boolean)
+            await this.primeDailyLeaderboardRefreshSession(
+                loadedChallenges,
+                refreshSession,
             );
             currentRows = this.buildDailyChallengeLeaderboardRows(loadedChallenges);
         } catch (error) {
@@ -344,10 +501,13 @@ export class LeaderboardsUi {
 
     async openDailyChallengeLeaderboardForChallenge(challenge, returnMode = 'close', {
         onClose = null,
-        playlistChallenges = null
+        playlistChallenges = null,
+        refreshSession: providedRefreshSession = null,
     } = {}) {
         if (!challenge?.id || !challenge.trackKey || !TRACKS[challenge.trackKey]) return;
 
+        const refreshSession = this.resolveDailyLeaderboardRefreshSession(providedRefreshSession);
+        refreshSession.selectedChallengeId = challenge.id;
         const requestId = ++this._requestVersion;
         const historyChallenges = mergeDailyChallengeHistory(
             playlistChallenges ?? getCachedDailyChallengePlaylist(),
@@ -375,13 +535,33 @@ export class LeaderboardsUi {
                         returnMode,
                         {
                             onClose,
-                            playlistChallenges: historyChallenges
+                            playlistChallenges: historyChallenges,
+                            refreshSession,
                         }
                     );
                 }
                 : null
         };
-        const initialSnapshot = this.resolveInitialDailyChallengeSnapshot(challenge);
+        const initialSnapshot = refreshSession.snapshotByChallengeId.get(challenge.id)
+            || this.resolveInitialDailyChallengeSnapshot(challenge);
+        const requiresRefresh = this._pendingDailyLeaderboardRefreshChallengeIds
+            .has(challenge.id);
+        const hasInitialRequest = refreshSession.inFlightByChallengeId.has(challenge.id);
+        if (
+            initialSnapshot
+            && !requiresRefresh
+            && !hasInitialRequest
+            && !refreshSession.refreshedChallengeIds.has(challenge.id)
+        ) {
+            refreshSession.refreshedChallengeIds.add(challenge.id);
+            refreshSession.snapshotByChallengeId.set(challenge.id, initialSnapshot);
+        }
+        const shouldRefresh = requiresRefresh || !initialSnapshot || hasInitialRequest;
+        const refreshingSnapshot = shouldRefresh
+            ? (initialSnapshot
+                ? { ...initialSnapshot, isRefreshing: true }
+                : { isLoading: true })
+            : initialSnapshot;
         let currentSnapshot = initialSnapshot;
         let pageRequest = null;
         const loadMoreLeaderboard = async () => {
@@ -409,20 +589,23 @@ export class LeaderboardsUi {
         this.showLeaderboardModalState(returnMode, {
             ...sharedOptions,
             scoreboardChallengeId: challenge.id,
-            scoreboardSnapshot: initialSnapshot || { isLoading: true },
+            scoreboardSnapshot: refreshingSnapshot,
             onClose
         });
 
-        const scoreboardSnapshot = await this.requestDailyChallengeLeaderboardSnapshot(
+        if (!shouldRefresh) return;
+
+        const scoreboardSnapshot = await this.requestDailyChallengeLeaderboardSessionRefresh(
             challenge.id,
-            {
-                forceRefresh: true,
-                limit: FULL_STANDINGS_PAGE_SIZE,
-                offset: 0,
-            }
+            refreshSession,
+            { forceRefresh: requiresRefresh },
         );
         if (requestId !== this._requestVersion) return;
-        if (!scoreboardSnapshot && initialSnapshot) return;
+        if (!scoreboardSnapshot && initialSnapshot) {
+            currentSnapshot = initialSnapshot;
+            this.updateModalScoreboardSnapshot(initialSnapshot);
+            return;
+        }
         currentSnapshot = scoreboardSnapshot;
 
         if (this.isRunsViewActive()) {
@@ -442,6 +625,7 @@ export class LeaderboardsUi {
     } = {}) {
         if (!trackKey || !TRACKS[trackKey]) return;
 
+        this._activeDailyLeaderboardRefreshSession = null;
         const providedSnapshot =
             scoreboardSnapshot
             && typeof scoreboardSnapshot === 'object'
@@ -450,6 +634,9 @@ export class LeaderboardsUi {
                 : null;
         const cachedSnapshot = providedSnapshot
             || this.getCachedTrackCardScoreboardSnapshot(trackKey, TRACK_MODE_DAILY_GP);
+        const refreshingSnapshot = cachedSnapshot
+            ? { ...cachedSnapshot, isRefreshing: true }
+            : { isLoading: true };
         const requestId = ++this._requestVersion;
         let currentSnapshot = cachedSnapshot;
         let pageRequest = null;
@@ -474,7 +661,7 @@ export class LeaderboardsUi {
             return pageRequest;
         };
         this.showLeaderboardModalState(returnMode, {
-            scoreboardSnapshot: cachedSnapshot || { isLoading: true },
+            scoreboardSnapshot: refreshingSnapshot,
             scoreboardTrackKey: trackKey,
             onLoadMoreLeaderboard: loadMoreLeaderboard,
         });
@@ -500,7 +687,11 @@ export class LeaderboardsUi {
         } catch (error) {
             console.error('Error loading track leaderboard:', error);
             if (requestId !== this._requestVersion) return;
-            if (cachedSnapshot) return;
+            if (cachedSnapshot) {
+                currentSnapshot = cachedSnapshot;
+                this.updateModalScoreboardSnapshot(cachedSnapshot);
+                return;
+            }
 
             if (this.isRunsViewActive()) {
                 this.showLeaderboardModalState(returnMode, {

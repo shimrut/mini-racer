@@ -11,8 +11,8 @@ import {
 } from "./verification-queue.js";
 import { setDailyChallengeBestTime } from "../daily-challenge/storage.js";
 import {
+  getCachedDailyChallengeSnapshot,
   getDailyChallengeSnapshot,
-  invalidateDailyChallengeSnapshot,
   submitDailyChallengeBestTime,
 } from "../daily-challenge/service.js";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
@@ -193,7 +193,6 @@ export const scoreboardEngineMethods = {
         trackKey: entry.trackKey,
         objectiveType: entry.objectiveType,
       };
-      invalidateDailyChallengeSnapshot(entry.challengeId);
       setDailyChallengeBestTime(
         challenge,
         body.bestTimeMs / 1000,
@@ -206,11 +205,17 @@ export const scoreboardEngineMethods = {
       );
       clearDailyChallengeVerification(entry.challengeId);
 
-      const scoreboardSnapshot = await getDailyChallengeSnapshot({
-        challengeId: entry.challengeId,
-        forceRefresh: true,
-      });
+      let scoreboardSnapshot = getCachedDailyChallengeSnapshot(entry.challengeId);
+      if (body.improved === true) {
+        scoreboardSnapshot = this.leaderboards?.refreshDailyChallengeAfterAcceptedSubmission
+          ? await this.leaderboards.refreshDailyChallengeAfterAcceptedSubmission(entry.challengeId)
+          : await getDailyChallengeSnapshot({
+              challengeId: entry.challengeId,
+              forceRefresh: true,
+            });
+      }
       if (
+        scoreboardSnapshot &&
         this.modal.matchesModalScoreboardContext({
           challengeId: entry.challengeId,
         })

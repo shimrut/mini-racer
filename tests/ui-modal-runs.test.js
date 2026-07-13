@@ -292,6 +292,55 @@ describe('ui modal runs helpers', () => {
         }
     });
 
+    it('keeps the cached rank visible with a compact refresh spinner', () => {
+        const originalDocument = global.document;
+        const header = createTestElement('header');
+        const modalLapTimes = createTestElement('div');
+        const modalRunsView = {
+            querySelector: vi.fn((selector) => (
+                selector === '.reusable-modal-header' ? header : null
+            ))
+        };
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        try {
+            renderLeaderboardStandaloneIntro.call({
+                modalLapTimes,
+                modalRunsView,
+                _modalRunsPayload: {
+                    showGlobalLeaderboard: true,
+                    scoreboardChallengeId: 'daily-1',
+                    scoreboardTrackKey: 'circuit',
+                    scoreboardSnapshot: {
+                        playerRankLabel: '#2',
+                        totalCount: 4,
+                        leaderboardEntryCount: 4,
+                        isRefreshing: true
+                    }
+                },
+                content: { formatTime: vi.fn() }
+            });
+
+            const summary = header.children.find((child) => (
+                child.className === 'leaderboard-summary leaderboard-summary--header'
+            ));
+            const value = summary.children[0];
+            const meta = summary.children[1];
+            expect(value.textContent).toBe('#2');
+            expect(value.classList.contains('is-refreshing')).toBe(true);
+            expect(value.getAttribute('aria-label')).toBe('#2; refreshing standings');
+            expect(value.toggleAttribute).toHaveBeenCalledWith('aria-busy', true);
+            expect(value.children[0].className)
+                .toBe('modal-rank-spinner leaderboard-refresh-spinner');
+            expect(meta.hidden).toBe(false);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
     it('matches modal scoreboard contexts for track and challenge payloads', () => {
         expect(matchesModalScoreboardContext.call({
             isModalActive: () => true,

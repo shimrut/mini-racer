@@ -6,6 +6,14 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
+function createDeferred() {
+    let resolve;
+    const promise = new Promise((resolvePromise) => {
+        resolve = resolvePromise;
+    });
+    return { promise, resolve };
+}
+
 describe('ui leaderboard helpers', () => {
     it('merges sequential rank pages without duplicating rows', () => {
         expect(mergeLeaderboardPages({
@@ -71,7 +79,7 @@ describe('ui leaderboard helpers', () => {
 
         expect(instance.requestDailyChallengeLeaderboardSnapshot).toHaveBeenCalledWith(
             'daily-1',
-            { forceRefresh: true, limit: 50, offset: 0 }
+            { forceRefresh: false, limit: 50, offset: 0 }
         );
         expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', {
             scoreboardMode: TRACK_MODE_DAILY_GP,
@@ -158,7 +166,7 @@ describe('ui leaderboard helpers', () => {
         await instance.showTrackLeaderboardModal('circuit', 'close');
 
         expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'close', {
-            scoreboardSnapshot: cachedSnapshot,
+            scoreboardSnapshot: { ...cachedSnapshot, isRefreshing: true },
             onLoadMoreLeaderboard: expect.any(Function),
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'circuit'
@@ -238,7 +246,7 @@ describe('ui leaderboard helpers', () => {
         });
 
         expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', {
-            scoreboardSnapshot: providedSnapshot,
+            scoreboardSnapshot: { ...providedSnapshot, isRefreshing: true },
             onLoadMoreLeaderboard: expect.any(Function),
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'circuit'
@@ -257,14 +265,12 @@ describe('ui leaderboard helpers', () => {
         });
     });
 
-    it('shows a provided daily snapshot immediately, then force-refreshes it', async () => {
+    it('uses a provided daily snapshot without refreshing it', async () => {
         const playedSnapshot = { playerRankLabel: '#3' };
-        const freshSnapshot = { playerRankLabel: '#4' };
         const showRunsModal = vi.fn();
         const dailyChallengeUi = { getSummary: vi.fn(() => null) };
         const instance = new LeaderboardsUi({ showRunsModal, dailyChallengeUi });
-        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
-            .mockResolvedValue(freshSnapshot);
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot');
 
         await instance.openDailyChallengeLeaderboardForChallenge({
             id: 'daily-2',
@@ -287,47 +293,345 @@ describe('ui leaderboard helpers', () => {
             }],
             selectedLeaderboardDayId: 'daily-2'
         });
-        expect(requestSnapshot).toHaveBeenCalledWith('daily-2', {
+        expect(requestSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('uses the initially loaded day snapshots without refreshing on day changes', async () => {
+        const challengeA = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: { playerRankLabel: '#8' }
+        };
+        const challengeB = {
+            id: 'daily-b',
+            trackKey: 'harborParkLoop',
+            scoreboardSnapshot: { playerRankLabel: '#9' }
+        };
+        const freshA = { playerRankLabel: '#2', topRows: [{ rank: 1, displayName: 'A' }] };
+        const freshB = { playerRankLabel: '#3', topRows: [{ rank: 1, displayName: 'B' }] };
+        const showRunsModal = vi.fn();
+        const instance = new LeaderboardsUi({
+            showRunsModal,
+            dailyChallengeUi: { getSummary: vi.fn(() => null) }
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockImplementation(async (challengeId) => (
+                challengeId === challengeA.id ? freshA : freshB
+            ));
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        const options = {
+            playlistChallenges: [challengeA, challengeB],
+            refreshSession
+        };
+
+        await instance.primeDailyLeaderboardRefreshSession(
+            [challengeA, challengeB],
+            refreshSession,
+        );
+        expect(requestSnapshot).toHaveBeenCalledTimes(2);
+
+        await instance.openDailyChallengeLeaderboardForChallenge(challengeA, 'close', options);
+        showRunsModal.mock.calls.at(-1)[4].onSelectLeaderboardDay(challengeB.id);
+        await vi.waitFor(() => {
+            expect(showRunsModal.mock.calls.at(-1)[4].scoreboardChallengeId)
+                .toBe(challengeB.id);
+            expect(showRunsModal.mock.calls.at(-1)[4].scoreboardSnapshot).toBe(freshB);
+        });
+        const callsBeforeReturningToA = showRunsModal.mock.calls.length;
+        showRunsModal.mock.calls.at(-1)[4].onSelectLeaderboardDay(challengeA.id);
+        await vi.waitFor(() => {
+            expect(showRunsModal).toHaveBeenCalledTimes(callsBeforeReturningToA + 1);
+        });
+
+        expect(requestSnapshot.mock.calls.map(([challengeId]) => challengeId)).toEqual([
+            challengeA.id,
+            challengeB.id
+        ]);
+        expect(showRunsModal.mock.calls.at(-1)[4]).toEqual(expect.objectContaining({
+            scoreboardChallengeId: challengeA.id,
+            scoreboardSnapshot: freshA
+        }));
+        expect(showRunsModal.mock.calls.at(-1)[4].scoreboardSnapshot.isRefreshing)
+            .toBeUndefined();
+    });
+
+    it('reuses initial day loads that are still running while the player switches days', async () => {
+        const challengeA = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: { playerRankLabel: '#8' }
+        };
+        const challengeB = {
+            id: 'daily-b',
+            trackKey: 'harborParkLoop',
+            scoreboardSnapshot: { playerRankLabel: '#9' }
+        };
+        const deferredA = createDeferred();
+        const deferredB = createDeferred();
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) }
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockImplementation((challengeId) => (
+                challengeId === challengeA.id ? deferredA.promise : deferredB.promise
+            ));
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        const options = {
+            playlistChallenges: [challengeA, challengeB],
+            refreshSession
+        };
+
+        const initialLoads = instance.primeDailyLeaderboardRefreshSession(
+            [challengeA, challengeB],
+            refreshSession,
+        );
+        const firstA = instance.openDailyChallengeLeaderboardForChallenge(challengeA, 'close', options);
+        const firstB = instance.openDailyChallengeLeaderboardForChallenge(challengeB, 'close', options);
+        const secondA = instance.openDailyChallengeLeaderboardForChallenge(challengeA, 'close', options);
+
+        expect(requestSnapshot.mock.calls.map(([challengeId]) => challengeId)).toEqual([
+            challengeA.id,
+            challengeB.id
+        ]);
+
+        deferredA.resolve({ playerRankLabel: '#2' });
+        deferredB.resolve({ playerRankLabel: '#3' });
+        await Promise.all([initialLoads, firstA, firstB, secondA]);
+    });
+
+    it('retries a day in the same session after its refresh fails', async () => {
+        const challenge = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: { playerRankLabel: '#8' }
+        };
+        const freshSnapshot = { playerRankLabel: '#2' };
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) },
+            updateModalScoreboardSnapshot: vi.fn()
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(freshSnapshot);
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        const options = { refreshSession };
+        instance._pendingDailyLeaderboardRefreshChallengeIds.add(challenge.id);
+
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge, 'close', options);
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge, 'close', options);
+
+        expect(requestSnapshot).toHaveBeenCalledTimes(2);
+        expect(refreshSession.refreshedChallengeIds.has(challenge.id)).toBe(true);
+    });
+
+    it('does not refresh a cached day after the leaderboard is closed and reopened', async () => {
+        const challenge = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: { playerRankLabel: '#8' }
+        };
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) }
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValue({ playerRankLabel: '#2' });
+
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge);
+        instance.cancelPendingRequests();
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge);
+
+        expect(requestSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('forces one newer refresh after an accepted time and keeps that result fresh', async () => {
+        const beforeAccepted = { playerRankLabel: '#4', currentPlayerRow: { bestTime: 14.2 } };
+        const challenge = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: beforeAccepted
+        };
+        const afterAccepted = { playerRankLabel: '#2', currentPlayerRow: { bestTime: 13.8 } };
+        const updateModalScoreboardSnapshot = vi.fn();
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) },
+            updateModalScoreboardSnapshot
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValueOnce(afterAccepted);
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        const options = { refreshSession };
+
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge, 'close', options);
+        await instance.refreshDailyChallengeAfterAcceptedSubmission(challenge.id);
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge, 'close', options);
+
+        expect(requestSnapshot).toHaveBeenCalledTimes(1);
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith({
+            ...beforeAccepted,
+            isRefreshing: true
+        });
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(afterAccepted);
+    });
+
+    it('does not refresh other cached days after an accepted better time', async () => {
+        const beforeAccepted = { playerRankLabel: '#4', currentPlayerRow: { bestTime: 14.2 } };
+        const afterAccepted = { playerRankLabel: '#2', currentPlayerRow: { bestTime: 13.8 } };
+        const otherDaySnapshot = { playerRankLabel: '#7', currentPlayerRow: { bestTime: 18.4 } };
+        const submittedChallenge = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: beforeAccepted
+        };
+        const otherChallenge = {
+            id: 'daily-b',
+            trackKey: 'harborParkLoop',
+            scoreboardSnapshot: otherDaySnapshot
+        };
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) },
+            updateModalScoreboardSnapshot: vi.fn()
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValue(afterAccepted);
+
+        await instance.openDailyChallengeLeaderboardForChallenge(submittedChallenge);
+        await instance.openDailyChallengeLeaderboardForChallenge(otherChallenge);
+        await instance.refreshDailyChallengeAfterAcceptedSubmission(submittedChallenge.id);
+        instance.cancelPendingRequests();
+        submittedChallenge.scoreboardSnapshot = afterAccepted;
+        await instance.openDailyChallengeLeaderboardForChallenge(otherChallenge);
+        await instance.openDailyChallengeLeaderboardForChallenge(submittedChallenge);
+
+        expect(requestSnapshot).toHaveBeenCalledTimes(1);
+        expect(requestSnapshot).toHaveBeenCalledWith(submittedChallenge.id, {
             forceRefresh: true,
             limit: 50,
             offset: 0,
         });
-        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', {
-            scoreboardSnapshot: freshSnapshot,
-            onLoadMoreLeaderboard: expect.any(Function),
-            scoreboardMode: TRACK_MODE_DAILY_GP,
-            scoreboardTrackKey: 'harborParkLoop',
-            scoreboardTitle: 'Leaderboard',
-            scoreboardSubhead: 'Harbor Park',
-            scoreboardChallengeId: 'daily-2',
-            leaderboardDayOptions: [{
-                challengeId: 'daily-2',
-                dayLabel: 'Day',
-                dateLabel: '--'
-            }],
-            selectedLeaderboardDayId: 'daily-2'
+    });
+
+    it('runs the accepted-time refresh after any older request for that day', async () => {
+        const challenge = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: { playerRankLabel: '#8' }
+        };
+        const olderRequest = createDeferred();
+        const acceptedRequest = createDeferred();
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) },
+            updateModalScoreboardSnapshot: vi.fn()
         });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockReturnValueOnce(olderRequest.promise)
+            .mockReturnValueOnce(acceptedRequest.promise);
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        instance._pendingDailyLeaderboardRefreshChallengeIds.add(challenge.id);
+
+        const initialOpen = instance.openDailyChallengeLeaderboardForChallenge(
+            challenge,
+            'close',
+            { refreshSession }
+        );
+        const acceptedRefresh = instance.refreshDailyChallengeAfterAcceptedSubmission(challenge.id);
+
+        expect(requestSnapshot).toHaveBeenCalledTimes(1);
+        olderRequest.resolve({ playerRankLabel: '#4' });
+        await vi.waitFor(() => {
+            expect(requestSnapshot).toHaveBeenCalledTimes(2);
+        });
+
+        acceptedRequest.resolve({ playerRankLabel: '#2' });
+        await Promise.all([initialOpen, acceptedRefresh]);
+    });
+
+    it('leaves an accepted-time refresh eligible for retry when it fails', async () => {
+        const beforeAccepted = { playerRankLabel: '#4' };
+        const challenge = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: beforeAccepted
+        };
+        const afterRetry = { playerRankLabel: '#2' };
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) },
+            updateModalScoreboardSnapshot: vi.fn()
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(afterRetry);
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        const options = { refreshSession };
+
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge, 'close', options);
+        await instance.refreshDailyChallengeAfterAcceptedSubmission(challenge.id);
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge, 'close', options);
+
+        expect(requestSnapshot).toHaveBeenCalledTimes(2);
+        expect(refreshSession.snapshotByChallengeId.get(challenge.id)).toBe(afterRetry);
+    });
+
+    it('clears the daily refresh spinner without replacing cached standings on failure', async () => {
+        const cachedSnapshot = { playerRankLabel: '#3' };
+        const showRunsModal = vi.fn();
+        const updateModalScoreboardSnapshot = vi.fn();
+        const dailyChallengeUi = { getSummary: vi.fn(() => null) };
+        const instance = new LeaderboardsUi({
+            showRunsModal,
+            dailyChallengeUi,
+            updateModalScoreboardSnapshot
+        });
+        vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue(null);
+        instance._pendingDailyLeaderboardRefreshChallengeIds.add('daily-2');
+
+        await instance.openDailyChallengeLeaderboardForChallenge({
+            id: 'daily-2',
+            trackKey: 'harborParkLoop',
+            scoreboardSnapshot: cachedSnapshot
+        }, 'back');
+
+        expect(showRunsModal).toHaveBeenCalledTimes(1);
+        expect(showRunsModal).toHaveBeenCalledWith(
+            null,
+            null,
+            null,
+            'back',
+            expect.objectContaining({
+                scoreboardSnapshot: { ...cachedSnapshot, isRefreshing: true }
+            })
+        );
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(cachedSnapshot);
     });
 
     it('keeps a cached track snapshot visible when its refresh fails', async () => {
         const cachedSnapshot = { playerRankLabel: '#2' };
         const showRunsModal = vi.fn();
+        const updateModalScoreboardSnapshot = vi.fn();
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const instance = new LeaderboardsUi({
             showRunsModal,
             getCachedTrackCardScoreboardSnapshot: vi.fn(() => cachedSnapshot),
-            getScoreboardSnapshot: vi.fn(() => Promise.reject(new Error('boom')))
+            getScoreboardSnapshot: vi.fn(() => Promise.reject(new Error('boom'))),
+            updateModalScoreboardSnapshot
         });
 
         await instance.showTrackLeaderboardModal('circuit', 'close');
 
         expect(showRunsModal).toHaveBeenCalledTimes(1);
         expect(showRunsModal).toHaveBeenCalledWith(null, null, null, 'close', {
-            scoreboardSnapshot: cachedSnapshot,
+            scoreboardSnapshot: { ...cachedSnapshot, isRefreshing: true },
             onLoadMoreLeaderboard: expect.any(Function),
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'circuit'
         });
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(cachedSnapshot);
 
         consoleError.mockRestore();
     });

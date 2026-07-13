@@ -1,6 +1,5 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js';
 import { TRACKS } from '../track/tracks.js';
-import { isLocalEnvironment } from '../track/environment.js';
 import {
     API_ROUTES,
     clampRequestLimit,
@@ -65,31 +64,22 @@ export async function getScoreboardSnapshot({
 
     const promise = (async () => {
         const currentPlayerId = getOrCreatePlayerId('scoreboard');
-
-        try {
-            const raw = await fetchScoreboardSnapshotViaProxy(
-                config,
-                trackKey,
-                currentPlayerId,
-                safeLimit,
-                safeOffset
-            );
-            return normalizeScoreboardSnapshot(raw);
-        } catch (error) {
-            if (isLocalEnvironment()) {
-                console.warn('Scoreboard snapshot fetch failed, falling back to empty:', error);
-            } else {
-                console.error('Scoreboard snapshot fetch failed:', error);
-            }
-            return createEmptyScoreboardSnapshot();
-        }
+        const raw = await fetchScoreboardSnapshotViaProxy(
+            config,
+            trackKey,
+            currentPlayerId,
+            safeLimit,
+            safeOffset
+        );
+        return normalizeScoreboardSnapshot(raw);
     })();
 
     inflightScoreboardSnapshots.set(dedupeKey, promise);
-    promise.finally(() => {
+    const clearInflight = () => {
         if (inflightScoreboardSnapshots.get(dedupeKey) === promise) {
             inflightScoreboardSnapshots.delete(dedupeKey);
         }
-    });
+    };
+    void promise.then(clearInflight, clearInflight);
     return promise;
 }

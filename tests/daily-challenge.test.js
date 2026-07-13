@@ -13,6 +13,7 @@ import {
     getDailyChallengePlaylist,
     getDailyChallengeRequiredLaps,
     getDailyChallengeSnapshot,
+    getCachedDailyChallengeSnapshot,
     getDailyChallengeTrackName,
     cacheDailyChallengePlaylist,
     getCachedDailyChallengePlaylist,
@@ -416,6 +417,44 @@ describe('daily-challenge service', () => {
         });
         expect(fetch).toHaveBeenCalledTimes(1);
         expect(fetch.mock.calls[0][0]).toContain('/api/daily/snapshot');
+    });
+
+    it('keeps the cached first page when a forced refresh fails', async () => {
+        const challengeId = 'cache-preservation-challenge';
+        window.location = {
+            origin: 'https://reddit.example',
+            hostname: 'reddit.example',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: ''
+        };
+        fetch
+            .mockResolvedValueOnce(createJsonResponse({
+                topRows: [{ rank: 1, bestTimeMs: 12345 }],
+                nearbyRows: [],
+                currentPlayerRow: null,
+                totalCount: 1,
+                leaderboardEntryCount: 1,
+                pageOffset: 0,
+                pageLimit: 50,
+                hasMore: false,
+                nextOffset: null
+            }))
+            .mockRejectedValueOnce(new Error('Network error'));
+
+        const cachedSnapshot = await getDailyChallengeSnapshot({ challengeId });
+
+        await expect(getDailyChallengeSnapshot({
+            challengeId,
+            forceRefresh: true
+        })).rejects.toThrow('Network error');
+
+        expect(getCachedDailyChallengeSnapshot(challengeId)).toEqual(cachedSnapshot);
+        const stored = JSON.parse(
+            memoryLocalStorage.getItem('VectorGpDailyChallengeSnapshotCache')
+        );
+        expect(stored.entries[challengeId].snapshot).toEqual(cachedSnapshot);
+        expect(fetch).toHaveBeenCalledTimes(2);
     });
 
     it('fetches later leaderboard pages instead of reusing the cached first page', async () => {

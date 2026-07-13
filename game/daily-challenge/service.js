@@ -602,18 +602,6 @@ export function getMissingDailyChallengeSnapshotIds(challengeIds = []) {
     )].filter((challengeId) => !readCachedDailySnapshot(challengeId));
 }
 
-export function invalidateDailyChallengeSnapshot(challengeId) {
-    if (!challengeId) return;
-    hydrateDailySnapshotCache();
-    dailySnapshotCache.delete(challengeId);
-    for (const requestKey of dailySnapshotInflight.keys()) {
-        if (requestKey.startsWith(`${challengeId}:`)) {
-            dailySnapshotInflight.delete(requestKey);
-        }
-    }
-    writeDailySnapshotCacheStorage();
-}
-
 function getObjectiveRequiredLaps(challenge) {
     if (challenge?.objectiveType === 'multi_lap_total') {
         return Math.max(2, Math.trunc(challenge.objectiveParams?.lapCount || 2));
@@ -926,8 +914,6 @@ export async function getDailyChallengeSnapshot({
         if (inflight) {
             return cloneScoreboardSnapshot(await inflight);
         }
-    } else if (forceRefresh && isFirstPage) {
-        invalidateDailyChallengeSnapshot(challengeId);
     }
 
     const requestPromise = loadDailyChallengeSnapshot({

@@ -1151,6 +1151,8 @@ export class ModalShell {
             payload?.scoreboardSnapshot,
             { fallbackText: '—' }
         );
+        const isRefreshing = Boolean(payload?.scoreboardSnapshot?.isRefreshing)
+            && !rankDisplay.isLoading;
         this.modalLapTimes.querySelector('.leaderboard-day-rail')?.remove();
         if (
             Array.isArray(payload?.leaderboardDayOptions)
@@ -1210,7 +1212,7 @@ export class ModalShell {
 
         const summaryValue = document.createElement('span');
         summaryValue.className = 'leaderboard-summary__value';
-        summaryValue.toggleAttribute('aria-busy', rankDisplay.isLoading);
+        summaryValue.toggleAttribute('aria-busy', rankDisplay.isLoading || isRefreshing);
         if (rankDisplay.isLoading) {
             summaryValue.classList.add('is-loading');
             summaryValue.setAttribute('aria-label', 'Loading your rank');
@@ -1224,6 +1226,17 @@ export class ModalShell {
             summaryValue.textContent = rankDisplay.text;
         } else {
             summaryValue.textContent = 'No time yet';
+        }
+        if (isRefreshing) {
+            summaryValue.classList.add('is-refreshing');
+            summaryValue.setAttribute(
+                'aria-label',
+                `${summaryValue.textContent}; refreshing standings`
+            );
+            const refreshSpinner = document.createElement('span');
+            refreshSpinner.className = 'modal-rank-spinner leaderboard-refresh-spinner';
+            refreshSpinner.setAttribute('aria-hidden', 'true');
+            summaryValue.appendChild(refreshSpinner);
         }
 
         const summaryMeta = document.createElement('span');

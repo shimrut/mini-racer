@@ -25,7 +25,6 @@ import {
   getDailyChallengePlaylist,
   getDailyChallengeSnapshot,
   getDailyChallengeTrackName,
-  invalidateDailyChallengeSnapshot,
   isDailyChallengeStoredResultForChallenge,
   prefetchDailyChallengeSnapshots,
 } from "./service.js";
@@ -306,9 +305,6 @@ export const dailyChallengeEngineMethods = {
     this.bestLapTime = Number.isFinite(localData?.bestTime)
       ? localData.bestTime
       : null;
-    if (forceRefresh) {
-      invalidateDailyChallengeSnapshot(challenge.id);
-    }
     let snapshot = null;
     try {
       snapshot = await getDailyChallengeSnapshot({
@@ -920,7 +916,6 @@ export const dailyChallengeEngineMethods = {
     }
 
     if (isNewBest) {
-      invalidateDailyChallengeSnapshot(challenge.id);
       const saved = saveDailyChallengeBestTime(
         challenge,
         finalTime,
