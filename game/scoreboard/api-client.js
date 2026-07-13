@@ -2,6 +2,7 @@ const PLAYER_ID_STORAGE_KEY = 'VectorGpScoreboardPlayerId';
 const GUEST_PLAYER_TOKEN_STORAGE_KEY = 'VectorGpGuestPlayerToken';
 let ephemeralPlayerId = null;
 let ephemeralGuestPlayerToken = null;
+let hasEphemeralGuestPlayerToken = false;
 
 const API_BASE_URL = '/api';
 
@@ -33,6 +34,7 @@ export function getOrCreatePlayerId(logLabel = 'scoreboard') {
     }
 
     try {
+        if (ephemeralPlayerId) return ephemeralPlayerId;
         const storedId = window.localStorage.getItem(PLAYER_ID_STORAGE_KEY);
         if (storedId) return storedId;
 
@@ -46,7 +48,28 @@ export function getOrCreatePlayerId(logLabel = 'scoreboard') {
     }
 }
 
+export function rotateGuestPlayerIdentity() {
+    const nextId = createPlayerId();
+    ephemeralPlayerId = nextId;
+    setGuestPlayerToken(null);
+
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return nextId;
+    }
+
+    try {
+        window.localStorage.setItem(PLAYER_ID_STORAGE_KEY, nextId);
+    } catch (error) {
+        console.error('Error rotating guest player id:', error);
+    }
+
+    return nextId;
+}
+
 export function getGuestPlayerToken() {
+    if (hasEphemeralGuestPlayerToken) {
+        return ephemeralGuestPlayerToken;
+    }
     if (typeof window === 'undefined' || !window.localStorage) {
         return ephemeralGuestPlayerToken;
     }
@@ -67,6 +90,7 @@ export function setGuestPlayerToken(token) {
         ? token.trim()
         : null;
     ephemeralGuestPlayerToken = normalizedToken;
+    hasEphemeralGuestPlayerToken = true;
 
     if (typeof window === 'undefined' || !window.localStorage) {
         return normalizedToken;

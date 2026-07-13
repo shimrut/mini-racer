@@ -8,6 +8,7 @@ import {
   API_ROUTES,
   getGuestPlayerToken,
   getOrCreatePlayerId,
+  rotateGuestPlayerIdentity,
   setGuestPlayerToken,
 } from "./scoreboard/api-client.js";
 import { isLocalEnvironment } from "./track/environment.js";
@@ -28,7 +29,9 @@ async function fetchRemotePlayerProgressState() {
   const response = await fetch(url.toString(), { method: "GET" });
 
   if (!response.ok) {
-    throw new Error(`Player bootstrap failed: ${response.status}`);
+    const error = new Error(`Player bootstrap failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   const payload = await response.json();
@@ -70,11 +73,21 @@ function getLocalPlayerProgressState() {
 }
 
 export async function getPlayerProgressState() {
+  if (isLocalEnvironment()) {
+    return getLocalPlayerProgressState();
+  }
+
   try {
-    if (isLocalEnvironment()) {
-      return getLocalPlayerProgressState();
+    let remoteState;
+    try {
+      remoteState = await fetchRemotePlayerProgressState();
+    } catch (error) {
+      if (error?.status !== 401) {
+        throw error;
+      }
+      rotateGuestPlayerIdentity();
+      remoteState = await fetchRemotePlayerProgressState();
     }
-    const remoteState = await fetchRemotePlayerProgressState();
     if (remoteState) {
       setGuestPlayerToken(remoteState.guestToken);
       setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);

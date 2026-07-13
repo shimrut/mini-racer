@@ -469,25 +469,6 @@ function resolveStoredLeaderboardIdentity(
     return previousProfile?.leaderboardIdentity || 'constructed';
 }
 
-function resolveCanonicalPlayerId({
-    playerId,
-    redditUsername,
-}: {
-    playerId?: unknown;
-    redditUsername?: unknown;
-}): string | null {
-    const safeUsername = sanitizeRedditUsername(redditUsername);
-    if (safeUsername) {
-        return `reddit:${safeUsername.toLowerCase()}`;
-    }
-
-    if (typeof playerId === 'string' && playerId.trim()) {
-        return `guest:${playerId.trim()}`;
-    }
-
-    return null;
-}
-
 function normalizeGuestPlayerId(playerId: unknown): string | null {
     return typeof playerId === 'string' && playerId.trim()
         ? playerId.trim()
@@ -498,12 +479,10 @@ async function resolveAuthorizedPlayerIdentity({
     playerId,
     redditUsername,
     guestToken,
-    allowUnsignedGuest = false,
 }: {
     playerId?: unknown;
     redditUsername?: unknown;
     guestToken?: unknown;
-    allowUnsignedGuest?: boolean;
 }): Promise<{
     canonicalPlayerId: string | null;
     guestPlayerId: string | null;
@@ -547,33 +526,93 @@ async function resolveAuthorizedPlayerIdentity({
         };
     }
 
-    if (!allowUnsignedGuest) {
-        return {
-            canonicalPlayerId: null,
-            guestPlayerId: null,
-            guestToken: null,
-        };
-    }
-
-    const normalizedGuestPlayerId = normalizeGuestPlayerId(playerId);
-    if (!normalizedGuestPlayerId) {
-        return {
-            canonicalPlayerId: null,
-            guestPlayerId: null,
-            guestToken: null,
-        };
-    }
-
     return {
-        canonicalPlayerId: `guest:${normalizedGuestPlayerId}`,
-        guestPlayerId: normalizedGuestPlayerId,
-        guestToken: await mintGuestPlayerToken(normalizedGuestPlayerId),
+        canonicalPlayerId: null,
+        guestPlayerId: null,
+        guestToken: null,
     };
 }
 
 async function readPlayerProfile(playerId: string): Promise<DailyGpPlayerProfile | null> {
     const rawProfile = await redis.get(createRedisPlayerProfileKey(playerId));
     return parseStoredPlayerProfile(rawProfile);
+}
+
+function buildPlayerProfile({
+    playerId,
+    leaderboardIdentity,
+    redditUsername,
+    preferences,
+    hasAnyData,
+    previousProfile,
+}: {
+    playerId: string;
+    leaderboardIdentity?: unknown;
+    redditUsername?: unknown;
+    preferences?: unknown;
+    hasAnyData?: boolean;
+    previousProfile?: DailyGpPlayerProfile | null;
+}): DailyGpPlayerProfile {
+    const nowIso = new Date().toISOString();
+    return {
+        playerId,
+        leaderboardIdentity: resolveStoredLeaderboardIdentity(leaderboardIdentity, previousProfile || null),
+        redditUsername: sanitizeRedditUsername(redditUsername) || previousProfile?.redditUsername || null,
+        preferences: preferences === undefined
+            ? previousProfile?.preferences || null
+            : normalizePlayerPreferences(preferences),
+        hasSeenGame: true,
+        hasAnyData: Boolean(hasAnyData || previousProfile?.hasAnyData),
+        firstSeenAt: previousProfile?.firstSeenAt || nowIso,
+        lastSeenAt: nowIso,
+        updatedAt: nowIso,
+    };
+}
+
+async function claimNewGuestPlayerProfile({
+    playerId,
+    leaderboardIdentity,
+}: {
+    playerId?: unknown;
+    leaderboardIdentity?: unknown;
+}): Promise<{
+    canonicalPlayerId: string;
+    guestPlayerId: string;
+    guestToken: string;
+    profile: DailyGpPlayerProfile;
+} | null> {
+    const guestPlayerId = normalizeGuestPlayerId(playerId);
+    if (!guestPlayerId) {
+        return null;
+    }
+
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+    if (!guestToken) {
+        return null;
+    }
+
+    const canonicalPlayerId = `guest:${guestPlayerId}`;
+    const profile = buildPlayerProfile({
+        playerId: canonicalPlayerId,
+        leaderboardIdentity,
+        hasAnyData: false,
+        previousProfile: null,
+    });
+    const claimed = await redis.set(
+        createRedisPlayerProfileKey(canonicalPlayerId),
+        JSON.stringify(profile),
+        { nx: true, expiration: createPlayerProfileExpirationDate() },
+    );
+    if (!claimed) {
+        return null;
+    }
+
+    return {
+        canonicalPlayerId,
+        guestPlayerId,
+        guestToken,
+        profile,
+    };
 }
 
 async function upsertPlayerProfile({
@@ -592,20 +631,14 @@ async function upsertPlayerProfile({
     previousProfile?: DailyGpPlayerProfile | null;
 }): Promise<DailyGpPlayerProfile> {
     const resolvedPreviousProfile = previousProfile ?? await readPlayerProfile(playerId);
-    const nowIso = new Date().toISOString();
-    const nextProfile: DailyGpPlayerProfile = {
+    const nextProfile = buildPlayerProfile({
         playerId,
-        leaderboardIdentity: resolveStoredLeaderboardIdentity(leaderboardIdentity, resolvedPreviousProfile),
-        redditUsername: sanitizeRedditUsername(redditUsername) || resolvedPreviousProfile?.redditUsername || null,
-        preferences: preferences === undefined
-            ? resolvedPreviousProfile?.preferences || null
-            : normalizePlayerPreferences(preferences),
-        hasSeenGame: true,
-        hasAnyData: Boolean(hasAnyData || resolvedPreviousProfile?.hasAnyData),
-        firstSeenAt: resolvedPreviousProfile?.firstSeenAt || nowIso,
-        lastSeenAt: nowIso,
-        updatedAt: nowIso,
-    };
+        leaderboardIdentity,
+        redditUsername,
+        preferences,
+        hasAnyData,
+        previousProfile: resolvedPreviousProfile,
+    });
 
     await writePlayerProfile(nextProfile);
     return nextProfile;
@@ -826,16 +859,32 @@ export async function getServerPlayerBootstrap({
     leaderboardIdentity?: unknown;
     guestToken?: unknown;
 } = {}): Promise<PlayerBootstrapPayload> {
-    const identity = await resolveAuthorizedPlayerIdentity({
+    const safeRequestRedditUsername = sanitizeRedditUsername(redditUsername);
+    const suppliedGuestToken = typeof guestToken === 'string' && Boolean(guestToken.trim());
+    let identity = await resolveAuthorizedPlayerIdentity({
         playerId,
         redditUsername,
         guestToken,
-        allowUnsignedGuest: true,
     });
-    const canonicalPlayerId = identity.canonicalPlayerId;
-    const safeRequestRedditUsername = sanitizeRedditUsername(redditUsername);
+    let previousProfile: DailyGpPlayerProfile | null = null;
+    let profile: DailyGpPlayerProfile | null = null;
 
-    if (!canonicalPlayerId) {
+    if (!identity.canonicalPlayerId && !safeRequestRedditUsername && !suppliedGuestToken) {
+        const claimedGuest = await claimNewGuestPlayerProfile({
+            playerId,
+            leaderboardIdentity,
+        });
+        if (claimedGuest) {
+            identity = {
+                canonicalPlayerId: claimedGuest.canonicalPlayerId,
+                guestPlayerId: claimedGuest.guestPlayerId,
+                guestToken: claimedGuest.guestToken,
+            };
+            profile = claimedGuest.profile;
+        }
+    }
+
+    if (!identity.canonicalPlayerId) {
         return {
             playerId: null,
             guestToken: null,
@@ -849,21 +898,23 @@ export async function getServerPlayerBootstrap({
         };
     }
 
-    const previousProfile = await readPlayerProfile(canonicalPlayerId);
-    const profile = await upsertPlayerProfile({
-        playerId: canonicalPlayerId,
-        leaderboardIdentity,
-        redditUsername,
-        hasAnyData: false,
-        previousProfile,
-    });
+    if (!profile) {
+        previousProfile = await readPlayerProfile(identity.canonicalPlayerId);
+        profile = await upsertPlayerProfile({
+            playerId: identity.canonicalPlayerId,
+            leaderboardIdentity,
+            redditUsername,
+            hasAnyData: false,
+            previousProfile,
+        });
+    }
     const firstSeenMs = Date.parse(profile.firstSeenAt);
     const isReturningPlayer = profile.hasSeenGame
         && Number.isFinite(firstSeenMs)
         && (Date.now() - firstSeenMs) > RETURNING_PLAYER_DELAY_MS;
 
     return {
-        playerId: canonicalPlayerId,
+        playerId: identity.canonicalPlayerId,
         guestToken: identity.guestToken,
         redditUsername: safeRequestRedditUsername,
         leaderboardIdentity: profile.leaderboardIdentity,
@@ -894,7 +945,6 @@ export async function updateServerPlayerPreferences({
         playerId,
         redditUsername,
         guestToken,
-        allowUnsignedGuest: true,
     });
     if (!identity.canonicalPlayerId) {
         return { playerId: null, guestToken: null, playerPreferences: null };
@@ -937,7 +987,6 @@ export async function updateServerPlayerIdentity({
         playerId,
         redditUsername,
         guestToken,
-        allowUnsignedGuest: true,
     });
     const canonicalPlayerId = identity.canonicalPlayerId;
     if (!canonicalPlayerId) {
@@ -1007,10 +1056,8 @@ export async function getServerDailyGpSnapshot({
         playerId,
         redditUsername,
         guestToken,
-        allowUnsignedGuest: true,
     });
-    const normalizedPlayerId = identity.canonicalPlayerId
-        || resolveCanonicalPlayerId({ playerId, redditUsername });
+    const normalizedPlayerId = identity.canonicalPlayerId;
     if (normalizedPlayerId) {
         await upsertPlayerProfile({
             playerId: normalizedPlayerId,
@@ -1157,7 +1204,6 @@ export async function submitServerDailyGpRun({
         playerId,
         redditUsername,
         guestToken,
-        allowUnsignedGuest: false,
     });
     if (!identity.canonicalPlayerId) {
         return {

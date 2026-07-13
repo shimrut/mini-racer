@@ -53,6 +53,21 @@ function getRequestUsername(): string | null {
         : null;
 }
 
+function hasPlayerCredential(value: unknown): boolean {
+    return typeof value === 'string' && Boolean(value.trim());
+}
+
+function sendPlayerAuthorizationFailure(
+    res: express.Response,
+    { playerId, guestToken }: { playerId?: unknown; guestToken?: unknown },
+): void {
+    if (hasPlayerCredential(playerId) || hasPlayerCredential(guestToken)) {
+        res.status(401).json({ error: 'Guest token is required for this player.' });
+        return;
+    }
+    res.status(400).json({ error: 'Invalid player identity.' });
+}
+
 function readContextSubredditId(): string | null {
     const id = (context as { subredditId?: unknown }).subredditId;
     return typeof id === 'string' && id.startsWith('t5_') ? id : null;
@@ -507,6 +522,10 @@ app.get('/api/player/bootstrap', async (req, res) => {
             guestToken: guestToken as string,
             redditUsername: getRequestUsername(),
         });
+        if (!payload.playerId) {
+            sendPlayerAuthorizationFailure(res, { playerId, guestToken });
+            return;
+        }
         res.status(200).json(payload);
     } catch (error) {
         console.error('Failed to load Reddit Mini Racer player bootstrap:', error);
@@ -523,6 +542,10 @@ app.post('/api/player/identity', async (req, res) => {
             leaderboardIdentity,
             redditUsername: getRequestUsername(),
         });
+        if (!payload.playerId) {
+            sendPlayerAuthorizationFailure(res, { playerId, guestToken });
+            return;
+        }
         res.status(200).json(payload);
     } catch (error) {
         console.error('Failed to update Reddit Mini Racer player identity:', error);
@@ -539,6 +562,10 @@ app.post('/api/player/preferences', async (req, res) => {
             playerPreferences,
             redditUsername: getRequestUsername(),
         });
+        if (!payload.playerId) {
+            sendPlayerAuthorizationFailure(res, { playerId, guestToken });
+            return;
+        }
         if (!payload.playerPreferences) {
             res.status(400).json({ error: 'Invalid player preferences' });
             return;

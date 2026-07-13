@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TRACKS } from "../game/track/tracks.js";
+import {
+  createRedisChallengeEntryHashKey,
+  createRedisChallengeLeaderboardKey,
+  encodeDailyGpLeaderboardScore,
+} from "../src/server/daily-gp-model.ts";
 
 class RedisTestDouble {
   constructor() {
@@ -162,6 +167,16 @@ class RedisTestDouble {
     return index >= 0 ? index : undefined;
   }
 
+  async zRange(key, start, stop) {
+    this._isExpired(key);
+    const ordered = [...(this.sortedSets.get(key)?.entries() || [])]
+      .sort((a, b) => {
+        if (a[1] === b[1]) return a[0].localeCompare(b[0]);
+        return a[1] - b[1];
+      });
+    return ordered.slice(start, stop + 1).map(([member, score]) => ({ member, score }));
+  }
+
   async watch() {
     const commands = [];
     return {
@@ -203,14 +218,38 @@ vi.mock("../src/server/replay-validator.ts", async () => {
 });
 
 const {
+  getServerDailyGpSnapshot,
   getServerDailyGpChallenge,
   getServerPlayerBootstrap,
   submitServerDailyGpRun,
+  updateServerPlayerIdentity,
+  updateServerPlayerPreferences,
 } = await import("../src/server/daily-gp-store.ts");
 const { mintGuestPlayerToken } = await import("../src/server/player-token.ts");
 const { validateDailyGpReplayDetailed } = await import("../src/server/replay-validator.ts");
 
 const validateDailyGpReplayDetailedMock = vi.mocked(validateDailyGpReplayDetailed);
+
+const playerPreferences = {
+  carSkin: "assets/cars/mr_mr_red.webp",
+  trailId: "gold",
+  musicEnabled: false,
+  carAudioEnabled: true,
+  crashAutoRestartEnabled: false,
+  crashRestartDelaySec: 0.8,
+};
+
+function findPlayerProfileEntry(playerId) {
+  for (const [key, value] of redis.strings.entries()) {
+    if (!key.startsWith("dailygp:player-profile:")) continue;
+    try {
+      if (JSON.parse(value).playerId === playerId) return { key, value };
+    } catch (_error) {
+      // Ignore malformed records while locating a known valid profile.
+    }
+  }
+  return null;
+}
 
 describe("daily-gp-store submission hardening", () => {
   beforeEach(() => {
@@ -262,6 +301,160 @@ describe("daily-gp-store submission hardening", () => {
     expect(firstBootstrap.guestToken).toBeTruthy();
     expect(secondBootstrap.guestToken).toBe(firstBootstrap.guestToken);
     expect(secondBootstrap.playerId).toBe(firstBootstrap.playerId);
+  });
+
+  it("atomically issues a guest token only to the first bootstrap claim", async () => {
+    const guestPlayerId = "guest-concurrent-bootstrap";
+    const results = await Promise.all([
+      getServerPlayerBootstrap({ playerId: guestPlayerId, redditUsername: null }),
+      getServerPlayerBootstrap({ playerId: guestPlayerId, redditUsername: null }),
+    ]);
+    const successful = results.filter((result) => result.playerId === `guest:${guestPlayerId}`);
+    const rejected = results.filter((result) => result.playerId === null);
+
+    expect(successful).toHaveLength(1);
+    expect(successful[0].guestToken).toBeTruthy();
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].guestToken).toBeNull();
+    expect(rejected[0].playerPreferences).toBeNull();
+  });
+
+  it("does not reissue a token or profile data for an existing guest", async () => {
+    const guestPlayerId = "guest-existing-bootstrap";
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    await updateServerPlayerPreferences({
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+      playerPreferences,
+    });
+    const storedBefore = findPlayerProfileEntry(`guest:${guestPlayerId}`);
+
+    const unauthorized = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+
+    expect(unauthorized).toMatchObject({
+      playerId: null,
+      guestToken: null,
+      playerPreferences: null,
+      hasAnyData: false,
+    });
+    expect(redis.strings.get(storedBefore.key)).toBe(storedBefore.value);
+  });
+
+  it("recreates an expired profile when the guest token still verifies", async () => {
+    const guestPlayerId = "guest-expired-profile";
+    const first = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const stored = findPlayerProfileEntry(`guest:${guestPlayerId}`);
+    await redis.del(stored.key);
+
+    const recovered = await getServerPlayerBootstrap({
+      playerId: guestPlayerId,
+      guestToken: first.guestToken,
+    });
+
+    expect(recovered.playerId).toBe(`guest:${guestPlayerId}`);
+    expect(recovered.guestToken).toBe(first.guestToken);
+    expect(findPlayerProfileEntry(`guest:${guestPlayerId}`)).not.toBeNull();
+  });
+
+  it("protects an existing malformed guest profile from tokenless replacement", async () => {
+    const guestPlayerId = "guest-malformed-profile";
+    await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const stored = findPlayerProfileEntry(`guest:${guestPlayerId}`);
+    redis.strings.set(stored.key, "not-json");
+
+    const unauthorized = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+
+    expect(unauthorized.playerId).toBeNull();
+    expect(unauthorized.guestToken).toBeNull();
+    expect(redis.strings.get(stored.key)).toBe("not-json");
+  });
+
+  it("requires the matching guest token for profile mutations", async () => {
+    const guestPlayerId = "guest-protected-mutations";
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const otherToken = await mintGuestPlayerToken("some-other-guest");
+
+    const unsignedPreferences = await updateServerPlayerPreferences({
+      playerId: guestPlayerId,
+      playerPreferences,
+    });
+    const invalidPreferences = await updateServerPlayerPreferences({
+      playerId: guestPlayerId,
+      guestToken: "invalid-token",
+      playerPreferences,
+    });
+    const mismatchedIdentity = await updateServerPlayerIdentity({
+      playerId: guestPlayerId,
+      guestToken: otherToken,
+      leaderboardIdentity: "reddit",
+    });
+    const authorizedPreferences = await updateServerPlayerPreferences({
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+      playerPreferences,
+    });
+
+    expect(unsignedPreferences.playerId).toBeNull();
+    expect(invalidPreferences.playerId).toBeNull();
+    expect(mismatchedIdentity.playerId).toBeNull();
+    expect(authorizedPreferences).toMatchObject({
+      playerId: `guest:${guestPlayerId}`,
+      guestToken: bootstrap.guestToken,
+      playerPreferences,
+    });
+  });
+
+  it("keeps snapshots public but personalizes them only with a valid guest token", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-snapshot-authorization";
+    const canonicalPlayerId = `guest:${guestPlayerId}`;
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const entry = {
+      playerId: canonicalPlayerId,
+      trackKey: challenge.trackKey,
+      bestTimeMs: 12345,
+      updatedAt: new Date().toISOString(),
+      completedLaps: null,
+      checkpointTimesSec: null,
+      validationMethod: "strict-replay",
+      strictReplayFailureReason: null,
+    };
+    await redis.hSet(createRedisChallengeEntryHashKey(challenge.id), {
+      [canonicalPlayerId]: JSON.stringify(entry),
+    });
+    await redis.zAdd(createRedisChallengeLeaderboardKey(challenge.id), {
+      member: canonicalPlayerId,
+      score: encodeDailyGpLeaderboardScore(entry.bestTimeMs),
+    });
+    const storedBefore = findPlayerProfileEntry(canonicalPlayerId);
+
+    const publicSnapshot = await getServerDailyGpSnapshot({
+      challengeId: challenge.id,
+      playerId: guestPlayerId,
+    });
+    const invalidSnapshot = await getServerDailyGpSnapshot({
+      challengeId: challenge.id,
+      playerId: guestPlayerId,
+      guestToken: "invalid-token",
+    });
+    const storedAfterPublicReads = redis.strings.get(storedBefore.key);
+    const privateSnapshot = await getServerDailyGpSnapshot({
+      challengeId: challenge.id,
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+    });
+
+    expect(publicSnapshot.topRows).toHaveLength(1);
+    expect(publicSnapshot.topRows[0].isCurrentPlayer).toBe(false);
+    expect(publicSnapshot.currentPlayerRow).toBeNull();
+    expect(publicSnapshot.playerRank).toBeNull();
+    expect(invalidSnapshot.currentPlayerRow).toBeNull();
+    expect(storedAfterPublicReads).toBe(storedBefore.value);
+    expect(privateSnapshot.currentPlayerRow).toMatchObject({
+      bestTimeMs: 12345,
+      isCurrentPlayer: true,
+    });
+    expect(privateSnapshot.playerRank).toBe(1);
   });
 
   it("rate limits repeated guest submissions", async () => {
