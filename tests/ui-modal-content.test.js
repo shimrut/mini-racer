@@ -232,4 +232,60 @@ describe('ui modal content helpers', () => {
 
         global.document = originalDocument;
     });
+
+    it('renders a trailing share affordance on the player row and reserved slots on the rest', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM('<div id="leaderboard"></div>');
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('leaderboard');
+        const component = new ModalContentUi();
+
+        component.renderScoreboardList(container, {
+            topRows: [
+                { rank: 1, displayName: 'SHIMROOT', bestTime: 6.4, isCurrentPlayer: true },
+                { rank: 2, displayName: 'Other', bestTime: 9.1 },
+            ],
+            currentPlayerRow: { rank: 1, displayName: 'SHIMROOT', bestTime: 6.4, isCurrentPlayer: true },
+            totalCount: 2,
+            leaderboardEntryCount: 2,
+        }, 'daily', 'circuit', null, { shareBest: { challengeId: 'daily-1', bestTime: 6.4 } });
+
+        const rows = container.querySelectorAll('.leaderboard-row');
+        expect(rows).toHaveLength(2);
+        expect(rows[0].classList.contains('is-shareable')).toBe(true);
+        expect(rows[0].getAttribute('role')).toBe('button');
+        expect(rows[0].getAttribute('tabindex')).toBe('0');
+        expect(rows[0].querySelector('.leaderboard-row__share')).not.toBe(null);
+        expect(rows[1].classList.contains('is-shareable')).toBe(false);
+        expect(rows[1].querySelector('.leaderboard-row__share')).toBe(null);
+
+        const actionSlots = container.querySelectorAll('.leaderboard-row__action');
+        expect(actionSlots).toHaveLength(2);
+
+        global.document = originalDocument;
+    });
+
+    it('omits the trailing action slots when no share option is provided', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM('<div id="leaderboard"></div>');
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('leaderboard');
+        const component = new ModalContentUi();
+
+        component.renderScoreboardList(container, {
+            topRows: [
+                { rank: 1, displayName: 'SHIMROOT', bestTime: 6.4, isCurrentPlayer: true },
+                { rank: 2, displayName: 'Other', bestTime: 9.1 },
+            ],
+            currentPlayerRow: { rank: 1, displayName: 'SHIMROOT', bestTime: 6.4, isCurrentPlayer: true },
+            totalCount: 2,
+            leaderboardEntryCount: 2,
+        }, 'daily', 'circuit');
+
+        expect(container.querySelector('.leaderboard-row__action')).toBe(null);
+        expect(container.querySelector('.leaderboard-row__share')).toBe(null);
+        expect(container.querySelector('.leaderboard-row.is-shareable')).toBe(null);
+
+        global.document = originalDocument;
+    });
 });

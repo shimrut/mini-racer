@@ -24,6 +24,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The launch card works without inline scroll traps.
 - [ ] The expanded game works across phone and desktop layouts.
 - [ ] The retry flow is fast and predictable after a finish or crash.
+- [ ] The finish screen shows `Improve`, `Share Time`, and `Home`, and sharing displays the exact comment plus Reddit username before posting.
+- [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
 
 ### Reddit-specific setup
 
@@ -31,6 +33,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The moderator install flow is confirmed in the target subreddit.
 - [ ] The **Create Mini Racer post** menu item successfully creates a playable post.
 - [ ] At least one example post has been created and reviewed end to end.
+- [ ] Moderator, scheduler, and repeated create actions reuse the same canonical post for the subreddit and UTC day.
+- [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.
 
 ### Quality and trust
 
@@ -40,6 +44,10 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Guest fallback identity behaves correctly when Reddit username display is unavailable or off.
 - [ ] Invalid or suspicious replay submissions are rejected cleanly.
 - [ ] Error states are understandable and do not leave the player stuck.
+- [ ] `SUBMIT_COMMENT` user-action permission is present in `devvit.json`, and the reviewed app version is approved for regular-user attribution.
+- [ ] A regular user can preview, confirm, and view a score-thread reply authored by that same account.
+- [ ] Playtest/app-account fallback attribution is rejected and cleaned up instead of appearing as a successful player share.
+- [ ] Re-sharing the same result returns the existing comment; deleting it allows a new share.
 
 ### Cross-account testing
 

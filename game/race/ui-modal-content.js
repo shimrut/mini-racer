@@ -6,6 +6,40 @@ import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
+const LEADERBOARD_SHARE_ICON_PATH = 'M307.8 18.4c-12 5-19.8 16.6-19.8 29.6l0 80-112 0c-97.2 0-176 78.8-176 176 0 113.3 81.5 163.9 100.2 174.1 2.5 1.4 5.3 1.9 8.1 1.9 10.9 0 19.7-8.9 19.7-19.7 0-7.5-4.3-14.4-9.8-19.5-9.4-8.8-22.2-26.4-22.2-56.7 0-53 43-96 96-96l96 0 0 80c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l160-160c12.5-12.5 12.5-32.8 0-45.3l-160-160c-9.2-9.2-22.9-11.9-34.9-6.9z';
+
+function appendLeaderboardRowAction(item, { shareable = false } = {}) {
+    const action = document.createElement('span');
+    action.className = 'leaderboard-row__action';
+    if (shareable) {
+        const shareBtn = document.createElement('button');
+        shareBtn.type = 'button';
+        shareBtn.className = 'leaderboard-row__share';
+        shareBtn.setAttribute('aria-hidden', 'true');
+        shareBtn.setAttribute('tabindex', '-1');
+        shareBtn.disabled = false;
+
+        const glyph = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        glyph.classList.add('leaderboard-row__share-icon');
+        glyph.setAttribute('viewBox', '0 0 512 512');
+        glyph.setAttribute('fill', 'currentColor');
+        glyph.setAttribute('aria-hidden', 'true');
+        glyph.setAttribute('focusable', 'false');
+        const glyphPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        glyphPath.setAttribute('d', LEADERBOARD_SHARE_ICON_PATH);
+        glyph.appendChild(glyphPath);
+
+        const shareLabel = document.createElement('span');
+        shareLabel.className = 'combined-action-btn-label';
+        shareLabel.textContent = 'Share Best';
+        shareLabel.hidden = true;
+
+        shareBtn.append(glyph, shareLabel);
+        action.appendChild(shareBtn);
+    }
+    item.appendChild(action);
+}
+
 function getFinitePositiveRank(value) {
     const rank = Number(value);
     return Number.isFinite(rank) && rank > 0
@@ -409,7 +443,8 @@ export class ModalContentUi {
 }
 
     renderScoreboardList(container, scoreboardSnapshot, scoreboardMode, trackKey = null, scoreboardSubhead = null, {
-    showHeader = true
+    showHeader = true,
+    shareBest = null
 } = {}) {
     if (!container) return;
     const isLoading = Boolean(scoreboardSnapshot?.isLoading);
@@ -529,6 +564,16 @@ export class ModalContentUi {
         const item = document.createElement('div');
         item.className = `combined-row leaderboard-row${entry.isCurrentPlayer ? ' is-player current' : ''}`;
 
+        const canShareRow = Boolean(shareBest)
+            && entry.isCurrentPlayer
+            && Number.isFinite(Number(shareBest.bestTime));
+        if (canShareRow) {
+            item.classList.add('is-shareable');
+            item.setAttribute('role', 'button');
+            item.setAttribute('tabindex', '0');
+            item.setAttribute('aria-label', 'Share your best time for this day');
+        }
+
         const runIndex = document.createElement('div');
         runIndex.className = 'combined-row-rank';
         runIndex.dataset.rank = entry.rank;
@@ -553,6 +598,10 @@ export class ModalContentUi {
         }
         item.appendChild(runTime);
 
+        if (shareBest) {
+            appendLeaderboardRowAction(item, { shareable: canShareRow });
+        }
+
         list.appendChild(item);
     };
 
@@ -575,6 +624,10 @@ export class ModalContentUi {
         runTime.className = 'combined-row-time';
         runTime.textContent = '—';
         item.appendChild(runTime);
+
+        if (shareBest) {
+            appendLeaderboardRowAction(item);
+        }
 
         list.appendChild(item);
     };

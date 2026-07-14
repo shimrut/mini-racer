@@ -151,9 +151,7 @@ async function applyTimeToBeat(el, trackKey) {
 }
 
 function formatTimeToBeat(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = (seconds % 60).toFixed(2).padStart(5, '0');
-    return `${mins}:${secs}`;
+    return seconds.toFixed(2).padStart(5, '0');
 }
 
 function renderChallengeStatus(challenge) {

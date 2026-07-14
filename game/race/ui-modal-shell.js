@@ -42,6 +42,9 @@ export class ModalShell {
         cancelLeaderboardRequests = null,
         playUnlockSound = () => null,
         getGarageUi = null,
+        getRedditUsername = () => null,
+        previewShare = null,
+        confirmShare = null,
     } = {}) {
         this.content = content;
         this.getLeaderboards = getLeaderboards;
@@ -50,6 +53,9 @@ export class ModalShell {
         this.cancelLeaderboardRequests = cancelLeaderboardRequests;
         this.playUnlockSound = playUnlockSound;
         this.getGarageUi = getGarageUi;
+        this.getRedditUsername = getRedditUsername;
+        this.previewShare = previewShare;
+        this.confirmShare = confirmShare;
         this._modalCloseFallbackTimer = null;
         this._modalCloseTransitionEndHandler = null;
         this._mainModalIsCrash = false;
@@ -269,10 +275,145 @@ export class ModalShell {
         btn.onclick = typeof action === 'function' ? action : null;
     }
 
+    _setShareButtonLabel(button, label) {
+        const labelNode = button?.querySelector?.('.combined-action-btn-label');
+        if (labelNode) labelNode.textContent = label.toUpperCase();
+        else if (button) button.textContent = label;
+    }
+
+    _closeSharePanel({ restoreScroll = true } = {}) {
+        const panel = this.modal?.querySelector?.('.result-share-panel');
+        const scrollTop = Number(panel?.dataset?.savedScrollTop);
+        panel?.remove();
+        if (restoreScroll && Number.isFinite(scrollTop) && this.modalLapTimes) {
+            this.modalLapTimes.scrollTop = scrollTop;
+        }
+    }
+
+    _showShareOutcome(panel, triggerButton, result) {
+        panel.replaceChildren();
+        const title = document.createElement('h3');
+        title.className = 'result-share-panel__title';
+        title.textContent = 'Shared';
+        const copy = document.createElement('blockquote');
+        copy.className = 'result-share-panel__copy';
+        copy.textContent = result?.commentText || 'Your result is already in the score thread.';
+        const actions = document.createElement('div');
+        actions.className = 'result-share-panel__actions';
+        const done = document.createElement('button');
+        done.type = 'button';
+        done.className = 'result-share-panel__button';
+        done.textContent = 'Done';
+        done.onclick = () => this._closeSharePanel();
+        actions.appendChild(done);
+        panel.append(title, copy, actions);
+        triggerButton.disabled = true;
+        this._setShareButtonLabel(triggerButton, 'Shared');
+    }
+
+    async _startShare(request, triggerButton, hostView) {
+        if (!triggerButton || !hostView) return;
+        this._closeSharePanel?.({ restoreScroll: false });
+        const scrim = document.createElement('section');
+        scrim.className = 'result-share-panel';
+        scrim.setAttribute('role', 'dialog');
+        scrim.setAttribute('aria-label', 'Share race result');
+        scrim.dataset.savedScrollTop = String(this.modalLapTimes?.scrollTop || 0);
+        const panel = document.createElement('div');
+        panel.className = 'result-share-panel__card';
+        scrim.appendChild(panel);
+        const title = document.createElement('h3');
+        title.className = 'result-share-panel__title';
+        title.textContent = 'Share your time';
+        const status = document.createElement('p');
+        status.className = 'result-share-panel__status';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'result-share-panel__button';
+        cancel.textContent = 'Cancel';
+        cancel.onclick = () => {
+            triggerButton.disabled = false;
+            this._closeSharePanel();
+        };
+        panel.append(title, status, cancel);
+        hostView.appendChild(scrim);
+
+        const username = this.getRedditUsername?.();
+        if (!username) {
+            status.textContent = 'Sign in to Reddit to share your time.';
+            cancel.textContent = 'Close';
+            return;
+        }
+        if (typeof this.previewShare !== 'function' || typeof this.confirmShare !== 'function') {
+            status.textContent = 'Sharing is unavailable right now.';
+            return;
+        }
+        triggerButton.disabled = true;
+        status.textContent = 'Preparing your verified result…';
+        try {
+            const response = await this.previewShare(request);
+            const body = response?.body || {};
+            if (body.status === 'already_shared') {
+                this._showShareOutcome(panel, triggerButton, body);
+                return;
+            }
+            if (!response?.ok || body.status !== 'ready') {
+                throw new Error(body.error || 'Could not prepare this result for sharing.');
+            }
+            panel.replaceChildren();
+            const disclosure = document.createElement('p');
+            disclosure.className = 'result-share-panel__status';
+            const disclosureUser = document.createElement('span');
+            disclosureUser.className = 'result-share-panel__accent';
+            disclosureUser.textContent = `u/${body.username}`;
+            disclosure.append('Post this comment as ', disclosureUser, '?');
+            const copy = document.createElement('blockquote');
+            copy.className = 'result-share-panel__copy';
+            copy.textContent = body.commentText;
+            const actions = document.createElement('div');
+            actions.className = 'result-share-panel__actions';
+            const cancelReady = cancel.cloneNode(true);
+            cancelReady.onclick = () => {
+                triggerButton.disabled = false;
+                this._closeSharePanel();
+            };
+            const confirm = document.createElement('button');
+            confirm.type = 'button';
+            confirm.className = 'result-share-panel__button result-share-panel__button--primary';
+            confirm.textContent = 'Post Comment';
+            confirm.onclick = async () => {
+                confirm.disabled = true;
+                cancelReady.disabled = true;
+                confirm.textContent = 'Posting…';
+                try {
+                    const confirmed = await this.confirmShare(body.shareToken);
+                    if (!confirmed?.ok || !['shared', 'already_shared'].includes(confirmed?.body?.status)) {
+                        throw new Error(confirmed?.body?.error || 'Could not share this result.');
+                    }
+                    this._showShareOutcome(panel, triggerButton, confirmed.body);
+                } catch (error) {
+                    confirm.disabled = false;
+                    cancelReady.disabled = false;
+                    confirm.textContent = 'Try Again';
+                    disclosure.textContent = error?.message || 'Could not share this result.';
+                    disclosure.classList.add('is-error');
+                }
+            };
+            actions.append(cancelReady, confirm);
+            panel.append(title, disclosure, copy, actions);
+            confirm.focus();
+        } catch (error) {
+            triggerButton.disabled = false;
+            status.textContent = error?.message || 'Could not prepare this result for sharing.';
+            status.classList.add('is-error');
+        }
+    }
+
     showModal(title, msg, lapData, options = {}) {
         if (!this.modal || !this.modalTitle) return;
 
         this.cancelPendingModalClose();
+        this._closeSharePanel?.({ restoreScroll: false });
         const modalKind = options.modalKind || null;
         if (modalKind !== 'pause') {
             this._hidePauseTrackPreview();
@@ -452,11 +593,21 @@ export class ModalShell {
                 'Improve time'
             );
         }
+        if (this.combinedPlaylistBtn) {
+            this._setShareButtonLabel(this.combinedPlaylistBtn, 'Share Time');
+            this.combinedPlaylistBtn.setAttribute('aria-label', 'Share time');
+            this.combinedPlaylistBtn.disabled = false;
+        }
 
         this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
         this._bindClickAction(this.combinedSettingsBtn, options.settingsAction);
         this._bindCombinedGarageBtn(this.combinedGarageBtn);
-        this._bindClickAction(this.combinedPlaylistBtn, options.playlistAction);
+        this._bindClickAction(
+            this.combinedPlaylistBtn,
+            options.shareRequest
+                ? () => void this._startShare(options.shareRequest, this.combinedPlaylistBtn, this.modalCombinedView)
+                : options.playlistAction,
+        );
         this._bindClickAction(this.combinedRestartBtn, finishResultModal(options.restartAction || options.primaryAction));
         this._syncGarageButtonToPanelState();
 
@@ -524,6 +675,7 @@ export class ModalShell {
         if (!this.modal || !this.modalTitle || !this.modalLapTimes || !this.modalRunsView || !this.modalMainView) return;
 
         this.cancelPendingModalClose();
+        this._closeSharePanel?.({ restoreScroll: false });
         const wasActive = this.isModalActive();
 
         // Save previous view state before clearing
@@ -571,16 +723,18 @@ export class ModalShell {
         this.configureRunsModalHeader?.();
         this.renderLeaderboardStandaloneIntro?.();
         if (this._modalRunsPayload.showGlobalLeaderboard) {
+            const shareBest = this._leaderboardShareBestOption();
             this.content.renderScoreboardList(
                 this.modalLapTimes,
                 this._modalRunsPayload.scoreboardSnapshot,
                 TRACK_MODE_DAILY_GP,
                 this._modalRunsPayload.scoreboardTrackKey,
                 this._modalRunsPayload.scoreboardSubhead,
-                { showHeader: hasPersonalBestList }
+                { showHeader: hasPersonalBestList, shareBest }
             );
         }
         this.bindLeaderboardPagination?.();
+        this._wireLeaderboardRowShare?.();
 
         if (this.backToMainBtn) {
             this.backToMainBtn.setAttribute('aria-label', 'Back');
@@ -605,6 +759,7 @@ export class ModalShell {
     closeModal() {
         if (!this.modal) return;
 
+        this._closeSharePanel({ restoreScroll: false });
         this._leaderboardRailScrollLeft = null;
         this.unbindLeaderboardPagination?.();
         const modal = this.modal;
@@ -945,16 +1100,18 @@ export class ModalShell {
             this.modalLapTimes.querySelector('.leaderboard-section')?.remove();
             this.renderLeaderboardStandaloneIntro();
             if (this._modalRunsPayload.showGlobalLeaderboard) {
+                const shareBest = this._leaderboardShareBestOption();
                 this.content.renderScoreboardList(
                     this.modalLapTimes,
                     this._modalRunsPayload.scoreboardSnapshot,
                     TRACK_MODE_DAILY_GP,
                     this._modalRunsPayload.scoreboardTrackKey,
                     this._modalRunsPayload.scoreboardSubhead,
-                    { showHeader: hasPersonalBestList }
+                    { showHeader: hasPersonalBestList, shareBest }
                 );
             }
             this.bindLeaderboardPagination?.();
+            this._wireLeaderboardRowShare?.();
             this.modalLapTimes.scrollTop = scrollTop;
             return;
         }
@@ -1277,6 +1434,40 @@ export class ModalShell {
 
         summary.append(summaryValue, summaryMeta);
         header?.appendChild(summary);
+    }
+
+    _wireLeaderboardRowShare() {
+        const payload = this._modalRunsPayload;
+        const challengeId = payload?.scoreboardChallengeId;
+        const playerBestTime = Number(payload?.scoreboardSnapshot?.currentPlayerRow?.bestTime);
+        if (!Number.isFinite(playerBestTime) || !challengeId) return;
+        const row = this.modalLapTimes?.querySelector?.('.leaderboard-row.is-shareable');
+        const shareBtn = row?.querySelector?.('.leaderboard-row__share');
+        if (!row || !shareBtn) return;
+
+        const trigger = () => {
+            if (shareBtn.disabled) return;
+            void this._startShare(
+                { source: 'standings', challengeId },
+                shareBtn,
+                this.modalRunsView,
+            );
+        };
+        row.onclick = trigger;
+        row.onkeydown = (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                trigger();
+            }
+        };
+    }
+
+    _leaderboardShareBestOption() {
+        const payload = this._modalRunsPayload;
+        const challengeId = payload?.scoreboardChallengeId;
+        const playerBestTime = Number(payload?.scoreboardSnapshot?.currentPlayerRow?.bestTime);
+        if (!Number.isFinite(playerBestTime) || !challengeId) return null;
+        return { challengeId, bestTime: playerBestTime };
     }
 
     unbindLeaderboardPagination() {

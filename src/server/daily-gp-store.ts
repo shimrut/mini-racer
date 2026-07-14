@@ -829,6 +829,27 @@ export async function getServerDailyGpPlayableChallenge(challengeId?: string | n
     return null;
 }
 
+export async function getServerDailyGpPlayerBest({
+    challengeId,
+    redditUsername,
+}: {
+    challengeId?: string | null;
+    redditUsername?: string | null;
+}): Promise<{ challenge: DailyGpChallenge; bestTimeMs: number } | null> {
+    const username = sanitizeRedditUsername(redditUsername);
+    const challenge = await getServerDailyGpPlayableChallenge(challengeId);
+    if (!username || !challenge) {
+        return null;
+    }
+
+    const entry = await readEntryByPlayerId(
+        challenge.id,
+        challenge.trackKey,
+        `reddit:${username.toLowerCase()}`,
+    );
+    return entry ? { challenge, bestTimeMs: entry.bestTimeMs } : null;
+}
+
 export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyGpChallenge[]> {
     const todayIndex = getUtcDayIndex(now);
     const challenges: DailyGpChallenge[] = [];

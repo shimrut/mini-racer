@@ -15,7 +15,9 @@ export const API_ROUTES = Object.freeze({
     dailyActiveUrl: `${API_BASE_URL}/daily/active`,
     dailyPlaylistUrl: `${API_BASE_URL}/daily/playlist`,
     dailySnapshotUrl: `${API_BASE_URL}/daily/snapshot`,
-    dailySubmitUrl: `${API_BASE_URL}/daily/submit`
+    dailySubmitUrl: `${API_BASE_URL}/daily/submit`,
+    dailySharePreviewUrl: `${API_BASE_URL}/daily/share/preview`,
+    dailyShareConfirmUrl: `${API_BASE_URL}/daily/share/confirm`
 });
 
 function createPlayerId() {

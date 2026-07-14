@@ -68,6 +68,7 @@ flowchart LR
 - `game/scoreboard/service.js` fetches leaderboard snapshots and submits best times.
 - `game/scoreboard/snapshot.js` owns the shared client-side snapshot shape, row/time normalization, empty state, and mutation-safe cache cloning used by both scoreboard and Daily GP flows.
 - `game/scoreboard/engine-methods.js` handles deferred verification and retry behavior after a local best run is recorded.
+- `game/race/ui-modal-shell.js` owns the shared result-confirmation UI used by both the finish screen and daily standings. `game/daily-challenge/service.js` sends preview and confirm requests; the browser never composes the public comment itself.
 - `game/storage.js` fetches player bootstrap state and falls back to local data when needed.
 - Daily GP track selection walks `game/track/tracks.js` in key order, one track per day, using the most-recent published day as the playhead; `src/server/daily-gp-store.ts` persists each new day to the `dailygp:challenges` Redis ledger (first-writer-wins) so past days never change.
 - Published Daily GP playlist rows come from server-side challenge history, not from recalculating old dates against the current track file.
@@ -88,6 +89,8 @@ flowchart LR
 - `src/server/community-member-count.ts` reads the public `subscribersCount` through Reddit's community-info API and caches it in Redis for five minutes. Standings use accepted leaderboard entries when Reddit does not return a usable count.
 - `game/shared/daily-gp-history-backfill.js` isolates the June 2-11, 2026 published-history seed used to backfill the server history store.
 - `src/server/replay-validator.ts` replays submitted inputs against shared track/physics logic before the server accepts a run.
+- `src/server/daily-gp-post-store.ts` keeps one canonical Daily GP post record per subreddit and challenge day. New post creation does not report success until `src/server/daily-gp-share.ts` has created and pinned that post's score thread; lazy repair is reserved for historical posts created before this contract. The share service validates finish replays or reads the verified standings best, generates the exact comment, and submits player comments only as replies to that score thread after confirmation.
+- Share previews expire after 10 minutes. Successful shares are idempotent by subreddit, challenge, Reddit user, and exact time for 45 days; a deleted comment clears that stale record and can be shared again. User attribution is checked after submission and a mismatched app-authored fallback is deleted.
 - Important implication: track geometry, finish/checkpoint logic, and physics tuning are not frontend-only. The server uses the same contracts.
 
 ## Major Areas And Their Responsibilities
@@ -100,10 +103,10 @@ flowchart LR
 | Race/physics | `game/race/simulation.js`, `game/race/engine-methods.js`, `game/car/handling.js` | Driving feel, crashes, finish logic, replay capture | Track runtime, config, HUD, modal flow |
 | Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js` | Car art, asset loading, garage selection, trail style | `public/assets/cars/*`, generated asset list, local cache, Redis player profile |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
-| Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow | API routes, daily challenge storage, server APIs |
+| Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow, share entry point | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js`, `game/player/preferences.js` | Identity, audio toggles, restart preferences, durable preference sync | Browser cache, player APIs, Redis profile, modal helpers |
 | Audio/analytics | `game/audio/*`, `game/player/service.js` | Sound playback and analytics events | Settings preferences, `/api/analytics/event` |
-| Server | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/daily-gp-model.ts`, `src/server/replay-validator.ts` | Persistence, validation, challenge scheduling, APIs | Redis, shared gameplay modules |
+| Server | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-post-store.ts`, `src/server/daily-gp-share.ts`, `src/server/replay-validator.ts` | Persistence, validation, challenge scheduling, canonical posts, Reddit result comments, APIs | Redis, Reddit API, shared gameplay modules |
 
 ## API Surface
 
@@ -118,6 +121,8 @@ These client-facing routes are defined in `src/server/index.ts`:
 - `/api/daily/playlist`
 - `/api/daily/snapshot`
 - `/api/daily/submit`
+- `/api/daily/share/preview`
+- `/api/daily/share/confirm`
 - `/api/analytics/event`
 - `/api/analytics/summary`
 
@@ -166,6 +171,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Daily challenge schedule or availability window | `game/track/tracks.js`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-store.ts`, `game/daily-challenge/service.js` | `src/server/index.ts`, `README.md` if player-facing behavior changes | New challenge generation walks the track file in order; playlist availability reads persisted published history so past days do not shift |
 | Start screen or daily card copy/layout | `game/daily-challenge/ui.js`, `game.html`, `styles.css` | `game/daily-challenge/service.js` | The UI is driven by API summary fields and modal launch actions |
 | Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/community-member-count.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned; community size comes from the cached public subscriber count |
+| Result sharing or score-thread behavior | `game/race/ui-modal-shell.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-share.ts`, `src/server/daily-gp-post-store.ts` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `devvit.json`, finish and standings tests | The same confirmation contract serves finish and standings; Reddit user-action permission and post/comment identity are server-enforced |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the independently expiring Reddit Redis player profile as the durable source |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |

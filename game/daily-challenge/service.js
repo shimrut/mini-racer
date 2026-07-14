@@ -1005,3 +1005,31 @@ export async function submitDailyChallengeBestTime({
         body: await response.json().catch(() => null)
     };
 }
+
+async function postDailyShareRequest(url, body) {
+    if (isLocalEnvironment()) {
+        return {
+            ok: false,
+            status: 403,
+            body: { status: 'unavailable_locally', error: 'Reddit sharing is only available in the hosted game.' }
+        };
+    }
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    return {
+        ok: response.ok,
+        status: response.status,
+        body: await response.json().catch(() => null),
+    };
+}
+
+export function previewDailyChallengeShare(payload = {}) {
+    return postDailyShareRequest(API_ROUTES.dailySharePreviewUrl, payload);
+}
+
+export function confirmDailyChallengeShare(shareToken) {
+    return postDailyShareRequest(API_ROUTES.dailyShareConfirmUrl, { shareToken });
+}

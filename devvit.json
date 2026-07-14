@@ -2,7 +2,12 @@
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "mini-racer",
   "permissions": {
-    "reddit": true,
+    "reddit": {
+      "enable": true,
+      "asUser": [
+        "SUBMIT_COMMENT"
+      ]
+    },
     "redis": true
   },
   "post": {

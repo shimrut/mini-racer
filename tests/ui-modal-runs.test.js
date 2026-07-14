@@ -11,6 +11,8 @@ const {
     renderLeaderboardStandaloneIntro,
     updateModalRunSummary,
     bindLeaderboardPagination,
+    _wireLeaderboardRowShare,
+    _leaderboardShareBestOption,
 } = ModalShell.prototype;
 
 function createClassList(initialClasses = []) {
@@ -134,7 +136,9 @@ describe('ui modal runs helpers', () => {
             _setActiveView: setActiveView,
             getCurrentTrackKey: vi.fn(() => 'circuit'),
             isModalActive: vi.fn(() => true),
-            activateModalFocusTrap: vi.fn()
+            activateModalFocusTrap: vi.fn(),
+            _leaderboardShareBestOption: ModalShell.prototype._leaderboardShareBestOption,
+            _wireLeaderboardRowShare: () => {}
         };
 
         try {
@@ -339,6 +343,71 @@ describe('ui modal runs helpers', () => {
         } finally {
             global.document = originalDocument;
         }
+    });
+
+    it('builds a share-best option only when the player has a shareable time', () => {
+        const ctx = {
+            _modalRunsPayload: {
+                scoreboardChallengeId: 'daily-1',
+                scoreboardSnapshot: { currentPlayerRow: { bestTime: 42.317 } }
+            }
+        };
+
+        expect(_leaderboardShareBestOption.call(ctx)).toEqual({
+            challengeId: 'daily-1',
+            bestTime: 42.317
+        });
+
+        const noChallenge = {
+            _modalRunsPayload: {
+                scoreboardChallengeId: null,
+                scoreboardSnapshot: { currentPlayerRow: { bestTime: 42.317 } }
+            }
+        };
+        expect(_leaderboardShareBestOption.call(noChallenge)).toBeNull();
+
+        const noTime = {
+            _modalRunsPayload: {
+                scoreboardChallengeId: 'daily-1',
+                scoreboardSnapshot: { currentPlayerRow: { bestTime: NaN } }
+            }
+        };
+        expect(_leaderboardShareBestOption.call(noTime)).toBeNull();
+    });
+
+    it('wires the player row to share and ignores a disabled share button', () => {
+        const shareBtn = createTestElement('button');
+        shareBtn.disabled = false;
+        const row = createTestElement('div');
+        row.querySelector = vi.fn((sel) => (
+            sel === '.leaderboard-row__share' ? shareBtn : null
+        ));
+        const modalLapTimes = createTestElement('div');
+        modalLapTimes.querySelector = vi.fn((sel) => (
+            sel === '.leaderboard-row.is-shareable' ? row : null
+        ));
+        const startShare = vi.fn();
+        const ctx = {
+            modalLapTimes,
+            modalRunsView: {},
+            _startShare: startShare,
+            _modalRunsPayload: {
+                scoreboardChallengeId: 'daily-1',
+                scoreboardSnapshot: { currentPlayerRow: { bestTime: 42.317 } }
+            }
+        };
+
+        _wireLeaderboardRowShare.call(ctx);
+
+        expect(typeof row.onclick).toBe('function');
+        row.onclick();
+        expect(startShare).toHaveBeenCalledTimes(1);
+        expect(startShare.mock.calls[0][0]).toEqual({ source: 'standings', challengeId: 'daily-1' });
+        expect(startShare.mock.calls[0][1]).toBe(shareBtn);
+
+        shareBtn.disabled = true;
+        row.onclick();
+        expect(startShare).toHaveBeenCalledTimes(1);
     });
 
     it('matches modal scoreboard contexts for track and challenge payloads', () => {

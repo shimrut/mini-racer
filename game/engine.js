@@ -52,6 +52,10 @@ import {
   applyPlayerPreferences,
   queuePlayerPreferencesSave,
 } from "./player/preferences.js";
+import {
+  confirmDailyChallengeShare,
+  previewDailyChallengeShare,
+} from "./daily-challenge/service.js";
 
 export class RealTimeRacer {
   constructor() {
@@ -108,6 +112,7 @@ export class RealTimeRacer {
     this.isProcessingVerificationQueue = false;
     this.hasAnyData = false;
     this.isReturningPlayer = false;
+    this.redditUsername = null;
     this.activeTimers = [];
     this.resizeCommitTimer = null;
 
@@ -228,6 +233,9 @@ export class RealTimeRacer {
       cancelLeaderboardRequests: () => this.leaderboards?.cancelPendingRequests(),
       playUnlockSound: (tier) => this.medalEffectsAudio?.scheduleMedalUnlock?.(tier),
       getGarageUi: () => this.garage,
+      getRedditUsername: () => this.redditUsername,
+      previewShare: (payload) => previewDailyChallengeShare(payload),
+      confirmShare: (shareToken) => confirmDailyChallengeShare(shareToken),
     });
     this.leaderboards = new LeaderboardsUi({
       showRunsModal: (...args) => this.modal.showRunsModal(...args),
@@ -327,10 +335,13 @@ export class RealTimeRacer {
 
     this.setLoadingStatus(30, "Fetching Profile...");
     this.playerHistoryPromise = getPlayerProgressState()
-      .then(async ({ hasAnyData, isReturningPlayer, playerPreferences }) => {
+      .then(async ({ hasAnyData, isReturningPlayer, playerPreferences, redditUsername }) => {
         this.setLoadingStatus(50, "Profile Loaded...");
         this.hasAnyData = Boolean(hasAnyData);
         this.isReturningPlayer = Boolean(isReturningPlayer);
+        this.redditUsername = typeof redditUsername === "string" && redditUsername.trim()
+          ? redditUsername.trim()
+          : null;
         if (playerPreferences) {
           await this.applyPersistedPlayerPreferences(playerPreferences);
         } else {

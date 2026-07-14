@@ -853,6 +853,7 @@ export const dailyChallengeEngineMethods = {
         };
 
     const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(challenge.id);
+    const replayPayload = this.scoreboardReplay.getPayload(1);
     this.modal.showModal(
       "Daily challenge complete",
       null,
@@ -891,8 +892,10 @@ export const dailyChallengeEngineMethods = {
           secondaryAction: () => this.reset(false),
         }),
         settingsAction: () => this.settings.openSettings(),
-        playlistAction: () => {
-          void this.openDailyChallengePlaylist();
+        shareRequest: {
+          source: "finish",
+          challengeId: challenge.id,
+          replay: replayPayload ? { ...replayPayload } : null,
         },
       },
     );
@@ -929,7 +932,6 @@ export const dailyChallengeEngineMethods = {
           : this.bestLapTime;
       }
 
-      const replayPayload = this.scoreboardReplay.getPayload(1);
       const submissionError = runSubmissionBlockedReason
         || (replayPayload
           ? null

@@ -15,6 +15,17 @@ import {
     updateServerPlayerPreferences,
 } from './daily-gp-store.js';
 import {
+    confirmDailyGpShare,
+    ensureDailyGpScoreThread,
+    previewDailyGpShare,
+    registerDailyGpPostWithScoreThread,
+    resolveDailyGpPostRecord,
+} from './daily-gp-share.js';
+import {
+    acquireDailyGpPostCreationLock,
+    releaseDailyGpPostCreationLock,
+} from './daily-gp-post-store.js';
+import {
     getServerAnalyticsSummary,
     submitServerAnalyticsEvent,
 } from './analytics-store.js';
@@ -51,6 +62,11 @@ function getRequestUsername(): string | null {
     return typeof context.username === 'string' && context.username.trim()
         ? context.username.trim()
         : null;
+}
+
+function getRequestAppSlug(): string | null {
+    const appSlug = (context as { appSlug?: unknown }).appSlug;
+    return typeof appSlug === 'string' && appSlug.trim() ? appSlug.trim() : null;
 }
 
 function hasPlayerCredential(value: unknown): boolean {
@@ -293,8 +309,9 @@ async function writeModAnalyticsPostRecord(record: ModAnalyticsPostRecord): Prom
 async function submitDailyMiniRacerPost(
     subredditName: string,
     challenge: DailyGpChallenge,
+    appSlug: string,
 ) {
-    return reddit.submitCustomPost({
+    const post = await reddit.submitCustomPost({
         subredditName,
         title: formatDailyMiniRacerPostTitle(challenge),
         entry: 'default',
@@ -306,6 +323,17 @@ async function submitDailyMiniRacerPost(
             text: formatDailyMiniRacerTextFallback(challenge),
         },
     });
+    if (typeof post.id !== 'string' || !post.id.startsWith('t3_') || typeof post.url !== 'string') {
+        throw new Error('Reddit did not return the daily post identity.');
+    }
+    await registerDailyGpPostWithScoreThread({
+        subredditName,
+        challengeId: challenge.id,
+        postId: post.id as `t3_${string}`,
+        postUrl: post.url,
+        appSlug,
+    });
+    return post;
 }
 
 async function submitModeratorAnalyticsPost(subredditName: string) {
@@ -350,28 +378,64 @@ async function ensureDailyMiniRacerPostForSubreddit(
     challenge: DailyGpChallenge,
 ) {
     const current = await readDailyAutopostSubscription(subredditName);
-    if (current?.lastPostedChallengeId === challenge.id) {
+    const appSlug = getRequestAppSlug();
+    if (!appSlug) {
+        throw new Error('Reddit did not provide the Mini Racer app identity.');
+    }
+    const existing = await resolveDailyGpPostRecord({
+        subredditName,
+        challengeId: challenge.id,
+        appSlug,
+        preferredPostUrl: current?.lastPostedChallengeId === challenge.id ? current.lastPostUrl : null,
+    });
+    if (existing) {
+        await ensureDailyGpScoreThread(existing, appSlug);
+        await upsertDailyAutopostSubscription(subredditName, (previous) => ({
+            subredditName,
+            enabled: previous?.enabled ?? false,
+            enabledAt: previous?.enabledAt ?? null,
+            updatedAt: new Date().toISOString(),
+            lastPostedChallengeId: challenge.id,
+            lastPostedAt: previous?.lastPostedChallengeId === challenge.id
+                ? previous.lastPostedAt
+                : existing.createdAt,
+            lastPostUrl: existing.postUrl,
+        }));
         return {
             created: false,
-            postUrl: current.lastPostUrl,
+            postUrl: existing.postUrl,
         };
     }
 
-    const post = await submitDailyMiniRacerPost(subredditName, challenge);
-    await upsertDailyAutopostSubscription(subredditName, (previous) => ({
-        subredditName,
-        enabled: previous?.enabled ?? false,
-        enabledAt: previous?.enabledAt ?? null,
-        updatedAt: new Date().toISOString(),
-        lastPostedChallengeId: challenge.id,
-        lastPostedAt: new Date().toISOString(),
-        lastPostUrl: post.url,
-    }));
-
-    return {
-        created: true,
-        postUrl: post.url,
-    };
+    const lock = await acquireDailyGpPostCreationLock(subredditName, challenge.id);
+    if (!lock) {
+        const raced = await resolveDailyGpPostRecord({ subredditName, challengeId: challenge.id, appSlug });
+        if (raced) {
+            const prepared = await ensureDailyGpScoreThread(raced, appSlug);
+            return { created: false, postUrl: prepared.postUrl };
+        }
+        throw new Error('Today\'s Mini Racer post is already being created.');
+    }
+    try {
+        const raced = await resolveDailyGpPostRecord({ subredditName, challengeId: challenge.id, appSlug });
+        if (raced) {
+            const prepared = await ensureDailyGpScoreThread(raced, appSlug);
+            return { created: false, postUrl: prepared.postUrl };
+        }
+        const post = await submitDailyMiniRacerPost(subredditName, challenge, appSlug);
+        await upsertDailyAutopostSubscription(subredditName, (previous) => ({
+            subredditName,
+            enabled: previous?.enabled ?? false,
+            enabledAt: previous?.enabledAt ?? null,
+            updatedAt: new Date().toISOString(),
+            lastPostedChallengeId: challenge.id,
+            lastPostedAt: new Date().toISOString(),
+            lastPostUrl: post.url,
+        }));
+        return { created: true, postUrl: post.url };
+    } finally {
+        await releaseDailyGpPostCreationLock(lock);
+    }
 }
 
 async function resolveMenuTargetSubredditName(targetId: string): Promise<string | null> {
@@ -676,6 +740,45 @@ app.post('/api/daily/submit', async (req, res) => {
     }
 });
 
+async function getDailyGpShareRequestContext() {
+    const subredditName = readContextSubredditName();
+    const subscription = subredditName
+        ? await readDailyAutopostSubscription(subredditName)
+        : null;
+    return {
+        username: getRequestUsername(),
+        subredditName,
+        appSlug: getRequestAppSlug(),
+        preferredPostUrl: subscription?.lastPostUrl ?? null,
+    };
+}
+
+app.post('/api/daily/share/preview', async (req, res) => {
+    try {
+        const result = await previewDailyGpShare(
+            req.body ?? {},
+            await getDailyGpShareRequestContext(),
+        );
+        res.status(result.status).json(result.body);
+    } catch (error) {
+        console.error('Failed to preview Reddit Mini Racer result share:', error);
+        res.status(500).json({ status: 'share_failed', error: 'Could not prepare this result for sharing.' });
+    }
+});
+
+app.post('/api/daily/share/confirm', async (req, res) => {
+    try {
+        const result = await confirmDailyGpShare(
+            req.body ?? {},
+            await getDailyGpShareRequestContext(),
+        );
+        res.status(result.status).json(result.body);
+    } catch (error) {
+        console.error('Failed to share Reddit Mini Racer result:', error);
+        res.status(500).json({ status: 'share_failed', error: 'Could not share this result.' });
+    }
+});
+
 app.post('/api/analytics/event', async (req, res) => {
     try {
         const result = await submitServerAnalyticsEvent({
@@ -778,19 +881,10 @@ registerMenuAction(
     },
     async (subredditName, res) => {
         const challenge = await getServerDailyGpChallenge();
-        const post = await submitDailyMiniRacerPost(subredditName, challenge);
-        await upsertDailyAutopostSubscription(subredditName, (previous) => ({
-            subredditName,
-            enabled: previous?.enabled ?? false,
-            enabledAt: previous?.enabledAt ?? null,
-            updatedAt: new Date().toISOString(),
-            lastPostedChallengeId: challenge.id,
-            lastPostedAt: new Date().toISOString(),
-            lastPostUrl: post.url,
-        }));
+        const result = await ensureDailyMiniRacerPostForSubreddit(subredditName, challenge);
 
         res.json({
-            navigateTo: post.url
+            navigateTo: result.postUrl,
         });
     },
 );

@@ -3415,6 +3415,7 @@ body.start-selection-active #start-overlay {
 
 /* Shared Results View Styling */
 .modal-view#modal-combined-view {
+    position: relative;
     width: 100%;
     max-width: 440px;
     background: transparent;
@@ -4382,4 +4383,192 @@ body:not(.loading-active) #loading-screen {
     width: 1.05em;
     height: 0.85em;
     flex: 0 0 auto;
+}
+
+.leaderboard-row__action {
+    flex: 0 0 auto;
+    width: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.leaderboard-row.is-shareable {
+    cursor: pointer;
+}
+
+.leaderboard-row.is-shareable:hover {
+    background: #4a1f1f;
+}
+
+.leaderboard-row.is-shareable:hover .combined-row-time,
+.leaderboard-row.is-shareable:hover .combined-row-name {
+    color: var(--text-color);
+}
+
+.leaderboard-row__share {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: var(--text-dim);
+    pointer-events: none;
+}
+
+.leaderboard-row.is-shareable:hover .leaderboard-row__share {
+    color: var(--accent-bright);
+}
+
+.leaderboard-row__share:disabled {
+    color: var(--text-muted);
+}
+
+.leaderboard-row__share-icon {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    pointer-events: none;
+}
+
+@keyframes resultSharePanelScrimIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes resultSharePanelCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.result-share-panel {
+    position: absolute;
+    z-index: 12;
+    inset: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(6px) saturate(1.05);
+    -webkit-backdrop-filter: blur(6px) saturate(1.05);
+    animation: resultSharePanelScrimIn 0.15s ease;
+}
+
+.result-share-panel__card {
+    width: 100%;
+    max-width: 21rem;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    padding: clamp(1.35rem, 6vw, 1.75rem);
+    border: none;
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    text-align: left;
+    overflow-y: auto;
+    animation: resultSharePanelCardIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.result-share-panel .result-share-panel__title {
+    margin: 0;
+    font-family: var(--header-font);
+    font-size: 1.5rem;
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-color);
+}
+
+.result-share-panel .result-share-panel__status,
+.result-share-panel .result-share-panel__copy {
+    margin: 0;
+    font-family: var(--header-font);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-style: normal;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    text-align: left;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+.result-share-panel .result-share-panel__status.is-error {
+    color: var(--accent-bright);
+}
+
+.result-share-panel .result-share-panel__status .result-share-panel__accent {
+    color: var(--accent-bright);
+    font-weight: 900;
+}
+
+.result-share-panel .result-share-panel__copy {
+    padding: 1rem 1.1rem;
+    border-left: 3px solid var(--accent-color);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.result-share-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.result-share-panel__button {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.1rem;
+    padding: 0 1.1rem;
+    border: none;
+    border-radius: var(--radius-full);
+    background: rgba(51, 65, 85, 0.8);
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 0.85rem;
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.result-share-panel__button:hover {
+    background: #475569;
+}
+
+.result-share-panel__button--primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.result-share-panel__button--primary:hover {
+    background: var(--accent-bright);
+}
+
+.result-share-panel__button:disabled {
+    opacity: 0.55;
+    cursor: wait;
 }

@@ -183,6 +183,16 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         allowLeaderboardOpen: true,
       }),
     );
+    expect(showModal.mock.calls[0][3]).toEqual(
+      expect.objectContaining({
+        shareRequest: {
+          source: "finish",
+          challengeId: "daily-1",
+          replay: { inputs: [] },
+        },
+      }),
+    );
+    expect(showModal.mock.calls[0][3]).not.toHaveProperty("playlistAction");
   });
 
   it("passes the pre-lap track medal into the win modal after lap storage updates", () => {
