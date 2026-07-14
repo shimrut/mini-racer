@@ -354,6 +354,22 @@ export class LeaderboardsUi {
         }
     }
 
+    async refreshDailyChallengeAfterResume(challengeId) {
+        const refreshSession = this._activeDailyLeaderboardRefreshSession;
+        const targetChallengeId = refreshSession?.selectedChallengeId || challengeId;
+        if (!targetChallengeId) return null;
+
+        this._pendingDailyLeaderboardRefreshChallengeIds.add(targetChallengeId);
+        if (
+            !this.isActiveDailyLeaderboardChallenge(refreshSession, targetChallengeId)
+            || !this.isRunsViewActive()
+        ) {
+            return getCachedDailyChallengeSnapshot(targetChallengeId);
+        }
+
+        return this.refreshDailyChallengeAfterAcceptedSubmission(targetChallengeId);
+    }
+
     resolveInitialDailyChallengeSnapshot(challenge) {
         const providedSnapshot = challenge?.scoreboardSnapshot;
         if (

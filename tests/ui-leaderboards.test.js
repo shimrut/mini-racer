@@ -477,6 +477,82 @@ describe('ui leaderboard helpers', () => {
         expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(afterAccepted);
     });
 
+    it('marks retained WebView standings stale so the next open refreshes them', async () => {
+        const cachedSnapshot = {
+            playerRankLabel: '#4',
+            leaderboardEntryCount: 6,
+            topRows: [{ rank: 1, displayName: 'Cached' }]
+        };
+        const freshSnapshot = {
+            playerRankLabel: '#4',
+            leaderboardEntryCount: 7,
+            topRows: [{ rank: 1, displayName: 'Fresh' }]
+        };
+        const challenge = {
+            id: 'daily-a',
+            trackKey: 'circuit',
+            scoreboardSnapshot: cachedSnapshot
+        };
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) },
+            isRunsViewActive: () => false
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValue(freshSnapshot);
+
+        await instance.refreshDailyChallengeAfterResume(challenge.id);
+        expect(requestSnapshot).not.toHaveBeenCalled();
+
+        await instance.openDailyChallengeLeaderboardForChallenge(challenge);
+
+        expect(requestSnapshot).toHaveBeenCalledTimes(1);
+        expect(requestSnapshot).toHaveBeenCalledWith(challenge.id, {
+            forceRefresh: true,
+            limit: 50,
+            offset: 0,
+        });
+    });
+
+    it('refreshes visible retained WebView standings immediately on resume', async () => {
+        const cachedSnapshot = {
+            playerRankLabel: '#4',
+            leaderboardEntryCount: 6,
+            topRows: [{ rank: 1, displayName: 'Cached' }]
+        };
+        const freshSnapshot = {
+            playerRankLabel: '#4',
+            leaderboardEntryCount: 7,
+            topRows: [{ rank: 1, displayName: 'Fresh' }]
+        };
+        const updateModalScoreboardSnapshot = vi.fn();
+        const instance = new LeaderboardsUi({
+            showRunsModal: vi.fn(),
+            dailyChallengeUi: { getSummary: vi.fn(() => null) },
+            isRunsViewActive: () => true,
+            updateModalScoreboardSnapshot
+        });
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValue(freshSnapshot);
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        refreshSession.selectedChallengeId = 'daily-a';
+        refreshSession.snapshotByChallengeId.set('daily-a', cachedSnapshot);
+
+        await instance.refreshDailyChallengeAfterResume('daily-a');
+
+        expect(requestSnapshot).toHaveBeenCalledTimes(1);
+        expect(requestSnapshot).toHaveBeenCalledWith('daily-a', {
+            forceRefresh: true,
+            limit: 50,
+            offset: 0,
+        });
+        expect(updateModalScoreboardSnapshot).toHaveBeenNthCalledWith(1, {
+            ...cachedSnapshot,
+            isRefreshing: true,
+        });
+        expect(updateModalScoreboardSnapshot).toHaveBeenNthCalledWith(2, freshSnapshot);
+    });
+
     it('does not refresh other cached days after an accepted better time', async () => {
         const beforeAccepted = { playerRankLabel: '#4', currentPlayerRow: { bestTime: 14.2 } };
         const afterAccepted = { playerRankLabel: '#2', currentPlayerRow: { bestTime: 13.8 } };

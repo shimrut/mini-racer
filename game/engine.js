@@ -389,6 +389,14 @@ export class RealTimeRacer {
       this.carEffectsAudio?.setTabHidden?.(document.hidden);
       this.medalEffectsAudio?.setTabHidden?.(document.hidden);
       this.proceduralMusic?.setTabHidden?.(document.hidden);
+      if (!document.hidden) {
+        const challengeId =
+          this.currentDailyChallenge?.id ||
+          this.activeDailyChallenge?.id ||
+          this.dailyChallengeUi?.getSummary?.()?.challengeId ||
+          null;
+        void this.leaderboards?.refreshDailyChallengeAfterResume?.(challengeId);
+      }
     });
     window.addEventListener("pagehide", () => {
       this.sendMapEvent();
