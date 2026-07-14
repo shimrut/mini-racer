@@ -202,6 +202,60 @@ body {
     gap: 0.45rem;
 }
 
+.hud-medal {
+    display: flex;
+    width: 2.35rem;
+    height: 2.35rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.post-preview-gold-medal,
+.post-preview-gold-medal svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.post-preview-gold-medal {
+    filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.45));
+}
+
+.post-preview-gold-medal .medal-svg__outer-border {
+    stroke: rgba(0, 0, 0, 0.15);
+    stroke-width: 4px;
+    paint-order: stroke fill;
+}
+
+.post-preview-gold-medal .medal-svg__inner-face {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+.post-preview-gold-medal .medal-svg__emblem-text,
+.post-preview-gold-medal .medal-svg__tier-caption {
+    font-family: var(--header-font), "Outfit", sans-serif;
+    font-style: italic;
+    font-weight: 900;
+    paint-order: stroke fill;
+    stroke: rgba(0, 0, 0, 0.38);
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
+
+.post-preview-gold-medal .medal-svg__emblem-text {
+    font-size: 146px;
+    letter-spacing: -0.05em;
+    stroke-width: 10px;
+}
+
+.post-preview-gold-medal .medal-svg__tier-caption {
+    font-size: 54px;
+    letter-spacing: 0.06em;
+    stroke-width: 5px;
+}
+
 .hud-value {
     font-size: clamp(1.6rem, 5vw, 2.2rem);
     font-weight: 800;

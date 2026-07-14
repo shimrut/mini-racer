@@ -98,4 +98,62 @@ describe('track preview rendering', () => {
         expect(ctx.__fillStyles).toContain('#222222');
         global.Path2D = OriginalPath2D;
     });
+
+    it('shows the custom-post car asset and trail past the starting line', () => {
+        const OriginalPath2D = global.Path2D;
+        global.Path2D = class Path2DMock {
+            addPath() {}
+            moveTo() {}
+            lineTo() {}
+            quadraticCurveTo() {}
+            closePath() {}
+        };
+        const ctx = createPreviewContext();
+        const carImage = { width: 500, height: 500 };
+        const canvas = {
+            width: 320,
+            height: 200,
+            getContext: vi.fn(() => ctx)
+        };
+
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: {
+                outer: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 8 },
+                    { x: 0, y: 8 }
+                ],
+                inner: [
+                    { x: 3, y: 3 },
+                    { x: 7, y: 3 },
+                    { x: 7, y: 5 },
+                    { x: 3, y: 5 }
+                ]
+            },
+            presentation: {},
+            startLine: {
+                p1: { x: 1, y: 1 },
+                p2: { x: 1, y: 3 }
+            },
+            startPos: { x: 0.5, y: 2 },
+            startAngle: 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            showSchematicCarTrail: true,
+            moveSchematicCarPastStartLine: true,
+            schematicCarImage: carImage,
+            hideSchematicStartArrow: true
+        });
+
+        const markerTranslations = ctx.translate.mock.calls.filter(([, y]) => y > 40 && y < 80);
+        expect(markerTranslations).toHaveLength(2);
+        expect(markerTranslations[0][0]).toBeGreaterThan(76);
+        expect(markerTranslations[1]).toEqual(markerTranslations[0]);
+        expect(ctx.drawImage).toHaveBeenCalledOnce();
+        expect(ctx.drawImage.mock.calls[0][0]).toBe(carImage);
+        expect(ctx.strokeStyle).toBe('rgba(239, 68, 68, 0.78)');
+        expect(ctx.lineWidth).toBeGreaterThanOrEqual(1.5);
+        global.Path2D = OriginalPath2D;
+    });
 });

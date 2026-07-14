@@ -230,11 +230,58 @@ function drawSchematicStartArrow(ctx, position, angle, scale = 1) {
     ctx.restore();
 }
 
+function drawSchematicCarTrail(ctx, position, angle, scale = 1) {
+    const s = scale;
+    ctx.save();
+    ctx.translate(position.x, position.y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(-48 * s, 0);
+    ctx.lineTo(-14 * s, 0);
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.78)';
+    ctx.lineWidth = Math.max(1.5, 2.25 * s);
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawSchematicCarImage(ctx, image, position, angle, scale = 1) {
+    if (!image) return;
+    const size = 36 * scale;
+    ctx.save();
+    ctx.translate(position.x, position.y);
+    ctx.rotate(angle);
+    ctx.shadowColor = 'rgba(2, 6, 23, 0.7)';
+    ctx.shadowBlur = 5 * scale;
+    ctx.shadowOffsetX = 1.5 * scale;
+    ctx.shadowOffsetY = 2 * scale;
+    ctx.drawImage(image, -size / 2, -size / 2, size, size);
+    ctx.restore();
+}
+
+function getSchematicCarPosition(startLine, startPos, startAngle, mapPoint, scale, movePastStartLine, carImage) {
+    if (!movePastStartLine || !startLine) {
+        return startPos ? mapPoint(startPos) : null;
+    }
+
+    const p1 = mapPoint(startLine.p1);
+    const p2 = mapPoint(startLine.p2);
+    const forwardOffset = (carImage ? 22 : 14) * scale;
+    return {
+        x: (p1.x + p2.x) / 2 + Math.cos(startAngle) * forwardOffset,
+        y: (p1.y + p2.y) / 2 + Math.sin(startAngle) * forwardOffset
+    };
+}
+
 function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, {
     startLine,
     startPos,
     startAngle = 0,
-    transparentBackground = false
+    transparentBackground = false,
+    showCarTrail = false,
+    moveCarPastStartLine = false,
+    carImage = null,
+    hideStartArrow = false
 }) {
     const outer = trackGeometry.outer;
     const inner = trackGeometry.inner;
@@ -277,10 +324,27 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     ctx.stroke(innerPath);
 
     // 4. Direction marker
-    if (startPos) {
-        const mappedStart = mapPoint(startPos);
+    if (startPos || (moveCarPastStartLine && startLine)) {
         const arrowScale = Math.min(width, height) / 420;
-        drawSchematicStartArrow(ctx, mappedStart, startAngle, arrowScale);
+        const markerPosition = getSchematicCarPosition(
+            startLine,
+            startPos,
+            startAngle,
+            mapPoint,
+            arrowScale,
+            moveCarPastStartLine,
+            carImage
+        );
+        if (markerPosition) {
+            if (showCarTrail) {
+                drawSchematicCarTrail(ctx, markerPosition, startAngle, arrowScale);
+            }
+            if (carImage) {
+                drawSchematicCarImage(ctx, carImage, markerPosition, startAngle, arrowScale);
+            } else if (!hideStartArrow) {
+                drawSchematicStartArrow(ctx, markerPosition, startAngle, arrowScale);
+            }
+        }
     }
 
     ctx.restore();
@@ -324,7 +388,11 @@ export function renderTrackPreviewCanvas(canvas, payload) {
             startLine,
             startPos,
             startAngle,
-            transparentBackground
+            transparentBackground,
+            showCarTrail: payload.showSchematicCarTrail === true,
+            moveCarPastStartLine: payload.moveSchematicCarPastStartLine === true,
+            carImage: payload.schematicCarImage || null,
+            hideStartArrow: payload.hideSchematicStartArrow === true
         });
         return;
     }

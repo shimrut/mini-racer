@@ -1,13 +1,15 @@
 import { TRACKS } from './game/track/tracks.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
+import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
+import { createMedalIconSvg } from './game/medals/medal-icon.js';
 import {
     getActiveDailyChallenge,
     getDailyChallengeCardStatus,
     requestFeaturedDailyChallengeStart
 } from './game/daily-challenge/service.js';
 import {
-    getTimeToBeatSeconds,
+    getTrackMedalThresholds,
 } from './game/medals/medals.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -26,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentTrack = fallbackTrack;
     let currentSkin = 'default';
     let currentChallenge = null;
+    const postPreviewCarPromise = loadPostPreviewCar();
 
     try {
         const challenge = await getActiveDailyChallenge({ allowExpiredPost: true });
@@ -33,16 +36,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentTrackKey = TRACKS[challenge.trackKey] ? challenge.trackKey : 'circuit';
         currentTrack = TRACKS[currentTrackKey] || fallbackTrack;
         currentSkin = challenge.skin || 'default';
+        const carImage = await postPreviewCarPromise;
 
         setTrackName(trackNameEl, currentTrack.name);
-        renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin);
+        renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
         await applyTimeToBeat(timeToBeatEl, currentTrackKey);
         renderChallengeStatus(challenge);
     } catch (error) {
         console.error('Error loading daily challenge preview:', error);
         setTrackName(trackNameEl, 'Challenge active');
+        const carImage = await postPreviewCarPromise;
         if (fallbackTrack) {
-            renderTrackPreview(canvas, 'circuit', fallbackTrack, 'default');
+            renderTrackPreview(canvas, 'circuit', fallbackTrack, 'default', carImage);
         }
         await applyTimeToBeat(timeToBeatEl, 'circuit');
     }
@@ -60,9 +65,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Dynamic resize handler to keep track drawing resolution extremely sharp and responsive
     window.addEventListener('resize', () => {
-        renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin);
+        void postPreviewCarPromise.then((carImage) => {
+            renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
+        });
     });
 });
+
+function loadPostPreviewCar() {
+    const loader = new CarSpriteLoader();
+    return new Promise((resolve) => {
+        loader.load(STOCK_CAR_ASSET_NAME, {
+            onLoaded: resolve,
+            onError: () => {
+                console.warn(`Unable to load ${STOCK_CAR_ASSET_NAME} in the custom post preview.`);
+                resolve(null);
+            }
+        });
+    });
+}
 
 async function openGame(event) {
     try {
@@ -112,14 +132,19 @@ function getChallengeTrackName(challenge) {
 async function applyTimeToBeat(el, trackKey) {
     if (!el) return;
     const textEl = el.querySelector('#time-to-beat-text');
-    let seconds = getTimeToBeatSeconds(trackKey, null);
+    const medalEl = el.querySelector('#time-to-beat-medal');
+    const seconds = getTrackMedalThresholds(trackKey)?.gold;
 
     if (!Number.isFinite(seconds)) {
         if (textEl) textEl.textContent = '';
+        medalEl?.replaceChildren();
         el.hidden = true;
         return;
     }
     el.hidden = false;
+    medalEl?.replaceChildren(createMedalIconSvg('gold', {
+        className: 'post-preview-gold-medal'
+    }));
     if (textEl) {
         textEl.textContent = formatTimeToBeat(seconds);
     }
@@ -136,11 +161,13 @@ function renderChallengeStatus(challenge) {
     if (!statusEl || !challenge) return;
 
     const status = getDailyChallengeCardStatus(challenge);
-    statusEl.textContent = status.label.toUpperCase();
+    statusEl.textContent = status.key === 'featured'
+        ? 'TODAY'
+        : status.label.toUpperCase();
     statusEl.className = `challenge-status challenge-status--${status.key}`;
 }
 
-function renderTrackPreview(canvas, trackKey, track, skin = 'default') {
+function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage = null) {
     const presentation = resolveTrackPresentation(trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
         event: skin ? { key: 'daily-challenge', trackKey, skin } : null
@@ -160,6 +187,10 @@ function renderTrackPreview(canvas, trackKey, track, skin = 'default') {
         startAngle: track.startAngle ?? 0,
         transparentBackground: true,
         previewRenderMode: 'schematic',
+        showSchematicCarTrail: true,
+        moveSchematicCarPastStartLine: true,
+        schematicCarImage: carImage,
+        hideSchematicStartArrow: true,
         runHistory: []
     });
 }
