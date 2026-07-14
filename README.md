@@ -17,11 +17,7 @@ Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put 
 
 - Mini Racer features a new track every day.
 - The featured slot updates on the UTC day reset.
-- The schedule walks `game/track/tracks.js` in key order, one track per day, wrapping at the end of the list. A server-side ledger records each day's track, so days that were already published never change.
-- Add a new track anywhere in `tracks.js` and it takes that slot in the rotation; days already published are not reshuffled. Past days are frozen in the ledger; only days not yet written reflect the current file order.
-- The server includes a one-time June 2-11, 2026 published-history backfill for the launch window.
-- Local game runs use the Daily GP API/post-bound challenge path; only explicit mock modes and standalone preview pages use a local mock challenge (the first track in `tracks.js`, or a specific track forced via `?mockDaily=<trackKey>`).
-- The local active-challenge cache is only a fallback when the API cannot be reached, not the source of truth for today's featured track.
+- Once a day is published, that track is locked in and does not change.
 - The `Tracks` screen keeps the last 7 days available to play.
 - Each track card shows the track preview, your best time, earned medals, and how long that track is still available.
 
@@ -29,7 +25,6 @@ Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put 
 
 - Daily Reddit post titles use `Mini Racer, {D MMM}: {track name}`, for example `Mini Racer, 12 Jul: Neon Apex`.
 - The post text fallback provides a readable explanation of Mini Racer, its controls, leaderboard, medal targets, and seven-day track availability for Google, Reddit search, Reddit Answers, and clients that cannot render the interactive post.
-- The fallback is generated from existing challenge and medal data. Tracks do not require individually maintained marketing descriptions.
 - The richer discovery copy belongs to the text fallback; the visible Reddit title stays short and consistent.
 
 ## Track availability
@@ -45,7 +40,7 @@ The Garage lets players change how their car looks without changing handling.
 
 - `Car skins`: 12 selectable skins grouped into Mini, Cyberpunk, and Steampunk sets.
 - `Trails`: 8 route-trail options, including `No Trail`.
-- Selections and gameplay preferences are restored from the player's Reddit-scoped profile, so app updates do not reset them. Browser storage remains a fast local cache.
+- Selections and gameplay preferences are saved to the player's Reddit profile, so app updates do not reset them.
 
 ## How a run works
 
