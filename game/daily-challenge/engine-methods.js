@@ -187,8 +187,6 @@ export const dailyChallengeEngineMethods = {
     }
 
     await this.loadTrack(targetTrackKey, {
-      trackPageview: false,
-      countMapSelection: false,
       loadPlayerProgress: false,
     });
   },
@@ -457,7 +455,6 @@ export const dailyChallengeEngineMethods = {
 
     this.resetCanvasPresentation();
     this.startButtonPending = true;
-    const playerTypeAlreadySent = this.sessionFlags.get("playerTypeSent");
     try {
       if (replacesCurrentRun && challenge.trackKey === this.currentTrackKey) {
         this.reset(false);
@@ -465,31 +462,9 @@ export const dailyChallengeEngineMethods = {
       this.activeDailyChallenge = challenge;
       if (challenge.trackKey && challenge.trackKey !== this.currentTrackKey) {
         await this.loadTrack(challenge.trackKey, {
-          trackPageview: false,
-          countMapSelection: true,
           loadPlayerProgress: false,
           preserveDailyChallengeContext: true,
         });
-      }
-
-      if (this.currentTrackPageviewPending) {
-        this.analytics.trackPageview(
-          `/track/${this.currentTrackKey}`,
-          `${this.currentTrackKey} Daily`,
-        );
-        this.currentTrackPageviewPending = false;
-      }
-
-      if (!this.playerTypeSent && !playerTypeAlreadySent) {
-        this.playerTypeSent = true;
-        this.sessionFlags.set("playerTypeSent", "1");
-        this.playerHistoryPromise
-          .then(({ isReturningPlayer }) => {
-            this.analytics.trackPlayerType(isReturningPlayer);
-          })
-          .catch(() => {
-            this.analytics.trackPlayerType(false);
-          });
       }
 
       this.applyDailyChallenge(challenge);
@@ -501,11 +476,6 @@ export const dailyChallengeEngineMethods = {
         modeStartPayload.source = options.startSource;
       }
       this.trackModeStart(modeStartPayload);
-      if (this.currentTrackMapSelectionPending) {
-        this.bumpMapSelectionForCurrentTrack();
-        this.currentTrackMapSelectionPending = false;
-      }
-      this.bumpDailyGpRaceStart();
       this.startSequence();
     } finally {
       this.startButtonPending = false;
@@ -671,9 +641,7 @@ export const dailyChallengeEngineMethods = {
           modalKind: "crash",
           primaryActionLabel: "Retry",
           primaryAction: () => this.restartDailyChallenge(),
-          primaryActionIcon: "retry",
           secondaryActionLabel: "Done",
-          secondaryActionIcon: "done",
           secondaryAction: () => this.reset(false),
         }),
         settingsAction: () => this.settings.openSettings(),
@@ -715,10 +683,8 @@ export const dailyChallengeEngineMethods = {
           modalKind: "rejected",
           primaryActionLabel: "Retry",
           primaryAction: () => this.restartDailyChallenge(),
-          primaryActionIcon: "retry",
           secondaryActionLabel: "Done",
           secondaryAction: () => this.reset(false),
-          secondaryActionIcon: "done",
         }),
         playlistAction: () => {
           void this.openDailyChallengePlaylist();
@@ -748,7 +714,6 @@ export const dailyChallengeEngineMethods = {
     }
 
     this.status = "won";
-    this.dailyGpRaceStats.win++;
     const finalTime = winData.lapTime;
     const challenge = this.activeDailyChallenge;
     const completedLaps = Math.max(0, Math.trunc(winData.completedLaps || 0));
@@ -886,9 +851,7 @@ export const dailyChallengeEngineMethods = {
           modalKind: "win",
           primaryActionLabel: "Retry",
           primaryAction: () => this.restartDailyChallenge(),
-          primaryActionIcon: "retry",
           secondaryActionLabel: "Done",
-          secondaryActionIcon: "done",
           secondaryAction: () => this.reset(false),
         }),
         settingsAction: () => this.settings.openSettings(),
@@ -993,7 +956,6 @@ export const dailyChallengeEngineMethods = {
     this.trackModeStart({
       trackKey: this.activeDailyChallenge.trackKey,
     });
-    this.bumpDailyGpRaceStart();
     this.reset(true, { preserveDailyChallenge: true });
   },
 };

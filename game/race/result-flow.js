@@ -38,23 +38,17 @@ export function createModalActions({
     modalKind,
     primaryActionLabel,
     primaryAction,
-    primaryActionIcon,
-    primaryShortcutLabel = null,
     restartAction = null,
     secondaryActionLabel,
-    secondaryAction,
-    secondaryActionIcon
+    secondaryAction
 } = {}) {
     return {
         modalKind,
         primaryActionLabel,
         primaryAction,
-        primaryActionIcon,
-        primaryShortcutLabel,
         restartAction,
         secondaryActionLabel,
-        secondaryAction,
-        secondaryActionIcon
+        secondaryAction
     };
 }
 

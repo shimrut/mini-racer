@@ -8,7 +8,6 @@ import {
     formatCombinedRankOutOf,
     getCombinedRankNumber,
     buildLapRecord,
-    createModalActions,
     isNewBestResult,
     pushRecentLap,
     scheduleModalScoreboardRefresh

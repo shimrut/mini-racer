@@ -56,10 +56,8 @@
     --radius-full: 999px;
 
     /* Sizing */
-    --modal-stack-btn-min-height: 3.5rem;
     --modal-floating-back-height: 2.55rem;
     --modal-floating-back-offset: 0.85rem;
-    --mobile-control-size: clamp(104px, 31vw, 130px);
     /* Full-screen panels: viewport height, capped (adjust cap in one place). */
     --screen-height-cap: 1000px;
     --screen-fill-height: min(100vh, var(--screen-height-cap));
@@ -760,7 +758,6 @@ body.start-selection-active .lap-flash {
     align-items: center;
     justify-content: center;
     gap: 0.8rem;
-    padding: 0.6rem 1.var(--space-xl);
     background: transparent;
     border: none;
     color: var(--text-color);
@@ -835,7 +832,7 @@ button:active {
     filter: none;
 }
 
-button:active:not(.main-menu__item):not(.combined-action-btn):not(.modal-btn):not(.hud-pause-btn):not(.daily-playlist-rank-btn):not(.touch-btn) {
+button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn):not(.touch-btn) {
     transform: none;
 }
 
@@ -1701,18 +1698,6 @@ body.start-selection-active #start-overlay {
     min-height: 0;
 }
 
-.pause-race-stats {
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    width: 100%;
-    min-width: 0;
-}
-
-.pause-race-stats[hidden] {
-    display: none !important;
-}
-
 .pause-race-progress__medals {
     display: inline-flex;
     align-items: center;
@@ -1745,41 +1730,6 @@ body.start-selection-active #start-overlay {
     width: 100%;
     height: auto;
     vertical-align: middle;
-}
-
-.modal-btn {
-    display: none;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 1.5rem;
-    width: 320px;
-    padding: 1.1rem 1.75rem;
-    background: #1e293b;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    font-family: var(--header-font);
-    font-size: 1.15rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    text-align: left;
-    position: relative;
-    white-space: nowrap;
-    outline: none;
-    box-shadow: none;
-}
-
-.modal-btn:focus,
-.modal-btn:focus-visible,
-.modal-btn:active {
-    outline: none;
-    box-shadow: none;
-}
-
-.modal-btn:hover {
-    background: #334155;
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -2305,72 +2255,6 @@ body.start-selection-active #start-overlay {
     padding-bottom: 0.15rem;
 }
 
-.daily-leaderboard-standing {
-    display: flex;
-    min-width: 4.75rem;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 0.15rem;
-    text-align: right;
-}
-
-.daily-leaderboard-standing-main {
-    width: auto;
-    min-width: 0;
-    height: auto;
-    padding: 0;
-    font-size: 1.35rem;
-    line-height: 0.95;
-    pointer-events: none;
-}
-
-.daily-leaderboard-standing-sub {
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    line-height: 1;
-    white-space: nowrap;
-}
-
-.daily-playlist-rank-btn {
-    display: inline-flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    color: var(--success);
-    font-family: var(--mono-font);
-    font-size: 1.25rem;
-    font-weight: 900;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    white-space: nowrap;
-    padding: 0 0.5rem;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    transition: transform 0.15s ease, color 0.15s ease;
-}
-
-.daily-playlist-rank-btn:hover {
-    color: var(--success-bright);
-    transform: scale(1.1);
-}
-
-.daily-playlist-rank-btn:active {
-    transform: none;
-}
-
-.daily-playlist-rank-btn .rank-hash {
-    font-size: 0.75em;
-    opacity: 0.7;
-    font-weight: 700;
-    margin-right: 0.05rem;
-}
-
 .daily-playlist-empty {
     margin: auto;
     color: var(--text-dim);
@@ -2382,27 +2266,6 @@ body.start-selection-active #start-overlay {
 }
 
 @media (max-width: 480px) {
-    .daily-playlist-rank-btn {
-        font-size: 1.05rem;
-        padding: 0 0.3rem;
-    }
-
-    .daily-leaderboard-entry {
-        grid-template-columns: 3.65rem minmax(0, 1fr) 4.1rem;
-    }
-
-    .daily-leaderboard-standing {
-        min-width: 4.1rem;
-    }
-
-    .daily-leaderboard-standing-main {
-        font-size: 1.15rem;
-    }
-
-    .daily-leaderboard-standing-sub {
-        font-size: 0.62rem;
-    }
-
     .leaderboard-summary__value {
         font-size: 1.15rem;
     }
@@ -2796,12 +2659,15 @@ body.start-selection-active #start-overlay {
 }
 
 .leaderboard-list.lap-times-list {
-    --leaderboard-row-height: 2.8rem;
     --leaderboard-row-gap: .4rem;
     display: flex;
     flex-direction: column;
     gap: var(--leaderboard-row-gap);
     width: 100%;
+}
+
+.leaderboard-day-swipe-enabled .leaderboard-section {
+    touch-action: pan-y;
 }
 
 #modal:has(#modal-runs-view.active-view) .reusable-modal-content {
@@ -2956,17 +2822,6 @@ body.start-selection-active #start-overlay {
     flex-direction: column
 }
 
-.modal-action-icon {
-    width: 1.1rem;
-    height: 1.1rem;
-    flex-shrink: 0
-}
-
-.modal-action-label {
-    display: inline-flex;
-    align-items: center
-}
-
 .modal--pause #modal-main-view.active-view,
 .modal--win #modal-main-view.active-view {
     display: flex;
@@ -3067,18 +2922,6 @@ body.start-selection-active #start-overlay {
     margin-top: 0
 }
 
-.modal-btn-kbd {
-    display: inline-block;
-    padding: .15rem .4rem;
-    font-size: .75em;
-    background: #ffffff26;
-    border-radius: var(--radius-xs);
-    border: 1px solid rgba(255, 255, 255, .35);
-    margin-left: .4rem;
-    font-family: inherit;
-    vertical-align: middle
-}
-
 .modal button:focus-visible {
     outline: none !important;
 }
@@ -3086,22 +2929,6 @@ body.start-selection-active #start-overlay {
 .modal--pause #modal-msg,
 .modal--win #modal-msg {
     display: none
-}
-
-.modal--pause .modal-action-icon,
-.modal--win .modal-action-icon {
-    width: 2.1rem;
-    height: 2.1rem;
-    stroke-width: 2.15
-}
-
-.modal--pause .modal-action-label,
-.modal--win .modal-action-label {
-    font-size: .58rem;
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: .18em;
-    text-align: center
 }
 
 .hud-lap-cluster {
@@ -3249,10 +3076,6 @@ body.start-selection-active #start-overlay {
         font-size: 1.45rem
     }
 
-    .modal-btn-kbd {
-        display: none
-    }
-
     .modal-card {
         padding: 1rem;
         max-width: min(92vw, 420px)
@@ -3358,10 +3181,6 @@ body.start-selection-active #start-overlay {
 }
 
 @media(orientation:landscape)and (max-height:500px) {
-    .touch-btn {
-        --mobile-control-size: 104px
-    }
-
     .mobile-hud-bar .mobile-speedometer {
         min-width: 5rem;
         padding: .55rem .8rem
@@ -3387,8 +3206,7 @@ body.start-selection-active #start-overlay {
 
     .modal-card {
         padding: .75rem 1rem;
-        margin: 0 auto;
-        --modal-stack-btn-min-height: 3.125rem
+        margin: 0 auto
     }
 
     .result-modal .modal-card-section--runs {
@@ -3448,12 +3266,6 @@ body.start-selection-active #start-overlay {
     height: min(34vw, 6.75rem);
 }
 
-.combined-stat {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-}
-
 .combined-stat-label {
     font-size: 0.62rem;
     font-weight: 700;
@@ -3463,18 +3275,10 @@ body.start-selection-active #start-overlay {
     opacity: 0.5;
 }
 
-.combined-stat-value {
-    font-family: var(--mono-font);
-    font-size: clamp(1.05rem, 2.8vw, 1.25rem);
-    font-weight: 800;
-    color: var(--text-color);
-    letter-spacing: -0.02em;
-}
-
 .combined-row {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.25rem;
     padding: 0.65rem 0.75rem;
     background: var(--bg-surface);
     border-radius: var(--radius-sm);

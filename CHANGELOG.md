@@ -14,11 +14,14 @@ How the game works today: [README.md](README.md#how-the-game-works).
 - The complete Vitest suite is now tracked in Git instead of being excluded by `.gitignore`.
 - Opening standings or Tracks from an older Reddit post now shows that challenge's original UTC date instead of incorrectly calling the post-bound track `Today`.
 - Standings now load every scored racer in 50-row pages as the list is scrolled, while the current player's rank and best time remain visible in the header regardless of which ranks have loaded; the initial rank-loading state is compact and aligned with that header.
+- Mobile standings can now switch between available days by swiping left or right, while the existing horizontally scrollable date strip remains visible and tappable and vertical standings scrolling continues to work.
 - Upgraded the Devvit toolchain to 0.13.7 with Vite 7.3.6, aligned server imports with declared Devvit packages, and removed the deprecated no-op inline entrypoint flag.
 - Standings now show cached results immediately and then force-refresh the selected day from the server each time standings are reopened, keeping web and mobile entry counts aligned without replacing usable cached results when a refresh fails.
 - Returning to a retained mobile WebView now refreshes visible standings, or marks the current challenge stale so its next standings open cannot reuse an outdated racer count.
 - Daily Reddit posts now use the concise `Mini Racer, {D MMM}: {track name}` title format, while the text fallback supplies indexable product, control, medal, leaderboard, and availability information without requiring track-specific descriptions.
 - Reduced the production game bundle by canonicalizing module imports, removing unused helpers, and deleting legacy proxy configuration scaffolding.
+- Removed disabled analytics pageview, player-type, map-selection, menu, and mode-selection plumbing while preserving the active game lifecycle and race event set.
+- Removed the retired intermediate standings track-picker and its rank-card styling, plus an unused modal icon/keyboard-hint renderer; current Tracks, Standings, swipe navigation, and combined action buttons are unchanged.
 - Consolidated client leaderboard snapshot normalization and moderator menu-action error handling without changing public routes or response shapes.
 - Removed unused JS helper exports and an unused player-status store left behind after earlier flow changes.
 - Removed an orphaned leaderboard next-target helper that was never wired into the tracked app UI.

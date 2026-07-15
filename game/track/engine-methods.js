@@ -119,21 +119,12 @@ export const trackEngineMethods = {
   async loadTrack(
     trackKey,
     {
-      trackPageview = true,
-      countMapSelection = true,
       loadPlayerProgress = true,
       preserveDailyChallengeContext = false,
     } = {},
   ) {
     const nextTrack = TRACKS[trackKey];
     if (!nextTrack) return;
-
-    if (trackPageview) {
-      this.analytics.trackPageview(`/track/${trackKey}`, trackKey);
-      this.currentTrackPageviewPending = false;
-    } else {
-      this.currentTrackPageviewPending = true;
-    }
 
     const requestId = ++this.trackLoadRequestId;
     this.currentTrack = nextTrack;
@@ -157,13 +148,6 @@ export const trackEngineMethods = {
 
     this.bestLapTime = null;
     this.syncCurrentRunPolicy();
-
-    if (countMapSelection) {
-      this.bumpMapSelectionForCurrentTrack();
-      this.currentTrackMapSelectionPending = false;
-    } else {
-      this.currentTrackMapSelectionPending = true;
-    }
 
     this.hud.setBestTime(this.bestLapTime, {
       persistToTrackCard: false,

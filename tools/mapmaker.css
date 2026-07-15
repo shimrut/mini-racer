@@ -1,18 +1,14 @@
 @import url('../fonts.css');
 
 :root {
-    --maker-bg: #050816;
     --maker-panel: rgba(11, 18, 32, 0.92);
     --maker-panel-border: rgba(148, 163, 184, 0.18);
     --maker-text: #e2e8f0;
     --maker-muted: #94a3b8;
     --maker-accent: #f43f5e;
-    --maker-accent-soft: rgba(244, 63, 94, 0.16);
     --maker-blue: #38bdf8;
     --maker-green: #22c55e;
     --maker-gold: #fbbf24;
-    --maker-grid: rgba(148, 163, 184, 0.08);
-    --maker-grid-strong: rgba(148, 163, 184, 0.16);
 }
 
 * {

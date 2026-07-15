@@ -4,7 +4,6 @@ import {
     getDailyChallengeCopyLabels,
     getDailyChallengeTrackName
 } from './service.js';
-import { buildScoreboardRankDisplay } from '../race/result-flow.js';
 import {
     getDailyChallengeVerificationEntry,
     getVerificationSnapshotFromQueueEntry
@@ -38,7 +37,6 @@ export class DailyChallengeUi {
         this.onSummaryUpdated = onSummaryUpdated;
         this._dailyChallengeSummary = null;
         this._dailyChallengeCountdownInterval = null;
-        this._playlistModalMode = null;
         this._dailyPreviewKey = '';
     }
 
@@ -238,7 +236,6 @@ export class DailyChallengeUi {
     openPlaylistModal(challenges = [], actions = null) {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
-        this._playlistModalMode = 'playlist';
         configureReusableModal(modal, {
             title: 'Tracks',
             closeLabel: 'Back',
@@ -259,7 +256,6 @@ export class DailyChallengeUi {
     closePlaylistModal() {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
-        this._playlistModalMode = null;
         closeModalElement(modal, () => {
             modal.classList.remove('active');
             document.body.classList.remove('modal-open');
@@ -268,10 +264,6 @@ export class DailyChallengeUi {
 
     isPlaylistModalOpen() {
         return Boolean(this.dailyChallengePlaylistModal?.classList.contains('active'));
-    }
-
-    isLeaderboardTracksModalOpen() {
-        return this._playlistModalMode === 'leaderboard' && this.isPlaylistModalOpen();
     }
 
     bindPlaylistModal() {
@@ -422,141 +414,6 @@ export class DailyChallengeUi {
             row.append(preview, content);
 
             list.appendChild(row);
-        }
-    }
-
-    openLeaderboardTracksModal(trackRows = [], actions = null) {
-        const modal = this.dailyChallengePlaylistModal;
-        if (!modal) return;
-        this._playlistModalMode = 'leaderboard';
-        configureReusableModal(modal, {
-            title: 'Standings',
-            closeLabel: 'Back',
-        });
-        this.renderLeaderboardTracks(trackRows, actions);
-        openModalElement(modal, () => modal.classList.add('active'));
-        document.body.classList.add('modal-open');
-        scheduleAfterModalPaint(() => {
-            const firstTrack = modal.querySelector('.daily-playlist-entry--hero');
-            if (firstTrack instanceof HTMLButtonElement) {
-                firstTrack.focus();
-            } else {
-                this.dailyChallengePlaylistCloseBtn?.focus?.();
-            }
-        });
-    }
-
-    renderLeaderboardTracks(trackRows = [], actions = null) {
-        const list = this.dailyChallengePlaylistList;
-        if (!list) return;
-        list.replaceChildren();
-        const onTrack = actions?.onTrack;
-
-        if (trackRows === null) {
-            const loading = document.createElement('div');
-            loading.className = 'daily-playlist-empty';
-            loading.textContent = 'Loading days...';
-            list.appendChild(loading);
-            return;
-        }
-
-        const rows = Array.isArray(trackRows)
-            ? trackRows.filter((row) => row?.trackKey && TRACKS[row.trackKey])
-            : [];
-        if (!rows.length) {
-            const empty = document.createElement('div');
-            empty.className = 'daily-playlist-empty';
-            empty.textContent = 'No days available';
-            list.appendChild(empty);
-            return;
-        }
-
-        for (const rowData of rows) {
-            const challenge = rowData.challenge || rowData;
-            const track = TRACKS[rowData.trackKey];
-            const dateParts = this.getPlaylistEntryDateParts(challenge);
-            const isCurrentTrack = challenge.id === this._dailyChallengeSummary?.challengeId;
-            const trackName = getDailyChallengeTrackName(challenge);
-
-            const row = document.createElement('button');
-            row.className = `daily-playlist-entry--hero${isCurrentTrack ? ' current' : ''}`;
-            row.type = 'button';
-            row.setAttribute(
-                'aria-label',
-                `Open leaderboard for ${trackName} from ${dateParts.weekday} ${dateParts.dateLabel}`
-            );
-            row.addEventListener('click', () => {
-                this.closePlaylistModal();
-                onTrack?.(challenge);
-            });
-
-            const preview = document.createElement('div');
-            preview.className = 'daily-playlist-hero-preview';
-
-            const canvas = document.createElement('canvas');
-            canvas.width = 300;
-            canvas.height = 160;
-            preview.appendChild(canvas);
-            this.renderPlaylistPreview(canvas, challenge);
-
-            const content = document.createElement('div');
-            content.className = 'daily-playlist-hero-content';
-
-            const info = document.createElement('div');
-            info.className = 'daily-playlist-hero-info';
-
-            const day = document.createElement('span');
-            day.className = 'daily-playlist-hero-day';
-            day.textContent = this.isPlaylistEntryToday(challenge) ? 'Today' : dateParts.dateLabel;
-
-            const title = document.createElement('span');
-            title.className = 'daily-playlist-hero-title';
-            title.textContent = trackName;
-
-            info.append(day, title);
-
-            const standing = document.createElement('div');
-            standing.className = 'daily-leaderboard-standing';
-
-            const standingMain = document.createElement('span');
-            standingMain.className = 'daily-playlist-rank-btn daily-leaderboard-standing-main';
-
-            const standingSub = document.createElement('span');
-            standingSub.className = 'daily-leaderboard-standing-sub';
-
-            this.applyLeaderboardTrackStanding(standingMain, standingSub, rowData);
-            standing.append(standingMain, standingSub);
-
-            content.append(info, standing);
-            row.append(preview, content);
-
-            list.appendChild(row);
-        }
-    }
-
-    applyLeaderboardTrackStanding(mainElement, subElement, rowData) {
-        const rankDisplay = buildScoreboardRankDisplay(
-            rowData?.scoreboardSnapshot,
-            { fallbackText: '--' }
-        );
-        const totalCount = Math.max(0, Math.trunc(Number(rowData?.scoreboardSnapshot?.totalCount)));
-        mainElement.replaceChildren();
-        mainElement.classList.toggle('daily-playlist-rank-btn--loading', rankDisplay.isLoading);
-        mainElement.toggleAttribute('aria-busy', rankDisplay.isLoading);
-
-        if (rankDisplay.isLoading) {
-            mainElement.textContent = '--';
-            subElement.textContent = 'Loading';
-            return;
-        }
-
-        const rankText = rankDisplay.text || '--';
-        if (rankText.startsWith('#')) {
-            mainElement.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
-            subElement.textContent = totalCount > 0 ? `of ${totalCount}` : 'Placed';
-        } else {
-            mainElement.textContent = rankText;
-            subElement.textContent = totalCount > 0 ? 'No time' : 'Open';
         }
     }
 

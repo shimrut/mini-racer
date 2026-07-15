@@ -1,24 +1,5 @@
 import { API_ROUTES, getOrCreatePlayerId } from '../scoreboard/api-client.js';
 
-export class SessionFlagStore {
-    get(key) {
-        try {
-            return sessionStorage.getItem(key) === '1';
-        } catch (error) {
-            return false;
-        }
-    }
-
-    set(key, value) {
-        try {
-            sessionStorage.setItem(key, value);
-        } catch (error) {
-            // Storage access can fail in privacy-restricted contexts; gameplay should continue.
-        }
-    }
-}
-// --- Analytics ---
-
 function createSessionId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
@@ -205,36 +186,8 @@ export class AnalyticsService {
         });
     }
 
-    trackPlayerType(isReturningPlayer) {
-        // Analytics disabled
-    }
-
-    trackSupportClick() {
-        // Analytics disabled
-    }
-
-    trackHeaderMenuOpen() {
-        // Analytics disabled
-    }
-
-    trackHowToPlayOpen() {
-        // Analytics disabled
-    }
-
-    trackModeSelected(payload) {
-        // Analytics disabled
-    }
-
     trackModeStarted(payload) {
         this.track('race_started', payload);
-    }
-
-    trackMapEvent(mapStats) {
-        // Analytics disabled
-    }
-
-    trackPageview(url, title) {
-        // Analytics disabled
     }
 
     trackRaceEnded(payload) {

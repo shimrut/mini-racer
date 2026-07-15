@@ -149,7 +149,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         },
         status: "playing",
         currentRunPolicy: { bestResultComparator: "time" },
-        dailyGpRaceStats: { start: 0, crash: 0, win: 0 },
         dailyChallengeBestResult: null,
         bestLapTime: null,
         cachedSpeed: 0,
@@ -231,7 +230,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       },
       isValidatedWinData: () => true,
       currentRunPolicy: { bestResultComparator: "time" },
-      dailyGpRaceStats: { start: 0, crash: 0, win: 0 },
       dailyChallengeBestResult: null,
       bestLapTime: null,
       cachedSpeed: 0,
@@ -295,7 +293,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
   it("retries a completed daily run without falling back to the regular reset path", () => {
     const reset = vi.fn();
     const trackModeStart = vi.fn();
-    const bumpDailyGpRaceStart = vi.fn();
 
     RealTimeRacer.prototype.restartDailyChallenge.call({
       activeDailyChallenge: {
@@ -310,14 +307,12 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         },
       },
       trackModeStart,
-      bumpDailyGpRaceStart,
       reset,
     });
 
     expect(trackModeStart).toHaveBeenCalledWith({
       trackKey: "harborParkLoop",
     });
-    expect(bumpDailyGpRaceStart).toHaveBeenCalled();
     expect(reset).toHaveBeenCalledWith(true, { preserveDailyChallenge: true });
   });
 
@@ -374,7 +369,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: null,
       activeDailyChallenge: { id: "previous", trackKey: "harborParkLoop" },
       currentTrackKey: "harborParkLoop",
-      sessionFlags: new Map(),
       resetCanvasPresentation: vi.fn(),
       reset: vi.fn(function reset() {
         this.status = "ready";
@@ -382,16 +376,11 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       loadTrack: vi.fn(),
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
-      currentTrackPageviewPending: false,
-      currentTrackMapSelectionPending: false,
-      bumpMapSelectionForCurrentTrack: vi.fn(),
-      bumpDailyGpRaceStart: vi.fn(),
       startSequence: vi.fn(function startSequence() {
         if (this.status === "ready") {
           this.status = "starting";
         }
       }),
-      playerTypeSent: true,
     };
 
     await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
@@ -401,7 +390,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.trackModeStart).toHaveBeenCalledWith({
       trackKey: "harborParkLoop",
     });
-    expect(engine.bumpDailyGpRaceStart).toHaveBeenCalled();
     expect(engine.startSequence).toHaveBeenCalled();
     expect(engine.status).toBe("starting");
   });
@@ -418,7 +406,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: null,
       activeDailyChallenge: { id: "previous", trackKey: "harborParkLoop" },
       currentTrackKey: "harborParkLoop",
-      sessionFlags: new Map(),
       resetCanvasPresentation: vi.fn(),
       reset: vi.fn(),
       loadTrack: vi.fn(async function loadTrack(trackKey) {
@@ -427,19 +414,12 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       }),
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
-      currentTrackPageviewPending: false,
-      currentTrackMapSelectionPending: false,
-      bumpMapSelectionForCurrentTrack: vi.fn(),
-      bumpDailyGpRaceStart: vi.fn(),
       startSequence: vi.fn(),
-      playerTypeSent: true,
     };
 
     await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
 
     expect(engine.loadTrack).toHaveBeenCalledWith("blueSector", {
-      trackPageview: false,
-      countMapSelection: true,
       loadPlayerProgress: false,
       preserveDailyChallengeContext: true,
     });
@@ -468,40 +448,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     });
 
     expect(setRuntimeConfig).toHaveBeenCalledWith(null);
-  });
-
-  it("prefetches the daily challenge car asset when the daily challenge is selected in the overlay", () => {
-    const analytics = { trackModeSelected: vi.fn() };
-    const prefetchCarSpriteAsset = vi.fn();
-
-    RealTimeRacer.prototype.trackModeSelection.call(
-      {
-        analytics,
-        getModeAnalyticsPayload:
-          RealTimeRacer.prototype.getModeAnalyticsPayload,
-        activeDailyChallenge: {
-          physicsOverrides: {
-            accel: 58,
-            brakePower: 90,
-            maxSpeed: 320,
-            turnRate: 5.75,
-            grip: 2.5,
-          },
-        },
-        prefetchCarSpriteAsset,
-        getDailyChallengeCarAssetName:
-          RealTimeRacer.prototype.getDailyChallengeCarAssetName,
-      },
-    );
-
-    expect(analytics.trackModeSelected).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mode: "daily",
-      }),
-    );
-    expect(prefetchCarSpriteAsset).toHaveBeenCalledWith(
-      "assets/cars/mr_mr_red.webp",
-    );
   });
 
   it("uses the single stock car asset for any physics overrides", () => {
@@ -744,7 +690,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
   it("resets the submitted replay when crash auto-restart starts a fresh attempt", () => {
     const engine = {
-      dailyGpRaceStats: { crash: 0 },
       status: "crashed",
       currentTrack: {
         startPos: { x: 8, y: 4 },

@@ -1,17 +1,13 @@
 @import url('../fonts.css');
 
 :root {
-    --promo-bg: #060b11;
     --promo-panel: rgba(8, 14, 22, 0.9);
-    --promo-panel-strong: rgba(12, 20, 32, 0.95);
     --promo-panel-border: rgba(148, 163, 184, 0.16);
     --promo-text: #ecf4ff;
     --promo-muted: #8ea1b8;
     --promo-accent: #22c55e;
     --promo-accent-soft: rgba(34, 197, 94, 0.16);
     --promo-blue: #38bdf8;
-    --promo-gold: #f59e0b;
-    --promo-red: #ef4444;
 }
 
 * {

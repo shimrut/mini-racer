@@ -9,10 +9,7 @@ import {
   getPlayerProgressState,
 } from "./storage.js";
 import { createRunPolicy } from "./race/run-policy.js";
-import {
-  AnalyticsService,
-  SessionFlagStore,
-} from "./player/service.js";
+import { AnalyticsService } from "./player/service.js";
 import {
   detectDevicePerformance,
   shouldExposeDebugHooks,
@@ -180,21 +177,14 @@ export class RealTimeRacer {
     this.pendingStartFrame = null;
     this.startButtonPending = false;
     this.relaunchDelayRemaining = 0;
-    this.currentTrackPageviewPending = false;
-    this.currentTrackMapSelectionPending = false;
     this.activeRunId = 0;
     this.scoreboardReplay = new ReplayRecorder();
     this.lapCheckpointTimesSec = [];
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
 
-    this.dailyGpRaceStats = { start: 0, crash: 0, win: 0 };
-    this.playerTypeSent = false;
-    this.mapStats = {};
-    this.mapEventSent = false;
     this._previewPresentationOpId = 0;
     this.analytics = new AnalyticsService();
-    this.sessionFlags = new SessionFlagStore();
 
     this.dailyChallengeUi = new DailyChallengeUi({
       previewQualityLevel: this.qualityLevel,
@@ -323,7 +313,6 @@ export class RealTimeRacer {
       }),
       onOpenDailyPlaylist: () => this.openDailyChallengePlaylist(),
       onPauseRun: () => this.pauseActiveRun(),
-      onHeaderMenuOpen: () => this.analytics.trackHeaderMenuOpen(),
     });
     this.interactions.bindModalViewToggles();
     this.interactions.bindModalActionRowPointerFocus();
@@ -399,7 +388,6 @@ export class RealTimeRacer {
       }
     });
     window.addEventListener("pagehide", () => {
-      this.sendMapEvent();
       this.analytics.trackGameClosed();
     });
     window.addEventListener("online", () => {
@@ -447,23 +435,6 @@ export class RealTimeRacer {
     this.requestRender();
   }
 
-  bumpDailyGpRaceStart() {
-    this.dailyGpRaceStats.start++;
-  }
-
-  sendMapEvent() {
-    const anyStarts = this.dailyGpRaceStats.start;
-    if (
-      this.mapEventSent ||
-      anyStarts === 0 ||
-      Object.keys(this.mapStats).length === 0
-    ) {
-      return;
-    }
-    this.mapEventSent = true;
-    this.analytics.trackMapEvent(this.mapStats);
-  }
-
   getModeAnalyticsPayload({
     trackKey = this.currentTrackKey,
     challengeId = null,
@@ -477,23 +448,9 @@ export class RealTimeRacer {
     };
   }
 
-  trackModeSelection() {
-    this.analytics.trackModeSelected(this.getModeAnalyticsPayload());
-    this.prefetchCarSpriteAsset(this.getDailyChallengeCarAssetName());
-  }
-
   trackModeStart(options = {}) {
     if (!options.source) return;
     this.analytics.trackModeStarted(this.getModeAnalyticsPayload(options));
-  }
-
-  getCurrentMapStatsKey() {
-    return `${this.currentTrackKey}_daily`;
-  }
-
-  bumpMapSelectionForCurrentTrack() {
-    const mapStatsKey = this.getCurrentMapStatsKey();
-    this.mapStats[mapStatsKey] = (this.mapStats[mapStatsKey] || 0) + 1;
   }
 
   getNow() {

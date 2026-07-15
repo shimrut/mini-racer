@@ -76,3 +76,58 @@ The scoreboard and Daily GP services now use one client snapshot normalizer and 
 Keep local source artwork outside `public/`. Git ignore rules do not prevent Vite from copying ignored files into a build made from a developer checkout.
 
 Keep `?v=` cache-busting suffixes out of JavaScript module import specifiers. Vite already owns production asset generation, and query variants can cause one source module to be bundled more than once.
+
+## Follow-up CSS cleanup: July 15, 2026
+
+The follow-up audit covered every tracked stylesheet and its matching HTML/JavaScript producer, including selectors inside media queries and dynamically constructed runtime classes. The confirmed dead batch was then removed.
+
+Removed from `styles.css`:
+
+- The `.modal-btn` rule family and its exception in the global `button:active` selector. No HTML or JavaScript created that class; active modal actions use `.combined-action-btn`.
+- `.pause-race-stats` and `.pause-race-stats[hidden]`. Current pause content is built around `.pause-header` and `.combined-actions`.
+- The mobile-only `.daily-leaderboard-entry` rule from an earlier standings-overview layout.
+- The base `.combined-stat` and `.combined-stat-value` rules. Current result markup uses `.stat-floating-item`, `.combined-stat-label`, and modifier-specific value classes.
+- Unread custom properties `--modal-stack-btn-min-height`, `--mobile-control-size`, and `--leaderboard-row-height`, including their responsive overrides.
+- The invalid `padding: 0.6rem 1.var(--space-xl)` declaration on `.hud-pause-btn`, which browsers discarded.
+
+Removed from secondary surfaces:
+
+- Eight unread custom properties from `preview.css`.
+- Four unread custom properties from `tools/mapmaker.css`, one from `tools/runner.css`, and four from `tools/tiktok-studio.css`.
+- Ignored local `tools/daily-challenge-admin.css`, an orphaned stylesheet with no matching HTML or JavaScript entrypoint.
+
+The dynamically constructed medal tier classes, preview challenge status classes, and runner result/severity classes remain active. The repeated `.hud-lap-cluster`, medal sizing/transition, and win-rank blocks also remain because their declarations are complementary rather than dead.
+
+Validation after removal:
+
+- The follow-up selector and custom-property scan reports only the known dynamically constructed class families and no unread custom properties.
+- `npm test`: 57 files and 390 tests passed.
+- `npm run build`: passed.
+
+## Disabled analytics plumbing cleanup: July 15, 2026
+
+The analytics server accepts six lifecycle events: `game_opened`, `game_closed`, `game_playtime_chunk`, `race_started`, `race_ended`, and `race_restarted`. The browser still carried empty methods and call-side state for retired player-type, support, menu, mode-selection, map-selection, and pageview events.
+
+The cleanup removed those no-op methods, the unused session flag store, deferred pageview/map-selection state, race counters that only fed the disabled map event, and the track-loading options that existed only to manage that state. Active lifecycle and race event payloads were left unchanged.
+
+Validation after removal:
+
+- Focused Daily GP and analytics tests: 2 files and 25 tests passed.
+- `npm test`: 57 files and 389 tests passed.
+- `npm run build`: passed.
+- Targeted reference scans found none of the retired methods or state names in source, tests, or the built client.
+
+## Producer-aware UI cleanup: July 15, 2026
+
+The selector scan could see producers for the `.daily-leaderboard-standing*` and `.daily-playlist-rank-btn*` classes, but those producers belonged to an unreachable intermediate standings track-picker. Current standings entry points open the selected-day leaderboard directly and switch days through the date rail or touch swipes; the separate Tracks playlist remains active.
+
+The retired overview methods, its mode flag, rank-card CSS, and the unused leaderboard playlist-fetch branch were removed. The unrelated active playlist renderer and full standings flow were preserved.
+
+The result modal also retained an uncalled SVG action-icon factory and button-content helper. Their icon and keyboard-hint payload fields, dedicated test, and `.modal-action-icon`, `.modal-action-label`, and `.modal-btn-kbd` CSS were removed. Current modal actions continue to use the active combined-action button path.
+
+Validation after removal:
+
+- Focused UI regression set: 8 files and 92 tests passed.
+- `npm test`: 57 files and 388 tests passed.
+- `npm run build`: passed.
+- Targeted source and built-output scans found none of the retired methods, payload fields, or CSS classes, while active Tracks, selected-day Standings, swipe navigation, and combined action-button references remain.

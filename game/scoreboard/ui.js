@@ -4,7 +4,6 @@ import {
     getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
     getDailyChallengeTrackName,
-    getDailyChallengePlaylist,
     getDailyChallengeSnapshot
 } from '../daily-challenge/service.js';
 import { getScoreboardSnapshot } from './service.js';
@@ -448,70 +447,6 @@ export class LeaderboardsUi {
                 refreshSession,
             }
         );
-    }
-
-    buildDailyChallengeLeaderboardRows(challenges = []) {
-        return (Array.isArray(challenges) ? challenges : [])
-            .filter((challenge) => challenge?.id && challenge.trackKey && TRACKS[challenge.trackKey])
-            .map((challenge) => ({
-                challenge,
-                trackKey: challenge.trackKey,
-                scoreboardSnapshot: this.resolveInitialDailyChallengeSnapshot(challenge) || { isLoading: true }
-            }));
-    }
-
-    openDailyChallengeLeaderboardOverviewModal(challenges, actions) {
-        const rows = this.buildDailyChallengeLeaderboardRows(challenges);
-        this.dailyChallengeUi.openLeaderboardTracksModal(rows.length ? rows : null, actions);
-        return rows;
-    }
-
-    async openDailyChallengeLeaderboardOverview() {
-        const requestId = ++this._requestVersion;
-        const refreshSession = this.startDailyLeaderboardRefreshSession();
-        let loadedChallenges = getCachedDailyChallengePlaylist();
-        let currentRows = [];
-        const actions = {
-            onTrack: (challenge) => {
-                void this.openDailyChallengeLeaderboardForChallenge(challenge, 'close', {
-                    refreshSession,
-                    onClose: () => {
-                        if (loadedChallenges.length) {
-                            currentRows = this.buildDailyChallengeLeaderboardRows(loadedChallenges);
-                        }
-                        this.dailyChallengeUi.openLeaderboardTracksModal(currentRows, actions);
-                    }
-                });
-            }
-        };
-
-        currentRows = this.openDailyChallengeLeaderboardOverviewModal(
-            loadedChallenges.length ? loadedChallenges : null,
-            actions
-        );
-        void this.primeDailyLeaderboardRefreshSession(
-            loadedChallenges,
-            refreshSession,
-        );
-
-        try {
-            loadedChallenges = await getDailyChallengePlaylist();
-            await this.primeDailyLeaderboardRefreshSession(
-                loadedChallenges,
-                refreshSession,
-            );
-            currentRows = this.buildDailyChallengeLeaderboardRows(loadedChallenges);
-        } catch (error) {
-            console.error('Error loading leaderboard tracks:', error);
-            currentRows = [];
-        }
-
-        if (
-            requestId === this._requestVersion
-            && this.dailyChallengeUi.isLeaderboardTracksModalOpen?.()
-        ) {
-            this.dailyChallengeUi.renderLeaderboardTracks?.(currentRows, actions);
-        }
     }
 
     async openDailyChallengeLeaderboardForChallenge(challenge, returnMode = 'close', {

@@ -8,32 +8,23 @@
     --bg-color-darker: #010410;
     --bg-surface: #0f172a;
     --text-color: #f8fafc;
-    --text-dim: #94a3b8;
     --text-muted: #64748b;
     --accent-color: #ef4444;
-    --accent-bright: #ff3e3e;
     --accent-hover: #f87171;
-    --bronze: #cd7f32;
-    --bronze-dim: color-mix(in oklab, #cd7f32 60%, transparent);
 
     /* Typography */
     --header-font: "Outfit", sans-serif;
     --mono-font: "JetBrains Mono", monospace;
 
     /* Spacing */
-    --space-xs: 0.25rem;
     --space-sm: 0.5rem;
     --space-md: 1rem;
     --space-lg: 1.5rem;
-    --space-xl: 2rem;
 
     /* Border Radius */
     --radius-sm: 0.5rem;
     --radius-md: 1rem;
-    --radius-lg: 1.25rem;
     --radius-full: 999px;
-
-    --post-height: 512px;
 }
 
 * {

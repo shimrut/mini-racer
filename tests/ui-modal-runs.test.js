@@ -11,6 +11,7 @@ const {
     renderLeaderboardStandaloneIntro,
     updateModalRunSummary,
     bindLeaderboardPagination,
+    bindLeaderboardDaySwipe,
     _wireLeaderboardRowShare,
     _leaderboardShareBestOption,
 } = ModalShell.prototype;
@@ -63,6 +64,129 @@ function setActiveView(view) {
 }
 
 describe('ui modal runs helpers', () => {
+    it('switches standings days with deliberate horizontal swipes', () => {
+        const listeners = new Map();
+        const onSelectLeaderboardDay = vi.fn();
+        const modalLapTimes = {
+            addEventListener: vi.fn((event, handler) => listeners.set(event, handler)),
+            removeEventListener: vi.fn((event) => listeners.delete(event)),
+        };
+        const context = {
+            modalLapTimes,
+            _modalRunsPayload: {
+                selectedLeaderboardDayId: 'today',
+                leaderboardDayOptions: [
+                    { challengeId: 'today' },
+                    { challengeId: 'yesterday' },
+                    { challengeId: 'older' },
+                ],
+                onSelectLeaderboardDay,
+            },
+            _leaderboardSwipeStart: null,
+            _leaderboardTouchStartHandler: null,
+            _leaderboardTouchEndHandler: null,
+            _leaderboardTouchCancelHandler: null,
+            unbindLeaderboardDaySwipe: ModalShell.prototype.unbindLeaderboardDaySwipe,
+        };
+        const target = { closest: vi.fn(() => null) };
+
+        bindLeaderboardDaySwipe.call(context);
+        listeners.get('touchstart')({ target, touches: [{ clientX: 180, clientY: 100 }] });
+        listeners.get('touchend')({ changedTouches: [{ clientX: 110, clientY: 106 }] });
+
+        expect(onSelectLeaderboardDay).toHaveBeenCalledWith('yesterday');
+
+        context._modalRunsPayload.selectedLeaderboardDayId = 'yesterday';
+        listeners.get('touchstart')({ target, touches: [{ clientX: 110, clientY: 100 }] });
+        listeners.get('touchend')({ changedTouches: [{ clientX: 180, clientY: 104 }] });
+
+        expect(onSelectLeaderboardDay).toHaveBeenLastCalledWith('today');
+    });
+
+    it('ignores short, vertical, and control-origin standings gestures', () => {
+        const listeners = new Map();
+        const onSelectLeaderboardDay = vi.fn();
+        const context = {
+            modalLapTimes: {
+                addEventListener: vi.fn((event, handler) => listeners.set(event, handler)),
+                removeEventListener: vi.fn((event) => listeners.delete(event)),
+            },
+            _modalRunsPayload: {
+                selectedLeaderboardDayId: 'today',
+                leaderboardDayOptions: [
+                    { challengeId: 'today' },
+                    { challengeId: 'yesterday' },
+                ],
+                onSelectLeaderboardDay,
+            },
+            _leaderboardSwipeStart: null,
+            _leaderboardTouchStartHandler: null,
+            _leaderboardTouchEndHandler: null,
+            _leaderboardTouchCancelHandler: null,
+            unbindLeaderboardDaySwipe: ModalShell.prototype.unbindLeaderboardDaySwipe,
+        };
+        const content = { closest: vi.fn(() => null) };
+
+        bindLeaderboardDaySwipe.call(context);
+        listeners.get('touchstart')({ target: content, touches: [{ clientX: 180, clientY: 100 }] });
+        listeners.get('touchend')({ changedTouches: [{ clientX: 145, clientY: 103 }] });
+        listeners.get('touchstart')({ target: content, touches: [{ clientX: 180, clientY: 100 }] });
+        listeners.get('touchend')({ changedTouches: [{ clientX: 110, clientY: 190 }] });
+        listeners.get('touchstart')({
+            target: { closest: vi.fn(() => ({})) },
+            touches: [{ clientX: 180, clientY: 100 }],
+        });
+        listeners.get('touchend')({ changedTouches: [{ clientX: 110, clientY: 100 }] });
+
+        expect(onSelectLeaderboardDay).not.toHaveBeenCalled();
+    });
+
+    it('keeps the date strip rendered alongside swipe navigation', () => {
+        const originalDocument = global.document;
+        const header = createTestElement('header');
+        const modalLapTimes = createTestElement('div');
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        try {
+            renderLeaderboardStandaloneIntro.call({
+                modalLapTimes,
+                modalRunsView: {
+                    querySelector: vi.fn((selector) => (
+                        selector === '.reusable-modal-header' ? header : null
+                    ))
+                },
+                _modalRunsPayload: {
+                    showGlobalLeaderboard: true,
+                    scoreboardChallengeId: 'today',
+                    scoreboardTrackKey: 'circuit',
+                    selectedLeaderboardDayId: 'today',
+                    leaderboardDayOptions: [
+                        { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15' },
+                        { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14' },
+                        { challengeId: 'older', dayLabel: 'Mon', dateLabel: 'Jul 13' },
+                    ],
+                    scoreboardSnapshot: { playerRankLabel: '#2', leaderboardEntryCount: 2 },
+                    onSelectLeaderboardDay: vi.fn(),
+                },
+                content: { formatTime: vi.fn() },
+            });
+
+            const rail = modalLapTimes.children.find((child) => (
+                child.className === 'leaderboard-day-rail'
+            ));
+            expect(rail).toBeTruthy();
+            expect(rail.children).toHaveLength(3);
+            expect(rail.children[0].disabled).toBe(true);
+            expect(rail.children.map((button) => button.children[0].textContent))
+                .toEqual(['Today', 'Jul 14', 'Jul 13']);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
     it('loads the next leaderboard page when scrolling near the bottom', async () => {
         const onLoadMoreLeaderboard = vi.fn(async () => {});
         let scrollHandler = null;

@@ -205,7 +205,6 @@ export const raceEngineMethods = {
   },
 
   restartCurrentRunAfterHardCrash() {
-    this.dailyGpRaceStats.crash++;
     this.analytics?.trackRaceRestarted?.({
       source: "auto_restart_after_crash",
       trackKey: this.currentTrackKey,
@@ -405,11 +404,9 @@ export const raceEngineMethods = {
         ...createModalActions({
           modalKind: "pause",
           primaryActionLabel: "Resume",
-          primaryActionIcon: "play",
           primaryAction: () => this.resumeActiveRun(),
           restartAction: () => this.restartDailyChallenge(),
           secondaryActionLabel: "Done",
-          secondaryActionIcon: "done",
           secondaryAction: () => this.reset(false),
         }),
         pauseTrackPreview: {
@@ -496,7 +493,6 @@ export const raceEngineMethods = {
       }
     }
     if (events.crashEndedRun) {
-      this.dailyGpRaceStats.crash++;
       this.hud.setPauseVisible(false);
       this.hud.setHudPersonalBestsOpenAllowed(true);
       this.modal.showModal(
@@ -521,10 +517,8 @@ export const raceEngineMethods = {
               });
               this.reset(true);
             },
-            primaryActionIcon: "retry",
             secondaryActionLabel: "Done",
             secondaryAction: () => this.reset(false),
-            secondaryActionIcon: "done",
           }),
           settingsAction: () => this.settings.openSettings(),
           playlistAction: () => {

@@ -18,49 +18,6 @@ function createClassList() {
 }
 
 describe('ui modal content helpers', () => {
-    it('renders modal action button text, icon, and shortcut hint', () => {
-        const originalDocument = global.document;
-        global.document = {
-            createElement: vi.fn((tagName) => ({
-                tagName,
-                className: '',
-                textContent: '',
-                dataset: {},
-                children: [],
-                appendChild(node) {
-                    this.children.push(node);
-                }
-            })),
-            createTextNode: vi.fn((text) => ({ nodeType: 'text', textContent: text }))
-        };
-
-        const button = {
-            children: [],
-            replaceChildren: vi.fn(function replaceChildren() {
-                this.children = [];
-            }),
-            appendChild(node) {
-                this.children.push(node);
-            }
-        };
-        const icon = { kind: 'icon' };
-
-        const component = new ModalContentUi({});
-        vi.spyOn(component, 'createModalActionIcon').mockReturnValue(icon);
-
-        component.setModalActionButtonContent(button, 'Race Again', { shortcutLabel: 'R', iconName: 'retry' });
-
-        expect(button.replaceChildren).toHaveBeenCalledTimes(1);
-        expect(button.children[0]).toBe(icon);
-        expect(button.children[1].className).toBe('modal-action-label');
-        expect(button.children[1].textContent).toBe('Race Again');
-        expect(button.children[2].nodeType).toBe('text');
-        expect(button.children[3].className).toBe('modal-btn-kbd');
-        expect(button.children[3].textContent).toBe('R');
-
-        global.document = originalDocument;
-    });
-
     it('renders a list of lap times with a PB header', () => {
         const originalDocument = global.document;
         global.document = {

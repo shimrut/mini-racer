@@ -33,6 +33,23 @@ function scheduleAfterModalPaint(callback) {
     });
 }
 
+const LEADERBOARD_SWIPE_MIN_DISTANCE_PX = 56;
+const LEADERBOARD_SWIPE_AXIS_RATIO = 1.25;
+
+function getSingleTouchPoint(touches) {
+    if (!touches || touches.length !== 1) return null;
+    const touch = touches[0];
+    const x = Number(touch?.clientX);
+    const y = Number(touch?.clientY);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+function isLeaderboardSwipeControl(target) {
+    return Boolean(target?.closest?.(
+        '.leaderboard-day-rail, button, a, input, select, textarea, [role="button"], .leaderboard-row.is-shareable'
+    ));
+}
+
 export class ModalShell {
     constructor({
         content,
@@ -72,6 +89,10 @@ export class ModalShell {
         this._lastPauseTrackPreviewKey = '';
         this._leaderboardScrollHandler = null;
         this._leaderboardPageLoading = false;
+        this._leaderboardSwipeStart = null;
+        this._leaderboardTouchStartHandler = null;
+        this._leaderboardTouchEndHandler = null;
+        this._leaderboardTouchCancelHandler = null;
     }
 
     _setActiveView(view) {
@@ -734,6 +755,7 @@ export class ModalShell {
             );
         }
         this.bindLeaderboardPagination?.();
+        this.bindLeaderboardDaySwipe?.();
         this._wireLeaderboardRowShare?.();
 
         if (this.backToMainBtn) {
@@ -762,6 +784,7 @@ export class ModalShell {
         this._closeSharePanel({ restoreScroll: false });
         this._leaderboardRailScrollLeft = null;
         this.unbindLeaderboardPagination?.();
+        this.unbindLeaderboardDaySwipe?.();
         const modal = this.modal;
         closeModalElement(modal, () => modal.classList.remove('active'));
         this.cancelLeaderboardRequests?.();
@@ -1505,6 +1528,83 @@ export class ModalShell {
             }
         };
         this.modalLapTimes.addEventListener('scroll', this._leaderboardScrollHandler, { passive: true });
+    }
+
+    unbindLeaderboardDaySwipe() {
+        if (this.modalLapTimes) {
+            this.modalLapTimes.classList?.remove('leaderboard-day-swipe-enabled');
+            if (this._leaderboardTouchStartHandler) {
+                this.modalLapTimes.removeEventListener('touchstart', this._leaderboardTouchStartHandler);
+            }
+            if (this._leaderboardTouchEndHandler) {
+                this.modalLapTimes.removeEventListener('touchend', this._leaderboardTouchEndHandler);
+            }
+            if (this._leaderboardTouchCancelHandler) {
+                this.modalLapTimes.removeEventListener('touchcancel', this._leaderboardTouchCancelHandler);
+            }
+        }
+        this._leaderboardSwipeStart = null;
+        this._leaderboardTouchStartHandler = null;
+        this._leaderboardTouchEndHandler = null;
+        this._leaderboardTouchCancelHandler = null;
+    }
+
+    bindLeaderboardDaySwipe() {
+        this.unbindLeaderboardDaySwipe();
+        const options = this._modalRunsPayload?.leaderboardDayOptions;
+        const onSelectDay = this._modalRunsPayload?.onSelectLeaderboardDay;
+        if (
+            !this.modalLapTimes
+            || !Array.isArray(options)
+            || options.length < 2
+            || typeof onSelectDay !== 'function'
+        ) {
+            return;
+        }
+
+        this._leaderboardTouchStartHandler = (event) => {
+            this._leaderboardSwipeStart = null;
+            if (isLeaderboardSwipeControl(event.target)) return;
+            const point = getSingleTouchPoint(event.touches);
+            this._leaderboardSwipeStart = point;
+        };
+        this._leaderboardTouchEndHandler = (event) => {
+            const start = this._leaderboardSwipeStart;
+            this._leaderboardSwipeStart = null;
+            if (!start) return;
+
+            const end = getSingleTouchPoint(event.changedTouches);
+            if (!end) return;
+            const deltaX = end.x - start.x;
+            const deltaY = end.y - start.y;
+            if (
+                Math.abs(deltaX) < LEADERBOARD_SWIPE_MIN_DISTANCE_PX
+                || Math.abs(deltaX) < Math.abs(deltaY) * LEADERBOARD_SWIPE_AXIS_RATIO
+            ) {
+                return;
+            }
+
+            const payload = this._modalRunsPayload;
+            const currentOptions = payload?.leaderboardDayOptions;
+            if (!Array.isArray(currentOptions)) return;
+            const selectedIndex = currentOptions.findIndex(
+                (option) => option?.challengeId === payload?.selectedLeaderboardDayId
+            );
+            if (selectedIndex < 0) return;
+
+            const nextIndex = deltaX < 0 ? selectedIndex + 1 : selectedIndex - 1;
+            const nextChallengeId = currentOptions[nextIndex]?.challengeId;
+            if (!nextChallengeId) return;
+            payload?.onSelectLeaderboardDay?.(nextChallengeId);
+        };
+        this._leaderboardTouchCancelHandler = () => {
+            this._leaderboardSwipeStart = null;
+        };
+
+        this.modalLapTimes.classList?.add('leaderboard-day-swipe-enabled');
+        this.modalLapTimes.addEventListener('touchstart', this._leaderboardTouchStartHandler, { passive: true });
+        this.modalLapTimes.addEventListener('touchend', this._leaderboardTouchEndHandler, { passive: true });
+        this.modalLapTimes.addEventListener('touchcancel', this._leaderboardTouchCancelHandler, { passive: true });
     }
 
     configureRunsModalHeader() {
