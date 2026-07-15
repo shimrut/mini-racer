@@ -290,7 +290,6 @@ export class LeaderboardsUi {
                 .has(challengeId);
             const cachedSnapshot = getCachedDailyChallengeSnapshot(challengeId);
             if (cachedSnapshot && !requiresRefresh) {
-                refreshSession.refreshedChallengeIds.add(challengeId);
                 refreshSession.snapshotByChallengeId.set(challengeId, cachedSnapshot);
                 continue;
             }
@@ -563,16 +562,12 @@ export class LeaderboardsUi {
         const requiresRefresh = this._pendingDailyLeaderboardRefreshChallengeIds
             .has(challenge.id);
         const hasInitialRequest = refreshSession.inFlightByChallengeId.has(challenge.id);
-        if (
-            initialSnapshot
-            && !requiresRefresh
-            && !hasInitialRequest
-            && !refreshSession.refreshedChallengeIds.has(challenge.id)
-        ) {
-            refreshSession.refreshedChallengeIds.add(challenge.id);
+        if (initialSnapshot && !refreshSession.snapshotByChallengeId.has(challenge.id)) {
             refreshSession.snapshotByChallengeId.set(challenge.id, initialSnapshot);
         }
-        const shouldRefresh = requiresRefresh || !initialSnapshot || hasInitialRequest;
+        const shouldRefresh = requiresRefresh
+            || hasInitialRequest
+            || !refreshSession.refreshedChallengeIds.has(challenge.id);
         const refreshingSnapshot = shouldRefresh
             ? (initialSnapshot
                 ? { ...initialSnapshot, isRefreshing: true }
@@ -614,7 +609,7 @@ export class LeaderboardsUi {
         const scoreboardSnapshot = await this.requestDailyChallengeLeaderboardSessionRefresh(
             challenge.id,
             refreshSession,
-            { forceRefresh: requiresRefresh },
+            { forceRefresh: true },
         );
         if (requestId !== this._requestVersion) return;
         if (!scoreboardSnapshot && initialSnapshot) {

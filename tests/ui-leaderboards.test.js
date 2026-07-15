@@ -265,12 +265,14 @@ describe('ui leaderboard helpers', () => {
         });
     });
 
-    it('uses a provided daily snapshot without refreshing it', async () => {
+    it('shows a provided daily snapshot immediately, then refreshes it', async () => {
         const playedSnapshot = { playerRankLabel: '#3' };
+        const freshSnapshot = { playerRankLabel: '#2' };
         const showRunsModal = vi.fn();
         const dailyChallengeUi = { getSummary: vi.fn(() => null) };
         const instance = new LeaderboardsUi({ showRunsModal, dailyChallengeUi });
-        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot');
+        const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValue(freshSnapshot);
 
         await instance.openDailyChallengeLeaderboardForChallenge({
             id: 'daily-2',
@@ -279,7 +281,7 @@ describe('ui leaderboard helpers', () => {
         }, 'back');
 
         expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', {
-            scoreboardSnapshot: playedSnapshot,
+            scoreboardSnapshot: { ...playedSnapshot, isRefreshing: true },
             onLoadMoreLeaderboard: expect.any(Function),
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'harborParkLoop',
@@ -293,7 +295,15 @@ describe('ui leaderboard helpers', () => {
             }],
             selectedLeaderboardDayId: 'daily-2'
         });
-        expect(requestSnapshot).not.toHaveBeenCalled();
+        expect(requestSnapshot).toHaveBeenCalledWith('daily-2', {
+            forceRefresh: true,
+            limit: 50,
+            offset: 0,
+        });
+        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', expect.objectContaining({
+            scoreboardChallengeId: 'daily-2',
+            scoreboardSnapshot: freshSnapshot,
+        }));
     });
 
     it('uses the initially loaded day snapshots without refreshing on day changes', async () => {
@@ -426,7 +436,7 @@ describe('ui leaderboard helpers', () => {
         expect(refreshSession.refreshedChallengeIds.has(challenge.id)).toBe(true);
     });
 
-    it('does not refresh a cached day after the leaderboard is closed and reopened', async () => {
+    it('refreshes a cached day again after the leaderboard is closed and reopened', async () => {
         const challenge = {
             id: 'daily-a',
             trackKey: 'circuit',
@@ -443,7 +453,17 @@ describe('ui leaderboard helpers', () => {
         instance.cancelPendingRequests();
         await instance.openDailyChallengeLeaderboardForChallenge(challenge);
 
-        expect(requestSnapshot).not.toHaveBeenCalled();
+        expect(requestSnapshot).toHaveBeenCalledTimes(2);
+        expect(requestSnapshot).toHaveBeenNthCalledWith(1, challenge.id, {
+            forceRefresh: true,
+            limit: 50,
+            offset: 0,
+        });
+        expect(requestSnapshot).toHaveBeenNthCalledWith(2, challenge.id, {
+            forceRefresh: true,
+            limit: 50,
+            offset: 0,
+        });
     });
 
     it('forces one newer refresh after an accepted time and keeps that result fresh', async () => {
@@ -453,6 +473,7 @@ describe('ui leaderboard helpers', () => {
             trackKey: 'circuit',
             scoreboardSnapshot: beforeAccepted
         };
+        const beforeSubmission = { playerRankLabel: '#3', currentPlayerRow: { bestTime: 14.2 } };
         const afterAccepted = { playerRankLabel: '#2', currentPlayerRow: { bestTime: 13.8 } };
         const updateModalScoreboardSnapshot = vi.fn();
         const instance = new LeaderboardsUi({
@@ -461,6 +482,7 @@ describe('ui leaderboard helpers', () => {
             updateModalScoreboardSnapshot
         });
         const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
+            .mockResolvedValueOnce(beforeSubmission)
             .mockResolvedValueOnce(afterAccepted);
         const refreshSession = instance.startDailyLeaderboardRefreshSession();
         const options = { refreshSession };
@@ -469,9 +491,19 @@ describe('ui leaderboard helpers', () => {
         await instance.refreshDailyChallengeAfterAcceptedSubmission(challenge.id);
         await instance.openDailyChallengeLeaderboardForChallenge(challenge, 'close', options);
 
-        expect(requestSnapshot).toHaveBeenCalledTimes(1);
+        expect(requestSnapshot).toHaveBeenCalledTimes(2);
+        expect(requestSnapshot).toHaveBeenNthCalledWith(1, challenge.id, {
+            forceRefresh: true,
+            limit: 50,
+            offset: 0,
+        });
+        expect(requestSnapshot).toHaveBeenNthCalledWith(2, challenge.id, {
+            forceRefresh: true,
+            limit: 50,
+            offset: 0,
+        });
         expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith({
-            ...beforeAccepted,
+            ...beforeSubmission,
             isRefreshing: true
         });
         expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(afterAccepted);
@@ -553,7 +585,7 @@ describe('ui leaderboard helpers', () => {
         expect(updateModalScoreboardSnapshot).toHaveBeenNthCalledWith(2, freshSnapshot);
     });
 
-    it('does not refresh other cached days after an accepted better time', async () => {
+    it('refreshes only the submitted day after an accepted better time', async () => {
         const beforeAccepted = { playerRankLabel: '#4', currentPlayerRow: { bestTime: 14.2 } };
         const afterAccepted = { playerRankLabel: '#2', currentPlayerRow: { bestTime: 13.8 } };
         const otherDaySnapshot = { playerRankLabel: '#7', currentPlayerRow: { bestTime: 18.4 } };
@@ -574,21 +606,37 @@ describe('ui leaderboard helpers', () => {
         });
         const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
             .mockResolvedValue(afterAccepted);
+        const refreshSession = instance.startDailyLeaderboardRefreshSession();
+        const options = { refreshSession };
 
-        await instance.openDailyChallengeLeaderboardForChallenge(submittedChallenge);
-        await instance.openDailyChallengeLeaderboardForChallenge(otherChallenge);
+        await instance.openDailyChallengeLeaderboardForChallenge(
+            submittedChallenge,
+            'close',
+            options,
+        );
+        await instance.openDailyChallengeLeaderboardForChallenge(
+            otherChallenge,
+            'close',
+            options,
+        );
         await instance.refreshDailyChallengeAfterAcceptedSubmission(submittedChallenge.id);
-        instance.cancelPendingRequests();
         submittedChallenge.scoreboardSnapshot = afterAccepted;
-        await instance.openDailyChallengeLeaderboardForChallenge(otherChallenge);
-        await instance.openDailyChallengeLeaderboardForChallenge(submittedChallenge);
+        await instance.openDailyChallengeLeaderboardForChallenge(
+            otherChallenge,
+            'close',
+            options,
+        );
+        await instance.openDailyChallengeLeaderboardForChallenge(
+            submittedChallenge,
+            'close',
+            options,
+        );
 
-        expect(requestSnapshot).toHaveBeenCalledTimes(1);
-        expect(requestSnapshot).toHaveBeenCalledWith(submittedChallenge.id, {
-            forceRefresh: true,
-            limit: 50,
-            offset: 0,
-        });
+        expect(requestSnapshot.mock.calls).toEqual([
+            [submittedChallenge.id, { forceRefresh: true, limit: 50, offset: 0 }],
+            [otherChallenge.id, { forceRefresh: true, limit: 50, offset: 0 }],
+            [submittedChallenge.id, { forceRefresh: true, limit: 50, offset: 0 }],
+        ]);
     });
 
     it('runs the accepted-time refresh after any older request for that day', async () => {
