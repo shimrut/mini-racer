@@ -42,8 +42,8 @@ import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
 import { createProceduralMusic } from "./audio/procedural-music.js";
-import { getCrashAutoRestartAfterCrashEnabled } from "./settings/crash-auto-restart-preference.js";
-import { getCrashRestartDelaySec } from "./settings/crash-restart-delay-preference.js";
+import { getCollisionAutoRestartEnabled } from "./settings/collision-auto-restart-preference.js";
+import { getCollisionRestartDelaySec } from "./settings/collision-restart-delay-preference.js";
 import { getCarProceduralAudioEnabled } from "./settings/car-audio-preference.js";
 import { getMusicEnabled } from "./settings/music-preference.js";
 import {
@@ -178,6 +178,9 @@ export class RealTimeRacer {
     this.pendingStartFrame = null;
     this.startButtonPending = false;
     this.relaunchDelayRemaining = 0;
+    this.wallImpactCooldownRemaining = 0;
+    this.wallContactActive = false;
+    this.wallContactReleaseRemaining = 0;
     this.activeRunId = 0;
     this.scoreboardReplay = new ReplayRecorder();
     this.lapCheckpointTimesSec = [];
@@ -237,15 +240,15 @@ export class RealTimeRacer {
       isRunsViewActive: () => this.modal.isRunsViewActive?.(),
       updateModalScoreboardSnapshot: (snapshot) => this.modal.updateModalScoreboardSnapshot?.(snapshot),
     });
-    this.crashAutoRestartAfterCrash = getCrashAutoRestartAfterCrashEnabled();
-    this.crashRestartDelaySec = getCrashRestartDelaySec();
+    this.collisionAutoRestartEnabled = getCollisionAutoRestartEnabled();
+    this.collisionRestartDelaySec = getCollisionRestartDelaySec();
     this.settings = new SettingsUi({
       modal: this.modal,
-      onCrashAutoRestartChanged: (value) => {
-        this.crashAutoRestartAfterCrash = value;
+      onCollisionAutoRestartChanged: (value) => {
+        this.collisionAutoRestartEnabled = value;
       },
-      onCrashRestartDelayChanged: (value) => {
-        this.crashRestartDelaySec = value;
+      onCollisionRestartDelayChanged: (value) => {
+        this.collisionRestartDelaySec = value;
       },
       onCarAudioChanged: (enabled) => {
         this.carEffectsAudio?.setEnabled?.(enabled);
@@ -406,6 +409,8 @@ export class RealTimeRacer {
       this.exposeTestHooks();
     } else {
       delete window.__RACER_DEBUG__;
+      delete window.render_game_to_text;
+      delete window.advanceTime;
     }
 
     this.lastTime = this.getNow();
@@ -419,8 +424,8 @@ export class RealTimeRacer {
   async applyPersistedPlayerPreferences(playerPreferences) {
     if (!applyPlayerPreferences(playerPreferences)) return;
 
-    this.crashAutoRestartAfterCrash = getCrashAutoRestartAfterCrashEnabled();
-    this.crashRestartDelaySec = getCrashRestartDelaySec();
+    this.collisionAutoRestartEnabled = getCollisionAutoRestartEnabled();
+    this.collisionRestartDelaySec = getCollisionRestartDelaySec();
     this.carEffectsAudio?.setEnabled?.(getCarProceduralAudioEnabled());
     this.proceduralMusic?.setEnabled?.(getMusicEnabled());
     this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
@@ -428,8 +433,8 @@ export class RealTimeRacer {
     this.trailTimer = 0;
     this.settings.refreshCarAudioPanel();
     this.settings.refreshMusicPanel();
-    this.settings.refreshCrashAutoRestartPanel();
-    this.settings.refreshCrashRestartDelayPanel();
+    this.settings.refreshCollisionAutoRestartPanel();
+    this.settings.refreshCollisionRestartDelayPanel();
     this.garage.syncSkinSelection();
     this.garage.syncTrailSelection();
     await this.syncCarSpriteAsset();
@@ -485,10 +490,12 @@ export class RealTimeRacer {
 
 
   exposeTestHooks() {
-    window.__RACER_DEBUG__ = Object.freeze({
-      renderGameToText: () => this.renderGameToText(),
-      advanceTime: (ms) => this.advanceTime(ms),
-    });
+    const renderGameToText = () => this.renderGameToText();
+    const advanceTime = (ms) => this.advanceTime(ms);
+
+    window.__RACER_DEBUG__ = Object.freeze({ renderGameToText, advanceTime });
+    window.render_game_to_text = renderGameToText;
+    window.advanceTime = advanceTime;
   }
 
   renderGameToText() {
@@ -502,12 +509,18 @@ export class RealTimeRacer {
         y: Number(this.pos.y.toFixed(2)),
         angle: Number(this.angle.toFixed(3)),
         angularVelocity: Number(this.angularVelocity.toFixed(3)),
+        velocityX: Number(this.velocity.x.toFixed(2)),
+        velocityY: Number(this.velocity.y.toFixed(2)),
         speed: Number(this.cachedSpeed.toFixed(2)),
+        wallImpactCooldownSec: Number((Number(this.wallImpactCooldownRemaining) || 0).toFixed(3)),
+        wallContactActive: Boolean(this.wallContactActive),
+        wallContactReleaseSec: Number((Number(this.wallContactReleaseRemaining) || 0).toFixed(3)),
       },
       lapTime: Number(this.currentTime.toFixed(2)),
       challengeLaps: this.currentChallengeRun?.recentLaps?.length || 0,
       startLine: this.currentTrack.startLine,
       routeTracePoints: this.routeTrace.length,
+      liveParticles: this.particles.length,
     });
   }
 

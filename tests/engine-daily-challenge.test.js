@@ -688,15 +688,15 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     }
   });
 
-  it("resets the submitted replay when crash auto-restart starts a fresh attempt", () => {
+  it("resets the submitted replay when collision auto-restart starts a fresh attempt", () => {
     const engine = {
-      status: "crashed",
+      status: "playing",
       currentTrack: {
         startPos: { x: 8, y: 4 },
         startAngle: 0,
       },
       runtimeConfig: { carRearAxleOffset: 0 },
-      crashRestartDelaySec: 0.5,
+      collisionRestartDelaySec: 0.5,
       scoreboardReplay: { reset: vi.fn() },
       resetRunToTrackStart: RealTimeRacer.prototype.resetRunToTrackStart,
       armRelaunchDelay: RealTimeRacer.prototype.armRelaunchDelay,
@@ -718,7 +718,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       getNow: () => 1234,
     };
 
-    RealTimeRacer.prototype.restartCurrentRunAfterHardCrash.call(engine);
+    RealTimeRacer.prototype.restartCurrentRunAfterCollision.call(engine);
 
     expect(engine.scoreboardReplay.reset).toHaveBeenCalledTimes(1);
     expect(engine.currentTime).toBe(0);

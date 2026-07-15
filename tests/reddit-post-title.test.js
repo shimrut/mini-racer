@@ -35,7 +35,7 @@ describe('reddit post title formatting', () => {
             '- Desktop: use Left/Right Arrow or A/D to steer.',
             '- Mobile: use the on-screen left and right controls.',
             '- There is no separate brake control. The car slows as you turn, so timing and a clean racing line matter.',
-            '- Crashing ends the attempt, but you can restart immediately.',
+            '- Every wall collision slows the car but lets the attempt continue.',
             '- Your fastest verified lap appears on the daily leaderboard.',
             '',
             "## Today's medal times",

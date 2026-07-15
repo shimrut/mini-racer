@@ -107,6 +107,9 @@ function createSimulationState(challenge: DailyGpChallenge, track: Record<string
     const state = {
         status: 'playing',
         relaunchDelayRemaining: 0,
+        wallImpactCooldownRemaining: 0,
+        wallContactActive: false,
+        wallContactReleaseRemaining: 0,
         currentTime: 0,
         keys: { left: false, right: false },
         angle: track.startAngle,

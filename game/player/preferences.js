@@ -17,13 +17,13 @@ import {
     setCarProceduralAudioEnabled,
 } from '../settings/car-audio-preference.js';
 import {
-    getCrashAutoRestartAfterCrashEnabled,
-    setCrashAutoRestartAfterCrashEnabled,
-} from '../settings/crash-auto-restart-preference.js';
+    getCollisionAutoRestartEnabled,
+    setCollisionAutoRestartEnabled,
+} from '../settings/collision-auto-restart-preference.js';
 import {
-    getCrashRestartDelaySec,
-    setCrashRestartDelaySec,
-} from '../settings/crash-restart-delay-preference.js';
+    getCollisionRestartDelaySec,
+    setCollisionRestartDelaySec,
+} from '../settings/collision-restart-delay-preference.js';
 import { getMusicEnabled, setMusicEnabled } from '../settings/music-preference.js';
 import { isLocalEnvironment } from '../track/environment.js';
 
@@ -35,8 +35,9 @@ export function readPlayerPreferences() {
         trailId: readPlayerTrailId(),
         musicEnabled: getMusicEnabled(),
         carAudioEnabled: getCarProceduralAudioEnabled(),
-        crashAutoRestartEnabled: getCrashAutoRestartAfterCrashEnabled(),
-        crashRestartDelaySec: getCrashRestartDelaySec(),
+        // Legacy wire field retained so stored player profiles remain compatible.
+        crashAutoRestartEnabled: getCollisionAutoRestartEnabled(),
+        crashRestartDelaySec: getCollisionRestartDelaySec(),
     };
 }
 
@@ -49,8 +50,8 @@ export function applyPlayerPreferences(value) {
     writePlayerTrailId(value.trailId);
     setMusicEnabled(value.musicEnabled);
     setCarProceduralAudioEnabled(value.carAudioEnabled);
-    setCrashAutoRestartAfterCrashEnabled(value.crashAutoRestartEnabled);
-    setCrashRestartDelaySec(value.crashRestartDelaySec);
+    setCollisionAutoRestartEnabled(value.crashAutoRestartEnabled);
+    setCollisionRestartDelaySec(value.crashRestartDelaySec);
     return true;
 }
 

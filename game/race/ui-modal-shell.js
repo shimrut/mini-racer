@@ -5,7 +5,7 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from '../track/presentation.js';
-import { createMedalIconSvg, createCrashMedalHeroIcon } from '../medals/medal-icon.js';
+import { createMedalIconSvg } from '../medals/medal-icon.js';
 import {
     getMedalRowSlots,
 } from '../medals/medals.js';
@@ -75,7 +75,6 @@ export class ModalShell {
         this.confirmShare = confirmShare;
         this._modalCloseFallbackTimer = null;
         this._modalCloseTransitionEndHandler = null;
-        this._mainModalIsCrash = false;
         this._modalKind = null;
         this._modalPrimaryAction = null;
         this._modalSecondaryAction = null;
@@ -263,6 +262,9 @@ export class ModalShell {
     get modalStatsRow() { return document.getElementById('modal-stats-row'); }
     get backToMainBtn() { return document.getElementById('back-to-main-btn'); }
     get modalMainView() { return document.getElementById('modal-main-view'); }
+    get modalPrimaryBtn() { return document.getElementById('modal-primary-btn'); }
+    get modalSecondaryBtn() { return document.getElementById('modal-secondary-btn'); }
+    get modalPlaylistBtn() { return document.getElementById('modal-playlist-btn'); }
     get modalRunsView() { return document.getElementById('modal-runs-view'); }
     get modalResumeBtn() { return document.getElementById('modal-resume-btn'); }
     get modalRestartBtn() { return document.getElementById('modal-restart-btn'); }
@@ -440,17 +442,15 @@ export class ModalShell {
             this._hidePauseTrackPreview();
         }
         this.modalTitle.textContent = title;
-        this._mainModalIsCrash = Boolean(lapData?.isCrash) || modalKind === 'crash';
         this._modalKind = modalKind;
-        this.modal.classList.toggle('modal--crash', this._mainModalIsCrash);
         this.modal.classList.toggle('modal--win', this._modalKind === 'win');
-        this.modal.classList.toggle('modal--pause', this._modalKind === 'pause' || this._modalKind === 'crash');
+        this.modal.classList.toggle('modal--pause', this._modalKind === 'pause');
         this._modalPrimaryAction = options.primaryAction || this.getDefaultPrimaryAction();
         this._modalSecondaryAction = options.secondaryAction || null;
         this._modalRunsPayload = buildModalRunsPayload(lapData, {
             currentTrackKey: this.getCurrentTrackKey()
         });
-        const usesCombinedResults = modalKind === 'win' || modalKind === 'crash';
+        const usesCombinedResults = modalKind === 'win';
         if (lapData) {
             if (this.modalMsg) this.modalMsg.style.display = 'none';
             if (this.modalStatsRow && usesCombinedResults) {
@@ -465,8 +465,6 @@ export class ModalShell {
                         this.content.setModalStatLeftRight(...statsPlan.args);
                     } else if (statsPlan.kind === 'hide') {
                         this.modalStatsRow.replaceChildren();
-                    } else if (statsPlan.kind === 'crash') {
-                        this.content.setModalStatCenter(...statsPlan.args);
                     } else if (statsPlan.kind === 'win') {
                         this.content.setWinStats(...statsPlan.args, {
                             showDelta: statsPlan.showDelta !== false,
@@ -511,22 +509,12 @@ export class ModalShell {
             return;
         }
 
-        if (this._modalKind === 'crash') {
-            this.showCrashResults(lapData, options);
-            return;
-        }
-
         if (this._modalKind === 'pause') {
             this.showPauseResults(lapData, options);
             return;
         }
 
-        if (this.modalMainView && this.modalRunsView) {
-            this.showMainModalView();
-        }
-
-        openModalElement(this.modal, () => this.modal.classList.add('active'));
-        scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
+        this.showMainResults(options);
     }
 
     showPauseResults(lapData, options = {}) {
@@ -550,26 +538,25 @@ export class ModalShell {
         });
     }
 
-    showCrashResults(lapData, options = {}) {
+    showMainResults(options = {}) {
         if (!this.modal || !this.modalMainView) return;
 
         this.cancelPendingModalClose();
-        this._bindClickAction(document.getElementById('modal-crash-menu-btn'), options.secondaryAction);
-        this._bindClickAction(document.getElementById('modal-crash-playlist-btn'), options.playlistAction);
-        this._bindClickAction(document.getElementById('modal-crash-retry-btn'), options.restartAction || options.primaryAction);
-
-        const msgEl = document.getElementById('modal-msg');
-        if (msgEl) {
-            msgEl.hidden = false;
-            msgEl.removeAttribute('hidden');
-            msgEl.style.display = 'block';
-            msgEl.textContent = `${Math.round(lapData?.impact || 0)} KPH`;
-        }
-
-        const iconContainer = document.getElementById('modal-crash-icon-container');
-        if (iconContainer) {
-            iconContainer.replaceChildren(createCrashMedalHeroIcon({ className: 'medal-svg--crash-modal' }));
-        }
+        this._bindClickAction(this.modalPrimaryBtn, options.restartAction || options.primaryAction);
+        this._bindClickAction(this.modalSecondaryBtn, options.secondaryAction);
+        this._bindClickAction(this.modalPlaylistBtn, options.playlistAction);
+        const syncAction = (button, label, action) => {
+            if (!button) return;
+            button.hidden = typeof action !== 'function';
+            if (typeof action === 'function') {
+                button.removeAttribute('hidden');
+                this._setShareButtonLabel(button, label);
+                button.setAttribute('aria-label', label);
+            }
+        };
+        syncAction(this.modalPrimaryBtn, options.primaryActionLabel || 'Continue', options.restartAction || options.primaryAction);
+        syncAction(this.modalSecondaryBtn, options.secondaryActionLabel || 'Back', options.secondaryAction);
+        syncAction(this.modalPlaylistBtn, 'Tracks', options.playlistAction);
 
         this._setActiveView(this.modalMainView);
 
@@ -585,8 +572,6 @@ export class ModalShell {
         this.content.renderCombinedResults(this.modalCombinedView, {
             time: lapData.lapTime,
             bestLap: lapData.bestTime,
-            crashImpact: null,
-            crashElapsedSec: null,
             scoreboardSnapshot: lapData.scoreboardSnapshot,
             title: 'RACE COMPLETE',
             statLabels: ['THIS LAP'],
@@ -598,7 +583,6 @@ export class ModalShell {
             lapCheckpointTimes: lapData.lapCheckpointTimes,
             pbCheckpointTimes: lapData.pbCheckpointTimes,
             pbFinishSec: lapData.pbFinishSec,
-            crashCombined: false
         });
 
         const finishResultModal = (fn) => {
@@ -704,7 +688,7 @@ export class ModalShell {
         const wasMainActive = this.modalMainView?.classList.contains('active-view');
         if (wasCombinedActive) {
             this._runsReturnView = 'combined';
-            this._savedModalState = { kind: this._modalKind, isCrash: this._mainModalIsCrash };
+            this._savedModalState = { kind: this._modalKind };
         } else if (wasMainActive) {
             this._runsReturnView = 'main';
             this._savedModalState = null;
@@ -713,9 +697,8 @@ export class ModalShell {
             this._savedModalState = null;
         }
 
-        this.modal.classList.remove('modal--crash', 'modal--win', 'modal--pause');
+        this.modal.classList.remove('modal--win', 'modal--pause');
         this._modalKind = null;
-        this._mainModalIsCrash = false;
         this._hidePauseTrackPreview();
         this.modalLapTimes.replaceChildren();
         const hasPersonalBestList = Array.isArray(lapTimesArray);
@@ -793,7 +776,6 @@ export class ModalShell {
 
         const cleanupAfterClose = () => {
             this._modalCloseTransitionEndHandler = null;
-            modal.classList.remove('modal--crash');
             modal.classList.remove('modal--pause');
             modal.classList.remove('modal--win');
             this._hidePauseTrackPreview();
@@ -851,21 +833,16 @@ export class ModalShell {
 
         const isCombinedViewReturn = this._runsReturnView === 'combined'
             || this._savedModalState?.kind === 'win'
-            || this._savedModalState?.kind === 'crash'
-            || this._modalKind === 'win'
-            || this._modalKind === 'crash';
+            || this._modalKind === 'win';
 
         if (isCombinedViewReturn) {
             this._modalKind = this._savedModalState?.kind || this._modalKind || 'win';
-            this._mainModalIsCrash = this._savedModalState?.isCrash || this._modalKind === 'crash';
             if (this.modal) {
-                this.modal.classList.toggle('modal--crash', this._mainModalIsCrash);
                 this.modal.classList.toggle('modal--win', this._modalKind === 'win');
-                this.modal.classList.toggle('modal--pause', this._modalKind === 'pause' || this._modalKind === 'crash');
+                this.modal.classList.toggle('modal--pause', this._modalKind === 'pause');
             }
             this._setActiveView(this.modalCombinedView);
         } else {
-            if (this.modal) this.modal.classList.toggle('modal--crash', this._mainModalIsCrash);
             this._setActiveView(this.modalMainView);
         }
     }
@@ -879,7 +856,7 @@ export class ModalShell {
     }
 
     isCombinedResultsModalActive() {
-        return this.isModalActive() && (this._modalKind === 'win' || this._modalKind === 'crash');
+        return this.isModalActive() && this._modalKind === 'win';
     }
 
     isPauseEscapeTarget(trapRoot) {
@@ -907,7 +884,7 @@ export class ModalShell {
             return this.modalResumeBtn;
         }
         if (
-            (this._modalKind === 'crash' || this._modalKind === 'win')
+            this._modalKind === 'win'
             && this.combinedRestartBtn?.offsetParent !== null
         ) {
             return this.combinedRestartBtn;
@@ -1143,9 +1120,7 @@ export class ModalShell {
             const rightGroupEl = this.modalCombinedView.querySelector('#combined-stats-right-group');
             const rankValueEl = this.modalCombinedView.querySelector('#combined-rank-value');
             const rankTotalEl = this.modalCombinedView.querySelector('#combined-rank-total');
-            const isCrash = this._modalKind === 'crash';
-
-            if (isCrash || !rankValueEl) {
+            if (!rankValueEl) {
                 if (rightGroupEl) {
                     rightGroupEl.hidden = true;
                     rightGroupEl.setAttribute('hidden', '');

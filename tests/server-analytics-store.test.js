@@ -129,7 +129,7 @@ describe('server analytics store', () => {
             playerId: 'browser-player',
             sessionId: 'session-1',
             payload: {
-                source: 'auto_restart_after_crash',
+                source: 'auto_restart_after_collision',
                 trackKey: 'circuit',
             },
         });
@@ -151,7 +151,7 @@ describe('server analytics store', () => {
         );
         expect(mockRedis.hIncrBy).toHaveBeenCalledWith(
             expect.stringContaining(':counters'),
-            'race_restarted:source:auto_restart_after_crash',
+            'race_restarted:source:auto_restart_after_collision',
             1,
         );
     });

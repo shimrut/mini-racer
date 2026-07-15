@@ -328,6 +328,31 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             }
         },
 
+        scheduleScrape(impact, severity = 0) {
+            if (!enabledCache || tabHidden) return;
+            buildGraph();
+            if (!ctx || !masterGain) return;
+            resumeContextIfNeeded();
+
+            const intensity = clamp(Number(impact) || 0, 0, 150);
+            if (intensity < 1) return;
+            const scrapeSeverity = clamp(Number(severity) || 0, 0, 1);
+            const t = ctx.currentTime;
+            const thud = ctx.createOscillator();
+            thud.type = 'triangle';
+            thud.frequency.setValueAtTime(180 - scrapeSeverity * 50, t);
+            thud.frequency.exponentialRampToValueAtTime(95, t + 0.07);
+            const thudG = ctx.createGain();
+            thudG.gain.setValueAtTime(0, t);
+            thudG.gain.linearRampToValueAtTime(0.05 + scrapeSeverity * 0.08, t + 0.004);
+            thudG.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+            thud.connect(thudG);
+            thudG.connect(masterGain);
+            keepAlive(thud);
+            thud.start(t);
+            thud.stop(t + 0.1);
+        },
+
         scheduleCrash(impact) {
             if (!enabledCache || tabHidden) return;
             buildGraph();

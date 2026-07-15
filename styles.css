@@ -234,8 +234,7 @@ body.start-selection-active .lap-flash {
     overflow: visible;
 }
 
-.medal-svg__outer-border,
-.medal-crash__bg {
+.medal-svg__outer-border {
     stroke: rgba(0, 0, 0, 0.15);
     stroke-width: 4px;
     paint-order: stroke fill;
@@ -311,82 +310,6 @@ body.start-selection-active .lap-flash {
 
 .medal-svg--placeholder .medal-svg__shape {
     stroke: rgba(148, 163, 184, 0.45);
-}
-
-.medal-crash__icon {
-    stroke: #0c0f13;
-    stroke-width: 10;
-    stroke-linejoin: round;
-    paint-order: stroke fill;
-    filter: drop-shadow(0 0 8px rgba(234, 88, 12, 0.45));
-}
-
-.medal-svg--crash.medal-svg--hero {
-    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.45));
-    transform-origin: 50% 55%;
-}
-
-.combined-hero-medal > .medal-svg--crash.medal-pile-icon--deferred {
-    opacity: 0;
-    transform: scale(0.22);
-}
-
-@keyframes medal-crash-entrance {
-    0% {
-        opacity: 0;
-        transform: scale(0.22);
-    }
-
-    14% {
-        opacity: 1;
-        transform: scale(1.2);
-    }
-
-    30% {
-        transform: scale(0.9) rotate(-5deg);
-    }
-
-    46% {
-        transform: scale(1.05) rotate(4deg);
-    }
-
-    62% {
-        transform: scale(0.97) rotate(-2deg);
-    }
-
-    78% {
-        transform: scale(1.02) rotate(1deg);
-    }
-
-    100% {
-        opacity: 1;
-        transform: scale(1) rotate(0deg);
-    }
-}
-
-@keyframes medal-crash-icon-flash {
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    18% {
-        opacity: 1;
-        filter: brightness(1.55) saturate(1.2);
-    }
-
-    42% {
-        opacity: 0.88;
-        filter: brightness(0.95);
-    }
-}
-
-.medal-svg--crash.medal-svg--medal-crash-entrance {
-    animation: medal-crash-entrance 0.58s cubic-bezier(0.34, 1.15, 0.64, 1) both;
-}
-
-.medal-svg--crash.medal-svg--medal-crash-entrance .medal-crash__icon {
-    animation: medal-crash-icon-flash 0.58s ease-out both;
 }
 
 .medal-svg--outline .medal-svg__shape {
@@ -629,9 +552,7 @@ body.start-selection-active .lap-flash {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .medal-svg--medal-entrance,
-    .medal-svg--crash.medal-svg--medal-crash-entrance,
-    .medal-svg--crash.medal-svg--medal-crash-entrance .medal-crash__icon {
+    .medal-svg--medal-entrance {
         animation: none;
         opacity: 1;
         transform: none;
@@ -1667,9 +1588,8 @@ body.start-selection-active #start-overlay {
     transition: none;
 }
 
-/* Bottom sheet modals: pause, crash, and win */
-#modal.modal--pause:not(.modal--crash):not(.modal--win),
-#modal.modal--crash,
+/* Bottom sheet modals: pause and win */
+#modal.modal--pause:not(.modal--win),
 #modal.modal--win {
     align-items: center;
     background: rgba(2, 6, 23, 0.6);
@@ -1677,8 +1597,7 @@ body.start-selection-active #start-overlay {
     -webkit-backdrop-filter: blur(6px) saturate(1.05);
 }
 
-#modal.modal--pause:not(.modal--crash):not(.modal--win) .modal-card,
-#modal.modal--crash .modal-card,
+#modal.modal--pause:not(.modal--win) .modal-card,
 #modal.modal--win .modal-card {
     height: auto;
     min-height: 0;
@@ -1688,12 +1607,12 @@ body.start-selection-active #start-overlay {
     background: transparent;
 }
 
-#modal.modal--pause:not(.modal--crash):not(.modal--win) .modal-card,
+#modal.modal--pause:not(.modal--win) .modal-card,
 #modal.modal--win .modal-card {
     max-width: min(92vw, 26rem);
 }
 
-#modal.modal--pause:not(.modal--crash):not(.modal--win) .modal-view#modal-pause-view.active-view {
+#modal.modal--pause:not(.modal--win) .modal-view#modal-pause-view.active-view {
     flex: 0 0 auto;
     min-height: 0;
 }
@@ -1733,8 +1652,7 @@ body.start-selection-active #start-overlay {
 }
 
 @media (prefers-reduced-transparency: reduce) {
-    #modal.modal--pause:not(.modal--crash):not(.modal--win),
-    #modal.modal--crash,
+    #modal.modal--pause:not(.modal--win),
     #modal.modal--win {
         background: rgba(2, 6, 23, 0.94);
         backdrop-filter: none;
@@ -1819,7 +1737,6 @@ body.start-selection-active #start-overlay {
     padding: 0
 }
 
-#modal.modal--crash .modal-card,
 #modal.modal--win .modal-card {
     margin-left: auto;
     margin-right: auto;
@@ -1828,11 +1745,6 @@ body.start-selection-active #start-overlay {
 #modal.modal--win .modal-card {
     width: 100%;
     max-width: min(92vw, 26rem);
-}
-
-#modal.modal--crash .modal-view#modal-combined-view.active-view {
-    flex: 0 0 auto;
-    min-height: 0;
 }
 
 /* Win overlay: horizontal medal row */
@@ -1868,22 +1780,18 @@ body.start-selection-active #start-overlay {
     font-size: 96px;
 }
 
-#modal.modal--crash.active .modal-card,
 #modal.modal--win.active .modal-card {
     position: relative;
     z-index: 2;
 }
 
-:is(
-    #modal.modal--win #modal-combined-view:not(.is-crash),
-    #modal.modal--crash #modal-combined-view.is-crash
-) .combined-hero-medal {
+#modal.modal--win #modal-combined-view .combined-hero-medal {
     justify-content: center;
     display: flex;
     align-items: center;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stats-right-group {
+#modal.modal--win #modal-combined-view .combined-stats-right-group {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -1892,13 +1800,13 @@ body.start-selection-active #start-overlay {
     text-align: right;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-value {
+#modal.modal--win #modal-combined-view .combined-rank-value {
     font-style: normal;
     color: #ffffff;
     margin-bottom: 0;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-value--status {
+#modal.modal--win #modal-combined-view .combined-rank-value--status {
     font-family: var(--header-font);
     font-size: clamp(0.95rem, 3.8vw, 1.15rem);
     font-weight: 800;
@@ -1909,14 +1817,14 @@ body.start-selection-active #start-overlay {
     max-width: 8.5rem;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-value .rank-hash {
+#modal.modal--win #modal-combined-view .combined-rank-value .rank-hash {
     font-size: 0.65em;
     opacity: 0.5;
     margin-right: 0.05em;
     font-weight: 700;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-total {
+#modal.modal--win #modal-combined-view .combined-rank-total {
     font-family: var(--mono-font);
     font-size: 0.85rem;
     color: var(--text-dim);
@@ -1924,7 +1832,7 @@ body.start-selection-active #start-overlay {
     font-weight: 900;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-value {
+#modal.modal--win #modal-combined-view .combined-rank-value {
     font-family: var(--mono-font);
     font-size: clamp(2.65rem, 8vw, 3.35rem);
     font-weight: 850;
@@ -1934,7 +1842,7 @@ body.start-selection-active #start-overlay {
     font-variant-numeric: tabular-nums;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--pb-delta {
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1945,53 +1853,41 @@ body.start-selection-active #start-overlay {
     font-variant-numeric: tabular-nums;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--pb-delta.is-gain {
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta.is-gain {
     color: var(--success-bright, var(--success-bright));
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--pb-delta.is-loss {
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta.is-loss {
     color: var(--accent-bright, var(--accent-bright));
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat-value--placeholder {
+#modal.modal--win #modal-combined-view .combined-stat-value--placeholder {
     font-size: 0.7rem;
     font-weight: 500;
     opacity: 0.6;
     font-variant-numeric: normal;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-stat--pb-delta[hidden] {
+#modal.modal--win #modal-combined-view .combined-stat--pb-delta[hidden] {
     display: flex !important;
     visibility: hidden;
     height: 0.95rem;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) #combined-next-medal-stat[hidden] {
+#modal.modal--win #modal-combined-view #combined-next-medal-stat[hidden] {
     display: none !important;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-next-medal-icon-slot {
+#modal.modal--win #modal-combined-view .combined-next-medal-icon-slot {
     display: inline-flex;
     align-items: center;
     line-height: 0;
 }
 
-#modal.modal--win #modal-combined-view:not(.is-crash) .combined-next-medal-icon-slot .medal-svg {
+#modal.modal--win #modal-combined-view .combined-next-medal-icon-slot .medal-svg {
     width: 1.15rem;
     height: 1.15rem;
     filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
-}
-
-#modal.modal--crash #modal-combined-view.is-crash .combined-stat-label {
-    display: none !important;
-}
-
-#modal.modal--crash #modal-combined-view.is-crash .combined-stats-right-group {
-    display: none !important;
-}
-
-.is-crash #combined-next-medal-stat {
-    display: none !important;
 }
 
 #modal.modal--win .modal-view#modal-combined-view.active-view {
@@ -2059,7 +1955,7 @@ body.start-selection-active #start-overlay {
     gap: 0.45rem;
 }
 
-#settings-modal .modal-sheet-settings-row--crash-delay {
+#settings-modal .modal-sheet-settings-row--collision-delay {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2074,7 +1970,7 @@ body.start-selection-active #start-overlay {
     width: 100%;
 }
 
-#settings-modal .settings-crash-delay-control-row {
+#settings-modal .settings-collision-delay-control-row {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -2084,7 +1980,7 @@ body.start-selection-active #start-overlay {
     margin: 0.15rem 0;
 }
 
-#settings-modal .settings-crash-delay-stepper {
+#settings-modal .settings-collision-delay-stepper {
     flex: 0 0 auto;
     width: 2.35rem;
     min-width: 2.35rem;
@@ -2107,23 +2003,23 @@ body.start-selection-active #start-overlay {
         transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#settings-modal .settings-crash-delay-stepper:hover:not(:disabled) {
+#settings-modal .settings-collision-delay-stepper:hover:not(:disabled) {
     background: rgba(71, 85, 105, 0.9);
     border-color: var(--border-default);
     transform: translateY(-1px);
 }
 
-#settings-modal .settings-crash-delay-stepper:active:not(:disabled) {
+#settings-modal .settings-collision-delay-stepper:active:not(:disabled) {
     transform: none;
     filter: none;
 }
 
-#settings-modal .settings-crash-delay-stepper:disabled {
+#settings-modal .settings-collision-delay-stepper:disabled {
     opacity: 0.25;
     cursor: not-allowed;
 }
 
-#settings-modal .settings-crash-delay-meter {
+#settings-modal .settings-collision-delay-meter {
     flex: 1 1 auto;
     display: grid;
     grid-template-columns: repeat(11, minmax(0, 1fr));
@@ -2133,13 +2029,13 @@ body.start-selection-active #start-overlay {
     align-items: center;
 }
 
-#settings-modal .settings-crash-delay-meter:focus-visible {
+#settings-modal .settings-collision-delay-meter:focus-visible {
     outline: 2px solid var(--accent-color);
     outline-offset: 2px;
     border-radius: 0.2rem;
 }
 
-#settings-modal .settings-crash-delay-meter__tick {
+#settings-modal .settings-collision-delay-meter__tick {
     display: block;
     height: 0.65rem;
     border: none;
@@ -2153,21 +2049,21 @@ body.start-selection-active #start-overlay {
         transform 0.15s ease;
 }
 
-#settings-modal .settings-crash-delay-meter__tick:hover {
+#settings-modal .settings-collision-delay-meter__tick:hover {
     background: rgba(51, 65, 85, 0.95);
     transform: scaleY(1.15);
 }
 
-#settings-modal .settings-crash-delay-meter__tick.is-filled {
+#settings-modal .settings-collision-delay-meter__tick.is-filled {
     background: rgba(71, 85, 105, 0.95);
 }
 
-#settings-modal .settings-crash-delay-meter__tick.is-active {
+#settings-modal .settings-collision-delay-meter__tick.is-active {
     background: var(--accent-color);
     box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
 }
 
-#settings-modal .settings-crash-delay-meter__tick.is-filled.is-active {
+#settings-modal .settings-collision-delay-meter__tick.is-filled.is-active {
     background: var(--accent-color);
 }
 
@@ -2802,14 +2698,6 @@ body.start-selection-active #start-overlay {
     color: var(--success)
 }
 
-.modal-stat-value--crash {
-    color: var(--accent-color)
-}
-
-.modal--crash h2 {
-    color: var(--text-color)
-}
-
 .modal-stat-delta {
     color: var(--accent-color);
     font-size: .75em;
@@ -2837,13 +2725,6 @@ body.start-selection-active #start-overlay {
     align-items: start;
     margin: 0;
     padding: 1rem 0
-}
-
-.modal--crash.modal--pause .modal-stats-row {
-    display: flex;
-    grid-template-columns: none;
-    gap: 0;
-    align-items: center
 }
 
 .modal-stat-stack {
@@ -3261,11 +3142,6 @@ body.start-selection-active #start-overlay {
     gap: 0.35rem;
 }
 
-.combined-hero-medal > .medal-svg--crash.medal-svg--hero {
-    width: min(34vw, 6.75rem);
-    height: min(34vw, 6.75rem);
-}
-
 .combined-stat-label {
     font-size: 0.62rem;
     font-weight: 700;
@@ -3355,8 +3231,7 @@ body.start-selection-active #start-overlay {
     gap: 0.75rem;
 }
 
-#modal.modal--win #combined-restart-btn,
-#modal.modal--crash #combined-restart-btn {
+#modal.modal--win #combined-restart-btn {
     width: 100%;
 }
 
@@ -3419,14 +3294,6 @@ body.start-selection-active #start-overlay {
     letter-spacing: 0.1em;
     background: var(--bg-surface);
     border-radius: var(--radius-md);
-}
-
-.is-crash .combined-row-rank[data-rank] {
-    opacity: 0.5;
-}
-
-.is-crash .combined-row.is-player {
-    background: #451a1a;
 }
 
 /* Achievements */
@@ -3896,7 +3763,7 @@ body:not(.loading-active) #loading-screen {
     }
 
     /* 3. Finish Screen */
-    #modal.modal--win #modal-combined-view:not(.is-crash) .combined-rank-value {
+    #modal.modal--win #modal-combined-view .combined-rank-value {
         font-size: clamp(2rem, 8vw, 2.5rem);
     }
     /* 4. Global Modals & Buttons */
@@ -4036,21 +3903,21 @@ body:not(.loading-active) #loading-screen {
     }
 
     #settings-modal .modal-sheet-settings-identity-head,
-    #settings-modal .modal-sheet-settings-row--crash-delay {
+    #settings-modal .modal-sheet-settings-row--collision-delay {
         gap: 0.55rem;
     }
 
-    #settings-modal .settings-crash-delay-control-row {
+    #settings-modal .settings-collision-delay-control-row {
         gap: 0.5rem;
     }
 
-    #settings-modal .settings-crash-delay-stepper {
+    #settings-modal .settings-collision-delay-stepper {
         width: 2.15rem;
         min-width: 2.15rem;
         height: 2.15rem;
     }
 
-    #settings-modal .settings-crash-delay-meter {
+    #settings-modal .settings-collision-delay-meter {
         gap: 0.2rem;
     }
 

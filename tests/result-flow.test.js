@@ -222,7 +222,7 @@ describe('result-flow helpers', () => {
         })).toBe('#2');
     });
 
-    it('builds modal stats plans for pause, crash, and win summaries', () => {
+    it('builds modal stats plans for pause and win summaries', () => {
         expect(buildModalStatsPlan({
             variant: 'daily-pause',
             lapTime: 50.1,
@@ -235,16 +235,6 @@ describe('result-flow helpers', () => {
             hasRuns: null,
             args: [],
             rankSnapshot: null
-        });
-
-        expect(buildModalStatsPlan({
-            isCrash: true,
-            impact: 188
-        })).toEqual({
-            kind: 'crash',
-            display: 'flex',
-            hasRuns: '',
-            args: ['Impact', '188 KPH', 'modal-stat-value--crash']
         });
 
         expect(buildModalStatsPlan({

@@ -312,25 +312,32 @@ describe('updateSimulation mechanics', () => {
         expect(state.runHistory.length).toBe(2);
     });
 
-    it('detects low-speed radius contact near a wall endpoint as a bounce', () => {
+    it('uses a radial normal to resolve a scrape near a wall endpoint', () => {
         const state = createTestSimState({
             pos: { x: -0.25, y: -0.25 },
             velocity: { x: 0.1, y: 0.1 },
             angle: Math.PI / 4,
         });
 
-        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
+        const events = updateSimulation(
+            state,
+            0.1,
+            { ...CONFIG, accel: 0, carRadius: 0.5 },
+            OPEN_TRACK,
+            ENDPOINT_WALL
+        );
 
-        expect(state.pos).toEqual({ x: -0.25, y: -0.25 });
-        expect(state.velocity.x).toBeCloseTo(-0.05);
-        expect(state.velocity.y).toBeCloseTo(-0.05);
-        expect(state.cachedSpeed).toBeCloseTo(Math.sqrt(0.005));
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(events.crashImpact).toBeNull();
+        expect(Math.hypot(state.pos.x, state.pos.y)).toBeCloseTo(
+            0.5 + CONFIG.carCollisionHalfLength + CONFIG.wallContactPadding
+        );
         expect(state.velocity.x).toBeLessThan(0);
         expect(state.velocity.y).toBeLessThan(0);
-        expect(state.particles.length).toBe(25);
+        expect(state.particles.length).toBe(15);
     });
 
-    it('uses deterministic spark physics for low-speed bounces', () => {
+    it('uses deterministic spark physics for scrapes', () => {
         vi.spyOn(Math, 'random').mockReturnValue(0);
         const state = createTestSimState({
             pos: { x: -0.25, y: -0.25 },
@@ -338,22 +345,20 @@ describe('updateSimulation mechanics', () => {
             angle: Math.PI / 4,
         });
 
-        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
+        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
 
-        expect(state.particles).toHaveLength(25);
+        expect(state.particles).toHaveLength(15);
         expect(state.particles[0]).toMatchObject({
             color: CONFIG.sparkColor,
             size: 2
         });
-        expect(state.particles[0].x).toBeCloseTo(-0.3);
-        expect(state.particles[0].y).toBeCloseTo(-0.5);
         expect(state.particles[0].vx).toBeCloseTo(2);
         expect(state.particles[0].vy).toBeCloseTo(0);
         expect(state.particles[0].life).toBeCloseTo(0.1);
         expect(state.particles[0].maxLife).toBeCloseTo(0.2);
     });
 
-    it('uses full spark angle, speed, and life ranges for bounces', () => {
+    it('uses full spark angle, speed, and life ranges for scrapes', () => {
         vi.spyOn(Math, 'random')
             .mockReturnValueOnce(0.5)
             .mockReturnValueOnce(0.5)
@@ -366,21 +371,19 @@ describe('updateSimulation mechanics', () => {
             angle: Math.PI / 4,
         });
 
-        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
+        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
 
         expect(state.particles[0]).toMatchObject({
             color: CONFIG.sparkColor,
             size: 2
         });
-        expect(state.particles[0].x).toBeCloseTo(-0.25);
-        expect(state.particles[0].y).toBeCloseTo(0.35);
         expect(state.particles[0].vx).toBeCloseTo(0);
         expect(state.particles[0].vy).toBeCloseTo(6);
         expect(state.particles[0].life).toBeCloseTo(0.25);
         expect(state.particles[0].maxLife).toBeCloseTo(0.35);
     });
 
-    it('detects low-speed radius contact near the middle of offset wall segments', () => {
+    it('resolves straight-wall contacts to the safe side of the barrier', () => {
         const verticalState = createTestSimState({
             pos: { x: 4.6, y: 15 },
             velocity: { x: 2, y: 0 },
@@ -390,13 +393,13 @@ describe('updateSimulation mechanics', () => {
         updateSimulation(
             verticalState,
             0.1,
-            { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.3 },
+            { ...CONFIG, accel: 0, carRadius: 0.3 },
             OPEN_TRACK,
             OFFSET_VERTICAL_WALL
         );
 
-        expect(verticalState.pos).toEqual({ x: 4.6, y: 15 });
-        expect(verticalState.velocity.x).toBeCloseTo(-1);
+        expect(verticalState.pos).toEqual({ x: 4.359, y: 15 });
+        expect(verticalState.velocity.x).toBeLessThan(0);
 
         const horizontalState = createTestSimState({
             pos: { x: 15, y: 4.6 },
@@ -407,43 +410,116 @@ describe('updateSimulation mechanics', () => {
         updateSimulation(
             horizontalState,
             0.1,
-            { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.3 },
+            { ...CONFIG, accel: 0, carRadius: 0.3 },
             OPEN_TRACK,
             OFFSET_HORIZONTAL_WALL
         );
 
-        expect(horizontalState.pos).toEqual({ x: 15, y: 4.6 });
-        expect(horizontalState.velocity.y).toBeCloseTo(-1);
+        expect(horizontalState.pos).toEqual({ x: 15, y: 4.359 });
+        expect(horizontalState.velocity.y).toBeLessThan(0);
     });
 
-    it('does not bounce when the car is outside the wall radius', () => {
+    it('detects a nose impact that the old center circle would miss', () => {
         const state = createTestSimState({
             pos: { x: 4.4, y: 15 },
             velocity: { x: 1, y: 0 },
             angle: 0,
         });
 
-        updateSimulation(
+        const events = updateSimulation(
             state,
             0.1,
-            { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.3 },
+            { ...CONFIG, accel: 0, carRadius: 0.3 },
             OPEN_TRACK,
             OFFSET_VERTICAL_WALL
         );
 
-        expect(state.pos.x).toBeCloseTo(4.5);
-        expect(state.velocity.x).toBeCloseTo(1);
-        expect(state.particles).toHaveLength(0);
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.pos.x).toBeCloseTo(4.359);
+        expect(state.velocity.x).toBeLessThan(0);
+        expect(state.particles).toHaveLength(15);
     });
 
-    it('treats exact crash-speed wall contact as a bounce', () => {
+    it('uses body orientation when deciding whether the car touches a wall', () => {
+        const noseFirst = createTestSimState({
+            pos: { x: 4.4, y: 15 },
+            velocity: { x: 0.5, y: 0 },
+            angle: 0,
+        });
+        const sideOn = createTestSimState({
+            pos: { x: 4.4, y: 15 },
+            velocity: { x: 0.5, y: 0 },
+            angle: Math.PI / 2,
+        });
+        const config = { ...CONFIG, accel: 0, grip: 0 };
+
+        const noseEvents = updateSimulation(noseFirst, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+        const noseImpactKind = noseEvents.wallImpact?.kind;
+        const sideEvents = updateSimulation(sideOn, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+
+        expect(noseImpactKind).toBe('scrape');
+        expect(sideEvents.wallImpact).toBeNull();
+        expect(sideOn.pos.x).toBeCloseTo(4.405);
+    });
+
+    it('uses rotation at the body contact point when measuring impact speed', () => {
+        const rotating = createTestSimState({
+            pos: { x: 4.73, y: 15 },
+            velocity: { x: 0, y: 5 },
+            angle: Math.PI / 2,
+            angularVelocity: 4,
+        });
+        const notRotating = createTestSimState({
+            pos: { x: 4.73, y: 15 },
+            velocity: { x: 0, y: 5 },
+            angle: Math.PI / 2,
+            angularVelocity: 0,
+        });
+        const config = { ...CONFIG, accel: 0, grip: 0 };
+
+        const rotatingEvents = updateSimulation(rotating, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+        const rotatingImpact = rotatingEvents.wallImpact?.impactKph;
+        const stillEvents = updateSimulation(notRotating, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+
+        expect(rotatingImpact).toBe(20);
+        expect(stillEvents.wallImpact).toBeNull();
+        expect(rotating.angularVelocity).toBe(0);
+    });
+
+    it('continues a high-speed glancing scrape while preserving along-wall momentum', () => {
+        const state = createTestSimState({
+            pos: { x: 0.2, y: 0 },
+            velocity: { x: 3, y: 10 },
+            angle: Math.atan2(10, 3),
+        });
+
+        const events = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, grip: 0, carRadius: 0.275 }, OPEN_TRACK, [
+            {
+                start: { x: 0.5, y: -1 },
+                end: { x: 0.5, y: 2 },
+                dx: 0,
+                dy: 3,
+                lenSq: 9
+            }
+        ]);
+
+        expect(events.crashEndedRun).toBe(false);
+        expect(events.crashImpact).toBeNull();
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape', impactKph: 60 });
+        expect(state.status).toBe('playing');
+        expect(state.velocity.x).toBeLessThan(0);
+        expect(state.velocity.y).toBeGreaterThan(5);
+        expect(state.cachedSpeed).toBeLessThan(Math.hypot(3, 10));
+    });
+
+    it('treats the exact 150 KPH perpendicular boundary as a maximum-severity scrape', () => {
         const state = createTestSimState({
             pos: { x: 0, y: 0 },
-            velocity: { x: 5, y: 0 },
+            velocity: { x: 7.5, y: 0 },
             angle: 0,
         });
 
-        const events = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.1 }, OPEN_TRACK, [
+        const events = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.1 }, OPEN_TRACK, [
             {
                 start: { x: 0.5, y: -1 },
                 end: { x: 0.5, y: 1 },
@@ -453,28 +529,185 @@ describe('updateSimulation mechanics', () => {
             }
         ]);
 
+        expect(events.wallImpact).toEqual({ kind: 'scrape', impactKph: 150, severity: 1 });
+        expect(events.crashImpact).toBeNull();
         expect(events.crashEndedRun).toBe(false);
-        expect(events.crashImpact).toBe(100);
         expect(state.status).toBe('playing');
-        expect(state.velocity.x).toBeCloseTo(-2.5);
-        expect(state.cachedSpeed).toBeCloseTo(2.5);
     });
 
-    it('detects low-speed radius contact near the far endpoint of a wall', () => {
+    it('uses the strongest inward contact when two wall segments meet', () => {
         const state = createTestSimState({
-            pos: { x: -0.25, y: 4.25 },
-            velocity: { x: 0.1, y: -0.1 },
-            angle: -Math.PI / 4,
+            pos: { x: 4.8, y: 4.8 },
+            velocity: { x: 2, y: 6 },
+            angle: Math.atan2(6, 2),
+        });
+        const cornerWalls = [
+            {
+                start: { x: 5, y: 0 },
+                end: { x: 5, y: 10 },
+                dx: 0,
+                dy: 10,
+                lenSq: 100,
+            },
+            {
+                start: { x: 0, y: 5 },
+                end: { x: 10, y: 5 },
+                dx: 10,
+                dy: 0,
+                lenSq: 100,
+            },
+        ];
+
+        const events = updateSimulation(
+            state,
+            0.01,
+            { ...CONFIG, accel: 0, grip: 0, carRadius: 0.5 },
+            OPEN_TRACK,
+            cornerWalls
+        );
+
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape', impactKph: 120 });
+        const bodyReachX = CONFIG.carRadius
+            + Math.abs(Math.cos(state.angle)) * CONFIG.carCollisionHalfLength;
+        const bodyReachY = CONFIG.carRadius
+            + Math.abs(Math.sin(state.angle)) * CONFIG.carCollisionHalfLength;
+        expect(state.pos.x + bodyReachX).toBeLessThanOrEqual(5);
+        expect(state.pos.y + bodyReachY).toBeLessThanOrEqual(5);
+    });
+
+    it('preserves a valid finish when a hard wall impact happens in the same step', () => {
+        const wallAndFinish = {
+            startLine: {
+                p1: { x: 0.5, y: -1 },
+                p2: { x: 0.5, y: 1 },
+            },
+            checkpoints: [],
+        };
+        const wall = [{
+            start: wallAndFinish.startLine.p1,
+            end: wallAndFinish.startLine.p2,
+            dx: 0,
+            dy: 2,
+            lenSq: 4,
+        }];
+        const state = createTestSimState({
+            currentTime: 1.99,
+            pos: { x: 0, y: 0 },
+            velocity: { x: 10, y: 0 },
+            angle: 0,
         });
 
-        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
+        const events = updateSimulation(
+            state,
+            0.1,
+            { ...CONFIG, accel: 0, carRadius: 0.1 },
+            wallAndFinish,
+            wall
+        );
 
-        expect(state.pos).toEqual({ x: -0.25, y: 4.25 });
-        expect(state.velocity.x).toBeCloseTo(-0.05);
-        expect(state.velocity.y).toBeCloseTo(0.05);
+        expect(events.winTriggered).toBe(true);
+        expect(events.crashEndedRun).toBe(false);
+        expect(events.wallImpact).toBeNull();
+        expect(events.crashImpact).toBeNull();
+        expect(state.particles).toHaveLength(0);
+        expect(state.status).toBe('won');
     });
 
-    it('uses reduced spark counts when frames are being skipped', () => {
+    it('scales scrape slowdown with penetration depth', () => {
+        const shallow = createTestSimState({
+            pos: { x: 4.51, y: 15 },
+            velocity: { x: 0.1, y: 5 },
+            angle: Math.atan2(5, 0.1),
+        });
+        const deep = createTestSimState({
+            pos: { x: 4.8, y: 15 },
+            velocity: { x: 0.1, y: 5 },
+            angle: Math.atan2(5, 0.1),
+        });
+        const config = { ...CONFIG, accel: 0, grip: 0, carRadius: 0.5 };
+
+        const shallowEvents = updateSimulation(shallow, 0.1, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+        const shallowSeverity = shallowEvents.wallImpact.severity;
+        const deepEvents = updateSimulation(deep, 0.1, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+
+        expect(deepEvents.wallImpact.kind).toBe('scrape');
+        expect(deepEvents.wallImpact.severity).toBeGreaterThan(shallowSeverity);
+        expect(deep.cachedSpeed).toBeLessThan(shallow.cachedSpeed);
+    });
+
+    it('corrects moving-away overlap without another penalty', () => {
+        const state = createTestSimState({
+            pos: { x: 4.8, y: 15 },
+            velocity: { x: -1, y: 0 },
+            angle: Math.PI,
+        });
+
+        const events = updateSimulation(
+            state,
+            0.1,
+            { ...CONFIG, accel: 0, carRadius: 0.5 },
+            OPEN_TRACK,
+            OFFSET_VERTICAL_WALL
+        );
+
+        expect(events.wallImpact).toBeNull();
+        expect(state.pos.x).toBeCloseTo(4.159);
+        expect(state.velocity.x).toBeCloseTo(-1);
+        expect(state.particles).toHaveLength(0);
+    });
+
+    it('suppresses repeat scrape penalties and feedback during cooldown', () => {
+        const state = createTestSimState({
+            pos: { x: 4.6, y: 15 },
+            velocity: { x: 1, y: 5 },
+            angle: Math.atan2(5, 1),
+        });
+        const config = { ...CONFIG, accel: 0, grip: 0, carRadius: 0.5 };
+        const first = updateSimulation(state, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+        const firstKind = first.wallImpact?.kind;
+        const firstTangentialSpeed = Math.abs(state.velocity.y);
+        const particleCount = state.particles.length;
+        state.pos = { x: 4.8, y: 15 };
+        state.velocity.x = 1;
+        const second = updateSimulation(state, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+
+        expect(firstKind).toBe('scrape');
+        expect(second.wallImpact).toBeNull();
+        expect(state.wallImpactCooldownRemaining).toBeGreaterThan(0);
+        expect(Math.abs(state.velocity.y)).toBeCloseTo(firstTangentialSpeed);
+        expect(state.particles.length).toBeLessThanOrEqual(particleCount);
+    });
+
+    it('does not retrigger a scrape while the same wall contact remains active', () => {
+        const state = createTestSimState({
+            pos: { x: 4.7, y: 15 },
+            velocity: { x: 1, y: 5 },
+            angle: Math.atan2(5, 1),
+        });
+        const config = { ...CONFIG, accel: 0, grip: 0 };
+        const first = updateSimulation(state, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+        const firstKind = first.wallImpact?.kind;
+        const particleCount = state.particles.length;
+        state.wallImpactCooldownRemaining = 0;
+        state.pos = { x: 3, y: 15 };
+        updateSimulation(state, 0.05, config, OPEN_TRACK, []);
+        expect(state.wallContactActive).toBe(true);
+        state.pos = { x: 4.8, y: 15 };
+        state.velocity.x = 1;
+
+        const continuous = updateSimulation(state, 0.01, config, OPEN_TRACK, OFFSET_VERTICAL_WALL);
+
+        expect(firstKind).toBe('scrape');
+        expect(continuous.wallImpact).toBeNull();
+        expect(state.wallContactActive).toBe(true);
+        expect(state.particles.length).toBeLessThanOrEqual(particleCount);
+
+        state.pos = { x: 3, y: 15 };
+        updateSimulation(state, 0.13, config, OPEN_TRACK, []);
+        expect(state.wallContactActive).toBe(false);
+    });
+
+    it('uses reduced scrape spark counts when frames are being skipped', () => {
         const bounceState = createTestSimState({
             frameSkip: 1,
             pos: { x: -0.25, y: -0.25 },
@@ -482,25 +715,28 @@ describe('updateSimulation mechanics', () => {
             angle: Math.PI / 4,
         });
 
-        updateSimulation(bounceState, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5, maxSpeed: 225 }, OPEN_TRACK, ENDPOINT_WALL);
+        updateSimulation(bounceState, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5, maxSpeed: 225 }, OPEN_TRACK, ENDPOINT_WALL);
 
-        expect(bounceState.particles).toHaveLength(15);
+        expect(bounceState.particles).toHaveLength(10);
 
-        const crashState = createTestSimState({
+        const severeScrapeState = createTestSimState({
             frameSkip: 1,
             pos: { x: -0.25, y: -0.25 },
             velocity: { x: 10, y: 10 },
             angle: Math.PI / 4,
         });
 
-        const events = updateSimulation(crashState, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5, maxSpeed: 225 }, OPEN_TRACK, ENDPOINT_WALL);
+        const events = updateSimulation(severeScrapeState, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5, maxSpeed: 225 }, OPEN_TRACK, ENDPOINT_WALL);
 
-        expect(events.crashImpact).toBe(225);
-        expect(events.crashEndedRun).toBe(true);
-        expect(crashState.particles).toHaveLength(30);
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape', impactKph: 159 });
+        expect(events.wallImpact.severity).toBeGreaterThan(0.8);
+        expect(events.crashImpact).toBeNull();
+        expect(events.crashEndedRun).toBe(false);
+        expect(severeScrapeState.status).toBe('playing');
+        expect(severeScrapeState.particles).toHaveLength(10);
     });
 
-    it('ends a non-daily regular run on hard crash and clears one-tick crash flags on the next tick', () => {
+    it('keeps a regular run active after an extreme wall impact and clears one-tick scrape flags', () => {
         const state = createTestSimState({
             currentModeKey: 'daily',
             currentTime: 2,
@@ -509,14 +745,16 @@ describe('updateSimulation mechanics', () => {
             angle: Math.PI / 4,
         });
 
-        const crashEvents = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
-        expect(crashEvents.crashEndedRun).toBe(true);
-        expect(state.status).toBe('crashed');
+        const scrapeEvents = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
+        expect(scrapeEvents.wallImpact).toMatchObject({ kind: 'scrape', severity: 1 });
+        expect(scrapeEvents.crashEndedRun).toBe(false);
+        expect(state.status).toBe('playing');
 
         state.pos = { x: 20, y: 20 };
         state.velocity = { x: 0, y: 0 };
-        const clearEvents = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.5 }, OPEN_TRACK, []);
+        const clearEvents = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5 }, OPEN_TRACK, []);
 
+        expect(clearEvents.wallImpact).toBeNull();
         expect(clearEvents.crashEndedRun).toBe(false);
     });
 

@@ -204,9 +204,9 @@ export const raceEngineMethods = {
     this.relaunchDelayRemaining = delaySeconds;
   },
 
-  restartCurrentRunAfterHardCrash() {
+  restartCurrentRunAfterCollision() {
     this.analytics?.trackRaceRestarted?.({
-      source: "auto_restart_after_crash",
+      source: "auto_restart_after_collision",
       trackKey: this.currentTrackKey,
       challengeId: this.activeDailyChallenge?.id || null,
     });
@@ -216,7 +216,7 @@ export const raceEngineMethods = {
     this.rankedSubmissionBlockedReason = null;
     this.resetRunToTrackStart({
       currentTime: 0,
-      relaunchDelay: this.crashRestartDelaySec,
+      relaunchDelay: this.collisionRestartDelaySec,
     });
     this.modal.closeModal();
     this.hud.setPauseVisible(true);
@@ -237,6 +237,9 @@ export const raceEngineMethods = {
     this.cachedSpeed = 0;
     this.angularVelocity = 0;
     this.currentTime = currentTime;
+    this.wallImpactCooldownRemaining = 0;
+    this.wallContactActive = false;
+    this.wallContactReleaseRemaining = 0;
     this.lapCheckpointTimesSec = [];
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
@@ -457,8 +460,15 @@ export const raceEngineMethods = {
       this.collisionSegments,
     );
 
-    if (events.crashImpact != null) {
-      this.carEffectsAudio?.scheduleCrash?.(events.crashImpact);
+    if (events.wallImpact?.kind === "scrape") {
+      this.carEffectsAudio?.scheduleScrape?.(
+        events.wallImpact.impactKph,
+        events.wallImpact.severity,
+      );
+      if (this.collisionAutoRestartEnabled) {
+        this.restartCurrentRunAfterCollision();
+        return;
+      }
     }
 
     if (events.checkpointPassed) {
@@ -470,62 +480,6 @@ export const raceEngineMethods = {
     }
     if (events.challengeLapCompleted) {
       this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime);
-    }
-    if (events.crashEndedRun) {
-      this.analytics?.trackRaceEnded?.({
-        cause: "crash",
-        trackKey: this.currentTrackKey,
-        challengeId: this.activeDailyChallenge?.id || null,
-        runTimeSec: this.currentTime,
-      });
-    }
-    if (this.crashAutoRestartAfterCrash && events.crashEndedRun) {
-      this.restartCurrentRunAfterHardCrash();
-      return;
-    }
-    if (events.challengeFailed) {
-      this.handleDailyChallengeFailure(
-        events.challengeFailureReason,
-        events.crashImpact,
-      );
-      if (this.currentChallengeRun) {
-        return;
-      }
-    }
-    if (events.crashEndedRun) {
-      this.hud.setPauseVisible(false);
-      this.hud.setHudPersonalBestsOpenAllowed(true);
-      this.modal.showModal(
-        "CRASHED",
-        null,
-        {
-          isCrash: true,
-          impact: events.crashImpact,
-          currentTime: this.currentTime,
-          scoreboardSnapshot:
-            this.dailyChallengeUi?.getDailyChallengeScoreboardSnapshot() || null,
-        },
-        {
-          ...createModalActions({
-            modalKind: "crash",
-            primaryActionLabel: "Retry",
-            primaryAction: () => {
-              this.analytics?.trackRaceRestarted?.({
-                source: "manual_restart_after_crash",
-                trackKey: this.currentTrackKey,
-                challengeId: this.activeDailyChallenge?.id || null,
-              });
-              this.reset(true);
-            },
-            secondaryActionLabel: "Done",
-            secondaryAction: () => this.reset(false),
-          }),
-          settingsAction: () => this.settings.openSettings(),
-          playlistAction: () => {
-            void this.openDailyChallengePlaylist();
-          },
-        },
-      );
     }
   },
 
@@ -550,6 +504,9 @@ export const raceEngineMethods = {
     this.lapCheckpointTimesSec = [];
     this.clearSteeringInput();
     this.relaunchDelayRemaining = 0;
+    this.wallImpactCooldownRemaining = 0;
+    this.wallContactActive = false;
+    this.wallContactReleaseRemaining = 0;
     this.status = "ready";
     this.activeRunId += 1;
     this.nextCheckpointIndex = 0;

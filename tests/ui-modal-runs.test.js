@@ -231,8 +231,7 @@ describe('ui modal runs helpers', () => {
         const modalClassList = createClassList([
             'active',
             'modal--win',
-            'modal--pause',
-            'modal--crash'
+            'modal--pause'
         ]);
         const mainClassList = createClassList(['active-view']);
         const combinedClassList = createClassList(['active-view']);
@@ -273,7 +272,6 @@ describe('ui modal runs helpers', () => {
 
             expect(modalClassList.values()).not.toContain('modal--win');
             expect(modalClassList.values()).not.toContain('modal--pause');
-            expect(modalClassList.values()).not.toContain('modal--crash');
             expect(combinedClassList.contains('active-view')).toBe(false);
             expect(runsClassList.contains('active-view')).toBe(true);
         } finally {

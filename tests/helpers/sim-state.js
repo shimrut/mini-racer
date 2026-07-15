@@ -20,6 +20,9 @@ export function createTestSimState(overrides = {}) {
     const baseState = {
         status: 'playing',
         relaunchDelayRemaining: 0,
+        wallImpactCooldownRemaining: 0,
+        wallContactActive: false,
+        wallContactReleaseRemaining: 0,
         currentTime: 2,
         keys: { left: false, right: false },
         angle: Math.PI / 2,

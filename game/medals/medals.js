@@ -506,20 +506,6 @@ export function playCombinedMedalRowEntrance(
     revealMedalIconsInOrder(icons, { reduced, shouldCelebrateTier, playUnlockSound, firstUnlockHoldMs });
 }
 
-/**
- * Crash combined view: impact slam on the hero crash medal (starts when the crash modal opens).
- * @param {HTMLElement|null|undefined} heroMedalEl `#combined-hero-medal`
- * @param {{ reduced?: boolean }} [options]
- */
-export function playCrashMedalEntrance(heroMedalEl, { reduced = false } = {}) {
-    const icon = heroMedalEl?.querySelector?.(':scope > .medal-svg--crash.medal-pile-icon--deferred');
-    if (!icon) return;
-    if (!reduced) {
-        icon.classList.add('medal-svg--medal-crash-entrance');
-    }
-    icon.classList.remove('medal-pile-icon--deferred');
-}
-
 function revealWinOverlayMedalRow(
     root,
     { reduced = false, shouldCelebrateTier = null, playUnlockSound = null } = {},
@@ -676,21 +662,12 @@ export function scheduleCombinedMedalEntranceAfterModal(
     const winOverlayRoot = heroMedalEl?.querySelector?.(':scope > .win-combined-medal-overlay');
     const winOverlayRow = winOverlayRoot?.querySelector?.('.win-combined-medal-overlay__row, .combined-medal-row');
     const heroRow = heroMedalEl?.querySelector?.(':scope > .combined-medal-row');
-    const crashHeroMedal = heroMedalEl?.querySelector?.(':scope > .medal-svg--crash.medal-pile-icon--deferred');
     const hasStack = Boolean(stackEl && stackEl.childElementCount > 0);
-    if (!heroRow && !hasStack && !winOverlayRoot && !crashHeroMedal) return;
+    if (!heroRow && !hasStack && !winOverlayRoot) return;
 
     const reduced =
         typeof globalThis !== 'undefined'
         && globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-
-    if (crashHeroMedal) {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                playCrashMedalEntrance(heroMedalEl, { reduced });
-            });
-        });
-    }
 
     const runEntrance = () => {
         if (heroRow && !winOverlayRow) {
@@ -703,10 +680,7 @@ export function scheduleCombinedMedalEntranceAfterModal(
         }
 
         const nextMedalSlot = combinedViewEl?.querySelector?.('#combined-next-medal-icon-slot');
-        const nextIcon =
-            combinedViewEl?.classList?.contains('is-crash')
-                ? null
-                : nextMedalSlot?.querySelector('.medal-svg.medal-pile-icon--deferred');
+        const nextIcon = nextMedalSlot?.querySelector('.medal-svg.medal-pile-icon--deferred');
         if (nextIcon) {
             nextIcon.classList.remove('medal-pile-icon--deferred');
         }

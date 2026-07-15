@@ -85,11 +85,16 @@ function captureOutcome(state, events) {
             y: Number(state.velocity.y.toFixed(6))
         },
         cachedSpeed: Number(state.cachedSpeed.toFixed(6)),
+        angularVelocity: Number(state.angularVelocity.toFixed(6)),
+        wallImpactCooldownRemaining: Number(state.wallImpactCooldownRemaining.toFixed(6)),
+        wallContactActive: state.wallContactActive,
+        wallContactReleaseRemaining: Number(state.wallContactReleaseRemaining.toFixed(6)),
         nextCheckpointIndex: state.nextCheckpointIndex,
         particles: state.particles.length,
         routeTracePoints: state.routeTrace.length,
         skidMarks: state.skidMarks.length,
         events: {
+            wallImpact: events.wallImpact,
             crashEndedRun: events.crashEndedRun,
             winTriggered: events.winTriggered,
             challengeLapCompleted: events.challengeLapCompleted,
@@ -169,14 +174,15 @@ describe('collision hash broadphase', () => {
             angle: 0
         });
 
-        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.1 }, TEST_TRACK, []);
+        const events = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, wallScrapeReferenceImpactKph: 100, carRadius: 0.1 }, TEST_TRACK, []);
 
         expect(collisionHash.queryStamp).toBe(1);
         expect(collisionHash.candidateSegments).toEqual([HASH_TEST_WALL]);
-        expect(state.status).toBe('crashed');
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape', severity: 1 });
+        expect(state.status).toBe('playing');
     });
 
-    it('includes hash buckets touched only by the car radius expansion', () => {
+    it('includes hash buckets touched only by the oriented collision-body expansion', () => {
         const collisionHash = {
             cells: new Map([
                 ['1,1', [HASH_EDGE_WALLS[0], HASH_EDGE_WALLS[1]]],
@@ -195,7 +201,7 @@ describe('collision hash broadphase', () => {
             angle: 0
         });
 
-        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.25 }, TEST_TRACK, []);
+        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.25 }, TEST_TRACK, []);
 
         expect(collisionHash.candidateSegments).toEqual([
             HASH_EDGE_WALLS[3],
@@ -203,7 +209,8 @@ describe('collision hash broadphase', () => {
             HASH_EDGE_WALLS[0],
             HASH_EDGE_WALLS[1]
         ]);
-        expect(state.particles.length).toBe(25);
+        expect(state.particles.length).toBe(0);
+        expect(state.pos.x).not.toBeCloseTo(1.1);
     });
 
     it('falls back to full collision segments when the swept hash range is empty', () => {
@@ -221,9 +228,10 @@ describe('collision hash broadphase', () => {
             angle: 0
         });
 
-        updateSimulation(state, 0.1, { ...CONFIG, accel: 0, crashSpeed: 5, carRadius: 0.1 }, TEST_TRACK, []);
+        const events = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, wallScrapeReferenceImpactKph: 100, carRadius: 0.1 }, TEST_TRACK, []);
 
         expect(collisionHash.candidateSegments).toEqual([]);
-        expect(state.status).toBe('crashed');
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape', severity: 1 });
+        expect(state.status).toBe('playing');
     });
 });

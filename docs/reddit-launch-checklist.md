@@ -23,7 +23,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The full game is understandable for a first-time player without extra instructions.
 - [ ] The launch card works without inline scroll traps.
 - [ ] The expanded game works across phone and desktop layouts.
-- [ ] The retry flow is fast and predictable after a finish or crash.
+- [ ] The retry flow is fast and predictable after a finish or an enabled collision auto-restart.
 - [ ] The finish screen shows `Improve`, `Share Time`, and `Home`, and sharing displays the exact comment plus Reddit username before posting.
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
 

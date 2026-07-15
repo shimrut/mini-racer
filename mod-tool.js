@@ -161,7 +161,7 @@ function renderSummary(data) {
         { label: 'Unknown', value: totals.raceStarts.unknown },
     ]);
     renderBreakdown('restart-breakdown', [
-        { label: 'Auto after crash', value: totals.restarts.autoCrash },
+        { label: 'Auto after collision', value: totals.restarts.autoCrash },
         { label: 'Manual after crash', value: totals.restarts.manualCrash },
         { label: 'Improve after win', value: totals.restarts.improveWin },
         { label: 'Unknown', value: totals.restarts.unknown },

@@ -283,7 +283,7 @@ describe("daily-gp-store submission hardening", () => {
 
     expect(result.status).toBe(422);
     expect(result.body.accepted).toBe(false);
-    expect(result.body.reason).toBe("crashed");
+    expect(result.body.reason).toBe("no_finish");
   });
 
   it("returns a stable guest token during bootstrap", async () => {

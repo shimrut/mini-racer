@@ -162,22 +162,18 @@
                 <div id="modal-main-view" class="modal-view" style="flex: 1; min-height: 85vh;">
                     <div class="modal-card-section" style="background: transparent; border: none; box-shadow: none; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2rem 0; width: 100%;">
                         <div class="pause-header" style="text-align: center; margin-top: 1rem; display: flex; flex-direction: column; align-items: center;">
-                            <div id="modal-crash-icon-container" style="display: flex; justify-content: center; align-items: center; margin-bottom: 0.5rem; width: 100%;"></div>
-                            <h2 id="modal-title" class="leaderboard-hero-track" style="margin-bottom: 1.5rem; font-size: 2rem; letter-spacing: 0.15em;">CRASHED</h2>
-                            <div class="combined-hero-time-group" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; flex-direction: column; align-items: center;">
-                                <span style="opacity: 0.6; text-transform: uppercase; font-size: 0.9rem; font-weight: 800; letter-spacing: 0.1em; margin-bottom: 0.25rem;">IMPACT</span>
-                                <div id="modal-msg" style="font-size: 3.5rem; font-weight: 900; font-style: italic; letter-spacing: 0.05em; line-height: 1; text-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--accent-color); text-transform: uppercase;">SPEED</div>
-                            </div>
+                            <h2 id="modal-title" class="leaderboard-hero-track" style="margin-bottom: 1.5rem; font-size: 2rem; letter-spacing: 0.15em;">NOTICE</h2>
+                            <p id="modal-msg" style="max-width: 30rem; margin: 0 auto 2rem;"></p>
                         </div>
                         <div class="combined-actions" style="display: flex; flex-direction: column; width: 100%; max-width: 320px; gap: 0.75rem; margin: 0 auto;">
-                            <button id="modal-crash-retry-btn" class="combined-action-btn combined-action-btn--primary" type="button" aria-label="Retry race" style="width: 100%; border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
-                                <span class="combined-action-btn-label">RETRY</span>
+                            <button id="modal-primary-btn" class="combined-action-btn combined-action-btn--primary" type="button" style="width: 100%; border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">CONTINUE</span>
                             </button>
-                            <button id="modal-crash-playlist-btn" class="combined-action-btn" type="button" aria-label="Change track" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
-                                <span class="combined-action-btn-label">CHANGE TRACK</span>
+                            <button id="modal-playlist-btn" class="combined-action-btn" type="button" aria-label="Change track" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">TRACKS</span>
                             </button>
-                            <button id="modal-crash-menu-btn" class="combined-action-btn" type="button" aria-label="Home" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
-                                <span class="combined-action-btn-label">HOME</span>
+                            <button id="modal-secondary-btn" class="combined-action-btn" type="button" style="width: 100%; background: rgba(51, 65, 85, 0.8); border-radius: 99px; font-size: 1.25rem; font-style: italic; font-weight: 900; letter-spacing: 0.1em;">
+                                <span class="combined-action-btn-label">BACK</span>
                             </button>
                         </div>
                     </div>
@@ -310,27 +306,27 @@
                         <p class="leaderboard-subhead settings-subsection-label">Racing</p>
                         <div class="modal-sheet-panel modal-sheet-panel--racing-group">
                             <div class="modal-sheet-settings-identity-head">
-                                <span id="settings-crash-auto-restart-heading"
-                                    class="modal-sheet-settings-identity-heading">Crash Auto-Restart: Off</span>
-                                <input type="checkbox" id="settings-crash-auto-restart-switch"
+                                <span id="settings-collision-auto-restart-heading"
+                                    class="modal-sheet-settings-identity-heading">Collision Auto-Restart: Off</span>
+                                <input type="checkbox" id="settings-collision-auto-restart-switch"
                                     class="modal-sheet-settings-switch"
-                                    aria-labelledby="settings-crash-auto-restart-heading" />
+                                    aria-labelledby="settings-collision-auto-restart-heading" />
                             </div>
                             <div class="modal-sheet-settings-row-divider"></div>
-                            <div class="modal-sheet-settings-row modal-sheet-settings-row--crash-delay">
-                                <span id="settings-crash-restart-delay-heading"
-                                    class="modal-sheet-settings-identity-heading">Crash Respawn Delay</span>
-                                <span id="settings-crash-restart-delay-value" class="modal-sheet-settings-delay-value"
+                            <div class="modal-sheet-settings-row modal-sheet-settings-row--collision-delay">
+                                <span id="settings-collision-restart-delay-heading"
+                                    class="modal-sheet-settings-identity-heading">Collision Restart Delay</span>
+                                <span id="settings-collision-restart-delay-value" class="modal-sheet-settings-delay-value"
                                     aria-live="polite">0.5 s</span>
                             </div>
-                            <div class="settings-crash-delay-control-row">
-                                <button type="button" id="settings-crash-restart-delay-minus"
-                                    class="settings-crash-delay-stepper" aria-label="Shorter throttle lock">-</button>
-                                <div id="settings-crash-restart-delay-meter" class="settings-crash-delay-meter"
-                                    role="slider" tabindex="0" aria-labelledby="settings-crash-restart-delay-heading"
+                            <div class="settings-collision-delay-control-row">
+                                <button type="button" id="settings-collision-restart-delay-minus"
+                                    class="settings-collision-delay-stepper" aria-label="Shorter throttle lock">-</button>
+                                <div id="settings-collision-restart-delay-meter" class="settings-collision-delay-meter"
+                                    role="slider" tabindex="0" aria-labelledby="settings-collision-restart-delay-heading"
                                     aria-valuemin="0" aria-valuemax="10" aria-valuenow="5"></div>
-                                <button type="button" id="settings-crash-restart-delay-plus"
-                                    class="settings-crash-delay-stepper" aria-label="Longer throttle lock">+</button>
+                                <button type="button" id="settings-collision-restart-delay-plus"
+                                    class="settings-collision-delay-stepper" aria-label="Longer throttle lock">+</button>
                             </div>
                         </div>
 

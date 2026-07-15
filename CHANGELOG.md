@@ -5,13 +5,15 @@ How the game works today: [README.md](README.md#how-the-game-works).
 ## 0.7
 
 - Fixed Android Reddit app sessions that could show only the car over a white background. Android now uses the reliable main-thread track renderer, while iOS and web clients retain the worker-rendered track path.
+- Every wall collision now costs momentum but lets the lap continue, including severe head-on impacts; the collision body follows the car's visible orientation so nose, side, and rear contact resolve consistently.
+- Removed the terminal crash screen. The former crash auto-restart setting is now optional `Collision Auto-Restart`, defaults off, and restarts the attempt after a scrape only when the player enables it.
 - Players can now preview and confirm a Reddit-attributed result comment from the finish screen, or share a verified best from the selected day in Standings. The server validates the result, derives the medal and copy, and prevents duplicate shares of the same time.
 - Daily post creation now reuses one canonical post per subreddit and challenge day and does not report success until its Mini Racer score thread is pinned. Older posts are repaired lazily so result sharing also works for available historical days.
 - Result sharing fails closed if Reddit cannot attribute the comment to the acting player; the app removes the fallback comment instead of silently posting it from the app account.
 - Guest profiles are now claimed atomically on first bootstrap and require their signed token for later profile reads, preference or identity changes, personalized standings, and submissions. Browsers that lose the credential rotate to a new guest identity once without clearing local settings or run data.
 - Player profiles now use individually expiring Redis records, so one active player no longer refreshes the retention window for every historical profile. Retired shared-hash records are ignored and expire naturally rather than being migrated over current preferences.
 - Standings now read Reddit's public subscriber count through one supported community-info request and cache it for five minutes, replacing repeated moderator/approved-user listings and redundant fallback calls on every leaderboard page.
-- Player car, trail, audio, music, and crash-restart preferences now persist in the existing Reddit Redis profile and are restored during startup, rather than relying only on browser storage that can reset after an app update.
+- Player car, trail, audio, music, and collision-restart preferences now persist in the existing Reddit Redis profile and are restored during startup, rather than relying only on browser storage that can reset after an app update.
 - The complete Vitest suite is now tracked in Git instead of being excluded by `.gitignore`.
 - Opening standings or Tracks from an older Reddit post now shows that challenge's original UTC date instead of incorrectly calling the post-bound track `Today`.
 - Standings now load every scored racer in 50-row pages as the list is scrolled, while the current player's rank and best time remain visible in the header regardless of which ranks have loaded; the initial rank-loading state is compact and aligned with that header.

@@ -605,53 +605,6 @@ export const dailyChallengeEngineMethods = {
     this.requestRender();
   },
 
-  restartDailyChallengeAfterCrash() {
-    if (!this.currentChallengeRun) return;
-
-    this.resetRunToTrackStart({
-      currentTime: this.currentTime,
-      relaunchDelay: this.crashRestartDelaySec,
-    });
-    this.hud.syncHud({ time: this.currentTime, speed: 0, force: true });
-    this.updateDailyChallengeHud();
-    this.requestRender();
-  },
-
-  handleDailyChallengeFailure(reason, crashImpact = null) {
-    if (!this.currentChallengeRun) return;
-
-    this.hud.setPauseVisible(false);
-    this.hud.setHudPersonalBestsOpenAllowed(true);
-
-    const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(
-      this.activeDailyChallenge?.id,
-    );
-
-    this.modal.showModal(
-      "CRASHED",
-      null,
-      {
-        isCrash: true,
-        impact: crashImpact,
-        currentTime: this.currentTime,
-        scoreboardSnapshot: existingScoreboardSnapshot,
-      },
-      {
-        ...createModalActions({
-          modalKind: "crash",
-          primaryActionLabel: "Retry",
-          primaryAction: () => this.restartDailyChallenge(),
-          secondaryActionLabel: "Done",
-          secondaryAction: () => this.reset(false),
-        }),
-        settingsAction: () => this.settings.openSettings(),
-        playlistAction: () => {
-          void this.openDailyChallengePlaylist();
-        },
-      },
-    );
-  },
-
   getInvalidWinDataReason(winData) {
     return getInvalidDailyChallengeWinReason(this, winData);
   },
@@ -939,13 +892,7 @@ export const dailyChallengeEngineMethods = {
   restartDailyChallenge() {
     if (!this.activeDailyChallenge) return;
 
-    if (this.status === "crashed") {
-      this.analytics?.trackRaceRestarted?.({
-        source: "manual_restart_after_crash",
-        trackKey: this.activeDailyChallenge.trackKey,
-        challengeId: this.activeDailyChallenge.id,
-      });
-    } else if (this.status === "won") {
+    if (this.status === "won") {
       this.analytics?.trackRaceRestarted?.({
         source: "improve_restart_after_win",
         trackKey: this.activeDailyChallenge.trackKey,

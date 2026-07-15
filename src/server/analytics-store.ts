@@ -98,6 +98,7 @@ const RACE_END_CAUSES = new Set([
 ]);
 
 const RESTART_SOURCES = new Set([
+    'auto_restart_after_collision',
     'auto_restart_after_crash',
     'manual_restart_after_crash',
     'improve_restart_after_win',
@@ -406,7 +407,10 @@ function buildSummaryDay(date: string, rawCounters: Record<string, string>): Ana
         else if (field === 'race_ended:cause:finish') day.raceEnds.finish = value;
         else if (field === 'race_ended:cause:unknown') day.raceEnds.unknown = value;
         else if (field === 'race_restarted') day.restarts.total = value;
-        else if (field === 'race_restarted:source:auto_restart_after_crash') day.restarts.autoCrash = value;
+        else if (
+            field === 'race_restarted:source:auto_restart_after_collision'
+            || field === 'race_restarted:source:auto_restart_after_crash'
+        ) day.restarts.autoCrash += value;
         else if (field === 'race_restarted:source:manual_restart_after_crash') day.restarts.manualCrash = value;
         else if (field === 'race_restarted:source:improve_restart_after_win') day.restarts.improveWin = value;
         else if (field === 'race_restarted:source:unknown') day.restarts.unknown = value;

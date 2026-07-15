@@ -1,6 +1,6 @@
 import { TRACKS } from '../track/tracks.js';
 import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/result-flow.js';
-import { createCrashMedalHeroIcon, createMedalIconSvg } from '../medals/medal-icon.js';
+import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 

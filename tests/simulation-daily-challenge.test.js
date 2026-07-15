@@ -85,8 +85,8 @@ describe('updateSimulation — daily challenge laps', () => {
     });
 });
 
-describe('updateSimulation — daily challenge crashes', () => {
-    it('fails non-budget daily on hard crash', () => {
+describe('updateSimulation — daily challenge wall impacts', () => {
+    it('keeps a daily challenge active after a severe wall impact', () => {
         const challengeRun = {
             objectiveType: 'single_lap_fastest',
             requiredLaps: 1,
@@ -103,9 +103,10 @@ describe('updateSimulation — daily challenge crashes', () => {
         });
 
         const events = updateSimulation(state, 1 / 60, CONFIG, TEST_TRACK, WALL_X5);
-        expect(events.challengeFailed).toBe(true);
-        expect(events.challengeFailureReason).toBe('Crash ended the challenge');
-        expect(state.status).toBe('crashed');
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape', severity: 1 });
+        expect(events.challengeFailed).toBe(false);
+        expect(events.challengeFailureReason).toBeNull();
+        expect(state.status).toBe('playing');
     });
 
 });

@@ -21,16 +21,16 @@ import {
     setCarProceduralAudioEnabled,
 } from './car-audio-preference.js';
 import {
-    getCrashAutoRestartAfterCrashEnabled,
-    setCrashAutoRestartAfterCrashEnabled,
-} from './crash-auto-restart-preference.js';
+    getCollisionAutoRestartEnabled,
+    setCollisionAutoRestartEnabled,
+} from './collision-auto-restart-preference.js';
 import {
-    CRASH_RESTART_DELAY_METER_TICKS,
-    CRASH_RESTART_DELAY_STEP,
-    crashRestartDelayToMeterStep,
-    getCrashRestartDelaySec,
-    setCrashRestartDelaySec,
-} from './crash-restart-delay-preference.js';
+    COLLISION_RESTART_DELAY_METER_TICKS,
+    COLLISION_RESTART_DELAY_STEP,
+    collisionRestartDelayToMeterStep,
+    getCollisionRestartDelaySec,
+    setCollisionRestartDelaySec,
+} from './collision-restart-delay-preference.js';
 import { userGesturePrepareCarEffects } from '../audio/car-effects-audio.js';
 import { userGesturePrepareMedalEffects } from '../audio/medal-effects-audio.js';
 import { userGesturePrepareMusic } from '../audio/procedural-music.js';
@@ -42,10 +42,10 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
-    constructor({ modal, onCrashAutoRestartChanged, onCrashRestartDelayChanged, onCarAudioChanged, onMusicChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
+    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
         this.modal = modal;
-        this.onCrashAutoRestartChanged = onCrashAutoRestartChanged;
-        this.onCrashRestartDelayChanged = onCrashRestartDelayChanged;
+        this.onCollisionAutoRestartChanged = onCollisionAutoRestartChanged;
+        this.onCollisionRestartDelayChanged = onCollisionRestartDelayChanged;
         this.onCarAudioChanged = onCarAudioChanged;
         this.onMusicChanged = onMusicChanged;
         this.onLeaderboardIdentityChanged = onLeaderboardIdentityChanged;
@@ -55,8 +55,8 @@ export class SettingsUi {
         this.refreshIdentityPanel();
         this.refreshCarAudioPanel();
         this.refreshMusicPanel();
-        this.refreshCrashAutoRestartPanel();
-        this.refreshCrashRestartDelayPanel();
+        this.refreshCollisionAutoRestartPanel();
+        this.refreshCollisionRestartDelayPanel();
     }
 
     get settingsModal() { return document.getElementById('settings-modal'); }
@@ -69,70 +69,70 @@ export class SettingsUi {
     get carAudioSwitch() { return document.getElementById('settings-car-audio-switch'); }
     get carAudioHeading() { return document.getElementById('settings-car-audio-heading'); }
     get carAudioDesc() { return document.getElementById('settings-car-audio-desc'); }
-    get crashAutoRestartSwitch() { return document.getElementById('settings-crash-auto-restart-switch'); }
-    get crashAutoRestartHeading() { return document.getElementById('settings-crash-auto-restart-heading'); }
-    get crashAutoRestartDesc() { return document.getElementById('settings-crash-auto-restart-desc'); }
-    get crashRestartDelayMeter() { return document.getElementById('settings-crash-restart-delay-meter'); }
-    get crashRestartDelayMinus() { return document.getElementById('settings-crash-restart-delay-minus'); }
-    get crashRestartDelayPlus() { return document.getElementById('settings-crash-restart-delay-plus'); }
-    get crashRestartDelayValue() { return document.getElementById('settings-crash-restart-delay-value'); }
-    get crashRestartDelayHeading() { return document.getElementById('settings-crash-restart-delay-heading'); }
-    get crashRestartDelayDesc() { return document.getElementById('settings-crash-restart-delay-desc'); }
+    get collisionAutoRestartSwitch() { return document.getElementById('settings-collision-auto-restart-switch'); }
+    get collisionAutoRestartHeading() { return document.getElementById('settings-collision-auto-restart-heading'); }
+    get collisionAutoRestartDesc() { return document.getElementById('settings-collision-auto-restart-desc'); }
+    get collisionRestartDelayMeter() { return document.getElementById('settings-collision-restart-delay-meter'); }
+    get collisionRestartDelayMinus() { return document.getElementById('settings-collision-restart-delay-minus'); }
+    get collisionRestartDelayPlus() { return document.getElementById('settings-collision-restart-delay-plus'); }
+    get collisionRestartDelayValue() { return document.getElementById('settings-collision-restart-delay-value'); }
+    get collisionRestartDelayHeading() { return document.getElementById('settings-collision-restart-delay-heading'); }
+    get collisionRestartDelayDesc() { return document.getElementById('settings-collision-restart-delay-desc'); }
     get musicSwitch() { return document.getElementById('settings-music-switch'); }
     get musicHeading() { return document.getElementById('settings-music-heading'); }
 
-    wireCrashRestartDelayMeter() {
-        const meter = this.crashRestartDelayMeter;
+    wireCollisionRestartDelayMeter() {
+        const meter = this.collisionRestartDelayMeter;
         if (!meter || meter.dataset.wired === '1') return;
         meter.dataset.wired = '1';
         meter.replaceChildren();
-        for (let i = 0; i < CRASH_RESTART_DELAY_METER_TICKS; i += 1) {
+        for (let i = 0; i < COLLISION_RESTART_DELAY_METER_TICKS; i += 1) {
             const tick = document.createElement('button');
             tick.type = 'button';
-            tick.className = 'settings-crash-delay-meter__tick';
+            tick.className = 'settings-collision-delay-meter__tick';
             tick.dataset.delayStep = String(i);
-            const labelSec = (i * CRASH_RESTART_DELAY_STEP).toFixed(1);
+            const labelSec = (i * COLLISION_RESTART_DELAY_STEP).toFixed(1);
             tick.setAttribute('aria-label', `${labelSec} seconds`);
             meter.appendChild(tick);
         }
         meter.addEventListener('click', (event) => {
             const tick = event.target.closest('[data-delay-step]');
             if (!tick || !meter.contains(tick)) return;
-            this.applyCrashRestartMeterStep(Number.parseInt(tick.dataset.delayStep, 10));
+            this.applyCollisionRestartMeterStep(Number.parseInt(tick.dataset.delayStep, 10));
         });
         meter.addEventListener('keydown', (event) => {
-            const step = crashRestartDelayToMeterStep(getCrashRestartDelaySec());
+            const step = collisionRestartDelayToMeterStep(getCollisionRestartDelaySec());
             let next = step;
             if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-                next = Math.min(CRASH_RESTART_DELAY_METER_TICKS - 1, step + 1);
+                next = Math.min(COLLISION_RESTART_DELAY_METER_TICKS - 1, step + 1);
             } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
                 next = Math.max(0, step - 1);
             } else if (event.key === 'End') {
-                next = CRASH_RESTART_DELAY_METER_TICKS - 1;
+                next = COLLISION_RESTART_DELAY_METER_TICKS - 1;
             } else if (event.key === 'Home') {
                 next = 0;
             } else {
                 return;
             }
             event.preventDefault();
-            this.applyCrashRestartMeterStep(next);
+            this.applyCollisionRestartMeterStep(next);
         });
 
-        this.crashRestartDelayMinus?.addEventListener('click', () => {
-            const s = crashRestartDelayToMeterStep(getCrashRestartDelaySec());
-            this.applyCrashRestartMeterStep(Math.max(0, s - 1));
+        this.collisionRestartDelayMinus?.addEventListener('click', () => {
+            const s = collisionRestartDelayToMeterStep(getCollisionRestartDelaySec());
+            this.applyCollisionRestartMeterStep(Math.max(0, s - 1));
         });
-        this.crashRestartDelayPlus?.addEventListener('click', () => {
-            const s = crashRestartDelayToMeterStep(getCrashRestartDelaySec());
-            this.applyCrashRestartMeterStep(Math.min(CRASH_RESTART_DELAY_METER_TICKS - 1, s + 1));
+        this.collisionRestartDelayPlus?.addEventListener('click', () => {
+            const s = collisionRestartDelayToMeterStep(getCollisionRestartDelaySec());
+            this.applyCollisionRestartMeterStep(Math.min(COLLISION_RESTART_DELAY_METER_TICKS - 1, s + 1));
         });
     }
 
-    applyCrashRestartMeterStep(stepIndex) {
-        const next = setCrashRestartDelaySec(stepIndex * CRASH_RESTART_DELAY_STEP);
-        this.onCrashRestartDelayChanged?.(next);
+    applyCollisionRestartMeterStep(stepIndex) {
+        const next = setCollisionRestartDelaySec(stepIndex * COLLISION_RESTART_DELAY_STEP);
+        this.onCollisionRestartDelayChanged?.(next);
         this.onPlayerPreferencesChanged?.();
-        this.refreshCrashRestartDelayPanel();
+        this.refreshCollisionRestartDelayPanel();
     }
 
     /**
@@ -199,15 +199,15 @@ export class SettingsUi {
                 this.refreshMusicPanel();
             });
         }
-        if (this.crashAutoRestartSwitch) {
-            this.crashAutoRestartSwitch.addEventListener('change', () => {
-                const next = setCrashAutoRestartAfterCrashEnabled(this.crashAutoRestartSwitch.checked);
-                this.onCrashAutoRestartChanged?.(next);
+        if (this.collisionAutoRestartSwitch) {
+            this.collisionAutoRestartSwitch.addEventListener('change', () => {
+                const next = setCollisionAutoRestartEnabled(this.collisionAutoRestartSwitch.checked);
+                this.onCollisionAutoRestartChanged?.(next);
                 this.onPlayerPreferencesChanged?.();
-                this.refreshCrashAutoRestartPanel();
+                this.refreshCollisionAutoRestartPanel();
             });
         }
-        this.wireCrashRestartDelayMeter();
+        this.wireCollisionRestartDelayMeter();
     }
 
     refreshIdentityPanel() {
@@ -297,27 +297,27 @@ export class SettingsUi {
         });
     }
 
-    refreshCrashAutoRestartPanel() {
+    refreshCollisionAutoRestartPanel() {
         this._syncBooleanSettingRow({
-            getValue: getCrashAutoRestartAfterCrashEnabled,
-            switchEl: this.crashAutoRestartSwitch,
-            headingEl: this.crashAutoRestartHeading,
-            descEl: this.crashAutoRestartDesc,
-            title: 'Crash Auto-Restart',
+            getValue: getCollisionAutoRestartEnabled,
+            switchEl: this.collisionAutoRestartSwitch,
+            headingEl: this.collisionAutoRestartHeading,
+            descEl: this.collisionAutoRestartDesc,
+            title: 'Collision Auto-Restart',
         });
     }
 
-    refreshCrashRestartDelayPanel() {
-        const sec = getCrashRestartDelaySec();
-        const step = crashRestartDelayToMeterStep(sec);
-        const maxStep = CRASH_RESTART_DELAY_METER_TICKS - 1;
+    refreshCollisionRestartDelayPanel() {
+        const sec = getCollisionRestartDelaySec();
+        const step = collisionRestartDelayToMeterStep(sec);
+        const maxStep = COLLISION_RESTART_DELAY_METER_TICKS - 1;
 
-        const meter = this.crashRestartDelayMeter;
+        const meter = this.collisionRestartDelayMeter;
         if (meter) {
             meter.setAttribute('aria-valuenow', String(step));
             meter.setAttribute('aria-valuemin', '0');
             meter.setAttribute('aria-valuemax', String(maxStep));
-            const ticks = meter.querySelectorAll('.settings-crash-delay-meter__tick');
+            const ticks = meter.querySelectorAll('.settings-collision-delay-meter__tick');
             ticks.forEach((tick, index) => {
                 tick.classList.toggle('is-filled', index <= step);
                 tick.classList.toggle('is-active', index === step);
@@ -325,20 +325,20 @@ export class SettingsUi {
         }
 
         const label = sec <= 0 ? 'Instant' : `${sec.toFixed(1)} s`;
-        if (this.crashRestartDelayValue) {
-            this.crashRestartDelayValue.textContent = label;
+        if (this.collisionRestartDelayValue) {
+            this.collisionRestartDelayValue.textContent = label;
         }
-        if (this.crashRestartDelayHeading) {
-            this.crashRestartDelayHeading.textContent = 'Crash Respawn Delay';
+        if (this.collisionRestartDelayHeading) {
+            this.collisionRestartDelayHeading.textContent = 'Collision Restart Delay';
         }
-        if (this.crashRestartDelayDesc) {
-            this.crashRestartDelayDesc.textContent = '';
+        if (this.collisionRestartDelayDesc) {
+            this.collisionRestartDelayDesc.textContent = '';
         }
-        if (this.crashRestartDelayMinus) {
-            this.crashRestartDelayMinus.disabled = step <= 0;
+        if (this.collisionRestartDelayMinus) {
+            this.collisionRestartDelayMinus.disabled = step <= 0;
         }
-        if (this.crashRestartDelayPlus) {
-            this.crashRestartDelayPlus.disabled = step >= maxStep;
+        if (this.collisionRestartDelayPlus) {
+            this.collisionRestartDelayPlus.disabled = step >= maxStep;
         }
     }
 
@@ -379,11 +379,11 @@ export class SettingsUi {
         this.refreshIdentityPanel();
         this.refreshCarAudioPanel();
         this.refreshMusicPanel();
-        this.refreshCrashAutoRestartPanel();
-        this.wireCrashRestartDelayMeter();
-        this.refreshCrashRestartDelayPanel();
-        this.onCrashAutoRestartChanged?.(getCrashAutoRestartAfterCrashEnabled());
-        this.onCrashRestartDelayChanged?.(getCrashRestartDelaySec());
+        this.refreshCollisionAutoRestartPanel();
+        this.wireCollisionRestartDelayMeter();
+        this.refreshCollisionRestartDelayPanel();
+        this.onCollisionAutoRestartChanged?.(getCollisionAutoRestartEnabled());
+        this.onCollisionRestartDelayChanged?.(getCollisionRestartDelaySec());
         void this.syncIdentityBootstrap();
 
         openModalElement(this.settingsModal, () => this.settingsModal.classList.add('active'));

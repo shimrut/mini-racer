@@ -36,6 +36,34 @@ const STRAIGHT_TRACK = {
     ],
 };
 
+const SCRAPE_TRACK = {
+    ...STRAIGHT_TRACK,
+    startPos: { x: 4, y: -35 },
+    startAngle: 1.48,
+    inner: [
+        { x: 5, y: -25 },
+        { x: 20, y: -25 },
+        { x: 20, y: -10 },
+        { x: 5, y: -10 },
+    ],
+};
+
+const HEAD_ON_WALL_TRACK = {
+    ...STRAIGHT_TRACK,
+    startPos: { x: 0, y: 0 },
+    startAngle: 0,
+    startLine: {
+        p1: { x: 10, y: -20 },
+        p2: { x: 10, y: 20 },
+    },
+    inner: [
+        { x: 5, y: -20 },
+        { x: 20, y: -20 },
+        { x: 20, y: 20 },
+        { x: 5, y: 20 },
+    ],
+};
+
 describe('server replay validator', () => {
     it('computes a finish time from replay inputs', () => {
         const result = validateDailyGpReplay({
@@ -80,6 +108,41 @@ describe('server replay validator', () => {
                 ],
             },
         })).toBe(null);
+    });
+
+    it('accepts a finished replay after a momentum-losing wall scrape', () => {
+        const clean = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: { ...STRAIGHT_TRACK, startPos: SCRAPE_TRACK.startPos, startAngle: SCRAPE_TRACK.startAngle },
+            replay: {
+                inputs: [{ frames: 300, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+        const scraped = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: SCRAPE_TRACK,
+            replay: {
+                inputs: [{ frames: 300, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(clean.ok).toBe(true);
+        expect(scraped.ok).toBe(true);
+        expect(scraped.run.bestTimeSec).toBeGreaterThan(clean.run.bestTimeSec);
+    });
+
+    it('does not classify a replay with a 150+ KPH wall impact as crashed', () => {
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: HEAD_ON_WALL_TRACK,
+            replay: {
+                inputs: [{ frames: 300, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(outcome.ok).toBe(false);
+        expect(outcome.failure.reason).not.toBe('crashed');
+        expect(outcome.failure.status).toBe('playing');
     });
 
     it('freezes exactly the recorded relaunch-delay frames (no off-by-one input shift)', () => {

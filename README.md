@@ -46,7 +46,8 @@ The Garage lets players change how their car looks without changing handling.
 
 - Every attempt is a single lap.
 - Crossing the finish line completes the run.
-- Crashing ends the attempt.
+- Every wall collision becomes a momentum-losing scrape, so wall contact costs time but never ends the attempt.
+- `Collision Auto-Restart` is optional and off by default; enabling it starts a fresh attempt after the first scrape instead of continuing the current lap.
 - If a completed lap is better than your previous best on that track, it becomes your new best time.
 
 ## Progress and competition

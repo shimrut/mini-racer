@@ -1,8 +1,7 @@
 import { clamp, KPH_PER_WORLD_UNIT } from '../car/handling.js';
-import { segmentsIntersect } from '../config.js';
+import { getIntersection, segmentsIntersect } from '../config.js';
 import {
     handleFinishCrossing,
-    handleHardCrash,
     resolveRunPolicy
 } from './run-policy.js';
 
@@ -15,6 +14,7 @@ const _events = {
     challengeProgressLaps: 0,
     challengeFailed: false,
     challengeFailureReason: null,
+    wallImpact: null,
     crashImpact: null,
     crashEndedRun: false,
     checkpointPassed: null
@@ -28,6 +28,7 @@ function resetEvents() {
     _events.challengeProgressLaps = 0;
     _events.challengeFailed = false;
     _events.challengeFailureReason = null;
+    _events.wallImpact = null;
     _events.crashImpact = null;
     _events.crashEndedRun = false;
     _events.checkpointPassed = null;
@@ -62,55 +63,404 @@ function createSparkParticles(pos, count, sparkColor) {
     return particles;
 }
 
-function checkWallCollision(p1, p2, wallSegments, carRadius) {
-    if (!wallSegments || wallSegments.length === 0) return false;
+const CONTACT_EPSILON = 1e-9;
+const MAX_CONTACT_RESOLUTION_PASSES = 12;
 
-    const carRadiusSq = carRadius * carRadius;
+function getClosestPointOnSegment(point, segment) {
+    const ax = point.x - segment.start.x;
+    const ay = point.y - segment.start.y;
+    const rawParam = segment.lenSq > 0
+        ? (ax * segment.dx + ay * segment.dy) / segment.lenSq
+        : 0;
+    const param = clamp(rawParam, 0, 1);
+    return {
+        x: segment.start.x + param * segment.dx,
+        y: segment.start.y + param * segment.dy,
+        param
+    };
+}
 
-    for (let i = 0; i < wallSegments.length; i++) {
-        const segment = wallSegments[i];
+function createSegment(start, end) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    return { start, end, dx, dy, lenSq: dx * dx + dy * dy };
+}
 
-        if (segmentsIntersect(p1, p2, segment.start, segment.end)) return true;
+function createCarAxis(center, angle, halfLength) {
+    const x = Math.cos(angle) * halfLength;
+    const y = Math.sin(angle) * halfLength;
+    return createSegment(
+        { x: center.x - x, y: center.y - y },
+        { x: center.x + x, y: center.y + y }
+    );
+}
 
-        const ax = p2.x - segment.start.x;
-        const ay = p2.y - segment.start.y;
-        let param = -1;
-        if (segment.lenSq !== 0) {
-            param = (ax * segment.dx + ay * segment.dy) / segment.lenSq;
+function getClosestSegmentPair(first, second) {
+    const intersection = getIntersection(first.start, first.end, second.start, second.end);
+    if (intersection) {
+        return { first: intersection, second: intersection, distance: 0 };
+    }
+
+    const candidates = [];
+    const firstStartToSecond = getClosestPointOnSegment(first.start, second);
+    candidates.push({ first: first.start, second: firstStartToSecond });
+    const firstEndToSecond = getClosestPointOnSegment(first.end, second);
+    candidates.push({ first: first.end, second: firstEndToSecond });
+    const secondStartToFirst = getClosestPointOnSegment(second.start, first);
+    candidates.push({ first: secondStartToFirst, second: second.start });
+    const secondEndToFirst = getClosestPointOnSegment(second.end, first);
+    candidates.push({ first: secondEndToFirst, second: second.end });
+
+    let selected = null;
+    for (let index = 0; index < candidates.length; index++) {
+        const candidate = candidates[index];
+        const dx = candidate.first.x - candidate.second.x;
+        const dy = candidate.first.y - candidate.second.y;
+        const distanceSq = dx * dx + dy * dy;
+        if (!selected || distanceSq < selected.distanceSq - CONTACT_EPSILON) {
+            selected = { ...candidate, distanceSq };
         }
+    }
+    return { ...selected, distance: Math.sqrt(selected.distanceSq) };
+}
 
-        let xx;
-        let yy;
-        if (param < 0) {
-            xx = segment.start.x;
-            yy = segment.start.y;
-        } else if (param > 1) {
-            xx = segment.end.x;
-            yy = segment.end.y;
-        } else {
-            xx = segment.start.x + param * segment.dx;
-            yy = segment.start.y + param * segment.dy;
+function getSafeContactNormal(safePoint, segment, wallPoint, bodyPoint, distance) {
+    if (distance > CONTACT_EPSILON) {
+        let normalX = (bodyPoint.x - wallPoint.x) / distance;
+        let normalY = (bodyPoint.y - wallPoint.y) / distance;
+        const safeSide = (safePoint.x - wallPoint.x) * normalX + (safePoint.y - wallPoint.y) * normalY;
+        if (safeSide < 0) {
+            normalX *= -1;
+            normalY *= -1;
         }
+        return { x: normalX, y: normalY };
+    }
 
-        const dx = p2.x - xx;
-        const dy = p2.y - yy;
-        if ((dx * dx + dy * dy) < carRadiusSq) {
-            return true;
+    const segmentLength = Math.sqrt(segment.lenSq);
+    const startDistance = Math.hypot(wallPoint.x - segment.start.x, wallPoint.y - segment.start.y);
+    const endDistance = Math.hypot(wallPoint.x - segment.end.x, wallPoint.y - segment.end.y);
+    const atEndpoint = startDistance <= 1e-7 || endDistance <= 1e-7;
+
+    if (atEndpoint) {
+        let dx = safePoint.x - wallPoint.x;
+        let dy = safePoint.y - wallPoint.y;
+        let length = Math.hypot(dx, dy);
+        if (length < CONTACT_EPSILON) {
+            dx = bodyPoint.x - wallPoint.x;
+            dy = bodyPoint.y - wallPoint.y;
+            length = Math.hypot(dx, dy);
+        }
+        if (length >= CONTACT_EPSILON) {
+            return { x: dx / length, y: dy / length };
         }
     }
 
-    return false;
+    if (segmentLength < CONTACT_EPSILON) return { x: 1, y: 0 };
+    let normalX = -segment.dy / segmentLength;
+    let normalY = segment.dx / segmentLength;
+    const side = (safePoint.x - wallPoint.x) * normalX + (safePoint.y - wallPoint.y) * normalY;
+    if (side < 0) {
+        normalX *= -1;
+        normalY *= -1;
+    }
+    return { x: normalX, y: normalY };
 }
 
-function getCollisionCandidates(p1, p2, collisionData, carRadius) {
+function getBodyPointVelocity(velocity, angularVelocity, bodyOffset) {
+    return {
+        x: velocity.x - angularVelocity * bodyOffset.y,
+        y: velocity.y + angularVelocity * bodyOffset.x
+    };
+}
+
+function buildContact({
+    segment,
+    segmentIndex,
+    wallPoint,
+    bodyAxisPoint,
+    bodyAxisOffset,
+    safePoint,
+    distance,
+    penetration,
+    velocity,
+    angularVelocity,
+    carRadius,
+    swept = false
+}) {
+    const normal = getSafeContactNormal(safePoint, segment, wallPoint, bodyAxisPoint, distance);
+    const bodyOffset = {
+        x: bodyAxisOffset.x - normal.x * carRadius,
+        y: bodyAxisOffset.y - normal.y * carRadius
+    };
+    const contactVelocity = getBodyPointVelocity(velocity, angularVelocity, bodyOffset);
+    const normalVelocity = contactVelocity.x * normal.x + contactVelocity.y * normal.y;
+    return {
+        segment,
+        segmentIndex,
+        closestPoint: wallPoint,
+        wallPoint,
+        bodyAxisOffset,
+        bodyOffset,
+        tangent: { x: -normal.y, y: normal.x },
+        normal,
+        distance,
+        penetration,
+        inwardSpeed: Math.max(0, -normalVelocity),
+        swept
+    };
+}
+
+function findSegmentContact({
+    safeCenter,
+    nextCenter,
+    angle,
+    velocity,
+    angularVelocity,
+    segment,
+    segmentIndex,
+    carRadius,
+    halfLength,
+    includeSweep
+}) {
+    const safeAxis = createCarAxis(safeCenter, angle, halfLength);
+    const nextAxis = createCarAxis(nextCenter, angle, halfLength);
+    const pair = getClosestSegmentPair(nextAxis, segment);
+
+    if (pair.distance < carRadius) {
+        let safePoint = getClosestPointOnSegment(pair.second, safeAxis);
+        if (Math.hypot(safePoint.x - pair.second.x, safePoint.y - pair.second.y) < CONTACT_EPSILON) {
+            safePoint = safeCenter;
+        }
+        return buildContact({
+            segment,
+            segmentIndex,
+            wallPoint: pair.second,
+            bodyAxisPoint: pair.first,
+            bodyAxisOffset: {
+                x: pair.first.x - nextCenter.x,
+                y: pair.first.y - nextCenter.y
+            },
+            safePoint,
+            distance: pair.distance,
+            penetration: clamp(carRadius - pair.distance, 0, carRadius),
+            velocity,
+            angularVelocity,
+            carRadius
+        });
+    }
+
+    if (!includeSweep) return null;
+    const headingX = Math.cos(angle);
+    const headingY = Math.sin(angle);
+    const offsets = halfLength > CONTACT_EPSILON ? [halfLength, 0, -halfLength] : [0];
+    let selected = null;
+
+    for (let offsetIndex = 0; offsetIndex < offsets.length; offsetIndex++) {
+        const offset = offsets[offsetIndex];
+        const bodyAxisOffset = { x: headingX * offset, y: headingY * offset };
+        const start = {
+            x: safeCenter.x + bodyAxisOffset.x,
+            y: safeCenter.y + bodyAxisOffset.y
+        };
+        const end = {
+            x: nextCenter.x + bodyAxisOffset.x,
+            y: nextCenter.y + bodyAxisOffset.y
+        };
+        const intersection = getIntersection(start, end, segment.start, segment.end);
+        if (!intersection) continue;
+        const contact = buildContact({
+            segment,
+            segmentIndex,
+            wallPoint: intersection,
+            bodyAxisPoint: intersection,
+            bodyAxisOffset,
+            safePoint: start,
+            distance: 0,
+            penetration: carRadius,
+            velocity,
+            angularVelocity,
+            carRadius,
+            swept: true
+        });
+        if (!selected || contact.inwardSpeed > selected.inwardSpeed + CONTACT_EPSILON) {
+            selected = contact;
+        }
+    }
+    return selected;
+}
+
+function selectWallContact(contacts) {
+    let selected = null;
+    for (let index = 0; index < contacts.length; index++) {
+        const contact = contacts[index];
+        if (
+            !selected
+            || contact.inwardSpeed > selected.inwardSpeed + CONTACT_EPSILON
+            || (
+                Math.abs(contact.inwardSpeed - selected.inwardSpeed) <= CONTACT_EPSILON
+                && (
+                    contact.penetration > selected.penetration + CONTACT_EPSILON
+                    || (
+                        Math.abs(contact.penetration - selected.penetration) <= CONTACT_EPSILON
+                        && contact.segmentIndex < selected.segmentIndex
+                    )
+                )
+            )
+        ) selected = contact;
+    }
+    return selected;
+}
+
+function findWallContacts({
+    safeCenter,
+    nextCenter,
+    angle,
+    velocity,
+    angularVelocity,
+    wallSegments,
+    carRadius,
+    halfLength,
+    includeSweep = true
+}) {
+    if (!wallSegments || wallSegments.length === 0) return [];
+
+    const contacts = [];
+
+    for (let i = 0; i < wallSegments.length; i++) {
+        const segment = wallSegments[i];
+        const contact = findSegmentContact({
+            safeCenter,
+            nextCenter,
+            angle,
+            velocity,
+            angularVelocity,
+            segment,
+            segmentIndex: i,
+            carRadius,
+            halfLength,
+            includeSweep
+        });
+        if (contact) contacts.push(contact);
+    }
+    return contacts;
+}
+
+function resolveWallContactPosition({
+    state,
+    primaryContact,
+    wallSegments,
+    safeCenter,
+    nextCenter,
+    angle,
+    carRadius,
+    halfLength,
+    padding
+}) {
+    state.pos.x = nextCenter.x;
+    state.pos.y = nextCenter.y;
+    if (primaryContact.swept) {
+        state.pos.x = primaryContact.wallPoint.x
+            + primaryContact.normal.x * (carRadius + padding)
+            - primaryContact.bodyAxisOffset.x;
+        state.pos.y = primaryContact.wallPoint.y
+            + primaryContact.normal.y * (carRadius + padding)
+            - primaryContact.bodyAxisOffset.y;
+    }
+
+    for (let pass = 0; pass < MAX_CONTACT_RESOLUTION_PASSES; pass++) {
+        const overlaps = findWallContacts({
+            safeCenter,
+            nextCenter: state.pos,
+            angle,
+            velocity: state.velocity,
+            angularVelocity: state.angularVelocity,
+            wallSegments,
+            carRadius,
+            halfLength,
+            includeSweep: false
+        });
+        if (overlaps.length === 0) break;
+        let deepest = overlaps[0];
+        for (let index = 1; index < overlaps.length; index++) {
+            const contact = overlaps[index];
+            if (
+                contact.penetration > deepest.penetration + CONTACT_EPSILON
+                || (
+                    Math.abs(contact.penetration - deepest.penetration) <= CONTACT_EPSILON
+                    && contact.segmentIndex < deepest.segmentIndex
+                )
+            ) deepest = contact;
+        }
+        state.pos.x += deepest.normal.x * (deepest.penetration + padding);
+        state.pos.y += deepest.normal.y * (deepest.penetration + padding);
+    }
+}
+
+function suppressInwardContactMotion(state, contacts) {
+    for (let index = 0; index < contacts.length; index++) {
+        const contact = contacts[index];
+        const centerNormalVelocity = state.velocity.x * contact.normal.x + state.velocity.y * contact.normal.y;
+        if (centerNormalVelocity < 0) {
+            state.velocity.x -= centerNormalVelocity * contact.normal.x;
+            state.velocity.y -= centerNormalVelocity * contact.normal.y;
+        }
+        const rotationalNormalVelocity = state.angularVelocity * (
+            contact.bodyOffset.x * contact.normal.y - contact.bodyOffset.y * contact.normal.x
+        );
+        if (rotationalNormalVelocity < 0) state.angularVelocity = 0;
+    }
+    state.cachedSpeed = Math.hypot(state.velocity.x, state.velocity.y);
+}
+
+function resolveWallScrape(state, contact, config) {
+    if (contact.inwardSpeed <= 0) return null;
+
+    const referenceImpactKph = Math.max(1, Number(config.wallScrapeReferenceImpactKph) || 150);
+    const impactKph = contact.inwardSpeed * KPH_PER_WORLD_UNIT;
+    const speedSeverity = clamp(impactKph / referenceImpactKph, 0, 1);
+    const depthSeverity = clamp(contact.penetration / config.carRadius, 0, 1);
+    const speedWeight = clamp(Number(config.wallScrapeSpeedSeverityWeight) || 0.8, 0, 1);
+    const depthWeight = clamp(Number(config.wallScrapeDepthSeverityWeight) || 0.2, 0, 1);
+    const totalWeight = Math.max(0.001, speedWeight + depthWeight);
+    const severity = clamp(
+        (speedSeverity * speedWeight + depthSeverity * depthWeight) / totalWeight,
+        0,
+        1
+    );
+
+    const centerNormalVelocity = state.velocity.x * contact.normal.x + state.velocity.y * contact.normal.y;
+    const tangentX = state.velocity.x - centerNormalVelocity * contact.normal.x;
+    const tangentY = state.velocity.y - centerNormalVelocity * contact.normal.y;
+
+    const maxRetention = clamp(Number(config.wallScrapeMaxTangentialRetention) || 0.85, 0, 1);
+    const minRetention = clamp(Number(config.wallScrapeMinTangentialRetention) || 0.35, 0, maxRetention);
+    const tangentRetention = maxRetention + (minRetention - maxRetention) * severity;
+    const minBounce = clamp(Number(config.wallScrapeMinBounce) || 0.05, 0, 1);
+    const maxBounce = clamp(Number(config.wallScrapeMaxBounce) || 0.15, minBounce, 1);
+    const bounce = minBounce + (maxBounce - minBounce) * severity;
+    const outwardSpeed = Math.max(0, centerNormalVelocity, contact.inwardSpeed * bounce);
+
+    state.velocity.x = tangentX * tangentRetention + contact.normal.x * outwardSpeed;
+    state.velocity.y = tangentY * tangentRetention + contact.normal.y * outwardSpeed;
+    const rotationalNormalVelocity = state.angularVelocity * (
+        contact.bodyOffset.x * contact.normal.y - contact.bodyOffset.y * contact.normal.x
+    );
+    if (rotationalNormalVelocity < 0) state.angularVelocity = 0;
+    state.cachedSpeed = Math.hypot(state.velocity.x, state.velocity.y);
+    state.wallImpactCooldownRemaining = Math.max(0, Number(config.wallImpactCooldownSec) || 0.12);
+
+    return { impactKph, severity };
+}
+
+function getCollisionCandidates(p1, p2, collisionData, collisionExtent) {
     if (!collisionData) return [];
     if (Array.isArray(collisionData)) return collisionData;
     if (!collisionData.cells || !collisionData.segments) return [];
 
-    const expandedMinX = Math.min(p1.x, p2.x) - carRadius;
-    const expandedMaxX = Math.max(p1.x, p2.x) + carRadius;
-    const expandedMinY = Math.min(p1.y, p2.y) - carRadius;
-    const expandedMaxY = Math.max(p1.y, p2.y) + carRadius;
+    const expandedMinX = Math.min(p1.x, p2.x) - collisionExtent;
+    const expandedMaxX = Math.max(p1.x, p2.x) + collisionExtent;
+    const expandedMinY = Math.min(p1.y, p2.y) - collisionExtent;
+    const expandedMaxY = Math.max(p1.y, p2.y) + collisionExtent;
     const startCellX = Math.floor(expandedMinX / collisionData.cellSize);
     const endCellX = Math.floor(expandedMaxX / collisionData.cellSize);
     const startCellY = Math.floor(expandedMinY / collisionData.cellSize);
@@ -163,6 +513,14 @@ export function updateSimulation(
     const runPolicy = resolveRunPolicy(state);
 
     if (state.status === 'playing') {
+        state.wallImpactCooldownRemaining = Math.max(
+            0,
+            (Number(state.wallImpactCooldownRemaining) || 0) - dt
+        );
+        state.wallContactReleaseRemaining = Math.max(
+            0,
+            (Number(state.wallContactReleaseRemaining) || 0) - dt
+        );
         if (state.relaunchDelayRemaining > 0) {
             state.relaunchDelayRemaining = Math.max(0, state.relaunchDelayRemaining - dt);
         } else {
@@ -280,12 +638,26 @@ export function updateSimulation(
             _nextPos.x = state.pos.x + state.velocity.x * dt;
             _nextPos.y = state.pos.y + state.velocity.y * dt;
 
-            const hitWall = checkWallCollision(
-                state.pos,
+            const carRadius = Math.max(0.001, Number(config.carRadius) || 0.275);
+            const halfLength = Math.max(0, Number(config.carCollisionHalfLength) || 0);
+            const safeCenter = { x: state.pos.x, y: state.pos.y };
+            const candidateSegments = getCollisionCandidates(
+                safeCenter,
                 _nextPos,
-                getCollisionCandidates(state.pos, _nextPos, state.collisionHash || collisionSegments, config.carRadius),
-                config.carRadius
+                state.collisionHash || collisionSegments,
+                carRadius + halfLength
             );
+            const wallContacts = findWallContacts({
+                safeCenter,
+                nextCenter: _nextPos,
+                angle: state.angle,
+                velocity: state.velocity,
+                angularVelocity: state.angularVelocity,
+                wallSegments: candidateSegments,
+                carRadius,
+                halfLength
+            });
+            const wallContact = selectWallContact(wallContacts);
 
             const checkpoints = currentTrack.checkpoints || [];
             if (state.nextCheckpointIndex < checkpoints.length) {
@@ -312,26 +684,48 @@ export function updateSimulation(
                 state.nextCheckpointIndex = 0;
             }
 
-            if (hitWall) {
-                const impact = Math.round(state.cachedSpeed * 20);
-                _events.crashImpact = impact;
-
-                if (state.cachedSpeed > config.crashSpeed) {
-                    const particleCount = state.frameSkip > 0 ? 10 : 20;
-                    const crashSparks = createSparkParticles(state.pos, particleCount * 5, config.sparkColor);
-                    for (let j = 0; j < crashSparks.length; j++) state.particles.push(crashSparks[j]);
-                    Object.assign(_events, handleHardCrash(state, runPolicy, checkpoints.length));
+            if (wallContact) {
+                const padding = Math.max(0, Number(config.wallContactPadding) || 0.001);
+                resolveWallContactPosition({
+                    state,
+                    primaryContact: wallContact,
+                    wallSegments: candidateSegments,
+                    safeCenter,
+                    nextCenter: _nextPos,
+                    angle: state.angle,
+                    carRadius,
+                    halfLength,
+                    padding
+                });
+                if (state.status === 'won') {
+                    // A valid finish takes precedence over collision penalties and feedback.
                 } else {
-                    state.velocity.x *= -0.5;
-                    state.velocity.y *= -0.5;
-                    state.cachedSpeed = Math.sqrt(state.velocity.x ** 2 + state.velocity.y ** 2);
-                    const particleCount = state.frameSkip > 0 ? 3 : 5;
-                    const bounceSparks = createSparkParticles(state.pos, particleCount * 5, config.sparkColor);
-                    for (let j = 0; j < bounceSparks.length; j++) state.particles.push(bounceSparks[j]);
+                    const suppressRepeat = Boolean(state.wallContactActive)
+                        || Number(state.wallImpactCooldownRemaining) > 0;
+                    const scrape = suppressRepeat ? null : resolveWallScrape(state, wallContact, config);
+                    if (suppressRepeat) suppressInwardContactMotion(state, wallContacts);
+                    if (scrape) {
+                        _events.wallImpact = {
+                            kind: 'scrape',
+                            impactKph: Math.round(scrape.impactKph),
+                            severity: scrape.severity
+                        };
+                        const particleCount = state.frameSkip > 0 ? 2 : 3;
+                        const scrapeSparks = createSparkParticles(state.pos, particleCount * 5, config.sparkColor);
+                        for (let j = 0; j < scrapeSparks.length; j++) state.particles.push(scrapeSparks[j]);
+                    }
                 }
+                state.wallContactActive = true;
+                state.wallContactReleaseRemaining = Math.max(
+                    0,
+                    Number(config.wallContactReleaseSec) || 0.12
+                );
             } else {
                 state.pos.x = _nextPos.x;
                 state.pos.y = _nextPos.y;
+                if (state.wallContactReleaseRemaining <= 0) {
+                    state.wallContactActive = false;
+                }
             }
 
             const vx = Math.cos(state.angle);

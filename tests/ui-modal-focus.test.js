@@ -27,22 +27,20 @@ describe('modal preferred focus', () => {
         expect(getModalPreferredFocusTarget.call(context)).toBe(resume);
     });
 
-    it('focuses retry/improve on crash and win', () => {
+    it('focuses improve on win', () => {
         const restart = visibleButton('combined-restart');
-        const crashContext = {
-            _modalKind: 'crash',
+        const winContext = {
+            _modalKind: 'win',
             modalResumeBtn: visibleButton('resume'),
             combinedRestartBtn: restart,
         };
-        const winContext = { ...crashContext, _modalKind: 'win' };
 
-        expect(getModalPreferredFocusTarget.call(crashContext)).toBe(restart);
         expect(getModalPreferredFocusTarget.call(winContext)).toBe(restart);
     });
 
     it('does not fall back to pause restart when combined restart is hidden', () => {
         const context = {
-            _modalKind: 'crash',
+            _modalKind: 'win',
             modalResumeBtn: visibleButton('resume'),
             combinedRestartBtn: hiddenButton('combined-restart'),
         };

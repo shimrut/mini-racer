@@ -185,15 +185,6 @@ export function buildModalStatsPlan(lapData) {
         };
     }
 
-    if (lapData.isCrash) {
-        return {
-            kind: 'crash',
-            display: 'flex',
-            hasRuns: '',
-            args: ['Impact', `${lapData.impact} KPH`, 'modal-stat-value--crash']
-        };
-    }
-
     if (lapData.isNewBest) {
         return {
             kind: 'win',
