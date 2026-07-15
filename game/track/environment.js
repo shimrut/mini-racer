@@ -24,6 +24,17 @@ export function shouldAutoRetryVerificationQueue() {
   return !isLocalEnvironment();
 }
 
+/**
+ * Android's embedded Reddit WebView can advertise OffscreenCanvas support
+ * without reliably presenting the worker-rendered canvas. Keep that client on
+ * the main-thread track renderer; iOS and web clients retain the worker path.
+ */
+export function shouldUseTrackLayerWorker(
+  clientName = globalThis.devvit?.context?.client?.name,
+) {
+  return clientName !== "ANDROID";
+}
+
 export function readCanvasDevicePixelRatio() {
   if (typeof window === "undefined") return 1;
   return window.devicePixelRatio || 1;

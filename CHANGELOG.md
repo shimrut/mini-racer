@@ -4,6 +4,7 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Fixed Android Reddit app sessions that could show only the car over a white background. Android now uses the reliable main-thread track renderer, while iOS and web clients retain the worker-rendered track path.
 - Players can now preview and confirm a Reddit-attributed result comment from the finish screen, or share a verified best from the selected day in Standings. The server validates the result, derives the medal and copy, and prevents duplicate shares of the same time.
 - Daily post creation now reuses one canonical post per subreddit and challenge day and does not report success until its Mini Racer score thread is pinned. Older posts are repaired lazily so result sharing also works for available historical days.
 - Result sharing fails closed if Reddit cannot attribute the comment to the acting player; the app removes the fallback comment instead of silently posting it from the app account.

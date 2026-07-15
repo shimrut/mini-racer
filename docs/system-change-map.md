@@ -44,6 +44,7 @@ flowchart LR
 - `game.html` provides the full DOM contract: canvases, HUD, overlays, settings modal, garage modal, results modal, and playlist modal.
 - `game/index.js` boots the app and instantiates `RealTimeRacer`.
 - `game/engine.js` is the top-level orchestrator. It creates the feature modules, owns current run state, and wires together UI, simulation, track rendering, audio, storage, and network flows.
+- The static track and the moving car use separate canvas layers. Devvit's Android client keeps the track layer on the main thread because its embedded WebView can expose the worker APIs without reliably presenting that canvas; iOS and web clients retain the worker renderer when supported.
 
 ### Gameplay Loop
 

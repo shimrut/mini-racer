@@ -13,6 +13,7 @@ import { AnalyticsService } from "./player/service.js";
 import {
   detectDevicePerformance,
   shouldExposeDebugHooks,
+  shouldUseTrackLayerWorker,
   readCanvasDevicePixelRatio,
 } from "./track/environment.js";
 import { ReplayRecorder } from "./race/replay.js";
@@ -65,7 +66,7 @@ export class RealTimeRacer {
     this.container = document.getElementById("game-container");
     this.isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
     this.trackLayer = new TrackLayerRenderer(this.trackLayerCanvas);
-    this.trackLayer.setup();
+    this.trackLayer.setup({ allowWorker: shouldUseTrackLayerWorker() });
     this.viewportWidth = 0;
     this.viewportHeight = 0;
     this.viewportDevicePixelRatio = 1;

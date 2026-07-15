@@ -47,10 +47,12 @@ export class TrackLayerRenderer {
    * falls back to a regular 2D context on the main thread.
    * Must be called once during engine construction.
    *
+   * @param {{allowWorker?: boolean}} [options]
    */
-  setup() {
+  setup({ allowWorker = true } = {}) {
     const canUseOffscreenWorker = Boolean(
-      this.canvas &&
+      allowWorker &&
+        this.canvas &&
         typeof Worker !== "undefined" &&
         typeof this.canvas.transferControlToOffscreen === "function" &&
         typeof createImageBitmap === "function",

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CONFIG } from "../game/config.js";
 import { RealTimeRacer } from "../game/engine.js";
 import { RingBuffer } from "../game/race/ring-buffer.js";
+import { shouldUseTrackLayerWorker } from "../game/track/environment.js";
 import { TrackLayerRenderer } from "../game/track/layer.js";
 
 function createRenderContext() {
@@ -183,6 +184,50 @@ describe("RealTimeRacer track layer renderer", () => {
     } finally {
       global.Worker = originalWorker;
       global.createImageBitmap = originalCreateImageBitmap;
+    }
+  });
+
+  it("keeps the Android Reddit client on the main-thread track layer", () => {
+    const fallbackContext = { id: "2d-context" };
+    const transferControlToOffscreen = vi.fn();
+    const getContext = vi.fn(() => fallbackContext);
+    const workerCtor = vi.fn();
+    const createImageBitmap = vi.fn();
+
+    const originalWorker = global.Worker;
+    const originalCreateImageBitmap = global.createImageBitmap;
+    const originalDevvit = globalThis.devvit;
+
+    global.Worker = workerCtor;
+    global.createImageBitmap = createImageBitmap;
+    globalThis.devvit = { context: { client: { name: "ANDROID" } } };
+
+    try {
+      const renderer = new TrackLayerRenderer({
+        transferControlToOffscreen,
+        getContext,
+      });
+
+      renderer.setup({
+        allowWorker: shouldUseTrackLayerWorker(),
+      });
+
+      expect(shouldUseTrackLayerWorker()).toBe(false);
+      expect(shouldUseTrackLayerWorker("IOS")).toBe(true);
+      expect(shouldUseTrackLayerWorker("WEB")).toBe(true);
+      expect(transferControlToOffscreen).not.toHaveBeenCalled();
+      expect(workerCtor).not.toHaveBeenCalled();
+      expect(getContext).toHaveBeenCalledWith("2d", { alpha: false });
+      expect(renderer.ctx).toBe(fallbackContext);
+      expect(renderer.workerReady).toBe(false);
+    } finally {
+      global.Worker = originalWorker;
+      global.createImageBitmap = originalCreateImageBitmap;
+      if (originalDevvit === undefined) {
+        delete globalThis.devvit;
+      } else {
+        globalThis.devvit = originalDevvit;
+      }
     }
   });
 
