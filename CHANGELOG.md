@@ -4,6 +4,7 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Guest submission throttling now uses a hashed server-provided Reddit request identity, so generating a new signed guest profile no longer resets the rate-limit window.
 - Fixed Android Reddit app sessions that could show only the car over a white background. Android now uses the reliable main-thread track renderer, while iOS and web clients retain the worker-rendered track path.
 - Every wall collision now costs momentum but lets the lap continue, including severe head-on impacts; the collision body follows the car's visible orientation so nose, side, and rear contact resolve consistently.
 - Removed the terminal crash screen. The former crash auto-restart setting is now optional `Collision Auto-Restart`, defaults off, and restarts the attempt after a scrape only when the player enables it.

@@ -457,9 +457,67 @@ describe("daily-gp-store submission hardening", () => {
     expect(privateSnapshot.playerRank).toBe(1);
   });
 
-  it("rate limits repeated guest submissions", async () => {
+  it("keeps the guest rate limit when the client rotates its signed player identity", async () => {
     const challenge = await getServerDailyGpChallenge();
     const guestPlayerId = "guest-rate-limit-check";
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+    const requestRateLimitIdentity = "stable-reddit-request-identity";
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const result = await submitServerDailyGpRun({
+        playerId: guestPlayerId,
+        guestToken,
+        challengeId: challenge.id,
+        trackKey: challenge.trackKey,
+        replay: { targetLapNumber: 1, inputs: [] },
+        requestRateLimitIdentity,
+      });
+      expect(result.status).toBe(422);
+    }
+
+    const rotatedGuestPlayerId = "rotated-guest-rate-limit-check";
+    const rotatedGuestToken = await mintGuestPlayerToken(rotatedGuestPlayerId);
+    const throttled = await submitServerDailyGpRun({
+      playerId: rotatedGuestPlayerId,
+      guestToken: rotatedGuestToken,
+      challengeId: challenge.id,
+      trackKey: challenge.trackKey,
+      replay: { targetLapNumber: 1, inputs: [] },
+      requestRateLimitIdentity,
+    });
+
+    expect(throttled.status).toBe(429);
+    expect(throttled.body.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it("keeps signed-in Reddit submissions keyed to the account identity", async () => {
+    const challenge = await getServerDailyGpChallenge();
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const result = await submitServerDailyGpRun({
+        redditUsername: "StableRedditUser",
+        challengeId: challenge.id,
+        trackKey: challenge.trackKey,
+        replay: { targetLapNumber: 1, inputs: [] },
+        requestRateLimitIdentity: `changing-request-${attempt}`,
+      });
+      expect(result.status).toBe(422);
+    }
+
+    const throttled = await submitServerDailyGpRun({
+      redditUsername: "StableRedditUser",
+      challengeId: challenge.id,
+      trackKey: challenge.trackKey,
+      replay: { targetLapNumber: 1, inputs: [] },
+      requestRateLimitIdentity: "another-changing-request",
+    });
+
+    expect(throttled.status).toBe(429);
+  });
+
+  it("falls back to the authorized guest identity when request context is unavailable", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-rate-limit-fallback";
     const guestToken = await mintGuestPlayerToken(guestPlayerId);
 
     for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -482,7 +540,6 @@ describe("daily-gp-store submission hardening", () => {
     });
 
     expect(throttled.status).toBe(429);
-    expect(throttled.body.retryAfterSeconds).toBeGreaterThan(0);
   });
 
   it("keeps the faster stored time when a slower replay arrives later", async () => {

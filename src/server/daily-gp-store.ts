@@ -79,8 +79,8 @@ const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 5_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function createSubmissionRateLimitKey(challengeId: string, playerId: string): string {
-    return `dailygp:submit-rate-limit:${challengeId}:${playerId}`;
+function createSubmissionRateLimitKey(challengeId: string, rateLimitIdentity: string): string {
+    return `dailygp:submit-rate-limit:${challengeId}:${rateLimitIdentity}`;
 }
 
 function createSubmissionLockKey(challengeId: string, playerId: string): string {
@@ -1184,6 +1184,7 @@ export async function submitServerDailyGpRun({
     replay,
     checkpointTimesSec,
     trackKey,
+    requestRateLimitIdentity,
 }: {
     playerId?: unknown;
     challengeId?: unknown;
@@ -1194,6 +1195,7 @@ export async function submitServerDailyGpRun({
     replay?: unknown;
     checkpointTimesSec?: unknown;
     trackKey?: unknown;
+    requestRateLimitIdentity?: unknown;
 }) {
     const challenge = await getServerDailyGpPlayableChallenge(
         typeof challengeId === 'string' ? challengeId : null,
@@ -1236,7 +1238,15 @@ export async function submitServerDailyGpRun({
         };
     }
 
-    const rateLimitResult = await checkSubmissionRateLimit(challenge.id, identity.canonicalPlayerId);
+    const safeRequestRateLimitIdentity = typeof requestRateLimitIdentity === 'string'
+        && requestRateLimitIdentity.trim()
+        ? requestRateLimitIdentity.trim()
+        : null;
+    const rateLimitIdentity = !sanitizeRedditUsername(redditUsername)
+        && safeRequestRateLimitIdentity
+        ? `request:${safeRequestRateLimitIdentity}`
+        : identity.canonicalPlayerId;
+    const rateLimitResult = await checkSubmissionRateLimit(challenge.id, rateLimitIdentity);
     if (!rateLimitResult.allowed) {
         return {
             status: 429,

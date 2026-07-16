@@ -34,6 +34,7 @@ import {
     formatDailyMiniRacerTextFallback,
 } from './reddit-post-title.js';
 import { getCommunityMemberCount } from './community-member-count.js';
+import { createRequestRateLimitIdentity } from './request-rate-limit-identity.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -62,6 +63,13 @@ function getRequestUsername(): string | null {
     return typeof context.username === 'string' && context.username.trim()
         ? context.username.trim()
         : null;
+}
+
+function getRequestRateLimitIdentity(): string | null {
+    return createRequestRateLimitIdentity({
+        loid: context.loid,
+        userId: context.userId,
+    });
 }
 
 function getRequestAppSlug(): string | null {
@@ -732,6 +740,7 @@ app.post('/api/daily/submit', async (req, res) => {
         const result = await submitServerDailyGpRun({
             ...(req.body ?? {}),
             redditUsername: getRequestUsername(),
+            requestRateLimitIdentity: getRequestRateLimitIdentity(),
         });
         res.status(result.status).json(result.body);
     } catch (error) {
