@@ -1,6 +1,7 @@
 import {
     formatDailyChallengeBestLabel,
     getDailyChallengeBestResult,
+    getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
     getDailyChallengeTrackName
 } from './service.js';
@@ -274,59 +275,6 @@ export class DailyChallengeUi {
         bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
     }
 
-    getPlaylistEntryDateParts(challenge) {
-        const source = typeof challenge?.startsAt === 'string' && challenge.startsAt
-            ? challenge.startsAt
-            : (typeof challenge?.challengeDate === 'string' && challenge.challengeDate
-                ? `${challenge.challengeDate}T00:00:00.000Z`
-                : '');
-        const timeMs = Date.parse(source);
-        if (!Number.isFinite(timeMs)) {
-            return {
-                weekday: '--',
-                dateLabel: '--'
-            };
-        }
-
-        const date = new Date(timeMs);
-        return {
-            weekday: new Intl.DateTimeFormat('en-US', {
-                weekday: 'short',
-                timeZone: 'UTC'
-            }).format(date),
-            dateLabel: new Intl.DateTimeFormat('en-US', {
-                month: 'short',
-                day: 'numeric',
-                timeZone: 'UTC'
-            }).format(date)
-        };
-    }
-
-    isPlaylistEntryToday(challenge, nowMs = Date.now()) {
-        const source = typeof challenge?.startsAt === 'string' && challenge.startsAt
-            ? challenge.startsAt
-            : (typeof challenge?.challengeDate === 'string' && challenge.challengeDate
-                ? `${challenge.challengeDate}T00:00:00.000Z`
-                : '');
-        const challengeTimeMs = Date.parse(source);
-        if (!Number.isFinite(challengeTimeMs) || !Number.isFinite(nowMs)) return false;
-
-        return new Date(challengeTimeMs).toISOString().slice(0, 10)
-            === new Date(nowMs).toISOString().slice(0, 10);
-    }
-
-    getPlaylistEntryAvailabilityProgress(challenge) {
-        const startMs = Date.parse(challenge?.startsAt || '');
-        const endMs = Date.parse(challenge?.availableUntil || '');
-        if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
-            return null;
-        }
-
-        const remaining = Math.max(0, endMs - Date.now());
-        const total = endMs - startMs;
-        return Math.max(0, Math.min(1, remaining / total));
-    }
-
     renderPlaylist(challenges = [], actions = null) {
         const list = this.dailyChallengePlaylistList;
         if (!list) return;
@@ -355,7 +303,8 @@ export class DailyChallengeUi {
         }
 
         for (const challenge of playableChallenges) {
-            const dateParts = this.getPlaylistEntryDateParts(challenge);
+            const availability = getDailyChallengeCardStatus(challenge);
+            const availabilityLabel = availability.key === 'featured' ? 'Today' : availability.label;
             const isCurrentTrack = challenge.id === this._dailyChallengeSummary?.challengeId;
             const trackName = getDailyChallengeTrackName(challenge);
             const bestResult = getDailyChallengeBestResult(challenge);
@@ -366,7 +315,7 @@ export class DailyChallengeUi {
             row.type = 'button';
             row.setAttribute(
                 'aria-label',
-                `Race ${trackName} from ${dateParts.weekday} ${dateParts.dateLabel}`
+                `Race ${trackName}. ${availabilityLabel}`
             );
             row.addEventListener('click', () => {
                 this.closePlaylistModal();
@@ -388,15 +337,18 @@ export class DailyChallengeUi {
             const info = document.createElement('div');
             info.className = 'daily-playlist-hero-info';
 
-            const day = document.createElement('span');
-            day.className = 'daily-playlist-hero-day';
-            day.textContent = this.isPlaylistEntryToday(challenge) ? 'Today' : dateParts.dateLabel;
-
             const title = document.createElement('span');
             title.className = 'daily-playlist-hero-title';
             title.textContent = trackName;
 
-            info.append(day, title);
+            info.append(title);
+
+            const meta = document.createElement('div');
+            meta.className = 'daily-playlist-hero-meta';
+
+            const status = document.createElement('span');
+            status.className = `daily-playlist-hero-status daily-playlist-hero-status--${availability.key}`;
+            status.textContent = availabilityLabel;
 
             const medal = document.createElement('div');
             medal.className = 'daily-playlist-hero-medal';
@@ -410,7 +362,8 @@ export class DailyChallengeUi {
                 }
             ));
 
-            content.append(info, medal);
+            meta.append(status, medal);
+            content.append(info, meta);
             row.append(preview, content);
 
             list.appendChild(row);

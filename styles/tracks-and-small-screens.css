@@ -66,20 +66,44 @@
     overflow-wrap: anywhere;
 }
 
-.daily-playlist-hero-day {
-    font-size: 0.65rem;
-    color: var(--accent-color);
-    text-transform: uppercase;
-    font-weight: 800;
-    letter-spacing: 0.15em;
+.daily-playlist-hero-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    align-self: stretch;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+    min-width: 0;
 }
 
-.daily-playlist-entry--hero.current .daily-playlist-hero-day {
-    background: var(--accent-color);
+.daily-playlist-hero-status {
+    max-width: 9.5rem;
+    font-size: 0.58rem;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.2;
+}
+
+.daily-playlist-hero-status--featured {
+    background: #dc2626;
     color: var(--text-color);
-    padding: 0.2rem 0.6rem;
-    border-radius: var(--radius-lg);
-    align-self: flex-start;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-full);
+}
+
+.daily-playlist-hero-status--available {
+    color: var(--accent-color);
+}
+
+.daily-playlist-hero-status--expired {
+    background: #475569;
+    color: var(--text-color);
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-full);
 }
 
 .daily-playlist-hero-medal {
