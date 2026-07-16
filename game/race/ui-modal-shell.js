@@ -1597,7 +1597,7 @@ export class ModalShell {
 
         const subtitleEl = this.modalRunsView.querySelector('[data-modal-subtitle]');
         subtitleEl?.classList.toggle(
-            'leaderboard-header-time',
+            'leaderboard-summary__time',
             Boolean(isLeaderboardOnly && playerTimeLabel)
         );
     }
