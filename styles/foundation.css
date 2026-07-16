@@ -42,6 +42,9 @@
     /* Sizing */
     --modal-floating-back-height: 2.55rem;
     --modal-floating-back-offset: 0.85rem;
+    --modal-floating-back-clearance: calc(
+        var(--modal-floating-back-height) + var(--modal-floating-back-offset) + 1rem
+    );
     /* Full-screen panels: viewport height, capped (adjust cap in one place). */
     --screen-height-cap: 1000px;
     --screen-fill-height: min(100vh, var(--screen-height-cap));

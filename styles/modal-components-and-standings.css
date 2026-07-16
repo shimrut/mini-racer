@@ -100,7 +100,7 @@
 .reusable-modal-content {
     display: flex;
     flex-direction: column;
-    padding: 0 1rem;
+    padding: 0 1rem var(--modal-floating-back-clearance);
     gap: 1rem;
     flex: 1 1 auto;
     min-height: 0;

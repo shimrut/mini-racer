@@ -515,7 +515,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: .1rem 0 .25rem;
+    padding: .1rem 0 var(--modal-floating-back-clearance);
 }
 
 #garage-modal .garage-skin-layout,
