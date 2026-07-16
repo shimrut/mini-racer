@@ -30,7 +30,7 @@ flowchart LR
     C --> I["Browser cache<br/>localStorage/sessionStorage"]
 
     G --> J["API client layer<br/>game/scoreboard/api-client.js"]
-    J --> K["Devvit/Express server<br/>src/server/index.ts"]
+    J --> K["Devvit/Express server<br/>boot + app factory + route registrars"]
     K --> L["Redis-backed stores<br/>player profiles, races, analytics"]
 
     K --> M["Shared challenge model<br/>src/server/daily-gp-model.ts"]
@@ -90,7 +90,20 @@ flowchart LR
 
 ### Server And Shared Validation
 
-- `src/server/index.ts` exposes all `/api/*` endpoints and Devvit moderator/internal actions.
+- `src/server/index.ts` is the production boot entrypoint only. It creates the
+  Devvit server from `src/server/server-app.ts`, whose import-safe app factory
+  installs the JSON middleware and registers capability-specific modules under
+  `src/server/routes/`.
+- Player, competition, sharing, analytics, moderator-menu, and scheduler routes
+  are registered separately. Route modules own HTTP parsing and responses, while
+  `src/server/server-app.ts` only wires their dependencies.
+- `src/server/request-context.ts` is the single adapter for request-scoped
+  Devvit identity, subreddit, post, and rate-limit context.
+- Focused workflow modules own the server behavior outside HTTP: post-bound
+  challenge resolution, community context, daily autopost persistence and post
+  creation, moderator authorization, and moderator analytics-post lifecycle.
+  These workflows use the existing Daily GP stores and sharing services without
+  changing their Redis keys or public contracts.
 - `src/server/daily-gp-model.ts` defines the challenge schedule, IDs, playable window, and Redis key model.
 - `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. Player profiles use derived per-player Redis keys with independent 180-day expiration. A new guest profile is claimed once with an atomic Redis write; every later bootstrap, preference update, identity update, personalized snapshot, and submission requires the matching signed guest token. Public snapshots remain available without a token but do not expose or refresh player-specific state. If a browser loses its token, startup rotates only the guest identity and retries once while preserving local preferences and run data. The retired shared profile hash is not read or migrated, preventing stale records from replacing current preferences. The published challenge history hash uses the same TTL as the installed Devvit server.
 - Guest submission throttling is independent of the signed guest profile ID: the submit route hashes Devvit's server-provided LOID, falling back to the Reddit user ID, and uses that stable request identity for guest rate limits. Signed-in Reddit players remain throttled by canonical account identity, and guests fall back to their authorized profile ID only when Reddit provides neither request identifier.
@@ -115,17 +128,16 @@ flowchart LR
 | Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow, share entry point | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js`, `game/player/preferences.js` | Identity, audio toggles, collision auto-restart and delay, durable preference sync | Browser cache, player APIs, Redis profile, modal helpers |
 | Audio/analytics | `game/audio/*`, `game/player/service.js` | Sound playback and analytics events | Settings preferences, `/api/analytics/event` |
-| Server | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-post-store.ts`, `src/server/daily-gp-share.ts`, `src/server/replay-validator.ts` | Persistence, validation, challenge scheduling, canonical posts, Reddit result comments, APIs | Redis, Reddit API, shared gameplay modules |
+| Server | `src/server/index.ts`, `src/server/server-app.ts`, `src/server/routes/*`, focused workflow modules, `src/server/daily-gp-store.ts`, `src/server/daily-gp-share.ts` | Server boot, HTTP contracts, Reddit workflows, persistence, validation, scheduling, canonical posts and result comments | Redis, Reddit API, shared gameplay modules |
 
 ## API Surface
 
-These client-facing routes are defined in `src/server/index.ts`:
+These client-facing routes are registered under `src/server/routes/`:
 
 - `/api/player/bootstrap`
 - `/api/player/identity`
 - `/api/player/preferences`
 - `/api/scoreboard/snapshot`
-- `/api/scoreboard/submit`
 - `/api/daily/active`
 - `/api/daily/playlist`
 - `/api/daily/snapshot`
@@ -144,7 +156,7 @@ The browser-side API route and player identity entrypoint is `game/scoreboard/ap
 | Dependency | Why it exists | Where it matters |
 | --- | --- | --- |
 | `@devvit/web`, `@devvit/redis` | Reddit/Devvit server runtime, context, Redis, shared request types, and posting flows | `src/server/*`, Devvit post/menu flows |
-| `express` | API routing inside the Devvit server | `src/server/index.ts` |
+| `express` | API routing and import-safe app creation inside the Devvit server | `src/server/server-app.ts`, `src/server/routes/*` |
 
 ### Product-Adjacent Dependencies
 
@@ -177,16 +189,16 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Collision rules, win rules, checkpoint behavior | `game/race/simulation.js`, `game/race/run-policy.js` | `src/server/replay-validator.ts`, `game/daily-challenge/engine-methods.js`, `game/race/result-flow.js` | Scrape and finish logic drive both local UX and server acceptance |
 | Track layout or new track | `game/track/tracks.js`, `game/track/runtime.js` if geometry handling changes | `src/server/daily-gp-store.ts`, `src/server/daily-gp-model.ts`, `game/daily-challenge/service.js`, `src/server/reddit-post-title.ts` | Track data is used by gameplay, Daily GP scheduling (file-order walk), previews, and server validation |
 | Track visual treatment only | `game/track/presentation.js`, `game/track/canvas.js`, `styles.css` | `game/daily-challenge/ui.js`, `game/race/ui-modal-shell.js`, `game/track/preview-renderer.js` | One presentation system feeds race view, previews, and modal thumbnails |
-| Daily challenge schedule or availability window | `game/track/tracks.js`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-store.ts`, `game/daily-challenge/service.js` | `src/server/index.ts`, `README.md` if player-facing behavior changes | New challenge generation walks the track file in order; playlist availability reads persisted published history so past days do not shift |
+| Daily challenge schedule or availability window | `game/track/tracks.js`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-store.ts`, `game/daily-challenge/service.js` | `src/server/post-bound-challenge.ts`, `README.md` if player-facing behavior changes | New challenge generation walks the track file in order; playlist availability reads persisted published history so past days do not shift |
 | Start screen or daily card copy/layout | `game/daily-challenge/ui.js`, `game.html`, `styles.css` | `game/daily-challenge/service.js` | The UI is driven by API summary fields and modal launch actions |
-| Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `src/server/community-member-count.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned; community size and submission rate-limit identity come from trusted server context |
-| Result sharing or score-thread behavior | `game/race/ui-modal-shell.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-share.ts`, `src/server/daily-gp-post-store.ts` | `src/server/index.ts`, `src/server/daily-gp-store.ts`, `devvit.json`, finish and standings tests | The same confirmation contract serves finish and standings; Reddit user-action permission and post/comment identity are server-enforced |
+| Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/routes/competition-routes.ts`, `src/server/daily-gp-store.ts`, `src/server/community-context.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned; community size and submission rate-limit identity come from trusted server context |
+| Result sharing or score-thread behavior | `game/race/ui-modal-shell.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-share.ts`, `src/server/daily-gp-post-store.ts` | `src/server/daily-post-service.ts`, `src/server/routes/share-routes.ts`, `devvit.json`, finish and standings tests | The same confirmation contract serves finish and standings; Reddit user-action permission and post/comment identity are server-enforced |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the independently expiring Reddit Redis player profile as the durable source |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |
 | Replay verification / anti-cheat changes | `src/server/replay-validator.ts`, `game/race/simulation.js`, `game/track/runtime.js`, `game/config.js` | `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | This is the highest-risk area because client and server must stay logically identical |
 | Analytics event changes | `game/player/service.js`, `src/server/analytics-store.ts` | `tools/analytics-dashboard.js`, `tools/analytics/schema.sql` | New event dimensions often need both collection and reporting updates |
-| Moderator workflows, daily autoposting, or public post discovery copy | `src/server/index.ts`, `src/server/daily-gp-model.ts`, `src/server/reddit-post-title.ts` | `README.md`, `CHANGELOG.md`, `tests/reddit-post-title.test.js`, analytics tooling if reporting changes | These flows are server-owned and tied to Devvit/Reddit context; the outer post title and text fallback are the public search and Reddit Answers surfaces |
+| Moderator workflows, daily autoposting, or public post discovery copy | `src/server/daily-post-service.ts`, `src/server/moderator-access.ts`, `src/server/moderator-analytics-post.ts`, `src/server/reddit-post-title.ts` | `src/server/routes/internal-routes.ts`, `README.md`, `CHANGELOG.md`, route/workflow tests | These flows are server-owned and tied to Devvit/Reddit context; the outer post title and text fallback are the public search and Reddit Answers surfaces |
 
 ## High-Risk Shared Contracts
 

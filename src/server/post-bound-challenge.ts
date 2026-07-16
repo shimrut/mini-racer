@@ -1,0 +1,84 @@
+import { reddit } from '@devvit/web/server';
+import { TRACKS } from '../../game/track/tracks.js';
+import type { DailyGpChallenge } from './daily-gp-model.js';
+import {
+    getServerDailyGpChallengeById,
+    persistServerDailyGpChallenge,
+} from './daily-gp-store.js';
+import {
+    readContextPostData,
+    readContextPostId,
+} from './request-context.js';
+
+export function normalizePostBoundDailyGpChallenge(value: unknown): DailyGpChallenge | null {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const record = value as Record<string, unknown>;
+    const id = typeof record.id === 'string' ? record.id : '';
+    const challengeDate = typeof record.challengeDate === 'string' ? record.challengeDate : '';
+    const trackKey = typeof record.trackKey === 'string' ? record.trackKey : '';
+    const startsAt = typeof record.startsAt === 'string' ? record.startsAt : '';
+    const endsAt = typeof record.endsAt === 'string' ? record.endsAt : '';
+    const availableUntil = typeof record.availableUntil === 'string' ? record.availableUntil : '';
+
+    if (
+        !/^daily-gp-\d{4}-\d{2}-\d{2}$/.test(id)
+        || !challengeDate
+        || !trackKey
+        || !TRACKS[trackKey]
+        || !startsAt
+        || !endsAt
+        || !availableUntil
+    ) {
+        return null;
+    }
+
+    return {
+        id,
+        challengeDate,
+        trackKey,
+        startsAt,
+        endsAt,
+        availableUntil,
+        status: 'active',
+        objectiveType: 'single_lap_fastest',
+        objectiveParams: {},
+        skin: 'default',
+    };
+}
+
+export async function getPostBoundDailyGpChallenge(): Promise<DailyGpChallenge | null> {
+    const contextPostData = readContextPostData();
+    const contextChallenge = normalizePostBoundDailyGpChallenge(contextPostData?.challenge);
+    if (contextChallenge) {
+        return persistServerDailyGpChallenge(contextChallenge);
+    }
+
+    const contextChallengeId = contextPostData?.challengeId;
+    if (typeof contextChallengeId === 'string' && contextChallengeId) {
+        return getServerDailyGpChallengeById(contextChallengeId);
+    }
+
+    const postId = readContextPostId();
+    if (!postId) {
+        return null;
+    }
+
+    try {
+        const post = await reddit.getPostById(postId as `t3_${string}`);
+        const postData = await post.getPostData();
+        const challenge = normalizePostBoundDailyGpChallenge(postData?.challenge);
+        if (challenge) {
+            return persistServerDailyGpChallenge(challenge);
+        }
+        const challengeId = typeof postData?.challengeId === 'string' && postData.challengeId
+            ? postData.challengeId
+            : null;
+        return challengeId ? getServerDailyGpChallengeById(challengeId) : null;
+    } catch (error) {
+        console.error('Failed to resolve post-bound Mini Racer challenge:', error);
+        return null;
+    }
+}

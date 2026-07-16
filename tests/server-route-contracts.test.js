@@ -1,0 +1,607 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createServerApp } from '../src/server/server-app.ts';
+import { registerPlayerRoutes } from '../src/server/routes/player-routes.ts';
+import { registerCompetitionRoutes } from '../src/server/routes/competition-routes.ts';
+import { registerShareRoutes } from '../src/server/routes/share-routes.ts';
+import { registerAnalyticsRoutes } from '../src/server/routes/analytics-routes.ts';
+import { registerInternalRoutes } from '../src/server/routes/internal-routes.ts';
+
+const openServers = new Set();
+
+afterEach(async () => {
+    vi.restoreAllMocks();
+    await Promise.all([...openServers].map((server) => new Promise((resolve) => {
+        server.close(resolve);
+    })));
+    openServers.clear();
+});
+
+async function startApp(registerRoutes) {
+    const app = createServerApp({ registerRoutes });
+    expect(app.listening).toBeUndefined();
+
+    const server = app.listen(0, '127.0.0.1');
+    openServers.add(server);
+    await new Promise((resolve, reject) => {
+        server.once('listening', resolve);
+        server.once('error', reject);
+    });
+    const address = server.address();
+    return `http://127.0.0.1:${address.port}`;
+}
+
+async function readJson(response) {
+    return response.json();
+}
+
+describe('server route contracts', () => {
+    it('preserves player authorization status distinctions', async () => {
+        const getServerPlayerBootstrap = vi.fn(async () => ({ playerId: null }));
+        const baseUrl = await startApp((app) => registerPlayerRoutes(app, {
+            getRequestUsername: () => null,
+            getServerPlayerBootstrap,
+            updateServerPlayerIdentity: vi.fn(),
+            updateServerPlayerPreferences: vi.fn(),
+        }));
+
+        const malformed = await fetch(`${baseUrl}/api/player/bootstrap`);
+        expect(malformed.status).toBe(400);
+        expect(await readJson(malformed)).toEqual({ error: 'Invalid player identity.' });
+
+        const unauthorized = await fetch(
+            `${baseUrl}/api/player/bootstrap?playerId=guest-1&guestToken=invalid`,
+        );
+        expect(unauthorized.status).toBe(401);
+        expect(await readJson(unauthorized)).toEqual({
+            error: 'Guest token is required for this player.',
+        });
+        expect(getServerPlayerBootstrap).toHaveBeenLastCalledWith({
+            playerId: 'guest-1',
+            guestToken: 'invalid',
+            redditUsername: null,
+        });
+    });
+
+    it('preserves player mutation forwarding, success, and invalid-preference responses', async () => {
+        const updateServerPlayerIdentity = vi.fn(async () => ({
+            playerId: 'guest:guest-1',
+            leaderboardIdentity: 'reddit',
+        }));
+        const updateServerPlayerPreferences = vi.fn()
+            .mockResolvedValueOnce({
+                playerId: 'guest:guest-1',
+                playerPreferences: null,
+            })
+            .mockResolvedValueOnce({
+                playerId: 'guest:guest-1',
+                playerPreferences: { musicEnabled: true },
+            });
+        const baseUrl = await startApp((app) => registerPlayerRoutes(app, {
+            getRequestUsername: () => 'RaceFan',
+            getServerPlayerBootstrap: vi.fn(),
+            updateServerPlayerIdentity,
+            updateServerPlayerPreferences,
+        }));
+
+        const identity = await fetch(`${baseUrl}/api/player/identity`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: 'guest-1',
+                guestToken: 'signed-token',
+                leaderboardIdentity: 'reddit',
+            }),
+        });
+        expect(identity.status).toBe(200);
+        expect(await readJson(identity)).toEqual({
+            playerId: 'guest:guest-1',
+            leaderboardIdentity: 'reddit',
+        });
+        expect(updateServerPlayerIdentity).toHaveBeenCalledWith({
+            playerId: 'guest-1',
+            guestToken: 'signed-token',
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'RaceFan',
+        });
+
+        const invalidPreferences = await fetch(`${baseUrl}/api/player/preferences`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: 'guest-1',
+                guestToken: 'signed-token',
+                playerPreferences: { musicEnabled: 'yes' },
+            }),
+        });
+        expect(invalidPreferences.status).toBe(400);
+        expect(await readJson(invalidPreferences)).toEqual({
+            error: 'Invalid player preferences',
+        });
+
+        const validPreferences = await fetch(`${baseUrl}/api/player/preferences`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: 'guest-1',
+                guestToken: 'signed-token',
+                playerPreferences: { musicEnabled: true },
+            }),
+        });
+        expect(validPreferences.status).toBe(200);
+        expect(await readJson(validPreferences)).toEqual({
+            playerId: 'guest:guest-1',
+            playerPreferences: { musicEnabled: true },
+        });
+    });
+
+    it('preserves competition fallback and submission forwarding', async () => {
+        const activeChallenge = {
+            id: 'daily-gp-2026-07-16',
+            challengeDate: '2026-07-16',
+            trackKey: 'circuit',
+            startsAt: '2026-07-16T00:00:00.000Z',
+            endsAt: '2026-07-17T00:00:00.000Z',
+            availableUntil: '2026-07-23T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const submitServerDailyGpRun = vi.fn(async (input) => ({
+            status: 422,
+            body: { accepted: false, reason: input.trackKey },
+        }));
+        const baseUrl = await startApp((app) => registerCompetitionRoutes(app, {
+            getRequestUsername: () => 'pm-user',
+            getRequestRateLimitIdentity: () => 'request-id',
+            getPostBoundDailyGpChallenge: vi.fn(async () => null),
+            getCommunityMemberTotalForLeaderboard: vi.fn(async () => 100),
+            getServerDailyGpChallenge: vi.fn(async () => activeChallenge),
+            getServerDailyGpPlaylist: vi.fn(async () => []),
+            getServerDailyGpSnapshot: vi.fn(),
+            submitServerDailyGpRun,
+            isDailyGpChallengePlayable: () => true,
+        }));
+
+        const unknown = await fetch(`${baseUrl}/api/scoreboard/snapshot?trackKey=missing`);
+        expect(unknown.status).toBe(200);
+        expect(await readJson(unknown)).toMatchObject({
+            topRows: [],
+            totalCount: 0,
+            objectiveType: 'single_lap_fastest',
+            pageOffset: 0,
+            pageLimit: 0,
+        });
+
+        const submitted = await fetch(`${baseUrl}/api/daily/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trackKey: 'circuit' }),
+        });
+        expect(submitted.status).toBe(422);
+        expect(await readJson(submitted)).toEqual({
+            accepted: false,
+            reason: 'circuit',
+        });
+        expect(submitServerDailyGpRun).toHaveBeenCalledWith({
+            trackKey: 'circuit',
+            redditUsername: 'pm-user',
+            requestRateLimitIdentity: 'request-id',
+        });
+    });
+
+    it('preserves active, playlist, and paginated snapshot contracts', async () => {
+        const activeChallenge = {
+            id: 'daily-gp-2026-07-16',
+            challengeDate: '2026-07-16',
+            trackKey: 'circuit',
+            startsAt: '2026-07-16T00:00:00.000Z',
+            endsAt: '2026-07-17T00:00:00.000Z',
+            availableUntil: '2026-07-23T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const postChallenge = {
+            ...activeChallenge,
+            id: 'daily-gp-2026-07-15',
+            challengeDate: '2026-07-15',
+        };
+        const getServerDailyGpSnapshot = vi.fn(async (input) => ({
+            challengeId: input.challengeId,
+            pageOffset: input.offset,
+            pageLimit: input.limit,
+        }));
+        const baseUrl = await startApp((app) => registerCompetitionRoutes(app, {
+            getRequestUsername: () => 'RaceFan',
+            getRequestRateLimitIdentity: () => 'request-id',
+            getPostBoundDailyGpChallenge: vi.fn(async () => postChallenge),
+            getCommunityMemberTotalForLeaderboard: vi.fn(async () => 321),
+            getServerDailyGpChallenge: vi.fn(async () => activeChallenge),
+            getServerDailyGpPlaylist: vi.fn(async () => [activeChallenge, postChallenge]),
+            getServerDailyGpSnapshot,
+            submitServerDailyGpRun: vi.fn(),
+            isDailyGpChallengePlayable: () => true,
+        }));
+
+        const active = await fetch(`${baseUrl}/api/daily/active`);
+        expect(await readJson(active)).toEqual(postChallenge);
+
+        const playlist = await fetch(`${baseUrl}/api/daily/playlist`);
+        expect(await readJson(playlist)).toEqual({
+            challenges: [activeChallenge, postChallenge],
+        });
+
+        const dailySnapshot = await fetch(
+            `${baseUrl}/api/daily/snapshot?challengeId=${postChallenge.id}&playerId=guest-1&guestToken=signed&limit=50&offset=100`,
+        );
+        expect(await readJson(dailySnapshot)).toEqual({
+            challengeId: postChallenge.id,
+            pageOffset: 100,
+            pageLimit: 50,
+        });
+        expect(getServerDailyGpSnapshot).toHaveBeenCalledWith({
+            challengeId: postChallenge.id,
+            playerId: 'guest-1',
+            guestToken: 'signed',
+            redditUsername: 'RaceFan',
+            limit: 50,
+            offset: 100,
+            communityMemberTotal: 321,
+        });
+
+        const scoreboardSnapshot = await fetch(
+            `${baseUrl}/api/scoreboard/snapshot?trackKey=circuit&limit=25&offset=75`,
+        );
+        expect(await readJson(scoreboardSnapshot)).toEqual({
+            challengeId: activeChallenge.id,
+            pageOffset: 75,
+            pageLimit: 25,
+        });
+    });
+
+    it('preserves share service statuses and request context', async () => {
+        const previewDailyGpShare = vi.fn(async () => ({
+            status: 409,
+            body: { status: 'not_shareable' },
+        }));
+        const baseUrl = await startApp((app) => registerShareRoutes(app, {
+            getDailyGpShareRequestContext: async () => ({
+                username: 'pm-user',
+                subredditName: 'mini_racer_dev',
+            }),
+            previewDailyGpShare,
+            confirmDailyGpShare: vi.fn(),
+        }));
+
+        const response = await fetch(`${baseUrl}/api/daily/share/preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challengeId: 'daily-gp-2026-07-16' }),
+        });
+        expect(response.status).toBe(409);
+        expect(await readJson(response)).toEqual({ status: 'not_shareable' });
+        expect(previewDailyGpShare).toHaveBeenCalledWith(
+            { challengeId: 'daily-gp-2026-07-16' },
+            { username: 'pm-user', subredditName: 'mini_racer_dev' },
+        );
+    });
+
+    it('preserves share confirmation and failure response shapes', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const confirmDailyGpShare = vi.fn(async () => ({
+            status: 200,
+            body: { status: 'shared', commentUrl: 'https://reddit.com/comment' },
+        }));
+        const previewDailyGpShare = vi.fn(async () => {
+            throw new Error('preview failed');
+        });
+        const baseUrl = await startApp((app) => registerShareRoutes(app, {
+            getDailyGpShareRequestContext: async () => ({
+                username: 'RaceFan',
+                subredditName: 'MiniRacer',
+                appSlug: 'mini-racer',
+            }),
+            previewDailyGpShare,
+            confirmDailyGpShare,
+        }));
+
+        const confirmed = await fetch(`${baseUrl}/api/daily/share/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shareToken: 'token' }),
+        });
+        expect(confirmed.status).toBe(200);
+        expect(await readJson(confirmed)).toEqual({
+            status: 'shared',
+            commentUrl: 'https://reddit.com/comment',
+        });
+
+        const failed = await fetch(`${baseUrl}/api/daily/share/preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        });
+        expect(failed.status).toBe(500);
+        expect(await readJson(failed)).toEqual({
+            status: 'share_failed',
+            error: 'Could not prepare this result for sharing.',
+        });
+    });
+
+    it('preserves analytics CORS and moderator authorization responses', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
+            getRequestUsername: () => null,
+            readContextPostId: () => null,
+            readContextSubredditName: () => 'mini_racer_dev',
+            resolveAnalyticsToolSubredditName: async () => 'mini_racer_dev',
+            assertModeratorForSubreddit: async () => {
+                throw new Error('Moderator access required for r/mini_racer_dev.');
+            },
+            submitServerAnalyticsEvent: vi.fn(),
+            getServerAnalyticsSummary: vi.fn(),
+        }));
+
+        const preflight = await fetch(`${baseUrl}/api/analytics/summary`, {
+            method: 'OPTIONS',
+        });
+        expect(preflight.status).toBe(204);
+        expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
+        expect(preflight.headers.get('access-control-allow-methods')).toBe('GET,POST,OPTIONS');
+
+        const forbidden = await fetch(`${baseUrl}/api/analytics/summary`);
+        expect(forbidden.status).toBe(403);
+        expect(await readJson(forbidden)).toEqual({
+            error: 'Moderator access required for r/mini_racer_dev.',
+        });
+    });
+
+    it('preserves analytics event status and summary query forwarding', async () => {
+        const submitServerAnalyticsEvent = vi.fn()
+            .mockResolvedValueOnce({ accepted: true })
+            .mockResolvedValueOnce({ accepted: false, error: 'invalid event' });
+        const getServerAnalyticsSummary = vi.fn(async () => ({ players: 12 }));
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
+            getRequestUsername: () => 'RaceFan',
+            readContextPostId: () => 't3_daily',
+            readContextSubredditName: () => 'MiniRacer',
+            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
+            assertModeratorForSubreddit: vi.fn(async () => 'RaceMod'),
+            submitServerAnalyticsEvent,
+            getServerAnalyticsSummary,
+        }));
+
+        const accepted = await fetch(`${baseUrl}/api/analytics/event`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: 'game_opened' }),
+        });
+        expect(accepted.status).toBe(200);
+        expect(submitServerAnalyticsEvent).toHaveBeenNthCalledWith(1, {
+            event: 'game_opened',
+            context: {
+                redditUsername: 'RaceFan',
+                postId: 't3_daily',
+                subredditName: 'MiniRacer',
+            },
+        });
+
+        const rejected = await fetch(`${baseUrl}/api/analytics/event`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: 'retired_event' }),
+        });
+        expect(rejected.status).toBe(400);
+        expect(await readJson(rejected)).toEqual({
+            accepted: false,
+            error: 'invalid event',
+        });
+
+        const summary = await fetch(
+            `${baseUrl}/api/analytics/summary?from=2026-07-01&to=2026-07-16&range=custom`,
+        );
+        expect(summary.status).toBe(200);
+        expect(await readJson(summary)).toEqual({ players: 12 });
+        expect(getServerAnalyticsSummary).toHaveBeenCalledWith({
+            from: '2026-07-01',
+            to: '2026-07-16',
+            range: 'custom',
+        });
+    });
+
+    it('preserves analytics missing-context and server-failure statuses', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
+            getRequestUsername: () => null,
+            readContextPostId: () => null,
+            readContextSubredditName: () => null,
+            resolveAnalyticsToolSubredditName: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce('MiniRacer'),
+            assertModeratorForSubreddit: vi.fn(async () => 'RaceMod'),
+            submitServerAnalyticsEvent: vi.fn(async () => {
+                throw new Error('event failed');
+            }),
+            getServerAnalyticsSummary: vi.fn(async () => {
+                throw new Error('summary failed');
+            }),
+        }));
+
+        const missing = await fetch(`${baseUrl}/api/analytics/summary`);
+        expect(missing.status).toBe(400);
+        expect(await readJson(missing)).toEqual({
+            error: 'Missing subreddit context for analytics.',
+        });
+
+        const eventFailure = await fetch(`${baseUrl}/api/analytics/event`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        });
+        expect(eventFailure.status).toBe(500);
+        expect(await readJson(eventFailure)).toEqual({
+            accepted: false,
+            error: 'Analytics event failed',
+        });
+
+        const summaryFailure = await fetch(`${baseUrl}/api/analytics/summary`);
+        expect(summaryFailure.status).toBe(500);
+        expect(await readJson(summaryFailure)).toEqual({
+            error: 'summary failed',
+        });
+    });
+
+    it('preserves menu fallbacks and scheduler isolation', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const ensureDailyMiniRacerPostForSubreddit = vi.fn(async (subredditName) => {
+            if (subredditName === 'broken') {
+                throw new Error('post failed');
+            }
+            return { created: subredditName === 'created', postUrl: null };
+        });
+        const baseUrl = await startApp((app) => registerInternalRoutes(app, {
+            resolveMenuTargetSubredditName: async () => null,
+            getServerDailyGpChallenge: async () => ({ id: 'daily-gp-2026-07-16' }),
+            ensureDailyMiniRacerPostForSubreddit,
+            enableDailyAutopost: vi.fn(),
+            deleteDailyAutopostSubscription: vi.fn(),
+            assertModeratorForSubreddit: vi.fn(),
+            ensureModeratorAnalyticsPostForSubreddit: vi.fn(),
+            readAllDailyAutopostSubscriptions: async () => [
+                { subredditName: 'disabled', enabled: false },
+                { subredditName: 'broken', enabled: true },
+                { subredditName: 'created', enabled: true },
+            ],
+        }));
+
+        const menu = await fetch(`${baseUrl}/internal/menu/post-create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetId: '' }),
+        });
+        expect(await readJson(menu)).toEqual({
+            showToast: {
+                text: 'Reddit did not provide a subreddit context for this install.',
+                appearance: 'neutral',
+            },
+        });
+
+        const scheduler = await fetch(`${baseUrl}/internal/scheduler/daily-posts`, {
+            method: 'POST',
+        });
+        expect(scheduler.status).toBe(200);
+        expect(await readJson(scheduler)).toEqual({
+            ok: true,
+            challengeId: 'daily-gp-2026-07-16',
+            createdCount: 1,
+        });
+        expect(ensureDailyMiniRacerPostForSubreddit).toHaveBeenCalledTimes(2);
+    });
+
+    it('preserves all moderator menu success responses and side effects', async () => {
+        const enableDailyAutopost = vi.fn();
+        const deleteDailyAutopostSubscription = vi.fn();
+        const assertModeratorForSubreddit = vi.fn();
+        const ensureModeratorAnalyticsPostForSubreddit = vi.fn(async () => ({
+            created: true,
+            postUrl: 'https://reddit.com/analytics',
+        }));
+        const ensureDailyMiniRacerPostForSubreddit = vi.fn()
+            .mockResolvedValueOnce({
+                created: false,
+                postUrl: 'https://reddit.com/existing',
+            })
+            .mockResolvedValueOnce({
+                created: true,
+                postUrl: 'https://reddit.com/today',
+            });
+        const baseUrl = await startApp((app) => registerInternalRoutes(app, {
+            resolveMenuTargetSubredditName: async () => 'MiniRacer',
+            getServerDailyGpChallenge: async () => ({ id: 'daily-gp-2026-07-16' }),
+            ensureDailyMiniRacerPostForSubreddit,
+            enableDailyAutopost,
+            deleteDailyAutopostSubscription,
+            assertModeratorForSubreddit,
+            ensureModeratorAnalyticsPostForSubreddit,
+            readAllDailyAutopostSubscriptions: async () => [],
+        }));
+        const request = (path) => fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetId: 't5_mini' }),
+        });
+
+        const created = await request('/internal/menu/post-create');
+        expect(await readJson(created)).toEqual({
+            navigateTo: 'https://reddit.com/existing',
+        });
+
+        const enabled = await request('/internal/menu/post-enable-daily');
+        expect(await readJson(enabled)).toEqual({
+            showToast: {
+                text: 'Daily Mini Racer posts enabled for r/MiniRacer. Today\'s post is live.',
+                appearance: 'success',
+            },
+            navigateTo: 'https://reddit.com/today',
+        });
+        expect(enableDailyAutopost).toHaveBeenCalledWith('MiniRacer');
+
+        const disabled = await request('/internal/menu/post-disable-daily');
+        expect(await readJson(disabled)).toEqual({
+            showToast: {
+                text: 'Daily Mini Racer posts disabled for r/MiniRacer.',
+                appearance: 'success',
+            },
+        });
+        expect(deleteDailyAutopostSubscription).toHaveBeenCalledWith('MiniRacer');
+
+        const analytics = await request('/internal/menu/mod-analytics-open');
+        expect(await readJson(analytics)).toEqual({
+            showToast: {
+                text: 'Mini Racer analytics is ready for r/MiniRacer.',
+                appearance: 'success',
+            },
+            navigateTo: 'https://reddit.com/analytics',
+        });
+        expect(assertModeratorForSubreddit).toHaveBeenCalledWith('MiniRacer');
+    });
+
+    it('preserves menu error toasts and scheduler-level failures', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const baseUrl = await startApp((app) => registerInternalRoutes(app, {
+            resolveMenuTargetSubredditName: async () => 'MiniRacer',
+            getServerDailyGpChallenge: vi.fn()
+                .mockRejectedValueOnce(new Error('create failed'))
+                .mockRejectedValueOnce(new Error('scheduler failed')),
+            ensureDailyMiniRacerPostForSubreddit: vi.fn(),
+            enableDailyAutopost: vi.fn(),
+            deleteDailyAutopostSubscription: vi.fn(),
+            assertModeratorForSubreddit: vi.fn(),
+            ensureModeratorAnalyticsPostForSubreddit: vi.fn(),
+            readAllDailyAutopostSubscriptions: async () => [],
+        }));
+
+        const menu = await fetch(`${baseUrl}/internal/menu/post-create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        });
+        expect(await readJson(menu)).toEqual({
+            showToast: {
+                text: 'Could not create the Mini Racer post: create failed',
+                appearance: 'neutral',
+            },
+        });
+
+        const scheduler = await fetch(`${baseUrl}/internal/scheduler/daily-posts`, {
+            method: 'POST',
+        });
+        expect(scheduler.status).toBe(500);
+        expect(await readJson(scheduler)).toEqual({
+            ok: false,
+            error: 'Scheduled daily post run failed',
+        });
+    });
+});
