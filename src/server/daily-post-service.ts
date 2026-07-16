@@ -22,6 +22,7 @@ import {
     getRequestUsername,
     readContextSubredditName,
 } from './request-context.js';
+import { resolveDailyShareImageUrl } from './share-image.js';
 
 export type DailyPostResult = {
     created: boolean;
@@ -45,6 +46,7 @@ async function submitDailyMiniRacerPost(
     challenge: DailyGpChallenge,
     appSlug: string,
 ) {
+    const shareImageUrl = resolveDailyShareImageUrl(challenge.trackKey);
     const post = await reddit.submitCustomPost({
         subredditName,
         title: formatDailyMiniRacerPostTitle(challenge),
@@ -56,6 +58,7 @@ async function submitDailyMiniRacerPost(
         textFallback: {
             text: formatDailyMiniRacerTextFallback(challenge),
         },
+        ...(shareImageUrl ? { styles: { shareImageUrl } } : {}),
     });
     if (typeof post.id !== 'string' || !post.id.startsWith('t3_') || typeof post.url !== 'string') {
         throw new Error('Reddit did not return the daily post identity.');

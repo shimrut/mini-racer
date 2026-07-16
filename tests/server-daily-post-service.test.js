@@ -6,6 +6,7 @@ const {
     mockPostStore,
     mockAutopostStore,
     mockContext,
+    mockShareImage,
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
@@ -28,6 +29,9 @@ const {
         getRequestUsername: vi.fn(),
         readContextSubredditName: vi.fn(),
     },
+    mockShareImage: {
+        resolveDailyShareImageUrl: vi.fn(),
+    },
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
@@ -35,6 +39,7 @@ vi.mock('../src/server/daily-gp-share.js', () => mockShare);
 vi.mock('../src/server/daily-gp-post-store.js', () => mockPostStore);
 vi.mock('../src/server/daily-autopost-store.js', () => mockAutopostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
+vi.mock('../src/server/share-image.js', () => mockShareImage);
 
 const {
     enableDailyAutopost,
@@ -72,6 +77,7 @@ describe('daily post workflow', () => {
         });
         mockPostStore.releaseDailyGpPostCreationLock.mockResolvedValue(undefined);
         mockShare.registerDailyGpPostWithScoreThread.mockResolvedValue({});
+        mockShareImage.resolveDailyShareImageUrl.mockReturnValue(null);
     });
 
     it('enables autoposting while retaining existing post history', async () => {
@@ -136,6 +142,13 @@ describe('daily post workflow', () => {
             created: true,
             postUrl: 'https://reddit.com/daily',
         });
+        expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(
+            expect.objectContaining({
+                subredditName: 'MiniRacer',
+                entry: 'default',
+            }),
+        );
+        expect(mockReddit.submitCustomPost.mock.calls[0][0].styles).toBeUndefined();
         expect(mockShare.registerDailyGpPostWithScoreThread).toHaveBeenCalledWith({
             subredditName: 'MiniRacer',
             challengeId: challenge.id,
@@ -147,6 +160,25 @@ describe('daily post workflow', () => {
             key: 'lock',
             value: 'value',
         });
+    });
+
+    it('attaches the track share image URL when the asset resolves', async () => {
+        mockShareImage.resolveDailyShareImageUrl.mockReturnValue(
+            'https://i.redd.it/circuit-share.jpg',
+        );
+        mockReddit.submitCustomPost.mockResolvedValue({
+            id: 't3_daily',
+            url: 'https://reddit.com/daily',
+        });
+
+        await ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge);
+
+        expect(mockShareImage.resolveDailyShareImageUrl).toHaveBeenCalledWith('circuit');
+        expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(
+            expect.objectContaining({
+                styles: { shareImageUrl: 'https://i.redd.it/circuit-share.jpg' },
+            }),
+        );
     });
 
     it('builds sharing context from the request adapter and stored canonical post', async () => {
