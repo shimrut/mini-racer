@@ -3,7 +3,8 @@ import {
     formatTrackNumber,
     generateTrackIntegrationSnippet,
     generateTrackModuleSource,
-    getTrackModuleFilename
+    getTrackModuleFilename,
+    isValidTrackKey
 } from '../tools/mapmaker/track-source.js';
 
 const TRACK = {
@@ -45,6 +46,9 @@ describe('Mapmaker track source serializer', () => {
     it('creates a kebab-case module filename from the track key', () => {
         expect(getTrackModuleFilename('sunlitTemple')).toBe('sunlit-temple.js');
         expect(getTrackModuleFilename('GPFinaleTrack')).toBe('gp-finale-track.js');
+        expect(isValidTrackKey('newCircuit')).toBe(true);
+        expect(isValidTrackKey('class')).toBe(false);
+        expect(() => getTrackModuleFilename('class')).toThrow(/non-reserved/);
     });
 
     it('emits a default-exported geometry-only module', () => {

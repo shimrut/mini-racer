@@ -3,7 +3,8 @@ import {
     formatTrackNumber as formatNumber,
     generateTrackIntegrationSnippet,
     generateTrackModuleSource,
-    getTrackModuleFilename
+    getTrackModuleFilename,
+    isValidTrackKey
 } from './mapmaker/track-source.js';
 
 const TOOL_LABELS = {
@@ -17,7 +18,6 @@ const TOOL_LABELS = {
 
 const EDITOR_TOOLS = ['outer', 'inner', 'startLine', 'startPos', 'checkpoints'];
 
-const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
 const MIN_DRAW_WIDTH = 1.5;
 const MAX_DRAW_WIDTH = 20;
@@ -383,8 +383,10 @@ class MapmakerApp {
             checkpointIndex: 0,
             drag: null,
             dirtyTrackKeys: new Set(),
+            originalTrackKeyByKey: new Map(
+                Object.keys(TRACKS).map((trackKey) => [trackKey, trackKey]),
+            ),
             status: 'Ready.',
-            fileHandle: null,
             isSpaceDown: false,
             skipDrawClick: false,
             draftLoop: [],
@@ -641,7 +643,7 @@ class MapmakerApp {
         this.addCheckpointBtn.addEventListener('click', () => this.addCheckpoint());
         this.removeCheckpointBtn.addEventListener('click', () => this.removeCheckpoint());
         this.reframeBtn.addEventListener('click', () => this.resetView());
-        this.saveTrackBtn.addEventListener('click', () => this.saveTrackModuleToFile());
+        this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
         this.downloadTrackBtn.addEventListener('click', () => this.downloadTrackModule());
         this.copyIntegrationBtn.addEventListener('click', () => this.copyTrackIntegration());
 
@@ -760,9 +762,6 @@ class MapmakerApp {
         if (!this.state.tracks[trackKey]) {
             return;
         }
-        if (trackKey !== this.state.selectedTrackKey) {
-            this.state.fileHandle = null;
-        }
         this.state.selectedTrackKey = trackKey;
         this.trackSelect.value = trackKey;
         this.trackKeyInput.value = trackKey;
@@ -826,9 +825,9 @@ class MapmakerApp {
             this.trackKeyInput.value = currentKey;
             return;
         }
-        if (!IDENTIFIER_RE.test(nextKey)) {
+        if (!isValidTrackKey(nextKey)) {
             this.trackKeyInput.value = currentKey;
-            this.setStatus('Track key must be a valid JavaScript identifier.', true);
+            this.setStatus('Track key must be a valid non-reserved JavaScript identifier.', true);
             return;
         }
         if (this.state.tracks[nextKey]) {
@@ -843,15 +842,19 @@ class MapmakerApp {
             rebuilt[key === currentKey ? nextKey : key] = value;
         });
         this.state.tracks = rebuilt;
+        const originalTrackKey = this.state.originalTrackKeyByKey.get(currentKey) ?? null;
+        this.state.originalTrackKeyByKey.delete(currentKey);
+        if (originalTrackKey) {
+            this.state.originalTrackKeyByKey.set(nextKey, originalTrackKey);
+        }
         this.state.dirtyTrackKeys.delete(currentKey);
         this.state.dirtyTrackKeys.add(nextKey);
         this.state.selectedTrackKey = nextKey;
-        this.state.fileHandle = null;
         this.populateTrackSelect();
         this.trackSelect.value = nextKey;
         this.trackKeyInput.value = nextKey;
         this.markDirty(
-            `Renamed track key to ${nextKey}. Save the new module, remove the old definition file, and copy the updated integration lines.`
+            `Renamed track key to ${nextKey}. Save & Integrate will replace the old definition and integration entries.`
         );
     }
 
@@ -861,8 +864,8 @@ class MapmakerApp {
             return;
         }
         const key = rawKey.trim();
-        if (!IDENTIFIER_RE.test(key)) {
-            this.setStatus('Track key must be a valid JavaScript identifier.', true);
+        if (!isValidTrackKey(key)) {
+            this.setStatus('Track key must be a valid non-reserved JavaScript identifier.', true);
             return;
         }
         if (this.state.tracks[key]) {
@@ -883,8 +886,8 @@ class MapmakerApp {
             return;
         }
         const key = rawKey.trim();
-        if (!IDENTIFIER_RE.test(key)) {
-            this.setStatus('Track key must be a valid JavaScript identifier.', true);
+        if (!isValidTrackKey(key)) {
+            this.setStatus('Track key must be a valid non-reserved JavaScript identifier.', true);
             return;
         }
         if (this.state.tracks[key]) {
@@ -2129,69 +2132,67 @@ class MapmakerApp {
         link.download = filename;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        this.markSaved(`Downloaded ${filename}.`);
+        this.setStatus(
+            `Downloaded ${filename}. Repository integration is still required.`,
+        );
     }
 
-    async getWritableFileHandle() {
-        if (this.state.fileHandle) {
-            return this.state.fileHandle;
-        }
-        if (window.showSaveFilePicker) {
-            this.state.fileHandle = await window.showSaveFilePicker({
-                suggestedName: getTrackModuleFilename(this.state.selectedTrackKey),
-                types: [{
-                    description: 'JavaScript modules',
-                    accept: { 'text/javascript': ['.js'] }
-                }]
-            });
-            return this.state.fileHandle;
-        }
-        if (!window.showOpenFilePicker) {
-            return null;
-        }
-
-        const [handle] = await window.showOpenFilePicker({
-            multiple: false,
-            types: [{
-                description: 'JavaScript modules',
-                accept: { 'text/javascript': ['.js'] }
-            }]
-        });
-        this.state.fileHandle = handle;
-        return handle;
-    }
-
-    async saveTrackModuleToFile() {
+    async saveAndIntegrateTrack() {
         const invalidTrack = this.validateTrack(this.track);
         if (invalidTrack) {
             this.setStatus(`Cannot save ${this.track.name}: ${invalidTrack}.`, true);
             return;
         }
 
-        const filename = getTrackModuleFilename(this.state.selectedTrackKey);
-        const source = generateTrackModuleSource(this.track);
+        const trackKey = this.state.selectedTrackKey;
+        const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey) ?? null;
+        if (
+            originalTrackKey
+            && originalTrackKey !== trackKey
+            && !window.confirm(
+                `Rename ${originalTrackKey} to ${trackKey}? This will delete the old definition file and replace its catalog, schedule, import, and registry entries.`,
+            )
+        ) {
+            return;
+        }
+
+        this.saveTrackBtn.disabled = true;
+        this.setStatus(`Saving and integrating ${this.track.name}...`);
         try {
-            const handle = await this.getWritableFileHandle();
-            if (!handle) {
-                this.downloadTrackModule();
-                return;
+            const response = await fetch('/__mapmaker/save-track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    trackKey,
+                    originalTrackKey,
+                    trackName: this.track.name,
+                    track: this.track,
+                }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result.error || `Save failed with status ${response.status}.`);
             }
 
-            const permission = await handle.requestPermission({ mode: 'readwrite' });
-            if (permission !== 'granted') {
-                this.setStatus('Write permission was not granted.', true);
-                return;
-            }
-
-            const writable = await handle.createWritable();
-            await writable.write(source);
-            await writable.close();
-            this.markSaved(`Saved ${filename}.`);
+            this.state.originalTrackKeyByKey.set(trackKey, trackKey);
+            const schedulePosition = result.scheduleIndex + 1;
+            const scheduleText = result.action === 'created'
+                ? ` Appended at schedule position ${schedulePosition}.`
+                : '';
+            const renameText = result.removedFilename
+                ? ` Removed ${result.removedFilename}.`
+                : '';
+            this.markSaved(
+                `Saved and integrated ${result.filename}.${scheduleText}${renameText}`,
+            );
         } catch (error) {
-            if (error?.name !== 'AbortError') {
-                console.error(error);
-                this.setStatus('Unable to save directly. Use Download File instead.', true);
-            }
+            console.error(error);
+            this.setStatus(
+                `${error.message} Run Mapmaker through the local Vite server, or use Download Module and Copy Integration.`,
+                true,
+            );
+        } finally {
+            this.saveTrackBtn.disabled = false;
         }
     }
 }

@@ -25,24 +25,23 @@ every consumer load the large geometry registry.
 ## Adding A Track
 
 1. Build and validate the layout in `tools/mapmaker.html`.
-2. Use **Copy Module**, **Save Track Module**, or **Download Module** to create a
-   new file under
-   `game/track/definitions/`.
-3. Add the generated geometry import and registry entry to
-   `game/track/tracks.js`.
-4. Add the track key and name to `TRACK_CATALOG` in
-   `game/track/catalog.js`.
-5. Add the key to `TRACK_SCHEDULE_KEYS` at the intended future Daily GP
-   position. Update `DEFAULT_TRACK_KEY` separately only when the product's
-   standard local fallback should change.
-6. Add medal thresholds in `game/medals/medal-times.json`.
-7. Add or adjust `game/track/presentation.js` only when the track needs a
+2. Run `npm run mapmaker`, open
+   `http://127.0.0.1:5173/tools/mapmaker.html`, and choose
+   **Save & Integrate**. It writes the definition module and updates
+   `TRACK_CATALOG`, `TRACK_SCHEDULE_KEYS`, the static definition imports, and
+   the compatibility registry.
+3. New tracks are appended as the final `TRACK_SCHEDULE_KEYS` entry by default.
+   Existing tracks keep their position. Renames replace the old key at its
+   existing position after confirmation and remove the old definition file.
+4. Add medal thresholds in `game/medals/medal-times.json`.
+5. Add or adjust `game/track/presentation.js` only when the track needs a
    non-default preview or race presentation.
-8. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
+6. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
 
-The Mapmaker's integration snippet provides the definition import, catalog
-metadata line, and geometry registry line. Review the generated key, file slug,
-and player-facing name before pasting them.
+The repository-writing endpoint exists only in the dedicated local Mapmaker
+Vite configuration and accepts requests only from localhost. It is not part of
+the Devvit playtest or production build. **Download Module**, **Copy Module**,
+and **Copy Integration** remain available as manual fallbacks.
 
 ## Dependency Rules
 

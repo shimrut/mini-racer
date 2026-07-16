@@ -11,6 +11,8 @@ IGNORE SUPABASE/
 tools/*
 !tools/generate-player-car-assets.js
 !tools/analyze-unused-css.js
+!tools/mapmaker/
+!tools/mapmaker/*.js
 public/assets/logo/
 public/assets/medals/
 local-assets/

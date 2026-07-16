@@ -226,8 +226,11 @@ These are useful, but they are not on the critical player path:
 - `mod-tool.html`, `mod-tool.js`, `mod-tool.css`
   Shipped moderator analytics UI and reporting support.
 - `tools/mapmaker.*`
-  Track/content support tooling. Its export includes the definition module and
-  the catalog/registry integration lines described in `docs/track-authoring.md`.
+  Track/content support tooling. Local **Save & Integrate** writes the selected
+  definition and updates the catalog, schedule, and compatibility registry;
+  new tracks append to the schedule by default. Manual module and integration
+  exports remain available as fallbacks, as described in
+  `docs/track-authoring.md`.
 - `tools/runner.*`
   Auxiliary workflow tooling.
 - `preview.html`, `preview.js`, `preview.css`

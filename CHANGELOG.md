@@ -5,6 +5,7 @@ How the game works today: [README.md](README.md#how-the-game-works).
 ## 0.7
 
 - Split the large track registry into lightweight catalog metadata, explicit Daily GP schedule order, and one geometry module per track. Metadata-only consumers no longer load full geometry, while rendering, collision, previews, and server replay validation retain the same assembled `TRACKS` contract.
+- Mapmaker can now save and integrate a track directly through the local development server. New tracks append to the Daily GP schedule, existing tracks update in place, and confirmed renames replace the old source and registry entries.
 - Split the Devvit server into a boot-only entrypoint, an import-safe composition root, capability-specific route registrars, and focused Reddit/Redis workflow modules without changing endpoints, response shapes, Redis records, or moderator behavior.
 - Guest submission throttling now uses a hashed server-provided Reddit request identity, so generating a new signed guest profile no longer resets the rate-limit window.
 - Fixed Android Reddit app sessions that could show only the car over a white background. Android now uses the reliable main-thread track renderer, while iOS and web clients retain the worker-rendered track path.
