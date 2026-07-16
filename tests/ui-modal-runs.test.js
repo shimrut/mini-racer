@@ -69,6 +69,9 @@ function createTestElement(tagName = 'div') {
             this.children.push(node);
             return node;
         },
+        prepend(...nodes) {
+            this.children.unshift(...nodes);
+        },
         querySelector: vi.fn(() => null)
     };
 }

@@ -1386,7 +1386,7 @@ export class ModalShell {
             const refreshSpinner = document.createElement('span');
             refreshSpinner.className = 'modal-rank-spinner leaderboard-refresh-spinner';
             refreshSpinner.setAttribute('aria-hidden', 'true');
-            summaryValue.appendChild(refreshSpinner);
+            summaryValue.prepend(refreshSpinner);
         }
 
         const summaryMeta = document.createElement('span');
