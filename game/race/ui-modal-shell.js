@@ -1391,13 +1391,6 @@ export class ModalShell {
 
         const summaryMeta = document.createElement('span');
         summaryMeta.className = 'leaderboard-summary__meta';
-        const playerBestTime = Number(payload?.scoreboardSnapshot?.currentPlayerRow?.bestTime);
-        if (Number.isFinite(playerBestTime)) {
-            const playerTime = document.createElement('span');
-            playerTime.className = 'leaderboard-summary__time';
-            playerTime.textContent = this.content.formatTime(playerBestTime);
-            summaryMeta.appendChild(playerTime);
-        }
         if (submittedRacerCount > 0) {
             const racerCountText = submittedRacerCount.toLocaleString();
             summaryMeta.setAttribute(
@@ -1427,6 +1420,7 @@ export class ModalShell {
 
         summary.append(summaryValue, summaryMeta);
         header?.appendChild(summary);
+        this.configureRunsModalHeader?.();
     }
 
     _wireLeaderboardRowShare() {
@@ -1586,16 +1580,26 @@ export class ModalShell {
         const trackName = payload?.scoreboardTrackKey && TRACKS[payload.scoreboardTrackKey]
             ? TRACKS[payload.scoreboardTrackKey].name
             : null;
+        const playerBestTime = Number(payload?.scoreboardSnapshot?.currentPlayerRow?.bestTime);
+        const playerTimeLabel = Number.isFinite(playerBestTime)
+            ? this.content.formatTime(playerBestTime)
+            : '';
 
         configureReusableModal(this.modalRunsView, {
             title: isLeaderboardOnly
-                ? payload?.scoreboardTitle || 'Standings'
+                ? (trackName || payload?.scoreboardTitle || 'Standings')
                 : 'Your 5 PBs',
             subtitle: isLeaderboardOnly
-                ? (trackName || '')
+                ? playerTimeLabel
                 : 'Personal Bests',
             closeLabel: this._runsViewMode === 'back' ? 'Back' : 'Close',
         });
+
+        const subtitleEl = this.modalRunsView.querySelector('[data-modal-subtitle]');
+        subtitleEl?.classList.toggle(
+            'leaderboard-header-time',
+            Boolean(isLeaderboardOnly && playerTimeLabel)
+        );
     }
 
     matchesModalScoreboardContext({ challengeId = null, trackKey = null } = {}) {

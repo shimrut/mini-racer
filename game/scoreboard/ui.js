@@ -59,30 +59,6 @@ function isDailyChallengeToday(challenge, nowMs = Date.now()) {
         === new Date(nowMs).toISOString().slice(0, 10);
 }
 
-function getDailyChallengeLeaderboardTitle(challenge) {
-    if (isDailyChallengeToday(challenge)) {
-        return 'Today';
-    }
-
-    const source = getDailyChallengeDateSource(challenge);
-    const timeMs = Date.parse(source);
-    if (!Number.isFinite(timeMs)) {
-        return 'Leaderboard';
-    }
-
-    const date = new Date(timeMs);
-    const weekday = new Intl.DateTimeFormat('en-US', {
-        weekday: 'short',
-        timeZone: 'UTC'
-    }).format(date);
-    const dateLabel = new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC'
-    }).format(date);
-    return `${weekday} ${dateLabel}`;
-}
-
 function buildDailyChallengeLeaderboardDayOption(challenge) {
     if (!isValidDailyChallenge(challenge)) return null;
 
@@ -469,7 +445,7 @@ export class LeaderboardsUi {
         const sharedOptions = {
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: challenge.trackKey,
-            scoreboardTitle: getDailyChallengeLeaderboardTitle(challenge),
+            scoreboardTitle: getDailyChallengeTrackName(challenge),
             scoreboardSubhead: getDailyChallengeTrackName(challenge),
             leaderboardDayOptions,
             selectedLeaderboardDayId: challenge.id,

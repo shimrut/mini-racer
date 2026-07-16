@@ -261,6 +261,16 @@
     opacity: 0.6;
 }
 
+.leaderboard-header-time {
+    font-family: var(--mono-font);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: var(--text-color);
+    opacity: 1;
+}
+
 .leaderboard-summary {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

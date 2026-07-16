@@ -84,7 +84,7 @@ describe('ui leaderboard helpers', () => {
         expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', {
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'circuit',
-            scoreboardTitle: 'Today',
+            scoreboardTitle: 'Classic Circuit',
             scoreboardSubhead: 'Classic Circuit',
             scoreboardChallengeId: 'daily-1',
             scoreboardSnapshot: { isLoading: true },
@@ -103,7 +103,7 @@ describe('ui leaderboard helpers', () => {
         expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', {
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'circuit',
-            scoreboardTitle: 'Today',
+            scoreboardTitle: 'Classic Circuit',
             scoreboardSubhead: 'Classic Circuit',
             scoreboardChallengeId: 'daily-1',
             scoreboardSnapshot,
@@ -121,7 +121,7 @@ describe('ui leaderboard helpers', () => {
         });
     });
 
-    it('shows an older post-bound challenge date instead of calling it Today', async () => {
+    it('shows the track name in the standings header instead of the challenge date', async () => {
         const originalDateNow = Date.now;
         Date.now = () => Date.parse('2026-07-12T12:00:00.000Z');
         try {
@@ -139,7 +139,7 @@ describe('ui leaderboard helpers', () => {
             });
 
             expect(showRunsModal).toHaveBeenCalledWith(null, null, null, 'close', expect.objectContaining({
-                scoreboardTitle: 'Fri Jul 10',
+                scoreboardTitle: 'Classic Circuit',
                 selectedLeaderboardDayId: 'daily-friday',
                 leaderboardDayOptions: [{
                     challengeId: 'daily-friday',
@@ -285,7 +285,7 @@ describe('ui leaderboard helpers', () => {
             onLoadMoreLeaderboard: expect.any(Function),
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'harborParkLoop',
-            scoreboardTitle: 'Leaderboard',
+            scoreboardTitle: 'Harbor Park',
             scoreboardSubhead: 'Harbor Park',
             scoreboardChallengeId: 'daily-2',
             leaderboardDayOptions: [{

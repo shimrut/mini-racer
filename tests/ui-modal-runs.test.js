@@ -9,6 +9,7 @@ const {
     showRunsModal,
     showModalLeaderboardPayload,
     renderLeaderboardStandaloneIntro,
+    configureRunsModalHeader,
     updateModalRunSummary,
     bindLeaderboardPagination,
     bindLeaderboardDaySwipe,
@@ -22,6 +23,22 @@ function createClassList(initialClasses = []) {
         add: (...names) => names.forEach((name) => classes.add(name)),
         remove: (...names) => names.forEach((name) => classes.delete(name)),
         contains: (name) => classes.has(name),
+        toggle: (name, force) => {
+            if (force === true) {
+                classes.add(name);
+                return true;
+            }
+            if (force === false) {
+                classes.delete(name);
+                return false;
+            }
+            if (classes.has(name)) {
+                classes.delete(name);
+                return false;
+            }
+            classes.add(name);
+            return true;
+        },
         values: () => Array.from(classes)
     };
 }
@@ -331,14 +348,21 @@ describe('ui modal runs helpers', () => {
         expect(showTrackLeaderboardModal).toHaveBeenLastCalledWith('circuit', 'back');
     });
 
-    it('keeps the player rank and time in the leaderboard header summary', () => {
+    it('keeps the player rank in the header summary and moves time under the track name', () => {
         const originalDocument = global.document;
         const header = createTestElement('header');
         const modalLapTimes = createTestElement('div');
+        const titleEl = createTestElement('span');
+        const subtitleEl = createTestElement('span');
+        subtitleEl.hidden = true;
         const modalRunsView = {
-            querySelector: vi.fn((selector) => (
-                selector === '.reusable-modal-header' ? header : null
-            ))
+            querySelector: vi.fn((selector) => {
+                if (selector === '.reusable-modal-header') return header;
+                if (selector === '[data-modal-title]') return titleEl;
+                if (selector === '[data-modal-subtitle]') return subtitleEl;
+                if (selector === '[data-modal-close]') return null;
+                return null;
+            })
         };
         global.document = {
             createElement: vi.fn((tagName) => createTestElement(tagName)),
@@ -360,7 +384,9 @@ describe('ui modal runs helpers', () => {
                         leaderboardEntryCount: 4
                     }
                 },
-                content: { formatTime: vi.fn(() => '42.32') }
+                content: { formatTime: vi.fn(() => '42.32') },
+                configureRunsModalHeader,
+                _runsViewMode: 'close'
             });
 
             const summary = header.children.find((child) => (
@@ -369,9 +395,11 @@ describe('ui modal runs helpers', () => {
             expect(summary).toBeTruthy();
             expect(summary.children[0].textContent).toBe('#2');
             expect(summary.children[1].getAttribute('aria-label')).toBe('4 racers');
-            expect(summary.children[1].children[0].textContent).toBe('42.32');
-            expect(summary.children[1].children[1].textContent).toBe('4');
-            expect(summary.children[1].children[2].classList.contains('leaderboard-summary__racer-icon')).toBe(true);
+            expect(summary.children[1].children[0].textContent).toBe('4');
+            expect(summary.children[1].children[1].classList.contains('leaderboard-summary__racer-icon')).toBe(true);
+            expect(subtitleEl.textContent).toBe('42.32');
+            expect(subtitleEl.hidden).toBe(false);
+            expect(subtitleEl.classList.contains('leaderboard-header-time')).toBe(true);
         } finally {
             global.document = originalDocument;
         }
