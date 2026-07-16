@@ -338,7 +338,7 @@ export class DailyChallengeUi {
             info.className = 'daily-playlist-hero-info';
 
             const status = document.createElement('span');
-            status.className = `daily-playlist-hero-status daily-playlist-hero-status--${availability.key}`;
+            status.className = 'daily-playlist-hero-day';
             status.textContent = availabilityLabel;
 
             const title = document.createElement('span');

@@ -526,7 +526,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     content: '';
     display: block;
     width: 100%;
-    height: var(--modal-floating-back-clearance);
+    height: calc(var(--modal-floating-back-height) + var(--modal-floating-back-offset) + 1rem);
     pointer-events: none;
 }
 
