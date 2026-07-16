@@ -1594,12 +1594,6 @@ export class ModalShell {
                 : 'Personal Bests',
             closeLabel: this._runsViewMode === 'back' ? 'Back' : 'Close',
         });
-
-        const subtitleEl = this.modalRunsView.querySelector('[data-modal-subtitle]');
-        subtitleEl?.classList.toggle(
-            'leaderboard-summary__time',
-            Boolean(isLeaderboardOnly && playerTimeLabel)
-        );
     }
 
     matchesModalScoreboardContext({ challengeId = null, trackKey = null } = {}) {

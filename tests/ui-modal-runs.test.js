@@ -399,7 +399,6 @@ describe('ui modal runs helpers', () => {
             expect(summary.children[1].children[1].classList.contains('leaderboard-summary__racer-icon')).toBe(true);
             expect(subtitleEl.textContent).toBe('42.32');
             expect(subtitleEl.hidden).toBe(false);
-            expect(subtitleEl.classList.contains('leaderboard-summary__time')).toBe(true);
         } finally {
             global.document = originalDocument;
         }
