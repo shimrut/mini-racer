@@ -15,7 +15,6 @@
     text-align: left;
     color: inherit;
     font: inherit;
-    position: relative;
 }
 .daily-playlist-entry--hero:hover {
     transform: translateY(-1px);
@@ -47,7 +46,7 @@
     flex: 1 1 auto;
     min-width: 0;
     gap: 1rem;
-    padding: 1.75rem 1.05rem 1rem;
+    padding: 1rem 1.05rem;
 }
 
 .daily-playlist-hero-info {
@@ -68,41 +67,28 @@
 }
 
 .daily-playlist-hero-status {
-    position: absolute;
-    top: 0;
-    right: 0;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 1.5rem;
-    max-width: min(48%, 11rem);
-    padding: 0.35rem 0.65rem;
-    border-radius: var(--radius-full);
-    font-size: 0.62rem;
-    font-weight: 900;
-    font-style: italic;
-    letter-spacing: 0.08em;
+    font-size: 0.65rem;
+    color: var(--accent-color);
     text-transform: uppercase;
-    text-align: right;
-    line-height: 1.2;
-    pointer-events: none;
+    font-weight: 800;
+    letter-spacing: 0.15em;
 }
 
 .daily-playlist-hero-status--featured {
-    background: #dc2626;
+    background: var(--accent-color);
     color: var(--text-color);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-lg);
+    align-self: flex-start;
+    letter-spacing: 0.15em;
 }
 
 .daily-playlist-hero-status--available {
-    background: transparent;
     color: var(--accent-color);
-    padding-right: 0.65rem;
 }
 
 .daily-playlist-hero-status--expired {
-    background: #475569;
-    color: var(--text-color);
+    color: #94a3b8;
 }
 
 .daily-playlist-hero-medal {
