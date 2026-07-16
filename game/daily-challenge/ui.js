@@ -331,6 +331,10 @@ export class DailyChallengeUi {
             preview.appendChild(canvas);
             this.renderPlaylistPreview(canvas, challenge);
 
+            const status = document.createElement('span');
+            status.className = `daily-playlist-hero-status daily-playlist-hero-status--${availability.key}`;
+            status.textContent = availabilityLabel;
+
             const content = document.createElement('div');
             content.className = 'daily-playlist-hero-content';
 
@@ -342,13 +346,6 @@ export class DailyChallengeUi {
             title.textContent = trackName;
 
             info.append(title);
-
-            const meta = document.createElement('div');
-            meta.className = 'daily-playlist-hero-meta';
-
-            const status = document.createElement('span');
-            status.className = `daily-playlist-hero-status daily-playlist-hero-status--${availability.key}`;
-            status.textContent = availabilityLabel;
 
             const medal = document.createElement('div');
             medal.className = 'daily-playlist-hero-medal';
@@ -362,9 +359,8 @@ export class DailyChallengeUi {
                 }
             ));
 
-            meta.append(status, medal);
-            content.append(info, meta);
-            row.append(preview, content);
+            content.append(info, medal);
+            row.append(preview, content, status);
 
             list.appendChild(row);
         }
