@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { readCssBundle } from './helpers/read-css-bundle.js';
 
-const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+const styles = readCssBundle(new URL('../styles.css', import.meta.url));
 
 describe('finish screen styles', () => {
     it('keeps the Improve button width rule separate from generic button declarations', () => {

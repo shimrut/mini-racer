@@ -58,7 +58,10 @@ flowchart LR
 ### UI And Modal Flow
 
 - `game.html` contains the modal markup and the IDs/classes the UI modules depend on.
-- `styles.css` contains nearly all visual rules for gameplay screens, reusable sheets, garage, settings, playlist, and result states.
+- `styles.css` is the single ordered stylesheet manifest loaded by the game. Its
+  product-oriented partials cover gameplay screens, reusable sheets, garage,
+  settings, playlist, standings and result states; their ownership and
+  cascade-preservation rules are documented in `docs/css-architecture.md`.
 - `game/race/ui-modal-shell.js` controls which modal view is open, focus trapping, pause/win/notice mode switching, and modal-to-garage handoff. Wall contact no longer has a terminal result screen.
 - `game/race/ui-modal-content.js` builds the result modal content blocks and score displays.
 - `game/ui/reusable-modal.js` and `game/ui/modal-handoff.js` provide shared modal behavior used by settings, garage, playlist, and some results flows.
@@ -229,3 +232,6 @@ Before approving any new request, sort it into one of these buckets:
   Anything touching tracks, physics, challenge rules, or replay validation.
 
 If a request lands in the cross-cutting bucket, plan for both gameplay validation and leaderboard acceptance checks before calling it complete.
+
+For visual changes, use `docs/css-architecture.md` to identify the owning
+stylesheet while preserving the manifest's documented cascade order.

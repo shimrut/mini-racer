@@ -1,0 +1,104 @@
+* {
+    box-sizing: border-box
+}
+
+:root {
+    /* Colors - Racing Palette */
+    --bg-color: #020617;
+    --bg-color-darker: #010410;
+    --bg-surface: #0f172a;
+    --text-color: #f8fafc;
+    --text-dim: #94a3b8;
+    --text-muted: #64748b;
+    --accent-color: #ef4444;
+    --accent-bright: #ff3e3e;
+    --success: #22c55e;
+    --success-bright: #4ade80;
+    --warning: #fbbf24;
+
+    /* Border Colors */
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-default: rgba(255, 255, 255, 0.12);
+    --border-strong: rgba(255, 255, 255, 0.18);
+
+    /* UI Colors */
+    --hud-panel-bg: var(--bg-color-darker);
+    --hud-panel-border: rgba(148, 163, 184, 0.2);
+
+    /* Typography */
+    --header-font: "Outfit", sans-serif;
+    --mono-font: "JetBrains Mono", monospace;
+
+    /* Spacing */
+    --space-xl: 2rem;
+
+    /* Border Radius */
+    --radius-xs: 0.25rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 1rem;
+    --radius-lg: 1.25rem;
+    --radius-full: 999px;
+
+    /* Sizing */
+    --modal-floating-back-height: 2.55rem;
+    --modal-floating-back-offset: 0.85rem;
+    /* Full-screen panels: viewport height, capped (adjust cap in one place). */
+    --screen-height-cap: 1000px;
+    --screen-fill-height: min(100vh, var(--screen-height-cap));
+
+    /* Z-Index */
+    --z-canvas: 0;
+    --z-hud: 100;
+    --z-overlay: 1000;
+    --z-modal: 2000
+}
+
+@supports (height: 100dvh) {
+    :root {
+        --screen-fill-height: min(100dvh, var(--screen-height-cap));
+    }
+}
+
+button:focus-visible,
+.touch-btn:focus-visible,
+a:focus-visible {
+    outline: none !important;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--header-font);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    height: 100dvh;
+    min-height: -webkit-fill-available;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none
+}
+
+body.start-overlay-active .hud-bar,
+body.start-overlay-active .speedometer,
+body.start-overlay-active .mobile-hud-bar,
+body.start-overlay-active .mobile-controls,
+body.start-overlay-active .hud-pause-btn,
+body.start-overlay-active .lap-flash,
+body.start-selection-active .hud-bar,
+body.start-selection-active .speedometer,
+body.start-selection-active .mobile-hud-bar,
+body.start-selection-active .mobile-controls,
+body.start-selection-active .hud-pause-btn,
+body.start-selection-active .lap-flash {
+    display: none !important
+}

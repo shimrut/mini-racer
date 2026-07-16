@@ -1,0 +1,193 @@
+.daily-playlist-entry--hero {
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    padding: 0;
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    overflow: hidden;
+    min-height: 7.25rem;
+    margin-bottom: 0;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+}
+.daily-playlist-entry--hero:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+}
+
+
+.daily-playlist-hero-preview {
+    width: min(42%, 13rem);
+    min-width: 9.5rem;
+    height: auto;
+    background: radial-gradient(circle at center, rgba(51, 65, 85, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.daily-playlist-hero-preview canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.daily-playlist-hero-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 1rem;
+    padding: 1rem 1.05rem;
+}
+
+.daily-playlist-hero-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.daily-playlist-hero-title {
+    font-size: 1.25rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    color: var(--text-color);
+    font-style: italic;
+    line-height: 1.05;
+    overflow-wrap: anywhere;
+}
+
+.daily-playlist-hero-day {
+    font-size: 0.65rem;
+    color: var(--accent-color);
+    text-transform: uppercase;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+}
+
+.daily-playlist-entry--hero.current .daily-playlist-hero-day {
+    background: var(--accent-color);
+    color: var(--text-color);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-lg);
+    align-self: flex-start;
+}
+
+.daily-playlist-hero-medal {
+    flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+}
+.daily-playlist-hero-medal .medal-svg--hero {
+    width: 100%;
+    height: 100%;
+}
+
+@media (max-width: 560px) {
+    #modal:has(#modal-runs-view.active-view) .modal-card,
+    #settings-modal .modal-card,
+    #daily-playlist-modal .modal-card,
+    #garage-modal .modal-card {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .reusable-modal-header {
+        padding: 1rem 1rem 0;
+    }
+
+    .reusable-modal-content,
+    #modal:has(#modal-runs-view.active-view) .reusable-modal-content {
+        padding-inline: 0.75rem;
+        gap: 0.75rem;
+    }
+
+    .result-modal .modal-card-section--sheet .modal-sheet-dismiss,
+    .result-modal .modal-card-section--runs .modal-sheet-dismiss {
+        max-width: calc(100% - 1.5rem);
+    }
+
+    #settings-modal .modal-sheet-panel {
+        padding: 0.8rem;
+    }
+
+    #settings-modal .modal-sheet-settings-identity-head,
+    #settings-modal .modal-sheet-settings-row--collision-delay {
+        gap: 0.55rem;
+    }
+
+    #settings-modal .settings-collision-delay-control-row {
+        gap: 0.5rem;
+    }
+
+    #settings-modal .settings-collision-delay-stepper {
+        width: 2.15rem;
+        min-width: 2.15rem;
+        height: 2.15rem;
+    }
+
+    #settings-modal .settings-collision-delay-meter {
+        gap: 0.2rem;
+    }
+
+    #garage-modal .garage-tab {
+        min-height: 2.85rem;
+        font-size: 0.9rem;
+    }
+
+    #garage-modal .garage-skin-section {
+        padding: 0.85rem 0.75rem;
+    }
+
+    #garage-modal .garage-skin-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.65rem;
+    }
+
+    #garage-modal .garage-skin-option {
+        min-height: 6.7rem;
+    }
+
+    #garage-modal .garage-skin-option__thumb {
+        height: 3.6rem;
+    }
+
+    #garage-modal .garage-trail-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.55rem;
+    }
+
+    #garage-modal .garage-trail-option {
+        min-height: 5.85rem;
+    }
+
+    .daily-playlist-entry--hero {
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .daily-playlist-hero-preview {
+        width: 100%;
+        min-width: 0;
+        height: 7rem;
+    }
+
+    .daily-playlist-hero-content {
+        align-items: flex-end;
+        padding: 0.85rem;
+    }
+
+    .daily-playlist-hero-title {
+        font-size: 1.1rem;
+    }
+
+}

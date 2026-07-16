@@ -1,0 +1,336 @@
+.modal {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: calc(var(--space-xl) + env(safe-area-inset-top)) env(safe-area-inset-right) calc(var(--space-xl) + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+    overflow: hidden;
+    z-index: var(--z-modal);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .16s ease;
+    will-change: opacity;
+    contain: layout paint;
+}
+
+.modal.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.modal.modal--instant {
+    transition: none;
+}
+
+/* Bottom sheet modals: pause and win */
+#modal.modal--pause:not(.modal--win),
+#modal.modal--win {
+    align-items: center;
+    background: rgba(2, 6, 23, 0.6);
+    backdrop-filter: blur(6px) saturate(1.05);
+    -webkit-backdrop-filter: blur(6px) saturate(1.05);
+}
+
+#modal.modal--pause:not(.modal--win) .modal-card,
+#modal.modal--win .modal-card {
+    height: auto;
+    min-height: 0;
+    max-height: var(--screen-fill-height);
+    margin-top: 0;
+    margin-bottom: 0;
+    background: transparent;
+}
+
+#modal.modal--pause:not(.modal--win) .modal-card,
+#modal.modal--win .modal-card {
+    max-width: min(92vw, 26rem);
+}
+
+#modal.modal--pause:not(.modal--win) .modal-view#modal-pause-view.active-view {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+.pause-race-progress__medals {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.18rem;
+    min-height: 1.45rem;
+    flex-wrap: wrap;
+}
+
+.pause-race-progress__medal-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.3rem;
+    height: 1.3rem;
+}
+
+.pause-race-progress__medal-slot--locked {
+    opacity: 0.55;
+}
+
+.medal-svg--pause {
+    width: 1.3rem;
+    height: 1.3rem;
+    flex: 0 0 auto;
+}
+
+#modal-pause-track-preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    vertical-align: middle;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    #modal.modal--pause:not(.modal--win),
+    #modal.modal--win {
+        background: rgba(2, 6, 23, 0.94);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+}
+
+@media (max-width: 768px) {
+    /* Full-width modals: outer + section padding stacked badly on narrow viewports */
+    .modal {
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .modal .modal-card {
+        padding: 0;
+    }
+
+    .result-modal .modal-card-section {
+        padding-inline: 0;
+    }
+
+    .result-modal .modal-card-section--runs,
+    .result-modal .modal-card-section--sheet {
+        /* Padding is now handled by inner elements */
+    }
+
+    #garage-modal .garage-tab {
+        font-size: 1.05rem;
+    }
+}
+
+.modal-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.modal .modal-card {
+    max-width: 420px;
+    height: var(--screen-fill-height);
+    max-height: var(--screen-fill-height);
+    padding: var(--space-xl);
+    margin: auto;
+    transform: translateY(10px);
+    transition: transform .16s cubic-bezier(.22, 1, .36, 1), opacity .16s ease;
+    will-change: transform, opacity;
+    contain: layout paint;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.daily-playlist-list,
+.result-modal .modal-card-section--runs .modal-lap-times-container,
+.reusable-modal-content,
+.result-modal .modal-card-section--sheet .achievements-list {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    touch-action: pan-y;
+}
+
+.modal .modal-card::-webkit-scrollbar,
+.daily-playlist-list::-webkit-scrollbar,
+.result-modal .modal-card-section--runs .modal-lap-times-container::-webkit-scrollbar,
+.reusable-modal-content::-webkit-scrollbar,
+.result-modal .modal-card-section--sheet .achievements-list::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+}
+
+#modal .modal-card {
+    padding: 0
+}
+
+#modal.modal--win .modal-card {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#modal.modal--win .modal-card {
+    width: 100%;
+    max-width: min(92vw, 26rem);
+}
+
+/* Win overlay: horizontal medal row */
+.win-combined-medal-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    width: min(92vw, 25rem);
+    max-width: 100%;
+}
+
+.win-combined-medal-overlay__center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    width: 100%;
+}
+
+.combined-hero-medal .win-combined-medal-overlay__row.combined-medal-row {
+    width: 100%;
+    justify-content: center;
+}
+
+.combined-hero-medal .win-combined-medal-overlay__row .combined-medal-row-slot .medal-svg--hero {
+    width: min(21vw, 3.5rem);
+    aspect-ratio: 1;
+    height: auto;
+}
+
+.combined-hero-medal .win-combined-medal-overlay__row .medal-svg--hero .medal-svg__center-time {
+    font-size: 96px;
+}
+
+#modal.modal--win.active .modal-card {
+    position: relative;
+    z-index: 2;
+}
+
+#modal.modal--win #modal-combined-view .combined-hero-medal {
+    justify-content: center;
+    display: flex;
+    align-items: center;
+}
+
+#modal.modal--win #modal-combined-view .combined-stats-right-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.15rem;
+    text-align: right;
+}
+
+#modal.modal--win #modal-combined-view .combined-rank-value {
+    font-style: normal;
+    color: #ffffff;
+    margin-bottom: 0;
+}
+
+#modal.modal--win #modal-combined-view .combined-rank-value--status {
+    font-family: var(--header-font);
+    font-size: clamp(0.95rem, 3.8vw, 1.15rem);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.15;
+    text-transform: uppercase;
+    white-space: normal;
+    max-width: 8.5rem;
+}
+
+#modal.modal--win #modal-combined-view .combined-rank-value .rank-hash {
+    font-size: 0.65em;
+    opacity: 0.5;
+    margin-right: 0.05em;
+    font-weight: 700;
+}
+
+#modal.modal--win #modal-combined-view .combined-rank-total {
+    font-family: var(--mono-font);
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1;
+    font-weight: 900;
+}
+
+#modal.modal--win #modal-combined-view .combined-rank-value {
+    font-family: var(--mono-font);
+    font-size: clamp(2.65rem, 8vw, 3.35rem);
+    font-weight: 850;
+    text-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    letter-spacing: -0.04em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta.is-gain {
+    color: var(--success-bright, var(--success-bright));
+}
+
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta.is-loss {
+    color: var(--accent-bright, var(--accent-bright));
+}
+
+#modal.modal--win #modal-combined-view .combined-stat-value--placeholder {
+    font-size: 0.7rem;
+    font-weight: 500;
+    opacity: 0.6;
+    font-variant-numeric: normal;
+}
+
+#modal.modal--win #modal-combined-view .combined-stat--pb-delta[hidden] {
+    display: flex !important;
+    visibility: hidden;
+    height: 0.95rem;
+}
+
+#modal.modal--win #modal-combined-view #combined-next-medal-stat[hidden] {
+    display: none !important;
+}
+
+#modal.modal--win #modal-combined-view .combined-next-medal-icon-slot {
+    display: inline-flex;
+    align-items: center;
+    line-height: 0;
+}
+
+#modal.modal--win #modal-combined-view .combined-next-medal-icon-slot .medal-svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+}
+
+#modal.modal--win .modal-view#modal-combined-view.active-view {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: min(92dvh, var(--screen-fill-height));
+    display: flex;
+    flex-direction: column;
+}

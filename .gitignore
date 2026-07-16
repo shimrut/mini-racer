@@ -10,6 +10,7 @@ package.devvit.local.json
 IGNORE SUPABASE/
 tools/*
 !tools/generate-player-car-assets.js
+!tools/analyze-unused-css.js
 public/assets/logo/
 public/assets/medals/
 local-assets/
@@ -32,6 +33,7 @@ coverage/
 test-results/
 playwright-report/
 .playwright-mcp/
+unused-css-report.json
 
 # Cursor debug output (keep .cursor/agents/ if you commit those)
 .cursor/debug-*.log

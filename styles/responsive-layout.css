@@ -1,0 +1,243 @@
+@media(min-width:769px) {
+    header {
+        justify-content: center;
+        gap: 12rem
+    }
+
+    .hud-bar {
+        left: 50%;
+        right: auto;
+        width: min(560px, calc(100vw - 2rem));
+        transform: translate(-50%)
+    }
+
+    .mobile-hud-bar {
+        padding-inline: 0;
+    }
+
+}
+
+@media(max-width:768px), (hover:none)and (pointer:coarse), (max-height:600px)and (orientation:landscape) {
+
+    #start-group {
+        width: 100%;
+        max-width: 29rem;
+        gap: .72rem;
+        padding-inline: .65rem
+    }
+
+    .hud-bar {
+        left: .5rem;
+        right: .5rem;
+        gap: .35rem
+    }
+
+    .hud-label {
+        font-size: .6rem
+    }
+
+    .mobile-controls {
+        display: flex
+    }
+
+    .control-group {
+        gap: .75rem
+    }
+
+    .speedometer--desktop {
+        display: none
+    }
+
+    .mobile-hud-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        inset: auto 0 max(1.5rem, env(safe-area-inset-bottom)) 0;
+        height: auto;
+        padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
+    }
+
+    .mobile-hud-bar .speedometer--desktop {
+        display: none;
+    }
+
+    .mobile-hud-bar .mobile-speedometer {
+        display: block;
+        position: static;
+        transform: none;
+    }
+
+    .light {
+        width: 30px;
+        height: 30px
+    }
+
+    .lap-flash {
+        top: calc(100% + 2.75rem);
+        min-width: 8.5rem;
+        padding: .5rem .7rem
+    }
+
+    .lap-flash-time {
+        display: none
+    }
+
+    .lap-flash-delta {
+        font-size: 1.45rem
+    }
+
+    .modal-card {
+        padding: 1rem;
+        max-width: min(92vw, 420px)
+    }
+
+    .result-modal .modal-card-section {
+        padding-inline: 1rem
+    }
+
+    .result-modal .modal-card-section--runs {
+        padding-top: .75rem;
+        padding-bottom: 1rem
+    }
+
+    #modal-main-view {
+        padding-bottom: 0
+    }
+
+    .result-modal h2 {
+        font-size: var(--space-xl);
+        margin-bottom: .1rem;
+        z-index: 1000
+    }
+
+    .result-modal p {
+        font-size: .95rem;
+        margin-bottom: .75rem
+    }
+
+    .modal-stats-row {
+        margin-bottom: 0;
+        margin-top: .5rem
+    }
+
+    .modal-stat-value {
+        font-size: 1.75rem
+    }
+
+    .lap-times-list:not(.leaderboard-list) {
+        max-height: 200px;
+        padding: .5rem
+    }
+
+}
+
+@media(max-width:430px) {
+    #start-group {
+        width: min(100vw - 1rem, 25rem);
+        gap: .58rem;
+        padding-inline: .45rem
+    }
+
+    .lobby-header {
+        padding-bottom: 1.15rem;
+    }
+
+    .lobby-title {
+        line-height: 0.82;
+    }
+
+    .lobby-title__mini {
+        font-size: clamp(3.35rem, 16vw, 4.5rem);
+    }
+
+    .lobby-title__racer {
+        font-size: clamp(5rem, 24vw, 6.25rem);
+    }
+
+    .main-menu__item--primary {
+        width: 100%;
+        padding: 1.2rem 1.15rem;
+        font-size: 1.9rem;
+    }
+
+    .start-btn-sub {
+        margin-top: 0.36rem;
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+    }
+}
+
+@media(max-height:760px)and (max-width:520px) {
+    #start-group {
+        gap: .52rem
+    }
+
+}
+
+@media(max-width:380px) {
+    #start-group {
+        gap: 0.55rem;
+    }
+
+    .main-menu__item--primary {
+        padding: 1.05rem 1rem;
+        font-size: 1.62rem;
+    }
+
+    .start-btn-sub {
+        margin-top: 0.32rem;
+        font-size: 0.64rem;
+    }
+}
+
+@media(orientation:landscape)and (max-height:500px) {
+    .mobile-hud-bar .mobile-speedometer {
+        min-width: 5rem;
+        padding: .55rem .8rem
+    }
+
+    .mobile-speedometer-value {
+        font-size: 1.15rem
+    }
+
+    .mobile-controls {
+        padding: 0 max(.5rem, env(safe-area-inset-left)) max(12px, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-right))
+    }
+
+    .control-group {
+        gap: .65rem
+    }
+
+    .modal {
+        justify-content: flex-start;
+        padding-top: .5rem;
+        padding-bottom: max(.5rem, env(safe-area-inset-bottom))
+    }
+
+    .modal-card {
+        padding: .75rem 1rem;
+        margin: 0 auto
+    }
+
+    .result-modal .modal-card-section--runs {
+        padding-top: .6rem;
+        padding-bottom: .75rem
+    }
+
+    .result-modal h2 {
+        font-size: 1.75rem;
+        margin-bottom: .15rem
+    }
+
+    .result-modal p {
+        font-size: .95rem;
+        margin-bottom: .5rem
+    }
+
+    .lap-times-list:not(.leaderboard-list) {
+        max-height: 100px;
+        padding: .3rem
+    }
+
+}

@@ -1,0 +1,281 @@
+#settings-modal .modal-card,
+#achievements-modal .modal-card,
+#daily-playlist-modal .modal-card,
+#garage-modal .modal-card {
+    padding: 0
+}
+
+/* Settings only: card shell and Close button rules stay default */
+#settings-modal .modal-card-section--sheet {
+    gap: 0.85rem;
+}
+
+#settings-modal .runs-header-row.leaderboard-header-row {
+    margin: 0 0 0.45rem;
+}
+
+#settings-modal .leaderboard-hero-track {
+    font-size: 1.5rem;
+    margin-bottom: 0.15rem;
+    font-family: var(--header-font);
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    /* Match athletic game modal headers */
+    color: var(--text-color);
+}
+
+#settings-modal .leaderboard-subhead {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    /* Match secondary structural labels */
+    color: var(--text-dim);
+    opacity: 0.6;
+}
+
+#settings-modal .leaderboard-header-stack {
+    gap: 0.15rem;
+}
+
+#settings-modal .modal-sheet-panel {
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius-lg);
+    background: rgba(30, 41, 59, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
+}
+
+#settings-modal .modal-sheet-panel--reddit-identity,
+#settings-modal .modal-sheet-panel--audio-group,
+#settings-modal .modal-sheet-panel--racing-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+#settings-modal .modal-sheet-settings-row--collision-delay {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.1rem;
+}
+
+#settings-modal .modal-sheet-settings-row-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 0.45rem 0;
+    width: 100%;
+}
+
+#settings-modal .settings-collision-delay-control-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+    margin: 0.15rem 0;
+}
+
+#settings-modal .settings-collision-delay-stepper {
+    flex: 0 0 auto;
+    width: 2.35rem;
+    min-width: 2.35rem;
+    height: 2.35rem;
+    padding: 0;
+    margin: 0;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    font-size: 1.15rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-color);
+    background: rgba(51, 65, 85, 0.7);
+    font-family: var(--header-font);
+    transition:
+        background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+        border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+        filter 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#settings-modal .settings-collision-delay-stepper:hover:not(:disabled) {
+    background: rgba(71, 85, 105, 0.9);
+    border-color: var(--border-default);
+    transform: translateY(-1px);
+}
+
+#settings-modal .settings-collision-delay-stepper:active:not(:disabled) {
+    transform: none;
+    filter: none;
+}
+
+#settings-modal .settings-collision-delay-stepper:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+#settings-modal .settings-collision-delay-meter {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    gap: 0.3rem;
+    min-width: 0;
+    padding: 0.3rem 0;
+    align-items: center;
+}
+
+#settings-modal .settings-collision-delay-meter:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+    border-radius: 0.2rem;
+}
+
+#settings-modal .settings-collision-delay-meter__tick {
+    display: block;
+    height: 0.65rem;
+    border: none;
+    padding: 0;
+    margin: 0;
+    border-radius: 0.15rem;
+    cursor: pointer;
+    background: rgba(30, 41, 59, 0.8);
+    transition:
+        background-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+#settings-modal .settings-collision-delay-meter__tick:hover {
+    background: rgba(51, 65, 85, 0.95);
+    transform: scaleY(1.15);
+}
+
+#settings-modal .settings-collision-delay-meter__tick.is-filled {
+    background: rgba(71, 85, 105, 0.95);
+}
+
+#settings-modal .settings-collision-delay-meter__tick.is-active {
+    background: var(--accent-color);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+#settings-modal .settings-collision-delay-meter__tick.is-filled.is-active {
+    background: var(--accent-color);
+}
+
+#settings-modal .modal-sheet-settings-delay-value {
+    flex-shrink: 0;
+    font-family: var(--mono-font);
+    /* Monospaced digital clock theme */
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--accent-color);
+    /* Highlight color */
+    letter-spacing: 0.02em;
+    min-width: 3.5rem;
+    text-align: right;
+}
+
+#settings-modal .settings-subsection-label {
+    margin: 0.45rem 0 -0.25rem 0.1rem;
+}
+
+#settings-modal .modal-sheet-settings-identity-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+#settings-modal .modal-sheet-settings-identity-heading {
+    font-size: 0.92rem;
+    /* Clean and legible size */
+    font-weight: 500;
+    /* Regular elegant weight, not bold! */
+    color: var(--text-color);
+    text-transform: none;
+    /* Sentence/Title case */
+    letter-spacing: 0.01em;
+    font-family: var(--header-font);
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+#settings-modal .modal-sheet-settings-switch {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 1.35rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+}
+
+#settings-modal .modal-sheet-settings-identity-desc {
+    margin: 0;
+    font-family: var(--mono-font);
+    /* Clean monospaced ID block */
+    font-size: 0.82rem;
+    font-weight: 400;
+    /* Subtle digital weight */
+    font-style: normal;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    color: var(--text-dim);
+    line-height: 1.25;
+    word-break: break-word;
+    text-align: left;
+}
+
+#settings-modal .combined-action-btn {
+    text-transform: uppercase;
+    /* Keep sports action styling */
+    letter-spacing: 0.15em;
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+#daily-playlist-modal .modal-card-section--sheet {
+    gap: 0.85rem;
+}
+
+#daily-playlist-list.daily-playlist-list {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 0.8rem;
+    padding-bottom: 0.15rem;
+}
+
+.daily-playlist-empty {
+    margin: auto;
+    color: var(--text-dim);
+    font-family: var(--header-font);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+    .leaderboard-summary__value {
+        font-size: 1.15rem;
+    }
+
+    .leaderboard-summary__meta {
+        font-size: 0.72rem;
+    }
+
+    .leaderboard-day-chip {
+        padding: 0.64rem 0.68rem;
+    }
+
+    .leaderboard-day-chip__day {
+        font-size: 0.7rem;
+    }
+
+}

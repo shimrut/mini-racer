@@ -1,0 +1,183 @@
+/* Shared Results View Styling */
+.modal-view#modal-combined-view {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    background: transparent;
+    overflow: hidden;
+    margin: auto;
+}
+
+.combined-hero-medal {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    line-height: 0;
+}
+
+.medal-svg--hero {
+    width: 5.5rem;
+    height: 5.5rem;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.combined-hero-medal .win-combined-medal-overlay {
+    width: auto;
+    max-width: min(92vw, 22rem);
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.combined-stat-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.5;
+}
+
+.combined-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    transition: background-color .15s ease;
+    border: none;
+}
+
+.combined-row.is-player {
+    background: #3f1818;
+}
+
+.combined-row--community-open {
+    opacity: 0.72;
+}
+
+.combined-row--community-summary .combined-row-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0.02em;
+}
+
+.combined-row-rank {
+    width: 2rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    font-family: var(--header-font);
+    font-size: 0.95rem;
+    font-weight: 900;
+    font-style: italic;
+    color: var(--text-dim);
+}
+
+.combined-row-rank[data-rank="1"] {
+    color: var(--accent-bright);
+}
+
+.combined-row-rank[data-rank="2"] {
+    color: #fb7185;
+}
+
+.combined-row-rank[data-rank="3"] {
+    color: #fda4af;
+}
+
+.combined-row-rank:not([data-rank="1"]):not([data-rank="2"]):not([data-rank="3"]) {
+    color: var(--text-muted);
+}
+
+.combined-row-name {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.combined-row-time {
+    font-family: var(--mono-font);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+.combined-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr);
+    gap: 0.75rem;
+}
+
+#modal.modal--win #combined-restart-btn {
+    width: 100%;
+}
+
+.combined-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    height: 4rem;
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+}
+
+.combined-action-btn:hover {
+    background: #475569;
+}
+
+.combined-action-btn svg,
+.combined-action-btn .combined-action-btn-label {
+    pointer-events: none;
+}
+
+.combined-action-btn:active {
+    transform: none;
+    filter: none;
+}
+
+.result-modal .modal-card-section--runs .combined-action-btn.modal-sheet-dismiss,
+.result-modal .modal-card-section--sheet .combined-action-btn.modal-sheet-dismiss,
+.result-modal .modal-card-section--runs .combined-action-btn.modal-sheet-dismiss:active,
+.result-modal .modal-card-section--sheet .combined-action-btn.modal-sheet-dismiss:active {
+    transform: translateX(-50%);
+}
+
+.combined-action-btn--primary {
+    background: var(--accent-color);
+    border: none;
+    color: white;
+}
+
+.combined-action-btn--primary:hover {
+    background: var(--accent-bright);
+}
+
+.combined-empty-msg {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+}
