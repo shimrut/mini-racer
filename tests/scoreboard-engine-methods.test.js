@@ -5,6 +5,12 @@ import {
   getDailyChallengeVerificationEntry,
   resetVerificationQueueForTests,
 } from "../game/scoreboard/verification-queue.js";
+import {
+  getDailyChallengeData,
+  saveDailyChallengeBestTime,
+  setDailyChallengeBestTime,
+} from "../game/daily-challenge/storage.js";
+import { isNewBestResult } from "../game/race/result-flow.js";
 
 const REPLAY = { inputs: [{ frames: 1, left: false, right: false }] };
 
@@ -211,5 +217,110 @@ describe("scoreboard engine verification retries", () => {
       verificationState: "error",
       submissionStage: "error",
     });
+  });
+
+  it("rolls back a matching local PB when ranking permanently fails", async () => {
+    const challengeId = "daily-rollback";
+    const challenge = {
+      id: challengeId,
+      challengeDate: "2026-04-14",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    setDailyChallengeBestTime(challenge, 12, 1);
+    saveDailyChallengeBestTime(challenge, 10, 1);
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 10,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+      challengeDate: "2026-04-14",
+      previousBestTime: 12,
+      previousCompletedLaps: 1,
+    });
+    const entry = getDailyChallengeVerificationEntry(challengeId);
+    const engine = {
+      activeDailyChallenge: challenge,
+      dailyChallengeBestResult: { bestTime: 10, completedLaps: 1 },
+      bestLapTime: 10,
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: {
+        refreshDailyChallengeAfterAcceptedSubmission: vi.fn(),
+      },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => false),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(
+      engine,
+      entry,
+      {
+        ok: false,
+        status: 400,
+        body: { error: "Replay rejected" },
+      },
+    );
+
+    expect(getDailyChallengeData(challengeId)).toMatchObject({ bestTime: 12 });
+    expect(engine.dailyChallengeBestResult).toMatchObject({ bestTime: 12 });
+    expect(engine.bestLapTime).toBe(12);
+    expect(isNewBestResult(
+      { bestResultComparator: "time" },
+      { bestTime: 11 },
+      engine.dailyChallengeBestResult,
+    )).toBe(true);
+  });
+
+  it("clears a stuck rejected local PB when no previous best exists", async () => {
+    const challengeId = "daily-clear-stuck";
+    const challenge = {
+      id: challengeId,
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    setDailyChallengeBestTime(challenge, 10, 1);
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 10,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+    });
+    const entry = getDailyChallengeVerificationEntry(challengeId);
+    const engine = {
+      currentDailyChallenge: challenge,
+      dailyChallengeBestResult: { bestTime: 10 },
+      bestLapTime: 10,
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: {
+        refreshDailyChallengeAfterAcceptedSubmission: vi.fn(),
+      },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => false),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(
+      engine,
+      entry,
+      {
+        ok: false,
+        status: 400,
+        body: { error: "Replay rejected" },
+      },
+    );
+
+    expect(getDailyChallengeData(challengeId)).toBe(null);
+    expect(engine.dailyChallengeBestResult).toBe(null);
+    expect(engine.bestLapTime).toBe(null);
+    expect(isNewBestResult(
+      { bestResultComparator: "time" },
+      { bestTime: 11 },
+      engine.dailyChallengeBestResult,
+    )).toBe(true);
   });
 });

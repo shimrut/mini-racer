@@ -153,6 +153,9 @@ export function enqueueDailyChallengeVerification({
   objectiveType = null,
   challengeDate = null,
   trackKey = null,
+  previousBestTime = null,
+  previousCompletedLaps = null,
+  previousCheckpointTimesSec = null,
 } = {}) {
   if (
     typeof challengeId !== "string" ||
@@ -176,6 +179,15 @@ export function enqueueDailyChallengeVerification({
     objectiveType: typeof objectiveType === "string" ? objectiveType : null,
     challengeDate: typeof challengeDate === "string" ? challengeDate : null,
     trackKey: typeof trackKey === "string" ? trackKey : null,
+    previousBestTime: Number.isFinite(previousBestTime)
+      ? previousBestTime
+      : null,
+    previousCompletedLaps: Number.isFinite(previousCompletedLaps)
+      ? Math.max(0, Math.trunc(previousCompletedLaps))
+      : null,
+    previousCheckpointTimesSec: Array.isArray(previousCheckpointTimesSec)
+      ? previousCheckpointTimesSec.slice()
+      : null,
     verificationState: "pending",
     submissionStage: VERIFICATION_STAGE_SUBMITTING,
     statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],

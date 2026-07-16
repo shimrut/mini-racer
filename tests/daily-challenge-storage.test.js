@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     getDailyChallengeData,
     saveDailyChallengeBestTime,
-    setDailyChallengeBestTime
+    setDailyChallengeBestTime,
+    clearDailyChallengeBestTime,
+    restoreDailyChallengeBestAfterFailedSubmission,
+    rollbackDailyChallengeBestIfMatchesFailedSubmission
 } from '../game/daily-challenge/storage.js';
 
 const CHALLENGE_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -481,6 +484,46 @@ describe('daily-challenge-storage', () => {
     it('rejects missing challenge objects before reading ids', () => {
         expect(saveDailyChallengeBestTime(null, 42)).toBe(null);
         expect(setDailyChallengeBestTime(undefined, 42)).toBe(null);
+    });
+
+    it('clears and restores local bests after failed submissions', () => {
+        const challenge = {
+            id: CHALLENGE_ID,
+            challengeDate: '2026-04-14',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest'
+        };
+        saveDailyChallengeBestTime(challenge, 12.5, 1, [4, 8, 12.5]);
+        saveDailyChallengeBestTime(challenge, 10, 1, [3, 7, 10]);
+
+        expect(rollbackDailyChallengeBestIfMatchesFailedSubmission(
+            challenge,
+            10,
+            {
+                bestTime: 12.5,
+                completedLaps: 1,
+                checkpointTimesSec: [4, 8, 12.5]
+            }
+        )).toMatchObject({
+            bestTime: 12.5,
+            completedLaps: 1
+        });
+
+        saveDailyChallengeBestTime(challenge, 9.5, 1);
+        expect(rollbackDailyChallengeBestIfMatchesFailedSubmission(
+            challenge,
+            9.5,
+            null
+        )).toBe(null);
+        expect(getDailyChallengeData(CHALLENGE_ID)).toBe(null);
+        expect(clearDailyChallengeBestTime(CHALLENGE_ID)).toBe(null);
+        expect(restoreDailyChallengeBestAfterFailedSubmission(challenge, {
+            bestTime: 11,
+            completedLaps: 2
+        })).toMatchObject({
+            bestTime: 11,
+            completedLaps: 2
+        });
     });
 
     it('does not copy string properties from malformed stored entries', () => {

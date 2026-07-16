@@ -1,5 +1,6 @@
 import {
   getDailyChallengeData,
+  restoreDailyChallengeBestAfterFailedSubmission,
   saveDailyChallengeBestTime,
   setDailyChallengeBestTime,
 } from "./storage.js";
@@ -835,6 +836,17 @@ export const dailyChallengeEngineMethods = {
     }
 
     if (isNewBest) {
+      const previousBestSnapshot = Number.isFinite(previousBest?.bestTime)
+        ? {
+            bestTime: Number(previousBest.bestTime),
+            completedLaps: Number.isFinite(previousBest.completedLaps)
+              ? previousBest.completedLaps
+              : null,
+            checkpointTimesSec: Array.isArray(previousBest.checkpointTimesSec)
+              ? previousBest.checkpointTimesSec
+              : null,
+          }
+        : null;
       const saved = saveDailyChallengeBestTime(
         challenge,
         finalTime,
@@ -862,9 +874,18 @@ export const dailyChallengeEngineMethods = {
             completedLaps,
             checkpointTimesSec: lapCheckpointTimes,
             replay: replayPayload ? { ...replayPayload } : null,
+            previousBest: previousBestSnapshot,
           });
 
       if (submissionError || !didEnqueue) {
+        const restored = restoreDailyChallengeBestAfterFailedSubmission(
+          challenge,
+          previousBestSnapshot,
+        );
+        this.dailyChallengeBestResult = restored ? { ...restored } : null;
+        this.bestLapTime = Number.isFinite(restored?.bestTime)
+          ? restored.bestTime
+          : null;
         this.modal.updateModalScoreboardSnapshot?.(
           {
             ...createVerificationSnapshot({

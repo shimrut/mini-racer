@@ -9,7 +9,10 @@ import {
   markDailyChallengeVerificationError,
   createVerificationSnapshot,
 } from "./verification-queue.js";
-import { setDailyChallengeBestTime } from "../daily-challenge/storage.js";
+import {
+  rollbackDailyChallengeBestIfMatchesFailedSubmission,
+  setDailyChallengeBestTime,
+} from "../daily-challenge/storage.js";
 import {
   getCachedDailyChallengeSnapshot,
   getDailyChallengeSnapshot,
@@ -21,6 +24,43 @@ function isRetryableVerificationFailure(result) {
   const status = Number(result?.status);
   if (!Number.isFinite(status)) return true;
   return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function previousBestFromVerificationEntry(entry) {
+  if (!Number.isFinite(entry?.previousBestTime)) return null;
+  return {
+    bestTime: entry.previousBestTime,
+    completedLaps: Number.isFinite(entry.previousCompletedLaps)
+      ? entry.previousCompletedLaps
+      : null,
+    checkpointTimesSec: Array.isArray(entry.previousCheckpointTimesSec)
+      ? entry.previousCheckpointTimesSec
+      : null,
+  };
+}
+
+function rollbackLocalBestForFailedVerificationEntry(engine, entry) {
+  if (!entry?.challengeId || !Number.isFinite(entry?.bestTime)) return null;
+  const restored = rollbackDailyChallengeBestIfMatchesFailedSubmission(
+    {
+      id: entry.challengeId,
+      challengeDate: entry.challengeDate,
+      trackKey: entry.trackKey,
+      objectiveType: entry.objectiveType,
+    },
+    entry.bestTime,
+    previousBestFromVerificationEntry(entry),
+  );
+  if (
+    engine?.activeDailyChallenge?.id === entry.challengeId
+    || engine?.currentDailyChallenge?.id === entry.challengeId
+  ) {
+    engine.dailyChallengeBestResult = restored ? { ...restored } : null;
+    engine.bestLapTime = Number.isFinite(restored?.bestTime)
+      ? restored.bestTime
+      : null;
+  }
+  return restored;
 }
 
 export const scoreboardEngineMethods = {
@@ -80,6 +120,7 @@ export const scoreboardEngineMethods = {
         entry.challengeId,
         "Submission replay is missing. Finish another run to rank it.",
       );
+      rollbackLocalBestForFailedVerificationEntry(this, entry);
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       if (
         this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })
@@ -259,6 +300,7 @@ export const scoreboardEngineMethods = {
         entry.challengeId,
         typeof body?.error === "string" ? body.error : "Submission failed",
       );
+      rollbackLocalBestForFailedVerificationEntry(this, entry);
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       if (
         this.modal.matchesModalScoreboardContext({
@@ -282,6 +324,7 @@ export const scoreboardEngineMethods = {
       entry.challengeId,
       "Submission unavailable",
     );
+    rollbackLocalBestForFailedVerificationEntry(this, entry);
     this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
     if (this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })) {
       this.modal.updateModalScoreboardSnapshot(
@@ -301,6 +344,7 @@ export const scoreboardEngineMethods = {
     completedLaps = null,
     replay,
     checkpointTimesSec = null,
+    previousBest = null,
   } = {}) {
     if (
       !challenge?.id ||
@@ -320,6 +364,15 @@ export const scoreboardEngineMethods = {
       objectiveType: challenge?.objectiveType,
       challengeDate: challenge?.challengeDate,
       trackKey: challenge?.trackKey,
+      previousBestTime: Number.isFinite(previousBest?.bestTime)
+        ? previousBest.bestTime
+        : null,
+      previousCompletedLaps: Number.isFinite(previousBest?.completedLaps)
+        ? previousBest.completedLaps
+        : null,
+      previousCheckpointTimesSec: Array.isArray(previousBest?.checkpointTimesSec)
+        ? previousBest.checkpointTimesSec
+        : null,
     });
     this.dailyChallengeUi.refreshDailyChallengeVerificationState(challenge?.id);
     if (enqueued) {

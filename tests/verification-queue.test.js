@@ -125,7 +125,10 @@ describe('verification queue', () => {
             replay: REPLAY,
             objectiveType: 'single_lap_fastest',
             challengeDate: '2026-04-22',
-            trackKey: 'circuit'
+            trackKey: 'circuit',
+            previousBestTime: 50.5,
+            previousCompletedLaps: 1.8,
+            previousCheckpointTimesSec: [10, 20, 50.5]
         }).enqueued).toBe(true);
 
         expect(enqueueDailyChallengeVerification({
@@ -143,7 +146,9 @@ describe('verification queue', () => {
             replay: REPLAY,
             objectiveType: 7,
             challengeDate: 7,
-            trackKey: 7
+            trackKey: 7,
+            previousBestTime: 44,
+            previousCompletedLaps: 2
         }).enqueued).toBe(true);
 
         expect(getDailyChallengeVerificationEntry('challenge-time')).toMatchObject({
@@ -152,6 +157,8 @@ describe('verification queue', () => {
             objectiveType: null,
             challengeDate: null,
             trackKey: null,
+            previousBestTime: 44,
+            previousCompletedLaps: 2,
             verificationState: 'pending',
             submissionStage: 'submitting',
             statusText: 'Submitting...'

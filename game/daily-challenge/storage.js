@@ -174,3 +174,49 @@ export function setDailyChallengeBestTime(
   writeDailyChallengeMap(nextMap);
   return getDailyChallengeData(challenge.id);
 }
+
+export function clearDailyChallengeBestTime(challengeId) {
+  if (!challengeId) return null;
+  const challengeMap = readDailyChallengeMap();
+  if (!challengeMap[challengeId]) return null;
+  const nextMap = { ...challengeMap };
+  delete nextMap[challengeId];
+  writeDailyChallengeMap(nextMap);
+  return null;
+}
+
+export function restoreDailyChallengeBestAfterFailedSubmission(
+  challenge,
+  previousBest = null,
+) {
+  if (!challenge?.id) return null;
+  if (Number.isFinite(previousBest?.bestTime)) {
+    return setDailyChallengeBestTime(
+      challenge,
+      previousBest.bestTime,
+      Number.isFinite(previousBest.completedLaps)
+        ? previousBest.completedLaps
+        : null,
+      Array.isArray(previousBest.checkpointTimesSec)
+        ? previousBest.checkpointTimesSec
+        : null,
+    );
+  }
+  return clearDailyChallengeBestTime(challenge.id);
+}
+
+export function rollbackDailyChallengeBestIfMatchesFailedSubmission(
+  challenge,
+  failedBestTime,
+  previousBest = null,
+) {
+  const local = getDailyChallengeData(challenge?.id);
+  if (
+    !Number.isFinite(failedBestTime)
+    || !Number.isFinite(local?.bestTime)
+    || local.bestTime !== failedBestTime
+  ) {
+    return local;
+  }
+  return restoreDailyChallengeBestAfterFailedSubmission(challenge, previousBest);
+}
