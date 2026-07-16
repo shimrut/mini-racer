@@ -165,7 +165,17 @@ describe('daily-challenge service', () => {
             availableUntil: '2026-06-09T00:00:00.000Z',
         })).toEqual({
             key: 'available',
-            label: 'Available until Jun 09',
+            label: 'Expires on Jun 09',
+        });
+
+        vi.setSystemTime(new Date('2026-06-08T14:00:00.000Z'));
+        expect(getDailyChallengeCardStatus({
+            startsAt: '2026-06-02T00:00:00.000Z',
+            endsAt: '2026-06-03T00:00:00.000Z',
+            availableUntil: '2026-06-09T00:00:00.000Z',
+        })).toEqual({
+            key: 'available',
+            label: 'Expires in 10h',
         });
 
         vi.setSystemTime(new Date('2026-06-10T00:00:00.000Z'));

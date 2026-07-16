@@ -675,6 +675,25 @@ function formatDailyChallengeStatusDate(isoString) {
     }).format(new Date(timeMs));
 }
 
+function formatDailyChallengeRemainingDuration(remainingMs) {
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0) return '';
+
+    const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+    if (totalMinutes < 60) {
+        return `${totalMinutes}m`;
+    }
+
+    const totalHours = Math.floor(totalMinutes / 60);
+    if (totalHours < 24) {
+        const minutes = totalMinutes % 60;
+        return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
+    }
+
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+}
+
 export function getDailyChallengeCardStatus(challenge, nowMs = Date.now()) {
     const endsAtMs = getChallengeTimeMs(challenge, 'endsAt');
     const availableUntilMs = getChallengeTimeMs(challenge, 'availableUntil');
@@ -687,10 +706,19 @@ export function getDailyChallengeCardStatus(challenge, nowMs = Date.now()) {
     }
 
     if (Number.isFinite(availableUntilMs) && nowMs < availableUntilMs) {
+        const remainingMs = availableUntilMs - nowMs;
+        if (remainingMs < DAY_MS) {
+            const remainingLabel = formatDailyChallengeRemainingDuration(remainingMs);
+            return {
+                key: 'available',
+                label: remainingLabel ? `Expires in ${remainingLabel}` : 'Expires',
+            };
+        }
+
         const formattedDate = formatDailyChallengeStatusDate(challenge?.availableUntil);
         return {
             key: 'available',
-            label: formattedDate ? `Available until ${formattedDate}` : 'Available',
+            label: formattedDate ? `Expires on ${formattedDate}` : 'Expires',
         };
     }
 
@@ -710,20 +738,7 @@ export function formatDailyChallengePlaylistAvailabilityLabel(challenge) {
     const remainingMs = untilMs - Date.now();
     if (remainingMs <= 0) return 'Expired';
 
-    const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-    if (totalMinutes < 60) {
-        return `${totalMinutes}m`;
-    }
-
-    const totalHours = Math.floor(totalMinutes / 60);
-    if (totalHours < 24) {
-        const minutes = totalMinutes % 60;
-        return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
-    }
-
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+    return formatDailyChallengeRemainingDuration(remainingMs);
 }
 
 export function getDailyChallengeModifierBadges(challenge) {
