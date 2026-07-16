@@ -100,10 +100,19 @@
 .reusable-modal-content {
     display: flex;
     flex-direction: column;
-    padding: 0 1rem var(--modal-floating-back-clearance);
+    padding: 0 1rem;
     gap: 1rem;
     flex: 1 1 auto;
     min-height: 0;
+}
+
+/* Scroll past the floating Back/Close without reserving a permanent footer tray. */
+.reusable-modal-content::after {
+    content: '';
+    flex: 0 0 auto;
+    width: 100%;
+    height: var(--modal-floating-back-clearance);
+    pointer-events: none;
 }
 
 .reusable-modal-close__icon {
