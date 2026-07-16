@@ -967,11 +967,6 @@ export class ModalShell {
                 document.getElementById('settings-back-btn')?.click();
                 return;
             }
-            if (trapRoot.id === 'achievements-modal') {
-                event.preventDefault();
-                document.getElementById('achievements-back-btn')?.click();
-                return;
-            }
             if (trapRoot.id === 'garage-modal') {
                 event.preventDefault();
                 document.getElementById('garage-close-btn')?.click();

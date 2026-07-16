@@ -25,7 +25,7 @@ flowchart LR
     C --> D["Track stack<br/>game/track/*"]
     C --> E["Race stack<br/>game/race/*"]
     C --> F["Car stack<br/>game/car/*"]
-    C --> G["UI stack<br/>daily challenge, scoreboard, settings, garage, achievements"]
+    C --> G["UI stack<br/>daily challenge, scoreboard, settings, garage"]
     C --> H["Audio + analytics<br/>game/audio/* + game/player/service.js"]
     C --> I["Browser cache<br/>localStorage/sessionStorage"]
 

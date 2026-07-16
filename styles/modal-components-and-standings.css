@@ -113,12 +113,6 @@
     fill: var(--text-muted);
 }
 
-.result-modal .modal-card-section--sheet .achievements-list {
-    flex: 1 1 auto;
-    min-height: 0;
-    padding: 0 1.5rem;
-}
-
 .modal-sheet-settings-row {
     display: flex;
     justify-content: space-between;

@@ -16,7 +16,6 @@ const expectedImports = [
     './styles/modal-components-and-standings.css',
     './styles/responsive-layout.css',
     './styles/results.css',
-    './styles/achievements.css',
     './styles/loading.css',
     './styles/result-details.css',
     './styles/tracks-and-small-screens.css',

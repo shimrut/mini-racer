@@ -23,11 +23,10 @@ top-to-bottom order.
 | 8 | `styles/modal-components-and-standings.css` | Reusable sheets, modal components and standings foundation |
 | 9 | `styles/responsive-layout.css` | Existing cross-product responsive overrides |
 | 10 | `styles/results.css` | Main finish-result presentation |
-| 11 | `styles/achievements.css` | Achievement list and progress |
-| 12 | `styles/loading.css` | Startup loading screen |
-| 13 | `styles/result-details.css` | Result details overlay and compact result layout |
-| 14 | `styles/tracks-and-small-screens.css` | Track cards and later small-screen sheet overrides |
-| 15 | `styles/standings-and-sharing.css` | Standings header, shareable rows and share panel |
+| 11 | `styles/loading.css` | Startup loading screen |
+| 12 | `styles/result-details.css` | Result details overlay and compact result layout |
+| 13 | `styles/tracks-and-small-screens.css` | Track cards and later small-screen sheet overrides |
+| 14 | `styles/standings-and-sharing.css` | Standings header, shareable rows and share panel |
 
 Some files intentionally span more than one product surface. Those boundaries
 reflect contiguous sections of the original stylesheet and avoid changing which
@@ -55,5 +54,5 @@ For structural or cross-file changes:
 2. Run `npm run build`.
 3. Confirm generated `game.html` still references one `/game.css`.
 4. Smoke-check loading, lobby, race HUD, pause, results, standings, tracks,
-   garage, settings, achievements and sharing at desktop, narrow mobile and
-   short landscape sizes.
+   garage, settings and sharing at desktop, narrow mobile and short landscape
+   sizes.

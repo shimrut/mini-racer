@@ -27,7 +27,6 @@ export class InteractionsUi {
     get dailyChallengeRankBtn() { return document.getElementById('daily-challenge-rank-btn'); }
     get dailyChallengePlaylistBtn() { return document.getElementById('daily-challenge-playlist-btn'); }
     get menuGarageBtn() { return document.getElementById('menu-btn-garage'); }
-    get menuAchievementsBtn() { return document.getElementById('menu-btn-achievements'); }
     get desktopSpeedometer() { return document.getElementById('desktop-speedometer'); }
     get mobileSpeedometer() { return document.getElementById('mobile-speedometer'); }
     get pauseBtn() { return document.getElementById('pause-btn'); }

@@ -131,3 +131,21 @@ Validation after removal:
 - `npm test`: 57 files and 388 tests passed.
 - `npm run build`: passed.
 - Targeted source and built-output scans found none of the retired methods, payload fields, or CSS classes, while active Tracks, selected-day Standings, swipe navigation, and combined action-button references remain.
+
+## Achievements prototype removal: July 16, 2026
+
+The hidden achievements prototype was removed from the shipped game surface. It
+contained only hard-coded sample progress and had no persistence, server API,
+analytics, or gameplay integration.
+
+The cleanup removed its hidden lobby entry, modal markup, UI module, engine
+wiring, focus-trap dismissal branch, stylesheet, and shared selector entries.
+Active medals, rankings, personal bests, daily challenge progress, garage,
+settings, and shared modal behavior remain unchanged.
+
+Validation after removal:
+
+- `npm test`: 60 files and 409 tests passed.
+- `npm run build`: passed.
+- Targeted source and built-output scans found no remaining achievements code,
+  markup, or styling.

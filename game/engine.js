@@ -34,7 +34,6 @@ import { LeaderboardsUi } from "./scoreboard/ui.js";
 import { SettingsUi } from "./settings/ui.js";
 import { GarageUi } from "./settings/garage-ui.js";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
-import { AchievementsUi } from "./achievements/ui.js";
 import { trackEngineMethods } from "./track/engine-methods.js";
 import { raceEngineMethods } from "./race/engine-methods.js";
 import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js";
@@ -304,9 +303,6 @@ export class RealTimeRacer {
         this.requestRender();
       },
       onPlayerPreferencesChanged: () => queuePlayerPreferencesSave(),
-    });
-    this.achievements = new AchievementsUi({
-      modal: this.modal,
     });
     this.interactions = new InteractionsUi({
       modal: this.modal,

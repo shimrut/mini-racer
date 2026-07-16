@@ -149,8 +149,7 @@
 
 .daily-playlist-list,
 .result-modal .modal-card-section--runs .modal-lap-times-container,
-.reusable-modal-content,
-.result-modal .modal-card-section--sheet .achievements-list {
+.reusable-modal-content {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -163,8 +162,7 @@
 .modal .modal-card::-webkit-scrollbar,
 .daily-playlist-list::-webkit-scrollbar,
 .result-modal .modal-card-section--runs .modal-lap-times-container::-webkit-scrollbar,
-.reusable-modal-content::-webkit-scrollbar,
-.result-modal .modal-card-section--sheet .achievements-list::-webkit-scrollbar {
+.reusable-modal-content::-webkit-scrollbar {
     width: 0;
     height: 0;
     display: none;
