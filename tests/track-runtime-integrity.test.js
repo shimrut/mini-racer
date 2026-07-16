@@ -45,6 +45,12 @@ function toKebabCase(trackKey) {
     return trackKey.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
 
+function hashTrackRegistry(trackRegistry) {
+    return createHash('sha256')
+        .update(JSON.stringify(trackRegistry))
+        .digest('hex');
+}
+
 describe('track runtime integrity', () => {
     it('keeps the compatibility registry identical to the ordered catalog', () => {
         expect(Object.keys(TRACKS)).toEqual(TRACK_SCHEDULE_KEYS);
@@ -69,12 +75,24 @@ describe('track runtime integrity', () => {
         expect(definitionFiles).toEqual(expectedFiles);
     });
 
-    it('preserves the track registry data while definitions are split into modules', () => {
-        const registryHash = createHash('sha256')
-            .update(JSON.stringify(TRACKS))
-            .digest('hex');
-        expect(registryHash).toBe(
+    it('preserves existing track data while intentionally extending the registry', () => {
+        const firstNewTrackIndex = TRACK_SCHEDULE_KEYS.indexOf('numberOne');
+        expect(firstNewTrackIndex).toBeGreaterThan(0);
+        expect(TRACK_SCHEDULE_KEYS.slice(firstNewTrackIndex)).toEqual([
+            'numberOne',
+            'numberTwo',
+        ]);
+
+        const existingTrackRegistry = Object.fromEntries(
+            TRACK_SCHEDULE_KEYS
+                .slice(0, firstNewTrackIndex)
+                .map((trackKey) => [trackKey, TRACKS[trackKey]]),
+        );
+        expect(hashTrackRegistry(existingTrackRegistry)).toBe(
             '923415f865de38edd3737e9c035dfa657e392c3d12143f29a38f8bbc491f14f8',
+        );
+        expect(hashTrackRegistry(TRACKS)).toBe(
+            '79419157c70d5e4c4e438163fe7523e399706f349dd94c4c0afa2234e959412b',
         );
     });
 

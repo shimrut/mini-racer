@@ -43,6 +43,8 @@ import quartzHollow from './definitions/quartz-hollow.js';
 import needleChicane from './definitions/needle-chicane.js';
 import cinderSpine from './definitions/cinder-spine.js';
 import glassSerpent from './definitions/glass-serpent.js';
+import numberOne from './definitions/number-one.js';
+import numberTwo from './definitions/number-two.js';
 import { TRACK_SCHEDULE_KEYS, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -91,6 +93,8 @@ const TRACK_GEOMETRY = {
     needleChicane,
     cinderSpine,
     glassSerpent,
+    numberOne,
+    numberTwo,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

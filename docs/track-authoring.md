@@ -36,7 +36,11 @@ every consumer load the large geometry registry.
 4. Add medal thresholds in `game/medals/medal-times.json`.
 5. Add or adjust `game/track/presentation.js` only when the track needs a
    non-default preview or race presentation.
-6. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
+6. Update the intentional full-registry fingerprint in
+   `tests/track-runtime-integrity.test.js`. Preserve the preceding registry
+   fingerprint as a subset assertion so adding a track cannot hide changes to
+   existing track geometry.
+7. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
 
 The repository-writing endpoint exists only in the dedicated local Mapmaker
 Vite configuration and accepts requests only from localhost. It is not part of
@@ -66,7 +70,8 @@ The regression suite checks:
 - the compatibility `TRACKS` registry contains every scheduled track;
 - player-facing names match between catalog metadata and the assembled
   geometry registry;
-- the full registry hash remains unchanged during structural refactors;
+- existing track data remains unchanged when the registry is extended;
+- the full registry fingerprint matches the intentionally reviewed track set;
 - every definition has usable boundaries, start data, checkpoints, and
   collision geometry;
 - published Daily GP history refers only to catalog tracks;

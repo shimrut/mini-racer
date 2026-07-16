@@ -44,6 +44,8 @@ export const TRACK_CATALOG = {
     needleChicane: { name: "Needle Chicane" },
     cinderSpine: { name: "Cinder Spine" },
     glassSerpent: { name: "Glass Serpent" },
+    numberOne: { name: "Number One" },
+    numberTwo: { name: "Number Two" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -92,6 +94,8 @@ export const TRACK_SCHEDULE_KEYS = [
     'needleChicane',
     'cinderSpine',
     'glassSerpent',
+    'numberOne',
+    'numberTwo',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

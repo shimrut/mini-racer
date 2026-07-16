@@ -269,10 +269,22 @@
     "silver": 14.59,
     "bronze": 14.84
   },
-   "glassSerpent": {
+  "glassSerpent": {
     "author": 17.25,
     "gold": 17.59,
     "silver": 17.81,
     "bronze": 18.09
+  },
+  "numberOne": {
+    "author": 9.20,
+    "gold": 9.52,
+    "silver": 9.65,
+    "bronze": 9.89
+  },
+  "numberTwo": {
+    "author": 14.25,
+    "gold": 14.59,
+    "silver": 14.97,
+    "bronze": 15.33
   }
 }
