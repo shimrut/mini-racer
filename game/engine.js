@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+import { DEFAULT_TRACK_KEY } from "./track/catalog.js";
 import { TRACKS } from "./track/tracks.js";
 import {
   resolveTrackPresentation,
@@ -76,9 +77,9 @@ export class RealTimeRacer {
     this.carSpriteLoader = new CarSpriteLoader();
     this.carAssetPromise = this.syncCarSpriteAsset();
 
-    this.currentTrack = TRACKS.circuit;
-    this.currentTrackKey = "circuit";
-    this.currentTrackPresentation = resolveTrackPresentation("circuit", {
+    this.currentTrack = TRACKS[DEFAULT_TRACK_KEY];
+    this.currentTrackKey = DEFAULT_TRACK_KEY;
+    this.currentTrackPresentation = resolveTrackPresentation(DEFAULT_TRACK_KEY, {
       surface: TRACK_PRESENTATION_SURFACES.RACE,
     });
     this.pos = { ...this.currentTrack.startPos };

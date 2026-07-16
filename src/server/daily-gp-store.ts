@@ -1,6 +1,10 @@
 import { redis } from '@devvit/redis';
 import { createHash } from 'node:crypto';
-import { TRACKS } from '../../game/track/tracks.js';
+import {
+    DEFAULT_TRACK_KEY,
+    hasTrack,
+    TRACK_SCHEDULE_KEYS,
+} from '../../game/track/catalog.js';
 import {
     normalizeLeaderboardIdentityPreference,
     resolveLeaderboardDisplayName,
@@ -124,7 +128,7 @@ function parseStoredChallenge(raw: string | null | undefined): DailyGpChallenge 
         }
 
         const trackKey = typeof parsed.trackKey === 'string' ? parsed.trackKey : '';
-        if (!trackKey || !TRACKS[trackKey]) {
+        if (!hasTrack(trackKey)) {
             return null;
         }
 
@@ -200,20 +204,18 @@ async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
 }
 
 /**
- * File-order pointer selection. tracks.js is the schedule: walk its key order
- * one track per day, wrapping at the end. The playhead is the most-recent ledger
- * entry before today (its trackKey). Tomorrow plays the next key after the
- * playhead in the current Object.keys(TRACKS) order, wrapping to index 0.
+ * Catalog-order pointer selection: walk TRACK_SCHEDULE_KEYS one track per day,
+ * wrapping at the end. The playhead is the most-recent ledger entry before today
+ * (its trackKey). Tomorrow plays the next key after the playhead.
  *
- * Editing tracks.js (append, insert, reorder, remove) only affects days that have
- * not been written yet; past days are frozen in the ledger. If the playhead
- * trackKey is no longer in the file (removed) or the ledger is empty, fall back
- * to the first key.
+ * Editing the explicit catalog schedule only affects days that have not been
+ * written yet; past days are frozen in the ledger. If the playhead trackKey is
+ * no longer scheduled or the ledger is empty, fall back to the catalog default.
  */
 async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
-    const pool = Object.keys(TRACKS);
+    const pool = TRACK_SCHEDULE_KEYS;
     if (pool.length === 0) {
-        return 'circuit';
+        return DEFAULT_TRACK_KEY;
     }
 
     const todayMs = todayStartsAt.getTime();
@@ -223,16 +225,16 @@ async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
 
     const playhead = priorEntries[0]?.trackKey;
     if (!playhead) {
-        return pool[0];
+        return pool[0] || DEFAULT_TRACK_KEY;
     }
 
     const playheadIndex = pool.indexOf(playhead);
     if (playheadIndex === -1) {
-        return pool[0];
+        return pool[0] || DEFAULT_TRACK_KEY;
     }
 
     const nextIndex = (playheadIndex + 1) % pool.length;
-    return pool[nextIndex] || pool[0];
+    return pool[nextIndex] || pool[0] || DEFAULT_TRACK_KEY;
 }
 
 function getTodayChallengeId(): string {

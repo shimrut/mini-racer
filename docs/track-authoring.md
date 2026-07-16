@@ -1,0 +1,94 @@
+# Track Authoring
+
+## Purpose
+
+Mini Racer separates lightweight track metadata from full race geometry.
+This keeps names, validation, and Daily GP scheduling available without making
+every consumer load the large geometry registry.
+
+## Track Files
+
+- `game/track/catalog.js`
+  Owns each track's player-facing name, `TRACK_SCHEDULE_KEYS`,
+  `DEFAULT_TRACK_KEY`, `hasTrack()`, and `getTrackName()`.
+- `game/track/definitions/<track-slug>.js`
+  Owns one track's boundaries, start position, start line, checkpoints, and
+  geometry-specific options.
+- `game/track/tracks.js`
+  Assembles definition modules into the compatibility `TRACKS` registry.
+  Rendering, collision, previews, and replay validation use this registry.
+- `game/track/geometry.js`
+  Owns the shared point and line-intersection helpers.
+- `game/track/runtime.js`
+  Converts a definition into smoothed geometry and collision data.
+
+## Adding A Track
+
+1. Build and validate the layout in `tools/mapmaker.html`.
+2. Use **Copy Module**, **Save Track Module**, or **Download Module** to create a
+   new file under
+   `game/track/definitions/`.
+3. Add the generated geometry import and registry entry to
+   `game/track/tracks.js`.
+4. Add the track key and name to `TRACK_CATALOG` in
+   `game/track/catalog.js`.
+5. Add the key to `TRACK_SCHEDULE_KEYS` at the intended future Daily GP
+   position. Update `DEFAULT_TRACK_KEY` separately only when the product's
+   standard local fallback should change.
+6. Add medal thresholds in `game/medals/medal-times.json`.
+7. Add or adjust `game/track/presentation.js` only when the track needs a
+   non-default preview or race presentation.
+8. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
+
+The Mapmaker's integration snippet provides the definition import, catalog
+metadata line, and geometry registry line. Review the generated key, file slug,
+and player-facing name before pasting them.
+
+## Dependency Rules
+
+- Use `getTrackName()` for a name.
+- Use `hasTrack()` to validate a track key.
+- Use `DEFAULT_TRACK_KEY` for the standard local fallback.
+- Use `TRACK_SCHEDULE_KEYS` when order controls Daily GP publication.
+- Import `TRACKS` only when the caller needs boundaries, checkpoints, start
+  geometry, rendering, collision, or replay validation.
+- Do not put track lists back into `game/config.js`.
+- Do not infer schedule order from definition filenames or object import order.
+
+Daily GP history is append-only in Redis. Reordering `TRACK_SCHEDULE_KEYS`
+changes only unpublished future days; it does not rewrite already published
+challenge records.
+
+## Validation
+
+The regression suite checks:
+
+- catalog and schedule keys stay aligned;
+- the compatibility `TRACKS` registry contains every scheduled track;
+- player-facing names match between catalog metadata and the assembled
+  geometry registry;
+- the full registry hash remains unchanged during structural refactors;
+- every definition has usable boundaries, start data, checkpoints, and
+  collision geometry;
+- published Daily GP history refers only to catalog tracks;
+- every catalog track has medal thresholds.
+
+Run the focused checks:
+
+```bash
+npx vitest run \
+  tests/track-runtime-integrity.test.js \
+  tests/reddit-daily-gp-model.test.js \
+  tests/medals.test.js \
+  tests/mapmaker-track-source.test.js \
+  tests/simulation-mechanics.test.js \
+  tests/simulation-daily-challenge.test.js \
+  tests/server-daily-gp-store.test.js \
+  tests/daily-gp-store.test.js
+```
+
+Then run:
+
+```bash
+npm run build
+```

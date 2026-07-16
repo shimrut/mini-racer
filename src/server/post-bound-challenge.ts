@@ -1,5 +1,5 @@
 import { reddit } from '@devvit/web/server';
-import { TRACKS } from '../../game/track/tracks.js';
+import { hasTrack } from '../../game/track/catalog.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
 import {
     getServerDailyGpChallengeById,
@@ -27,7 +27,7 @@ export function normalizePostBoundDailyGpChallenge(value: unknown): DailyGpChall
         !/^daily-gp-\d{4}-\d{2}-\d{2}$/.test(id)
         || !challengeDate
         || !trackKey
-        || !TRACKS[trackKey]
+        || !hasTrack(trackKey)
         || !startsAt
         || !endsAt
         || !availableUntil

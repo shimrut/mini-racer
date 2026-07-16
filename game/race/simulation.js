@@ -1,5 +1,5 @@
 import { clamp, KPH_PER_WORLD_UNIT } from '../car/handling.js';
-import { getIntersection, segmentsIntersect } from '../config.js';
+import { getIntersection, segmentsIntersect } from '../track/geometry.js';
 import {
     handleFinishCrossing,
     resolveRunPolicy

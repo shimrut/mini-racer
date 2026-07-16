@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DailyChallengeUi } from '../game/daily-challenge/ui.js?v=2.08';
+import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 
 describe('ui daily challenge helpers', () => {
     it('sets leaderboard menu aria-label without rank details', () => {

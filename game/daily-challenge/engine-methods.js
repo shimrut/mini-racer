@@ -35,6 +35,7 @@ import {
   writeTrackLastLapMedal,
 } from "../medals/last-lap-medal-storage.js";
 import { getTrackCanvasAsset } from "../track/assets.js";
+import { DEFAULT_TRACK_KEY } from "../track/catalog.js";
 import { TRACKS } from "../track/tracks.js";
 import {
   createDailyChallengePresentationEvent,
@@ -171,11 +172,10 @@ export const dailyChallengeEngineMethods = {
   },
 
   async syncReadyBackgroundTrack(challenge = this.activeDailyChallenge) {
-    const fallbackTrackKey = "circuit";
     const targetTrackKey =
       typeof challenge?.trackKey === "string" && challenge.trackKey
         ? challenge.trackKey
-        : fallbackTrackKey;
+        : DEFAULT_TRACK_KEY;
 
     if (this.status !== "ready" || !targetTrackKey) {
       return;

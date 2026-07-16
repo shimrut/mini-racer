@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { ModalContentUi } from '../game/race/ui-modal-content.js?v=2.08';
+import { ModalContentUi } from '../game/race/ui-modal-content.js';
 
 function createClassList() {
     const classes = new Set();

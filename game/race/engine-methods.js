@@ -7,7 +7,7 @@ import {
   getDailyChallengeCopyLabels,
   getDailyChallengeTrackName,
 } from "../daily-challenge/service.js";
-import { TRACKS } from "../track/tracks.js";
+import { getTrackName } from "../track/catalog.js";
 
 const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;
@@ -417,7 +417,7 @@ export const raceEngineMethods = {
           skin: this.activeDailyChallenge?.skin ?? null,
           trackName: this.activeDailyChallenge
             ? getDailyChallengeTrackName(this.activeDailyChallenge)
-            : (TRACKS[this.currentTrackKey]?.name || this.currentTrackKey),
+            : getTrackName(this.currentTrackKey, this.currentTrackKey),
           bestTime,
         },
         settingsAction: () => this.settings.openSettings(),

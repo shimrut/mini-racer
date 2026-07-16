@@ -1,4 +1,4 @@
-import { TRACKS } from '../track/tracks.js';
+import { hasTrack } from '../track/catalog.js';
 import { TRACK_MODE_DAILY_GP } from '../config.js';
 import {
     getCachedDailyChallengePlaylist,
@@ -38,7 +38,7 @@ export function mergeLeaderboardPages(currentSnapshot, nextPage) {
 }
 
 function isValidDailyChallenge(challenge) {
-    return Boolean(challenge?.id && challenge.trackKey && TRACKS[challenge.trackKey]);
+    return Boolean(challenge?.id && hasTrack(challenge.trackKey));
 }
 
 function getDailyChallengeDateSource(challenge) {
@@ -454,7 +454,7 @@ export class LeaderboardsUi {
         playlistChallenges = null,
         refreshSession: providedRefreshSession = null,
     } = {}) {
-        if (!challenge?.id || !challenge.trackKey || !TRACKS[challenge.trackKey]) return;
+        if (!challenge?.id || !hasTrack(challenge.trackKey)) return;
 
         const refreshSession = this.resolveDailyLeaderboardRefreshSession(providedRefreshSession);
         refreshSession.selectedChallengeId = challenge.id;
@@ -569,7 +569,7 @@ export class LeaderboardsUi {
     async showTrackLeaderboardModal(trackKey, returnMode = 'close', {
         scoreboardSnapshot = null
     } = {}) {
-        if (!trackKey || !TRACKS[trackKey]) return;
+        if (!hasTrack(trackKey)) return;
 
         this._activeDailyLeaderboardRefreshSession = null;
         const providedSnapshot =

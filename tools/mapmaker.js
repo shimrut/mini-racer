@@ -1,4 +1,10 @@
-import { TRACKS } from '../game/track/tracks.js?v=2.09';
+import { TRACKS } from '../game/track/tracks.js';
+import {
+    formatTrackNumber as formatNumber,
+    generateTrackIntegrationSnippet,
+    generateTrackModuleSource,
+    getTrackModuleFilename
+} from './mapmaker/track-source.js';
 
 const TOOL_LABELS = {
     draw: 'line build',
@@ -29,21 +35,6 @@ function cloneTracks(source) {
 
 function clonePoint(point) {
     return { x: Number(point.x), y: Number(point.y) };
-}
-
-function formatNumber(value) {
-    if (!Number.isFinite(value)) {
-        return '0';
-    }
-    const rounded = Math.round(value * 1000) / 1000;
-    if (Math.abs(rounded - Math.round(rounded)) < 0.000001) {
-        return String(Math.round(rounded));
-    }
-    return rounded.toFixed(3).replace(/\.?0+$/, '');
-}
-
-function pointSource(point) {
-    return `Point(${formatNumber(point.x)}, ${formatNumber(point.y)})`;
 }
 
 function midpoint(a, b) {
@@ -369,14 +360,15 @@ class MapmakerApp {
         this.checkpointCount = document.getElementById('checkpoint-count');
         this.statusText = document.getElementById('status-text');
         this.dirtyBadge = document.getElementById('dirty-badge');
-        this.saveTracksBtn = document.getElementById('save-tracks-btn');
-        this.downloadTracksBtn = document.getElementById('download-tracks-btn');
+        this.saveTrackBtn = document.getElementById('save-track-btn');
+        this.downloadTrackBtn = document.getElementById('download-track-btn');
         this.newTrackBtn = document.getElementById('new-track-btn');
         this.duplicateTrackBtn = document.getElementById('duplicate-track-btn');
         this.insertPointBtn = document.getElementById('insert-point-btn');
         this.deletePointBtn = document.getElementById('delete-point-btn');
         this.reversePolygonBtn = document.getElementById('reverse-polygon-btn');
         this.copyTrackBtn = document.getElementById('copy-track-btn');
+        this.copyIntegrationBtn = document.getElementById('copy-integration-btn');
         this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
         this.removeCheckpointBtn = document.getElementById('remove-checkpoint-btn');
         this.reframeBtn = document.getElementById('reframe-btn');
@@ -390,7 +382,7 @@ class MapmakerApp {
             hoverHandle: null,
             checkpointIndex: 0,
             drag: null,
-            dirty: false,
+            dirtyTrackKeys: new Set(),
             status: 'Ready.',
             fileHandle: null,
             isSpaceDown: false,
@@ -649,8 +641,9 @@ class MapmakerApp {
         this.addCheckpointBtn.addEventListener('click', () => this.addCheckpoint());
         this.removeCheckpointBtn.addEventListener('click', () => this.removeCheckpoint());
         this.reframeBtn.addEventListener('click', () => this.resetView());
-        this.saveTracksBtn.addEventListener('click', () => this.saveTracksToFile());
-        this.downloadTracksBtn.addEventListener('click', () => this.downloadTracksFile());
+        this.saveTrackBtn.addEventListener('click', () => this.saveTrackModuleToFile());
+        this.downloadTrackBtn.addEventListener('click', () => this.downloadTrackModule());
+        this.copyIntegrationBtn.addEventListener('click', () => this.copyTrackIntegration());
 
         this.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
         this.canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
@@ -670,6 +663,13 @@ class MapmakerApp {
                 this.state.isSpaceDown = false;
                 this.canvas.dataset.pan = 'false';
             }
+        });
+        window.addEventListener('beforeunload', (event) => {
+            if (this.state.dirtyTrackKeys.size === 0) {
+                return;
+            }
+            event.preventDefault();
+            event.returnValue = '';
         });
     }
 
@@ -737,22 +737,31 @@ class MapmakerApp {
         Object.entries(this.state.tracks).forEach(([key, track]) => {
             const option = document.createElement('option');
             option.value = key;
-            option.textContent = track.name;
+            option.textContent = this.getTrackOptionText(key, track);
             this.trackSelect.appendChild(option);
         });
         this.trackSelect.value = previous;
     }
 
+    getTrackOptionText(key, track) {
+        return this.state.dirtyTrackKeys.has(key)
+            ? `${track.name} • Unsaved`
+            : track.name;
+    }
+
     syncTrackSelectText() {
         const option = this.trackSelect.querySelector(`option[value="${this.state.selectedTrackKey}"]`);
         if (option) {
-            option.textContent = this.track.name;
+            option.textContent = this.getTrackOptionText(this.state.selectedTrackKey, this.track);
         }
     }
 
     loadTrack(trackKey) {
         if (!this.state.tracks[trackKey]) {
             return;
+        }
+        if (trackKey !== this.state.selectedTrackKey) {
+            this.state.fileHandle = null;
         }
         this.state.selectedTrackKey = trackKey;
         this.trackSelect.value = trackKey;
@@ -784,6 +793,7 @@ class MapmakerApp {
         this.syncSelectedInputs();
         this.updateStageText();
         this.updateDrawMetricsLabel();
+        this.syncDirtyBadge();
         this.draw();
     }
 
@@ -833,11 +843,16 @@ class MapmakerApp {
             rebuilt[key === currentKey ? nextKey : key] = value;
         });
         this.state.tracks = rebuilt;
+        this.state.dirtyTrackKeys.delete(currentKey);
+        this.state.dirtyTrackKeys.add(nextKey);
         this.state.selectedTrackKey = nextKey;
+        this.state.fileHandle = null;
         this.populateTrackSelect();
         this.trackSelect.value = nextKey;
         this.trackKeyInput.value = nextKey;
-        this.markDirty(`Renamed track key to ${nextKey}.`);
+        this.markDirty(
+            `Renamed track key to ${nextKey}. Save the new module, remove the old definition file, and copy the updated integration lines.`
+        );
     }
 
     createTrack() {
@@ -987,12 +1002,6 @@ class MapmakerApp {
 
         const hasInvalidPoint = points.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y));
         return hasInvalidPoint ? 'contains invalid coordinates' : null;
-    }
-
-    getInvalidTrackEntries(trackEntries = Object.entries(this.state.tracks)) {
-        return trackEntries
-            .map(([key, track]) => ({ key, track, reason: this.validateTrack(track) }))
-            .filter((entry) => entry.reason);
     }
 
     getTrackBounds() {
@@ -1759,17 +1768,25 @@ class MapmakerApp {
     }
 
     markDirty(message, updateStatus = true) {
-        this.state.dirty = true;
-        this.dirtyBadge.textContent = 'Unsaved';
+        this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
+        this.syncTrackSelectText();
+        this.syncDirtyBadge();
         if (updateStatus) {
             this.setStatus(message);
         }
         this.draw();
     }
 
+    syncDirtyBadge() {
+        const isDirty = this.state.dirtyTrackKeys.has(this.state.selectedTrackKey);
+        this.dirtyBadge.textContent = isDirty ? 'Unsaved' : 'Saved';
+        this.dirtyBadge.classList.toggle('pill-warn', isDirty);
+    }
+
     markSaved(message) {
-        this.state.dirty = false;
-        this.dirtyBadge.textContent = 'Saved';
+        this.state.dirtyTrackKeys.delete(this.state.selectedTrackKey);
+        this.syncTrackSelectText();
+        this.syncDirtyBadge();
         this.setStatus(message);
     }
 
@@ -2063,47 +2080,6 @@ class MapmakerApp {
         handles.forEach((handle) => this.drawHandle(handle, viewport));
     }
 
-    generateTrackSource(key, track, indent = '    ') {
-        const lines = [];
-        lines.push(`${indent}${key}: {`);
-        lines.push(`${indent}    name: ${JSON.stringify(track.name)},`);
-        if (track.cornerRadius !== undefined) {
-            lines.push(`${indent}    cornerRadius: ${formatNumber(track.cornerRadius)},`);
-        }
-        if (track.drawWidth !== undefined) {
-            lines.push(`${indent}    drawWidth: ${formatNumber(clamp(Number(track.drawWidth) || DEFAULT_DRAW_WIDTH, MIN_DRAW_WIDTH, MAX_DRAW_WIDTH))},`);
-        }
-        if (track.lineSmoothing !== undefined) {
-            lines.push(`${indent}    lineSmoothing: ${formatNumber(clamp(Number(track.lineSmoothing) || 0, MIN_LINE_SMOOTHING, MAX_LINE_SMOOTHING))},`);
-        }
-        lines.push(`${indent}    outer: [`);
-        track.outer.forEach((point, index) => {
-            lines.push(`${indent}        ${pointSource(point)}${index === track.outer.length - 1 ? '' : ','}`);
-        });
-        lines.push(`${indent}    ],`);
-        lines.push(`${indent}    inner: [`);
-        track.inner.forEach((point, index) => {
-            lines.push(`${indent}        ${pointSource(point)}${index === track.inner.length - 1 ? '' : ','}`);
-        });
-        lines.push(`${indent}    ],`);
-        lines.push(`${indent}    startLine: { p1: ${pointSource(track.startLine.p1)}, p2: ${pointSource(track.startLine.p2)} },`);
-        lines.push(`${indent}    startPos: ${pointSource(track.startPos)},`);
-        lines.push(`${indent}    startAngle: ${formatNumber(track.startAngle ?? 0)},`);
-        lines.push(`${indent}    checkpoints: [`);
-        track.checkpoints.forEach((checkpoint, index) => {
-            const comma = index === track.checkpoints.length - 1 ? '' : ',';
-            lines.push(`${indent}        { p1: ${pointSource(checkpoint.p1)}, p2: ${pointSource(checkpoint.p2)} }${comma}`);
-        });
-        lines.push(`${indent}    ]`);
-        lines.push(`${indent}}`);
-        return lines.join('\n');
-    }
-
-    generateTracksSource() {
-        const blocks = Object.entries(this.state.tracks).map(([key, track]) => this.generateTrackSource(key, track));
-        return `import { Point } from '../config.js';\n\n// --- Track Definitions ---\nexport const TRACKS = {\n${blocks.join(',\n')}\n};\n`;
-    }
-
     async copyCurrentTrack() {
         const invalidTrack = this.validateTrack(this.track);
         if (invalidTrack) {
@@ -2111,11 +2087,11 @@ class MapmakerApp {
             return;
         }
 
-        const text = this.generateTrackSource(this.state.selectedTrackKey, this.track, '');
+        const text = generateTrackModuleSource(this.track);
         try {
             if (navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(text);
-                this.setStatus('Copied current track source.');
+                this.setStatus(`Copied ${getTrackModuleFilename(this.state.selectedTrackKey)} module source.`);
                 return;
             }
         } catch (error) {
@@ -2124,26 +2100,50 @@ class MapmakerApp {
         this.setStatus('Clipboard write is not available here.', true);
     }
 
-    downloadTracksFile() {
-        const invalidTracks = this.getInvalidTrackEntries();
-        if (invalidTracks.length > 0) {
-            const invalid = invalidTracks[0];
-            this.setStatus(`Cannot export while ${invalid.track.name} is incomplete: ${invalid.reason}.`, true);
+    async copyTrackIntegration() {
+        const text = generateTrackIntegrationSnippet(this.state.selectedTrackKey, this.track.name);
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                this.setStatus('Copied catalog, import, and registry integration lines.');
+                return;
+            }
+        } catch (error) {
+            console.error(error);
+        }
+        this.setStatus('Clipboard write is not available here.', true);
+    }
+
+    downloadTrackModule() {
+        const invalidTrack = this.validateTrack(this.track);
+        if (invalidTrack) {
+            this.setStatus(`Cannot export ${this.track.name}: ${invalidTrack}.`, true);
             return;
         }
 
-        const blob = new Blob([this.generateTracksSource()], { type: 'text/javascript;charset=utf-8' });
+        const filename = getTrackModuleFilename(this.state.selectedTrackKey);
+        const blob = new Blob([generateTrackModuleSource(this.track)], { type: 'text/javascript;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'tracks.js';
+        link.download = filename;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        this.markSaved('Downloaded tracks.js.');
+        this.markSaved(`Downloaded ${filename}.`);
     }
 
     async getWritableFileHandle() {
         if (this.state.fileHandle) {
+            return this.state.fileHandle;
+        }
+        if (window.showSaveFilePicker) {
+            this.state.fileHandle = await window.showSaveFilePicker({
+                suggestedName: getTrackModuleFilename(this.state.selectedTrackKey),
+                types: [{
+                    description: 'JavaScript modules',
+                    accept: { 'text/javascript': ['.js'] }
+                }]
+            });
             return this.state.fileHandle;
         }
         if (!window.showOpenFilePicker) {
@@ -2153,7 +2153,7 @@ class MapmakerApp {
         const [handle] = await window.showOpenFilePicker({
             multiple: false,
             types: [{
-                description: 'JavaScript files',
+                description: 'JavaScript modules',
                 accept: { 'text/javascript': ['.js'] }
             }]
         });
@@ -2161,19 +2161,19 @@ class MapmakerApp {
         return handle;
     }
 
-    async saveTracksToFile() {
-        const invalidTracks = this.getInvalidTrackEntries();
-        if (invalidTracks.length > 0) {
-            const invalid = invalidTracks[0];
-            this.setStatus(`Cannot save while ${invalid.track.name} is incomplete: ${invalid.reason}.`, true);
+    async saveTrackModuleToFile() {
+        const invalidTrack = this.validateTrack(this.track);
+        if (invalidTrack) {
+            this.setStatus(`Cannot save ${this.track.name}: ${invalidTrack}.`, true);
             return;
         }
 
-        const source = this.generateTracksSource();
+        const filename = getTrackModuleFilename(this.state.selectedTrackKey);
+        const source = generateTrackModuleSource(this.track);
         try {
             const handle = await this.getWritableFileHandle();
             if (!handle) {
-                this.downloadTracksFile();
+                this.downloadTrackModule();
                 return;
             }
 
@@ -2186,7 +2186,7 @@ class MapmakerApp {
             const writable = await handle.createWritable();
             await writable.write(source);
             await writable.close();
-            this.markSaved('Saved updated tracks.js.');
+            this.markSaved(`Saved ${filename}.`);
         } catch (error) {
             if (error?.name !== 'AbortError') {
                 console.error(error);

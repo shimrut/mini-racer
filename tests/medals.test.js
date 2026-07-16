@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TRACKS } from '../game/track/tracks.js';
+import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import {
     TRACK_MEDAL_THRESHOLDS,
     getAuthorMedalSeconds,
@@ -34,7 +34,7 @@ describe('medals', () => {
     });
 
     it('defines ordered thresholds for every track', () => {
-        const keys = Object.keys(TRACKS).sort();
+        const keys = [...TRACK_SCHEDULE_KEYS].sort();
         const thresholdKeys = Object.keys(TRACK_MEDAL_THRESHOLDS).sort();
         for (const trackKey of keys) {
             expect(thresholdKeys).toContain(trackKey);

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { TRACKS } from '../game/track/tracks.js';
+import {
+    hasTrack,
+    TRACK_CATALOG,
+    TRACK_SCHEDULE_KEYS,
+} from '../game/track/catalog.js';
 import { PUBLISHED_DAILY_GP_TRACKS_BY_DATE } from '../game/shared/daily-gp-history-backfill.js';
 import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-backfill.ts';
 import {
@@ -38,7 +42,7 @@ describe('reddit daily gp model', () => {
         const scheduledTrackKeys = Object.values(PUBLISHED_DAILY_GP_TRACKS_BY_DATE);
         expect(new Set(scheduledTrackKeys).size).toBe(scheduledTrackKeys.length);
         for (const trackKey of scheduledTrackKeys) {
-            expect(TRACKS[trackKey]).toBeTruthy();
+            expect(hasTrack(trackKey)).toBe(true);
         }
     });
 
@@ -72,23 +76,13 @@ describe('reddit daily gp model', () => {
 
     it('uses every playable track key as the generation pool', () => {
         const scheduledTrackKeys = Object.values(PUBLISHED_DAILY_GP_TRACKS_BY_DATE);
-        const pool = Object.keys(TRACKS);
+        const pool = TRACK_SCHEDULE_KEYS;
 
         expect(scheduledTrackKeys.every((key) => pool.includes(key))).toBe(true);
     });
 
-    it('makes new track file additions eligible for future generation', () => {
-        const extendedPool = Object.keys({
-            ...TRACKS,
-            newPlayableTrack: {
-                name: 'New Playable Track',
-            },
-        });
-
-        expect(extendedPool).toEqual([
-            ...Object.keys(TRACKS),
-            'newPlayableTrack',
-        ]);
+    it('uses explicit catalog order for future Daily GP generation', () => {
+        expect(TRACK_SCHEDULE_KEYS).toEqual(Object.keys(TRACK_CATALOG));
     });
 
     it('keeps day indexing stable within the same UTC day', () => {

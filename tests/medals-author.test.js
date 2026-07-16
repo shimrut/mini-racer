@@ -18,7 +18,7 @@ describe('author medal', () => {
         vi.doMock('../game/medals/medal-times.json', () => ({
             default: circuitFixture
         }));
-        const tm = await import('../game/medals/medals.js?v=2.03');
+        const tm = await import('../game/medals/medals.js');
         expect(tm.getMedalForLapTime('circuit', 3.99)).toBe('author');
         expect(tm.getMedalForLapTime('circuit', 4.5)).toBe('gold');
     });
@@ -29,7 +29,7 @@ describe('author medal', () => {
                 circuit: { gold: 5.44, silver: 6.07, bronze: 6.37, author: 99.0 }
             }
         }));
-        const tm = await import('../game/medals/medals.js?v=2.03');
+        const tm = await import('../game/medals/medals.js');
         const t = tm.getTrackMedalThresholds('circuit');
         expect(tm.getMedalForLapTime('circuit', t.gold - 0.1)).toBe('gold');
         expect(tm.getNextMedalTarget('circuit', 'gold')).toBe(null);
@@ -39,7 +39,7 @@ describe('author medal', () => {
         vi.doMock('../game/medals/medal-times.json', () => ({
             default: circuitFixture
         }));
-        const tm = await import('../game/medals/medals.js?v=2.03');
+        const tm = await import('../game/medals/medals.js');
         expect(tm.getNextMedalTarget('circuit', 'gold')).toEqual({ tier: 'author', maxSeconds: 4 });
         expect(tm.getNextMedalTarget('circuit', 'author')).toBe(null);
     });
@@ -48,7 +48,7 @@ describe('author medal', () => {
         vi.doMock('../game/medals/medal-times.json', () => ({
             default: circuitFixture
         }));
-        const tm = await import('../game/medals/medals.js?v=2.03');
+        const tm = await import('../game/medals/medals.js');
         expect(tm.getTimeToBeatSeconds('circuit', 'gold')).toBe(4);
         expect(tm.getTimeToBeatSeconds('circuit', 'author')).toBe(4);
     });
@@ -57,7 +57,7 @@ describe('author medal', () => {
         vi.doMock('../game/medals/medal-times.json', () => ({
             default: circuitFixture
         }));
-        const tm = await import('../game/medals/medals.js?v=2.03');
+        const tm = await import('../game/medals/medals.js');
         const line = tm.formatMedalTargetsLine('circuit');
         expect(line).toContain('Author');
         expect(line).toContain('Gold');

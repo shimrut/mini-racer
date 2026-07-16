@@ -1,13 +1,13 @@
-import { CONFIG } from '../game/config.js?v=2.09';
-import { TRACKS } from '../game/track/tracks.js?v=2.09';
-import { getTrackCanvasAsset, getTrackRuntimeAsset } from '../game/track/assets.js?v=2.09';
-import { updateSimulation } from '../game/race/simulation.js?v=2.09';
-import { RingBuffer } from '../game/race/ring-buffer.js?v=2.09';
+import { CONFIG } from '../game/config.js';
+import { DEFAULT_TRACK_KEY } from '../game/track/catalog.js';
+import { TRACKS } from '../game/track/tracks.js';
+import { getTrackCanvasAsset, getTrackRuntimeAsset } from '../game/track/assets.js';
+import { updateSimulation } from '../game/race/simulation.js';
+import { RingBuffer } from '../game/race/ring-buffer.js';
 
 const MP4_MUXER_CDN = 'https://esm.sh/mp4-muxer@5.2.3';
 
 const ROUTE_SAMPLE_COUNT = 240;
-const DEFAULT_TRACK_KEY = 'circuit';
 const EXPORT_FPS = 60;
 const CLIP_MIN_DURATION_SEC = 4;
 const CLIP_MAX_DURATION_SEC = 20;

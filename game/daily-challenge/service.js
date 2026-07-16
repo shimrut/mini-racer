@@ -1,4 +1,8 @@
-import { TRACKS } from '../track/tracks.js';
+import {
+    DEFAULT_TRACK_KEY,
+    getTrackName,
+    hasTrack,
+} from '../track/catalog.js';
 import { isLocalEnvironment } from '../track/environment.js';
 import {
     API_ROUTES,
@@ -58,12 +62,12 @@ function resolveMockDailyTrackKey(params) {
     if (!params) return null;
 
     const mockDaily = params.get('mockDaily');
-    if (mockDaily && mockDaily !== 'true' && TRACKS[mockDaily]) {
+    if (mockDaily && mockDaily !== 'true' && hasTrack(mockDaily)) {
         return mockDaily;
     }
 
     const mockTrack = params.get('mockTrack');
-    if (mockTrack && TRACKS[mockTrack]) {
+    if (mockTrack && hasTrack(mockTrack)) {
         return mockTrack;
     }
 
@@ -74,7 +78,7 @@ function shouldUseMockDailyChallenge() {
     const params = getMockDailyUrlParams();
     if (params) {
         const mockDaily = params.get('mockDaily');
-        if (mockDaily === 'true' || (mockDaily && TRACKS[mockDaily])) {
+        if (mockDaily === 'true' || (mockDaily && hasTrack(mockDaily))) {
             return true;
         }
         if (params.get('localDev') === 'true') {
@@ -87,7 +91,7 @@ function shouldUseMockDailyChallenge() {
 function getMockDailyChallenge() {
     const params = getMockDailyUrlParams();
     const fixedTrackKey = resolveMockDailyTrackKey(params);
-    const trackKey = fixedTrackKey || Object.keys(TRACKS)[0];
+    const trackKey = fixedTrackKey || DEFAULT_TRACK_KEY;
     if (!trackKey) {
         return null;
     }
@@ -121,7 +125,7 @@ function getMockDailyChallengeSnapshot() {
 function toCachedActiveChallenge(challenge) {
     if (!challenge || typeof challenge !== 'object') return null;
     if (typeof challenge.id !== 'string' || !challenge.id) return null;
-    if (typeof challenge.trackKey !== 'string' || !TRACKS[challenge.trackKey]) return null;
+    if (typeof challenge.trackKey !== 'string' || !hasTrack(challenge.trackKey)) return null;
 
     return {
         id: challenge.id,
@@ -268,7 +272,7 @@ function normalizeObjectiveType(value) {
 function normalizeDailyChallenge(raw) {
     if (!raw || typeof raw !== 'object') return null;
     if (typeof raw.id !== 'string' || !raw.id) return null;
-    if (typeof raw.trackKey !== 'string' || !TRACKS[raw.trackKey]) return null;
+    if (typeof raw.trackKey !== 'string' || !hasTrack(raw.trackKey)) return null;
 
     return {
         id: raw.id,
@@ -318,7 +322,7 @@ function isChallengeStillUsable(challenge, nowMs = Date.now()) {
 }
 
 function isChallengeTrackCurrentForSchedule(challenge) {
-    return Boolean(challenge?.trackKey && TRACKS[challenge.trackKey]);
+    return hasTrack(challenge?.trackKey);
 }
 
 function sortDailyPlaylist(challenges) {
@@ -610,7 +614,7 @@ function getObjectiveRequiredLaps(challenge) {
 }
 
 export function getDailyChallengeTrackName(challenge) {
-    return TRACKS[challenge?.trackKey]?.name || 'Unknown Track';
+    return getTrackName(challenge?.trackKey, 'Unknown Track');
 }
 
 export function getDailyChallengeObjectiveLabel(challenge) {

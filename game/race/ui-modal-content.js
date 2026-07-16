@@ -1,4 +1,4 @@
-import { TRACKS } from '../track/tracks.js';
+import { getTrackName } from '../track/catalog.js';
 import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/result-flow.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
@@ -361,8 +361,7 @@ export class ModalContentUi {
         : poolTotal;
     const openCommunitySlots = Math.max(0, poolTotal - leaderboardEntryCount);
 
-    const trackMeta = trackKey && TRACKS[trackKey] ? TRACKS[trackKey] : null;
-    const trackName = trackMeta?.name || null;
+    const trackName = getTrackName(trackKey, null);
 
     const section = document.createElement('section');
     const leaderboardOnly = container.childElementCount === 0;

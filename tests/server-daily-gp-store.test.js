@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TRACK_CATALOG, TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-backfill.ts';
 
@@ -292,6 +293,82 @@ describe('server daily gp store submissions', () => {
                 'daily-gp-2026-06-10': expect.stringContaining('"trackKey":"caspianBoulevard"'),
             }),
         );
+    });
+
+    it('does not schedule a geometry definition until its key is added to the catalog schedule', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-01-10T12:00:00.000Z'));
+        TRACKS.geometryOnlyTestTrack = TRACKS.circuit;
+
+        try {
+            const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+
+            expect(challenge.trackKey).toBe(TRACK_SCHEDULE_KEYS[0]);
+            expect(challenge.trackKey).not.toBe('geometryOnlyTestTrack');
+        } finally {
+            delete TRACKS.geometryOnlyTestTrack;
+            vi.useRealTimers();
+        }
+    });
+
+    it('makes a catalog addition the next eligible scheduled track', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-01-11T12:00:00.000Z'));
+        const testTrackKey = 'catalogScheduleTestTrack';
+        const priorTrackKey = TRACK_SCHEDULE_KEYS.at(-1);
+        TRACK_CATALOG[testTrackKey] = { name: 'Catalog Schedule Test Track' };
+        TRACK_SCHEDULE_KEYS.push(testTrackKey);
+        mockRedis.hGetAll.mockResolvedValue({
+            'daily-gp-2030-01-10': JSON.stringify({
+                id: 'daily-gp-2030-01-10',
+                challengeDate: '2030-01-10',
+                trackKey: priorTrackKey,
+                startsAt: '2030-01-10T00:00:00.000Z',
+                endsAt: '2030-01-11T00:00:00.000Z',
+                availableUntil: '2030-01-17T00:00:00.000Z',
+            }),
+        });
+
+        try {
+            const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+
+            expect(challenge.trackKey).toBe(testTrackKey);
+        } finally {
+            TRACK_SCHEDULE_KEYS.pop();
+            delete TRACK_CATALOG[testTrackKey];
+            vi.useRealTimers();
+        }
+    });
+
+    it('keeps an already-published day frozen when the future schedule changes', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-01-12T12:00:00.000Z'));
+        const storedChallenge = {
+            id: 'daily-gp-2030-01-12',
+            challengeDate: '2030-01-12',
+            trackKey: 'sunlitTemple',
+            startsAt: '2030-01-12T00:00:00.000Z',
+            endsAt: '2030-01-13T00:00:00.000Z',
+            availableUntil: '2030-01-19T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        mockRedis.hGet.mockResolvedValue(JSON.stringify(storedChallenge));
+        TRACK_SCHEDULE_KEYS.reverse();
+
+        try {
+            const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+
+            expect(challenge).toEqual(storedChallenge);
+        } finally {
+            TRACK_SCHEDULE_KEYS.reverse();
+            vi.useRealTimers();
+        }
     });
 
     it('filters snapshot rows whose stored track does not match the challenge track', async () => {

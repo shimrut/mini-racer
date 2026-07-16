@@ -1,4 +1,4 @@
-import { TRACKS } from '../../game/track/tracks.js';
+import { getTrackName } from '../../game/track/catalog.js';
 import medalTimes from '../../game/medals/medal-times.json' with { type: 'json' };
 import type { DailyGpChallenge } from './daily-gp-model.js';
 
@@ -86,7 +86,7 @@ export function formatDailyMiniRacerPostTitle(
     challenge: DailyGpChallenge,
     options: DailyPostTitleOptions = {},
 ): string {
-    const trackName = TRACKS[challenge.trackKey]?.name || 'Featured Track';
+    const trackName = getTrackName(challenge.trackKey, 'Featured Track');
     const personalBestTime = formatSeconds(options.personalBestSec);
     return applyTitleTemplate(getDailyPostTitleFormat(), {
         challengeDate: challenge.challengeDate,
@@ -101,7 +101,7 @@ export function formatDailyMiniRacerPostTitle(
 }
 
 export function formatDailyMiniRacerTextFallback(challenge: DailyGpChallenge): string {
-    const trackName = TRACKS[challenge.trackKey]?.name || challenge.trackKey;
+    const trackName = getTrackName(challenge.trackKey, challenge.trackKey);
     const medalTimeTokens = getMedalTimeTokens(challenge.trackKey);
 
     return [

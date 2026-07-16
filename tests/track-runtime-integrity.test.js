@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../game/config.js';
+import { createHash } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import {
+    DEFAULT_TRACK_KEY,
+    hasTrack,
+    TRACK_CATALOG,
+    TRACK_SCHEDULE_KEYS,
+} from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
 
@@ -34,27 +41,41 @@ function pointInPolygon(point, polygon) {
     return inside;
 }
 
+function toKebabCase(trackKey) {
+    return trackKey.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
 describe('track runtime integrity', () => {
-    it('keeps the Daily GP server allowlist (visibleTrackKeys) aligned with config order', () => {
-        expect(CONFIG.visibleTrackKeys).toEqual([
-            'circuit',
-            'sunlitTemple',
-            'moebiusStrip',
-            'blueSector',
-            'harborParkLoop',
-            'jadeSpiralCircuit',
-            'cedarRidgeCircuit',
-            'sakuraWeave',
-            'royalPlateau',
-            'twinRise',
-            'templeStraight',
-            'harborPrincipality',
-            'serpentCrossing',
-            'ardennesRidge',
-            'wingArena',
-            'albertGardens',
-            'caspianBoulevard'
-        ]);
+    it('keeps the compatibility registry identical to the ordered catalog', () => {
+        expect(Object.keys(TRACKS)).toEqual(TRACK_SCHEDULE_KEYS);
+        expect(TRACK_SCHEDULE_KEYS).toEqual(Object.keys(TRACK_CATALOG));
+        expect(new Set(TRACK_SCHEDULE_KEYS).size).toBe(TRACK_SCHEDULE_KEYS.length);
+        Object.entries(TRACK_CATALOG).forEach(([trackKey, metadata]) => {
+            expect(metadata.name.trim(), `${trackKey} needs a player-facing name`).not.toBe('');
+            expect(TRACKS[trackKey]?.name).toBe(metadata.name);
+        });
+    });
+
+    it('keeps exactly one kebab-case definition file for every catalog track', () => {
+        const definitionFiles = readdirSync(
+            new URL('../game/track/definitions/', import.meta.url),
+        )
+            .filter((filename) => filename.endsWith('.js'))
+            .sort();
+        const expectedFiles = TRACK_SCHEDULE_KEYS
+            .map((trackKey) => `${toKebabCase(trackKey)}.js`)
+            .sort();
+
+        expect(definitionFiles).toEqual(expectedFiles);
+    });
+
+    it('preserves the track registry data while definitions are split into modules', () => {
+        const registryHash = createHash('sha256')
+            .update(JSON.stringify(TRACKS))
+            .digest('hex');
+        expect(registryHash).toBe(
+            '923415f865de38edd3737e9c035dfa657e392c3d12143f29a38f8bbc491f14f8',
+        );
     });
 
     it('keeps Kettle Run nested and its lap gates ordered for a complete timed lap', () => {
@@ -87,10 +108,11 @@ describe('track runtime integrity', () => {
         expect(events).toEqual(['finish-0', 'cp-0', 'cp-1', 'cp-2']);
     });
 
-    it('keeps every visibleTrackKeys entry mapped to a real playable track', () => {
-        expect(CONFIG.visibleTrackKeys.length).toBeGreaterThan(0);
-        CONFIG.visibleTrackKeys.forEach((trackKey) => {
-            if (!Object.prototype.hasOwnProperty.call(TRACKS, trackKey)) return;
+    it('keeps every scheduled track mapped to a real playable definition', () => {
+        expect(TRACK_SCHEDULE_KEYS.length).toBeGreaterThan(0);
+        expect(DEFAULT_TRACK_KEY).toBe(TRACK_SCHEDULE_KEYS[0]);
+        TRACK_SCHEDULE_KEYS.forEach((trackKey) => {
+            expect(hasTrack(trackKey), `${trackKey} is missing from the catalog`).toBe(true);
             expect(TRACKS[trackKey], `${trackKey} is missing from TRACKS`).toBeTruthy();
         });
     });

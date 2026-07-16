@@ -1,5 +1,5 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js';
-import { TRACKS } from '../track/tracks.js';
+import { hasTrack } from '../track/catalog.js';
 import {
     API_ROUTES,
     clampRequestLimit,
@@ -49,7 +49,7 @@ export async function getScoreboardSnapshot({
     if (!config || typeof fetch !== 'function') {
         return createEmptyScoreboardSnapshot();
     }
-    if (!TRACKS[trackKey]) {
+    if (!hasTrack(trackKey)) {
         return createEmptyScoreboardSnapshot();
     }
 

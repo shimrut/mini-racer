@@ -2,7 +2,7 @@ import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
 import { randomUUID } from 'node:crypto';
 import { getMedalForLapTime } from '../../game/medals/medals.js';
-import { TRACKS } from '../../game/track/tracks.js';
+import { getTrackName } from '../../game/track/catalog.js';
 import { DAILY_GP_REDIS_TTL_SECONDS, type DailyGpChallenge } from './daily-gp-model.js';
 import {
     getServerDailyGpPlayerBest,
@@ -454,7 +454,7 @@ export async function previewDailyGpShare(
         commentText: formatDailyGpShareComment(
             result.bestTimeMs,
             medal,
-            TRACKS[result.challenge.trackKey]?.name,
+            getTrackName(result.challenge.trackKey, ''),
         ),
         createdAt: new Date().toISOString(),
     };

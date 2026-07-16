@@ -1,4 +1,4 @@
-import { TRACKS } from '../../game/track/tracks.js';
+import { hasTrack } from '../../game/track/catalog.js';
 import { getBackfilledDailyGpTrackKeyForDate } from '../../game/shared/daily-gp-history-backfill.js';
 import {
     createDailyChallengeId,
@@ -18,7 +18,7 @@ export function getBackfilledDailyGpChallenge(challengeId: string): DailyGpChall
 
     const challengeDate = match[1];
     const trackKey = getBackfilledDailyGpTrackKeyForDate(challengeDate);
-    if (!trackKey || !TRACKS[trackKey]) return null;
+    if (!hasTrack(trackKey)) return null;
 
     const startsAt = getUtcDayStart(challengeDate);
     if (!startsAt) return null;
