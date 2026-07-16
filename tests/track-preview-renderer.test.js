@@ -148,7 +148,7 @@ describe('track preview rendering', () => {
 
         const markerTranslations = ctx.translate.mock.calls.filter(([, y]) => y > 40 && y < 80);
         expect(markerTranslations).toHaveLength(2);
-        expect(markerTranslations[0][0]).toBeGreaterThan(76);
+        expect(markerTranslations[0][0]).toBeGreaterThan(85);
         expect(markerTranslations[1]).toEqual(markerTranslations[0]);
         expect(ctx.drawImage).toHaveBeenCalledOnce();
         expect(ctx.drawImage.mock.calls[0][0]).toBe(carImage);

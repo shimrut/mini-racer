@@ -266,7 +266,7 @@ function getSchematicCarPosition(startLine, startPos, startAngle, mapPoint, scal
 
     const p1 = mapPoint(startLine.p1);
     const p2 = mapPoint(startLine.p2);
-    const forwardOffset = (carImage ? 22 : 14) * scale;
+    const forwardOffset = (carImage ? 35 : 14) * scale;
     return {
         x: (p1.x + p2.x) / 2 + Math.cos(startAngle) * forwardOffset,
         y: (p1.y + p2.y) / 2 + Math.sin(startAngle) * forwardOffset

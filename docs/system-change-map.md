@@ -214,7 +214,7 @@ These are useful, but they are not on the critical player path:
 - `tools/runner.*`
   Auxiliary workflow tooling.
 - `preview.html`, `preview.js`, `preview.css`
-  Custom Reddit post preview entrypoint and standalone local review surface. The current challenge is labeled `Today`; the preview shows its gold-medal threshold and shared gold medal artwork, and draws the stock in-game car just past the start line with a short trail. In-game schematic previews do not use that post-only treatment.
+  Custom Reddit post preview entrypoint and standalone local review surface. The current challenge is labeled `Today`; the preview shows its gold-medal threshold and shared gold medal artwork, and draws the stock in-game car clearly past the start line with a short trail. In-game schematic previews do not use that post-only treatment.
 - `mod-tool.*`
   Moderator/support tooling outside the main race runtime.
 

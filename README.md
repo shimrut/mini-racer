@@ -61,7 +61,7 @@ The Garage lets players change how their car looks without changing handling.
 
 ## First-time experience
 
-- The post preview marks the current track as `Today`, shows its gold-medal target time and medal, places the stock in-game car just past the starting line with a short trail behind it, and includes a `Race Now` button.
+- The post preview marks the current track as `Today`, shows its gold-medal target time and medal, places the stock in-game car clearly past the starting line with a short trail behind it, and includes a `Race Now` button.
 - The full game opens with the featured track ready to play.
 - The controls and goal are immediate: finish one clean lap as fast as possible.
 
