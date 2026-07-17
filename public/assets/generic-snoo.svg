@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Generic Snoo">
-  <path fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="6" d="M53 25 63 12l12 4"/>
-  <circle cx="79" cy="17" r="5" fill="#ef4444"/>
-  <path fill="#f8fafc" d="M48 23c-22 0-39 13-39 31 0 9 5 17 13 23 7 6 16 9 26 9s19-3 26-9c8-6 13-14 13-23 0-18-17-31-39-31Z"/>
-  <ellipse cx="32" cy="52" rx="6" ry="7" fill="#ef4444"/>
-  <ellipse cx="64" cy="52" rx="6" ry="7" fill="#ef4444"/>
-  <path fill="none" stroke="#ef4444" stroke-linecap="round" stroke-width="5" d="M30 68c5 5 11 7 18 7s13-2 18-7"/>
-</svg>

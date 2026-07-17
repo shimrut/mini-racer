@@ -45,7 +45,7 @@ The post preview shows today’s track, the gold-medal target, a car on the star
 
 Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
 
-Final podium posts use a separate moderator-controlled schedule. They show the top three verified times for the track that just expired, using each finalist's Reddit username (without a `u/` prefix) or private generated racer name according to the setting saved when the podium is published. Public Reddit identities include their Reddit avatar; private identities use the same generic Snoo without revealing profile details. Podiums created before avatar data was added resolve and cache public avatars through the post's server context.
+Final podium posts use a separate moderator-controlled schedule. They show the top three verified times for the track that just expired, using each finalist's Reddit username (without a `u/` prefix) or private generated racer name according to the setting saved when the podium is published. Public Reddit identities include their Snoovatar when Devvit exposes one; Reddit accounts using a standard profile icon, private identities, unavailable avatars, and empty places use Reddit's official hosted default Snoo without revealing profile details. Podiums created before avatar data was added resolve and cache public Snoovatar lookups through the post's server context.
 
 ## Garage
 

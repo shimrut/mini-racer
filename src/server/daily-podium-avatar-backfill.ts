@@ -9,7 +9,7 @@ export type DailyGpPodiumAvatarPosition = {
 };
 
 function createCacheKey(postId: string): string {
-    return `dailygp:podium-avatar-backfill:${postId}`;
+    return `dailygp:podium-avatar-backfill:v2:${postId}`;
 }
 
 function parseCachedPositions(value: string | undefined): DailyGpPodiumAvatarPosition[] | null {

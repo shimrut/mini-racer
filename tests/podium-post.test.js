@@ -7,6 +7,9 @@ import {
     renderPodium,
 } from '../podium.js';
 
+const OFFICIAL_REDDIT_SNOO_URL =
+    'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
+
 function createDocument() {
     return new JSDOM(`
         <h1 id="podium-title"></h1>
@@ -14,7 +17,7 @@ function createDocument() {
         <ol>
             ${[1, 2, 3].map((rank) => `
                 <li data-rank="${rank}">
-                    <img class="podium-row__avatar podium-row__avatar--generic" src="assets/generic-snoo.svg" alt="">
+                    <img class="podium-row__avatar podium-row__avatar--generic" src="${OFFICIAL_REDDIT_SNOO_URL}" alt="">
                     <span class="podium-row__name"></span>
                     <span class="podium-row__time"></span>
                 </li>
@@ -41,9 +44,9 @@ describe('podium custom post', () => {
         });
 
         expect(result.positions).toEqual([
-            { rank: 1, displayName: 'RaceFan', identityType: 'reddit', formattedTime: '18.42', avatarUrl: 'assets/generic-snoo.svg' },
-            { rank: 2, displayName: 'Turbo Otter 42', identityType: 'private', formattedTime: '18.76', avatarUrl: 'assets/generic-snoo.svg' },
-            { rank: 3, displayName: 'No verified finish', identityType: 'empty', formattedTime: '—', avatarUrl: 'assets/generic-snoo.svg' },
+            { rank: 1, displayName: 'RaceFan', identityType: 'reddit', formattedTime: '18.42', avatarUrl: OFFICIAL_REDDIT_SNOO_URL },
+            { rank: 2, displayName: 'Turbo Otter 42', identityType: 'private', formattedTime: '18.76', avatarUrl: OFFICIAL_REDDIT_SNOO_URL },
+            { rank: 3, displayName: 'No verified finish', identityType: 'empty', formattedTime: '—', avatarUrl: OFFICIAL_REDDIT_SNOO_URL },
         ]);
     });
 
@@ -79,7 +82,7 @@ describe('podium custom post', () => {
             'Winner Reddit avatar',
         );
         expect(document.querySelector('[data-rank="2"] .podium-row__avatar').getAttribute('src')).toBe(
-            'assets/generic-snoo.svg',
+            OFFICIAL_REDDIT_SNOO_URL,
         );
     });
 
@@ -97,7 +100,7 @@ describe('podium custom post', () => {
         expect(result.positions[2].displayName).toBe('Driver');
     });
 
-    it('never renders an unsafe avatar URL and labels private generic Snoos', () => {
+    it('never renders an unsafe avatar URL and labels the official Reddit fallback', () => {
         const document = createDocument();
         renderPodium(document, {
             positions: [
@@ -107,9 +110,9 @@ describe('podium custom post', () => {
         });
 
         const avatars = document.querySelectorAll('.podium-row__avatar');
-        expect(avatars[0].getAttribute('src')).toBe('assets/generic-snoo.svg');
-        expect(avatars[1].getAttribute('src')).toBe('assets/generic-snoo.svg');
-        expect(avatars[1].alt).toBe('Generic Snoo avatar');
+        expect(avatars[0].getAttribute('src')).toBe(OFFICIAL_REDDIT_SNOO_URL);
+        expect(avatars[1].getAttribute('src')).toBe(OFFICIAL_REDDIT_SNOO_URL);
+        expect(avatars[1].alt).toBe('Official Reddit default Snoo avatar');
     });
 
     it('hydrates public avatars missing from legacy immutable post data', async () => {
@@ -133,6 +136,6 @@ describe('podium custom post', () => {
             displayName: 'shimroot',
             avatarUrl: 'https://styles.redditmedia.com/shimroot.png',
         });
-        expect(hydrated.positions[1].avatarUrl).toBe('assets/generic-snoo.svg');
+        expect(hydrated.positions[1].avatarUrl).toBe(OFFICIAL_REDDIT_SNOO_URL);
     });
 });

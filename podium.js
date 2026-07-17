@@ -1,7 +1,7 @@
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
 const EMPTY_TIME = '—';
-const GENERIC_SNOO_URL = 'assets/generic-snoo.svg';
+const GENERIC_SNOO_URL = 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
 
 export function readPodiumPostData(root = globalThis) {
     const postData = root?.devvit?.context?.postData;
@@ -88,7 +88,7 @@ function renderPosition(row, position) {
         avatar.alt = position.identityType === 'reddit'
             ? `${position.displayName} Reddit avatar`
             : position.identityType === 'private'
-                ? 'Generic Snoo avatar'
+                ? 'Official Reddit default Snoo avatar'
                 : '';
         avatar.classList.toggle('podium-row__avatar--generic', position.avatarUrl === GENERIC_SNOO_URL);
         avatar.onerror = () => {

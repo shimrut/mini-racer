@@ -47,7 +47,7 @@ describe('legacy daily podium avatar backfill', () => {
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('shimroot');
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledTimes(1);
         expect(mockRedis.set).toHaveBeenCalledWith(
-            'dailygp:podium-avatar-backfill:t3_podium',
+            'dailygp:podium-avatar-backfill:v2:t3_podium',
             expect.stringContaining('profileIcon.png'),
             { expiration: expect.any(Date) },
         );
