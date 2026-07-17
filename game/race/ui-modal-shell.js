@@ -195,7 +195,9 @@ export class ModalShell {
             document.getElementById('settings-music-switch'),
             document.getElementById('settings-pb-ghost-switch'),
             document.getElementById('settings-collision-auto-restart-switch'),
+            document.getElementById('settings-collision-restart-delay-minus'),
             document.getElementById('settings-collision-restart-delay-meter'),
+            document.getElementById('settings-collision-restart-delay-plus'),
             document.getElementById('settings-back-btn'),
         ], { requireLaidOut: false });
     }
@@ -763,7 +765,7 @@ export class ModalShell {
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => {
             this._syncPauseTrackPreview(options.pauseTrackPreview);
-            this.resetMenuKeyboardNav();
+            this.resetMenuKeyboardNav?.();
             this.activateModalFocusTrap(this.modal);
         });
     }
@@ -891,7 +893,7 @@ export class ModalShell {
         });
 
         scheduleAfterModalPaint(() => {
-            this.resetMenuKeyboardNav();
+            this.resetMenuKeyboardNav?.();
             this.activateModalFocusTrap(this.modal);
         });
     }

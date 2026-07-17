@@ -67,9 +67,9 @@ flowchart LR
   product-oriented partials cover gameplay screens, reusable sheets, garage,
   settings, playlist, standings and result states; their ownership and
   cascade-preservation rules are documented in `docs/css-architecture.md`.
-- `game/race/ui-modal-shell.js` controls which modal view is open, focus trapping, pause/win/notice mode switching, and modal-to-garage handoff. Wall contact no longer has a terminal result screen. Pause and finish action lists support Up/Down/W/S keyboard navigation; the `is-menu-selected` cue appears only after the first move key, while Enter still activates the preferred action (Resume / Improve) beforehand. Garage and Settings modals use the same keyboard list navigation while trapped.
-- `game/race/ui-start-overlay.js` owns the lobby start overlay and the same vertical keyboard navigation for main-menu items while no sheet is open on top. Enter defaults to Start Race without a visible cue until Up/Down/W/S is used.
-- `game/ui/menu-keyboard-nav.js` is the shared helper for menu keyboard navigation used by lobby, pause, finish, garage, settings, and the share dialog. Arrows and WASD move to the nearest on-screen item in that direction; Enter activates; the selection outline appears only after a move key and clears on mouse move.
+- `game/race/ui-modal-shell.js` controls which modal view is open, focus trapping, pause/win/notice mode switching, and modal-to-garage handoff. Wall contact no longer has a terminal result screen. Active menus use shared spatial keyboard navigation; the `is-menu-selected` cue appears only after a directional key, while Enter still activates the preferred action beforehand.
+- `game/race/ui-start-overlay.js` owns the lobby start overlay and uses the same spatial keyboard navigation while no sheet is open on top. Enter defaults to Start Race without a visible cue until a directional key is used.
+- `game/ui/menu-keyboard-nav.js` is the shared geometry-based menu navigator used by lobby, pause, finish, garage, settings, and the share dialog. Arrow keys and WASD move to the nearest active control in the requested on-screen direction.
 - `game/race/ui-modal-content.js` builds the result modal content blocks and score displays.
 - `game/ui/reusable-modal.js` and `game/ui/modal-handoff.js` provide shared modal behavior used by settings, garage, playlist, and some results flows.
 

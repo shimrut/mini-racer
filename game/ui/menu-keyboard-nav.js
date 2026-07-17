@@ -28,21 +28,12 @@ export function filterVisibleMenuItems(nodes, { requireLaidOut = true } = {}) {
     });
 }
 
-/** @returns {'up'|'down'|'left'|'right'|null} */
 export function getMenuNavDirection(key) {
     if (key === 'ArrowUp' || key === 'w' || key === 'W') return 'up';
     if (key === 'ArrowDown' || key === 's' || key === 'S') return 'down';
     if (key === 'ArrowLeft' || key === 'a' || key === 'A') return 'left';
     if (key === 'ArrowRight' || key === 'd' || key === 'D') return 'right';
     return null;
-}
-
-/** @deprecated Use getMenuNavDirection. Kept for vertical-only callers/tests. */
-export function getMenuNavDelta(key) {
-    const direction = getMenuNavDirection(key);
-    if (direction === 'up') return -1;
-    if (direction === 'down') return 1;
-    return 0;
 }
 
 export function collectVisibleActionButtons(container, selector = ':scope > button', {
@@ -60,88 +51,6 @@ export function findPreferredMenuIndex(buttons) {
     ));
     if (primaryIdx >= 0 && !buttons[primaryIdx].disabled) return primaryIdx;
     return buttons.findIndex((button) => !button.disabled);
-}
-
-function getItemCenter(item) {
-    if (typeof item?.getBoundingClientRect !== 'function') {
-        return null;
-    }
-    const rect = item.getBoundingClientRect();
-    return {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-        width: rect.width,
-        height: rect.height,
-    };
-}
-
-/**
- * Pick the nearest item in a screen direction.
- * Prefers items aligned on the cross-axis (same row/column), then closest ahead.
- * @returns {number} index or -1 when nothing lies in that direction
- */
-export function findSpatialNeighborIndex(items, currentIndex, direction) {
-    if (!items?.length || !direction) return -1;
-
-    if (currentIndex < 0 || currentIndex >= items.length) {
-        return direction === 'down' || direction === 'right' ? 0 : items.length - 1;
-    }
-
-    const current = getItemCenter(items[currentIndex]);
-    if (!current) {
-        // Fallback when layout metrics are unavailable (unit tests / detached nodes).
-        if (direction === 'up' || direction === 'left') {
-            return (currentIndex - 1 + items.length) % items.length;
-        }
-        if (direction === 'down' || direction === 'right') {
-            return (currentIndex + 1) % items.length;
-        }
-        return -1;
-    }
-
-    let bestIndex = -1;
-    let bestScore = Infinity;
-
-    for (let i = 0; i < items.length; i += 1) {
-        if (i === currentIndex) continue;
-        const candidate = getItemCenter(items[i]);
-        if (!candidate) continue;
-
-        const dx = candidate.x - current.x;
-        const dy = candidate.y - current.y;
-        let primary = 0;
-        let secondary = 0;
-        let inDirection = false;
-
-        if (direction === 'up') {
-            inDirection = dy < -1;
-            primary = -dy;
-            secondary = Math.abs(dx);
-        } else if (direction === 'down') {
-            inDirection = dy > 1;
-            primary = dy;
-            secondary = Math.abs(dx);
-        } else if (direction === 'left') {
-            inDirection = dx < -1;
-            primary = -dx;
-            secondary = Math.abs(dy);
-        } else if (direction === 'right') {
-            inDirection = dx > 1;
-            primary = dx;
-            secondary = Math.abs(dy);
-        }
-
-        if (!inDirection) continue;
-
-        // Prefer same row/column, then nearest ahead.
-        const score = secondary * 1000 + primary;
-        if (score < bestScore) {
-            bestScore = score;
-            bestIndex = i;
-        }
-    }
-
-    return bestIndex;
 }
 
 export function clearMenuSelection(buttons, container = null) {
@@ -205,10 +114,64 @@ function resolveSelectedIndex(buttons, state, getActiveElement) {
     return findPreferredMenuIndex(buttons);
 }
 
+function getItemCenter(item) {
+    const rect = item?.getBoundingClientRect?.();
+    if (!rect) return null;
+    const width = Number(rect.width);
+    const height = Number(rect.height);
+    const left = Number(rect.left);
+    const top = Number(rect.top);
+    if (![width, height, left, top].every(Number.isFinite)) return null;
+    return {
+        x: left + (width / 2),
+        y: top + (height / 2),
+    };
+}
+
+function getDirectionalDistance(from, to, direction) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const primary = direction === 'left'
+        ? -dx
+        : direction === 'right'
+            ? dx
+            : direction === 'up'
+                ? -dy
+                : dy;
+    const perpendicular = direction === 'left' || direction === 'right'
+        ? Math.abs(dy)
+        : Math.abs(dx);
+
+    // Keep movement inside a 90-degree cone so "left" cannot jump to
+    // an unrelated control that is mostly above or below the current one.
+    if (primary <= 0 || primary < perpendicular) return null;
+    return primary + (perpendicular * 2);
+}
+
+export function findSpatialMenuIndex(items, currentIndex, direction) {
+    if (!items?.length || currentIndex < 0 || currentIndex >= items.length) return -1;
+    const origin = getItemCenter(items[currentIndex]);
+    if (!origin) return -1;
+
+    let bestIndex = -1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < items.length; index += 1) {
+        if (index === currentIndex) continue;
+        const center = getItemCenter(items[index]);
+        if (!center) continue;
+        const distance = getDirectionalDistance(origin, center, direction);
+        if (distance !== null && distance < bestDistance) {
+            bestIndex = index;
+            bestDistance = distance;
+        }
+    }
+    return bestIndex;
+}
+
 /**
- * Directional menu keyboard nav: arrows + WASD move by screen position, Enter activates.
+ * Spatial menu keyboard nav: arrows/WASD move toward the nearest control,
+ * Enter activates.
  * Selection cue appears only after the first move key.
- * If nothing lies in that direction, returns false so controls like sliders can handle Left/Right.
  * @returns {boolean} true when the event was handled
  */
 export function handleMenuListKeydown(event, {
@@ -225,15 +188,12 @@ export function handleMenuListKeydown(event, {
     const direction = getMenuNavDirection(key);
 
     if (direction) {
-        let index = resolveSelectedIndex(buttons, state, getActiveElement);
-        const nextIndex = findSpatialNeighborIndex(buttons, index, direction);
-        if (nextIndex < 0) {
-            return false;
-        }
+        const currentIndex = resolveSelectedIndex(buttons, state, getActiveElement);
+        const nextIndex = findSpatialMenuIndex(buttons, currentIndex, direction);
+        if (nextIndex < 0) return false;
 
         event.preventDefault?.();
         event.stopPropagation?.();
-
         state.selectedIndex = nextIndex;
         state.keyboardNavActive = true;
         applyMenuSelection(buttons, nextIndex, { showCue: true, container });

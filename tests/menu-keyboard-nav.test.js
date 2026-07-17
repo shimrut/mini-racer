@@ -4,13 +4,17 @@ import {
     applyMenuSelection,
     createMenuKeyboardState,
     dismissMenuKeyboardCue,
-    findSpatialNeighborIndex,
+    findSpatialMenuIndex,
     getMenuNavDirection,
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../game/ui/menu-keyboard-nav.js';
 
-function makeButton(id, { disabled = false, primary = false, rect = null } = {}) {
+function makeButton(id, {
+    disabled = false,
+    primary = false,
+    rect = { left: 0, top: 0, width: 100, height: 40 },
+} = {}) {
     const classNames = new Set(primary ? ['main-menu__item--primary'] : []);
     const classList = {
         values: classNames,
@@ -23,24 +27,14 @@ function makeButton(id, { disabled = false, primary = false, rect = null } = {})
             return force;
         },
     };
-    const button = {
+    return {
         id,
         disabled,
         classList,
         focus: vi.fn(),
         click: vi.fn(),
+        getBoundingClientRect: () => rect,
     };
-    if (rect) {
-        button.getBoundingClientRect = () => ({
-            left: rect.x,
-            top: rect.y,
-            width: rect.w,
-            height: rect.h,
-            right: rect.x + rect.w,
-            bottom: rect.y + rect.h,
-        });
-    }
-    return button;
 }
 
 function makeEvent(key, extras = {}) {
@@ -57,23 +51,26 @@ function makeEvent(key, extras = {}) {
 }
 
 describe('menu keyboard nav helper', () => {
-    it('maps arrows and wasd to directions', () => {
+    it('maps arrow and WASD keys to spatial directions', () => {
         expect(getMenuNavDirection('ArrowUp')).toBe('up');
         expect(getMenuNavDirection('w')).toBe('up');
         expect(getMenuNavDirection('ArrowDown')).toBe('down');
-        expect(getMenuNavDirection('s')).toBe('down');
+        expect(getMenuNavDirection('S')).toBe('down');
         expect(getMenuNavDirection('ArrowLeft')).toBe('left');
         expect(getMenuNavDirection('a')).toBe('left');
         expect(getMenuNavDirection('ArrowRight')).toBe('right');
-        expect(getMenuNavDirection('d')).toBe('right');
+        expect(getMenuNavDirection('D')).toBe('right');
         expect(getMenuNavDirection('Enter')).toBe(null);
     });
 
     it('defaults to the preferred item for Enter without showing a cue', () => {
         const buttons = [
-            makeButton('standings'),
-            makeButton('tracks'),
-            makeButton('race', { primary: true }),
+            makeButton('standings', { rect: { left: 0, top: 0, width: 100, height: 40 } }),
+            makeButton('tracks', { rect: { left: 0, top: 50, width: 100, height: 40 } }),
+            makeButton('race', {
+                primary: true,
+                rect: { left: 0, top: 100, width: 100, height: 40 },
+            }),
         ];
         const state = createMenuKeyboardState();
         resetMenuKeyboardState(state, buttons, { preferredIndex: 2 });
@@ -93,68 +90,75 @@ describe('menu keyboard nav helper', () => {
         expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 
-    it('moves with ArrowDown/S and shows the selection cue', () => {
+    it('shows the selection cue only after the first move key', () => {
         const buttons = [
-            makeButton('standings'),
-            makeButton('tracks'),
-            makeButton('race', { primary: true }),
+            makeButton('standings', { rect: { left: 0, top: 0, width: 100, height: 40 } }),
+            makeButton('tracks', { rect: { left: 0, top: 50, width: 100, height: 40 } }),
+            makeButton('race', {
+                primary: true,
+                rect: { left: 0, top: 100, width: 100, height: 40 },
+            }),
         ];
         const state = createMenuKeyboardState();
-        resetMenuKeyboardState(state, buttons, { preferredIndex: 2 });
+        const container = {
+            classList: {
+                values: new Set(),
+                add(name) { this.values.add(name); },
+                remove(name) { this.values.delete(name); },
+                contains(name) { return this.values.has(name); },
+                toggle(name, force) {
+                    if (force) this.values.add(name);
+                    else this.values.delete(name);
+                    return force;
+                },
+            },
+        };
+        resetMenuKeyboardState(state, buttons, { preferredIndex: 2, container });
 
         handleMenuListKeydown(makeEvent('ArrowUp'), {
             buttons,
             state,
+            container,
             getActiveElement: () => buttons[2],
         });
 
         expect(state.keyboardNavActive).toBe(true);
         expect(state.selectedIndex).toBe(1);
         expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+        expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 
-    it('picks spatial neighbors in a grid with left/right', () => {
-        const a = makeButton('a', { rect: { x: 0, y: 0, w: 40, h: 40 } });
-        const b = makeButton('b', { rect: { x: 60, y: 0, w: 40, h: 40 } });
-        const c = makeButton('c', { rect: { x: 0, y: 60, w: 40, h: 40 } });
-        const d = makeButton('d', { rect: { x: 60, y: 60, w: 40, h: 40 } });
-        const items = [a, b, c, d];
-
-        expect(findSpatialNeighborIndex(items, 0, 'right')).toBe(1);
-        expect(findSpatialNeighborIndex(items, 0, 'down')).toBe(2);
-        expect(findSpatialNeighborIndex(items, 1, 'left')).toBe(0);
-        expect(findSpatialNeighborIndex(items, 2, 'right')).toBe(3);
-        expect(findSpatialNeighborIndex(items, 0, 'left')).toBe(-1);
-    });
-
-    it('moves right with D in a laid-out grid', () => {
-        const a = makeButton('a', { rect: { x: 0, y: 0, w: 40, h: 40 } });
-        const b = makeButton('b', { rect: { x: 60, y: 0, w: 40, h: 40 } });
+    it('does not wrap when there is no control in the pressed direction', () => {
+        const buttons = [
+            makeButton('a', { rect: { left: 0, top: 0, width: 100, height: 40 } }),
+            makeButton('b', { rect: { left: 0, top: 50, width: 100, height: 40 } }),
+            makeButton('c', { rect: { left: 0, top: 100, width: 100, height: 40 } }),
+        ];
         const state = createMenuKeyboardState();
-        state.selectedIndex = 0;
+        state.selectedIndex = 2;
 
-        expect(handleMenuListKeydown(makeEvent('d'), {
-            buttons: [a, b],
+        expect(handleMenuListKeydown(makeEvent('ArrowDown'), {
+            buttons,
             state,
-            getActiveElement: () => a,
-        })).toBe(true);
-        expect(state.selectedIndex).toBe(1);
-        expect(b.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
-    });
-
-    it('leaves Left/Right unhandled when nothing is beside the current item', () => {
-        const top = makeButton('top', { rect: { x: 0, y: 0, w: 40, h: 40 } });
-        const bottom = makeButton('bottom', { rect: { x: 0, y: 80, w: 40, h: 40 } });
-        const state = createMenuKeyboardState();
-        state.selectedIndex = 0;
-        const event = makeEvent('ArrowRight');
-
-        expect(handleMenuListKeydown(event, {
-            buttons: [top, bottom],
-            state,
-            getActiveElement: () => top,
+            getActiveElement: () => buttons[2],
         })).toBe(false);
-        expect(event.preventDefault).not.toHaveBeenCalled();
+
+        expect(state.selectedIndex).toBe(2);
+        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+    });
+
+    it('moves through a grid using actual control positions', () => {
+        const buttons = [
+            makeButton('top-left', { rect: { left: 0, top: 0, width: 80, height: 40 } }),
+            makeButton('top-right', { rect: { left: 100, top: 0, width: 80, height: 40 } }),
+            makeButton('bottom-left', { rect: { left: 0, top: 60, width: 80, height: 40 } }),
+            makeButton('bottom-right', { rect: { left: 100, top: 60, width: 80, height: 40 } }),
+        ];
+
+        expect(findSpatialMenuIndex(buttons, 0, 'right')).toBe(1);
+        expect(findSpatialMenuIndex(buttons, 0, 'down')).toBe(2);
+        expect(findSpatialMenuIndex(buttons, 3, 'left')).toBe(2);
+        expect(findSpatialMenuIndex(buttons, 3, 'up')).toBe(1);
     });
 
     it('activates the cued item on Enter', () => {
@@ -207,10 +211,14 @@ describe('menu keyboard nav helper', () => {
     });
 
     it('allows navigating when a checkbox switch is focused', () => {
-        const checkbox = makeButton('toggle');
+        const checkbox = makeButton('toggle', {
+            rect: { left: 0, top: 0, width: 100, height: 40 },
+        });
         checkbox.tagName = 'INPUT';
         checkbox.type = 'checkbox';
-        const close = makeButton('close');
+        const close = makeButton('close', {
+            rect: { left: 0, top: 50, width: 100, height: 40 },
+        });
         const buttons = [checkbox, close];
         const state = createMenuKeyboardState();
         state.selectedIndex = 0;

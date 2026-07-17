@@ -111,9 +111,9 @@ export class SettingsUi {
         meter.addEventListener('keydown', (event) => {
             const step = collisionRestartDelayToMeterStep(getCollisionRestartDelaySec());
             let next = step;
-            if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
+            if (event.key === 'ArrowRight') {
                 next = Math.min(COLLISION_RESTART_DELAY_METER_TICKS - 1, step + 1);
-            } else if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
+            } else if (event.key === 'ArrowLeft') {
                 next = Math.max(0, step - 1);
             } else if (event.key === 'End') {
                 next = COLLISION_RESTART_DELAY_METER_TICKS - 1;

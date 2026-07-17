@@ -133,7 +133,12 @@ describe('modal escape key', () => {
 });
 
 describe('modal pause/finish menu keyboard nav', () => {
-    function makeMenuButton(id) {
+    function makeMenuButton(id, {
+        left = 0,
+        top = 0,
+        width = 100,
+        height = 40,
+    } = {}) {
         const classList = {
             values: new Set(),
             add(name) { this.values.add(name); },
@@ -155,13 +160,14 @@ describe('modal pause/finish menu keyboard nav', () => {
             focus: vi.fn(),
             click: vi.fn(),
             getAttribute: () => null,
+            getBoundingClientRect: () => ({ left, top, width, height }),
         };
     }
 
     it('moves selection with ArrowDown on pause actions', () => {
-        const resume = makeMenuButton('resume');
-        const restart = makeMenuButton('restart');
-        const home = makeMenuButton('home');
+        const resume = makeMenuButton('resume', { top: 0 });
+        const restart = makeMenuButton('restart', { top: 60 });
+        const home = makeMenuButton('home', { top: 120 });
         const buttons = [resume, restart, home];
         const actionsRoot = {
             querySelectorAll: () => buttons,
@@ -251,7 +257,7 @@ describe('modal pause/finish menu keyboard nav', () => {
 
         try {
             handleModalTrapKeydown.call(context, arrowEvent);
-            expect(closeBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(closeBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(false);
             expect(shareBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
 
             const escapeEvent = {
@@ -268,9 +274,9 @@ describe('modal pause/finish menu keyboard nav', () => {
     });
 
     it('navigates garage items without touching finish actions', () => {
-        const tab = makeMenuButton('tab-skin');
-        const option = makeMenuButton('skin-option');
-        const close = makeMenuButton('close');
+        const tab = makeMenuButton('tab-skin', { top: 0 });
+        const option = makeMenuButton('skin-option', { top: 60 });
+        const close = makeMenuButton('close', { top: 120 });
         const garageItems = [tab, option, close];
         const finishShare = makeMenuButton('finish-share');
         finishShare.classList.add(MENU_SELECTED_CLASS);
@@ -309,9 +315,9 @@ describe('modal pause/finish menu keyboard nav', () => {
     });
 
     it('navigates settings items when the settings modal is trapped', () => {
-        const switchEl = makeMenuButton('switch');
-        const meter = makeMenuButton('meter');
-        const close = makeMenuButton('close');
+        const switchEl = makeMenuButton('switch', { top: 0 });
+        const meter = makeMenuButton('meter', { top: 60 });
+        const close = makeMenuButton('close', { top: 120 });
         const settingsItems = [switchEl, meter, close];
         const settingsState = { keyboardNavActive: false, selectedIndex: 0 };
         const context = {
