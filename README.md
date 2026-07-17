@@ -66,3 +66,25 @@ Tips:
 - Only **one** race post is used per community per day — creating again reuses that post instead of flooding the feed
 - Every race post gets a pinned **Mini Racer score thread** for player result comments
 - Players share scores as replies in that thread, from their own accounts
+
+## What’s new
+
+### 1.2
+
+- Hitting a wall no longer ends the lap — you scrape, lose speed, and keep going
+- **Collision Auto-Restart** is optional and off by default (turn it on in Settings if you want a bump to restart the attempt)
+- Tracks list shows when a track is about to expire
+- Standings header shows the track name and time; mobile day switching is simpler
+- Daily posts can show a track preview image when shared as a link
+- New tracks added to the rotation (**Number One**, **Number Two**)
+- Android fix: the track no longer appears as a blank white background
+
+### 1.1
+
+- **Share Time** after a finish, and **Share Best** from Standings — preview the comment, then post it from your Reddit account
+- Every race post gets a pinned **score thread** for those shared results
+- Clearer daily post titles and better plain-text description under the post
+- Car look and settings save to your Reddit profile (less likely to reset after an update)
+- Standings load more racers as you scroll, while your own rank stays visible
+- Nicer post preview (today’s track, gold-medal target, car on the start line)
+- Mini Racer app icon for the Reddit apps listing
