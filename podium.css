@@ -201,13 +201,23 @@ body {
 
 .podium-row--gold {
     --tier: var(--gold);
-    min-height: clamp(4.2rem, 12.5vh, 6rem);
+    min-height: clamp(4.75rem, 14vh, 6.75rem);
     background:
-        linear-gradient(90deg, color-mix(in srgb, var(--gold) 12%, transparent), transparent 46%),
+        linear-gradient(90deg, color-mix(in srgb, var(--gold) 14%, transparent), transparent 48%),
         var(--panel);
 }
-.podium-row--silver { --tier: var(--silver); }
-.podium-row--bronze { --tier: var(--bronze); }
+.podium-row--silver {
+    --tier: var(--silver);
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--silver) 12%, transparent), transparent 46%),
+        var(--panel);
+}
+.podium-row--bronze {
+    --tier: var(--bronze);
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--bronze) 12%, transparent), transparent 46%),
+        var(--panel);
+}
 
 .podium-row__place {
     display: flex;
@@ -226,13 +236,17 @@ body {
 }
 
 .podium-row--gold .podium-row__number {
-    font-size: clamp(2.1rem, 6.4vw, 3.55rem);
+    font-size: clamp(2.4rem, 7.2vw, 4rem);
 }
 
 .podium-row__ordinal {
     margin-left: 0.08em;
     font-size: clamp(0.5rem, 1.25vw, 0.7rem);
     letter-spacing: 0.04em;
+}
+
+.podium-row--gold .podium-row__ordinal {
+    font-size: clamp(0.55rem, 1.4vw, 0.78rem);
 }
 
 .podium-row__identity {
@@ -242,6 +256,10 @@ body {
     gap: clamp(0.65rem, 1.8vw, 0.95rem);
     min-width: 0;
     padding-inline: clamp(0.75rem, 2.2vw, 1.25rem);
+}
+
+.podium-row--gold .podium-row__identity {
+    grid-template-columns: clamp(2.65rem, 6.4vw, 3.9rem) minmax(0, 1fr);
 }
 
 .podium-row__avatar {
@@ -291,7 +309,7 @@ body {
 }
 
 .podium-row--gold .podium-row__name {
-    font-size: clamp(1.05rem, 3vw, 1.55rem);
+    font-size: clamp(1.15rem, 3.3vw, 1.75rem);
 }
 
 .podium-row__time {
@@ -305,7 +323,7 @@ body {
 }
 
 .podium-row--gold .podium-row__time {
-    font-size: clamp(1.05rem, 3.1vw, 1.65rem);
+    font-size: clamp(1.15rem, 3.4vw, 1.85rem);
     color: color-mix(in srgb, var(--gold) 88%, var(--ink));
 }
 
@@ -406,7 +424,7 @@ body {
     }
 
     .podium-row--gold {
-        min-height: 3.75rem;
+        min-height: 4.15rem;
     }
 
     .podium-row__place {
@@ -424,7 +442,7 @@ body {
     }
 
     .podium-row--gold .podium-row__name {
-        font-size: 0.98rem;
+        font-size: 1.08rem;
     }
 
     .podium-row__time {
@@ -432,7 +450,7 @@ body {
     }
 
     .podium-row--gold .podium-row__time {
-        font-size: 0.98rem;
+        font-size: 1.08rem;
     }
 }
 
@@ -447,7 +465,7 @@ body {
     }
 
     .podium-row--gold {
-        min-height: 3.25rem;
+        min-height: 3.55rem;
     }
 
     .podium-footer > span {
