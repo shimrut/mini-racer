@@ -44,6 +44,80 @@ import {
   TRACK_PRESENTATION_SURFACES,
 } from "../track/presentation.js";
 
+function normalizeTrackPersonalBest(record, trackKey = null) {
+  if (!record || typeof record !== "object") return null;
+  if (trackKey && record.trackKey && record.trackKey !== trackKey) return null;
+  const bestTimeMs = Number(record.bestTimeMs);
+  if (!Number.isFinite(bestTimeMs) || bestTimeMs <= 0) return null;
+  return {
+    trackKey: record.trackKey || trackKey || null,
+    bestTime: bestTimeMs / 1000,
+    checkpointTimesSec: Array.isArray(record.checkpointTimesSec)
+      ? record.checkpointTimesSec.slice()
+      : null,
+    ghostAvailable: Boolean(record.ghostAvailable || record.ghost),
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : null,
+  };
+}
+
+function getTrackPersonalBestForChallenge(engine, challenge) {
+  if (!challenge?.trackKey) return null;
+  if (
+    engine.trackPersonalBestResult?.trackKey === challenge.trackKey
+    && Number.isFinite(engine.trackPersonalBestResult.bestTime)
+  ) {
+    return engine.trackPersonalBestResult;
+  }
+  return engine.trackPersonalBestByTrackKey?.[challenge.trackKey] || null;
+}
+
+function applyTrackPersonalBest(engine, challenge, record, { prepareGhost = false } = {}) {
+  if (!challenge?.trackKey) return null;
+  const personalBest = normalizeTrackPersonalBest(record, challenge.trackKey);
+  if (!engine.trackPersonalBestByTrackKey) {
+    engine.trackPersonalBestByTrackKey = Object.create(null);
+  }
+  if (personalBest) {
+    engine.trackPersonalBestByTrackKey[challenge.trackKey] = personalBest;
+  } else {
+    delete engine.trackPersonalBestByTrackKey[challenge.trackKey];
+  }
+
+  if (
+    engine.activeDailyChallenge?.id === challenge.id
+    || engine.currentDailyChallenge?.id === challenge.id
+  ) {
+    engine.trackPersonalBestResult = personalBest;
+    engine.bestLapTime = personalBest?.bestTime ?? null;
+    if (challenge.trackKey && Number.isFinite(personalBest?.bestTime)) {
+      if (!engine.sessionBestLapSecByTrackKey) {
+        engine.sessionBestLapSecByTrackKey = Object.create(null);
+      }
+      engine.sessionBestLapSecByTrackKey[challenge.trackKey] = personalBest.bestTime;
+      if (Array.isArray(personalBest.checkpointTimesSec)) {
+        if (!engine.sessionBestCheckpointTimesByTrackKey) {
+          engine.sessionBestCheckpointTimesByTrackKey = Object.create(null);
+        }
+        engine.sessionBestCheckpointTimesByTrackKey[challenge.trackKey] =
+          personalBest.checkpointTimesSec.slice();
+      }
+    }
+  }
+
+  if (prepareGhost) {
+    if (personalBest?.ghostAvailable) engine.pbGhost?.prepare?.(record);
+    else engine.pbGhost?.clearTrack?.();
+  }
+  return personalBest;
+}
+
+function decorateChallengesWithTrackPersonalBests(engine, challenges = []) {
+  return (Array.isArray(challenges) ? challenges : []).map((challenge) => ({
+    ...challenge,
+    trackPersonalBest: getTrackPersonalBestForChallenge(engine, challenge),
+  }));
+}
+
 function getInvalidDailyChallengeWinReason(engine, winData) {
   if (!winData || typeof winData !== "object") return "Finish data missing.";
   if (engine.status !== "won") return "Run did not end in a winning state.";
@@ -82,6 +156,51 @@ function getInvalidDailyChallengeWinReason(engine, winData) {
 }
 
 export const dailyChallengeEngineMethods = {
+  async refreshTrackPersonalBestSummaries(challenges = []) {
+    const playableChallenges = Array.isArray(challenges)
+      ? challenges.filter((challenge) => challenge?.id && challenge?.trackKey)
+      : [];
+    if (!playableChallenges.length) return {};
+
+    const summaries = await this.pbGhostService.getSummaries(
+      playableChallenges.map((challenge) => challenge.id),
+    );
+    for (const challenge of playableChallenges) {
+      applyTrackPersonalBest(this, challenge, summaries?.[challenge.id] ?? null);
+    }
+    return summaries;
+  },
+
+  async prepareTrackPersonalBestGhost(challenge, { forceRefresh = false } = {}) {
+    if (!challenge?.id || !challenge?.trackKey) {
+      this.pbGhost?.clearTrack?.();
+      return null;
+    }
+    const record = await this.pbGhostService.getForChallenge(challenge.id, {
+      forceRefresh,
+    });
+    return applyTrackPersonalBest(this, challenge, record, {
+      prepareGhost: true,
+    });
+  },
+
+  applyVerifiedTrackPersonalBest(challenge, record) {
+    const personalBest = applyTrackPersonalBest(this, challenge, record);
+    if (
+      personalBest
+      && (
+        this.activeDailyChallenge?.id === challenge?.id
+        || this.currentDailyChallenge?.id === challenge?.id
+      )
+    ) {
+      this.syncTrackMedalFromChallengeBest(challenge, personalBest.bestTime);
+      this.hud?.setBestTime?.(personalBest.bestTime, {
+        persistToTrackCard: false,
+      });
+    }
+    return personalBest;
+  },
+
   waitForPlaylistModalPaint() {
     return new Promise((resolve) => {
       if (typeof requestAnimationFrame !== "function") {
@@ -243,8 +362,10 @@ export const dailyChallengeEngineMethods = {
       ? storedLocalData
       : null;
     this.dailyChallengeBestResult = localData ? { ...localData } : null;
-    this.bestLapTime = Number.isFinite(localData?.bestTime)
-      ? localData.bestTime
+    const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
+    this.trackPersonalBestResult = trackPersonalBest;
+    this.bestLapTime = Number.isFinite(trackPersonalBest?.bestTime)
+      ? trackPersonalBest.bestTime
       : null;
     this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
     const objectiveLabel = getDailyChallengeObjectiveLabel(challenge);
@@ -260,9 +381,10 @@ export const dailyChallengeEngineMethods = {
       modifierBadges: getDailyChallengeModifierBadges(challenge),
       modifierLabel: getDailyChallengeModifierLabel(challenge),
       bestTime: this.bestLapTime,
-      bestLabel: formatDailyChallengeResultLabel(challenge, localData),
+      bestLabel: formatDailyChallengeResultLabel(challenge, trackPersonalBest),
       rankLabel: "--",
       scoreboardSnapshot: null,
+      usesTrackPersonalBest: true,
       objectiveType: challenge.objectiveType,
       startsAt: challenge.startsAt,
       challengeDate: challenge.challengeDate,
@@ -277,6 +399,14 @@ export const dailyChallengeEngineMethods = {
       this.currentDailyChallenge = challenge || null;
       this.activeDailyChallenge = null;
       this.setDailyChallengeLobbySummary(challenge);
+      if (challenge) {
+        try {
+          await this.refreshTrackPersonalBestSummaries([challenge]);
+          this.setDailyChallengeLobbySummary(challenge);
+        } catch (error) {
+          console.error("Error loading track personal best:", error);
+        }
+      }
       await this.syncReadyBackgroundTrack(challenge);
       return challenge;
     } catch (error) {
@@ -301,17 +431,26 @@ export const dailyChallengeEngineMethods = {
       ? storedLocalData
       : null;
     this.dailyChallengeBestResult = localData ? { ...localData } : null;
-    this.bestLapTime = Number.isFinite(localData?.bestTime)
-      ? localData.bestTime
-      : null;
+    let trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
+    this.trackPersonalBestResult = trackPersonalBest;
+    this.bestLapTime = trackPersonalBest?.bestTime ?? null;
     let snapshot = null;
-    try {
-      snapshot = await getDailyChallengeSnapshot({
+    const [snapshotResult, trackPbResult] = await Promise.allSettled([
+      getDailyChallengeSnapshot({
         challengeId: challenge.id,
         forceRefresh,
-      });
-    } catch (error) {
-      console.error("Error loading daily challenge snapshot:", error);
+      }),
+      this.refreshTrackPersonalBestSummaries([challenge]),
+    ]);
+    if (snapshotResult.status === "fulfilled") {
+      snapshot = snapshotResult.value;
+    } else {
+      console.error("Error loading daily challenge snapshot:", snapshotResult.reason);
+    }
+    if (trackPbResult.status === "fulfilled") {
+      trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
+    } else {
+      console.error("Error loading track personal best:", trackPbResult.reason);
     }
 
     if (
@@ -327,15 +466,14 @@ export const dailyChallengeEngineMethods = {
         snapshot.currentPlayerRow.checkpointTimesSec,
       ) || localData;
       this.dailyChallengeBestResult = localData ? { ...localData } : null;
-      this.bestLapTime = Number.isFinite(localData?.bestTime)
-        ? localData.bestTime
-        : this.bestLapTime;
-      this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
     }
 
-    const bestTime = Number.isFinite(localData?.bestTime)
-      ? localData.bestTime
+    this.trackPersonalBestResult = trackPersonalBest;
+    this.bestLapTime = Number.isFinite(trackPersonalBest?.bestTime)
+      ? trackPersonalBest.bestTime
       : null;
+    this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
+    const bestTime = this.bestLapTime;
     const rankLabel = snapshot?.playerRankLabel || "--";
     const objectiveLabel = getDailyChallengeObjectiveLabel(challenge);
     this.dailyChallengeUi.setDailyChallengeSummary({
@@ -349,9 +487,10 @@ export const dailyChallengeEngineMethods = {
       modifierBadges: getDailyChallengeModifierBadges(challenge),
       modifierLabel: getDailyChallengeModifierLabel(challenge),
       bestTime,
-      bestLabel: formatDailyChallengeResultLabel(challenge, localData),
+      bestLabel: formatDailyChallengeResultLabel(challenge, trackPersonalBest),
       rankLabel,
       scoreboardSnapshot: snapshot,
+      usesTrackPersonalBest: true,
       objectiveType: challenge.objectiveType,
       endsAt: challenge.endsAt,
     });
@@ -385,20 +524,22 @@ export const dailyChallengeEngineMethods = {
       ? storedDailyRaw
       : null;
     this.dailyChallengeBestResult = storedDaily ? { ...storedDaily } : null;
-    this.bestLapTime = Number.isFinite(storedDaily?.bestTime)
-      ? storedDaily.bestTime
+    const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
+    this.trackPersonalBestResult = trackPersonalBest;
+    this.bestLapTime = Number.isFinite(trackPersonalBest?.bestTime)
+      ? trackPersonalBest.bestTime
       : null;
     this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
     const tk = challenge.trackKey;
-    if (tk && Number.isFinite(storedDaily?.bestTime)) {
-      const storedSec = Number(storedDaily.bestTime);
+    if (tk && Number.isFinite(trackPersonalBest?.bestTime)) {
+      const storedSec = Number(trackPersonalBest.bestTime);
       const cur = this.sessionBestLapSecByTrackKey?.[tk];
       if (!Number.isFinite(cur) || storedSec < cur) {
         this.sessionBestLapSecByTrackKey[tk] = storedSec;
       }
       const storedCheckpoints = normalizeCheckpointTimesSec(
         storedSec,
-        storedDaily.checkpointTimesSec,
+        trackPersonalBest.checkpointTimesSec,
       );
       if (storedCheckpoints) {
         if (!this.sessionBestCheckpointTimesByTrackKey) {
@@ -420,6 +561,8 @@ export const dailyChallengeEngineMethods = {
     this.currentChallengeRun = null;
     this.activeDailyChallenge = null;
     this.dailyChallengeBestResult = null;
+    this.trackPersonalBestResult = null;
+    this.pbGhost?.clearTrack?.();
     this.syncCurrentRunPolicy();
     this.setRuntimeConfig(null);
     this.hud.setHudPrimaryMetric({
@@ -455,19 +598,33 @@ export const dailyChallengeEngineMethods = {
     }
 
     this.resetCanvasPresentation();
+    this.startOverlay?.hideStartOverlay?.();
     this.startButtonPending = true;
     try {
       if (replacesCurrentRun && challenge.trackKey === this.currentTrackKey) {
-        this.reset(false);
+        this.reset(false, {
+          showStartOverlay: false,
+        });
       }
       this.activeDailyChallenge = challenge;
       if (challenge.trackKey && challenge.trackKey !== this.currentTrackKey) {
         await this.loadTrack(challenge.trackKey, {
           loadPlayerProgress: false,
           preserveDailyChallengeContext: true,
+          showStartOverlayOnReset: false,
         });
       }
 
+      this.pbGhost?.clearTrack?.();
+      if (typeof this.prepareTrackPersonalBestGhost === "function") {
+        try {
+          // Await before countdown so fetch/parse cannot hitch the first racing frames.
+          // Restart keeps a warm prepared ghost and does not re-enter this path.
+          await this.prepareTrackPersonalBestGhost(challenge);
+        } catch (error) {
+          console.error("Error loading personal best ghost:", error);
+        }
+      }
       this.applyDailyChallenge(challenge);
       const modeStartPayload = {
         trackKey: challenge.trackKey,
@@ -508,6 +665,7 @@ export const dailyChallengeEngineMethods = {
     } else {
       loadedChallenges = getCachedDailyChallengePlaylist();
     }
+    loadedChallenges = decorateChallengesWithTrackPersonalBests(this, loadedChallenges);
     playlistRequestNeeded = loadedChallenges.length < 7;
     this.dailyChallengeUi.openPlaylistModal(
       loadedChallenges.length ? loadedChallenges : null,
@@ -520,6 +678,7 @@ export const dailyChallengeEngineMethods = {
       try {
         loadedChallenges = await getDailyChallengePlaylist();
         if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+        loadedChallenges = decorateChallengesWithTrackPersonalBests(this, loadedChallenges);
         this.dailyChallengeUi.renderPlaylist(loadedChallenges, playlistActions);
         this.scheduleDailyPlaylistPrewarm(loadedChallenges);
       } catch (error) {
@@ -529,6 +688,15 @@ export const dailyChallengeEngineMethods = {
         }
         return;
       }
+    }
+
+    try {
+      await this.refreshTrackPersonalBestSummaries(loadedChallenges);
+      loadedChallenges = decorateChallengesWithTrackPersonalBests(this, loadedChallenges);
+      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+      this.dailyChallengeUi.renderPlaylist(loadedChallenges, playlistActions);
+    } catch (error) {
+      console.error("Error loading playlist personal bests:", error);
     }
 
     const missingSnapshotIds = getMissingDailyChallengeSnapshotIds(
@@ -671,7 +839,8 @@ export const dailyChallengeEngineMethods = {
     const finalTime = winData.lapTime;
     const challenge = this.activeDailyChallenge;
     const completedLaps = Math.max(0, Math.trunc(winData.completedLaps || 0));
-    const previousBest = this.dailyChallengeBestResult;
+    const previousDailyBest = this.dailyChallengeBestResult;
+    const previousTrackBest = this.trackPersonalBestResult;
     const finishMedal = getMedalForLapTime(challenge.trackKey, finalTime);
     const previousTrackMedal = this.hasTrackMedalBeforeLastLapWrite
       ? this.trackMedalBeforeLastLapWrite
@@ -680,11 +849,13 @@ export const dailyChallengeEngineMethods = {
     this.trackMedalBeforeLastLapWrite = null;
     writeTrackLastLapMedal(challenge.trackKey, finishMedal);
     const lapMedal = readTrackLastLapMedal(challenge.trackKey);
-    const isNewBest = isNewBestResult(
+    const isDailyBest = isNewBestResult(
       this.currentRunPolicy,
       { bestTime: finalTime, completedLaps },
-      previousBest,
+      previousDailyBest,
     );
+    const isNewBest = !Number.isFinite(previousTrackBest?.bestTime)
+      || finalTime < previousTrackBest.bestTime;
     const runBestBeforeLastLap = this.currentChallengeRun.bestLapSecBeforeLastLap;
     const trackKey = challenge.trackKey;
     const lastRunLap = this.currentChallengeRun.recentLaps?.length
@@ -694,12 +865,12 @@ export const dailyChallengeEngineMethods = {
       trackKey && Number.isFinite(this.sessionBestLapSecByTrackKey?.[trackKey])
         ? this.sessionBestLapSecByTrackKey[trackKey]
         : null;
-    const storedChallengeBestSec =
-      previousBest != null && Number.isFinite(Number(previousBest.bestTime))
-        ? Number(previousBest.bestTime)
+    const storedTrackBestSec =
+      previousTrackBest != null && Number.isFinite(Number(previousTrackBest.bestTime))
+        ? Number(previousTrackBest.bestTime)
         : null;
-    const previousPersonalBestSec = storedChallengeBestSec != null
-        ? storedChallengeBestSec
+    const previousPersonalBestSec = storedTrackBestSec != null
+        ? storedTrackBestSec
         : Number.isFinite(runBestBeforeLastLap)
           ? runBestBeforeLastLap
           : sessionPrevSec != null
@@ -729,8 +900,8 @@ export const dailyChallengeEngineMethods = {
 
     const lapCheckpointTimes = this.getLapCheckpointTimesSec?.() ?? [];
     const storedPbCheckpointTimes = normalizeCheckpointTimesSec(
-      storedChallengeBestSec ?? finalTime,
-      previousBest?.checkpointTimesSec,
+      storedTrackBestSec ?? finalTime,
+      previousTrackBest?.checkpointTimesSec,
     );
     const priorPbCheckpointTimes =
       storedPbCheckpointTimes
@@ -785,7 +956,7 @@ export const dailyChallengeEngineMethods = {
         primaryStatLabel:
           getDailyChallengeCopyLabels(challenge).primaryStatLabel,
         variant: null,
-        scoreboardSnapshot: isNewBest
+        scoreboardSnapshot: isDailyBest
           ? optimisticVerificationSnapshot
           : existingScoreboardSnapshot,
         scoreboardChallengeId: challenge.id,
@@ -821,29 +992,15 @@ export const dailyChallengeEngineMethods = {
       this.modal.modalMsg.textContent = `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
     }
 
-    if (trackKey && Number.isFinite(finalTime)) {
-      if (!this.sessionBestLapSecByTrackKey) {
-        this.sessionBestLapSecByTrackKey = Object.create(null);
-      }
-      const curSession = this.sessionBestLapSecByTrackKey[trackKey];
-      if (!Number.isFinite(curSession) || finalTime < curSession) {
-        this.sessionBestLapSecByTrackKey[trackKey] = finalTime;
-        if (!this.sessionBestCheckpointTimesByTrackKey) {
-          this.sessionBestCheckpointTimesByTrackKey = Object.create(null);
-        }
-        this.sessionBestCheckpointTimesByTrackKey[trackKey] = lapCheckpointTimes.slice();
-      }
-    }
-
-    if (isNewBest) {
-      const previousBestSnapshot = Number.isFinite(previousBest?.bestTime)
+    if (isDailyBest) {
+      const previousBestSnapshot = Number.isFinite(previousDailyBest?.bestTime)
         ? {
-            bestTime: Number(previousBest.bestTime),
-            completedLaps: Number.isFinite(previousBest.completedLaps)
-              ? previousBest.completedLaps
+            bestTime: Number(previousDailyBest.bestTime),
+            completedLaps: Number.isFinite(previousDailyBest.completedLaps)
+              ? previousDailyBest.completedLaps
               : null,
-            checkpointTimesSec: Array.isArray(previousBest.checkpointTimesSec)
-              ? previousBest.checkpointTimesSec
+            checkpointTimesSec: Array.isArray(previousDailyBest.checkpointTimesSec)
+              ? previousDailyBest.checkpointTimesSec
               : null,
           }
         : null;
@@ -855,9 +1012,6 @@ export const dailyChallengeEngineMethods = {
       );
       if (saved) {
         this.dailyChallengeBestResult = { ...saved };
-        this.bestLapTime = Number.isFinite(saved.bestTime)
-          ? saved.bestTime
-          : this.bestLapTime;
       }
 
       const submissionError = runSubmissionBlockedReason
@@ -883,9 +1037,6 @@ export const dailyChallengeEngineMethods = {
           previousBestSnapshot,
         );
         this.dailyChallengeBestResult = restored ? { ...restored } : null;
-        this.bestLapTime = Number.isFinite(restored?.bestTime)
-          ? restored.bestTime
-          : null;
         this.modal.updateModalScoreboardSnapshot?.(
           {
             ...createVerificationSnapshot({

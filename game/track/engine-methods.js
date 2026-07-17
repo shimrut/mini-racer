@@ -121,6 +121,7 @@ export const trackEngineMethods = {
     {
       loadPlayerProgress = true,
       preserveDailyChallengeContext = false,
+      showStartOverlayOnReset = true,
     } = {},
   ) {
     const nextTrack = TRACKS[trackKey];
@@ -129,6 +130,7 @@ export const trackEngineMethods = {
     const requestId = ++this.trackLoadRequestId;
     this.currentTrack = nextTrack;
     this.currentTrackKey = trackKey;
+    this.pbGhost?.clearTrack?.();
     if (!preserveDailyChallengeContext) {
       this.clearDailyChallengeRun();
     }
@@ -154,7 +156,9 @@ export const trackEngineMethods = {
     });
 
     if (!loadPlayerProgress) {
-      this.reset();
+      this.reset(false, {
+        showStartOverlay: showStartOverlayOnReset,
+      });
       if (
         document.activeElement &&
         typeof document.activeElement.blur === "function"

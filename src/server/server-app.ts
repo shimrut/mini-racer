@@ -4,6 +4,8 @@ import {
     getServerDailyGpChallenge,
     getServerDailyGpPlaylist,
     getServerDailyGpSnapshot,
+    getServerPlayerPbGhost,
+    getServerPlayerTrackPbSummaries,
     getServerPlayerBootstrap,
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
@@ -47,6 +49,7 @@ import { registerCompetitionRoutes } from './routes/competition-routes.js';
 import { registerShareRoutes } from './routes/share-routes.js';
 import { registerAnalyticsRoutes } from './routes/analytics-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
+import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 
 function registerProductionRoutes(app: express.Application): void {
     registerPlayerRoutes(app, {
@@ -54,6 +57,11 @@ function registerProductionRoutes(app: express.Application): void {
         getServerPlayerBootstrap: (input) => getServerPlayerBootstrap(input),
         updateServerPlayerIdentity: (input) => updateServerPlayerIdentity(input),
         updateServerPlayerPreferences: (input) => updateServerPlayerPreferences(input),
+    });
+    registerPbGhostRoutes(app, {
+        getRequestUsername,
+        getServerPlayerTrackPbSummaries: (input) => getServerPlayerTrackPbSummaries(input),
+        getServerPlayerPbGhost: (input) => getServerPlayerPbGhost(input),
     });
     registerCompetitionRoutes(app, {
         getRequestUsername,

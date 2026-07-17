@@ -180,6 +180,77 @@ describe("scoreboard engine verification retries", () => {
     expect(getDailyChallengeVerificationEntry(challengeId)).toBe(null);
   });
 
+  it("updates and refetches the lifetime track PB independently from the daily leaderboard", async () => {
+    const challengeId = "daily-track-pb";
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 44,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+    });
+    const entry = getDailyChallengeVerificationEntry(challengeId);
+    const applyVerifiedTrackPersonalBest = vi.fn();
+    const invalidate = vi.fn();
+    const prepareTrackPersonalBestGhost = vi.fn().mockResolvedValue(null);
+    const refreshAfterAcceptedSubmission = vi.fn();
+    const engine = {
+      trackPersonalBestResult: {
+        trackKey: "circuit",
+        bestTime: 45,
+        checkpointTimesSec: [10, 20],
+      },
+      applyVerifiedTrackPersonalBest,
+      prepareTrackPersonalBestGhost,
+      pbGhostService: { invalidate },
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: {
+        refreshDailyChallengeAfterAcceptedSubmission: refreshAfterAcceptedSubmission,
+      },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => false),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(
+      engine,
+      entry,
+      {
+        ok: true,
+        status: 200,
+        body: {
+          accepted: true,
+          improved: false,
+          bestTimeMs: 44000,
+          trackBestTimeMs: 44000,
+          trackPbImproved: true,
+          trackGhostAvailable: true,
+          checkpointTimesSec: [9, 19],
+        },
+      },
+    );
+
+    expect(applyVerifiedTrackPersonalBest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: challengeId,
+        trackKey: "circuit",
+      }),
+      {
+        trackKey: "circuit",
+        bestTimeMs: 44000,
+        checkpointTimesSec: [9, 19],
+        ghostAvailable: true,
+      },
+    );
+    expect(invalidate).toHaveBeenCalledWith(challengeId);
+    expect(prepareTrackPersonalBestGhost).toHaveBeenCalledWith(
+      expect.objectContaining({ id: challengeId }),
+      { forceRefresh: true },
+    );
+    expect(refreshAfterAcceptedSubmission).not.toHaveBeenCalled();
+  });
+
   it("does not refresh standings when a submission is rejected", async () => {
     const challengeId = "daily-rejected";
     enqueueDailyChallengeVerification({

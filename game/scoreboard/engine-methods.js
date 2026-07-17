@@ -56,9 +56,11 @@ function rollbackLocalBestForFailedVerificationEntry(engine, entry) {
     || engine?.currentDailyChallenge?.id === entry.challengeId
   ) {
     engine.dailyChallengeBestResult = restored ? { ...restored } : null;
-    engine.bestLapTime = Number.isFinite(restored?.bestTime)
-      ? restored.bestTime
-      : null;
+    if (!Object.prototype.hasOwnProperty.call(engine, "trackPersonalBestResult")) {
+      engine.bestLapTime = Number.isFinite(restored?.bestTime)
+        ? restored.bestTime
+        : null;
+    }
   }
   return restored;
 }
@@ -245,6 +247,38 @@ export const scoreboardEngineMethods = {
           : entry.checkpointTimesSec,
       );
       clearDailyChallengeVerification(entry.challengeId);
+
+      const existingTrackBest = this.trackPersonalBestResult;
+      const existingTrackBestTimeMs = Number.isFinite(existingTrackBest?.bestTime)
+        ? Math.round(existingTrackBest.bestTime * 1000)
+        : null;
+      if (Number.isFinite(body.trackBestTimeMs)) {
+        this.applyVerifiedTrackPersonalBest?.(challenge, {
+          trackKey: entry.trackKey,
+          bestTimeMs: body.trackBestTimeMs,
+          checkpointTimesSec: body.trackPbImproved === true
+            ? (Array.isArray(body.checkpointTimesSec)
+                ? body.checkpointTimesSec
+                : entry.checkpointTimesSec)
+            : existingTrackBest?.checkpointTimesSec ?? null,
+          ghostAvailable: Boolean(body.trackGhostAvailable),
+        });
+      }
+      const shouldRefreshGhost = Boolean(body.trackGhostAvailable) && (
+        body.trackPbImproved === true
+        || !Number.isFinite(existingTrackBestTimeMs)
+        || body.trackBestTimeMs < existingTrackBestTimeMs
+      );
+      if (shouldRefreshGhost) {
+        this.pbGhostService?.invalidate?.(entry.challengeId);
+        try {
+          await this.prepareTrackPersonalBestGhost?.(challenge, {
+            forceRefresh: true,
+          });
+        } catch (error) {
+          console.error("Error refreshing personal best ghost:", error);
+        }
+      }
 
       let scoreboardSnapshot = getCachedDailyChallengeSnapshot(entry.challengeId);
       if (body.improved === true) {

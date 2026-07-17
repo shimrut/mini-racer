@@ -307,7 +307,8 @@ export class DailyChallengeUi {
             const availabilityLabel = availability.key === 'featured' ? 'Today' : availability.label;
             const isCurrentTrack = challenge.id === this._dailyChallengeSummary?.challengeId;
             const trackName = getDailyChallengeTrackName(challenge);
-            const bestResult = getDailyChallengeBestResult(challenge);
+            const bestResult = challenge.trackPersonalBest
+                || getDailyChallengeBestResult(challenge);
             const bestMedal = getMedalForLapTime(challenge.trackKey, Number(bestResult?.bestTime));
 
             const row = document.createElement('button');
@@ -418,14 +419,16 @@ export class DailyChallengeUi {
         };
 
         if (verificationEntry && verificationSnapshot) {
-            nextSummary.bestTime = Number.isFinite(verificationEntry.bestTime)
-                ? verificationEntry.bestTime
-                : verifiedBestTime;
-            nextSummary.bestLabel = formatDailyChallengeBestLabel(
-                summary.objectiveType,
-                verificationEntry.bestTime,
-                verificationEntry.completedLaps
-            );
+            if (!summary.usesTrackPersonalBest) {
+                nextSummary.bestTime = Number.isFinite(verificationEntry.bestTime)
+                    ? verificationEntry.bestTime
+                    : verifiedBestTime;
+                nextSummary.bestLabel = formatDailyChallengeBestLabel(
+                    summary.objectiveType,
+                    verificationEntry.bestTime,
+                    verificationEntry.completedLaps
+                );
+            }
             nextSummary.scoreboardSnapshot = {
                 ...(verifiedScoreboardSnapshot || {}),
                 ...verificationSnapshot,

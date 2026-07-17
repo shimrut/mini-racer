@@ -31,11 +31,24 @@ describe('durable player preferences', () => {
             trailId: 'gold',
             musicEnabled: false,
             carAudioEnabled: true,
+            pbGhostEnabled: false,
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
         };
 
         expect(applyPlayerPreferences(expected)).toBe(true);
         expect(readPlayerPreferences()).toEqual(expected);
+    });
+
+    it('defaults old server profiles to an enabled PB ghost', () => {
+        expect(applyPlayerPreferences({
+            carSkin: PLAYER_CAR_SKINS[0].assetName,
+            trailId: 'cyan',
+            musicEnabled: true,
+            carAudioEnabled: true,
+            crashAutoRestartEnabled: false,
+            crashRestartDelaySec: 0.5,
+        })).toBe(true);
+        expect(readPlayerPreferences().pbGhostEnabled).toBe(true);
     });
 });

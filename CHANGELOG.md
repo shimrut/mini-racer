@@ -4,6 +4,14 @@ How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 
+- Added persistent personal-best ghosts per player and track. Verified lifetime
+  track PBs now survive daily challenge dates, return when a track is featured
+  again, and can be followed as a highly transparent, collisionless copy of the
+  player's selected car; the default-on ghost can be disabled in Settings.
+- Selecting a race from Tracks now transitions directly into track preparation
+  and the countdown instead of briefly restoring the home screen; PB ghost
+  retrieval finishes before countdown so the first attempt does not hitch while
+  the ghost payload is still downloading or parsing.
 - Added Number One and Number Two to the Daily GP schedule with dedicated
   geometry modules and medal targets, while preserving the existing 45-track
   registry unchanged.

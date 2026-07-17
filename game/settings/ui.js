@@ -38,16 +38,21 @@ import {
     getMusicEnabled,
     setMusicEnabled,
 } from './music-preference.js';
+import {
+    getPbGhostEnabled,
+    setPbGhostEnabled,
+} from './pb-ghost-preference.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
-    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
+    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onPbGhostChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
         this.modal = modal;
         this.onCollisionAutoRestartChanged = onCollisionAutoRestartChanged;
         this.onCollisionRestartDelayChanged = onCollisionRestartDelayChanged;
         this.onCarAudioChanged = onCarAudioChanged;
         this.onMusicChanged = onMusicChanged;
+        this.onPbGhostChanged = onPbGhostChanged;
         this.onLeaderboardIdentityChanged = onLeaderboardIdentityChanged;
         this.onPlayerPreferencesChanged = onPlayerPreferencesChanged;
         this.identityBootstrap = null;
@@ -57,6 +62,7 @@ export class SettingsUi {
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
         this.refreshCollisionRestartDelayPanel();
+        this.refreshPbGhostPanel();
     }
 
     get settingsModal() { return document.getElementById('settings-modal'); }
@@ -80,6 +86,8 @@ export class SettingsUi {
     get collisionRestartDelayDesc() { return document.getElementById('settings-collision-restart-delay-desc'); }
     get musicSwitch() { return document.getElementById('settings-music-switch'); }
     get musicHeading() { return document.getElementById('settings-music-heading'); }
+    get pbGhostSwitch() { return document.getElementById('settings-pb-ghost-switch'); }
+    get pbGhostHeading() { return document.getElementById('settings-pb-ghost-heading'); }
 
     wireCollisionRestartDelayMeter() {
         const meter = this.collisionRestartDelayMeter;
@@ -207,6 +215,14 @@ export class SettingsUi {
                 this.refreshCollisionAutoRestartPanel();
             });
         }
+        if (this.pbGhostSwitch) {
+            this.pbGhostSwitch.addEventListener('change', () => {
+                const next = setPbGhostEnabled(this.pbGhostSwitch.checked);
+                this.onPbGhostChanged?.(next);
+                this.onPlayerPreferencesChanged?.();
+                this.refreshPbGhostPanel();
+            });
+        }
         this.wireCollisionRestartDelayMeter();
     }
 
@@ -307,6 +323,15 @@ export class SettingsUi {
         });
     }
 
+    refreshPbGhostPanel() {
+        this._syncBooleanSettingRow({
+            getValue: getPbGhostEnabled,
+            switchEl: this.pbGhostSwitch,
+            headingEl: this.pbGhostHeading,
+            title: 'Personal Best Ghost',
+        });
+    }
+
     refreshCollisionRestartDelayPanel() {
         const sec = getCollisionRestartDelaySec();
         const step = collisionRestartDelayToMeterStep(sec);
@@ -380,6 +405,7 @@ export class SettingsUi {
         this.refreshCarAudioPanel();
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
+        this.refreshPbGhostPanel();
         this.wireCollisionRestartDelayMeter();
         this.refreshCollisionRestartDelayPanel();
         this.onCollisionAutoRestartChanged?.(getCollisionAutoRestartEnabled());

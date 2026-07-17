@@ -5,6 +5,7 @@ import { registerCompetitionRoutes } from '../src/server/routes/competition-rout
 import { registerShareRoutes } from '../src/server/routes/share-routes.ts';
 import { registerAnalyticsRoutes } from '../src/server/routes/analytics-routes.ts';
 import { registerInternalRoutes } from '../src/server/routes/internal-routes.ts';
+import { registerPbGhostRoutes } from '../src/server/routes/pb-ghost-routes.ts';
 
 const openServers = new Set();
 
@@ -35,6 +36,111 @@ async function readJson(response) {
 }
 
 describe('server route contracts', () => {
+    it('authorizes and forwards PB ghost summary and full-trace lookups', async () => {
+        const getServerPlayerTrackPbSummaries = vi.fn(async () => ({
+            playerId: 'guest:guest-1',
+            trackPbs: {
+                'daily-gp-2026-07-16': {
+                    trackKey: 'circuit',
+                    bestTimeMs: 12345,
+                    checkpointTimesSec: [4.2, 9.8],
+                    ghostAvailable: true,
+                },
+            },
+        }));
+        const getServerPlayerPbGhost = vi.fn(async () => ({
+            playerId: 'guest:guest-1',
+            challengeId: 'daily-gp-2026-07-16',
+            trackKey: 'circuit',
+            personalBest: {
+                bestTimeMs: 12345,
+                checkpointTimesSec: [4.2, 9.8],
+                updatedAt: '2026-07-16T12:00:00.000Z',
+                ghost: {
+                    schemaVersion: 1,
+                    sampleRateHz: 20,
+                    samples: [[0, 0, 0, 0], [12345, 1000, 1000, 100]],
+                },
+            },
+        }));
+        const baseUrl = await startApp((app) => registerPbGhostRoutes(app, {
+            getRequestUsername: () => null,
+            getServerPlayerTrackPbSummaries,
+            getServerPlayerPbGhost,
+        }));
+
+        const summaries = await fetch(
+            `${baseUrl}/api/player/track-pbs?challengeIds=daily-gp-2026-07-16,daily-gp-2026-07-15&playerId=guest-1&guestToken=signed`,
+        );
+        expect(summaries.status).toBe(200);
+        expect(await readJson(summaries)).toEqual({
+            trackPbs: {
+                'daily-gp-2026-07-16': {
+                    trackKey: 'circuit',
+                    bestTimeMs: 12345,
+                    checkpointTimesSec: [4.2, 9.8],
+                    ghostAvailable: true,
+                },
+            },
+        });
+        expect(getServerPlayerTrackPbSummaries).toHaveBeenCalledWith({
+            challengeIds: ['daily-gp-2026-07-16', 'daily-gp-2026-07-15'],
+            playerId: 'guest-1',
+            guestToken: 'signed',
+            redditUsername: null,
+        });
+
+        const fullGhost = await fetch(
+            `${baseUrl}/api/player/pb-ghost?challengeId=daily-gp-2026-07-16&playerId=guest-1&guestToken=signed`,
+        );
+        expect(fullGhost.status).toBe(200);
+        expect(await readJson(fullGhost)).toMatchObject({
+            challengeId: 'daily-gp-2026-07-16',
+            trackKey: 'circuit',
+            personalBest: {
+                bestTimeMs: 12345,
+                ghost: { sampleRateHz: 20 },
+            },
+        });
+    });
+
+    it('rejects unauthorized PB ghost access and unavailable challenges', async () => {
+        const getServerPlayerPbGhost = vi.fn()
+            .mockResolvedValueOnce({
+                playerId: null,
+                challengeId: null,
+                trackKey: null,
+                personalBest: null,
+            })
+            .mockResolvedValueOnce({
+                playerId: 'guest:guest-1',
+                challengeId: null,
+                trackKey: null,
+                personalBest: null,
+            });
+        const baseUrl = await startApp((app) => registerPbGhostRoutes(app, {
+            getRequestUsername: () => null,
+            getServerPlayerTrackPbSummaries: vi.fn(async () => ({
+                playerId: null,
+                trackPbs: {},
+            })),
+            getServerPlayerPbGhost,
+        }));
+
+        const unauthorized = await fetch(
+            `${baseUrl}/api/player/pb-ghost?challengeId=missing&playerId=guest-1&guestToken=invalid`,
+        );
+        expect(unauthorized.status).toBe(401);
+
+        const unavailable = await fetch(
+            `${baseUrl}/api/player/pb-ghost?challengeId=missing&playerId=guest-1&guestToken=signed`,
+        );
+        expect(unavailable.status).toBe(404);
+        expect(await readJson(unavailable)).toEqual({
+            error: 'Daily challenge is not playable.',
+        });
+    });
+
     it('preserves player authorization status distinctions', async () => {
         const getServerPlayerBootstrap = vi.fn(async () => ({ playerId: null }));
         const baseUrl = await startApp((app) => registerPlayerRoutes(app, {

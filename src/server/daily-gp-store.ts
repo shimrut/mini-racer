@@ -5,6 +5,7 @@ import {
     hasTrack,
     TRACK_SCHEDULE_KEYS,
 } from '../../game/track/catalog.js';
+import { TRACKS } from '../../game/track/tracks.js';
 import {
     normalizeLeaderboardIdentityPreference,
     resolveLeaderboardDisplayName,
@@ -34,6 +35,11 @@ import {
 import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 import { mintGuestPlayerToken, verifyGuestPlayerToken } from './player-token.js';
+import {
+    getPlayerTrackPbRecord,
+    seedPlayerTrackPersonalBest,
+    upsertPlayerTrackPersonalBest,
+} from './pb-ghost-store.js';
 
 type SnapshotRow = {
     rank: number;
@@ -393,6 +399,10 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
         || typeof preferences.musicEnabled !== 'boolean'
         || typeof preferences.carAudioEnabled !== 'boolean'
         || typeof preferences.crashAutoRestartEnabled !== 'boolean'
+        || (
+            preferences.pbGhostEnabled !== undefined
+            && typeof preferences.pbGhostEnabled !== 'boolean'
+        )
         || !Number.isFinite(crashRestartDelaySec)
         || crashRestartDelaySec < 0
         || crashRestartDelaySec > 1
@@ -407,6 +417,7 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
         carAudioEnabled: preferences.carAudioEnabled,
         crashAutoRestartEnabled: preferences.crashAutoRestartEnabled,
         crashRestartDelaySec: Math.round(crashRestartDelaySec * 10) / 10,
+        pbGhostEnabled: preferences.pbGhostEnabled !== false,
     };
 }
 
@@ -871,6 +882,181 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
     return challenges;
 }
 
+async function readOrSeedTrackPersonalBest({
+    playerId,
+    isGuest,
+    challenge,
+}: {
+    playerId: string;
+    isGuest: boolean;
+    challenge: DailyGpChallenge;
+}) {
+    const track = TRACKS[challenge.trackKey];
+    if (!track) return null;
+
+    const existing = await getPlayerTrackPbRecord({
+        playerId,
+        trackKey: challenge.trackKey,
+        track,
+    });
+    if (existing) return existing;
+
+    const retainedEntry = await readEntryByPlayerId(
+        challenge.id,
+        challenge.trackKey,
+        playerId,
+    );
+    if (!retainedEntry || retainedEntry.validationMethod !== 'strict-replay') {
+        return null;
+    }
+
+    const seeded = await seedPlayerTrackPersonalBest({
+        playerId,
+        isGuest,
+        trackKey: challenge.trackKey,
+        track,
+        bestTimeMs: retainedEntry.bestTimeMs,
+        checkpointTimesSec: retainedEntry.checkpointTimesSec,
+        updatedAt: retainedEntry.updatedAt,
+    });
+    return seeded.record;
+}
+
+export async function getServerPlayerTrackPbSummaries({
+    challengeIds,
+    playerId,
+    redditUsername,
+    guestToken,
+}: {
+    challengeIds?: unknown;
+    playerId?: unknown;
+    redditUsername?: unknown;
+    guestToken?: unknown;
+}): Promise<{
+    playerId: string | null;
+    trackPbs: Record<string, {
+        trackKey: string;
+        bestTimeMs: number;
+        checkpointTimesSec: number[] | null;
+        ghostAvailable: boolean;
+    } | null>;
+}> {
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+    });
+    if (!identity.canonicalPlayerId) {
+        return { playerId: null, trackPbs: {} };
+    }
+
+    const requestedIds = Array.isArray(challengeIds)
+        ? [...new Set(challengeIds.filter((value): value is string => (
+            typeof value === 'string' && Boolean(value)
+        )))].slice(0, DAILY_GP_PLAYLIST_DAYS)
+        : [];
+    const playlist = await getServerDailyGpPlaylist();
+    const challengeById = new Map(playlist.map((challenge) => [challenge.id, challenge]));
+    const trackPbs: Record<string, {
+        trackKey: string;
+        bestTimeMs: number;
+        checkpointTimesSec: number[] | null;
+        ghostAvailable: boolean;
+    } | null> = {};
+
+    for (const challengeId of requestedIds) {
+        const challenge = challengeById.get(challengeId);
+        if (!challenge) {
+            trackPbs[challengeId] = null;
+            continue;
+        }
+        const record = await readOrSeedTrackPersonalBest({
+            playerId: identity.canonicalPlayerId,
+            isGuest: Boolean(identity.guestPlayerId),
+            challenge,
+        });
+        trackPbs[challengeId] = record
+            ? {
+                trackKey: record.trackKey,
+                bestTimeMs: record.bestTimeMs,
+                checkpointTimesSec: record.checkpointTimesSec,
+                ghostAvailable: Boolean(record.ghost),
+            }
+            : null;
+    }
+
+    return {
+        playerId: identity.canonicalPlayerId,
+        trackPbs,
+    };
+}
+
+export async function getServerPlayerPbGhost({
+    challengeId,
+    playerId,
+    redditUsername,
+    guestToken,
+}: {
+    challengeId?: unknown;
+    playerId?: unknown;
+    redditUsername?: unknown;
+    guestToken?: unknown;
+}): Promise<{
+    playerId: string | null;
+    challengeId: string | null;
+    trackKey: string | null;
+    personalBest: {
+        bestTimeMs: number;
+        checkpointTimesSec: number[] | null;
+        updatedAt: string;
+        ghost: import('./pb-ghost-trace.js').PbGhostTrace | null;
+    } | null;
+}> {
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+    });
+    if (!identity.canonicalPlayerId) {
+        return {
+            playerId: null,
+            challengeId: null,
+            trackKey: null,
+            personalBest: null,
+        };
+    }
+    const challenge = await getServerDailyGpPlayableChallenge(
+        typeof challengeId === 'string' ? challengeId : null,
+    );
+    if (!challenge) {
+        return {
+            playerId: identity.canonicalPlayerId,
+            challengeId: null,
+            trackKey: null,
+            personalBest: null,
+        };
+    }
+
+    const record = await readOrSeedTrackPersonalBest({
+        playerId: identity.canonicalPlayerId,
+        isGuest: Boolean(identity.guestPlayerId),
+        challenge,
+    });
+    return {
+        playerId: identity.canonicalPlayerId,
+        challengeId: challenge.id,
+        trackKey: challenge.trackKey,
+        personalBest: record
+            ? {
+                bestTimeMs: record.bestTimeMs,
+                checkpointTimesSec: record.checkpointTimesSec,
+                updatedAt: record.updatedAt,
+                ghost: record.ghost,
+            }
+            : null,
+    };
+}
+
 export async function getServerPlayerBootstrap({
     playerId,
     redditUsername,
@@ -1295,6 +1481,50 @@ export async function submitServerDailyGpRun({
         nextBestTimeSec,
         strictReplayOutcome.run.checkpointTimesSec,
     ) ?? strictReplayOutcome.run.checkpointTimesSec ?? null;
+    const track = TRACKS[challenge.trackKey];
+    if (!track) {
+        return {
+            status: 500,
+            body: {
+                accepted: false,
+                error: 'Daily challenge track is unavailable.',
+            },
+        };
+    }
+    const submissionLock = await acquireSubmissionLock(challenge.id, normalizedPlayerId);
+    if (!submissionLock) {
+        return {
+            status: 429,
+            body: {
+                accepted: false,
+                error: 'Submission already in progress. Try again in a moment.',
+                retryAfterSeconds: 1,
+            },
+        };
+    }
+    // Seed from a retained verified daily result before evaluating this replay.
+    // This prevents a slower retry from becoming the lifetime track PB during
+    // the feature's time-only migration window.
+    let trackPbResult: Awaited<ReturnType<typeof upsertPlayerTrackPersonalBest>>;
+    try {
+        await readOrSeedTrackPersonalBest({
+            playerId: normalizedPlayerId,
+            isGuest: Boolean(identity.guestPlayerId),
+            challenge,
+        });
+        trackPbResult = await upsertPlayerTrackPersonalBest({
+            playerId: normalizedPlayerId,
+            isGuest: Boolean(identity.guestPlayerId),
+            trackKey: challenge.trackKey,
+            track,
+            bestTimeMs: nextBestTimeMs,
+            checkpointTimesSec: normalizedCheckpointTimesSec,
+            ghost: strictReplayOutcome.run.ghost ?? null,
+        });
+    } catch (error) {
+        await releaseSubmissionLock(submissionLock);
+        throw error;
+    }
 
     const nextEntry: DailyGpLeaderboardEntry = {
         playerId: normalizedPlayerId,
@@ -1307,18 +1537,6 @@ export async function submitServerDailyGpRun({
         strictReplayFailureReason: null,
     };
 
-    const submissionLock = await acquireSubmissionLock(challenge.id, normalizedPlayerId);
-    if (!submissionLock) {
-        return {
-            status: 429,
-            body: {
-                accepted: false,
-                error: 'Submission already in progress. Try again in a moment.',
-                retryAfterSeconds: 1,
-            },
-        };
-    }
-
     try {
         const previousEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
         if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
@@ -1328,6 +1546,9 @@ export async function submitServerDailyGpRun({
                     accepted: true,
                     improved: false,
                     bestTimeMs: previousEntry.bestTimeMs,
+                    trackBestTimeMs: trackPbResult.record.bestTimeMs,
+                    trackPbImproved: trackPbResult.improved,
+                    trackGhostAvailable: Boolean(trackPbResult.record.ghost),
                     completedLaps: null,
                     checkpointTimesSec: previousEntry.checkpointTimesSec ?? null,
                     validationMethod: previousEntry.validationMethod ?? 'strict-replay',
@@ -1373,6 +1594,9 @@ export async function submitServerDailyGpRun({
             accepted: true,
             improved: true,
             bestTimeMs: nextBestTimeMs,
+            trackBestTimeMs: trackPbResult.record.bestTimeMs,
+            trackPbImproved: trackPbResult.improved,
+            trackGhostAvailable: Boolean(trackPbResult.record.ghost),
             completedLaps: strictReplayOutcome.run.completedLaps,
             checkpointTimesSec: nextEntry.checkpointTimesSec,
             validationMethod: nextEntry.validationMethod,

@@ -206,6 +206,7 @@ let actualValidateDailyGpReplayDetailed = null;
 
 vi.mock("@devvit/redis", () => ({
   redis,
+  redisCompressed: redis,
 }));
 
 vi.mock("../src/server/replay-validator.ts", async () => {
@@ -220,7 +221,9 @@ vi.mock("../src/server/replay-validator.ts", async () => {
 const {
   getServerDailyGpSnapshot,
   getServerDailyGpChallenge,
+  getServerPlayerPbGhost,
   getServerPlayerBootstrap,
+  getServerPlayerTrackPbSummaries,
   submitServerDailyGpRun,
   updateServerPlayerIdentity,
   updateServerPlayerPreferences,
@@ -457,6 +460,48 @@ describe("daily-gp-store submission hardening", () => {
     expect(privateSnapshot.playerRank).toBe(1);
   });
 
+  it("lazily seeds a time-only track PB from a retained verified result", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-pb-migration";
+    const canonicalPlayerId = `guest:${guestPlayerId}`;
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    await redis.hSet(createRedisChallengeEntryHashKey(challenge.id), {
+      [canonicalPlayerId]: JSON.stringify({
+        playerId: canonicalPlayerId,
+        trackKey: challenge.trackKey,
+        bestTimeMs: 4321,
+        updatedAt: "2026-07-16T12:00:00.000Z",
+        completedLaps: null,
+        checkpointTimesSec: [1.2, 2.4],
+        validationMethod: "strict-replay",
+        strictReplayFailureReason: null,
+      }),
+    });
+
+    const summaries = await getServerPlayerTrackPbSummaries({
+      challengeIds: [challenge.id],
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+    });
+    const full = await getServerPlayerPbGhost({
+      challengeId: challenge.id,
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+    });
+
+    expect(summaries.trackPbs[challenge.id]).toEqual({
+      trackKey: challenge.trackKey,
+      bestTimeMs: 4321,
+      checkpointTimesSec: [1.2, 2.4],
+      ghostAvailable: false,
+    });
+    expect(full.personalBest).toMatchObject({
+      bestTimeMs: 4321,
+      checkpointTimesSec: [1.2, 2.4],
+      ghost: null,
+    });
+  });
+
   it("keeps the guest rate limit when the client rotates its signed player identity", async () => {
     const challenge = await getServerDailyGpChallenge();
     const guestPlayerId = "guest-rate-limit-check";
@@ -591,9 +636,13 @@ describe("daily-gp-store submission hardening", () => {
     expect(first.status).toBe(200);
     expect(first.body.improved).toBe(true);
     expect(first.body.bestTimeMs).toBe(3000);
+    expect(first.body.trackBestTimeMs).toBe(3000);
+    expect(first.body.trackPbImproved).toBe(true);
     expect(second.status).toBe(200);
     expect(second.body.improved).toBe(false);
     expect(second.body.bestTimeMs).toBe(3000);
+    expect(second.body.trackBestTimeMs).toBe(3000);
+    expect(second.body.trackPbImproved).toBe(false);
     expect(second.body.validationMethod).toBe("strict-replay");
   });
 });

@@ -52,6 +52,7 @@ export type DailyGpPlayerPreferences = {
     carAudioEnabled: boolean;
     crashAutoRestartEnabled: boolean;
     crashRestartDelaySec: number;
+    pbGhostEnabled: boolean;
 };
 
 export function getUtcDayIndex(date = new Date()): number {

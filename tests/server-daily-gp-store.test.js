@@ -74,7 +74,10 @@ function createMockTransaction(options = {}) {
     };
 }
 
-vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
+vi.mock('@devvit/redis', () => ({
+    redis: mockRedis,
+    redisCompressed: mockRedis,
+}));
 vi.mock('../src/server/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
 }));
@@ -106,6 +109,11 @@ describe('server daily gp store submissions', () => {
                 bestTimeMs: 12345,
                 completedLaps: 1,
                 checkpointTimesSec: [4.2, 9.8],
+                ghost: {
+                    schemaVersion: 1,
+                    sampleRateHz: 20,
+                    samples: [[0, 0, 0, 0], [12345, 1000, 1000, 100]],
+                },
                 method: 'finish',
             },
         });
@@ -131,6 +139,9 @@ describe('server daily gp store submissions', () => {
             body: {
                 accepted: true,
                 bestTimeMs: 12345,
+                trackBestTimeMs: 12345,
+                trackPbImproved: true,
+                trackGhostAvailable: true,
                 completedLaps: 1,
                 checkpointTimesSec: [4.2, 9.8],
                 validationMethod: 'strict-replay',
@@ -662,6 +673,7 @@ describe('server daily gp store submissions', () => {
             carAudioEnabled: true,
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
+            pbGhostEnabled: true,
         };
 
         const saved = await updateServerPlayerPreferences({

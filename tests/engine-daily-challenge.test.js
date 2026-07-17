@@ -369,6 +369,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: null,
       activeDailyChallenge: { id: "previous", trackKey: "harborParkLoop" },
       currentTrackKey: "harborParkLoop",
+      startOverlay: { hideStartOverlay: vi.fn() },
       resetCanvasPresentation: vi.fn(),
       reset: vi.fn(function reset() {
         this.status = "ready";
@@ -385,7 +386,10 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
     await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
 
-    expect(engine.reset).toHaveBeenCalledWith(false);
+    expect(engine.startOverlay.hideStartOverlay).toHaveBeenCalled();
+    expect(engine.reset).toHaveBeenCalledWith(false, {
+      showStartOverlay: false,
+    });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.trackModeStart).toHaveBeenCalledWith({
       trackKey: "harborParkLoop",
@@ -406,6 +410,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: null,
       activeDailyChallenge: { id: "previous", trackKey: "harborParkLoop" },
       currentTrackKey: "harborParkLoop",
+      startOverlay: { hideStartOverlay: vi.fn() },
       resetCanvasPresentation: vi.fn(),
       reset: vi.fn(),
       loadTrack: vi.fn(async function loadTrack(trackKey) {
@@ -422,9 +427,54 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.loadTrack).toHaveBeenCalledWith("blueSector", {
       loadPlayerProgress: false,
       preserveDailyChallengeContext: true,
+      showStartOverlayOnReset: false,
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();
+  });
+
+  it("waits for the PB ghost request before starting a playlist track", async () => {
+    const challenge = {
+      id: "daily-ghost-pending",
+      trackKey: "blueSector",
+      objectiveType: "single_lap_fastest",
+    };
+    let resolveGhost;
+    let startSequenceOrder = 0;
+    let ghostResolvedOrder = 0;
+    const ghostRequest = new Promise((resolve) => {
+      resolveGhost = resolve;
+    });
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: null,
+      activeDailyChallenge: null,
+      currentTrackKey: "blueSector",
+      startOverlay: { hideStartOverlay: vi.fn() },
+      resetCanvasPresentation: vi.fn(),
+      applyDailyChallenge: vi.fn(),
+      trackModeStart: vi.fn(),
+      startSequence: vi.fn(() => {
+        startSequenceOrder = ghostResolvedOrder + 1;
+      }),
+      pbGhost: { clearTrack: vi.fn() },
+      prepareTrackPersonalBestGhost: vi.fn(() => ghostRequest.then(() => {
+        ghostResolvedOrder = 1;
+      })),
+    };
+
+    const startPromise = RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge, {
+      startSource: "track_modal",
+    });
+    expect(engine.startSequence).not.toHaveBeenCalled();
+    resolveGhost(null);
+    await startPromise;
+
+    expect(engine.startSequence).toHaveBeenCalled();
+    expect(startSequenceOrder).toBe(2);
+    expect(engine.startButtonPending).toBe(false);
+    expect(engine.prepareTrackPersonalBestGhost).toHaveBeenCalledWith(challenge);
   });
 
   it("uses the default car settings for daily challenges", () => {
@@ -448,6 +498,47 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     });
 
     expect(setRuntimeConfig).toHaveBeenCalledWith(null);
+  });
+
+  it("uses the lifetime track PB instead of the selected day's stored best", () => {
+    const setBestTime = vi.fn();
+    const engine = {
+      createDailyChallengeRun: vi.fn(() => ({})),
+      syncCurrentRunPolicy: vi.fn(),
+      syncTrackMedalFromChallengeBest: vi.fn(),
+      setRuntimeConfig: vi.fn(),
+      dailyChallengeBestResult: null,
+      trackPersonalBestResult: null,
+      trackPersonalBestByTrackKey: {
+        circuit: {
+          trackKey: "circuit",
+          bestTime: 41.25,
+          checkpointTimesSec: [10, 20, 30],
+        },
+      },
+      sessionBestLapSecByTrackKey: Object.create(null),
+      sessionBestCheckpointTimesByTrackKey: Object.create(null),
+      bestLapTime: null,
+      hud: {
+        setPauseVisible: vi.fn(),
+        setHudPersonalBestsOpenAllowed: vi.fn(),
+        setBestTime,
+      },
+      syncChallengeHudPrimaryStats: vi.fn(),
+      updateDailyChallengeHud: vi.fn(),
+    };
+
+    RealTimeRacer.prototype.applyDailyChallenge.call(engine, {
+      id: "daily-1",
+      trackKey: "circuit",
+    });
+
+    expect(engine.bestLapTime).toBe(41.25);
+    expect(engine.trackPersonalBestResult).toMatchObject({
+      trackKey: "circuit",
+      bestTime: 41.25,
+    });
+    expect(engine.sessionBestLapSecByTrackKey.circuit).toBe(41.25);
   });
 
   it("uses the single stock car asset for any physics overrides", () => {

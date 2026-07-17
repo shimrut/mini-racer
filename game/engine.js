@@ -46,6 +46,9 @@ import { getCollisionAutoRestartEnabled } from "./settings/collision-auto-restar
 import { getCollisionRestartDelaySec } from "./settings/collision-restart-delay-preference.js";
 import { getCarProceduralAudioEnabled } from "./settings/car-audio-preference.js";
 import { getMusicEnabled } from "./settings/music-preference.js";
+import { getPbGhostEnabled } from "./settings/pb-ghost-preference.js";
+import { PbGhost } from "./ghost/pb-ghost.js";
+import { PbGhostService } from "./ghost/pb-ghost-service.js";
 import {
   applyPlayerPreferences,
   queuePlayerPreferencesSave,
@@ -106,6 +109,10 @@ export class RealTimeRacer {
     /** Per-track checkpoint split times (sec) for the session PB lap. */
     this.sessionBestCheckpointTimesByTrackKey = Object.create(null);
     this.dailyChallengeBestResult = null;
+    this.trackPersonalBestResult = null;
+    this.trackPersonalBestByTrackKey = Object.create(null);
+    this.pbGhost = new PbGhost({ enabled: getPbGhostEnabled() });
+    this.pbGhostService = new PbGhostService();
     this.verificationQueueTimer = null;
     this.isProcessingVerificationQueue = false;
     this.hasAnyData = false;
@@ -273,6 +280,10 @@ export class RealTimeRacer {
           maxSpeedKph: this.runtimeConfig.maxSpeed,
         });
       },
+      onPbGhostChanged: (enabled) => {
+        this.pbGhost.setEnabled(enabled);
+        this.requestRender();
+      },
       onLeaderboardIdentityChanged: async () => {
         await this.refreshDailyChallengeSummary({ forceRefresh: true });
       },
@@ -425,6 +436,7 @@ export class RealTimeRacer {
     this.collisionRestartDelaySec = getCollisionRestartDelaySec();
     this.carEffectsAudio?.setEnabled?.(getCarProceduralAudioEnabled());
     this.proceduralMusic?.setEnabled?.(getMusicEnabled());
+    this.pbGhost.setEnabled(getPbGhostEnabled());
     this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
     this.routeTrace.clear();
     this.trailTimer = 0;
@@ -432,6 +444,7 @@ export class RealTimeRacer {
     this.settings.refreshMusicPanel();
     this.settings.refreshCollisionAutoRestartPanel();
     this.settings.refreshCollisionRestartDelayPanel();
+    this.settings.refreshPbGhostPanel();
     this.garage.syncSkinSelection();
     this.garage.syncTrailSelection();
     await this.syncCarSpriteAsset();

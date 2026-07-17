@@ -4,6 +4,10 @@ import { buildCollisionRuntime, buildTrackGeometry } from '../../game/track/runt
 import { TRACKS } from '../../game/track/tracks.js';
 import { createRunPolicy } from '../../game/race/run-policy.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
+import {
+    createPbGhostTraceRecorder,
+    type PbGhostTrace,
+} from './pb-ghost-trace.js';
 
 export const MAX_REPLAY_FRAMES = 12_000;
 
@@ -24,6 +28,7 @@ type ReplayValidationResult = {
     bestTimeMs: number;
     completedLaps: number | null;
     checkpointTimesSec: number[] | null;
+    ghost: PbGhostTrace | null;
     method: 'finish';
 };
 
@@ -195,6 +200,11 @@ export function validateDailyGpReplayDetailed({
     const { state, collisionSegments } = createSimulationState(challenge, track);
     const config = { ...CONFIG };
     const fixedDt = Number(config.fixedDt) || (1 / 60);
+    const ghostRecorder = createPbGhostTraceRecorder({
+        timeSec: 0,
+        position: state.pos,
+        angle: state.angle,
+    });
 
     for (const segment of segments) {
         for (let frame = 0; frame < segment.frames; frame += 1) {
@@ -222,6 +232,11 @@ export function validateDailyGpReplayDetailed({
                 track,
                 collisionSegments,
             );
+            ghostRecorder.sample({
+                timeSec: state.currentTime,
+                position: state.pos,
+                angle: state.angle,
+            });
 
             if (events.crashEndedRun || state.status === 'crashed') {
                 return {
@@ -248,6 +263,11 @@ export function validateDailyGpReplayDetailed({
                         checkpointTimesSec: Array.isArray(state.lapCheckpointTimesSec) && state.lapCheckpointTimesSec.length
                             ? state.lapCheckpointTimesSec.slice()
                             : null,
+                        ghost: ghostRecorder.finish({
+                            timeSec: bestTimeSec,
+                            position: state.pos,
+                            angle: state.angle,
+                        }),
                         method: 'finish',
                     },
                 };

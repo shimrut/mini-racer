@@ -7,7 +7,8 @@ Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put 
 ## What players can do
 
 - Race a featured track and chase the fastest lap.
-- Improve a personal best and climb the leaderboard.
+- Follow a highly transparent copy of your selected car on the fastest verified lap you have set on that track.
+- Improve a lifetime track personal best while climbing each day's separate leaderboard.
 - Share a finished lap or a verified daily best as a Reddit comment after confirming the exact copy and posting account.
 - Replay recent tracks from the in-game `Tracks` screen.
 - Unlock medals on each track by beating target times.
@@ -19,7 +20,8 @@ Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put 
 - The featured slot updates on the UTC day reset.
 - Once a day is published, that track is locked in and does not change.
 - The `Tracks` screen keeps the last 7 days available to play.
-- Each track card shows the track preview, your best time, earned medals, and how long that track is still available.
+- Each track card shows the track preview, your lifetime best time, earned medals, and how long that track is still available.
+- A track's verified personal best and ghost remain attached to that track when it leaves the seven-day list and returns on a future date.
 
 ## Public Reddit posts and discoverability
 
@@ -48,11 +50,12 @@ The Garage lets players change how their car looks without changing handling.
 - Crossing the finish line completes the run.
 - Every wall collision becomes a momentum-losing scrape, so wall contact costs time but never ends the attempt.
 - `Collision Auto-Restart` is optional and off by default; enabling it starts a fresh attempt after the first scrape instead of continuing the current lap.
-- If a completed lap is better than your previous best on that track, it becomes your new best time.
+- `Personal Best Ghost` is on by default and can be disabled in Settings.
+- If a server-verified completed lap is strictly faster than your previous best on that track, it becomes the ghost used on the next attempt.
 
 ## Progress and competition
 
-- Your best time is shown for each available track.
+- Your lifetime best time is shown for each available track, independently from that day's leaderboard result.
 - Standings load the complete ranked field as you scroll and keep your own rank visible even when it is outside the currently loaded rows.
 - Medals are earned by beating fixed target times on each track.
 - The finish screen offers `Improve`, `Share Time`, and `Home`. Standings offer `Share Best` when the player has a verified time for the selected day.

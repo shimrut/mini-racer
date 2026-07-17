@@ -24,6 +24,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The launch card works without inline scroll traps.
 - [ ] The expanded game works across phone and desktop layouts.
 - [ ] The retry flow is fast and predictable after a finish or an enabled collision auto-restart.
+- [ ] A verified lifetime PB ghost appears on the next attempt for that track, including when the track returns on a later date.
+- [ ] The PB ghost uses the player's currently selected car and is visibly more transparent than the live player car.
+- [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.
 - [ ] The finish screen shows `Improve`, `Share Time`, and `Home`, and sharing displays the exact comment plus Reddit username before posting.
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
 
@@ -43,6 +46,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Reddit username display behaves correctly when identity is enabled.
 - [ ] Guest fallback identity behaves correctly when Reddit username display is unavailable or off.
 - [ ] Invalid or suspicious replay submissions are rejected cleanly.
+- [ ] A daily leaderboard improvement and a lifetime track PB improvement are displayed and stored independently.
+- [ ] Existing retained verified results seed a time-only track PB without showing a fabricated ghost.
+- [ ] A geometry or simulation revision rejects an incompatible stored ghost instead of rendering it on the changed track.
 - [ ] Error states are understandable and do not leave the player stuck.
 - [ ] `SUBMIT_COMMENT` user-action permission is present in `devvit.json`, and the reviewed app version is approved for regular-user attribution.
 - [ ] A regular user can preview, confirm, and view a score-thread reply authored by that same account.

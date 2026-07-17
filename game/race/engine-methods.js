@@ -151,6 +151,7 @@ export const raceEngineMethods = {
 
         this.pendingStartFrame = requestAnimationFrame((time) => {
           this.pendingStartFrame = null;
+          this.pbGhost?.beginRun?.();
           this.snapRenderPoseToCurrentPose();
           this.accumulator = 0;
           this.status = "playing";
@@ -211,6 +212,7 @@ export const raceEngineMethods = {
       challengeId: this.activeDailyChallenge?.id || null,
     });
     this.status = "playing";
+    this.pbGhost?.beginRun?.();
     this.scoreboardReplay.reset();
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
@@ -483,7 +485,13 @@ export const raceEngineMethods = {
     }
   },
 
-  reset(autoStart = false, { preserveDailyChallenge = false } = {}) {
+  reset(
+    autoStart = false,
+    {
+      preserveDailyChallenge = false,
+      showStartOverlay = !autoStart,
+    } = {},
+  ) {
     this.clearTimers();
     if (this.pendingStartFrame !== null) {
       cancelAnimationFrame(this.pendingStartFrame);
@@ -539,7 +547,7 @@ export const raceEngineMethods = {
     this._lookAheadX = 0;
     this._lookAheadY = 0;
 
-    if (autoStart) {
+    if (!showStartOverlay) {
       this.startOverlay.hideStartOverlay();
     } else {
       this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
@@ -736,13 +744,21 @@ export const raceEngineMethods = {
 
     const px = displayPos.x * gs;
     const py = displayPos.y * gs;
+    const renderScale = CONFIG.carSpriteRenderScale ?? 1;
+    const drawWidth = this.carSpriteDrawWidth * renderScale;
+    const drawHeight = this.carSpriteDrawHeight * renderScale;
+    this.pbGhost?.render?.(ctx, {
+      raceTimeSec: this.currentTime,
+      gridSize: gs,
+      carSprite: this.carSprite,
+      drawWidth,
+      drawHeight,
+    });
+
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(displayAngle);
 
-    const renderScale = CONFIG.carSpriteRenderScale ?? 1;
-    const drawWidth = this.carSpriteDrawWidth * renderScale;
-    const drawHeight = this.carSpriteDrawHeight * renderScale;
     if (this.qualityLevel <= 0) {
       ctx.shadowColor = CONFIG.carSpriteShadowColor;
       ctx.shadowBlur = CONFIG.carSpriteShadowBlur;
