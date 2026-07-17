@@ -143,6 +143,18 @@
     background: #475569;
 }
 
+.combined-action-btn.is-menu-selected:not(.combined-action-btn--primary) {
+    background: #475569;
+    outline: 2px solid rgba(255, 255, 255, 0.55);
+    outline-offset: 2px;
+}
+
+.combined-action-btn--primary.is-menu-selected {
+    filter: brightness(1.06);
+    outline: 2px solid rgba(255, 255, 255, 0.75);
+    outline-offset: 3px;
+}
+
 .combined-action-btn svg,
 .combined-action-btn .combined-action-btn-label {
     pointer-events: none;

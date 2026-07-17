@@ -268,6 +268,19 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     color: var(--text-color);
 }
 
+.main-menu__item.is-menu-selected:not(.main-menu__item--primary) {
+    color: var(--text-color);
+    background: rgba(255, 255, 255, 0.08);
+    outline: 2px solid rgba(255, 255, 255, 0.55);
+    outline-offset: 2px;
+}
+
+.main-menu__item--primary.is-menu-selected {
+    filter: brightness(1.06);
+    outline: 2px solid rgba(255, 255, 255, 0.75);
+    outline-offset: 3px;
+}
+
 .main-menu__item:active {
     filter: none;
 }

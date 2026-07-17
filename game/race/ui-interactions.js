@@ -63,7 +63,7 @@ export class InteractionsUi {
     }
 
     bindMenu() {
-        // No longer used, main menu handles its own simple clicks
+        this.startOverlay?.bindKeyboardNavigation?.();
     }
 
     bindPrimaryActions() {

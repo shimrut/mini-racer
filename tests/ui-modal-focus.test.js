@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ModalShell } from '../game/race/ui-modal-shell.js';
+import { MENU_SELECTED_CLASS } from '../game/ui/menu-keyboard-nav.js';
 
 const {
     getModalPreferredFocusTarget,
@@ -125,6 +126,79 @@ describe('modal escape key', () => {
 
             expect(event.preventDefault).toHaveBeenCalled();
             expect(closeBtn.click).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+});
+
+describe('modal pause/finish menu keyboard nav', () => {
+    function makeMenuButton(id) {
+        const classList = {
+            values: new Set(),
+            add(name) { this.values.add(name); },
+            remove(name) { this.values.delete(name); },
+            contains(name) { return this.values.has(name); },
+            toggle(name, force) {
+                if (force) this.values.add(name);
+                else this.values.delete(name);
+                return force;
+            },
+        };
+        return {
+            id,
+            disabled: false,
+            hidden: false,
+            offsetParent: {},
+            style: {},
+            classList,
+            focus: vi.fn(),
+            click: vi.fn(),
+            getAttribute: () => null,
+        };
+    }
+
+    it('moves selection with ArrowDown on pause actions', () => {
+        const resume = makeMenuButton('resume');
+        const restart = makeMenuButton('restart');
+        const home = makeMenuButton('home');
+        const buttons = [resume, restart, home];
+        const actionsRoot = {
+            querySelectorAll: () => buttons,
+        };
+        const pauseView = {
+            classList: { contains: (name) => name === 'active-view' },
+            querySelector: () => actionsRoot,
+        };
+        const state = { keyboardNavActive: false };
+        const context = {
+            _activeTrapModal: { id: 'modal' },
+            _modalKind: 'pause',
+            _menuKeyboardState: state,
+            isModalActive: () => true,
+            isPauseEscapeTarget: () => false,
+            modalPauseView: pauseView,
+            modalCombinedView: { classList: { contains: () => false } },
+            modalRunsView: { classList: { contains: () => false } },
+            getActiveMenuActionsRoot: ModalShell.prototype.getActiveMenuActionsRoot,
+        };
+        const event = {
+            key: 'ArrowDown',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            target: null,
+        };
+        const originalDocument = global.document;
+        global.document = { activeElement: resume };
+
+        try {
+            handleModalTrapKeydown.call(context, event);
+            expect(event.preventDefault).toHaveBeenCalled();
+            expect(restart.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(restart.focus).toHaveBeenCalled();
         } finally {
             global.document = originalDocument;
         }

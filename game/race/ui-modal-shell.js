@@ -22,6 +22,12 @@ import {
 } from '../medals/medals.js';
 import { closeModalElement, openModalElement, runModalHandoff } from '../ui/modal-handoff.js';
 import { configureReusableModal } from '../ui/reusable-modal.js';
+import {
+    collectVisibleActionButtons,
+    createMenuKeyboardState,
+    handleMenuListKeydown,
+    resetMenuKeyboardState,
+} from '../ui/menu-keyboard-nav.js';
 
 function isButtonElement(node) {
     return typeof HTMLButtonElement !== 'undefined' && node instanceof HTMLButtonElement;
@@ -92,6 +98,24 @@ export class ModalShell {
         this._leaderboardTouchStartHandler = null;
         this._leaderboardTouchEndHandler = null;
         this._leaderboardTouchCancelHandler = null;
+        this._menuKeyboardState = createMenuKeyboardState();
+    }
+
+    getActiveMenuActionsRoot() {
+        if (!this.isModalActive()) return null;
+        if (this._modalKind === 'pause' && this.modalPauseView?.classList.contains('active-view')) {
+            return this.modalPauseView.querySelector('.combined-actions');
+        }
+        if (this._modalKind === 'win' && this.modalCombinedView?.classList.contains('active-view')) {
+            return this.modalCombinedView.querySelector('.combined-actions');
+        }
+        return null;
+    }
+
+    resetMenuKeyboardNav() {
+        const root = this.getActiveMenuActionsRoot();
+        const buttons = collectVisibleActionButtons(root);
+        resetMenuKeyboardState(this._menuKeyboardState, buttons);
     }
 
     _setActiveView(view) {
@@ -530,6 +554,7 @@ export class ModalShell {
         this._syncGarageButtonToPanelState();
 
         this._setActiveView(this.modalPauseView);
+        this.resetMenuKeyboardNav();
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => {
@@ -635,6 +660,7 @@ export class ModalShell {
         }
 
         this._setActiveView(this.modalCombinedView);
+        this.resetMenuKeyboardNav();
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
 
@@ -982,21 +1008,15 @@ export class ModalShell {
             }
         }
 
-        const isDesktopModalNav = window.matchMedia('(min-width: 769px)').matches;
-        const actionButtons = isDesktopModalNav
-            ? Array.from(this._activeTrapModal.querySelectorAll('.modal-action-row > button'))
-                .filter((button) => !button.hidden && button.offsetParent !== null)
-            : [];
-
-        if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && actionButtons.length > 1) {
-            const activeIndex = actionButtons.indexOf(document.activeElement);
-            if (activeIndex !== -1) {
-                event.preventDefault();
-                const direction = event.key === 'ArrowRight' ? 1 : -1;
-                const nextIndex = (activeIndex + direction + actionButtons.length) % actionButtons.length;
-                actionButtons[nextIndex].focus();
+        const menuActionsRoot = this.getActiveMenuActionsRoot();
+        if (menuActionsRoot && this._activeTrapModal?.id === 'modal') {
+            const menuButtons = collectVisibleActionButtons(menuActionsRoot);
+            if (handleMenuListKeydown(event, {
+                buttons: menuButtons,
+                state: this._menuKeyboardState,
+            })) {
+                return;
             }
-            return;
         }
 
         if (event.key !== 'Tab') return;

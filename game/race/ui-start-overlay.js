@@ -1,3 +1,17 @@
+import {
+    collectVisibleActionButtons,
+    createMenuKeyboardState,
+    handleMenuListKeydown,
+    resetMenuKeyboardState,
+} from '../ui/menu-keyboard-nav.js';
+
+const BLOCKING_OVERLAY_IDS = [
+    'modal',
+    'settings-modal',
+    'garage-modal',
+    'daily-playlist-modal',
+];
+
 export class StartOverlay {
     constructor({
         dailyChallengeUi,
@@ -5,11 +19,14 @@ export class StartOverlay {
         this.dailyChallengeUi = dailyChallengeUi;
         this._startOverlayHasAnyData = false;
         this._startOverlayIsReturningPlayer = false;
+        this._menuKeyboardState = createMenuKeyboardState();
+        this._menuKeydownHandler = null;
     }
 
     get startOverlay() { return document.getElementById('start-overlay'); }
     get startGroup() { return document.getElementById('start-group'); }
     get startBtn() { return document.getElementById('daily-challenge-start-btn'); }
+    get mainMenu() { return this.startOverlay?.querySelector?.('.main-menu') || null; }
 
     setStartOverlayActive(isActive) {
         document.body.classList.toggle("start-overlay-active", Boolean(isActive));
@@ -36,6 +53,39 @@ export class StartOverlay {
         );
     }
 
+    isLobbyKeyboardNavBlocked() {
+        for (const id of BLOCKING_OVERLAY_IDS) {
+            const el = document.getElementById(id);
+            if (el?.classList?.contains('active')) return true;
+        }
+        return false;
+    }
+
+    getLobbyMenuButtons() {
+        return collectVisibleActionButtons(this.mainMenu, ':scope > .main-menu__item');
+    }
+
+    resetLobbyMenuKeyboardNav() {
+        resetMenuKeyboardState(this._menuKeyboardState, this.getLobbyMenuButtons());
+    }
+
+    bindKeyboardNavigation() {
+        if (this._menuKeydownHandler || typeof document === 'undefined') return;
+        this._menuKeydownHandler = (event) => this.handleLobbyMenuKeydown(event);
+        document.addEventListener('keydown', this._menuKeydownHandler, true);
+    }
+
+    handleLobbyMenuKeydown(event) {
+        if (!this.isStartOverlayVisible()) return;
+        if (this.isLobbyKeyboardNavBlocked()) return;
+
+        const buttons = this.getLobbyMenuButtons();
+        handleMenuListKeydown(event, {
+            buttons,
+            state: this._menuKeyboardState,
+        });
+    }
+
     showStartOverlay(hasAnyData, isReturningPlayer = false) {
         const overlay = this.startOverlay;
         const group = this.startGroup;
@@ -43,6 +93,7 @@ export class StartOverlay {
         if (group) group.style.display = "flex";
         this.setStartOverlayActive(true);
         this.updateStartOverlayMode(hasAnyData, isReturningPlayer);
+        this.resetLobbyMenuKeyboardNav();
         requestAnimationFrame(() => this.focusPrimaryAction());
     }
 
@@ -51,6 +102,7 @@ export class StartOverlay {
         if (overlay) overlay.style.display = "none";
         this.setStartOverlayActive(false);
         this.setStartSelectionMode(false);
+        this.resetLobbyMenuKeyboardNav();
     }
 
     updateStartOverlayMode(
