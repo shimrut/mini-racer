@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
 
-const { mockReddit, mockMedia, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted(() => ({
+const { mockReddit, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
         getPostById: vi.fn(),
         getPostsByUser: vi.fn(),
         getSnoovatarUrl: vi.fn(),
     },
-    mockMedia: { upload: vi.fn() },
     mockAutopostStore: {
         readDailyPodiumAutopostSubscription: vi.fn(),
         upsertDailyPodiumAutopostSubscription: vi.fn(),
@@ -22,7 +20,7 @@ const { mockReddit, mockMedia, mockAutopostStore, mockPostStore, mockContext } =
     mockContext: { getRequestAppSlug: vi.fn() },
 }));
 
-vi.mock('@devvit/web/server', () => ({ media: mockMedia, reddit: mockReddit }));
+vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
 vi.mock('../src/server/daily-podium-autopost-store.js', () => mockAutopostStore);
 vi.mock('../src/server/daily-podium-post-store.js', () => mockPostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
@@ -84,10 +82,6 @@ describe('daily podium post workflow', () => {
         mockReddit.getPostById.mockResolvedValue({ id: 't3_existing' });
         mockReddit.getPostsByUser.mockReturnValue({ all: vi.fn(async () => []) });
         mockReddit.getSnoovatarUrl.mockResolvedValue('https://styles.redditmedia.com/avatar.png');
-        mockMedia.upload.mockResolvedValue({
-            mediaId: 'avatar-media',
-            mediaUrl: 'https://i.redd.it/frozen-avatar.png',
-        });
         mockContext.getRequestAppSlug.mockReturnValue('mini-racer');
     });
 
@@ -115,11 +109,6 @@ describe('daily podium post workflow', () => {
         });
     });
 
-    it('enables the Devvit media capability used to freeze Snoovatars', () => {
-        const config = JSON.parse(readFileSync(new URL('../devvit.json', import.meta.url), 'utf8'));
-        expect(config.permissions.media).toBe(true);
-    });
-
     it('creates an immutable sanitized custom post without a score thread', async () => {
         await expect(
             ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
@@ -142,13 +131,13 @@ describe('daily podium post workflow', () => {
                     positions: podium.positions.map(({ playerId, profile, ...position }) => ({
                         ...position,
                         avatarUrl: position.identityType === 'reddit'
-                            ? 'https://i.redd.it/frozen-avatar.png'
+                            ? 'https://styles.redditmedia.com/avatar.png'
                             : null,
                     })),
                 },
             },
             textFallback: {
-                text: expect.stringContaining('1. Gold - u/RaceFan - 18.42s'),
+                text: expect.stringContaining('1. Gold - RaceFan - 18.42s'),
             },
         });
         const serializedPostData = JSON.stringify(
@@ -160,10 +149,6 @@ describe('daily podium post workflow', () => {
         expect(serializedPostData).not.toContain('timeSec');
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledOnce();
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
-        expect(mockMedia.upload).toHaveBeenCalledWith({
-            url: 'https://styles.redditmedia.com/avatar.png',
-            type: 'image',
-        });
         expect(mockPostStore.writeDailyGpPodiumPostRecord).toHaveBeenCalledWith(
             expect.objectContaining({
                 subredditName: 'MiniRacer',
@@ -211,11 +196,10 @@ describe('daily podium post workflow', () => {
             null,
             null,
         ]);
-        expect(mockMedia.upload).not.toHaveBeenCalled();
     });
 
-    it('still publishes with the generic fallback when a Snoovatar upload fails', async () => {
-        mockMedia.upload.mockRejectedValue(new Error('media unavailable'));
+    it('still publishes with the generic fallback when Reddit avatar lookup fails', async () => {
+        mockReddit.getSnoovatarUrl.mockRejectedValue(new Error('Reddit unavailable'));
 
         await expect(
             ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),

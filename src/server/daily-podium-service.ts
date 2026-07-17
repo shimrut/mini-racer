@@ -1,4 +1,4 @@
-import { media, reddit } from '@devvit/web/server';
+import { reddit } from '@devvit/web/server';
 import type {
     DailyGpPodiumPostData,
     FinalDailyGpPodium,
@@ -51,10 +51,19 @@ function emptyPosition(rank: 1 | 2 | 3): FinalDailyGpPodiumPosition {
     };
 }
 
-function isSafeAvatarUrl(value: unknown): value is string {
+export function isRedditAvatarUrl(value: unknown): value is string {
     if (typeof value !== 'string') return false;
     try {
-        return new URL(value).protocol === 'https:';
+        const url = new URL(value);
+        const hostname = url.hostname.toLowerCase();
+        return url.protocol === 'https:' && (
+            hostname === 'redd.it'
+            || hostname.endsWith('.redd.it')
+            || hostname === 'redditmedia.com'
+            || hostname.endsWith('.redditmedia.com')
+            || hostname === 'redditstatic.com'
+            || hostname.endsWith('.redditstatic.com')
+        );
     } catch {
         return false;
     }
@@ -102,13 +111,11 @@ export function sanitizeDailyGpPodiumForPost(
     };
 }
 
-async function resolveRedditAvatarUrl(displayName: string): Promise<string | null> {
+export async function resolveRedditAvatarUrl(displayName: string): Promise<string | null> {
     const username = displayName.replace(/^u\//i, '');
     try {
-        const sourceUrl = await reddit.getSnoovatarUrl(username);
-        if (!isSafeAvatarUrl(sourceUrl)) return null;
-        const uploaded = await media.upload({ url: sourceUrl, type: 'image' });
-        return isSafeAvatarUrl(uploaded?.mediaUrl) ? uploaded.mediaUrl : null;
+        const avatarUrl = await reddit.getSnoovatarUrl(username);
+        return isRedditAvatarUrl(avatarUrl) ? avatarUrl : null;
     } catch {
         return null;
     }
@@ -131,9 +138,7 @@ export async function resolveDailyGpPodiumAvatarsForPost(
 
 function formatPodiumDisplayName(position: FinalDailyGpPodiumPosition): string {
     if (position.identityType !== 'reddit') return position.displayName;
-    return position.displayName.startsWith('u/')
-        ? position.displayName
-        : `u/${position.displayName}`;
+    return position.displayName.replace(/^u\//i, '');
 }
 
 export function formatDailyMiniRacerPodiumTitle(podium: DailyGpPodiumPostData): string {

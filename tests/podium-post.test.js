@@ -1,6 +1,11 @@
 import { JSDOM } from 'jsdom';
-import { describe, expect, it } from 'vitest';
-import { normalizePodium, readPodiumPostData, renderPodium } from '../podium.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+    hydrateMissingRedditAvatars,
+    normalizePodium,
+    readPodiumPostData,
+    renderPodium,
+} from '../podium.js';
 
 function createDocument() {
     return new JSDOM(`
@@ -36,7 +41,7 @@ describe('podium custom post', () => {
         });
 
         expect(result.positions).toEqual([
-            { rank: 1, displayName: 'u/RaceFan', identityType: 'reddit', formattedTime: '18.42', avatarUrl: 'assets/generic-snoo.svg' },
+            { rank: 1, displayName: 'RaceFan', identityType: 'reddit', formattedTime: '18.42', avatarUrl: 'assets/generic-snoo.svg' },
             { rank: 2, displayName: 'Turbo Otter 42', identityType: 'private', formattedTime: '18.76', avatarUrl: 'assets/generic-snoo.svg' },
             { rank: 3, displayName: 'No verified finish', identityType: 'empty', formattedTime: '—', avatarUrl: 'assets/generic-snoo.svg' },
         ]);
@@ -63,7 +68,7 @@ describe('podium custom post', () => {
         expect(document.getElementById('challenge-date').textContent).toBe('JUL 10, 2026');
         expect(document.querySelectorAll('[data-rank]')).toHaveLength(3);
         expect(Array.from(document.querySelectorAll('.podium-row__name'), (node) => node.textContent)).toEqual([
-            'u/Winner',
+            'Winner',
             'No verified finish',
             'No verified finish',
         ]);
@@ -71,7 +76,7 @@ describe('podium custom post', () => {
             'https://i.redd.it/frozen-avatar.png',
         );
         expect(document.querySelector('[data-rank="1"] .podium-row__avatar').alt).toBe(
-            'u/Winner Reddit avatar',
+            'Winner Reddit avatar',
         );
         expect(document.querySelector('[data-rank="2"] .podium-row__avatar').getAttribute('src')).toBe(
             'assets/generic-snoo.svg',
@@ -89,7 +94,7 @@ describe('podium custom post', () => {
 
         expect(result.positions[0].identityType).toBe('empty');
         expect(result.positions[1].identityType).toBe('empty');
-        expect(result.positions[2].displayName).toBe('u/Driver');
+        expect(result.positions[2].displayName).toBe('Driver');
     });
 
     it('never renders an unsafe avatar URL and labels private generic Snoos', () => {
@@ -105,5 +110,29 @@ describe('podium custom post', () => {
         expect(avatars[0].getAttribute('src')).toBe('assets/generic-snoo.svg');
         expect(avatars[1].getAttribute('src')).toBe('assets/generic-snoo.svg');
         expect(avatars[1].alt).toBe('Generic Snoo avatar');
+    });
+
+    it('hydrates public avatars missing from legacy immutable post data', async () => {
+        const podium = normalizePodium({
+            positions: [
+                { rank: 1, displayName: 'u/shimroot', identityType: 'reddit', formattedTime: '0:10.57' },
+                { rank: 2, displayName: 'Private Otter', identityType: 'private', formattedTime: '0:10.60' },
+            ],
+        });
+        const fetch = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({
+                positions: [{ rank: 1, avatarUrl: 'https://styles.redditmedia.com/shimroot.png' }],
+            }),
+        }));
+
+        const hydrated = await hydrateMissingRedditAvatars({ fetch }, podium);
+
+        expect(fetch).toHaveBeenCalledWith('/api/podium/avatars');
+        expect(hydrated.positions[0]).toMatchObject({
+            displayName: 'shimroot',
+            avatarUrl: 'https://styles.redditmedia.com/shimroot.png',
+        });
+        expect(hydrated.positions[1].avatarUrl).toBe('assets/generic-snoo.svg');
     });
 });

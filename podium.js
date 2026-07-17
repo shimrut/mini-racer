@@ -118,8 +118,37 @@ function normalizeAvatarUrl(value) {
 }
 
 function formatRedditName(value) {
-    const name = value.replace(/^u\//i, '');
-    return name ? `u/${name}` : EMPTY_NAME;
+    return value.replace(/^u\//i, '') || EMPTY_NAME;
+}
+
+export async function hydrateMissingRedditAvatars(root, podium) {
+    if (!root?.fetch || !podium?.positions?.some(
+        (position) => position.identityType === 'reddit' && position.avatarUrl === GENERIC_SNOO_URL
+    )) {
+        return podium;
+    }
+
+    try {
+        const response = await root.fetch('/api/podium/avatars');
+        if (!response?.ok) return podium;
+        const payload = await response.json();
+        const avatarsByRank = new Map(
+            (Array.isArray(payload?.positions) ? payload.positions : [])
+                .filter((position) => Number.isInteger(position?.rank))
+                .map((position) => [position.rank, normalizeAvatarUrl(position.avatarUrl)])
+        );
+        return {
+            ...podium,
+            positions: podium.positions.map((position) => ({
+                ...position,
+                avatarUrl: position.identityType === 'reddit'
+                    ? avatarsByRank.get(position.rank) || position.avatarUrl
+                    : position.avatarUrl,
+            })),
+        };
+    } catch {
+        return podium;
+    }
 }
 
 function formatChallengeDate(value) {
@@ -138,8 +167,10 @@ function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-function boot() {
-    renderPodium(document, readPodiumPostData());
+async function boot() {
+    const podium = renderPodium(document, readPodiumPostData());
+    const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
+    if (hydrated !== podium) renderPodium(document, hydrated);
 }
 
 if (typeof document !== 'undefined') {

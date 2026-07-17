@@ -24,6 +24,7 @@ import {
     getRequestRateLimitIdentity,
     getRequestUsername,
     readContextPostId,
+    readContextPostData,
     readContextSubredditName,
 } from './request-context.js';
 import { getPostBoundDailyGpChallenge } from './post-bound-challenge.js';
@@ -59,6 +60,8 @@ import { registerShareRoutes } from './routes/share-routes.js';
 import { registerAnalyticsRoutes } from './routes/analytics-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
 import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
+import { registerPodiumRoutes } from './routes/podium-routes.js';
+import { resolveLegacyDailyGpPodiumAvatars } from './daily-podium-avatar-backfill.js';
 
 function registerProductionRoutes(app: express.Application): void {
     registerPlayerRoutes(app, {
@@ -71,6 +74,11 @@ function registerProductionRoutes(app: express.Application): void {
         getRequestUsername,
         getServerPlayerTrackPbSummaries: (input) => getServerPlayerTrackPbSummaries(input),
         getServerPlayerPbGhost: (input) => getServerPlayerPbGhost(input),
+    });
+    registerPodiumRoutes(app, {
+        readContextPostId,
+        readContextPostData,
+        resolveLegacyDailyGpPodiumAvatars,
     });
     registerCompetitionRoutes(app, {
         getRequestUsername,
