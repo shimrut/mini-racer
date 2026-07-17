@@ -182,15 +182,15 @@ async function boot() {
     if (hydrated !== podium) renderPodium(document, hydrated);
 }
 
-export function bindPodiumPlayNow(documentRef) {
+export function bindPodiumPlayNow(documentRef, openGame = openFeaturedGameFromPodium) {
     const playButton = documentRef?.getElementById('podium-play');
     if (!playButton || playButton.dataset.bound === '1') return playButton || null;
     playButton.dataset.bound = '1';
-    playButton.addEventListener('click', openFeaturedGameFromPodium);
+    playButton.addEventListener('click', openGame);
     return playButton;
 }
 
-async function openFeaturedGameFromPodium(event) {
+export async function openFeaturedGameFromPodium(event) {
     requestFeaturedDailyChallengeStart();
     try {
         // Hosted custom posts only; local podium-test.html has no Devvit client.

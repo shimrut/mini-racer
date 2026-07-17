@@ -155,16 +155,25 @@ describe('podium custom post', () => {
     });
 
     it('Play Now requests today\'s featured track and opens the game entry', async () => {
-        const { requestExpandedMode } = await import('@devvit/web/client');
         const document = createDocument();
-        const button = bindPodiumPlayNow(document);
+        const openGame = vi.fn(async () => undefined);
+        const button = bindPodiumPlayNow(document, openGame);
         expect(button).toBeTruthy();
 
         button.click();
-        await Promise.resolve();
-        await Promise.resolve();
+
+        expect(openGame).toHaveBeenCalledOnce();
+    });
+
+    it('featured open path stores the featured-start override before expanding', async () => {
+        const { openFeaturedGameFromPodium } = await import('../podium.js');
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        requestFeaturedDailyChallengeStart.mockClear();
+        requestExpandedMode.mockClear();
+
+        await openFeaturedGameFromPodium({ type: 'click' });
 
         expect(requestFeaturedDailyChallengeStart).toHaveBeenCalledOnce();
-        expect(requestExpandedMode).toHaveBeenCalledWith(expect.any(Object), 'game');
+        expect(requestExpandedMode).toHaveBeenCalledWith({ type: 'click' }, 'game');
     });
 });
