@@ -3,7 +3,7 @@
 - Pressing plain `R` now restarts the race while playing, paused, or on the finish screen. Modifier combinations such as Ctrl/Cmd/Alt/Shift+R keep their normal browser behavior and do not restart.
 - Fixed PB ghost motion using the raw 60 Hz simulation clock instead of the live car's interpolated render timeline, which made the ghost visibly step when first-run frame pacing was uneven.
 
-How the game works today: [README.md](README.md#how-the-game-works).
+How the game works: [README.md](README.md#how-the-game-works).
 
 ## 0.7
 

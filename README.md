@@ -1,73 +1,71 @@
 # Mini Racer
 
-Mini Racer is a fast, one-lap arcade racing game built for Reddit.
+Mini Racer is a quick, one-lap racing game for Reddit.
 
-Open a Mini Racer post, tap `Race Now`, learn the track quickly, and try to put down a cleaner lap than everyone else. The game is built around short sessions, quick restarts, and visible improvement from run to run.
+Open a Mini Racer post, tap **Race Now**, learn the track, and try again until your lap is cleaner and faster. Runs are short on purpose — restart fast, improve often.
+
+## How the game works
+
+Every attempt is **one lap**. Cross the finish line to complete it.
+
+Hitting a wall does **not** end your run. You lose speed (and time), then keep going. If you prefer the old “bump and restart” feel, turn on **Collision Auto-Restart** in Settings (it is off by default).
+
+Press **R** to restart while racing, paused, or on the finish screen.
+
+### Controls and goal
+
+Steer, finish one clean lap as fast as you can, then try again. Improvement comes from learning the corners — when to brake, how to exit cleanly, and how little wall contact you can get away with.
 
 ## What players can do
 
-- Race a featured track and chase the fastest lap.
-- Follow a highly transparent copy of your selected car on the fastest verified lap you have set on that track.
-- Improve a lifetime track personal best while climbing each day's separate leaderboard.
-- Share a finished lap or a verified daily best as a Reddit comment after confirming the exact copy and posting account.
-- Replay recent tracks from the in-game `Tracks` screen.
-- Unlock medals on each track by beating target times.
-- Customize the car look in the Garage.
+- Race **today’s featured track** and chase the fastest lap
+- Beat your **personal best** on each track (kept for life on that track)
+- Race against a faint **ghost** of your best verified lap (on by default; turn it off in Settings)
+- Climb that day’s **leaderboard** in Standings
+- Earn **medals** by beating target times on each track
+- Replay the last **7 days** of tracks from the Tracks screen
+- Change how your car looks in the **Garage** (skins and trails — handling stays the same)
+- **Share** a finished lap or a verified daily best as a Reddit comment (you preview the text first)
 
-## Track release cadence
+Your car look and settings are saved to your Reddit profile, so they should stick around after app updates.
 
-- Mini Racer features a new track every day.
-- The featured slot updates on the UTC day reset.
-- Once a day is published, that track is locked in and does not change.
-- The `Tracks` screen keeps the last 7 days available to play.
-- Each track card shows the track preview, your lifetime best time, earned medals, and how long that track is still available.
-- A track's verified personal best and ghost remain attached to that track when it leaves the seven-day list and returns on a future date.
+## Daily tracks
 
-## Public Reddit posts and discoverability
+- A **new track** becomes the featured race each day (day changes at midnight UTC)
+- Once a day’s track is posted, it **stays that track** — it does not get swapped later
+- Tracks stay playable for **7 days**, then drop out of the list
+- Each track card shows a preview, your best time, medals, and when that track expires
+- Your personal best (and ghost) for a track come back if that track returns on a later date
 
-- Daily Reddit post titles use `Mini Racer, {D MMM}: {track name}`, for example `Mini Racer, 12 Jul: Neon Apex`.
-- The post text fallback provides a readable explanation of Mini Racer, its controls, leaderboard, medal targets, and seven-day track availability for Google, Reddit search, Reddit Answers, and clients that cannot render the interactive post.
-- The richer discovery copy belongs to the text fallback; the visible Reddit title stays short and consistent.
+## Standings and sharing
 
-## Track availability
+- Standings show the full daily ranking as you scroll; **your rank stays visible** even if you are far down the list
+- On the finish screen: **Improve**, **Share Time**, and **Home**
+- In Standings: **Share Best** appears when you have a verified time for the day you are viewing
+- Shared results go to the post’s pinned **score thread**, as a comment from your Reddit account after you confirm
+- Sharing the same result again reuses the existing comment instead of posting a duplicate
 
-- A new track becomes the featured race each day.
-- Older tracks do not disappear immediately.
-- Tracks remain playable for 7 days, then expire and drop out of the list.
-- If a track is close to expiring, the game shows the remaining time directly on the track card.
+## First look on Reddit
 
-## Garage options
+The post preview shows today’s track, the gold-medal target, a car on the start line, and a **Race Now** button.
 
-The Garage lets players change how their car looks without changing handling.
+Older posts keep their original track while it is still available. If that day’s track has expired, opening the post takes you to **today’s** featured track instead.
 
-- `Car skins`: 12 selectable skins grouped into Mini, Cyberpunk, and Steampunk sets.
-- `Trails`: 8 route-trail options, including `No Trail`.
-- Selections and gameplay preferences are saved to the player's Reddit profile, so app updates do not reset them.
-
-## How a run works
-
-- Every attempt is a single lap.
-- Crossing the finish line completes the run.
-- Every wall collision becomes a momentum-losing scrape, so wall contact costs time but never ends the attempt.
-- `Collision Auto-Restart` is optional and off by default; enabling it starts a fresh attempt after the first scrape instead of continuing the current lap.
-- `Personal Best Ghost` is on by default and can be disabled in Settings.
-- If a server-verified completed lap is strictly faster than your previous best on that track, it becomes the ghost used on the next attempt.
-
-## Progress and competition
-
-- Your lifetime best time is shown for each available track, independently from that day's leaderboard result.
-- Standings load the complete ranked field as you scroll and keep your own rank visible even when it is outside the currently loaded rows.
-- Medals are earned by beating fixed target times on each track.
-- The finish screen offers `Improve`, `Share Time`, and `Home`. Standings offer `Share Best` when the player has a verified time for the selected day.
-- Every custom race post creates and pins its Mini Racer score thread as part of the same post action. Shared results are replies to that thread and are posted from the player's Reddit account only after confirmation. Repeating the same share reuses the existing comment instead of posting a duplicate.
-- The game is designed for fast retries, so improvement comes from learning braking points, corner shape, and clean exits.
-
-## First-time experience
-
-- The post preview marks the current track as `Today`, shows its gold-medal target time and medal, places the stock in-game car clearly past the starting line with a short trail behind it, and includes a `Race Now` button.
-- The full game opens with the post's playable track and personal-best ghost ready to play. Valid historical posts keep their original track; expired posts resolve to today's featured track and preload today's ghost instead.
-- The controls and goal are immediate: finish one clean lap as fast as possible.
+Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
 
 ## For moderators
 
-Mini Racer is meant to be installed in a subreddit and used to create playable posts for that community. Once installed, moderators can create a Mini Racer post from the subreddit menu. Moderator and scheduled creation both reuse one canonical post per community and UTC race day; every canonical post has one pinned Mini Racer score-thread comment for player result replies.
+Install Mini Racer in your subreddit, then use the subreddit menu:
+
+| Menu item | What it does |
+| --- | --- |
+| **Create Mini Racer post** | Creates a playable race post for today |
+| **Enable daily Mini Racer posts** | Auto-posts a new race each day (UTC) |
+| **Disable daily Mini Racer posts** | Stops the daily auto-posts |
+| **Open Mini Racer analytics** | Opens moderator-only analytics for the community |
+
+Tips:
+
+- Only **one** race post is used per community per day — creating again reuses that post instead of flooding the feed
+- Every race post gets a pinned **Mini Racer score thread** for player result comments
+- Players share scores as replies in that thread, from their own accounts
