@@ -150,7 +150,13 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     border: none;
     color: rgba(255, 255, 255);
     cursor: pointer;
-    transition: background-color 0.2s ease, color 0.15s ease;
+    transition:
+        background-color 0.2s ease,
+        color 0.15s ease,
+        opacity 0.18s ease,
+        filter 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.18s ease;
     gap: 0.85rem;
 }
 
@@ -268,15 +274,59 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     color: var(--text-color);
 }
 
+.main-menu.has-keyboard-menu-cue .main-menu__item:not(.is-menu-selected) {
+    opacity: 0.4;
+    filter: saturate(0.75);
+}
+
 .main-menu__item.is-menu-selected:not(.main-menu__item--primary) {
-    color: var(--text-color);
-    background: rgba(255, 255, 255, 0.14);
-    box-shadow: inset 3px 0 0 0 #fff, 0 0 0 2px rgba(255, 255, 255, 0.7);
+    color: #fff;
+    background: linear-gradient(
+        90deg,
+        rgba(239, 68, 68, 0.28) 0%,
+        rgba(239, 68, 68, 0.1) 42%,
+        rgba(255, 255, 255, 0.03) 100%
+    );
+    box-shadow:
+        inset 3px 0 0 0 var(--accent-color),
+        0 0 18px rgba(239, 68, 68, 0.18);
+}
+
+.main-menu__item.is-menu-selected:not(.main-menu__item--primary)::after {
+    content: "";
+    position: absolute;
+    left: 0.15rem;
+    top: 50%;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 2px solid var(--accent-color);
+    border-bottom: 2px solid var(--accent-color);
+    transform: translateY(-50%) rotate(-45deg);
+    pointer-events: none;
+}
+
+.main-menu__item.is-menu-selected:not(.main-menu__item--primary) .main-menu__label {
+    color: #fff;
+    letter-spacing: 0.14em;
+}
+
+.main-menu__item.is-menu-selected:not(.main-menu__item--primary) .main-menu__icon {
+    color: var(--accent-color);
+    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.55));
 }
 
 .main-menu__item--primary.is-menu-selected {
-    filter: brightness(1.08);
-    box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(255, 255, 255, 0.35);
+    filter: brightness(1.1) saturate(1.08);
+    box-shadow:
+        0 0 0 2px rgba(15, 23, 42, 0.95),
+        0 0 0 4px #fff,
+        0 0 0 7px var(--accent-color),
+        0 10px 28px rgba(239, 68, 68, 0.45);
+    transform: translateY(-1px);
+}
+
+.main-menu__item--primary.is-menu-selected .start-btn-main {
+    text-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
 }
 
 .main-menu__item:active {

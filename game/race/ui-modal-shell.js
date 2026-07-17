@@ -27,7 +27,6 @@ import {
     createMenuKeyboardState,
     handleMenuListKeydown,
     resetMenuKeyboardState,
-    selectMenuButton,
 } from '../ui/menu-keyboard-nav.js';
 
 function isButtonElement(node) {
@@ -103,7 +102,6 @@ export class ModalShell {
     }
 
     getActiveMenuActionsRoot() {
-        if (!this.isModalActive()) return null;
         if (this._modalKind === 'pause' && this.modalPauseView?.classList.contains('active-view')) {
             return this.modalPauseView.querySelector('.combined-actions');
         }
@@ -115,20 +113,20 @@ export class ModalShell {
 
     resetMenuKeyboardNav() {
         const root = this.getActiveMenuActionsRoot();
-        const buttons = collectVisibleActionButtons(root);
-        resetMenuKeyboardState(this._menuKeyboardState, buttons);
-    }
-
-    selectDefaultMenuItem() {
-        const root = this.getActiveMenuActionsRoot();
-        const buttons = collectVisibleActionButtons(root);
-        if (!buttons.length) return;
-
-        const preferred = this.getModalPreferredFocusTarget();
-        const target = preferred && buttons.includes(preferred)
-            ? preferred
-            : buttons[0];
-        selectMenuButton(buttons, target, this._menuKeyboardState);
+        const buttons = collectVisibleActionButtons(root, ':scope > button', {
+            requireLaidOut: false,
+        });
+        const preferred = this._modalKind === 'pause'
+            ? this.modalResumeBtn
+            : this._modalKind === 'win'
+                ? this.combinedRestartBtn
+                : null;
+        const preferredIndex = preferred ? buttons.indexOf(preferred) : -1;
+        resetMenuKeyboardState(this._menuKeyboardState, buttons, {
+            preferredIndex: preferredIndex >= 0 ? preferredIndex : null,
+            container: root,
+            focusPreferred: true,
+        });
     }
 
     _setActiveView(view) {
@@ -567,11 +565,11 @@ export class ModalShell {
         this._syncGarageButtonToPanelState();
 
         this._setActiveView(this.modalPauseView);
-        this.resetMenuKeyboardNav();
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => {
             this._syncPauseTrackPreview(options.pauseTrackPreview);
+            this.resetMenuKeyboardNav();
             this.activateModalFocusTrap(this.modal);
         });
     }
@@ -673,7 +671,6 @@ export class ModalShell {
         }
 
         this._setActiveView(this.modalCombinedView);
-        this.resetMenuKeyboardNav();
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
 
@@ -699,7 +696,10 @@ export class ModalShell {
             playUnlockSound
         });
 
-        scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
+        scheduleAfterModalPaint(() => {
+            this.resetMenuKeyboardNav();
+            this.activateModalFocusTrap(this.modal);
+        });
     }
 
     showRunsModal(lapTimesArray, bestTime, currentTime = null, returnMode = 'close', {
@@ -947,9 +947,6 @@ export class ModalShell {
             : null;
         if (preferredFocus) preferredFocus.focus();
         else if (focusables.length) focusables[0].focus();
-        if (modalEl === this.modal) {
-            this.selectDefaultMenuItem();
-        }
         this._modalTrapKeydown = (event) => this.handleModalTrapKeydown(event);
         document.addEventListener('keydown', this._modalTrapKeydown, true);
     }
@@ -1030,6 +1027,7 @@ export class ModalShell {
             if (handleMenuListKeydown(event, {
                 buttons: menuButtons,
                 state: this._menuKeyboardState,
+                container: menuActionsRoot,
             })) {
                 return;
             }

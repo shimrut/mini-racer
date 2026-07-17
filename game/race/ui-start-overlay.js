@@ -3,7 +3,6 @@ import {
     createMenuKeyboardState,
     handleMenuListKeydown,
     resetMenuKeyboardState,
-    selectMenuButton,
 } from '../ui/menu-keyboard-nav.js';
 
 const BLOCKING_OVERLAY_IDS = [
@@ -67,19 +66,13 @@ export class StartOverlay {
     }
 
     resetLobbyMenuKeyboardNav() {
-        resetMenuKeyboardState(this._menuKeyboardState, this.getLobbyMenuButtons());
-    }
-
-    selectDefaultLobbyItem() {
-        if (!this.isStartOverlayVisible()) return;
         const buttons = this.getLobbyMenuButtons();
-        if (!buttons.length) return;
-
-        const startBtn = this.startBtn;
-        const preferred = startBtn && !startBtn.disabled && buttons.includes(startBtn)
-            ? startBtn
-            : buttons[buttons.length - 1];
-        selectMenuButton(buttons, preferred, this._menuKeyboardState);
+        const preferredIndex = buttons.indexOf(this.startBtn);
+        resetMenuKeyboardState(this._menuKeyboardState, buttons, {
+            preferredIndex: preferredIndex >= 0 ? preferredIndex : null,
+            container: this.mainMenu,
+            focusPreferred: true,
+        });
     }
 
     bindKeyboardNavigation() {
@@ -96,6 +89,7 @@ export class StartOverlay {
         handleMenuListKeydown(event, {
             buttons,
             state: this._menuKeyboardState,
+            container: this.mainMenu,
         });
     }
 
@@ -106,10 +100,8 @@ export class StartOverlay {
         if (group) group.style.display = "flex";
         this.setStartOverlayActive(true);
         this.updateStartOverlayMode(hasAnyData, isReturningPlayer);
-        requestAnimationFrame(() => {
-            this.focusPrimaryAction();
-            this.selectDefaultLobbyItem();
-        });
+        this.resetLobbyMenuKeyboardNav();
+        requestAnimationFrame(() => this.focusPrimaryAction());
     }
 
     hideStartOverlay() {
@@ -163,10 +155,7 @@ export class StartOverlay {
         }
         this.setStartSelectionMode(false);
         if (isOverlayVisible) {
-            requestAnimationFrame(() => {
-                this.focusPrimaryAction();
-                this.selectDefaultLobbyItem();
-            });
+            requestAnimationFrame(() => this.focusPrimaryAction());
         }
     }
 
@@ -209,10 +198,7 @@ export class StartOverlay {
             overlay.classList.toggle('is-ready', Boolean(isReady));
         }
         if (isReady) {
-            requestAnimationFrame(() => {
-                this.focusPrimaryAction();
-                this.selectDefaultLobbyItem();
-            });
+            requestAnimationFrame(() => this.focusPrimaryAction());
         }
     }
 }

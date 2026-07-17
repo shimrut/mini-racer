@@ -6,12 +6,12 @@ import {
     getMenuNavDelta,
     handleMenuListKeydown,
     resetMenuKeyboardState,
-    selectMenuButton,
 } from '../game/ui/menu-keyboard-nav.js';
 
-function makeButton(id, { disabled = false } = {}) {
+function makeButton(id, { disabled = false, primary = false } = {}) {
+    const classNames = new Set(primary ? ['main-menu__item--primary'] : []);
     const classList = {
-        values: new Set(),
+        values: classNames,
         add(name) { this.values.add(name); },
         remove(name) { this.values.delete(name); },
         contains(name) { return this.values.has(name); },
@@ -54,26 +54,70 @@ describe('menu keyboard nav helper', () => {
         expect(getMenuNavDelta('Enter')).toBe(0);
     });
 
-    it('selects the first item on first ArrowDown when nothing is focused', () => {
-        const buttons = [makeButton('a'), makeButton('b'), makeButton('c')];
+    it('defaults to the preferred item for Enter without showing a cue', () => {
+        const buttons = [
+            makeButton('standings'),
+            makeButton('tracks'),
+            makeButton('race', { primary: true }),
+        ];
         const state = createMenuKeyboardState();
-        const event = makeEvent('ArrowDown');
+        resetMenuKeyboardState(state, buttons, { preferredIndex: 2 });
 
+        expect(state.keyboardNavActive).toBe(false);
+        expect(state.selectedIndex).toBe(2);
+        expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+        expect(buttons[2].focus).toHaveBeenCalled();
+
+        const event = makeEvent('Enter');
         expect(handleMenuListKeydown(event, {
             buttons,
             state,
             getActiveElement: () => null,
         })).toBe(true);
-
-        expect(state.keyboardNavActive).toBe(true);
-        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
-        expect(buttons[0].focus).toHaveBeenCalled();
-        expect(event.preventDefault).toHaveBeenCalled();
+        expect(buttons[2].click).toHaveBeenCalled();
+        expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 
-    it('moves from the focused item and wraps around', () => {
+    it('shows the selection cue only after the first move key', () => {
+        const buttons = [
+            makeButton('standings'),
+            makeButton('tracks'),
+            makeButton('race', { primary: true }),
+        ];
+        const state = createMenuKeyboardState();
+        const container = {
+            classList: {
+                values: new Set(),
+                add(name) { this.values.add(name); },
+                remove(name) { this.values.delete(name); },
+                contains(name) { return this.values.has(name); },
+                toggle(name, force) {
+                    if (force) this.values.add(name);
+                    else this.values.delete(name);
+                    return force;
+                },
+            },
+        };
+        resetMenuKeyboardState(state, buttons, { preferredIndex: 2, container });
+
+        handleMenuListKeydown(makeEvent('ArrowUp'), {
+            buttons,
+            state,
+            container,
+            getActiveElement: () => buttons[2],
+        });
+
+        expect(state.keyboardNavActive).toBe(true);
+        expect(state.selectedIndex).toBe(1);
+        expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+        expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+        expect(container.classList.contains('has-keyboard-menu-cue')).toBe(true);
+    });
+
+    it('wraps from the last item to the first on ArrowDown', () => {
         const buttons = [makeButton('a'), makeButton('b'), makeButton('c')];
         const state = createMenuKeyboardState();
+        state.selectedIndex = 2;
 
         handleMenuListKeydown(makeEvent('ArrowDown'), {
             buttons,
@@ -82,12 +126,13 @@ describe('menu keyboard nav helper', () => {
         });
 
         expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
-        expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 
-    it('activates the selected item on Enter', () => {
+    it('activates the cued item on Enter', () => {
         const buttons = [makeButton('a'), makeButton('b')];
         const state = createMenuKeyboardState();
+        state.selectedIndex = 1;
+        state.keyboardNavActive = true;
         applyMenuSelection(buttons, 1, { showCue: true });
         const event = makeEvent('Enter');
 
@@ -101,27 +146,17 @@ describe('menu keyboard nav helper', () => {
         expect(event.preventDefault).toHaveBeenCalled();
     });
 
-    it('selects a preferred default button with the cue visible', () => {
-        const buttons = [makeButton('a'), makeButton('b'), makeButton('c')];
-        const state = createMenuKeyboardState();
-
-        selectMenuButton(buttons, buttons[1], state);
-
-        expect(state.keyboardNavActive).toBe(true);
-        expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
-        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
-        expect(buttons[1].focus).toHaveBeenCalled();
-    });
-
-    it('clears selection state on reset', () => {
-        const buttons = [makeButton('a'), makeButton('b')];
+    it('clears the cue on reset while keeping a preferred index', () => {
+        const buttons = [makeButton('a'), makeButton('b', { primary: true })];
         const state = createMenuKeyboardState();
         state.keyboardNavActive = true;
         applyMenuSelection(buttons, 0, { showCue: true });
 
-        resetMenuKeyboardState(state, buttons);
+        resetMenuKeyboardState(state, buttons, { preferredIndex: 1 });
 
         expect(state.keyboardNavActive).toBe(false);
+        expect(state.selectedIndex).toBe(1);
         expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+        expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 });
