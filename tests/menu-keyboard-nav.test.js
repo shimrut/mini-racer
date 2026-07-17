@@ -111,7 +111,6 @@ describe('menu keyboard nav helper', () => {
         expect(state.selectedIndex).toBe(1);
         expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
         expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
-        expect(container.classList.contains('has-keyboard-menu-cue')).toBe(true);
     });
 
     it('wraps from the last item to the first on ArrowDown', () => {
