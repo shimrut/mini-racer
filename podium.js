@@ -2,6 +2,7 @@ import { TRACKS } from './game/track/tracks.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
 import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
+import { requestFeaturedDailyChallengeStart } from './game/daily-challenge/service.js';
 
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
@@ -176,8 +177,28 @@ async function boot() {
     const podium = renderPodium(document, readPodiumPostData());
     // Paint the track immediately — do not wait on avatar backfill or the car sprite.
     renderPodiumTrack(podium.trackName);
+    bindPodiumPlayNow(document);
     const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
     if (hydrated !== podium) renderPodium(document, hydrated);
+}
+
+export function bindPodiumPlayNow(documentRef) {
+    const playButton = documentRef?.getElementById('podium-play');
+    if (!playButton || playButton.dataset.bound === '1') return playButton || null;
+    playButton.dataset.bound = '1';
+    playButton.addEventListener('click', openFeaturedGameFromPodium);
+    return playButton;
+}
+
+async function openFeaturedGameFromPodium(event) {
+    requestFeaturedDailyChallengeStart();
+    try {
+        // Hosted custom posts only; local podium-test.html has no Devvit client.
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        await requestExpandedMode(event, 'game');
+    } catch (error) {
+        console.error('Failed to open today\'s featured Mini Racer track from the podium:', error);
+    }
 }
 
 let trackCarPromise = null;

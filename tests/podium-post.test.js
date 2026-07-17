@@ -1,11 +1,25 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    bindPodiumPlayNow,
     hydrateMissingRedditAvatars,
     normalizePodium,
     readPodiumPostData,
     renderPodium,
 } from '../podium.js';
+import { requestFeaturedDailyChallengeStart } from '../game/daily-challenge/service.js';
+
+vi.mock('../game/daily-challenge/service.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        requestFeaturedDailyChallengeStart: vi.fn(),
+    };
+});
+
+vi.mock('@devvit/web/client', () => ({
+    requestExpandedMode: vi.fn(async () => undefined),
+}));
 
 const OFFICIAL_REDDIT_SNOO_URL =
     'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
@@ -23,6 +37,7 @@ function createDocument() {
                 </li>
             `).join('')}
         </ol>
+        <button id="podium-play" type="button">Play Now</button>
     `).window.document;
 }
 
@@ -137,5 +152,19 @@ describe('podium custom post', () => {
             avatarUrl: 'https://styles.redditmedia.com/shimroot.png',
         });
         expect(hydrated.positions[1].avatarUrl).toBe(OFFICIAL_REDDIT_SNOO_URL);
+    });
+
+    it('Play Now requests today\'s featured track and opens the game entry', async () => {
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        const document = createDocument();
+        const button = bindPodiumPlayNow(document);
+        expect(button).toBeTruthy();
+
+        button.click();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(requestFeaturedDailyChallengeStart).toHaveBeenCalledOnce();
+        expect(requestExpandedMode).toHaveBeenCalledWith(expect.any(Object), 'game');
     });
 });
