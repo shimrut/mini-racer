@@ -1578,30 +1578,6 @@ export async function submitServerDailyGpRun({
             },
         };
     }
-    // Seed from a retained verified daily result before evaluating this replay.
-    // This prevents a slower retry from becoming the lifetime track PB during
-    // the feature's time-only migration window.
-    let trackPbResult: Awaited<ReturnType<typeof upsertPlayerTrackPersonalBest>>;
-    try {
-        await readOrSeedTrackPersonalBest({
-            playerId: normalizedPlayerId,
-            isGuest: Boolean(identity.guestPlayerId),
-            challenge,
-        });
-        trackPbResult = await upsertPlayerTrackPersonalBest({
-            playerId: normalizedPlayerId,
-            isGuest: Boolean(identity.guestPlayerId),
-            trackKey: challenge.trackKey,
-            track,
-            bestTimeMs: nextBestTimeMs,
-            checkpointTimesSec: normalizedCheckpointTimesSec,
-            ghost: strictReplayOutcome.run.ghost ?? null,
-        });
-    } catch (error) {
-        await releaseSubmissionLock(submissionLock);
-        throw error;
-    }
-
     const nextEntry: DailyGpLeaderboardEntry = {
         playerId: normalizedPlayerId,
         trackKey: challenge.trackKey,
@@ -1613,70 +1589,111 @@ export async function submitServerDailyGpRun({
         strictReplayFailureReason: null,
     };
 
+    let previousEntry: DailyGpLeaderboardEntry | null = null;
+    let dailyPersistence: PromiseSettledResult<{
+        interrupted: boolean;
+        improved: boolean;
+        entry: DailyGpLeaderboardEntry;
+    }>;
+    let trackPbPersistence: PromiseSettledResult<Awaited<ReturnType<typeof upsertPlayerTrackPersonalBest>>>;
     try {
-        const previousEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
-        if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
-            return {
-                status: 200,
-                body: {
-                    accepted: true,
-                    improved: false,
-                    bestTimeMs: previousEntry.bestTimeMs,
-                    trackBestTimeMs: trackPbResult.record.bestTimeMs,
-                    trackPbImproved: trackPbResult.improved,
-                    trackGhostAvailable: Boolean(trackPbResult.record.ghost),
-                    completedLaps: null,
-                    checkpointTimesSec: previousEntry.checkpointTimesSec ?? null,
-                    validationMethod: previousEntry.validationMethod ?? 'strict-replay',
-                    strictReplayFailureReason: previousEntry.strictReplayFailureReason ?? null,
-                },
-            };
-        }
+        previousEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
+        const dailyWrite = async () => {
+            if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
+                return { interrupted: false, improved: false, entry: previousEntry };
+            }
 
-        const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
-        const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
-        const tx = await redis.watch(submissionLock.key);
-        await tx.multi();
-        await tx.hSet(
-            entryHashKey,
-            { [normalizedPlayerId]: JSON.stringify(nextEntry) },
-        );
-        await tx.zAdd(
-            leaderboardKey,
-            {
-                member: normalizedPlayerId,
-                score: encodeDailyGpLeaderboardScore(nextBestTimeMs),
-            },
-        );
-        await tx.expire(leaderboardKey, DAILY_GP_REDIS_TTL_SECONDS);
-        await tx.expire(entryHashKey, DAILY_GP_REDIS_TTL_SECONDS);
-        const transactionResults = await tx.exec();
-        if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
-            return {
-                status: 503,
-                body: {
-                    accepted: false,
-                    error: 'Submission save was interrupted. Retrying automatically.',
+            const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
+            const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
+            const tx = await redis.watch(submissionLock.key);
+            await tx.multi();
+            await tx.hSet(
+                entryHashKey,
+                { [normalizedPlayerId]: JSON.stringify(nextEntry) },
+            );
+            await tx.zAdd(
+                leaderboardKey,
+                {
+                    member: normalizedPlayerId,
+                    score: encodeDailyGpLeaderboardScore(nextBestTimeMs),
                 },
+            );
+            await tx.expire(leaderboardKey, DAILY_GP_REDIS_TTL_SECONDS);
+            await tx.expire(entryHashKey, DAILY_GP_REDIS_TTL_SECONDS);
+            const transactionResults = await tx.exec();
+            return {
+                interrupted: !Array.isArray(transactionResults) || transactionResults.length === 0,
+                improved: true,
+                entry: nextEntry,
             };
-        }
+        };
+        const retainedPersonalBest = previousEntry?.validationMethod === 'strict-replay'
+            ? {
+                bestTimeMs: previousEntry.bestTimeMs,
+                checkpointTimesSec: previousEntry.checkpointTimesSec,
+                updatedAt: previousEntry.updatedAt,
+            }
+            : null;
+        [dailyPersistence, trackPbPersistence] = await Promise.allSettled([
+            dailyWrite(),
+            upsertPlayerTrackPersonalBest({
+                playerId: normalizedPlayerId,
+                isGuest: Boolean(identity.guestPlayerId),
+                trackKey: challenge.trackKey,
+                track,
+                bestTimeMs: nextBestTimeMs,
+                checkpointTimesSec: normalizedCheckpointTimesSec,
+                ghost: strictReplayOutcome.run.ghost ?? null,
+                retainedPersonalBest,
+            }),
+        ]);
     } finally {
-        await releaseSubmissionLock(submissionLock);
+        try {
+            await releaseSubmissionLock(submissionLock);
+        } catch (error) {
+            // Lock cleanup is best-effort; it must not replace a committed outcome.
+            console.error('Daily GP submission lock cleanup failed:', error);
+        }
     }
 
+    if (dailyPersistence!.status === 'rejected') {
+        throw dailyPersistence!.reason;
+    }
+    if (dailyPersistence!.value.interrupted) {
+        return {
+            status: 503,
+            body: {
+                accepted: false,
+                error: 'Submission save was interrupted. Retrying automatically.',
+            },
+        };
+    }
+
+    const storedDailyEntry = dailyPersistence!.value.entry;
+    const trackPbAvailable = trackPbPersistence!.status === 'fulfilled';
+    if (!trackPbAvailable) {
+        console.error('Lifetime PB persistence failed after a valid Daily GP run:', trackPbPersistence!.reason);
+    }
+    const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
     return {
         status: 200,
         body: {
             accepted: true,
-            improved: true,
-            bestTimeMs: nextBestTimeMs,
-            trackBestTimeMs: trackPbResult.record.bestTimeMs,
-            trackPbImproved: trackPbResult.improved,
-            trackGhostAvailable: Boolean(trackPbResult.record.ghost),
-            completedLaps: strictReplayOutcome.run.completedLaps,
-            checkpointTimesSec: nextEntry.checkpointTimesSec,
-            validationMethod: nextEntry.validationMethod,
-            strictReplayFailureReason: nextEntry.strictReplayFailureReason,
+            improved: dailyPersistence!.value.improved,
+            bestTimeMs: storedDailyEntry.bestTimeMs,
+            trackPbPersistenceStatus: trackPbAvailable
+                ? (trackPbResult!.improved ? 'stored' : 'unchanged')
+                : 'unavailable',
+            trackPersonalBest: trackPbResult?.record ?? null,
+            trackBestTimeMs: trackPbResult?.record.bestTimeMs ?? null,
+            trackPbImproved: trackPbResult?.improved ?? false,
+            trackGhostAvailable: Boolean(trackPbResult?.record.ghost),
+            completedLaps: dailyPersistence!.value.improved
+                ? strictReplayOutcome.run.completedLaps
+                : null,
+            checkpointTimesSec: storedDailyEntry.checkpointTimesSec ?? null,
+            validationMethod: storedDailyEntry.validationMethod ?? 'strict-replay',
+            strictReplayFailureReason: storedDailyEntry.strictReplayFailureReason ?? null,
         },
     };
 }

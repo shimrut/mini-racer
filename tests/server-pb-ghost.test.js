@@ -46,6 +46,10 @@ vi.mock('@devvit/redis', () => ({
 import {
     createPbGhostTraceRecorder,
     createTrackFingerprint,
+    getPbGhostTraceSampleCount,
+    isValidPbGhostTrace,
+    PB_GHOST_MAX_SAMPLES,
+    PB_GHOST_SAMPLE_INTERVAL_MS,
     PB_GHOST_SAMPLE_RATE_HZ,
 } from '../src/server/pb-ghost-trace.ts';
 import {
@@ -64,12 +68,11 @@ const TRACK = {
 };
 
 const GHOST = {
-    schemaVersion: 1,
-    sampleRateHz: PB_GHOST_SAMPLE_RATE_HZ,
-    samples: [
-        [0, 0, -1000, 0],
-        [1000, 1000, 0, 100],
-    ],
+    schemaVersion: 2,
+    sampleIntervalMs: PB_GHOST_SAMPLE_INTERVAL_MS,
+    finishTimeMs: 50,
+    origin: [0, -100, 0],
+    deltas: [100, 100, 100],
 };
 
 describe('PB ghost trace and storage', () => {
@@ -99,10 +102,119 @@ describe('PB ghost trace and storage', () => {
             angle: 0.75,
         });
 
-        expect(trace.sampleRateHz).toBe(20);
-        expect(trace.samples[0]).toEqual([0, 0, 0, 0]);
-        expect(trace.samples.at(-1)).toEqual([1012, 9000, 8000, 750]);
-        expect(trace.samples.length).toBe(22);
+        expect(trace).toMatchObject({
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: 1012,
+            origin: [0, 0, 0],
+        });
+        expect(getPbGhostTraceSampleCount(trace)).toBe(22);
+        const final = trace.deltas.reduce((pose, value, index) => {
+            pose[index % 3] += value;
+            return pose;
+        }, [...trace.origin]);
+        expect(final).toEqual([900, 800, 750]);
+    });
+
+    it('cuts a representative 12-second trace to less than half the legacy JSON size', () => {
+        const poseAt = (timeSec) => ({
+            timeSec,
+            position: {
+                x: 50 + 30 * Math.cos(timeSec * 0.7),
+                y: 40 + 25 * Math.sin(timeSec * 0.7),
+            },
+            angle: Math.atan2(
+                17.5 * Math.cos(timeSec * 0.7),
+                -21 * Math.sin(timeSec * 0.7),
+            ),
+        });
+        const recorder = createPbGhostTraceRecorder(poseAt(0));
+        for (let frame = 1; frame <= 12 * 60; frame += 1) {
+            recorder.sample(poseAt(frame / 60));
+        }
+        const trace = recorder.finish(poseAt(12));
+        const legacy = {
+            schemaVersion: 1,
+            sampleRateHz: 20,
+            samples: Array.from({ length: 12 * 20 + 1 }, (_, index) => {
+                const pose = poseAt(index / 20);
+                return [
+                    index * 50,
+                    Math.round(pose.position.x * 1000),
+                    Math.round(pose.position.y * 1000),
+                    Math.round(pose.angle * 1000),
+                ];
+            }),
+        };
+
+        expect(Buffer.byteLength(JSON.stringify(trace), 'utf8'))
+            .toBeLessThan(Buffer.byteLength(JSON.stringify(legacy), 'utf8') * 0.5);
+    });
+
+    it('uses the shortest angular delta across the wrap boundary', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 1, y: 1 },
+            angle: 3.13,
+        });
+        recorder.sample({
+            timeSec: 0.05,
+            position: { x: 0.9, y: 0.8 },
+            angle: -3.13,
+        });
+        const trace = recorder.finish({
+            timeSec: 0.05,
+            position: { x: 0.9, y: 0.8 },
+            angle: -3.13,
+        });
+
+        expect(trace.origin).toEqual([100, 100, 3130]);
+        expect(trace.deltas).toEqual([-10, -20, 23]);
+    });
+
+    it('validates negative deltas, timing, point limits and encoded size', () => {
+        expect(isValidPbGhostTrace({
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: 50,
+            origin: [100, 100, 100],
+            deltas: [-10, -20, -30],
+        })).toBe(true);
+        expect(isValidPbGhostTrace({
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: 51,
+            origin: [0, 0, 0],
+            deltas: [0, 0, 0],
+        })).toBe(false);
+        expect(isValidPbGhostTrace({
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: 50,
+            origin: [0, 0, 0],
+            deltas: [0, 0],
+        })).toBe(false);
+        expect(isValidPbGhostTrace({
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: (PB_GHOST_MAX_SAMPLES - 1) * 50,
+            origin: [0, 0, 0],
+            deltas: Array((PB_GHOST_MAX_SAMPLES - 1) * 3).fill(0),
+        })).toBe(true);
+        expect(isValidPbGhostTrace({
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: PB_GHOST_MAX_SAMPLES * 50,
+            origin: [0, 0, 0],
+            deltas: Array(PB_GHOST_MAX_SAMPLES * 3).fill(0),
+        })).toBe(false);
+        expect(isValidPbGhostTrace({
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: (PB_GHOST_MAX_SAMPLES - 1) * 50,
+            origin: [0, 0, 0],
+            deltas: Array((PB_GHOST_MAX_SAMPLES - 1) * 3).fill(1_000_000_000),
+        })).toBe(false);
     });
 
     it('keeps only the strictly faster per-track record', async () => {
@@ -130,6 +242,107 @@ describe('PB ghost trace and storage', () => {
         expect(slower.record.bestTimeMs).toBe(12_000);
         expect(slower.record.ghost).toEqual(GHOST);
         expect(redis.expire).not.toHaveBeenCalled();
+    });
+
+    it('selects a retained strict daily best and the current verified ghost under one lock', async () => {
+        const retained = await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:retained',
+            isGuest: false,
+            trackKey: 'circuit',
+            track: TRACK,
+            bestTimeMs: 13_000,
+            checkpointTimesSec: [5, 9],
+            ghost: GHOST,
+            retainedPersonalBest: {
+                bestTimeMs: 12_000,
+                checkpointTimesSec: [4, 8],
+                updatedAt: '2026-07-01T00:00:00.000Z',
+            },
+        });
+
+        expect(retained.improved).toBe(false);
+        expect(retained.record).toMatchObject({
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            ghost: null,
+            updatedAt: '2026-07-01T00:00:00.000Z',
+        });
+
+        redis.strings.clear();
+        redis.hashes.clear();
+        const tied = await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:tied',
+            isGuest: false,
+            trackKey: 'circuit',
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4.1, 8.1],
+            ghost: GHOST,
+            retainedPersonalBest: {
+                bestTimeMs: 12_000,
+                checkpointTimesSec: [4, 8],
+                updatedAt: '2026-07-01T00:00:00.000Z',
+            },
+        });
+
+        expect(tied.improved).toBe(true);
+        expect(tied.record).toMatchObject({
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4.1, 8.1],
+            ghost: GHOST,
+        });
+    });
+
+    it('enriches an equal time-only record with the current verified ghost', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:enriched',
+            isGuest: false,
+            trackKey: 'circuit',
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            ghost: null,
+        });
+
+        const result = await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:enriched',
+            isGuest: false,
+            trackKey: 'circuit',
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4.1, 8.1],
+            ghost: GHOST,
+            retainedPersonalBest: {
+                bestTimeMs: 13_000,
+                checkpointTimesSec: [5, 9],
+                updatedAt: '2026-07-01T00:00:00.000Z',
+            },
+        });
+
+        expect(result.improved).toBe(true);
+        expect(result.record).toMatchObject({
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4.1, 8.1],
+            ghost: GHOST,
+        });
+    });
+
+    it('does not let lock cleanup errors replace a committed PB outcome', async () => {
+        redis.get.mockRejectedValueOnce(new Error('cleanup unavailable'));
+
+        await expect(upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:cleanup',
+            isGuest: false,
+            trackKey: 'circuit',
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            ghost: GHOST,
+        })).resolves.toMatchObject({
+            improved: true,
+            record: { bestTimeMs: 12_000, ghost: GHOST },
+        });
+        expect(redis.hSet).toHaveBeenCalled();
     });
 
     it('applies rolling retention only to guest collections', async () => {

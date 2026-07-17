@@ -176,6 +176,17 @@ function renderSummary(data) {
     ]);
     renderBreakdown('language-breakdown', buildTopBreakdownRows(totals.context?.languages, prettifyLanguageKey, 6));
     renderBreakdown('timezone-breakdown', buildTopBreakdownRows(totals.context?.timezones, prettifyTimezoneKey, 6));
+    renderBreakdown('ghost-readiness-breakdown', [
+        { label: 'Readiness checks', value: totals.ghostReadiness?.total },
+        { label: 'Ready before GO', value: totals.ghostReadiness?.readyBeforeGo },
+        { label: 'Ghostless at GO', value: totals.ghostReadiness?.ghostlessAtGo },
+        { label: 'Notice shown', value: totals.ghostReadiness?.noticeShown },
+        ...buildTopBreakdownRows(totals.ghostReadiness?.finishToGhostReadyBuckets, (value) => `Finish to ready: ${prettifyGhostBucket(value)}`, 6),
+        ...buildTopBreakdownRows(totals.ghostReadiness?.finishToGhostReadyByPlatform, (value) => `Latency/platform: ${prettifyGhostBucket(value)}`, 4),
+        ...buildTopBreakdownRows(totals.ghostReadiness?.finishToGhostReadyByClientVersion, (value) => `Latency/version: ${prettifyGhostBucket(value)}`, 4),
+        ...buildTopBreakdownRows(totals.ghostReadiness?.goSafetyMarginBuckets, (value) => `GO margin: ${prettifyGhostBucket(value)}`, 4),
+        ...buildTopBreakdownRows(totals.ghostReadiness?.platforms, (value) => `At GO: ${prettifyPlatformKey(value)}`, 4),
+    ]);
     renderTrackRows(totals.tracks || {});
     renderPeriodChart(days, granularity);
 }
@@ -204,6 +215,7 @@ function renderErrorState() {
     renderBreakdown('screen-breakdown', []);
     renderBreakdown('language-breakdown', []);
     renderBreakdown('timezone-breakdown', []);
+    renderBreakdown('ghost-readiness-breakdown', []);
     renderTrackRows({});
     renderPeriodChart([], 'day');
 }
@@ -450,6 +462,18 @@ function sumDays(days) {
             improveWin: 0,
             unknown: 0,
         },
+        ghostReadiness: {
+            total: 0,
+            readyBeforeGo: 0,
+            ghostlessAtGo: 0,
+            noticeShown: 0,
+            finishToGhostReadyBuckets: {},
+            finishToGhostReadyByPlatform: {},
+            finishToGhostReadyByClientVersion: {},
+            goSafetyMarginBuckets: {},
+            platforms: {},
+            clientVersions: {},
+        },
         tracks: {},
         context: {
             platforms: {},
@@ -477,6 +501,34 @@ function sumDays(days) {
         totals.restarts.manualCrash += toNumber(day.restarts?.manualCrash);
         totals.restarts.improveWin += toNumber(day.restarts?.improveWin);
         totals.restarts.unknown += toNumber(day.restarts?.unknown);
+        totals.ghostReadiness.total += toNumber(day.ghostReadiness?.total);
+        totals.ghostReadiness.readyBeforeGo += toNumber(day.ghostReadiness?.readyBeforeGo);
+        totals.ghostReadiness.ghostlessAtGo += toNumber(day.ghostReadiness?.ghostlessAtGo);
+        totals.ghostReadiness.noticeShown += toNumber(day.ghostReadiness?.noticeShown);
+        totals.ghostReadiness.finishToGhostReadyBuckets = mergeNumberMaps(
+            totals.ghostReadiness.finishToGhostReadyBuckets,
+            day.ghostReadiness?.finishToGhostReadyBuckets,
+        );
+        totals.ghostReadiness.finishToGhostReadyByPlatform = mergeNumberMaps(
+            totals.ghostReadiness.finishToGhostReadyByPlatform,
+            day.ghostReadiness?.finishToGhostReadyByPlatform,
+        );
+        totals.ghostReadiness.finishToGhostReadyByClientVersion = mergeNumberMaps(
+            totals.ghostReadiness.finishToGhostReadyByClientVersion,
+            day.ghostReadiness?.finishToGhostReadyByClientVersion,
+        );
+        totals.ghostReadiness.goSafetyMarginBuckets = mergeNumberMaps(
+            totals.ghostReadiness.goSafetyMarginBuckets,
+            day.ghostReadiness?.goSafetyMarginBuckets,
+        );
+        totals.ghostReadiness.platforms = mergeNumberMaps(
+            totals.ghostReadiness.platforms,
+            day.ghostReadiness?.platforms,
+        );
+        totals.ghostReadiness.clientVersions = mergeNumberMaps(
+            totals.ghostReadiness.clientVersions,
+            day.ghostReadiness?.clientVersions,
+        );
 
         for (const [trackKey, track] of Object.entries(day.tracks || {})) {
             const current = totals.tracks[trackKey] || { played: 0, raceEnds: {}, restarts: {} };
@@ -705,4 +757,8 @@ function prettifyTimezoneKey(value) {
         .split('/')
         .map((part) => part.replace(/_/g, ' '))
         .join(' / ') || 'Unknown';
+}
+
+function prettifyGhostBucket(value) {
+    return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase()) || 'Unknown';
 }

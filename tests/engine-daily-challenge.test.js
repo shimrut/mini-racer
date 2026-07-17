@@ -455,6 +455,34 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.scheduleVerificationQueueProcessing).not.toHaveBeenCalled();
   });
 
+  it("starts verification processing synchronously when the finish is queued", () => {
+    const callOrder = [];
+    const engine = {
+      currentTrackKey: "circuit",
+      currentChallengeRun: { challengeId: "daily-1", trackKey: "circuit" },
+      dailyChallengeUi: {
+        refreshDailyChallengeVerificationState: vi.fn(() => callOrder.push("refresh")),
+      },
+      markTrackPersonalBestGhostPending: vi.fn(() => callOrder.push("mark-pending")),
+      processVerificationQueue: vi.fn(() => {
+        callOrder.push("submit-started");
+        return Promise.resolve();
+      }),
+      scheduleVerificationQueueProcessing: vi.fn(),
+    };
+
+    expect(RealTimeRacer.prototype.enqueueDailyChallengeVerificationSubmission.call(engine, {
+      challenge: { id: "daily-1", trackKey: "circuit", objectiveType: "single_lap_fastest" },
+      bestTime: 10,
+      completedLaps: 1,
+      replay: { inputs: [{ frames: 600, left: false, right: false }] },
+      isTrackPbCandidate: true,
+    })).toBe(true);
+
+    expect(callOrder).toEqual(["mark-pending", "refresh", "submit-started"]);
+    expect(engine.scheduleVerificationQueueProcessing).not.toHaveBeenCalled();
+  });
+
   it("starts a playlist-selected daily challenge from an active result modal", async () => {
     const challenge = {
       id: "daily-1",
@@ -565,6 +593,136 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.prepareTrackPersonalBestGhost).toHaveBeenCalledWith(challenge);
     resolveGhost(null);
     await ghostRequest;
+  });
+
+  it("does not reuse a prepared ghost while a local track PB candidate is pending", async () => {
+    const challenge = {
+      id: "daily-pending-pb",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    const clearPrepared = vi.fn();
+    const prepareTrackPersonalBestGhost = vi.fn();
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: challenge,
+      activeDailyChallenge: null,
+      currentTrackKey: challenge.trackKey,
+      preparedPbGhostChallengeId: challenge.id,
+      pendingPbGhostCandidateChallengeIds: new Set([challenge.id]),
+      startOverlay: { hideStartOverlay: vi.fn() },
+      resetCanvasPresentation: vi.fn(),
+      applyDailyChallenge: vi.fn(),
+      trackModeStart: vi.fn(),
+      startSequence: vi.fn(),
+      pbGhost: { clearPrepared },
+      prepareTrackPersonalBestGhost,
+    };
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
+
+    expect(clearPrepared).toHaveBeenCalledTimes(1);
+    expect(prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
+    expect(engine.preparedPbGhostChallengeId).toBe(null);
+    expect(engine.startSequence).toHaveBeenCalled();
+  });
+
+  it("does not issue a fallback GET for the immediate attempt after PB persistence is unavailable", async () => {
+    const challenge = {
+      id: "daily-unavailable-pb",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    const clearPrepared = vi.fn();
+    const prepareTrackPersonalBestGhost = vi.fn();
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: challenge,
+      activeDailyChallenge: null,
+      currentTrackKey: challenge.trackKey,
+      preparedPbGhostChallengeId: null,
+      pendingPbGhostCandidateChallengeIds: new Set(),
+      unavailablePbGhostChallengeIds: new Set([challenge.id]),
+      pbGhostSelectionChallengeId: challenge.id,
+      pbGhostSelectionGeneration: 1,
+      startOverlay: { hideStartOverlay: vi.fn() },
+      resetCanvasPresentation: vi.fn(),
+      applyDailyChallenge: vi.fn(),
+      trackModeStart: vi.fn(),
+      startSequence: vi.fn(),
+      pbGhost: { clearPrepared },
+      prepareTrackPersonalBestGhost,
+    };
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
+
+    expect(clearPrepared).toHaveBeenCalledTimes(1);
+    expect(prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
+    expect(engine.startSequence).toHaveBeenCalled();
+  });
+
+  it("does not let late or superseded ghost requests prepare the wrong selection", async () => {
+    const challenge = { id: "daily-a", trackKey: "circuit" };
+    let resolveFirst;
+    let resolveSecond;
+    const requests = [
+      new Promise((resolve) => { resolveFirst = resolve; }),
+      new Promise((resolve) => { resolveSecond = resolve; }),
+    ];
+    const prepare = vi.fn();
+    const engine = {
+      activeDailyChallenge: challenge,
+      currentDailyChallenge: challenge,
+      trackPersonalBestByTrackKey: Object.create(null),
+      sessionBestLapSecByTrackKey: Object.create(null),
+      sessionBestCheckpointTimesByTrackKey: Object.create(null),
+      pbGhost: { prepare, clearTrack: vi.fn() },
+      pbGhostService: { getForChallenge: vi.fn(() => requests.shift()) },
+    };
+
+    const first = RealTimeRacer.prototype.prepareTrackPersonalBestGhost.call(engine, challenge);
+    const second = RealTimeRacer.prototype.prepareTrackPersonalBestGhost.call(engine, challenge);
+    const newerRecord = {
+      trackKey: "circuit",
+      bestTimeMs: 900,
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [100, 0, 0],
+      },
+    };
+    resolveSecond(newerRecord);
+    await second;
+    resolveFirst({
+      trackKey: "circuit",
+      bestTimeMs: 1000,
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [100, 0, 0],
+      },
+    });
+    await first;
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(prepare).toHaveBeenCalledWith(newerRecord);
+
+    let resolveLate;
+    engine.pbGhostService.getForChallenge.mockReturnValueOnce(
+      new Promise((resolve) => { resolveLate = resolve; }),
+    );
+    const late = RealTimeRacer.prototype.prepareTrackPersonalBestGhost.call(engine, challenge);
+    engine.pbGhostSelectionChallengeId = "daily-b";
+    engine.pbGhostSelectionGeneration += 1;
+    engine.activeDailyChallenge = { id: "daily-b", trackKey: "blueSector" };
+    resolveLate(newerRecord);
+    await late;
+    expect(prepare).toHaveBeenCalledTimes(1);
   });
 
   it("reuses the ghost prepared during startup on the first play", async () => {
@@ -990,5 +1148,142 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.currentTime).toBe(0);
     expect(engine.relaunchDelayRemaining).toBe(0.5);
     expect(engine.status).toBe("playing");
+  });
+
+  it("starts on time and shows the unavailable notice when an enabled PB has no ghost at GO", () => {
+    const challenge = { id: "daily-pending-pb", trackKey: "circuit" };
+    const trackPbGhostReadiness = vi.fn();
+    const showGhostUnavailableNotice = vi.fn(() => true);
+    const engine = {
+      activeDailyChallenge: challenge,
+      trackPersonalBestResult: {
+        trackKey: challenge.trackKey,
+        bestTime: 42,
+        ghostAvailable: true,
+      },
+      trackPersonalBestByTrackKey: Object.create(null),
+      pbGhost: { enabled: true, beginRun: vi.fn(() => false) },
+      hud: { showGhostUnavailableNotice },
+      analytics: { trackPbGhostReadiness },
+      getNow: () => 1400,
+      pbGhostReadinessByChallengeId: {
+        [challenge.id]: {
+          challengeId: challenge.id,
+          trackKey: challenge.trackKey,
+          finishAtMs: 0,
+          readyAtMs: null,
+          goAtMs: null,
+          goReported: false,
+          readyReported: false,
+        },
+      },
+    };
+
+    expect(RealTimeRacer.prototype.beginPersonalBestGhostRunAtGo.call(engine))
+      .toEqual({ ghostActive: false, ghostExpected: true, noticeShown: true });
+    expect(showGhostUnavailableNotice).toHaveBeenCalledTimes(1);
+    expect(trackPbGhostReadiness).toHaveBeenCalledWith(expect.objectContaining({
+      sampleType: "go",
+      ghostlessAtGo: true,
+      noticeShown: true,
+      finishToGhostReadySec: null,
+    }));
+  });
+
+  it.each([
+    [false, { trackKey: "circuit", bestTime: 42 }],
+    [true, null],
+  ])("does not show an unavailable notice when ghosts are disabled or no PB exists", (enabled, personalBest) => {
+    const showGhostUnavailableNotice = vi.fn(() => true);
+    const engine = {
+      activeDailyChallenge: { id: "daily-no-notice", trackKey: "circuit" },
+      trackPersonalBestResult: personalBest,
+      trackPersonalBestByTrackKey: Object.create(null),
+      pbGhost: { enabled, beginRun: vi.fn(() => false) },
+      hud: { showGhostUnavailableNotice },
+      getNow: () => 1400,
+    };
+
+    const result = RealTimeRacer.prototype.beginPersonalBestGhostRunAtGo.call(engine);
+
+    expect(result.noticeShown).toBe(false);
+    expect(showGhostUnavailableNotice).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed canonical ghost without replacing the known PB", () => {
+    const challenge = { id: "daily-malformed-ghost", trackKey: "circuit" };
+    const existing = { trackKey: "circuit", bestTime: 43, ghostAvailable: true };
+    const clearPrepared = vi.fn();
+    const installForChallenge = vi.fn();
+    const engine = {
+      activeDailyChallenge: challenge,
+      currentDailyChallenge: challenge,
+      trackPersonalBestResult: existing,
+      trackPersonalBestByTrackKey: { circuit: existing },
+      pbGhostSelectionChallengeId: challenge.id,
+      pbGhostSelectionGeneration: 1,
+      pbGhostPrepareGenerationByChallengeId: { [challenge.id]: 1 },
+      pendingPbGhostCandidateChallengeIds: new Set([challenge.id]),
+      preparedPbGhostChallengeId: challenge.id,
+      pbGhost: { clearPrepared },
+      pbGhostService: { installForChallenge },
+      resolveTrackPersonalBestGhostPending:
+        RealTimeRacer.prototype.resolveTrackPersonalBestGhostPending,
+    };
+
+    const result = RealTimeRacer.prototype.installCanonicalTrackPersonalBestGhost.call(
+      engine,
+      challenge,
+      {
+        trackKey: challenge.trackKey,
+        bestTimeMs: 42_000,
+        checkpointTimesSec: null,
+        updatedAt: "2026-07-17T20:00:00.000Z",
+        ghost: {
+          schemaVersion: 2,
+          sampleIntervalMs: 50,
+          finishTimeMs: 50,
+          origin: [0, 0, 0],
+          deltas: [],
+        },
+      },
+    );
+
+    expect(result).toBeNull();
+    expect(engine.trackPersonalBestResult).toBe(existing);
+    expect(engine.trackPersonalBestByTrackKey.circuit).toBe(existing);
+    expect(installForChallenge).not.toHaveBeenCalled();
+    expect(clearPrepared).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the prior authoritative ghost for the attempt after a rejected PB", () => {
+    const challenge = { id: "daily-rejected-pb", trackKey: "circuit" };
+    const previous = {
+      bestTimeMs: 43_000,
+      samples: [
+        { timeMs: 0, x: 0, y: 0, angle: 0 },
+        { timeMs: 43_000, x: 1, y: 1, angle: 0 },
+      ],
+    };
+    const prepare = vi.fn(() => true);
+    const engine = {
+      activeDailyChallenge: challenge,
+      pbGhostSelectionChallengeId: challenge.id,
+      pbGhostSelectionGeneration: 1,
+      pendingPbGhostCandidateChallengeIds: new Set([challenge.id]),
+      previousPreparedPbGhostByChallengeId: { [challenge.id]: previous },
+      pbGhost: { prepare, clearPrepared: vi.fn() },
+      preparedPbGhostChallengeId: null,
+      resolveTrackPersonalBestGhostPending:
+        RealTimeRacer.prototype.resolveTrackPersonalBestGhostPending,
+    };
+
+    expect(RealTimeRacer.prototype.restorePreviousTrackPersonalBestGhost.call(
+      engine,
+      challenge,
+    )).toBe(true);
+    expect(prepare).toHaveBeenCalledWith(previous);
+    expect(engine.preparedPbGhostChallengeId).toBe(challenge.id);
+    expect(engine.pendingPbGhostCandidateChallengeIds.has(challenge.id)).toBe(false);
   });
 });

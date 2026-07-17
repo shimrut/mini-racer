@@ -110,9 +110,11 @@ describe('server daily gp store submissions', () => {
                 completedLaps: 1,
                 checkpointTimesSec: [4.2, 9.8],
                 ghost: {
-                    schemaVersion: 1,
-                    sampleRateHz: 20,
-                    samples: [[0, 0, 0, 0], [12345, 1000, 1000, 100]],
+                    schemaVersion: 2,
+                    sampleIntervalMs: 50,
+                    finishTimeMs: 50,
+                    origin: [0, 0, 0],
+                    deltas: [100, 100, 100],
                 },
                 method: 'finish',
             },
@@ -142,6 +144,20 @@ describe('server daily gp store submissions', () => {
                 trackBestTimeMs: 12345,
                 trackPbImproved: true,
                 trackGhostAvailable: true,
+                trackPbPersistenceStatus: 'stored',
+                trackPersonalBest: {
+                    trackKey: challenge.trackKey,
+                    bestTimeMs: 12345,
+                    checkpointTimesSec: [4.2, 9.8],
+                    updatedAt: expect.any(String),
+                    ghost: {
+                        schemaVersion: 2,
+                        sampleIntervalMs: 50,
+                        finishTimeMs: 50,
+                        origin: [0, 0, 0],
+                        deltas: [100, 100, 100],
+                    },
+                },
                 completedLaps: 1,
                 checkpointTimesSec: [4.2, 9.8],
                 validationMethod: 'strict-replay',
@@ -165,6 +181,98 @@ describe('server daily gp store submissions', () => {
         expect(leaderboardEntry.bestTimeMs).toBe(12345);
         expect(leaderboardEntry.checkpointTimesSec).toEqual([4.2, 9.8]);
         expect(leaderboardEntry.validationMethod).toBe('strict-replay');
+    });
+
+    it('accepts a committed daily result when lifetime PB persistence is unavailable', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.hSet.mockImplementation(async (key) => {
+            if (String(key).startsWith('dailygp:track-pbs:')) {
+                throw new Error('PB storage unavailable');
+            }
+            return 1;
+        });
+
+        const result = await submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            leaderboardIdentity: 'constructed',
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(result).toMatchObject({
+            status: 200,
+            body: {
+                accepted: true,
+                improved: true,
+                trackPbPersistenceStatus: 'unavailable',
+                trackPersonalBest: null,
+                trackBestTimeMs: null,
+                trackPbImproved: false,
+                trackGhostAvailable: false,
+            },
+        });
+        expect(mockRedis.zAdd).toHaveBeenCalledWith(
+            expect.stringContaining(challenge.id),
+            expect.objectContaining({ member: 'reddit:pm-user', score: 12345 }),
+        );
+    });
+
+    it('does not let submission lock cleanup errors replace a committed daily outcome', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.get.mockImplementation(async (key) => {
+            if (String(key).startsWith('dailygp:submit-lock:')) {
+                throw new Error('cleanup unavailable');
+            }
+            return null;
+        });
+
+        const result = await submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(result).toMatchObject({
+            status: 200,
+            body: { accepted: true, trackPbPersistenceStatus: 'stored' },
+        });
+    });
+
+    it('starts PB persistence while the daily transaction is still pending', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        let finishDailyWrite;
+        mockRedis.zAdd.mockImplementation(() => new Promise((resolve) => {
+            finishDailyWrite = resolve;
+        }));
+
+        const pending = submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        await vi.waitFor(() => {
+            expect(mockRedis.hSet).toHaveBeenCalledWith(
+                expect.stringMatching(/^dailygp:track-pbs:/),
+                expect.objectContaining({ [challenge.trackKey]: expect.any(String) }),
+            );
+            expect(finishDailyWrite).toBeTypeOf('function');
+        });
+        finishDailyWrite(1);
+
+        await expect(pending).resolves.toMatchObject({
+            status: 200,
+            body: { accepted: true, trackPbPersistenceStatus: 'stored' },
+        });
     });
 
     it('commits concurrent submissions from different players under separate submission locks', async () => {

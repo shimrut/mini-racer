@@ -197,4 +197,8 @@ export class AnalyticsService {
     trackRaceRestarted(payload) {
         this.track('race_restarted', payload);
     }
+
+    trackPbGhostReadiness(payload) {
+        this.track('pb_ghost_readiness', payload);
+    }
 }

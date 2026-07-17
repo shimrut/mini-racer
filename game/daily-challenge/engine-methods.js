@@ -5,6 +5,7 @@ import {
   setDailyChallengeBestTime,
 } from "./storage.js";
 import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js";
+import { normalizePbGhostRecord } from "../ghost/pb-ghost.js";
 import {
   buildLapRecord,
   createModalActions,
@@ -60,6 +61,48 @@ function normalizeTrackPersonalBest(record, trackKey = null) {
   };
 }
 
+function getMonotonicNow(engine) {
+  const value = engine?.getNow?.();
+  if (Number.isFinite(value)) return value;
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return performance.now();
+  }
+  return Date.now();
+}
+
+function isValidCanonicalTrackPersonalBest(record, trackKey) {
+  if (!record || typeof record !== "object") return false;
+  if (record.trackKey !== trackKey) return false;
+  if (!Number.isFinite(Number(record.bestTimeMs)) || Number(record.bestTimeMs) <= 0) {
+    return false;
+  }
+  if (record.checkpointTimesSec !== null && !Array.isArray(record.checkpointTimesSec)) {
+    return false;
+  }
+  if (typeof record.updatedAt !== "string" || !record.updatedAt) return false;
+  return record.ghost === null || normalizePbGhostRecord(record) !== null;
+}
+
+function getPbGhostReadinessState(engine, challengeId) {
+  return challengeId && engine.pbGhostReadinessByChallengeId?.[challengeId] || null;
+}
+
+function emitLatePbGhostReadyMeasurement(engine, state) {
+  if (!state?.goReported || state.readyReported || !Number.isFinite(state.readyAtMs)) return;
+  state.readyReported = true;
+  engine.analytics?.trackPbGhostReadiness?.({
+    sampleType: "ready_followup",
+    trackKey: state.trackKey,
+    finishToGhostReadySec: Math.max(0, state.readyAtMs - state.finishAtMs) / 1000,
+    readyBeforeGo: false,
+    goSafetyMarginSec: Number.isFinite(state.goAtMs)
+      ? (state.goAtMs - state.readyAtMs) / 1000
+      : null,
+    ghostlessAtGo: false,
+    noticeShown: false,
+  });
+}
+
 function getTrackPersonalBestForChallenge(engine, challenge) {
   if (!challenge?.trackKey) return null;
   if (
@@ -69,6 +112,66 @@ function getTrackPersonalBestForChallenge(engine, challenge) {
     return engine.trackPersonalBestResult;
   }
   return engine.trackPersonalBestByTrackKey?.[challenge.trackKey] || null;
+}
+
+function getPbGhostSelectionChallengeId(engine) {
+  return engine.pbGhostSelectionChallengeId
+    || engine.activeDailyChallenge?.id
+    || engine.currentDailyChallenge?.id
+    || null;
+}
+
+function claimPbGhostSelection(engine, challengeId) {
+  const normalizedId = challengeId || null;
+  if (engine.pbGhostSelectionChallengeId === normalizedId) {
+    return engine.pbGhostSelectionGeneration || 0;
+  }
+  if (normalizedId && engine.unavailablePbGhostChallengeIds?.has(normalizedId)) {
+    engine.unavailablePbGhostChallengeIds.delete(normalizedId);
+  }
+  if (
+    normalizedId
+    && engine.pbGhostSelectionChallengeId == null
+    && engine.preparedPbGhostChallengeId === normalizedId
+  ) {
+    engine.pbGhostSelectionChallengeId = normalizedId;
+    engine.pbGhostSelectionGeneration = engine.pbGhostSelectionGeneration || 1;
+    return engine.pbGhostSelectionGeneration;
+  }
+  engine.pbGhostSelectionChallengeId = normalizedId;
+  engine.pbGhostSelectionGeneration = (engine.pbGhostSelectionGeneration || 0) + 1;
+  engine.preparedPbGhostChallengeId = null;
+  return engine.pbGhostSelectionGeneration;
+}
+
+function bumpPbGhostPrepareGeneration(engine, challengeId) {
+  if (!engine.pbGhostPrepareGenerationByChallengeId) {
+    engine.pbGhostPrepareGenerationByChallengeId = Object.create(null);
+  }
+  const nextGeneration =
+    (engine.pbGhostPrepareGenerationByChallengeId[challengeId] || 0) + 1;
+  engine.pbGhostPrepareGenerationByChallengeId[challengeId] = nextGeneration;
+  return nextGeneration;
+}
+
+function isCurrentPbGhostPreparation(
+  engine,
+  challengeId,
+  prepareGeneration,
+  selectionGeneration,
+) {
+  return (
+    engine.pbGhostPrepareGenerationByChallengeId?.[challengeId] === prepareGeneration
+    && getPbGhostSelectionChallengeId(engine) === challengeId
+    && (engine.pbGhostSelectionGeneration || 0) === selectionGeneration
+  );
+}
+
+function getPendingPbGhostCandidates(engine) {
+  if (!engine.pendingPbGhostCandidateChallengeIds) {
+    engine.pendingPbGhostCandidateChallengeIds = new Set();
+  }
+  return engine.pendingPbGhostCandidateChallengeIds;
 }
 
 function applyTrackPersonalBest(engine, challenge, record, { prepareGhost = false } = {}) {
@@ -83,10 +186,10 @@ function applyTrackPersonalBest(engine, challenge, record, { prepareGhost = fals
     delete engine.trackPersonalBestByTrackKey[challenge.trackKey];
   }
 
-  if (
-    engine.activeDailyChallenge?.id === challenge.id
-    || engine.currentDailyChallenge?.id === challenge.id
-  ) {
+  const selectedChallengeId = engine.activeDailyChallenge?.id
+    || engine.currentDailyChallenge?.id
+    || null;
+  if (selectedChallengeId === challenge.id) {
     engine.trackPersonalBestResult = personalBest;
     engine.bestLapTime = personalBest?.bestTime ?? null;
     if (challenge.trackKey && Number.isFinite(personalBest?.bestTime)) {
@@ -177,14 +280,170 @@ export const dailyChallengeEngineMethods = {
       this.preparedPbGhostChallengeId = null;
       return null;
     }
+    const selectionGeneration = this.pbGhostSelectionChallengeId == null
+      && getPbGhostSelectionChallengeId(this) === challenge.id
+      ? claimPbGhostSelection(this, challenge.id)
+      : (this.pbGhostSelectionGeneration || 0);
+    const prepareGeneration = bumpPbGhostPrepareGeneration(this, challenge.id);
     const record = await this.pbGhostService.getForChallenge(challenge.id, {
       forceRefresh,
     });
-    const personalBest = applyTrackPersonalBest(this, challenge, record, {
-      prepareGhost: true,
-    });
+    if (
+      !isCurrentPbGhostPreparation(
+        this,
+        challenge.id,
+        prepareGeneration,
+        selectionGeneration,
+      )
+    ) {
+      return null;
+    }
+    const personalBest = applyTrackPersonalBest(this, challenge, record, { prepareGhost: true });
     this.preparedPbGhostChallengeId = challenge.id;
     return personalBest;
+  },
+
+  markTrackPersonalBestGhostPending(challenge) {
+    if (!challenge?.id) return false;
+    getPendingPbGhostCandidates(this).add(challenge.id);
+    bumpPbGhostPrepareGeneration(this, challenge.id);
+    this.pbGhostService?.invalidate?.(challenge.id);
+    if (!this.previousPreparedPbGhostByChallengeId) {
+      this.previousPreparedPbGhostByChallengeId = Object.create(null);
+    }
+    this.previousPreparedPbGhostByChallengeId[challenge.id] =
+      this.pbGhost?.preparedRecord ?? null;
+    if (!this.pbGhostReadinessByChallengeId) {
+      this.pbGhostReadinessByChallengeId = Object.create(null);
+    }
+    this.pbGhostReadinessByChallengeId[challenge.id] = {
+      challengeId: challenge.id,
+      trackKey: challenge.trackKey,
+      finishAtMs: getMonotonicNow(this),
+      readyAtMs: null,
+      goAtMs: null,
+      goReported: false,
+      readyReported: false,
+    };
+    return true;
+  },
+
+  resolveTrackPersonalBestGhostPending(challengeId) {
+    if (!challengeId) return false;
+    return getPendingPbGhostCandidates(this).delete(challengeId);
+  },
+
+  markTrackPersonalBestGhostUnavailable(challenge) {
+    if (!challenge?.id) return false;
+    bumpPbGhostPrepareGeneration(this, challenge.id);
+    this.pbGhostService?.invalidate?.(challenge.id);
+    this.resolveTrackPersonalBestGhostPending(challenge.id);
+    if (!this.unavailablePbGhostChallengeIds) {
+      this.unavailablePbGhostChallengeIds = new Set();
+    }
+    this.unavailablePbGhostChallengeIds.add(challenge.id);
+    if (this.previousPreparedPbGhostByChallengeId) {
+      delete this.previousPreparedPbGhostByChallengeId[challenge.id];
+    }
+    if (getPbGhostSelectionChallengeId(this) === challenge.id) {
+      this.pbGhost?.clearPrepared?.();
+      this.preparedPbGhostChallengeId = null;
+    }
+    return true;
+  },
+
+  restorePreviousTrackPersonalBestGhost(challenge) {
+    if (!challenge?.id) return false;
+    const previous = this.previousPreparedPbGhostByChallengeId?.[challenge.id] ?? null;
+    this.resolveTrackPersonalBestGhostPending(challenge.id);
+    if (this.previousPreparedPbGhostByChallengeId) {
+      delete this.previousPreparedPbGhostByChallengeId[challenge.id];
+    }
+    this.unavailablePbGhostChallengeIds?.delete(challenge.id);
+    if (getPbGhostSelectionChallengeId(this) !== challenge.id) return false;
+    if (previous && this.pbGhost?.prepare?.(previous)) {
+      this.preparedPbGhostChallengeId = challenge.id;
+      return true;
+    }
+    this.pbGhost?.clearPrepared?.();
+    this.preparedPbGhostChallengeId = null;
+    return false;
+  },
+
+  installCanonicalTrackPersonalBestGhost(challenge, record) {
+    if (!challenge?.id || !challenge?.trackKey || !record) return null;
+    const ownsSelection = getPbGhostSelectionChallengeId(this) === challenge.id;
+    if (!isValidCanonicalTrackPersonalBest(record, challenge.trackKey)) {
+      bumpPbGhostPrepareGeneration(this, challenge.id);
+      this.resolveTrackPersonalBestGhostPending(challenge.id);
+      if (this.previousPreparedPbGhostByChallengeId) {
+        delete this.previousPreparedPbGhostByChallengeId[challenge.id];
+      }
+      if (!this.unavailablePbGhostChallengeIds) {
+        this.unavailablePbGhostChallengeIds = new Set();
+      }
+      this.unavailablePbGhostChallengeIds.add(challenge.id);
+      if (ownsSelection) {
+        this.pbGhost?.clearPrepared?.();
+        this.preparedPbGhostChallengeId = null;
+      }
+      return null;
+    }
+    this.pbGhostService?.installForChallenge?.(challenge.id, record);
+    this.unavailablePbGhostChallengeIds?.delete(challenge.id);
+    bumpPbGhostPrepareGeneration(this, challenge.id);
+    this.resolveTrackPersonalBestGhostPending(challenge.id);
+    if (this.previousPreparedPbGhostByChallengeId) {
+      delete this.previousPreparedPbGhostByChallengeId[challenge.id];
+    }
+    const personalBest = applyTrackPersonalBest(this, challenge, record, {
+      prepareGhost: ownsSelection,
+    });
+    if (ownsSelection) {
+      this.preparedPbGhostChallengeId = challenge.id;
+    }
+    if (record.ghost !== null && normalizePbGhostRecord(record)) {
+      const readiness = getPbGhostReadinessState(this, challenge.id);
+      if (readiness) {
+        readiness.readyAtMs = getMonotonicNow(this);
+        emitLatePbGhostReadyMeasurement(this, readiness);
+      }
+    }
+    return personalBest;
+  },
+
+  beginPersonalBestGhostRunAtGo() {
+    const challenge = this.activeDailyChallenge;
+    const challengeId = challenge?.id || null;
+    const goAtMs = getMonotonicNow(this);
+    const ghostActive = this.pbGhost?.beginRun?.() === true;
+    const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
+    const ghostExpected = this.pbGhost?.enabled === true
+      && Number.isFinite(trackPersonalBest?.bestTime);
+    const noticeShown = ghostExpected
+      && !ghostActive
+      && this.hud?.showGhostUnavailableNotice?.() === true;
+    const readiness = getPbGhostReadinessState(this, challengeId);
+    if (readiness && !readiness.goReported) {
+      readiness.goAtMs = goAtMs;
+      readiness.goReported = true;
+      const readyAtMs = Number.isFinite(readiness.readyAtMs)
+        ? readiness.readyAtMs
+        : null;
+      if (readyAtMs !== null) readiness.readyReported = true;
+      this.analytics?.trackPbGhostReadiness?.({
+        sampleType: "go",
+        trackKey: readiness.trackKey,
+        finishToGhostReadySec: readyAtMs === null
+          ? null
+          : Math.max(0, readyAtMs - readiness.finishAtMs) / 1000,
+        readyBeforeGo: ghostActive && readyAtMs !== null && readyAtMs <= goAtMs,
+        goSafetyMarginSec: readyAtMs === null ? null : (goAtMs - readyAtMs) / 1000,
+        ghostlessAtGo: !ghostActive,
+        noticeShown,
+      });
+    }
+    return { ghostActive, ghostExpected, noticeShown };
   },
 
   async loadInitialPersonalBestGhostAsset() {
@@ -207,10 +466,7 @@ export const dailyChallengeEngineMethods = {
     const personalBest = applyTrackPersonalBest(this, challenge, record);
     if (
       personalBest
-      && (
-        this.activeDailyChallenge?.id === challenge?.id
-        || this.currentDailyChallenge?.id === challenge?.id
-      )
+      && (this.activeDailyChallenge?.id || this.currentDailyChallenge?.id) === challenge?.id
     ) {
       this.syncTrackMedalFromChallengeBest(challenge, personalBest.bestTime);
       this.hud?.setBestTime?.(personalBest.bestTime, {
@@ -583,6 +839,7 @@ export const dailyChallengeEngineMethods = {
     this.trackPersonalBestResult = null;
     this.pbGhost?.clearTrack?.();
     this.preparedPbGhostChallengeId = null;
+    claimPbGhostSelection(this, null);
     this.syncCurrentRunPolicy();
     this.setRuntimeConfig(null);
     this.hud.setHudPrimaryMetric({
@@ -619,6 +876,7 @@ export const dailyChallengeEngineMethods = {
 
     this.resetCanvasPresentation();
     this.startOverlay?.hideStartOverlay?.();
+    claimPbGhostSelection(this, challenge.id);
     this.startButtonPending = true;
     try {
       if (replacesCurrentRun && challenge.trackKey === this.currentTrackKey) {
@@ -637,8 +895,14 @@ export const dailyChallengeEngineMethods = {
 
       const hasPreparedGhostAsset =
         this.preparedPbGhostChallengeId === challenge.id;
+      const hasPendingGhostCandidate =
+        getPendingPbGhostCandidates(this).has(challenge.id);
+      const hasUnavailableGhost =
+        this.unavailablePbGhostChallengeIds?.has(challenge.id) === true;
       if (
         !hasPreparedGhostAsset
+        && !hasPendingGhostCandidate
+        && !hasUnavailableGhost
         && typeof this.prepareTrackPersonalBestGhost === "function"
       ) {
         this.pbGhost?.clearTrack?.();
@@ -646,6 +910,9 @@ export const dailyChallengeEngineMethods = {
         void this.prepareTrackPersonalBestGhost(challenge).catch((error) => {
           console.error("Error loading personal best ghost:", error);
         });
+      } else if (hasPendingGhostCandidate || hasUnavailableGhost) {
+        this.pbGhost?.clearPrepared?.();
+        this.preparedPbGhostChallengeId = null;
       }
       this.applyDailyChallenge(challenge);
       const modeStartPayload = {
@@ -935,13 +1202,62 @@ export const dailyChallengeEngineMethods = {
         ? this.sessionBestLapSecByTrackKey[trackKey] ?? null
         : null;
     const runSubmissionBlockedReason = this.rankedSubmissionBlockedReason || null;
-    const optimisticVerificationSnapshot = runSubmissionBlockedReason
+    const replayPayload = this.scoreboardReplay.getPayload(1);
+    let submissionError = runSubmissionBlockedReason;
+    let didEnqueue = true;
+    if (isDailyBest) {
+      const previousBestSnapshot = Number.isFinite(previousDailyBest?.bestTime)
+        ? {
+            bestTime: Number(previousDailyBest.bestTime),
+            completedLaps: Number.isFinite(previousDailyBest.completedLaps)
+              ? previousDailyBest.completedLaps
+              : null,
+            checkpointTimesSec: Array.isArray(previousDailyBest.checkpointTimesSec)
+              ? previousDailyBest.checkpointTimesSec
+              : null,
+          }
+        : null;
+      const saved = saveDailyChallengeBestTime(
+        challenge,
+        finalTime,
+        completedLaps,
+        lapCheckpointTimes,
+      );
+      if (saved) this.dailyChallengeBestResult = { ...saved };
+
+      submissionError = submissionError
+        || (replayPayload
+          ? null
+          : this.scoreboardReplay.overflowed
+            ? "Replay was too long to submit. Finish a cleaner run to rank it."
+            : "Submission replay was unavailable for this run.");
+      didEnqueue = submissionError
+        ? false
+        : this.enqueueDailyChallengeVerificationSubmission({
+            challenge,
+            bestTime: finalTime,
+            completedLaps,
+            checkpointTimesSec: lapCheckpointTimes,
+            replay: { ...replayPayload },
+            previousBest: previousBestSnapshot,
+            isTrackPbCandidate: isNewBest,
+          });
+      if (submissionError || !didEnqueue) {
+        const restored = restoreDailyChallengeBestAfterFailedSubmission(
+          challenge,
+          previousBestSnapshot,
+        );
+        this.dailyChallengeBestResult = restored ? { ...restored } : null;
+      }
+    }
+
+    const optimisticVerificationSnapshot = submissionError || !didEnqueue
       ? {
           ...createVerificationSnapshot({
             verificationState: "error",
             isLoading: false,
             submissionStage: "error",
-            statusText: runSubmissionBlockedReason,
+            statusText: submissionError || "Leaderboard submission could not be queued.",
           }),
           currentPlayerRow: {
             isCurrentPlayer: true,
@@ -965,7 +1281,6 @@ export const dailyChallengeEngineMethods = {
         };
 
     const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(challenge.id);
-    const replayPayload = this.scoreboardReplay.getPayload(1);
     this.modal.showModal(
       "Daily challenge complete",
       null,
@@ -1014,69 +1329,6 @@ export const dailyChallengeEngineMethods = {
       this.modal.modalMsg.textContent = `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
     }
 
-    if (isDailyBest) {
-      const previousBestSnapshot = Number.isFinite(previousDailyBest?.bestTime)
-        ? {
-            bestTime: Number(previousDailyBest.bestTime),
-            completedLaps: Number.isFinite(previousDailyBest.completedLaps)
-              ? previousDailyBest.completedLaps
-              : null,
-            checkpointTimesSec: Array.isArray(previousDailyBest.checkpointTimesSec)
-              ? previousDailyBest.checkpointTimesSec
-              : null,
-          }
-        : null;
-      const saved = saveDailyChallengeBestTime(
-        challenge,
-        finalTime,
-        completedLaps,
-        lapCheckpointTimes,
-      );
-      if (saved) {
-        this.dailyChallengeBestResult = { ...saved };
-      }
-
-      const submissionError = runSubmissionBlockedReason
-        || (replayPayload
-          ? null
-          : this.scoreboardReplay.overflowed
-            ? "Replay was too long to submit. Finish a cleaner run to rank it."
-            : "Submission replay was unavailable for this run.");
-      const didEnqueue = submissionError
-        ? false
-        : this.enqueueDailyChallengeVerificationSubmission({
-            challenge,
-            bestTime: finalTime,
-            completedLaps,
-            checkpointTimesSec: lapCheckpointTimes,
-            replay: replayPayload ? { ...replayPayload } : null,
-            previousBest: previousBestSnapshot,
-          });
-
-      if (submissionError || !didEnqueue) {
-        const restored = restoreDailyChallengeBestAfterFailedSubmission(
-          challenge,
-          previousBestSnapshot,
-        );
-        this.dailyChallengeBestResult = restored ? { ...restored } : null;
-        this.modal.updateModalScoreboardSnapshot?.(
-          {
-            ...createVerificationSnapshot({
-              verificationState: "error",
-              isLoading: false,
-              submissionStage: "error",
-              statusText: submissionError || "Leaderboard submission could not be queued.",
-            }),
-            currentPlayerRow: {
-              isCurrentPlayer: true,
-              bestTime: finalTime,
-              rank: null,
-              displayName: "You",
-            },
-          },
-        );
-      }
-    }
   },
 
   isValidatedWinData(winData) {

@@ -328,6 +328,24 @@ export class RaceHud {
     if (this.goMessage) this.goMessage.classList.add('visible');
 }
 
+    showGhostUnavailableNotice({ durationMs = 2000 } = {}) {
+        if (!this.lapFlash || !this.lapFlashDelta) return false;
+
+        if (this._lapFlashTimer !== null) {
+            clearTimeout(this._lapFlashTimer);
+            this._lapFlashTimer = null;
+        }
+
+        this.lapFlashLabel && (this.lapFlashLabel.textContent = '');
+        this.lapFlashTime && (this.lapFlashTime.textContent = '');
+        this.lapFlashDelta.hidden = false;
+        this.lapFlashDelta.textContent = 'GHOST UNAVAILABLE';
+        this.lapFlash.classList.remove('is-gain', 'is-loss');
+        this.lapFlash.classList.add('is-warning', 'visible');
+        this._lapFlashTimer = setTimeout(() => this.hideLapFlash(), durationMs);
+        return true;
+    }
+
     _showTimingFlash({ label, timeSec, deltaVsBest, isNewBest = false, evenDeltaText = 'Even lap' }) {
         if (!this.lapFlash || !this.lapFlashLabel || !this.lapFlashTime || !this.lapFlashDelta) return;
 
@@ -402,10 +420,10 @@ export class RaceHud {
     if (this.lapFlash) this.lapFlash.classList.remove('visible');
 }
 
-    resetCountdown() {
+    resetCountdown({ preserveLapFlash = false } = {}) {
     this.hideStartLights();
     if (this.goMessage) this.goMessage.classList.remove('visible');
-    this.hideLapFlash();
+    if (!preserveLapFlash) this.hideLapFlash();
 }
 
 }

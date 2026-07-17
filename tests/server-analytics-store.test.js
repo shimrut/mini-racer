@@ -156,6 +156,61 @@ describe('server analytics store', () => {
         );
     });
 
+    it('records only aggregate PB ghost readiness counters and bounded timing buckets', async () => {
+        const { submitServerAnalyticsEvent } = await import('../src/server/analytics-store.ts');
+
+        await submitServerAnalyticsEvent({
+            eventName: 'pb_ghost_readiness',
+            playerId: 'browser-player',
+            sessionId: 'session-1',
+            payload: {
+                finishToGhostReadySec: 4.2,
+                readyBeforeGo: true,
+                goSafetyMarginSec: 1.4,
+                ghostlessAtGo: true,
+                noticeShown: true,
+                clientPlatform: 'android',
+                clientVersion: '2026.29',
+            },
+        });
+
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:ready_before_go', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:ghostless_at_go', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:notice_shown', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:finish_to_ready:bucket:2_to_5s', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:finish_to_ready_platform:bucket:android__2_to_5s', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:finish_to_ready_client_version:bucket:2026.29__2_to_5s', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:go_safety_margin:bucket:over_1000ms', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:context:platform:android', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:context:client_version:2026.29', 1);
+        expect(mockRedis.hSetNX).not.toHaveBeenCalled();
+    });
+
+    it('adds a late ready latency sample without double-counting the GO attempt', async () => {
+        const { submitServerAnalyticsEvent } = await import('../src/server/analytics-store.ts');
+
+        await submitServerAnalyticsEvent({
+            eventName: 'pb_ghost_readiness',
+            payload: {
+                sampleType: 'ready_followup',
+                finishToGhostReadySec: 1.3,
+                goSafetyMarginSec: -0.2,
+                clientPlatform: 'ios',
+                clientVersion: '2026.30',
+            },
+        });
+
+        expect(mockRedis.hIncrBy).not.toHaveBeenCalledWith(
+            expect.stringContaining(':counters'),
+            'pb_ghost_readiness',
+            1,
+        );
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:finish_to_ready:bucket:1200_to_1400ms', 1);
+        expect(mockRedis.hIncrBy).toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:go_safety_margin:bucket:late', 1);
+        expect(mockRedis.hIncrBy).not.toHaveBeenCalledWith(expect.stringContaining(':counters'), 'pb_ghost_readiness:context:platform:ios', 1);
+    });
+
     it('returns a dated summary from daily Redis counters', async () => {
         const { getServerAnalyticsSummary } = await import('../src/server/analytics-store.ts');
         mockRedis.hGetAll.mockResolvedValue({
@@ -175,6 +230,13 @@ describe('server analytics store', () => {
             'race_restarted:source:improve_restart_after_win': '4',
             'track:circuit:played': '6',
             'track:circuit:race_ended:cause:finish': '5',
+            pb_ghost_readiness: '3',
+            'pb_ghost_readiness:ready_before_go': '2',
+            'pb_ghost_readiness:ghostless_at_go': '1',
+            'pb_ghost_readiness:notice_shown': '1',
+            'pb_ghost_readiness:finish_to_ready:bucket:2_to_5s': '3',
+            'pb_ghost_readiness:go_safety_margin:bucket:over_1000ms': '2',
+            'pb_ghost_readiness:context:platform:android': '3',
         });
 
         const summary = await getServerAnalyticsSummary({
@@ -206,6 +268,15 @@ describe('server analytics store', () => {
             }),
             restarts: expect.objectContaining({
                 improveWin: 4,
+            }),
+            ghostReadiness: expect.objectContaining({
+                total: 3,
+                readyBeforeGo: 2,
+                ghostlessAtGo: 1,
+                noticeShown: 1,
+                finishToGhostReadyBuckets: { '2_to_5s': 3 },
+                goSafetyMarginBuckets: { 'over_1000ms': 2 },
+                platforms: { android: 3 },
             }),
             tracks: {
                 circuit: expect.objectContaining({

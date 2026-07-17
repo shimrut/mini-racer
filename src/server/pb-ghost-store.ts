@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DAILY_GP_PLAYER_PROFILE_TTL_SECONDS } from './daily-gp-model.js';
 import {
     createTrackFingerprint,
+    isValidPbGhostTrace,
     PB_GHOST_SCHEMA_VERSION,
     PB_GHOST_SIMULATION_REVISION,
     type PbGhostTrace,
@@ -46,18 +47,8 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
         ) {
             return null;
         }
-        const ghost = value.ghost && typeof value.ghost === 'object'
-            && value.ghost.schemaVersion === PB_GHOST_SCHEMA_VERSION
-            && value.ghost.sampleRateHz === 20
-            && Array.isArray(value.ghost.samples)
-            && value.ghost.samples.length >= 2
-            && value.ghost.samples.length <= 4_000
-            && value.ghost.samples.every((sample) => (
-                Array.isArray(sample)
-                && sample.length === 4
-                && sample.every(Number.isInteger)
-            ))
-            ? value.ghost as PbGhostTrace
+        const ghost = isValidPbGhostTrace(value.ghost)
+            ? value.ghost
             : null;
         return {
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
@@ -127,6 +118,7 @@ export async function upsertPlayerTrackPersonalBest({
     bestTimeMs,
     checkpointTimesSec,
     ghost,
+    retainedPersonalBest = null,
     updatedAt = new Date().toISOString(),
 }: {
     playerId: string;
@@ -136,6 +128,11 @@ export async function upsertPlayerTrackPersonalBest({
     bestTimeMs: number;
     checkpointTimesSec: number[] | null;
     ghost: PbGhostTrace | null;
+    retainedPersonalBest?: {
+        bestTimeMs: number;
+        checkpointTimesSec: number[] | null;
+        updatedAt: string;
+    } | null;
     updatedAt?: string;
 }): Promise<{ record: PlayerTrackPbRecord; improved: boolean }> {
     const lockKey = playerTrackLockKey(playerId, trackKey);
@@ -150,28 +147,58 @@ export async function upsertPlayerTrackPersonalBest({
 
     try {
         const existing = await readCompatibleRecord({ playerId, trackKey, track });
-        if (existing && existing.bestTimeMs <= bestTimeMs) {
-            return { record: existing, improved: false };
-        }
-
-        const record: PlayerTrackPbRecord = {
+        const trackFingerprint = createTrackFingerprint(track);
+        const current: PlayerTrackPbRecord = {
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
             trackKey,
-            trackFingerprint: createTrackFingerprint(track),
+            trackFingerprint,
             simulationRevision: PB_GHOST_SIMULATION_REVISION,
             bestTimeMs: Math.round(bestTimeMs),
             checkpointTimesSec,
             ghost,
             updatedAt,
         };
+        const retained = retainedPersonalBest && Number.isFinite(retainedPersonalBest.bestTimeMs)
+            ? {
+                schemaVersion: PB_GHOST_SCHEMA_VERSION,
+                trackKey,
+                trackFingerprint,
+                simulationRevision: PB_GHOST_SIMULATION_REVISION,
+                bestTimeMs: Math.round(retainedPersonalBest.bestTimeMs),
+                checkpointTimesSec: retainedPersonalBest.checkpointTimesSec,
+                ghost: null,
+                updatedAt: retainedPersonalBest.updatedAt,
+            } satisfies PlayerTrackPbRecord
+            : null;
+        const candidates = [
+            existing ? { source: 'existing' as const, record: existing } : null,
+            retained ? { source: 'retained' as const, record: retained } : null,
+            { source: 'current' as const, record: current },
+        ].filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+        const winner = candidates.reduce((best, candidate) => {
+            if (candidate.record.bestTimeMs < best.record.bestTimeMs) return candidate;
+            if (candidate.record.bestTimeMs > best.record.bestTimeMs) return best;
+            if (candidate.record.ghost && !best.record.ghost) return candidate;
+            return best;
+        });
+        if (winner.source === 'existing') {
+            return { record: existing!, improved: false };
+        }
+
+        const record = winner.record;
         const collectionKey = playerCollectionKey(playerId);
         await redis.hSet(collectionKey, { [trackKey]: JSON.stringify(record) });
         if (isGuest) {
             await redis.expire(collectionKey, DAILY_GP_PLAYER_PROFILE_TTL_SECONDS);
         }
-        return { record, improved: true };
+        return { record, improved: winner.source === 'current' };
     } finally {
-        await releaseLock(lockKey, lockValue);
+        try {
+            await releaseLock(lockKey, lockValue);
+        } catch (error) {
+            // Lock cleanup is best-effort; it must not replace a committed outcome.
+            console.error('Lifetime PB lock cleanup failed:', error);
+        }
     }
 }
 

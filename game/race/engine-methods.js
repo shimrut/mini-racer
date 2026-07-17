@@ -151,7 +151,8 @@ export const raceEngineMethods = {
 
         this.pendingStartFrame = requestAnimationFrame((time) => {
           this.pendingStartFrame = null;
-          this.pbGhost?.beginRun?.();
+          const ghostStart = this.beginPersonalBestGhostRunAtGo?.()
+            ?? { ghostActive: this.pbGhost?.beginRun?.() === true, noticeShown: false };
           this.snapRenderPoseToCurrentPose();
           this.accumulator = 0;
           this.status = "playing";
@@ -167,7 +168,7 @@ export const raceEngineMethods = {
 
           this.activeTimers.push(
             setTimeout(() => {
-              this.hud.resetCountdown();
+              this.hud.resetCountdown({ preserveLapFlash: ghostStart.noticeShown });
             }, 300),
           );
         });

@@ -643,6 +643,8 @@ describe("daily-gp-store submission hardening", () => {
     expect(second.body.bestTimeMs).toBe(3000);
     expect(second.body.trackBestTimeMs).toBe(3000);
     expect(second.body.trackPbImproved).toBe(false);
+    expect(second.body.trackPbPersistenceStatus).toBe("unchanged");
+    expect(second.body.trackPersonalBest).toEqual(first.body.trackPersonalBest);
     expect(second.body.validationMethod).toBe("strict-replay");
   });
 });

@@ -57,9 +57,11 @@ describe('server route contracts', () => {
                 checkpointTimesSec: [4.2, 9.8],
                 updatedAt: '2026-07-16T12:00:00.000Z',
                 ghost: {
-                    schemaVersion: 1,
-                    sampleRateHz: 20,
-                    samples: [[0, 0, 0, 0], [12345, 1000, 1000, 100]],
+                    schemaVersion: 2,
+                    sampleIntervalMs: 50,
+                    finishTimeMs: 50,
+                    origin: [0, 0, 0],
+                    deltas: [100, 100, 100],
                 },
             },
         }));
@@ -99,7 +101,7 @@ describe('server route contracts', () => {
             trackKey: 'circuit',
             personalBest: {
                 bestTimeMs: 12345,
-                ghost: { sampleRateHz: 20 },
+                ghost: { sampleIntervalMs: 50 },
             },
         });
     });

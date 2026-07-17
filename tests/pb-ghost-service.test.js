@@ -54,7 +54,13 @@ describe('PB ghost API service', () => {
   it('caches a full personal-best record until invalidated', async () => {
     const record = {
       bestTimeMs: 1500,
-      ghost: { samples: [[0, 0, 0, 0], [1500, 1000, 1000, 0]] },
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [100, 100, 0],
+      },
     };
     const fetchImpl = vi.fn(async () => ({
       ok: true,
@@ -74,5 +80,45 @@ describe('PB ghost API service', () => {
     service.invalidate('daily-1');
     await service.getForChallenge('daily-1');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps challenge requests independent while a canonical install supersedes an older request', async () => {
+    const resolvers = new Map();
+    const fetchImpl = vi.fn((url) => new Promise((resolve) => {
+      resolvers.set(new URL(url).searchParams.get('challengeId'), resolve);
+    }));
+    const service = new PbGhostService({
+      routes: {
+        playerTrackPbsUrl: '/api/player/track-pbs',
+        playerPbGhostUrl: '/api/player/pb-ghost',
+      },
+      fetchImpl,
+    });
+
+    const firstRequest = service.getForChallenge('daily-1');
+    const secondRequest = service.getForChallenge('daily-2');
+    resolvers.get('daily-2')({
+      ok: true,
+      json: async () => ({ personalBest: { bestTimeMs: 2200 } }),
+    });
+    await expect(secondRequest).resolves.toEqual({ bestTimeMs: 2200 });
+
+    const canonical = {
+      bestTimeMs: 1500,
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [100, 100, 0],
+      },
+    };
+    service.installForChallenge('daily-1', canonical);
+    resolvers.get('daily-1')({
+      ok: true,
+      json: async () => ({ personalBest: { bestTimeMs: 1800 } }),
+    });
+    await expect(firstRequest).resolves.toBe(null);
+    await expect(service.getForChallenge('daily-1')).resolves.toBe(canonical);
   });
 });

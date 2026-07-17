@@ -1,4 +1,8 @@
-const POSITION_SCALE = 1000;
+const PB_GHOST_SCHEMA_VERSION = 2;
+const SAMPLE_INTERVAL_MS = 50;
+const MAX_SAMPLES = 4000;
+const MAX_ENCODED_BYTES = 128 * 1024;
+const POSITION_SCALE = 100;
 const ANGLE_SCALE = 1000;
 const GHOST_ALPHA = 0.24;
 const FINISH_FADE_MS = 500;
@@ -6,29 +10,6 @@ const FINISH_FADE_MS = 500;
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
-}
-
-function normalizeTupleSample(sample) {
-  if (!Array.isArray(sample) || sample.length < 4) return null;
-  const timeMs = finiteNumber(sample[0]);
-  const xMilli = finiteNumber(sample[1]);
-  const yMilli = finiteNumber(sample[2]);
-  const angleMilli = finiteNumber(sample[3]);
-  if (
-    timeMs === null
-    || xMilli === null
-    || yMilli === null
-    || angleMilli === null
-    || timeMs < 0
-  ) {
-    return null;
-  }
-  return {
-    timeMs,
-    x: xMilli / POSITION_SCALE,
-    y: yMilli / POSITION_SCALE,
-    angle: angleMilli / ANGLE_SCALE,
-  };
 }
 
 function normalizeObjectSample(sample) {
@@ -49,20 +30,87 @@ function normalizeObjectSample(sample) {
   return { timeMs, x, y, angle };
 }
 
-export function normalizePbGhostRecord(record) {
-  const rawSamples = record?.ghost?.samples ?? record?.samples;
+function normalizeInternalSamples(rawSamples) {
   if (!Array.isArray(rawSamples) || rawSamples.length < 2) return null;
-
   const samples = [];
   let previousTimeMs = -1;
   for (const rawSample of rawSamples) {
-    const sample = Array.isArray(rawSample)
-      ? normalizeTupleSample(rawSample)
-      : normalizeObjectSample(rawSample);
+    const sample = normalizeObjectSample(rawSample);
     if (!sample || sample.timeMs <= previousTimeMs) return null;
     previousTimeMs = sample.timeMs;
     samples.push(sample);
   }
+  return samples;
+}
+
+function decodeCompactTrace(trace) {
+  if (
+    !trace
+    || typeof trace !== 'object'
+    || trace.schemaVersion !== PB_GHOST_SCHEMA_VERSION
+    || trace.sampleIntervalMs !== SAMPLE_INTERVAL_MS
+    || !Number.isSafeInteger(trace.finishTimeMs)
+    || trace.finishTimeMs <= 0
+    || !Array.isArray(trace.origin)
+    || trace.origin.length !== 3
+    || !trace.origin.every(Number.isSafeInteger)
+    || !Array.isArray(trace.deltas)
+    || trace.deltas.length < 3
+    || trace.deltas.length % 3 !== 0
+    || !trace.deltas.every(Number.isSafeInteger)
+  ) {
+    return null;
+  }
+  let encodedSize = 0;
+  try {
+    encodedSize = JSON.stringify(trace).length;
+  } catch {
+    return null;
+  }
+  if (encodedSize > MAX_ENCODED_BYTES) return null;
+  const sampleCount = 1 + trace.deltas.length / 3;
+  if (sampleCount < 2 || sampleCount > MAX_SAMPLES) return null;
+  const penultimateTimeMs = (sampleCount - 2) * SAMPLE_INTERVAL_MS;
+  const nextRegularTimeMs = (sampleCount - 1) * SAMPLE_INTERVAL_MS;
+  if (
+    trace.finishTimeMs <= penultimateTimeMs
+    || trace.finishTimeMs > nextRegularTimeMs
+  ) {
+    return null;
+  }
+
+  let xCm = trace.origin[0];
+  let yCm = trace.origin[1];
+  let angleMilli = trace.origin[2];
+  const samples = [{
+    timeMs: 0,
+    x: xCm / POSITION_SCALE,
+    y: yCm / POSITION_SCALE,
+    angle: angleMilli / ANGLE_SCALE,
+  }];
+  for (let offset = 0; offset < trace.deltas.length; offset += 3) {
+    xCm += trace.deltas[offset];
+    yCm += trace.deltas[offset + 1];
+    angleMilli += trace.deltas[offset + 2];
+    if (![xCm, yCm, angleMilli].every(Number.isSafeInteger)) return null;
+    const sampleIndex = 1 + offset / 3;
+    samples.push({
+      timeMs: sampleIndex === sampleCount - 1
+        ? trace.finishTimeMs
+        : sampleIndex * SAMPLE_INTERVAL_MS,
+      x: xCm / POSITION_SCALE,
+      y: yCm / POSITION_SCALE,
+      angle: angleMilli / ANGLE_SCALE,
+    });
+  }
+  return samples;
+}
+
+export function normalizePbGhostRecord(record) {
+  const samples = record?.ghost
+    ? decodeCompactTrace(record.ghost)
+    : normalizeInternalSamples(record?.samples);
+  if (!samples) return null;
 
   return Object.freeze({
     bestTimeMs: finiteNumber(record?.bestTimeMs),
@@ -127,6 +175,10 @@ export class PbGhost {
     this.activeRecord = this.preparedRecord;
     this.activeEnabled = this.enabled && this.activeRecord !== null;
     return this.activeEnabled;
+  }
+
+  clearPrepared() {
+    this.preparedRecord = null;
   }
 
   clearTrack() {

@@ -123,6 +123,10 @@ export const scoreboardEngineMethods = {
         "Submission replay is missing. Finish another run to rank it.",
       );
       rollbackLocalBestForFailedVerificationEntry(this, entry);
+      this.restorePreviousTrackPersonalBestGhost?.({
+        id: entry.challengeId,
+        trackKey: entry.trackKey,
+      });
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       if (
         this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })
@@ -252,7 +256,21 @@ export const scoreboardEngineMethods = {
       const existingTrackBestTimeMs = Number.isFinite(existingTrackBest?.bestTime)
         ? Math.round(existingTrackBest.bestTime * 1000)
         : null;
-      if (Number.isFinite(body.trackBestTimeMs)) {
+      const hasCanonicalTrackPbContract = ["stored", "unchanged", "unavailable"]
+        .includes(body.trackPbPersistenceStatus);
+      const canonicalTrackPersonalBest =
+        ["stored", "unchanged"].includes(body.trackPbPersistenceStatus)
+        && body.trackPersonalBest && typeof body.trackPersonalBest === "object"
+          ? body.trackPersonalBest
+          : null;
+      if (canonicalTrackPersonalBest) {
+        this.installCanonicalTrackPersonalBestGhost?.(
+          challenge,
+          canonicalTrackPersonalBest,
+        );
+      } else if (body.trackPbPersistenceStatus === "unavailable") {
+        this.markTrackPersonalBestGhostUnavailable?.(challenge);
+      } else if (!hasCanonicalTrackPbContract && Number.isFinite(body.trackBestTimeMs)) {
         this.applyVerifiedTrackPersonalBest?.(challenge, {
           trackKey: entry.trackKey,
           bestTimeMs: body.trackBestTimeMs,
@@ -264,7 +282,11 @@ export const scoreboardEngineMethods = {
           ghostAvailable: Boolean(body.trackGhostAvailable),
         });
       }
-      const shouldRefreshGhost = Boolean(body.trackGhostAvailable) && (
+      if (hasCanonicalTrackPbContract) {
+        this.resolveTrackPersonalBestGhostPending?.(entry.challengeId);
+      }
+      const shouldRefreshGhost = !hasCanonicalTrackPbContract
+        && Boolean(body.trackGhostAvailable) && (
         body.trackPbImproved === true
         || !Number.isFinite(existingTrackBestTimeMs)
         || body.trackBestTimeMs < existingTrackBestTimeMs
@@ -277,7 +299,11 @@ export const scoreboardEngineMethods = {
           });
         } catch (error) {
           console.error("Error refreshing personal best ghost:", error);
+        } finally {
+          this.resolveTrackPersonalBestGhostPending?.(entry.challengeId);
         }
+      } else if (!hasCanonicalTrackPbContract) {
+        this.resolveTrackPersonalBestGhostPending?.(entry.challengeId);
       }
 
       let scoreboardSnapshot = getCachedDailyChallengeSnapshot(entry.challengeId);
@@ -330,6 +356,10 @@ export const scoreboardEngineMethods = {
     }
 
     if (result && !result.ok) {
+      this.restorePreviousTrackPersonalBestGhost?.({
+        id: entry.challengeId,
+        trackKey: entry.trackKey,
+      });
       markDailyChallengeVerificationError(
         entry.challengeId,
         typeof body?.error === "string" ? body.error : "Submission failed",
@@ -354,6 +384,10 @@ export const scoreboardEngineMethods = {
       return;
     }
 
+    this.restorePreviousTrackPersonalBestGhost?.({
+      id: entry.challengeId,
+      trackKey: entry.trackKey,
+    });
     markDailyChallengeVerificationError(
       entry.challengeId,
       "Submission unavailable",
@@ -379,6 +413,7 @@ export const scoreboardEngineMethods = {
     replay,
     checkpointTimesSec = null,
     previousBest = null,
+    isTrackPbCandidate = false,
   } = {}) {
     if (
       !challenge?.id ||
@@ -408,9 +443,20 @@ export const scoreboardEngineMethods = {
         ? previousBest.checkpointTimesSec
         : null,
     });
+    if (enqueued && isTrackPbCandidate) {
+      this.markTrackPersonalBestGhostPending?.(challenge);
+    }
     this.dailyChallengeUi.refreshDailyChallengeVerificationState(challenge?.id);
     if (enqueued) {
-      this.scheduleVerificationQueueProcessing(0);
+      const processing = this.processVerificationQueue?.();
+      if (processing && typeof processing.catch === "function") {
+        void processing.catch((error) => {
+          console.error("Error processing verification queue:", error);
+          this.scheduleVerificationQueueProcessing(getVerificationRetryDelayMs());
+        });
+      } else {
+        this.scheduleVerificationQueueProcessing(0);
+      }
     }
     return enqueued;
   },

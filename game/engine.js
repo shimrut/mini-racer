@@ -114,6 +114,13 @@ export class RealTimeRacer {
     this.pbGhost = new PbGhost({ enabled: getPbGhostEnabled() });
     this.pbGhostService = new PbGhostService();
     this.preparedPbGhostChallengeId = null;
+    this.pbGhostSelectionChallengeId = null;
+    this.pbGhostSelectionGeneration = 0;
+    this.pbGhostPrepareGenerationByChallengeId = Object.create(null);
+    this.pendingPbGhostCandidateChallengeIds = new Set();
+    this.pbGhostReadinessByChallengeId = Object.create(null);
+    this.previousPreparedPbGhostByChallengeId = Object.create(null);
+    this.unavailablePbGhostChallengeIds = new Set();
     this.verificationQueueTimer = null;
     this.isProcessingVerificationQueue = false;
     this.hasAnyData = false;

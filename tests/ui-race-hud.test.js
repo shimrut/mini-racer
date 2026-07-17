@@ -194,6 +194,34 @@ describe('ui race hud helpers', () => {
         expect(lapFlash.classList.add).toHaveBeenCalledWith('is-loss');
     });
 
+    it('shows a compact ghost-unavailable notice for two seconds', () => {
+        vi.useFakeTimers();
+        const lapFlash = { classList: { add: vi.fn(), remove: vi.fn() } };
+        const lapFlashLabel = { textContent: '' };
+        const lapFlashTime = { textContent: '' };
+        const lapFlashDelta = { hidden: true, textContent: '' };
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'lap-flash': lapFlash,
+            'lap-flash-label': lapFlashLabel,
+            'lap-flash-time': lapFlashTime,
+            'lap-flash-delta': lapFlashDelta,
+        }[id] || null));
+
+        const hud = new RaceHud();
+        vi.spyOn(hud, 'hideLapFlash');
+        expect(hud.showGhostUnavailableNotice()).toBe(true);
+        expect(lapFlashDelta.textContent).toBe('GHOST UNAVAILABLE');
+        expect(lapFlash.classList.add).toHaveBeenCalledWith('is-warning', 'visible');
+
+        vi.advanceTimersByTime(300);
+        hud.resetCountdown({ preserveLapFlash: true });
+        expect(hud.hideLapFlash).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(1699);
+        expect(hud.hideLapFlash).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(1);
+        expect(hud.hideLapFlash).toHaveBeenCalledTimes(1);
+    });
+
     it('toggles the pause affordance on both HUD speedometers', () => {
         const pauseBtn = {
             hidden: true,

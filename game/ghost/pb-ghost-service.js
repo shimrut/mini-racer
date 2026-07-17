@@ -30,16 +30,34 @@ export class PbGhostService {
         ? (...args) => globalThis.fetch(...args)
         : null;
     this.recordCache = new Map();
-    this.requestId = 0;
+    this.requestGenerationByChallengeId = new Map();
   }
 
   clear() {
-    this.requestId += 1;
+    for (const challengeId of this.requestGenerationByChallengeId.keys()) {
+      this.bumpRequestGeneration(challengeId);
+    }
     this.recordCache.clear();
   }
 
   invalidate(challengeId) {
-    if (challengeId) this.recordCache.delete(challengeId);
+    if (!challengeId) return;
+    this.bumpRequestGeneration(challengeId);
+    this.recordCache.delete(challengeId);
+  }
+
+  bumpRequestGeneration(challengeId) {
+    const nextGeneration = (this.requestGenerationByChallengeId.get(challengeId) || 0) + 1;
+    this.requestGenerationByChallengeId.set(challengeId, nextGeneration);
+    return nextGeneration;
+  }
+
+  installForChallenge(challengeId, record) {
+    if (typeof challengeId !== 'string' || !challengeId.trim()) return null;
+    const normalizedId = challengeId.trim();
+    this.bumpRequestGeneration(normalizedId);
+    this.recordCache.set(normalizedId, record ?? null);
+    return record ?? null;
   }
 
   async getSummaries(challengeIds) {
@@ -76,7 +94,7 @@ export class PbGhostService {
     }
     if (isLocalEnvironment() || typeof this.fetchImpl !== 'function') return null;
 
-    const requestId = ++this.requestId;
+    const requestGeneration = this.bumpRequestGeneration(normalizedId);
     const url = new URL(this.routes.playerPbGhostUrl, globalThis.location?.origin ?? 'http://localhost');
     url.searchParams.set('challengeId', normalizedId);
     addPlayerIdentity(url);
@@ -84,7 +102,11 @@ export class PbGhostService {
       await this.fetchImpl(url.toString(), { method: 'GET' }),
       'Personal best ghost request',
     );
-    if (requestId !== this.requestId) return null;
+    if (
+      requestGeneration !== this.requestGenerationByChallengeId.get(normalizedId)
+    ) {
+      return null;
+    }
 
     const record = payload?.personalBest ?? payload?.trackPb ?? payload?.record ?? null;
     this.recordCache.set(normalizedId, record);

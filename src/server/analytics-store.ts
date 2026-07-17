@@ -8,7 +8,8 @@ type AnalyticsEventName =
     | 'race_started'
     | 'race_ended'
     | 'race_restarted'
-    | 'game_playtime_chunk';
+    | 'game_playtime_chunk'
+    | 'pb_ghost_readiness';
 
 type AnalyticsContext = {
     redditUsername?: string | null;
@@ -59,6 +60,18 @@ type AnalyticsSummaryDay = {
         improveWin: number;
         unknown: number;
     };
+    ghostReadiness: {
+        total: number;
+        readyBeforeGo: number;
+        ghostlessAtGo: number;
+        noticeShown: number;
+        finishToGhostReadyBuckets: Record<string, number>;
+        finishToGhostReadyByPlatform: Record<string, number>;
+        finishToGhostReadyByClientVersion: Record<string, number>;
+        goSafetyMarginBuckets: Record<string, number>;
+        platforms: Record<string, number>;
+        clientVersions: Record<string, number>;
+    };
     tracks: Record<string, {
         played: number;
         raceStarts: Record<string, number>;
@@ -84,6 +97,7 @@ const EVENT_NAMES = new Set<AnalyticsEventName>([
     'race_ended',
     'race_restarted',
     'game_playtime_chunk',
+    'pb_ghost_readiness',
 ]);
 
 const RACE_START_SOURCES = new Set([
@@ -242,6 +256,34 @@ function secondsToMs(value: number): number {
     return Math.max(0, Math.round(value * 1000));
 }
 
+function getFinishToGhostReadyBucket(value: unknown): string | null {
+    const seconds = normalizeFiniteNumber(value, { max: 24 * 60 * 60 });
+    if (seconds == null) return null;
+    if (seconds < 0.25) return 'under_250ms';
+    if (seconds < 0.5) return '250_to_500ms';
+    if (seconds < 0.75) return '500_to_750ms';
+    if (seconds < 1) return '750_to_1000ms';
+    if (seconds < 1.2) return '1000_to_1200ms';
+    if (seconds < 1.4) return '1200_to_1400ms';
+    if (seconds < 2) return '1400_to_2000ms';
+    if (seconds < 5) return '2_to_5s';
+    return 'over_5s';
+}
+
+function getGoSafetyMarginBucket(value: unknown): string | null {
+    const seconds = normalizeFiniteNumber(value, {
+        min: -24 * 60 * 60,
+        max: 24 * 60 * 60,
+    });
+    if (seconds == null) return null;
+    if (seconds < 0) return 'late';
+    if (seconds < 0.1) return 'under_100ms';
+    if (seconds < 0.25) return '100_to_250ms';
+    if (seconds < 0.5) return '250_to_500ms';
+    if (seconds < 1) return '500_to_1000ms';
+    return 'over_1000ms';
+}
+
 function addTrackFields(
     increments: Map<string, number>,
     trackKey: string | null,
@@ -292,6 +334,18 @@ function createEmptySummaryDay(date: string): AnalyticsSummaryDay {
             manualCrash: 0,
             improveWin: 0,
             unknown: 0,
+        },
+        ghostReadiness: {
+            total: 0,
+            readyBeforeGo: 0,
+            ghostlessAtGo: 0,
+            noticeShown: 0,
+            finishToGhostReadyBuckets: {},
+            finishToGhostReadyByPlatform: {},
+            finishToGhostReadyByClientVersion: {},
+            goSafetyMarginBuckets: {},
+            platforms: {},
+            clientVersions: {},
         },
         tracks: {},
     };
@@ -384,6 +438,55 @@ function assignContextMetric(day: AnalyticsSummaryDay, field: string, value: num
     return false;
 }
 
+function assignGhostReadinessMetric(day: AnalyticsSummaryDay, field: string, value: number): boolean {
+    if (field === 'pb_ghost_readiness') {
+        day.ghostReadiness.total = value;
+        return true;
+    }
+    if (field === 'pb_ghost_readiness:ready_before_go') {
+        day.ghostReadiness.readyBeforeGo = value;
+        return true;
+    }
+    if (field === 'pb_ghost_readiness:ghostless_at_go') {
+        day.ghostReadiness.ghostlessAtGo = value;
+        return true;
+    }
+    if (field === 'pb_ghost_readiness:notice_shown') {
+        day.ghostReadiness.noticeShown = value;
+        return true;
+    }
+
+    const parts = field.split(':');
+    if (parts.length !== 4 || parts[0] !== 'pb_ghost_readiness') return false;
+    const [, metric, detailType, detailValue] = parts;
+    if (!detailValue) return false;
+    if (metric === 'finish_to_ready' && detailType === 'bucket') {
+        day.ghostReadiness.finishToGhostReadyBuckets[detailValue] = value;
+        return true;
+    }
+    if (metric === 'finish_to_ready_platform' && detailType === 'bucket') {
+        day.ghostReadiness.finishToGhostReadyByPlatform[detailValue] = value;
+        return true;
+    }
+    if (metric === 'finish_to_ready_client_version' && detailType === 'bucket') {
+        day.ghostReadiness.finishToGhostReadyByClientVersion[detailValue] = value;
+        return true;
+    }
+    if (metric === 'go_safety_margin' && detailType === 'bucket') {
+        day.ghostReadiness.goSafetyMarginBuckets[detailValue] = value;
+        return true;
+    }
+    if (metric === 'context' && detailType === 'platform') {
+        day.ghostReadiness.platforms[detailValue] = value;
+        return true;
+    }
+    if (metric === 'context' && detailType === 'client_version') {
+        day.ghostReadiness.clientVersions[detailValue] = value;
+        return true;
+    }
+    return false;
+}
+
 function buildSummaryDay(date: string, rawCounters: Record<string, string>): AnalyticsSummaryDay {
     const day = createEmptySummaryDay(date);
 
@@ -391,6 +494,7 @@ function buildSummaryDay(date: string, rawCounters: Record<string, string>): Ana
         const value = toCount(rawValue);
         if (assignTrackMetric(day, field, value)) continue;
         if (assignContextMetric(day, field, value)) continue;
+        if (assignGhostReadinessMetric(day, field, value)) continue;
 
         if (field === 'active_players') day.activePlayers = value;
         else if (field === 'sessions') day.sessions = value;
@@ -462,6 +566,29 @@ function mergeSummaryDays(
             total.restarts[key] += day.restarts[key];
         }
 
+        total.ghostReadiness.total += day.ghostReadiness.total;
+        total.ghostReadiness.readyBeforeGo += day.ghostReadiness.readyBeforeGo;
+        total.ghostReadiness.ghostlessAtGo += day.ghostReadiness.ghostlessAtGo;
+        total.ghostReadiness.noticeShown += day.ghostReadiness.noticeShown;
+        for (const [bucket, value] of Object.entries(day.ghostReadiness.finishToGhostReadyBuckets)) {
+            total.ghostReadiness.finishToGhostReadyBuckets[bucket] = (total.ghostReadiness.finishToGhostReadyBuckets[bucket] || 0) + value;
+        }
+        for (const [bucket, value] of Object.entries(day.ghostReadiness.finishToGhostReadyByPlatform)) {
+            total.ghostReadiness.finishToGhostReadyByPlatform[bucket] = (total.ghostReadiness.finishToGhostReadyByPlatform[bucket] || 0) + value;
+        }
+        for (const [bucket, value] of Object.entries(day.ghostReadiness.finishToGhostReadyByClientVersion)) {
+            total.ghostReadiness.finishToGhostReadyByClientVersion[bucket] = (total.ghostReadiness.finishToGhostReadyByClientVersion[bucket] || 0) + value;
+        }
+        for (const [bucket, value] of Object.entries(day.ghostReadiness.goSafetyMarginBuckets)) {
+            total.ghostReadiness.goSafetyMarginBuckets[bucket] = (total.ghostReadiness.goSafetyMarginBuckets[bucket] || 0) + value;
+        }
+        for (const [platform, value] of Object.entries(day.ghostReadiness.platforms)) {
+            total.ghostReadiness.platforms[platform] = (total.ghostReadiness.platforms[platform] || 0) + value;
+        }
+        for (const [clientVersion, value] of Object.entries(day.ghostReadiness.clientVersions)) {
+            total.ghostReadiness.clientVersions[clientVersion] = (total.ghostReadiness.clientVersions[clientVersion] || 0) + value;
+        }
+
         for (const [trackKey, track] of Object.entries(day.tracks)) {
             const target = getTrackSummary(total, trackKey);
             target.played += track.played;
@@ -493,7 +620,9 @@ function buildEventIncrements(
     const increments = new Map<string, number>();
     const trackKey = normalizeString(payload.trackKey, 80);
 
-    addIncrement(increments, eventName);
+    const isPbGhostReadyFollowup = eventName === 'pb_ghost_readiness'
+        && payload.sampleType === 'ready_followup';
+    if (!isPbGhostReadyFollowup) addIncrement(increments, eventName);
 
     if (eventName === 'game_closed') {
         return increments;
@@ -550,6 +679,32 @@ function buildEventIncrements(
         addTrackFields(increments, trackKey, `race_restarted:source:${source}`);
     }
 
+    if (eventName === 'pb_ghost_readiness') {
+        const finishToGhostReadyBucket = getFinishToGhostReadyBucket(payload.finishToGhostReadySec);
+        const goSafetyMarginBucket = getGoSafetyMarginBucket(payload.goSafetyMarginSec);
+        const readyBeforeGo = payload.readyBeforeGo === true;
+        const ghostlessAtGo = payload.ghostlessAtGo === true;
+        const noticeShown = payload.noticeShown === true;
+        const clientPlatform = normalizeDimensionValue(payload.clientPlatform, { fallback: 'unknown' });
+        const clientVersion = normalizeDimensionValue(payload.clientVersion, { maxLength: 24 });
+
+        if (readyBeforeGo) addIncrement(increments, 'pb_ghost_readiness:ready_before_go');
+        if (ghostlessAtGo) addIncrement(increments, 'pb_ghost_readiness:ghostless_at_go');
+        if (noticeShown) addIncrement(increments, 'pb_ghost_readiness:notice_shown');
+        if (finishToGhostReadyBucket) {
+            addIncrement(increments, `pb_ghost_readiness:finish_to_ready:bucket:${finishToGhostReadyBucket}`);
+            if (clientPlatform) {
+                addIncrement(increments, `pb_ghost_readiness:finish_to_ready_platform:bucket:${clientPlatform}__${finishToGhostReadyBucket}`);
+            }
+            if (clientVersion) {
+                addIncrement(increments, `pb_ghost_readiness:finish_to_ready_client_version:bucket:${clientVersion}__${finishToGhostReadyBucket}`);
+            }
+        }
+        if (goSafetyMarginBucket) addIncrement(increments, `pb_ghost_readiness:go_safety_margin:bucket:${goSafetyMarginBucket}`);
+        if (!isPbGhostReadyFollowup && clientPlatform) addIncrement(increments, `pb_ghost_readiness:context:platform:${clientPlatform}`);
+        if (!isPbGhostReadyFollowup && clientVersion) addIncrement(increments, `pb_ghost_readiness:context:client_version:${clientVersion}`);
+    }
+
     return increments;
 }
 
@@ -575,7 +730,10 @@ export async function submitServerAnalyticsEvent({
     const dailyIncrements = buildEventIncrements(normalizedEventName, normalizedPayload);
     const hourlyIncrements = buildEventIncrements(normalizedEventName, normalizedPayload);
 
-    if (analyticsPlayerId) {
+    // PB ghost readiness is intentionally aggregate-only: do not associate it
+    // with player or session identity sets, even though the common client
+    // transport includes those fields for other analytics events.
+    if (analyticsPlayerId && normalizedEventName !== 'pb_ghost_readiness') {
         const [dailyPlayerWasNew, hourlyPlayerWasNew] = await Promise.all([
             redis.hSetNX(createDailyAnalyticsPlayersKey(date), analyticsPlayerId, '1'),
             redis.hSetNX(createHourlyAnalyticsPlayersKey(hour), analyticsPlayerId, '1'),

@@ -6,63 +6,130 @@ import {
 } from '../game/ghost/pb-ghost.js';
 
 const record = {
-  bestTimeMs: 2000,
+  bestTimeMs: 100,
   ghost: {
-    samples: [
-      [0, 1000, 2000, 3100],
-      [1000, 3000, 4000, -3100],
-      [2000, 5000, 6000, -3000],
-    ],
+    schemaVersion: 2,
+    sampleIntervalMs: 50,
+    finishTimeMs: 100,
+    origin: [100, 200, 3100],
+    deltas: [200, 200, 83, 200, 200, 100],
   },
 };
 
 describe('PB ghost playback', () => {
   it('normalizes compact server samples', () => {
     expect(normalizePbGhostRecord(record)).toMatchObject({
-      bestTimeMs: 2000,
-      finishTimeMs: 2000,
+      bestTimeMs: 100,
+      finishTimeMs: 100,
       samples: [
         { timeMs: 0, x: 1, y: 2, angle: 3.1 },
-        { timeMs: 1000, x: 3, y: 4, angle: -3.1 },
-        { timeMs: 2000, x: 5, y: 6, angle: -3 },
+        { timeMs: 50, x: 3, y: 4, angle: 3.183 },
+        { timeMs: 100, x: 5, y: 6, angle: 3.283 },
       ],
     });
   });
 
   it('rejects malformed and non-monotonic traces', () => {
     expect(normalizePbGhostRecord(null)).toBe(null);
-    expect(normalizePbGhostRecord({ ghost: { samples: [[0, 0, 0, 0]] } })).toBe(null);
     expect(normalizePbGhostRecord({
-      ghost: { samples: [[0, 0, 0, 0], [0, 1, 1, 1]] },
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [],
+      },
+    })).toBe(null);
+    expect(normalizePbGhostRecord({
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 75,
+        origin: [0, 0, 0],
+        deltas: [1, 1, 1],
+      },
+    })).toBe(null);
+    expect(normalizePbGhostRecord({
+      ghost: {
+        ...record.ghost,
+        padding: 'x'.repeat(128 * 1024),
+      },
     })).toBe(null);
   });
 
   it('interpolates position and angle over the shortest arc', () => {
     const normalized = normalizePbGhostRecord(record);
-    const pose = interpolatePbGhostPose(normalized.samples, 500);
+    const pose = interpolatePbGhostPose(normalized.samples, 25);
     expect(pose.x).toBe(2);
     expect(pose.y).toBe(3);
     expect(Math.abs(pose.angle)).toBeCloseTo(Math.PI, 2);
   });
 
+  it('reconstructs fixed-rate timestamps, exact finish time and centimetre precision', () => {
+    const normalized = normalizePbGhostRecord({
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 73,
+        origin: [123, -568, 1234],
+        deltas: [-23, 68, -234, 25, -25, 500],
+      },
+    });
+
+    expect(normalized.samples.map((sample) => sample.timeMs)).toEqual([0, 50, 73]);
+    expect(normalized.samples.at(-1)).toMatchObject({
+      x: 1.25,
+      y: -5.25,
+      angle: 1.5,
+    });
+    expect(Math.abs(normalized.samples[0].x - 1.234)).toBeLessThanOrEqual(0.005);
+    expect(Math.abs(normalized.samples[0].y - (-5.678))).toBeLessThanOrEqual(0.005);
+    expect(Math.abs(normalized.samples[0].angle - 1.234)).toBeLessThanOrEqual(0.001);
+  });
+
   it('freezes prepared data and enabled state at the next attempt', () => {
     const ghost = new PbGhost({ enabled: true });
     ghost.prepare(record);
-    expect(ghost.getPose(0.5)).toBe(null);
+    expect(ghost.getPose(0.025)).toBe(null);
     expect(ghost.beginRun()).toBe(true);
-    expect(ghost.getPose(0.5)).toMatchObject({ x: 2, y: 3 });
+    expect(ghost.getPose(0.025)).toMatchObject({ x: 2, y: 3 });
 
     ghost.prepare({
-      ghost: { samples: [[0, 9000, 9000, 0], [1000, 10000, 10000, 0]] },
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [900, 900, 0],
+        deltas: [100, 100, 0],
+      },
     });
-    expect(ghost.getPose(0.5)).toMatchObject({ x: 2, y: 3 });
+    expect(ghost.getPose(0.025)).toMatchObject({ x: 2, y: 3 });
 
     ghost.setEnabled(false);
-    expect(ghost.getPose(0.5)).toBe(null);
+    expect(ghost.getPose(0.025)).toBe(null);
     ghost.setEnabled(true);
-    expect(ghost.getPose(0.5)).toBe(null);
+    expect(ghost.getPose(0.025)).toBe(null);
     ghost.beginRun();
-    expect(ghost.getPose(0.5)).toMatchObject({ x: 9.5, y: 9.5 });
+    expect(ghost.getPose(0.025)).toMatchObject({ x: 9.5, y: 9.5 });
+  });
+
+  it('uses a ghost prepared after GO only on the next attempt', () => {
+    const ghost = new PbGhost();
+    expect(ghost.beginRun()).toBe(false);
+
+    ghost.prepare({
+      bestTimeMs: 50,
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [100, 0, 0],
+      },
+    });
+    expect(ghost.getPose(0.025)).toBe(null);
+    expect(ghost.beginRun()).toBe(true);
+    expect(ghost.getPose(0.025)).toMatchObject({ x: 0.5 });
   });
 
   it('renders without mutating playback samples', () => {
@@ -81,7 +148,7 @@ describe('PB ghost playback', () => {
     const carSprite = { id: 'selected-car' };
 
     expect(ghost.render(ctx, {
-      raceTimeSec: 0.5,
+      raceTimeSec: 0.025,
       gridSize: 20,
       carSprite,
       drawWidth: 52,

@@ -251,6 +251,106 @@ describe("scoreboard engine verification retries", () => {
     expect(refreshAfterAcceptedSubmission).not.toHaveBeenCalled();
   });
 
+  it("installs the accepted canonical track PB without a follow-up GET", async () => {
+    const challengeId = "daily-canonical-track-pb";
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 42,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+    });
+    const entry = getDailyChallengeVerificationEntry(challengeId);
+    const canonical = {
+      trackKey: "circuit",
+      bestTimeMs: 42000,
+      checkpointTimesSec: [9, 19],
+      updatedAt: "2026-07-17T20:00:00.000Z",
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [100, 100, 0],
+      },
+    };
+    const installCanonicalTrackPersonalBestGhost = vi.fn();
+    const prepareTrackPersonalBestGhost = vi.fn();
+    const invalidate = vi.fn();
+    const resolveTrackPersonalBestGhostPending = vi.fn();
+    const engine = {
+      installCanonicalTrackPersonalBestGhost,
+      prepareTrackPersonalBestGhost,
+      resolveTrackPersonalBestGhostPending,
+      pbGhostService: { invalidate },
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: { refreshDailyChallengeAfterAcceptedSubmission: vi.fn() },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => false),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(engine, entry, {
+      ok: true,
+      status: 200,
+      body: {
+        accepted: true,
+        improved: false,
+        bestTimeMs: 42000,
+        trackPbPersistenceStatus: "stored",
+        trackPersonalBest: canonical,
+      },
+    });
+
+    expect(installCanonicalTrackPersonalBestGhost).toHaveBeenCalledWith(
+      expect.objectContaining({ id: challengeId, trackKey: "circuit" }),
+      canonical,
+    );
+    expect(resolveTrackPersonalBestGhostPending).toHaveBeenCalledWith(challengeId);
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
+  });
+
+  it("marks the previous ghost unavailable when PB persistence fails", async () => {
+    const challengeId = "daily-pb-unavailable";
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 42,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+    });
+    const entry = getDailyChallengeVerificationEntry(challengeId);
+    const markTrackPersonalBestGhostUnavailable = vi.fn();
+    const engine = {
+      markTrackPersonalBestGhostUnavailable,
+      resolveTrackPersonalBestGhostPending: vi.fn(),
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: { refreshDailyChallengeAfterAcceptedSubmission: vi.fn() },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => false),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(engine, entry, {
+      ok: true,
+      status: 200,
+      body: {
+        accepted: true,
+        improved: false,
+        bestTimeMs: 42_000,
+        trackPbPersistenceStatus: "unavailable",
+        trackPersonalBest: null,
+      },
+    });
+
+    expect(markTrackPersonalBestGhostUnavailable).toHaveBeenCalledWith(
+      expect.objectContaining({ id: challengeId, trackKey: "circuit" }),
+    );
+  });
+
   it("does not refresh standings when a submission is rejected", async () => {
     const challengeId = "daily-rejected";
     enqueueDailyChallengeVerification({
