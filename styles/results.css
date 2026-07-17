@@ -143,9 +143,12 @@
     background: #475569;
 }
 
-.combined-action-btn.is-menu-selected .combined-action-btn-label {
-    text-decoration: underline;
-    text-underline-offset: 0.22em;
+.combined-action-btn.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.combined-action-btn--primary.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
 }
 
 .combined-action-btn svg,

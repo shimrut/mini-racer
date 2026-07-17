@@ -33,7 +33,6 @@ export function findPreferredMenuIndex(buttons) {
     const primaryIdx = buttons.findIndex((button) => (
         button.classList?.contains?.('main-menu__item--primary')
         || button.classList?.contains?.('combined-action-btn--primary')
-        || button.classList?.contains?.('result-share-panel__button--primary')
     ));
     if (primaryIdx >= 0 && !buttons[primaryIdx].disabled) return primaryIdx;
     return buttons.findIndex((button) => !button.disabled);
@@ -46,6 +45,20 @@ export function clearMenuSelection(buttons, container = null) {
         }
     }
     container?.classList?.remove?.(MENU_KEYBOARD_CUE_CLASS);
+}
+
+/** Hide the keyboard selection outline after mouse movement. */
+export function dismissMenuKeyboardCue(state, buttons = [], {
+    container = null,
+    preferredIndex = null,
+} = {}) {
+    if (!state?.keyboardNavActive) return false;
+    clearMenuSelection(buttons, container);
+    state.keyboardNavActive = false;
+    state.selectedIndex = typeof preferredIndex === 'number' && preferredIndex >= 0
+        ? preferredIndex
+        : findPreferredMenuIndex(buttons);
+    return true;
 }
 
 export function applyMenuSelection(buttons, index, {

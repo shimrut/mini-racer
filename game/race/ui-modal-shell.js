@@ -23,10 +23,9 @@ import {
 import { closeModalElement, openModalElement, runModalHandoff } from '../ui/modal-handoff.js';
 import { configureReusableModal } from '../ui/reusable-modal.js';
 import {
-    clearMenuSelection,
     collectVisibleActionButtons,
     createMenuKeyboardState,
-    getMenuNavDelta,
+    dismissMenuKeyboardCue,
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
@@ -101,61 +100,7 @@ export class ModalShell {
         this._leaderboardTouchEndHandler = null;
         this._leaderboardTouchCancelHandler = null;
         this._menuKeyboardState = createMenuKeyboardState();
-        this._shareMenuKeyboardState = createMenuKeyboardState();
-    }
-
-    getSharePanel() {
-        return this.modal?.querySelector?.('.result-share-panel') || null;
-    }
-
-    isSharePanelOpen() {
-        return Boolean(this.getSharePanel());
-    }
-
-    getSharePanelButtons({ requireLaidOut = true } = {}) {
-        const panel = this.getSharePanel();
-        return collectVisibleActionButtons(panel, '.result-share-panel__button', { requireLaidOut });
-    }
-
-    getShareMenuActionsRoot() {
-        const panel = this.getSharePanel();
-        if (!panel) return null;
-        return panel.querySelector('.result-share-panel__actions') || panel;
-    }
-
-    resetShareMenuKeyboardNav({ focusPreferred = true } = {}) {
-        const root = this.getShareMenuActionsRoot();
-        const buttons = this.getSharePanelButtons({ requireLaidOut: false });
-        resetMenuKeyboardState(this._shareMenuKeyboardState, buttons, {
-            preferredIndex: null,
-            container: root,
-            focusPreferred,
-        });
-    }
-
-    clearUnderlyingMenuKeyboardCue() {
-        const root = this.getActiveMenuActionsRoot();
-        const buttons = collectVisibleActionButtons(root, ':scope > button', {
-            requireLaidOut: false,
-        });
-        clearMenuSelection(buttons, root);
-        if (this._menuKeyboardState) {
-            this._menuKeyboardState.keyboardNavActive = false;
-        }
-    }
-
-    dismissSharePanelFromKeyboard() {
-        if (!this.isSharePanelOpen()) return false;
-        const buttons = this.getSharePanelButtons({ requireLaidOut: false });
-        const dismissBtn = buttons.find((button) => (
-            !button.classList?.contains?.('result-share-panel__button--primary')
-        )) || buttons[0];
-        if (dismissBtn) {
-            dismissBtn.click();
-            return true;
-        }
-        this._closeSharePanel();
-        return true;
+        this._modalTrapPointerMove = null;
     }
 
     getActiveMenuActionsRoot() {
@@ -173,16 +118,35 @@ export class ModalShell {
         const buttons = collectVisibleActionButtons(root, ':scope > button', {
             requireLaidOut: false,
         });
+        resetMenuKeyboardState(this._menuKeyboardState, buttons, {
+            preferredIndex: this.getMenuPreferredIndex(buttons),
+            container: root,
+            focusPreferred: true,
+        });
+    }
+
+    getMenuPreferredIndex(buttons) {
         const preferred = this._modalKind === 'pause'
             ? this.modalResumeBtn
             : this._modalKind === 'win'
                 ? this.combinedRestartBtn
                 : null;
-        const preferredIndex = preferred ? buttons.indexOf(preferred) : -1;
-        resetMenuKeyboardState(this._menuKeyboardState, buttons, {
-            preferredIndex: preferredIndex >= 0 ? preferredIndex : null,
+        if (!preferred || !buttons?.length) return null;
+        const preferredIndex = buttons.indexOf(preferred);
+        return preferredIndex >= 0 ? preferredIndex : null;
+    }
+
+    dismissMenuKeyboardCueFromPointer(event) {
+        if (!this._menuKeyboardState?.keyboardNavActive) return;
+        if (event?.pointerType && event.pointerType !== 'mouse') return;
+        if (this._activeTrapModal?.id !== 'modal') return;
+
+        const root = this.getActiveMenuActionsRoot();
+        if (!root) return;
+        const buttons = collectVisibleActionButtons(root);
+        dismissMenuKeyboardCue(this._menuKeyboardState, buttons, {
             container: root,
-            focusPreferred: true,
+            preferredIndex: this.getMenuPreferredIndex(buttons),
         });
     }
 
@@ -399,13 +363,6 @@ export class ModalShell {
     _closeSharePanel({ restoreScroll = true } = {}) {
         const panel = this.modal?.querySelector?.('.result-share-panel');
         const scrollTop = Number(panel?.dataset?.savedScrollTop);
-        const shareRoot = this.getShareMenuActionsRoot();
-        const shareButtons = this.getSharePanelButtons({ requireLaidOut: false });
-        clearMenuSelection(shareButtons, shareRoot);
-        if (this._shareMenuKeyboardState) {
-            this._shareMenuKeyboardState.keyboardNavActive = false;
-            this._shareMenuKeyboardState.selectedIndex = -1;
-        }
         panel?.remove();
         if (restoreScroll && Number.isFinite(scrollTop) && this.modalLapTimes) {
             this.modalLapTimes.scrollTop = scrollTop;
@@ -431,13 +388,11 @@ export class ModalShell {
         panel.append(title, copy, actions);
         triggerButton.disabled = true;
         this._setShareButtonLabel(triggerButton, 'Shared');
-        this.resetShareMenuKeyboardNav();
     }
 
     async _startShare(request, triggerButton, hostView) {
         if (!triggerButton || !hostView) return;
         this._closeSharePanel?.({ restoreScroll: false });
-        this.clearUnderlyingMenuKeyboardCue();
         const scrim = document.createElement('section');
         scrim.className = 'result-share-panel';
         scrim.setAttribute('role', 'dialog');
@@ -461,18 +416,15 @@ export class ModalShell {
         };
         panel.append(title, status, cancel);
         hostView.appendChild(scrim);
-        this.resetShareMenuKeyboardNav();
 
         const username = this.getRedditUsername?.();
         if (!username) {
             status.textContent = 'Sign in to Reddit to share your time.';
             cancel.textContent = 'Close';
-            this.resetShareMenuKeyboardNav();
             return;
         }
         if (typeof this.previewShare !== 'function' || typeof this.confirmShare !== 'function') {
             status.textContent = 'Sharing is unavailable right now.';
-            this.resetShareMenuKeyboardNav();
             return;
         }
         triggerButton.disabled = true;
@@ -524,17 +476,15 @@ export class ModalShell {
                     confirm.textContent = 'Try Again';
                     disclosure.textContent = error?.message || 'Could not share this result.';
                     disclosure.classList.add('is-error');
-                    this.resetShareMenuKeyboardNav();
                 }
             };
             actions.append(cancelReady, confirm);
             panel.append(title, disclosure, copy, actions);
-            this.resetShareMenuKeyboardNav();
+            confirm.focus();
         } catch (error) {
             triggerButton.disabled = false;
             status.textContent = error?.message || 'Could not prepare this result for sharing.';
             status.classList.add('is-error');
-            this.resetShareMenuKeyboardNav();
         }
     }
 
@@ -1009,6 +959,10 @@ export class ModalShell {
             document.removeEventListener('keydown', this._modalTrapKeydown, true);
             this._modalTrapKeydown = null;
         }
+        if (this._modalTrapPointerMove) {
+            document.removeEventListener('pointermove', this._modalTrapPointerMove, true);
+            this._modalTrapPointerMove = null;
+        }
 
         this._focusBeforeModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this._activeTrapModal = modalEl;
@@ -1019,14 +973,20 @@ export class ModalShell {
         if (preferredFocus) preferredFocus.focus();
         else if (focusables.length) focusables[0].focus();
         this._modalTrapKeydown = (event) => this.handleModalTrapKeydown(event);
+        this._modalTrapPointerMove = (event) => this.dismissMenuKeyboardCueFromPointer(event);
         document.addEventListener('keydown', this._modalTrapKeydown, true);
+        document.addEventListener('pointermove', this._modalTrapPointerMove, true);
     }
 
     releaseModalFocusTrap(modalEl) {
         if (this._activeTrapModal !== modalEl) return;
         document.removeEventListener('keydown', this._modalTrapKeydown, true);
+        if (this._modalTrapPointerMove) {
+            document.removeEventListener('pointermove', this._modalTrapPointerMove, true);
+        }
         this._activeTrapModal = null;
         this._modalTrapKeydown = null;
+        this._modalTrapPointerMove = null;
         const activeElement = document.activeElement;
         if (
             activeElement
@@ -1064,59 +1024,6 @@ export class ModalShell {
         if (!this._activeTrapModal) return;
 
         const isEscape = event.key === 'Escape' || event.code === 'Escape';
-        const sharePanelOpen = this._activeTrapModal?.id === 'modal' && this.isSharePanelOpen();
-
-        if (sharePanelOpen) {
-            if (isEscape) {
-                event.preventDefault();
-                event.stopPropagation();
-                this.dismissSharePanelFromKeyboard();
-                return;
-            }
-
-            const shareButtons = this.getSharePanelButtons();
-            if (handleMenuListKeydown(event, {
-                buttons: shareButtons,
-                state: this._shareMenuKeyboardState,
-                container: this.getShareMenuActionsRoot(),
-            })) {
-                return;
-            }
-
-            // Never let menu keys fall through to the finish/pause actions under the share panel.
-            if (getMenuNavDelta(event.key) !== 0 || event.key === 'Enter') {
-                event.preventDefault();
-                event.stopPropagation();
-                return;
-            }
-
-            if (event.key === 'Tab') {
-                const focusables = shareButtons.length
-                    ? shareButtons
-                    : this.getFocusables(this.getSharePanel());
-                if (focusables.length === 0) {
-                    event.preventDefault();
-                    return;
-                }
-                const first = focusables[0];
-                const last = focusables[focusables.length - 1];
-                if (event.shiftKey) {
-                    if (document.activeElement === first) {
-                        event.preventDefault();
-                        last.focus();
-                    }
-                    return;
-                }
-                if (document.activeElement === last) {
-                    event.preventDefault();
-                    first.focus();
-                }
-                return;
-            }
-
-            return;
-        }
-
         if (isEscape) {
             const trapRoot = this._activeTrapModal;
             if (this.isPauseEscapeTarget(trapRoot)) {

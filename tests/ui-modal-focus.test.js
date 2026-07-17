@@ -82,7 +82,6 @@ describe('modal escape key', () => {
             _activeTrapModal: modal,
             _modalKind: 'pause',
             isModalActive: () => true,
-            isSharePanelOpen: () => false,
             isPauseEscapeTarget: function isPauseEscapeTarget(trapRoot) {
                 return ModalShell.prototype.isPauseEscapeTarget.call(this, trapRoot);
             },
@@ -177,7 +176,6 @@ describe('modal pause/finish menu keyboard nav', () => {
             _modalKind: 'pause',
             _menuKeyboardState: state,
             isModalActive: () => true,
-            isSharePanelOpen: () => false,
             isPauseEscapeTarget: () => false,
             modalPauseView: pauseView,
             modalCombinedView: { classList: { contains: () => false } },
@@ -204,77 +202,5 @@ describe('modal pause/finish menu keyboard nav', () => {
         } finally {
             global.document = originalDocument;
         }
-    });
-
-    it('routes Enter to the share panel and blocks the finish menu underneath', () => {
-        const improve = makeMenuButton('improve');
-        improve.classList.toggle(MENU_SELECTED_CLASS, true);
-        const cancel = makeMenuButton('cancel');
-        const post = makeMenuButton('post');
-        post.classList.values.add('result-share-panel__button--primary');
-        const shareButtons = [cancel, post];
-        const shareActions = {
-            querySelectorAll: () => shareButtons,
-        };
-        const shareState = { keyboardNavActive: false, selectedIndex: 1 };
-        const finishState = { keyboardNavActive: true, selectedIndex: 0 };
-        const dismissSharePanelFromKeyboard = vi.fn();
-        const context = {
-            _activeTrapModal: { id: 'modal' },
-            _modalKind: 'win',
-            _menuKeyboardState: finishState,
-            _shareMenuKeyboardState: shareState,
-            isSharePanelOpen: () => true,
-            getSharePanel: () => ({ id: 'share' }),
-            getSharePanelButtons: () => shareButtons,
-            getShareMenuActionsRoot: () => shareActions,
-            dismissSharePanelFromKeyboard,
-            getActiveMenuActionsRoot: () => ({ id: 'finish-actions' }),
-            isPauseEscapeTarget: () => false,
-        };
-        const event = {
-            key: 'Enter',
-            preventDefault: vi.fn(),
-            stopPropagation: vi.fn(),
-            ctrlKey: false,
-            metaKey: false,
-            altKey: false,
-            target: null,
-        };
-        const originalDocument = global.document;
-        global.document = { activeElement: post };
-
-        try {
-            handleModalTrapKeydown.call(context, event);
-            expect(post.click).toHaveBeenCalled();
-            expect(improve.click).not.toHaveBeenCalled();
-            expect(event.stopPropagation).toHaveBeenCalled();
-        } finally {
-            global.document = originalDocument;
-        }
-    });
-
-    it('closes the share panel on Escape instead of dismissing the finish screen', () => {
-        const dismissSharePanelFromKeyboard = vi.fn(() => true);
-        const dismissRunsView = vi.fn();
-        const context = {
-            _activeTrapModal: { id: 'modal' },
-            isSharePanelOpen: () => true,
-            dismissSharePanelFromKeyboard,
-            dismissRunsView,
-            isPauseEscapeTarget: () => false,
-            modalRunsView: { classList: { contains: () => true } },
-        };
-        const event = {
-            key: 'Escape',
-            code: 'Escape',
-            preventDefault: vi.fn(),
-            stopPropagation: vi.fn(),
-        };
-
-        handleModalTrapKeydown.call(context, event);
-
-        expect(dismissSharePanelFromKeyboard).toHaveBeenCalled();
-        expect(dismissRunsView).not.toHaveBeenCalled();
     });
 });

@@ -3,6 +3,7 @@ import {
     MENU_SELECTED_CLASS,
     applyMenuSelection,
     createMenuKeyboardState,
+    dismissMenuKeyboardCue,
     getMenuNavDelta,
     handleMenuListKeydown,
     resetMenuKeyboardState,
@@ -157,5 +158,22 @@ describe('menu keyboard nav helper', () => {
         expect(state.selectedIndex).toBe(1);
         expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
         expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+    });
+
+    it('dismisses the cue on mouse movement and restores the preferred index', () => {
+        const buttons = [
+            makeButton('standings'),
+            makeButton('race', { primary: true }),
+        ];
+        const state = createMenuKeyboardState();
+        state.selectedIndex = 0;
+        state.keyboardNavActive = true;
+        applyMenuSelection(buttons, 0, { showCue: true });
+
+        dismissMenuKeyboardCue(state, buttons, { preferredIndex: 1 });
+
+        expect(state.keyboardNavActive).toBe(false);
+        expect(state.selectedIndex).toBe(1);
+        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 });

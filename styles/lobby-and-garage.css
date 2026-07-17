@@ -268,10 +268,12 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     color: var(--text-color);
 }
 
-.main-menu__item.is-menu-selected .main-menu__label,
-.main-menu__item.is-menu-selected .start-btn-main {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+.main-menu__item.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.main-menu__item--primary.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
 }
 
 .main-menu__item:active {

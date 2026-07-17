@@ -1,6 +1,7 @@
 import {
     collectVisibleActionButtons,
     createMenuKeyboardState,
+    dismissMenuKeyboardCue,
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
@@ -21,6 +22,7 @@ export class StartOverlay {
         this._startOverlayIsReturningPlayer = false;
         this._menuKeyboardState = createMenuKeyboardState();
         this._menuKeydownHandler = null;
+        this._menuPointerMoveHandler = null;
     }
 
     get startOverlay() { return document.getElementById('start-overlay'); }
@@ -65,20 +67,30 @@ export class StartOverlay {
         return collectVisibleActionButtons(this.mainMenu, ':scope > .main-menu__item');
     }
 
+    getLobbyPreferredIndex(buttons = this.getLobbyMenuButtons()) {
+        const preferredIndex = buttons.indexOf(this.startBtn);
+        return preferredIndex >= 0 ? preferredIndex : null;
+    }
+
     resetLobbyMenuKeyboardNav() {
         const buttons = this.getLobbyMenuButtons();
-        const preferredIndex = buttons.indexOf(this.startBtn);
         resetMenuKeyboardState(this._menuKeyboardState, buttons, {
-            preferredIndex: preferredIndex >= 0 ? preferredIndex : null,
+            preferredIndex: this.getLobbyPreferredIndex(buttons),
             container: this.mainMenu,
             focusPreferred: true,
         });
     }
 
     bindKeyboardNavigation() {
-        if (this._menuKeydownHandler || typeof document === 'undefined') return;
-        this._menuKeydownHandler = (event) => this.handleLobbyMenuKeydown(event);
-        document.addEventListener('keydown', this._menuKeydownHandler, true);
+        if (typeof document === 'undefined') return;
+        if (!this._menuKeydownHandler) {
+            this._menuKeydownHandler = (event) => this.handleLobbyMenuKeydown(event);
+            document.addEventListener('keydown', this._menuKeydownHandler, true);
+        }
+        if (!this._menuPointerMoveHandler) {
+            this._menuPointerMoveHandler = (event) => this.handleLobbyMenuPointerMove(event);
+            document.addEventListener('pointermove', this._menuPointerMoveHandler, true);
+        }
     }
 
     handleLobbyMenuKeydown(event) {
@@ -90,6 +102,19 @@ export class StartOverlay {
             buttons,
             state: this._menuKeyboardState,
             container: this.mainMenu,
+        });
+    }
+
+    handleLobbyMenuPointerMove(event) {
+        if (!this._menuKeyboardState.keyboardNavActive) return;
+        if (event.pointerType && event.pointerType !== 'mouse') return;
+        if (!this.isStartOverlayVisible()) return;
+        if (this.isLobbyKeyboardNavBlocked()) return;
+
+        const buttons = this.getLobbyMenuButtons();
+        dismissMenuKeyboardCue(this._menuKeyboardState, buttons, {
+            container: this.mainMenu,
+            preferredIndex: this.getLobbyPreferredIndex(buttons),
         });
     }
 
