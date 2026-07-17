@@ -173,16 +173,10 @@ body {
 
 .podium-list {
     display: grid;
+    gap: clamp(0.55rem, 1.6vh, 0.85rem);
     margin: 0;
-    padding: 0.15rem 0;
+    padding: 0;
     list-style: none;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--panel);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 0.85);
 }
 
 .podium-row {
@@ -193,11 +187,12 @@ body {
     align-items: center;
     min-height: clamp(3.8rem, 11vh, 5.4rem);
     padding-inline: clamp(0.85rem, 2.4vw, 1.35rem);
+    border-radius: var(--radius);
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 14px 28px -24px rgba(0, 0, 0, 0.9);
     animation: row-arrive 540ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.podium-row + .podium-row {
-    border-top: 1px solid var(--line);
 }
 
 .podium-row:nth-child(1) { animation-delay: 160ms; }
@@ -207,7 +202,9 @@ body {
 .podium-row--gold {
     --tier: var(--gold);
     min-height: clamp(4.2rem, 12.5vh, 6rem);
-    background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 10%, transparent), transparent 42%);
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--gold) 12%, transparent), transparent 46%),
+        var(--panel);
 }
 .podium-row--silver { --tier: var(--silver); }
 .podium-row--bronze { --tier: var(--bronze); }
@@ -217,7 +214,6 @@ body {
     align-items: baseline;
     justify-content: flex-start;
     padding-right: clamp(0.7rem, 2vw, 1.1rem);
-    border-right: 1px solid var(--line);
     color: var(--tier);
     font-style: italic;
     font-weight: 900;

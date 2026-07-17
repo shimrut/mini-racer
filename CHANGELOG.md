@@ -1,5 +1,6 @@
 # Changelog
 
+- Split final podium places into separate rounded rows with spacing and no borders.
 - Restyled final podium posts to match the rounded results panel reference while keeping Mini Racer type, color, and accent rules; removed the red trail divider in favor of the faint track watermark.
 - Tightened final podium spacing and lowered the track watermark so results read clearer against the backdrop.
 - Removed the dashed empty-time box and gold-place star accents from final podium posts for a quieter layout.
