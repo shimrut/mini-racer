@@ -12,6 +12,13 @@
 
 <body>
     <main class="podium-shell" aria-labelledby="podium-title">
+        <div class="ambient" aria-hidden="true">
+            <span class="ambient__grain"></span>
+            <span class="ambient__streak"></span>
+            <span class="ambient__checks"></span>
+            <span class="ambient__halo"></span>
+        </div>
+
         <header class="podium-header">
             <div class="brand-lockup" aria-label="Mini Racer">
                 <span class="brand-lockup__mini">Mini</span>
@@ -26,9 +33,13 @@
         </header>
 
         <section class="podium-results" aria-label="Final podium results">
-            <div class="finish-line" aria-hidden="true"></div>
+            <div class="finish-line" aria-hidden="true">
+                <span class="finish-line__trail"></span>
+                <img class="finish-line__car" src="public/assets/cars/mr_mr_red.webp" alt="">
+            </div>
             <ol id="podium-list" class="podium-list">
                 <li class="podium-row podium-row--gold" data-rank="1">
+                    <span class="podium-row__crown" aria-hidden="true">★</span>
                     <span class="podium-row__place" aria-label="First place">
                         <span class="podium-row__number">1</span>
                         <span class="podium-row__ordinal">ST</span>
@@ -74,8 +85,7 @@
         </section>
 
         <footer class="podium-footer">
-            <span>Seven days. One final order.</span>
-            <span class="podium-footer__mark" aria-hidden="true"></span>
+            <span>More tracks. More podiums. Go claim your spot.</span>
         </footer>
     </main>
 </body>
