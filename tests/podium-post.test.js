@@ -1,11 +1,25 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    bindPodiumPlayNow,
     hydrateMissingRedditAvatars,
     normalizePodium,
     readPodiumPostData,
     renderPodium,
 } from '../podium.js';
+import { requestFeaturedDailyChallengeStart } from '../game/daily-challenge/service.js';
+
+vi.mock('../game/daily-challenge/service.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        requestFeaturedDailyChallengeStart: vi.fn(),
+    };
+});
+
+vi.mock('@devvit/web/client', () => ({
+    requestExpandedMode: vi.fn(async () => undefined),
+}));
 
 const OFFICIAL_REDDIT_SNOO_URL =
     'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
@@ -23,6 +37,7 @@ function createDocument() {
                 </li>
             `).join('')}
         </ol>
+        <button id="podium-play" type="button">Play Now</button>
     `).window.document;
 }
 
@@ -137,5 +152,28 @@ describe('podium custom post', () => {
             avatarUrl: 'https://styles.redditmedia.com/shimroot.png',
         });
         expect(hydrated.positions[1].avatarUrl).toBe(OFFICIAL_REDDIT_SNOO_URL);
+    });
+
+    it('Play Now requests today\'s featured track and opens the game entry', async () => {
+        const document = createDocument();
+        const openGame = vi.fn(async () => undefined);
+        const button = bindPodiumPlayNow(document, openGame);
+        expect(button).toBeTruthy();
+
+        button.click();
+
+        expect(openGame).toHaveBeenCalledOnce();
+    });
+
+    it('featured open path stores the featured-start override before expanding', async () => {
+        const { openFeaturedGameFromPodium } = await import('../podium.js');
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        requestFeaturedDailyChallengeStart.mockClear();
+        requestExpandedMode.mockClear();
+
+        await openFeaturedGameFromPodium({ type: 'click' });
+
+        expect(requestFeaturedDailyChallengeStart).toHaveBeenCalledOnce();
+        expect(requestExpandedMode).toHaveBeenCalledWith({ type: 'click' }, 'game');
     });
 });

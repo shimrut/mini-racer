@@ -1,3 +1,9 @@
+import { TRACKS } from './game/track/tracks.js';
+import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
+import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
+import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
+import { requestFeaturedDailyChallengeStart } from './game/daily-challenge/service.js';
+
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
 const EMPTY_TIME = '—';
@@ -169,8 +175,97 @@ function cleanText(value) {
 
 async function boot() {
     const podium = renderPodium(document, readPodiumPostData());
+    // Paint the track immediately — do not wait on avatar backfill or the car sprite.
+    renderPodiumTrack(podium.trackName);
+    bindPodiumPlayNow(document);
     const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
     if (hydrated !== podium) renderPodium(document, hydrated);
+}
+
+export function bindPodiumPlayNow(documentRef, openGame = openFeaturedGameFromPodium) {
+    const playButton = documentRef?.getElementById('podium-play');
+    if (!playButton || playButton.dataset.bound === '1') return playButton || null;
+    playButton.dataset.bound = '1';
+    playButton.addEventListener('click', openGame);
+    return playButton;
+}
+
+export async function openFeaturedGameFromPodium(event) {
+    requestFeaturedDailyChallengeStart();
+    try {
+        // Hosted custom posts only; local podium-test.html has no Devvit client.
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        await requestExpandedMode(event, 'game');
+    } catch (error) {
+        console.error('Failed to open today\'s featured Mini Racer track from the podium:', error);
+    }
+}
+
+let trackCarPromise = null;
+
+function loadTrackCar() {
+    if (trackCarPromise) return trackCarPromise;
+    const loader = new CarSpriteLoader();
+    trackCarPromise = new Promise((resolve) => {
+        loader.load(STOCK_CAR_ASSET_NAME, {
+            onLoaded: resolve,
+            onError: () => {
+                console.warn(`Unable to load ${STOCK_CAR_ASSET_NAME} in the podium post.`);
+                resolve(null);
+            },
+        });
+    });
+    return trackCarPromise;
+}
+
+function resolveTrackByName(trackName) {
+    if (typeof trackName !== 'string') return null;
+    const target = trackName.trim().toLowerCase();
+    for (const [trackKey, track] of Object.entries(TRACKS)) {
+        if (track && typeof track.name === 'string' && track.name.trim().toLowerCase() === target) {
+            return { trackKey, track };
+        }
+    }
+    return null;
+}
+
+function renderPodiumTrack(trackName) {
+    const canvas = document.getElementById('podium-track');
+    if (!canvas) return;
+    const resolved = resolveTrackByName(trackName) || { trackKey: 'circuit', track: TRACKS.circuit };
+    const { trackKey, track } = resolved;
+    if (!track) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = globalThis.devicePixelRatio || 1;
+    canvas.width = Math.max(100, Math.round(rect.width * dpr));
+    canvas.height = Math.max(100, Math.round(rect.height * dpr));
+
+    const presentation = resolveTrackPresentation(trackKey, {
+        surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+    });
+
+    const paint = (carImage = null) => {
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: { outer: track.outer, inner: track.inner },
+            presentation,
+            startLine: track.startLine,
+            startPos: track.startPos,
+            startAngle: track.startAngle ?? 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            showSchematicCarTrail: Boolean(carImage),
+            moveSchematicCarPastStartLine: true,
+            schematicCarImage: carImage,
+            hideSchematicStartArrow: true,
+            runHistory: [],
+        });
+    };
+
+    paint(null);
+    loadTrackCar().then((carImage) => {
+        if (carImage) paint(carImage);
+    });
 }
 
 if (typeof document !== 'undefined') {
@@ -179,4 +274,9 @@ if (typeof document !== 'undefined') {
     } else {
         boot();
     }
+
+    window.addEventListener('resize', () => {
+        const podium = renderPodium(document, readPodiumPostData());
+        renderPodiumTrack(podium.trackName);
+    });
 }

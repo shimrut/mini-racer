@@ -1,5 +1,12 @@
 # Changelog
 
+- Made the gold podium row larger and added matching silver/bronze side gradients.
+- Split final podium places into separate rounded rows with spacing and no borders.
+- Restyled final podium posts to match the rounded results panel reference while keeping Mini Racer type, color, and accent rules; removed the red trail divider in favor of the faint track watermark.
+- Tightened final podium spacing and lowered the track watermark so results read clearer against the backdrop.
+- Removed the dashed empty-time box and gold-place star accents from final podium posts for a quieter layout.
+- Added a **Play Now** control on final podium posts that opens today's featured Mini Racer track.
+- Fixed the final podium custom post so the red finish-line trail meets the car (dash mask no longer blanks the right side) and the daily track schematic shows as a faint background immediately on load instead of after avatar or car-asset waits.
 - Replaced the podium's hand-drawn fallback with Reddit's official hosted default Snoo. Reddit accounts whose standard profile icon is not exposed by Devvit now use that official fallback, and the legacy avatar cache is versioned so existing podiums adopt it immediately.
 - Fixed podium public racers incorrectly showing the generic Snoo on posts created before avatar payloads existed. Legacy posts now resolve and cache only their already-public Reddit identities, new posts retain the Reddit-hosted avatar URL directly, and podium names no longer include `u/`.
 - Added identity-aware podium avatars: finalists displaying a Reddit username show their publication-time Snoovatar, while private identities and unavailable avatars use a bundled generic Snoo without exposing additional profile data.

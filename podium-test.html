@@ -4,9 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Racer Final Podium</title>
+    <title>Podium boot test</title>
     <link rel="stylesheet" href="podium.css">
-    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <script>
+        window.__DEVVIT_PODIUM__ = {
+            challengeId: 'demo',
+            challengeDate: '2026-07-10',
+            trackName: 'Cedar Ridge',
+            positions: [
+                { rank: 1, identityType: 'reddit', displayName: 'u/shimroot', formattedTime: '0:10.57', avatarUrl: 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_1.png' },
+                { rank: 2, identityType: 'reddit', displayName: 'u/velvet_wombat', formattedTime: '0:10.60', avatarUrl: 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_2.png' },
+                { rank: 3, identityType: 'empty', displayName: '', formattedTime: null, avatarUrl: null }
+            ]
+        };
+        window.devvit = { context: { postData: { podium: window.__DEVVIT_PODIUM__ } } };
+    </script>
     <script type="module" src="podium.js"></script>
 </head>
 
@@ -23,7 +35,6 @@
                 <span class="brand-lockup__mini">Mini</span>
                 <span class="brand-lockup__racer">Racer</span>
             </div>
-
             <div class="result-heading">
                 <p class="result-heading__eyebrow">Final podium</p>
                 <h1 id="podium-title" class="result-heading__track">Daily GP</h1>
