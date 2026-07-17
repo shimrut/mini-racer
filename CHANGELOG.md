@@ -1,5 +1,6 @@
 # Changelog
 
+- Tightened final podium spacing and lowered the track watermark so results read clearer against the backdrop.
 - Removed the dashed empty-time box and gold-place star accents from final podium posts for a quieter layout.
 - Added a **Play Now** control on final podium posts that opens today's featured Mini Racer track.
 - Fixed the final podium custom post so the red finish-line trail meets the car (dash mask no longer blanks the right side) and the daily track schematic shows as a faint background immediately on load instead of after avatar or car-asset waits.
