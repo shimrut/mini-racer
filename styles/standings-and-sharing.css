@@ -254,6 +254,14 @@
     background: #475569;
 }
 
+.result-share-panel__button.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
+.result-share-panel__button--primary.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+}
+
 .result-share-panel__button--primary {
     background: var(--accent-color);
     color: white;

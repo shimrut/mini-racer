@@ -177,6 +177,7 @@ describe('modal pause/finish menu keyboard nav', () => {
             _menuKeyboardState: state,
             isModalActive: () => true,
             isPauseEscapeTarget: () => false,
+            isSharePanelOpen: () => false,
             modalPauseView: pauseView,
             modalCombinedView: { classList: { contains: () => false } },
             modalRunsView: { classList: { contains: () => false } },
@@ -199,6 +200,68 @@ describe('modal pause/finish menu keyboard nav', () => {
             expect(event.preventDefault).toHaveBeenCalled();
             expect(restart.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
             expect(restart.focus).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('keeps keyboard nav on the share panel instead of finish actions underneath', () => {
+        const closeBtn = makeMenuButton('close');
+        const shareBtn = makeMenuButton('share');
+        shareBtn.classList.add(MENU_SELECTED_CLASS);
+        const finishRoot = {
+            querySelectorAll: () => [shareBtn],
+        };
+        const shareActions = {
+            querySelectorAll: (selector) => (selector === 'button' || selector === ':scope > button' ? [closeBtn] : []),
+        };
+        const sharePanel = {
+            querySelector: (selector) => (selector === '.result-share-panel__actions' ? shareActions : null),
+            querySelectorAll: (selector) => (selector === 'button' ? [closeBtn] : []),
+        };
+        const closeSharePanel = vi.fn();
+        const shareState = { keyboardNavActive: false, selectedIndex: 0 };
+        const finishState = { keyboardNavActive: true, selectedIndex: 0 };
+        const context = {
+            _activeTrapModal: { id: 'modal' },
+            _modalKind: 'win',
+            _menuKeyboardState: finishState,
+            _shareMenuKeyboardState: shareState,
+            isSharePanelOpen: () => true,
+            isPauseEscapeTarget: () => false,
+            getSharePanelRoot: () => sharePanel,
+            getSharePanelButtons: () => [closeBtn],
+            getSharePanelActionsContainer: () => shareActions,
+            getActiveMenuActionsRoot: () => finishRoot,
+            _closeSharePanel: closeSharePanel,
+            getFocusables: () => [closeBtn],
+        };
+
+        const arrowEvent = {
+            key: 'ArrowDown',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            target: null,
+        };
+        const originalDocument = global.document;
+        global.document = { activeElement: closeBtn };
+
+        try {
+            handleModalTrapKeydown.call(context, arrowEvent);
+            expect(closeBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(shareBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+
+            const escapeEvent = {
+                key: 'Escape',
+                code: 'Escape',
+                preventDefault: vi.fn(),
+                stopPropagation: vi.fn(),
+            };
+            handleModalTrapKeydown.call(context, escapeEvent);
+            expect(closeSharePanel).toHaveBeenCalled();
         } finally {
             global.document = originalDocument;
         }

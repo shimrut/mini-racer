@@ -100,7 +100,46 @@ export class ModalShell {
         this._leaderboardTouchEndHandler = null;
         this._leaderboardTouchCancelHandler = null;
         this._menuKeyboardState = createMenuKeyboardState();
+        this._shareMenuKeyboardState = createMenuKeyboardState();
         this._modalTrapPointerMove = null;
+    }
+
+    isSharePanelOpen() {
+        return Boolean(this.modal?.querySelector?.('.result-share-panel'));
+    }
+
+    getSharePanelRoot() {
+        return this.modal?.querySelector?.('.result-share-panel') || null;
+    }
+
+    getSharePanelButtons() {
+        return collectVisibleActionButtons(this.getSharePanelRoot(), 'button', {
+            requireLaidOut: false,
+        });
+    }
+
+    getSharePanelActionsContainer() {
+        const root = this.getSharePanelRoot();
+        return root?.querySelector?.('.result-share-panel__actions') || root;
+    }
+
+    clearFinishMenuKeyboardCue() {
+        const root = this.getActiveMenuActionsRoot();
+        const buttons = collectVisibleActionButtons(root, ':scope > button', {
+            requireLaidOut: false,
+        });
+        if (this._menuKeyboardState?.keyboardNavActive) {
+            dismissMenuKeyboardCue(this._menuKeyboardState, buttons, {
+                container: root,
+                preferredIndex: this.getMenuPreferredIndex(buttons),
+            });
+            return;
+        }
+        resetMenuKeyboardState(this._menuKeyboardState, buttons, {
+            preferredIndex: this.getMenuPreferredIndex(buttons),
+            container: root,
+            focusPreferred: false,
+        });
     }
 
     getActiveMenuActionsRoot() {
@@ -137,9 +176,19 @@ export class ModalShell {
     }
 
     dismissMenuKeyboardCueFromPointer(event) {
-        if (!this._menuKeyboardState?.keyboardNavActive) return;
         if (event?.pointerType && event.pointerType !== 'mouse') return;
         if (this._activeTrapModal?.id !== 'modal') return;
+
+        if (this.isSharePanelOpen()) {
+            const shareButtons = this.getSharePanelButtons();
+            dismissMenuKeyboardCue(this._shareMenuKeyboardState, shareButtons, {
+                container: this.getSharePanelActionsContainer(),
+                preferredIndex: shareButtons.length ? shareButtons.length - 1 : null,
+            });
+            return;
+        }
+
+        if (!this._menuKeyboardState?.keyboardNavActive) return;
 
         const root = this.getActiveMenuActionsRoot();
         if (!root) return;
@@ -363,6 +412,10 @@ export class ModalShell {
     _closeSharePanel({ restoreScroll = true } = {}) {
         const panel = this.modal?.querySelector?.('.result-share-panel');
         const scrollTop = Number(panel?.dataset?.savedScrollTop);
+        resetMenuKeyboardState(this._shareMenuKeyboardState, this.getSharePanelButtons(), {
+            container: this.getSharePanelActionsContainer(),
+            focusPreferred: false,
+        });
         panel?.remove();
         if (restoreScroll && Number.isFinite(scrollTop) && this.modalLapTimes) {
             this.modalLapTimes.scrollTop = scrollTop;
@@ -388,6 +441,11 @@ export class ModalShell {
         panel.append(title, copy, actions);
         triggerButton.disabled = true;
         this._setShareButtonLabel(triggerButton, 'Shared');
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
+            preferredIndex: 0,
+            container: actions,
+            focusPreferred: true,
+        });
     }
 
     async _startShare(request, triggerButton, hostView) {
@@ -416,11 +474,18 @@ export class ModalShell {
         };
         panel.append(title, status, cancel);
         hostView.appendChild(scrim);
+        this.clearFinishMenuKeyboardCue();
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [cancel], {
+            preferredIndex: 0,
+            container: this.getSharePanelActionsContainer(),
+            focusPreferred: true,
+        });
 
         const username = this.getRedditUsername?.();
         if (!username) {
             status.textContent = 'Sign in to Reddit to share your time.';
             cancel.textContent = 'Close';
+            cancel.focus();
             return;
         }
         if (typeof this.previewShare !== 'function' || typeof this.confirmShare !== 'function') {
@@ -480,7 +545,11 @@ export class ModalShell {
             };
             actions.append(cancelReady, confirm);
             panel.append(title, disclosure, copy, actions);
-            confirm.focus();
+            resetMenuKeyboardState(this._shareMenuKeyboardState, [cancelReady, confirm], {
+                preferredIndex: 1,
+                container: actions,
+                focusPreferred: true,
+            });
         } catch (error) {
             triggerButton.disabled = false;
             status.textContent = error?.message || 'Could not prepare this result for sharing.';
@@ -1024,6 +1093,12 @@ export class ModalShell {
         if (!this._activeTrapModal) return;
 
         const isEscape = event.key === 'Escape' || event.code === 'Escape';
+        if (isEscape && this.isSharePanelOpen?.()) {
+            event.preventDefault();
+            event.stopPropagation();
+            this._closeSharePanel();
+            return;
+        }
         if (isEscape) {
             const trapRoot = this._activeTrapModal;
             if (this.isPauseEscapeTarget(trapRoot)) {
@@ -1050,6 +1125,36 @@ export class ModalShell {
                 this.dismissRunsView();
                 return;
             }
+        }
+
+        if (this.isSharePanelOpen?.() && this._activeTrapModal?.id === 'modal') {
+            const sharePanel = this.getSharePanelRoot();
+            const shareButtons = this.getSharePanelButtons();
+            if (handleMenuListKeydown(event, {
+                buttons: shareButtons,
+                state: this._shareMenuKeyboardState,
+                container: this.getSharePanelActionsContainer(),
+            })) {
+                return;
+            }
+            if (event.key === 'Tab' && sharePanel) {
+                const focusables = this.getFocusables(sharePanel);
+                if (focusables.length === 0) return;
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (event.shiftKey) {
+                    if (document.activeElement === first) {
+                        event.preventDefault();
+                        last.focus();
+                    }
+                    return;
+                }
+                if (document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+            return;
         }
 
         const menuActionsRoot = this.getActiveMenuActionsRoot();
