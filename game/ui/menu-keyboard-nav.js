@@ -5,8 +5,27 @@ function isEditableTarget(target) {
     if (!target || typeof target !== 'object') return false;
     if (typeof Element !== 'undefined' && !(target instanceof Element)) return false;
     const tag = target.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag === 'INPUT') {
+        const type = String(target.type || 'text').toLowerCase();
+        // Checkboxes are settings toggles and must stay keyboard-navigable.
+        if (type === 'checkbox' || type === 'radio' || type === 'button' || type === 'submit') {
+            return false;
+        }
+        return true;
+    }
     return Boolean(target.isContentEditable);
+}
+
+export function filterVisibleMenuItems(nodes, { requireLaidOut = true } = {}) {
+    if (!nodes?.length) return [];
+    return Array.from(nodes).filter((node) => {
+        if (!node || node.disabled || node.hidden) return false;
+        if (node.getAttribute?.('aria-hidden') === 'true') return false;
+        if (node.style?.display === 'none') return false;
+        if (requireLaidOut && node.offsetParent === null) return false;
+        return true;
+    });
 }
 
 export function getMenuNavDelta(key) {
@@ -19,13 +38,7 @@ export function collectVisibleActionButtons(container, selector = ':scope > butt
     requireLaidOut = true,
 } = {}) {
     if (!container?.querySelectorAll) return [];
-    return Array.from(container.querySelectorAll(selector)).filter((button) => {
-        if (!button || button.disabled || button.hidden) return false;
-        if (button.getAttribute?.('aria-hidden') === 'true') return false;
-        if (button.style?.display === 'none') return false;
-        if (requireLaidOut && button.offsetParent === null) return false;
-        return true;
-    });
+    return filterVisibleMenuItems(container.querySelectorAll(selector), { requireLaidOut });
 }
 
 export function findPreferredMenuIndex(buttons) {

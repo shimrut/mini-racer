@@ -214,6 +214,21 @@
     accent-color: var(--accent-color);
 }
 
+#settings-modal .modal-sheet-settings-switch.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    border-radius: var(--radius-full);
+}
+
+#settings-modal .settings-collision-delay-meter.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    border-radius: var(--radius-sm);
+}
+
+#settings-modal .combined-action-btn.is-menu-selected,
+#settings-modal #settings-back-btn.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
 #settings-modal .modal-sheet-settings-identity-desc {
     margin: 0;
     font-family: var(--mono-font);

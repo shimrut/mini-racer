@@ -176,4 +176,38 @@ describe('menu keyboard nav helper', () => {
         expect(state.selectedIndex).toBe(1);
         expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
+
+    it('allows navigating when a checkbox switch is focused', () => {
+        const checkbox = makeButton('toggle');
+        checkbox.tagName = 'INPUT';
+        checkbox.type = 'checkbox';
+        const close = makeButton('close');
+        const buttons = [checkbox, close];
+        const state = createMenuKeyboardState();
+        state.selectedIndex = 0;
+        const event = makeEvent('ArrowDown', { target: checkbox });
+
+        expect(handleMenuListKeydown(event, {
+            buttons,
+            state,
+            getActiveElement: () => checkbox,
+        })).toBe(true);
+        expect(close.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+    });
+
+    it('activates a checkbox with Enter', () => {
+        const checkbox = makeButton('toggle');
+        checkbox.tagName = 'INPUT';
+        checkbox.type = 'checkbox';
+        const state = createMenuKeyboardState();
+        state.selectedIndex = 0;
+        const event = makeEvent('Enter', { target: checkbox });
+
+        expect(handleMenuListKeydown(event, {
+            buttons: [checkbox],
+            state,
+            getActiveElement: () => checkbox,
+        })).toBe(true);
+        expect(checkbox.click).toHaveBeenCalled();
+    });
 });

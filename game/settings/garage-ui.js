@@ -88,7 +88,10 @@ export class GarageUi {
         });
         if (isVisible) {
             this.setGarageTab(this.activeGarageTab, { focusTab: false });
-            requestAnimationFrame(() => this.modal?.activateModalFocusTrap?.(garageModal));
+            requestAnimationFrame(() => {
+                this.modal?.activateModalFocusTrap?.(garageModal);
+                this.modal?.resetGarageMenuKeyboardNav?.();
+            });
         } else {
             this.modal?.releaseModalFocusTrap?.(garageModal);
             if (this.modal?.isModalActive?.()) {
@@ -125,6 +128,7 @@ export class GarageUi {
             const focusEl = tabButtons.find(([id]) => id === this.activeGarageTab)?.[1];
             focusEl?.focus();
         }
+        this.modal?.onGarageTabChangedForKeyboardNav?.();
     }
 
     buildSkinGrid() {

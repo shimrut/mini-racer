@@ -418,6 +418,7 @@ export class SettingsUi {
             if (this.modal && this.modal.activateModalFocusTrap) {
                 this.modal.activateModalFocusTrap(this.settingsModal);
             }
+            this.modal?.resetSettingsMenuKeyboardNav?.();
         });
     }
 }

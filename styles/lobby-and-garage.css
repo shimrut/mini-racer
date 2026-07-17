@@ -337,6 +337,14 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     color: var(--bg-surface);
 }
 
+.garage-tab.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
+.garage-tab.is-selected.is-menu-selected {
+    box-shadow: 0 0 0 2px var(--accent-color);
+}
+
 .garage-tab-panel {
     flex: 1 1 auto;
     min-height: 0;
@@ -408,6 +416,16 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 .garage-skin-option.is-selected:hover,
 .garage-trail-option.is-selected:hover {
     background: #991b1b;
+}
+
+.garage-skin-option.is-menu-selected,
+.garage-trail-option.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
+.garage-skin-option.is-selected.is-menu-selected,
+.garage-trail-option.is-selected.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
 }
 
 .garage-skin-option__thumb {
@@ -611,3 +629,21 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     width: 3rem;
     height: 3rem;
 }
+
+#garage-modal .garage-tab.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
+#garage-modal .garage-tab.is-selected.is-menu-selected {
+    box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+#garage-modal .garage-skin-option.is-menu-selected,
+#garage-modal .garage-trail-option.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
+#garage-modal .combined-action-btn.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+

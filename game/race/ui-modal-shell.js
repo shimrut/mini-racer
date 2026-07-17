@@ -23,9 +23,11 @@ import {
 import { closeModalElement, openModalElement, runModalHandoff } from '../ui/modal-handoff.js';
 import { configureReusableModal } from '../ui/reusable-modal.js';
 import {
+    applyMenuSelection,
     collectVisibleActionButtons,
     createMenuKeyboardState,
     dismissMenuKeyboardCue,
+    filterVisibleMenuItems,
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
@@ -101,6 +103,8 @@ export class ModalShell {
         this._leaderboardTouchCancelHandler = null;
         this._menuKeyboardState = createMenuKeyboardState();
         this._shareMenuKeyboardState = createMenuKeyboardState();
+        this._garageMenuKeyboardState = createMenuKeyboardState();
+        this._settingsMenuKeyboardState = createMenuKeyboardState();
         this._modalTrapPointerMove = null;
     }
 
@@ -121,6 +125,88 @@ export class ModalShell {
     getSharePanelActionsContainer() {
         const root = this.getSharePanelRoot();
         return root?.querySelector?.('.result-share-panel__actions') || root;
+    }
+
+    getGarageMenuContainer() {
+        return document.getElementById('garage-panel')
+            || document.getElementById('garage-modal');
+    }
+
+    getGarageMenuItems() {
+        const tabSkin = document.getElementById('garage-tab-skin');
+        const tabTrails = document.getElementById('garage-tab-trails');
+        const closeBtn = document.getElementById('garage-close-btn');
+        const skinPanel = document.getElementById('garage-panel-skin');
+        const trailsPanel = document.getElementById('garage-panel-trails');
+        const activePanel = skinPanel && !skinPanel.hidden
+            ? skinPanel
+            : trailsPanel;
+        const options = activePanel
+            ? collectVisibleActionButtons(
+                activePanel,
+                '.garage-skin-option, .garage-trail-option',
+                { requireLaidOut: false },
+            )
+            : [];
+        return filterVisibleMenuItems(
+            [tabSkin, tabTrails, ...options, closeBtn],
+            { requireLaidOut: false },
+        );
+    }
+
+    resetGarageMenuKeyboardNav({ keepCue = false } = {}) {
+        const items = this.getGarageMenuItems();
+        const container = this.getGarageMenuContainer();
+        const firstOptionIndex = items.findIndex((item) => (
+            item.classList?.contains?.('garage-skin-option')
+            || item.classList?.contains?.('garage-trail-option')
+        ));
+
+        if (keepCue && this._garageMenuKeyboardState?.keyboardNavActive) {
+            const index = firstOptionIndex >= 0 ? firstOptionIndex : 0;
+            this._garageMenuKeyboardState.selectedIndex = index;
+            this._garageMenuKeyboardState.keyboardNavActive = true;
+            applyMenuSelection(items, index, { showCue: true, container });
+            return index;
+        }
+
+        return resetMenuKeyboardState(this._garageMenuKeyboardState, items, {
+            preferredIndex: 0,
+            container,
+            focusPreferred: true,
+        });
+    }
+
+    onGarageTabChangedForKeyboardNav() {
+        this.resetGarageMenuKeyboardNav({
+            keepCue: Boolean(this._garageMenuKeyboardState?.keyboardNavActive),
+        });
+    }
+
+    getSettingsMenuContainer() {
+        return document.getElementById('modal-settings-view')
+            || document.getElementById('settings-modal');
+    }
+
+    getSettingsMenuItems() {
+        return filterVisibleMenuItems([
+            document.getElementById('settings-reddit-identity-switch'),
+            document.getElementById('settings-car-audio-switch'),
+            document.getElementById('settings-music-switch'),
+            document.getElementById('settings-pb-ghost-switch'),
+            document.getElementById('settings-collision-auto-restart-switch'),
+            document.getElementById('settings-collision-restart-delay-meter'),
+            document.getElementById('settings-back-btn'),
+        ], { requireLaidOut: false });
+    }
+
+    resetSettingsMenuKeyboardNav() {
+        const items = this.getSettingsMenuItems();
+        return resetMenuKeyboardState(this._settingsMenuKeyboardState, items, {
+            preferredIndex: 0,
+            container: this.getSettingsMenuContainer(),
+            focusPreferred: true,
+        });
     }
 
     clearFinishMenuKeyboardCue() {
@@ -177,7 +263,25 @@ export class ModalShell {
 
     dismissMenuKeyboardCueFromPointer(event) {
         if (event?.pointerType && event.pointerType !== 'mouse') return;
-        if (this._activeTrapModal?.id !== 'modal') return;
+        const trapId = this._activeTrapModal?.id;
+
+        if (trapId === 'garage-modal') {
+            dismissMenuKeyboardCue(this._garageMenuKeyboardState, this.getGarageMenuItems(), {
+                container: this.getGarageMenuContainer(),
+                preferredIndex: 0,
+            });
+            return;
+        }
+
+        if (trapId === 'settings-modal') {
+            dismissMenuKeyboardCue(this._settingsMenuKeyboardState, this.getSettingsMenuItems(), {
+                container: this.getSettingsMenuContainer(),
+                preferredIndex: 0,
+            });
+            return;
+        }
+
+        if (trapId !== 'modal') return;
 
         if (this.isSharePanelOpen()) {
             const shareButtons = this.getSharePanelButtons();
@@ -1155,6 +1259,26 @@ export class ModalShell {
                 }
             }
             return;
+        }
+
+        if (this._activeTrapModal?.id === 'garage-modal') {
+            if (handleMenuListKeydown(event, {
+                buttons: this.getGarageMenuItems(),
+                state: this._garageMenuKeyboardState,
+                container: this.getGarageMenuContainer(),
+            })) {
+                return;
+            }
+        }
+
+        if (this._activeTrapModal?.id === 'settings-modal') {
+            if (handleMenuListKeydown(event, {
+                buttons: this.getSettingsMenuItems(),
+                state: this._settingsMenuKeyboardState,
+                container: this.getSettingsMenuContainer(),
+            })) {
+                return;
+            }
         }
 
         const menuActionsRoot = this.getActiveMenuActionsRoot();

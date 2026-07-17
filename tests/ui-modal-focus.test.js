@@ -266,4 +266,80 @@ describe('modal pause/finish menu keyboard nav', () => {
             global.document = originalDocument;
         }
     });
+
+    it('navigates garage items without touching finish actions', () => {
+        const tab = makeMenuButton('tab-skin');
+        const option = makeMenuButton('skin-option');
+        const close = makeMenuButton('close');
+        const garageItems = [tab, option, close];
+        const finishShare = makeMenuButton('finish-share');
+        finishShare.classList.add(MENU_SELECTED_CLASS);
+        const garageState = { keyboardNavActive: false, selectedIndex: 0 };
+        const finishState = { keyboardNavActive: true, selectedIndex: 0 };
+
+        const context = {
+            _activeTrapModal: { id: 'garage-modal' },
+            _garageMenuKeyboardState: garageState,
+            _menuKeyboardState: finishState,
+            isSharePanelOpen: () => false,
+            isPauseEscapeTarget: () => false,
+            getGarageMenuItems: () => garageItems,
+            getGarageMenuContainer: () => ({ classList: { toggle: vi.fn(), remove: vi.fn() } }),
+            getActiveMenuActionsRoot: () => ({ querySelectorAll: () => [finishShare] }),
+        };
+        const event = {
+            key: 'ArrowDown',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            target: null,
+        };
+        const originalDocument = global.document;
+        global.document = { activeElement: tab };
+
+        try {
+            handleModalTrapKeydown.call(context, event);
+            expect(option.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(finishShare.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('navigates settings items when the settings modal is trapped', () => {
+        const switchEl = makeMenuButton('switch');
+        const meter = makeMenuButton('meter');
+        const close = makeMenuButton('close');
+        const settingsItems = [switchEl, meter, close];
+        const settingsState = { keyboardNavActive: false, selectedIndex: 0 };
+        const context = {
+            _activeTrapModal: { id: 'settings-modal' },
+            _settingsMenuKeyboardState: settingsState,
+            isSharePanelOpen: () => false,
+            isPauseEscapeTarget: () => false,
+            getSettingsMenuItems: () => settingsItems,
+            getSettingsMenuContainer: () => ({ classList: { toggle: vi.fn(), remove: vi.fn() } }),
+        };
+        const event = {
+            key: 'ArrowDown',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            target: null,
+        };
+        const originalDocument = global.document;
+        global.document = { activeElement: switchEl };
+
+        try {
+            handleModalTrapKeydown.call(context, event);
+            expect(meter.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(settingsState.keyboardNavActive).toBe(true);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
 });
