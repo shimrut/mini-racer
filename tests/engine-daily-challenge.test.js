@@ -71,6 +71,104 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(resumeActiveRun).toHaveBeenCalled();
   });
 
+  it("restarts the race when plain R is pressed while playing", () => {
+    const restartDailyChallenge = vi.fn();
+    const event = { key: "r", preventDefault: vi.fn() };
+
+    RealTimeRacer.prototype.handleKey.call(
+      {
+        status: "playing",
+        currentChallengeRun: { id: "run-1" },
+        modal: { isModalActive: () => false },
+        restartDailyChallenge,
+        getSteeringDirection: () => null,
+      },
+      event,
+      true,
+    );
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(restartDailyChallenge).toHaveBeenCalled();
+  });
+
+  it("restarts the race when plain R is pressed while paused", () => {
+    const restartDailyChallenge = vi.fn();
+    const event = { key: "R", preventDefault: vi.fn() };
+
+    RealTimeRacer.prototype.handleKey.call(
+      {
+        status: "paused",
+        currentChallengeRun: { id: "run-1" },
+        modal: {
+          isModalActive: () => true,
+          isStandaloneRunsViewActive: () => false,
+        },
+        restartDailyChallenge,
+        getSteeringDirection: () => null,
+      },
+      event,
+      true,
+    );
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(restartDailyChallenge).toHaveBeenCalled();
+  });
+
+  it("restarts the race when plain R is pressed on the finish screen", () => {
+    const restartDailyChallenge = vi.fn();
+    const event = { key: "r", preventDefault: vi.fn() };
+
+    RealTimeRacer.prototype.handleKey.call(
+      {
+        status: "won",
+        currentChallengeRun: { id: "run-1" },
+        modal: {
+          isModalActive: () => true,
+          isStandaloneRunsViewActive: () => false,
+        },
+        restartDailyChallenge,
+        getSteeringDirection: () => null,
+      },
+      event,
+      true,
+    );
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(restartDailyChallenge).toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: "Ctrl", modifiers: { ctrlKey: true } },
+    { label: "Meta", modifiers: { metaKey: true } },
+    { label: "Alt", modifiers: { altKey: true } },
+    { label: "Shift", modifiers: { shiftKey: true } },
+  ])("does not restart when $label+R is pressed", ({ modifiers }) => {
+    const restartDailyChallenge = vi.fn();
+    const reset = vi.fn();
+    const event = {
+      key: "r",
+      preventDefault: vi.fn(),
+      ...modifiers,
+    };
+
+    RealTimeRacer.prototype.handleKey.call(
+      {
+        status: "playing",
+        currentChallengeRun: { id: "run-1" },
+        modal: { isModalActive: () => false },
+        restartDailyChallenge,
+        reset,
+        getSteeringDirection: () => null,
+      },
+      event,
+      true,
+    );
+
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(restartDailyChallenge).not.toHaveBeenCalled();
+    expect(reset).not.toHaveBeenCalled();
+  });
+
   it("shows race wording in the HUD for multi-lap daily challenges", () => {
     const setHudPrimaryMetric = vi.fn();
     const setBestTime = vi.fn();

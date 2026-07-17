@@ -349,25 +349,32 @@ export const raceEngineMethods = {
       this.pauseActiveRun();
       return;
     }
-    if (
-      event.key.toLowerCase() === "r" &&
+    const isPlainR =
       isDown &&
-      this.modal.isModalActive()
-    ) {
-      event.preventDefault();
-      if (this.modal.isPauseModalActive()) {
-        return;
-      }
-      if (this.modal.isStandaloneRunsViewActive()) {
+      event.key.toLowerCase() === "r" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey;
+    if (isPlainR) {
+      if (this.modal?.isModalActive?.() && this.modal.isStandaloneRunsViewActive()) {
+        event.preventDefault();
         this.modal.closeModal();
         return;
       }
-      if (this.currentChallengeRun) {
-        this.restartDailyChallenge();
+      if (
+        this.status === "playing" ||
+        this.status === "paused" ||
+        this.modal?.isModalActive?.()
+      ) {
+        event.preventDefault();
+        if (this.currentChallengeRun) {
+          this.restartDailyChallenge();
+        } else {
+          this.reset(true);
+        }
         return;
       }
-      this.reset(true);
-      return;
     }
     const steeringDirection = this.getSteeringDirection(event);
     if (steeringDirection) {
