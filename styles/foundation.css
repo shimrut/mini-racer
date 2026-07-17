@@ -59,9 +59,9 @@
     }
 }
 
-button:focus-visible,
-.touch-btn:focus-visible,
-a:focus-visible {
+button:focus-visible:not(.is-menu-selected),
+.touch-btn:focus-visible:not(.is-menu-selected),
+a:focus-visible:not(.is-menu-selected) {
     outline: none !important;
 }
 

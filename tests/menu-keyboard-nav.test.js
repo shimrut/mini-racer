@@ -6,6 +6,7 @@ import {
     getMenuNavDelta,
     handleMenuListKeydown,
     resetMenuKeyboardState,
+    selectMenuButton,
 } from '../game/ui/menu-keyboard-nav.js';
 
 function makeButton(id, { disabled = false } = {}) {
@@ -98,6 +99,18 @@ describe('menu keyboard nav helper', () => {
 
         expect(buttons[1].click).toHaveBeenCalled();
         expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('selects a preferred default button with the cue visible', () => {
+        const buttons = [makeButton('a'), makeButton('b'), makeButton('c')];
+        const state = createMenuKeyboardState();
+
+        selectMenuButton(buttons, buttons[1], state);
+
+        expect(state.keyboardNavActive).toBe(true);
+        expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+        expect(buttons[1].focus).toHaveBeenCalled();
     });
 
     it('clears selection state on reset', () => {

@@ -3,6 +3,7 @@ import {
     createMenuKeyboardState,
     handleMenuListKeydown,
     resetMenuKeyboardState,
+    selectMenuButton,
 } from '../ui/menu-keyboard-nav.js';
 
 const BLOCKING_OVERLAY_IDS = [
@@ -69,6 +70,18 @@ export class StartOverlay {
         resetMenuKeyboardState(this._menuKeyboardState, this.getLobbyMenuButtons());
     }
 
+    selectDefaultLobbyItem() {
+        if (!this.isStartOverlayVisible()) return;
+        const buttons = this.getLobbyMenuButtons();
+        if (!buttons.length) return;
+
+        const startBtn = this.startBtn;
+        const preferred = startBtn && !startBtn.disabled && buttons.includes(startBtn)
+            ? startBtn
+            : buttons[buttons.length - 1];
+        selectMenuButton(buttons, preferred, this._menuKeyboardState);
+    }
+
     bindKeyboardNavigation() {
         if (this._menuKeydownHandler || typeof document === 'undefined') return;
         this._menuKeydownHandler = (event) => this.handleLobbyMenuKeydown(event);
@@ -93,8 +106,10 @@ export class StartOverlay {
         if (group) group.style.display = "flex";
         this.setStartOverlayActive(true);
         this.updateStartOverlayMode(hasAnyData, isReturningPlayer);
-        this.resetLobbyMenuKeyboardNav();
-        requestAnimationFrame(() => this.focusPrimaryAction());
+        requestAnimationFrame(() => {
+            this.focusPrimaryAction();
+            this.selectDefaultLobbyItem();
+        });
     }
 
     hideStartOverlay() {
@@ -148,7 +163,10 @@ export class StartOverlay {
         }
         this.setStartSelectionMode(false);
         if (isOverlayVisible) {
-            requestAnimationFrame(() => this.focusPrimaryAction());
+            requestAnimationFrame(() => {
+                this.focusPrimaryAction();
+                this.selectDefaultLobbyItem();
+            });
         }
     }
 
@@ -191,7 +209,10 @@ export class StartOverlay {
             overlay.classList.toggle('is-ready', Boolean(isReady));
         }
         if (isReady) {
-            requestAnimationFrame(() => this.focusPrimaryAction());
+            requestAnimationFrame(() => {
+                this.focusPrimaryAction();
+                this.selectDefaultLobbyItem();
+            });
         }
     }
 }

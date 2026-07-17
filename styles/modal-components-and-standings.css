@@ -624,7 +624,7 @@
     margin-top: 0
 }
 
-.modal button:focus-visible {
+.modal button:focus-visible:not(.is-menu-selected) {
     outline: none !important;
 }
 

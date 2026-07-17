@@ -144,15 +144,13 @@
 }
 
 .combined-action-btn.is-menu-selected:not(.combined-action-btn--primary) {
-    background: #475569;
-    outline: 2px solid rgba(255, 255, 255, 0.55);
-    outline-offset: 2px;
+    background: #64748b;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(255, 255, 255, 0.25);
 }
 
 .combined-action-btn--primary.is-menu-selected {
-    filter: brightness(1.06);
-    outline: 2px solid rgba(255, 255, 255, 0.75);
-    outline-offset: 3px;
+    filter: brightness(1.08);
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(255, 255, 255, 0.35);
 }
 
 .combined-action-btn svg,

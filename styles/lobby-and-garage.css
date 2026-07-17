@@ -270,15 +270,13 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 
 .main-menu__item.is-menu-selected:not(.main-menu__item--primary) {
     color: var(--text-color);
-    background: rgba(255, 255, 255, 0.08);
-    outline: 2px solid rgba(255, 255, 255, 0.55);
-    outline-offset: 2px;
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: inset 3px 0 0 0 #fff, 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
 .main-menu__item--primary.is-menu-selected {
-    filter: brightness(1.06);
-    outline: 2px solid rgba(255, 255, 255, 0.75);
-    outline-offset: 3px;
+    filter: brightness(1.08);
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(255, 255, 255, 0.35);
 }
 
 .main-menu__item:active {

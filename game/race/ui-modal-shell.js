@@ -27,6 +27,7 @@ import {
     createMenuKeyboardState,
     handleMenuListKeydown,
     resetMenuKeyboardState,
+    selectMenuButton,
 } from '../ui/menu-keyboard-nav.js';
 
 function isButtonElement(node) {
@@ -116,6 +117,18 @@ export class ModalShell {
         const root = this.getActiveMenuActionsRoot();
         const buttons = collectVisibleActionButtons(root);
         resetMenuKeyboardState(this._menuKeyboardState, buttons);
+    }
+
+    selectDefaultMenuItem() {
+        const root = this.getActiveMenuActionsRoot();
+        const buttons = collectVisibleActionButtons(root);
+        if (!buttons.length) return;
+
+        const preferred = this.getModalPreferredFocusTarget();
+        const target = preferred && buttons.includes(preferred)
+            ? preferred
+            : buttons[0];
+        selectMenuButton(buttons, target, this._menuKeyboardState);
     }
 
     _setActiveView(view) {
@@ -934,6 +947,9 @@ export class ModalShell {
             : null;
         if (preferredFocus) preferredFocus.focus();
         else if (focusables.length) focusables[0].focus();
+        if (modalEl === this.modal) {
+            this.selectDefaultMenuItem();
+        }
         this._modalTrapKeydown = (event) => this.handleModalTrapKeydown(event);
         document.addEventListener('keydown', this._modalTrapKeydown, true);
     }

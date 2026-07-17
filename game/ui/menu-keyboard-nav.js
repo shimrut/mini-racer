@@ -45,9 +45,16 @@ export function applyMenuSelection(buttons, index, { showCue = true } = {}) {
     return target;
 }
 
+export function selectMenuButton(buttons, targetButton, state = null) {
+    if (!buttons?.length || !targetButton) return null;
+    const index = buttons.indexOf(targetButton);
+    if (index < 0) return null;
+    if (state) state.keyboardNavActive = true;
+    return applyMenuSelection(buttons, index, { showCue: true });
+}
+
 /**
  * Vertical menu keyboard nav: Up/Down/W/S move, Enter activates.
- * Selection cue (is-menu-selected) appears after the first move key.
  * @returns {boolean} true when the event was handled
  */
 export function handleMenuListKeydown(event, {
