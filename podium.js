@@ -174,9 +174,10 @@ function cleanText(value) {
 
 async function boot() {
     const podium = renderPodium(document, readPodiumPostData());
+    // Paint the track immediately — do not wait on avatar backfill or the car sprite.
+    renderPodiumTrack(podium.trackName);
     const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
     if (hydrated !== podium) renderPodium(document, hydrated);
-    renderPodiumTrack(podium.trackName);
 }
 
 let trackCarPromise = null;
@@ -223,7 +224,7 @@ function renderPodiumTrack(trackName) {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
     });
 
-    loadTrackCar().then((carImage) => {
+    const paint = (carImage = null) => {
         renderTrackPreviewCanvas(canvas, {
             trackGeometry: { outer: track.outer, inner: track.inner },
             presentation,
@@ -238,6 +239,11 @@ function renderPodiumTrack(trackName) {
             hideSchematicStartArrow: true,
             runHistory: [],
         });
+    };
+
+    paint(null);
+    loadTrackCar().then((carImage) => {
+        if (carImage) paint(carImage);
     });
 }
 

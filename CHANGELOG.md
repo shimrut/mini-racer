@@ -1,6 +1,6 @@
 # Changelog
 
-- Fixed the final podium custom post so the red finish-line trail meets the car (dash mask no longer blanks the right side) and the daily track schematic shows as a faint background.
+- Fixed the final podium custom post so the red finish-line trail meets the car (dash mask no longer blanks the right side) and the daily track schematic shows as a faint background immediately on load instead of after avatar or car-asset waits.
 - Replaced the podium's hand-drawn fallback with Reddit's official hosted default Snoo. Reddit accounts whose standard profile icon is not exposed by Devvit now use that official fallback, and the legacy avatar cache is versioned so existing podiums adopt it immediately.
 - Fixed podium public racers incorrectly showing the generic Snoo on posts created before avatar payloads existed. Legacy posts now resolve and cache only their already-public Reddit identities, new posts retain the Reddit-hosted avatar URL directly, and podium names no longer include `u/`.
 - Added identity-aware podium avatars: finalists displaying a Reddit username show their publication-time Snoovatar, while private identities and unavailable avatars use a bundled generic Snoo without exposing additional profile data.
