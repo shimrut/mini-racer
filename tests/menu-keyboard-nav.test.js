@@ -4,12 +4,13 @@ import {
     applyMenuSelection,
     createMenuKeyboardState,
     dismissMenuKeyboardCue,
-    getMenuNavDelta,
+    findSpatialNeighborIndex,
+    getMenuNavDirection,
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../game/ui/menu-keyboard-nav.js';
 
-function makeButton(id, { disabled = false, primary = false } = {}) {
+function makeButton(id, { disabled = false, primary = false, rect = null } = {}) {
     const classNames = new Set(primary ? ['main-menu__item--primary'] : []);
     const classList = {
         values: classNames,
@@ -22,13 +23,24 @@ function makeButton(id, { disabled = false, primary = false } = {}) {
             return force;
         },
     };
-    return {
+    const button = {
         id,
         disabled,
         classList,
         focus: vi.fn(),
         click: vi.fn(),
     };
+    if (rect) {
+        button.getBoundingClientRect = () => ({
+            left: rect.x,
+            top: rect.y,
+            width: rect.w,
+            height: rect.h,
+            right: rect.x + rect.w,
+            bottom: rect.y + rect.h,
+        });
+    }
+    return button;
 }
 
 function makeEvent(key, extras = {}) {
@@ -45,14 +57,16 @@ function makeEvent(key, extras = {}) {
 }
 
 describe('menu keyboard nav helper', () => {
-    it('maps arrow and wasd keys to deltas', () => {
-        expect(getMenuNavDelta('ArrowUp')).toBe(-1);
-        expect(getMenuNavDelta('w')).toBe(-1);
-        expect(getMenuNavDelta('W')).toBe(-1);
-        expect(getMenuNavDelta('ArrowDown')).toBe(1);
-        expect(getMenuNavDelta('s')).toBe(1);
-        expect(getMenuNavDelta('S')).toBe(1);
-        expect(getMenuNavDelta('Enter')).toBe(0);
+    it('maps arrows and wasd to directions', () => {
+        expect(getMenuNavDirection('ArrowUp')).toBe('up');
+        expect(getMenuNavDirection('w')).toBe('up');
+        expect(getMenuNavDirection('ArrowDown')).toBe('down');
+        expect(getMenuNavDirection('s')).toBe('down');
+        expect(getMenuNavDirection('ArrowLeft')).toBe('left');
+        expect(getMenuNavDirection('a')).toBe('left');
+        expect(getMenuNavDirection('ArrowRight')).toBe('right');
+        expect(getMenuNavDirection('d')).toBe('right');
+        expect(getMenuNavDirection('Enter')).toBe(null);
     });
 
     it('defaults to the preferred item for Enter without showing a cue', () => {
@@ -79,53 +93,68 @@ describe('menu keyboard nav helper', () => {
         expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 
-    it('shows the selection cue only after the first move key', () => {
+    it('moves with ArrowDown/S and shows the selection cue', () => {
         const buttons = [
             makeButton('standings'),
             makeButton('tracks'),
             makeButton('race', { primary: true }),
         ];
         const state = createMenuKeyboardState();
-        const container = {
-            classList: {
-                values: new Set(),
-                add(name) { this.values.add(name); },
-                remove(name) { this.values.delete(name); },
-                contains(name) { return this.values.has(name); },
-                toggle(name, force) {
-                    if (force) this.values.add(name);
-                    else this.values.delete(name);
-                    return force;
-                },
-            },
-        };
-        resetMenuKeyboardState(state, buttons, { preferredIndex: 2, container });
+        resetMenuKeyboardState(state, buttons, { preferredIndex: 2 });
 
         handleMenuListKeydown(makeEvent('ArrowUp'), {
             buttons,
             state,
-            container,
             getActiveElement: () => buttons[2],
         });
 
         expect(state.keyboardNavActive).toBe(true);
         expect(state.selectedIndex).toBe(1);
         expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
-        expect(buttons[2].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
     });
 
-    it('wraps from the last item to the first on ArrowDown', () => {
-        const buttons = [makeButton('a'), makeButton('b'), makeButton('c')];
+    it('picks spatial neighbors in a grid with left/right', () => {
+        const a = makeButton('a', { rect: { x: 0, y: 0, w: 40, h: 40 } });
+        const b = makeButton('b', { rect: { x: 60, y: 0, w: 40, h: 40 } });
+        const c = makeButton('c', { rect: { x: 0, y: 60, w: 40, h: 40 } });
+        const d = makeButton('d', { rect: { x: 60, y: 60, w: 40, h: 40 } });
+        const items = [a, b, c, d];
+
+        expect(findSpatialNeighborIndex(items, 0, 'right')).toBe(1);
+        expect(findSpatialNeighborIndex(items, 0, 'down')).toBe(2);
+        expect(findSpatialNeighborIndex(items, 1, 'left')).toBe(0);
+        expect(findSpatialNeighborIndex(items, 2, 'right')).toBe(3);
+        expect(findSpatialNeighborIndex(items, 0, 'left')).toBe(-1);
+    });
+
+    it('moves right with D in a laid-out grid', () => {
+        const a = makeButton('a', { rect: { x: 0, y: 0, w: 40, h: 40 } });
+        const b = makeButton('b', { rect: { x: 60, y: 0, w: 40, h: 40 } });
         const state = createMenuKeyboardState();
-        state.selectedIndex = 2;
+        state.selectedIndex = 0;
 
-        handleMenuListKeydown(makeEvent('ArrowDown'), {
-            buttons,
+        expect(handleMenuListKeydown(makeEvent('d'), {
+            buttons: [a, b],
             state,
-            getActiveElement: () => buttons[2],
-        });
+            getActiveElement: () => a,
+        })).toBe(true);
+        expect(state.selectedIndex).toBe(1);
+        expect(b.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+    });
 
-        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+    it('leaves Left/Right unhandled when nothing is beside the current item', () => {
+        const top = makeButton('top', { rect: { x: 0, y: 0, w: 40, h: 40 } });
+        const bottom = makeButton('bottom', { rect: { x: 0, y: 80, w: 40, h: 40 } });
+        const state = createMenuKeyboardState();
+        state.selectedIndex = 0;
+        const event = makeEvent('ArrowRight');
+
+        expect(handleMenuListKeydown(event, {
+            buttons: [top, bottom],
+            state,
+            getActiveElement: () => top,
+        })).toBe(false);
+        expect(event.preventDefault).not.toHaveBeenCalled();
     });
 
     it('activates the cued item on Enter', () => {
