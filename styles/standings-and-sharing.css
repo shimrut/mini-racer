@@ -254,6 +254,11 @@
     background: #475569;
 }
 
+.result-share-panel__button.is-menu-selected {
+    text-decoration: underline;
+    text-underline-offset: 0.22em;
+}
+
 .result-share-panel__button--primary {
     background: var(--accent-color);
     color: white;
