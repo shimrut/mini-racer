@@ -57,29 +57,36 @@ body {
 .podium-shell::after {
     content: "";
     position: absolute;
-    z-index: -1;
+    z-index: 0;
     inset: 0;
-    background: radial-gradient(circle at 78% 30%, rgba(5, 7, 11, 0.7), transparent 60%);
+    background: radial-gradient(circle at 78% 30%, rgba(5, 7, 11, 0.28), transparent 62%);
     pointer-events: none;
 }
 
 .podium-track {
     position: absolute;
-    z-index: -1;
+    z-index: 1;
     inset: 0;
     width: 100%;
     height: 100%;
-    opacity: 0.16;
+    opacity: 0.26;
     pointer-events: none;
-    -webkit-mask-image: radial-gradient(circle at 70% 35%, black 35%, transparent 78%);
-    mask-image: radial-gradient(circle at 70% 35%, black 35%, transparent 78%);
+    -webkit-mask-image: radial-gradient(circle at 72% 38%, black 42%, transparent 82%);
+    mask-image: radial-gradient(circle at 72% 38%, black 42%, transparent 82%);
 }
 
 .ambient {
     position: absolute;
     inset: 0;
-    z-index: -1;
+    z-index: 0;
     pointer-events: none;
+}
+
+.podium-header,
+.podium-results,
+.podium-footer {
+    position: relative;
+    z-index: 2;
 }
 
 .ambient__grain {
@@ -191,19 +198,21 @@ body {
 
 .finish-line__trail {
     flex: 1 1 auto;
-    height: clamp(0.22rem, 0.6vw, 0.36rem);
+    height: clamp(0.28rem, 0.75vw, 0.42rem);
+    /* Overlap into the car sprite's transparent left pad so the trail meets the body. */
+    margin-right: clamp(-1.05rem, -2.8vw, -0.7rem);
     border-radius: 999px;
     background: linear-gradient(90deg,
         transparent,
-        color-mix(in srgb, var(--accent) 35%, transparent) 30%,
-        color-mix(in srgb, var(--accent) 75%, transparent) 80%,
+        color-mix(in srgb, var(--accent) 35%, transparent) 28%,
+        color-mix(in srgb, var(--accent) 78%, transparent) 72%,
         var(--accent));
-    -webkit-mask-image: repeating-linear-gradient(90deg, black 0 55%, transparent 55% 100%);
-    mask-image: repeating-linear-gradient(90deg, black 0 55%, transparent 55% 100%);
-    opacity: 0.85;
+    opacity: 0.92;
 }
 
 .finish-line__car {
+    position: relative;
+    z-index: 1;
     flex: 0 0 auto;
     height: clamp(2.4rem, 7vh, 3.6rem);
     width: auto;

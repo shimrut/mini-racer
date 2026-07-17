@@ -223,7 +223,7 @@ function renderPodiumTrack(trackName) {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
     });
 
-    trackCarPromise.then((carImage) => {
+    loadTrackCar().then((carImage) => {
         renderTrackPreviewCanvas(canvas, {
             trackGeometry: { outer: track.outer, inner: track.inner },
             presentation,
