@@ -135,6 +135,9 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     gap: 0.75rem;
     width: 100%;
     margin-top: auto;
+    /* Room for the keyboard selection ring (parents clip overflow). */
+    padding: 0.35rem 0.4rem 0.5rem;
+    box-sizing: border-box;
 }
 
 
@@ -145,12 +148,13 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     flex-direction: row-reverse;
     align-items: center;
     justify-content: flex-start;
-    padding: 0.6rem 0.45rem;
+    padding: 0.65rem 0.85rem;
     background: none;
     border: none;
+    border-radius: var(--radius-full);
     color: rgba(255, 255, 255);
     cursor: pointer;
-    transition: background-color 0.2s ease, color 0.15s ease;
+    transition: background-color 0.2s ease, color 0.15s ease, box-shadow 0.15s ease;
     gap: 0.85rem;
 }
 
@@ -269,7 +273,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 .main-menu__item.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .main-menu__item--primary.is-menu-selected {

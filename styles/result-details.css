@@ -192,6 +192,8 @@
     max-width: 320px;
     gap: 0.75rem;
     margin: 0 auto;
+    padding: 0.35rem;
+    box-sizing: border-box;
 }
 
 #modal-combined-view .combined-action-btn {

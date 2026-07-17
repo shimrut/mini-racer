@@ -115,6 +115,9 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr);
     gap: 0.75rem;
+    /* Room for the keyboard selection ring. */
+    padding: 0.35rem;
+    box-sizing: border-box;
 }
 
 #modal.modal--win #combined-restart-btn {
@@ -129,7 +132,7 @@
     height: 4rem;
     background: none;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-full);
     color: var(--text-color);
     font-family: var(--header-font);
     font-size: 0.85rem;
@@ -144,7 +147,7 @@
 }
 
 .combined-action-btn.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .combined-action-btn--primary.is-menu-selected {
