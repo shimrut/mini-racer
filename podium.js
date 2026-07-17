@@ -1,6 +1,7 @@
 import { TRACKS } from './game/track/tracks.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
+import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
 import { requestFeaturedDailyChallengeStart } from './game/daily-challenge/service.js';
 
 const PODIUM_SIZE = 3;
@@ -200,6 +201,23 @@ export async function openFeaturedGameFromPodium(event) {
     }
 }
 
+let trackCarPromise = null;
+
+function loadTrackCar() {
+    if (trackCarPromise) return trackCarPromise;
+    const loader = new CarSpriteLoader();
+    trackCarPromise = new Promise((resolve) => {
+        loader.load(STOCK_CAR_ASSET_NAME, {
+            onLoaded: resolve,
+            onError: () => {
+                console.warn(`Unable to load ${STOCK_CAR_ASSET_NAME} in the podium post.`);
+                resolve(null);
+            },
+        });
+    });
+    return trackCarPromise;
+}
+
 function resolveTrackByName(trackName) {
     if (typeof trackName !== 'string') return null;
     const target = trackName.trim().toLowerCase();
@@ -227,16 +245,26 @@ function renderPodiumTrack(trackName) {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
     });
 
-    renderTrackPreviewCanvas(canvas, {
-        trackGeometry: { outer: track.outer, inner: track.inner },
-        presentation,
-        startLine: track.startLine,
-        startPos: track.startPos,
-        startAngle: track.startAngle ?? 0,
-        transparentBackground: true,
-        previewRenderMode: 'schematic',
-        hideSchematicStartArrow: true,
-        runHistory: [],
+    const paint = (carImage = null) => {
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: { outer: track.outer, inner: track.inner },
+            presentation,
+            startLine: track.startLine,
+            startPos: track.startPos,
+            startAngle: track.startAngle ?? 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            showSchematicCarTrail: Boolean(carImage),
+            moveSchematicCarPastStartLine: true,
+            schematicCarImage: carImage,
+            hideSchematicStartArrow: true,
+            runHistory: [],
+        });
+    };
+
+    paint(null);
+    loadTrackCar().then((carImage) => {
+        if (carImage) paint(carImage);
     });
 }
 
