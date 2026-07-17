@@ -28,6 +28,7 @@ Your car look and settings are saved to your Reddit profile, so they should stic
 - A **new track** becomes the featured race each day (day changes at midnight UTC)
 - Once a day’s track is posted, it **stays that track** — it does not get swapped later
 - Tracks stay playable for **7 days**, then drop out of the list
+- Communities can automatically publish that track's final global podium after its seven-day window closes
 - Each track card shows a preview, your best time, medals, and how long that track is still available
 
 ## Standings and sharing
@@ -44,6 +45,8 @@ The post preview shows today’s track, the gold-medal target, a car on the star
 
 Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
 
+Final podium posts use a separate moderator-controlled schedule. They show the top three verified times for the track that just expired, using each finalist's Reddit username or private generated racer name according to the setting saved when the podium is published.
+
 ## Garage
 
 - **12 car skins** in Mini, Cyberpunk, and Steampunk sets
@@ -59,12 +62,15 @@ Install Mini Racer in your subreddit, then use the subreddit menu:
 | **Create Mini Racer post** | Creates a playable race post for today |
 | **Enable daily Mini Racer posts** | Auto-posts a new race each day (UTC) |
 | **Disable daily Mini Racer posts** | Stops the daily auto-posts |
+| **Enable daily Mini Racer podium posts** | Auto-posts the final podium at 00:01 UTC when a track expires |
+| **Disable daily Mini Racer podium posts** | Stops final podium auto-posts without affecting race posts |
 | **Open Mini Racer analytics** | Opens moderator-only analytics for the community |
 
 Tips:
 
 - Only **one** race post is used per community per day — creating again reuses that post instead of flooding the feed
 - Every race post gets a pinned **Mini Racer score thread** for player result comments
+- Podium posts are informational, use an independent opt-in, and never create a score thread
 - Players share scores as replies in that thread, from their own accounts
 
 ## What’s new

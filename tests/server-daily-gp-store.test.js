@@ -306,6 +306,221 @@ describe('server daily gp store submissions', () => {
         );
     });
 
+    it('publishes the challenge whose seven-day window just expired at the UTC boundary', async () => {
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const expiredChallenge = {
+            id: 'daily-gp-2026-07-10',
+            challengeDate: '2026-07-10',
+            trackKey: 'circuit',
+            startsAt: '2026-07-10T00:00:00.000Z',
+            endsAt: '2026-07-11T00:00:00.000Z',
+            availableUntil: '2026-07-17T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        mockRedis.hGet.mockImplementation(async (_key, field) => (
+            field === expiredChallenge.id ? JSON.stringify(expiredChallenge) : null
+        ));
+
+        await expect(getServerFinalDailyGpPodium(
+            new Date('2026-07-17T00:01:00.000Z'),
+        )).resolves.toMatchObject({
+            challengeId: expiredChallenge.id,
+            challengeDate: '2026-07-10',
+            trackKey: 'circuit',
+        });
+        expect(mockRedis.hGet).toHaveBeenCalledWith('dailygp:challenges', expiredChallenge.id);
+    });
+
+    it('selects the prior expired day immediately before the next UTC boundary', async () => {
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const challenge = {
+            id: 'daily-gp-2026-07-09',
+            challengeDate: '2026-07-09',
+            trackKey: 'circuit',
+            startsAt: '2026-07-09T00:00:00.000Z',
+            endsAt: '2026-07-10T00:00:00.000Z',
+            availableUntil: '2026-07-16T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        mockRedis.hGet.mockImplementation(async (_key, field) => (
+            field === challenge.id ? JSON.stringify(challenge) : null
+        ));
+
+        await expect(getServerFinalDailyGpPodium(
+            new Date('2026-07-16T23:59:59.999Z'),
+        )).resolves.toMatchObject({ challengeId: challenge.id });
+    });
+
+    it('returns no final podium when the historical challenge ledger has no eligible day', async () => {
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        mockRedis.hGet.mockResolvedValue(null);
+
+        await expect(getServerFinalDailyGpPodium(
+            new Date('2026-07-17T00:01:00.000Z'),
+        )).resolves.toBeNull();
+    });
+
+    it.each([0, 1, 2, 3])('returns exactly three safe podium positions for %s verified finishers', async (count) => {
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const challenge = {
+            id: 'daily-gp-2026-07-10',
+            challengeDate: '2026-07-10',
+            trackKey: 'circuit',
+            startsAt: '2026-07-10T00:00:00.000Z',
+            endsAt: '2026-07-11T00:00:00.000Z',
+            availableUntil: '2026-07-17T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const members = Array.from({ length: count }, (_, index) => ({
+            member: `guest:podium-${index + 1}`,
+            score: 12000 + (index * 100),
+        }));
+        mockRedis.hGet.mockImplementation(async (_key, field) => (
+            field === challenge.id ? JSON.stringify(challenge) : null
+        ));
+        mockRedis.zRange.mockResolvedValue(members);
+        mockRedis.hMGet.mockResolvedValue(members.map((member, index) => JSON.stringify({
+            playerId: member.member,
+            trackKey: challenge.trackKey,
+            bestTimeMs: 12000 + (index * 100),
+            updatedAt: '2026-07-10T12:00:00.000Z',
+        })));
+        mockRedis.mGet.mockResolvedValue(members.map((member) => JSON.stringify({
+            playerId: member.member,
+            leaderboardIdentity: 'reddit',
+            redditUsername: null,
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-07-10T12:00:00.000Z',
+            lastSeenAt: '2026-07-10T12:00:00.000Z',
+            updatedAt: '2026-07-10T12:00:00.000Z',
+        })));
+
+        const result = await getServerFinalDailyGpPodium(new Date('2026-07-17T00:01:00.000Z'));
+
+        expect(result.positions).toHaveLength(3);
+        expect(result.positions.filter((position) => position.identityType !== 'empty')).toHaveLength(count);
+        expect(result.positions.filter((position) => position.identityType === 'empty')).toHaveLength(3 - count);
+        if (count > 0) expect(result.positions[0].identityType).toBe('private');
+    });
+
+    it('advances the expired podium challenge across month and year boundaries', async () => {
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const challenge = {
+            id: 'daily-gp-2025-12-25',
+            challengeDate: '2025-12-25',
+            trackKey: 'circuit',
+            startsAt: '2025-12-25T00:00:00.000Z',
+            endsAt: '2025-12-26T00:00:00.000Z',
+            availableUntil: '2026-01-01T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        mockRedis.hGet.mockImplementation(async (_key, field) => (
+            field === challenge.id ? JSON.stringify(challenge) : null
+        ));
+
+        await expect(getServerFinalDailyGpPodium(
+            new Date('2026-01-01T00:01:00.000Z'),
+        )).resolves.toMatchObject({ challengeId: challenge.id });
+        expect(mockRedis.hGet).toHaveBeenCalledWith('dailygp:challenges', challenge.id);
+    });
+
+    it('freezes sanitized podium identities and fills missing positions', async () => {
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const challenge = {
+            id: 'daily-gp-2026-07-10',
+            challengeDate: '2026-07-10',
+            trackKey: 'circuit',
+            startsAt: '2026-07-10T00:00:00.000Z',
+            endsAt: '2026-07-11T00:00:00.000Z',
+            availableUntil: '2026-07-17T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const members = [
+            { member: 'reddit:racefan', score: 12340 },
+            { member: 'guest:private-player', score: 13560 },
+        ];
+        mockRedis.hGet.mockImplementation(async (_key, field) => (
+            field === challenge.id ? JSON.stringify(challenge) : null
+        ));
+        mockRedis.zRange.mockResolvedValue(members);
+        mockRedis.hMGet.mockResolvedValue([
+            JSON.stringify({
+                playerId: members[0].member,
+                trackKey: challenge.trackKey,
+                bestTimeMs: 12340,
+                updatedAt: '2026-07-10T12:00:00.000Z',
+            }),
+            JSON.stringify({
+                playerId: members[1].member,
+                trackKey: challenge.trackKey,
+                bestTimeMs: 13560,
+                updatedAt: '2026-07-10T13:00:00.000Z',
+            }),
+        ]);
+        mockRedis.mGet.mockResolvedValue([
+            JSON.stringify({
+                playerId: members[0].member,
+                leaderboardIdentity: 'reddit',
+                redditUsername: 'RaceFan',
+                hasSeenGame: true,
+                hasAnyData: true,
+                firstSeenAt: '2026-07-10T12:00:00.000Z',
+                lastSeenAt: '2026-07-10T12:00:00.000Z',
+                updatedAt: '2026-07-10T12:00:00.000Z',
+            }),
+            JSON.stringify({
+                playerId: members[1].member,
+                leaderboardIdentity: 'constructed',
+                redditUsername: 'HiddenUser',
+                hasSeenGame: true,
+                hasAnyData: true,
+                firstSeenAt: '2026-07-10T13:00:00.000Z',
+                lastSeenAt: '2026-07-10T13:00:00.000Z',
+                updatedAt: '2026-07-10T13:00:00.000Z',
+            }),
+        ]);
+
+        const podium = await getServerFinalDailyGpPodium(new Date('2026-07-17T00:01:00.000Z'));
+
+        expect(podium.positions).toEqual([
+            {
+                rank: 1,
+                displayName: 'RaceFan',
+                identityType: 'reddit',
+                formattedTime: '0:12.34',
+            },
+            expect.objectContaining({
+                rank: 2,
+                identityType: 'private',
+                formattedTime: '0:13.56',
+            }),
+            {
+                rank: 3,
+                displayName: 'No verified finish',
+                identityType: 'empty',
+                formattedTime: null,
+            },
+        ]);
+        expect(podium.positions[1].displayName).not.toContain('HiddenUser');
+        expect(JSON.stringify(podium)).not.toContain('private-player');
+    });
+
     it('does not schedule a geometry definition until its key is added to the catalog schedule', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2030-01-10T12:00:00.000Z'));

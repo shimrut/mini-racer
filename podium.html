@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer Final Podium</title>
+    <link rel="stylesheet" href="podium.css">
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <script type="module" src="podium.js"></script>
+</head>
+
+<body>
+    <main class="podium-shell" aria-labelledby="podium-title">
+        <header class="podium-header">
+            <div class="brand-lockup" aria-label="Mini Racer">
+                <span class="brand-lockup__mini">Mini</span>
+                <span class="brand-lockup__racer">Racer</span>
+            </div>
+
+            <div class="result-heading">
+                <p class="result-heading__eyebrow">Final podium</p>
+                <h1 id="podium-title" class="result-heading__track">Daily GP</h1>
+                <p id="challenge-date" class="result-heading__date">Final results</p>
+            </div>
+        </header>
+
+        <section class="podium-results" aria-label="Final podium results">
+            <div class="finish-line" aria-hidden="true"></div>
+            <ol id="podium-list" class="podium-list">
+                <li class="podium-row podium-row--gold" data-rank="1">
+                    <span class="podium-row__place" aria-label="First place">
+                        <span class="podium-row__number">1</span>
+                        <span class="podium-row__ordinal">ST</span>
+                    </span>
+                    <span class="podium-row__identity">
+                        <span class="podium-row__medal" aria-hidden="true">Gold</span>
+                        <span class="podium-row__name">No verified finish</span>
+                    </span>
+                    <span class="podium-row__time" aria-label="No verified time">—</span>
+                </li>
+                <li class="podium-row podium-row--silver" data-rank="2">
+                    <span class="podium-row__place" aria-label="Second place">
+                        <span class="podium-row__number">2</span>
+                        <span class="podium-row__ordinal">ND</span>
+                    </span>
+                    <span class="podium-row__identity">
+                        <span class="podium-row__medal" aria-hidden="true">Silver</span>
+                        <span class="podium-row__name">No verified finish</span>
+                    </span>
+                    <span class="podium-row__time" aria-label="No verified time">—</span>
+                </li>
+                <li class="podium-row podium-row--bronze" data-rank="3">
+                    <span class="podium-row__place" aria-label="Third place">
+                        <span class="podium-row__number">3</span>
+                        <span class="podium-row__ordinal">RD</span>
+                    </span>
+                    <span class="podium-row__identity">
+                        <span class="podium-row__medal" aria-hidden="true">Bronze</span>
+                        <span class="podium-row__name">No verified finish</span>
+                    </span>
+                    <span class="podium-row__time" aria-label="No verified time">—</span>
+                </li>
+            </ol>
+        </section>
+
+        <footer class="podium-footer">
+            <span>Seven days. One final order.</span>
+            <span class="podium-footer__mark" aria-hidden="true"></span>
+        </footer>
+    </main>
+</body>
+
+</html>

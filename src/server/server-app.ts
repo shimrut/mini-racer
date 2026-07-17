@@ -2,6 +2,7 @@ import express from 'express';
 import { isDailyGpChallengePlayable } from './daily-gp-model.js';
 import {
     getServerDailyGpChallenge,
+    getServerFinalDailyGpPodium,
     getServerDailyGpPlaylist,
     getServerDailyGpSnapshot,
     getServerPlayerPbGhost,
@@ -36,6 +37,14 @@ import {
     deleteDailyAutopostSubscription,
     readAllDailyAutopostSubscriptions,
 } from './daily-autopost-store.js';
+import {
+    enableDailyPodiumAutopost,
+    ensureDailyMiniRacerPodiumPostForSubreddit,
+} from './daily-podium-service.js';
+import {
+    deleteDailyPodiumAutopostSubscription,
+    readAllDailyPodiumAutopostSubscriptions,
+} from './daily-podium-autopost-store.js';
 import {
     assertModeratorForSubreddit,
     resolveMenuTargetSubredditName,
@@ -95,12 +104,17 @@ function registerProductionRoutes(app: express.Application): void {
     registerInternalRoutes(app, {
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
+        getServerFinalDailyGpPodium,
         ensureDailyMiniRacerPostForSubreddit,
         enableDailyAutopost,
         deleteDailyAutopostSubscription,
+        ensureDailyMiniRacerPodiumPostForSubreddit,
+        enableDailyPodiumAutopost,
+        deleteDailyPodiumAutopostSubscription,
         assertModeratorForSubreddit,
         ensureModeratorAnalyticsPostForSubreddit,
         readAllDailyAutopostSubscriptions,
+        readAllDailyPodiumAutopostSubscriptions,
     });
 }
 

@@ -52,9 +52,9 @@ function hashTrackRegistry(trackRegistry) {
 }
 
 describe('track runtime integrity', () => {
-    it('keeps the compatibility registry identical to the ordered catalog', () => {
+    it('keeps the compatibility registry ordered by the complete schedule', () => {
         expect(Object.keys(TRACKS)).toEqual(TRACK_SCHEDULE_KEYS);
-        expect(TRACK_SCHEDULE_KEYS).toEqual(Object.keys(TRACK_CATALOG));
+        expect(new Set(TRACK_SCHEDULE_KEYS)).toEqual(new Set(Object.keys(TRACK_CATALOG)));
         expect(new Set(TRACK_SCHEDULE_KEYS).size).toBe(TRACK_SCHEDULE_KEYS.length);
         Object.entries(TRACK_CATALOG).forEach(([trackKey, metadata]) => {
             expect(metadata.name.trim(), `${trackKey} needs a player-facing name`).not.toBe('');

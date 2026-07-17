@@ -1,0 +1,363 @@
+import { reddit } from '@devvit/web/server';
+import type {
+    DailyGpPodiumPostData,
+    FinalDailyGpPodium,
+    FinalDailyGpPodiumPosition,
+} from './daily-podium-model.js';
+import {
+    readDailyPodiumAutopostSubscription,
+    upsertDailyPodiumAutopostSubscription,
+} from './daily-podium-autopost-store.js';
+import {
+    acquireDailyGpPodiumPostCreationLock,
+    readDailyGpPodiumPostRecord,
+    releaseDailyGpPodiumPostCreationLock,
+    writeDailyGpPodiumPostRecord,
+} from './daily-podium-post-store.js';
+import { getRequestAppSlug } from './request-context.js';
+
+const EMPTY_FINISH_LABEL = 'No verified finish';
+const SHORT_MONTH_NAMES = Object.freeze([
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]);
+
+export type DailyPodiumPostResult = {
+    created: boolean;
+    postUrl: string | null;
+};
+
+function normalizeName(value: string): string {
+    return value.trim().toLowerCase();
+}
+
+function formatChallengeDate(value: string, includeYear = false): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return value;
+
+    const [, year, monthText, dayText] = match;
+    const monthName = SHORT_MONTH_NAMES[Number(monthText) - 1];
+    const day = Number(dayText);
+    if (!monthName || day < 1 || day > 31) return value;
+    return `${day} ${monthName}${includeYear ? ` ${year}` : ''}`;
+}
+
+function emptyPosition(rank: 1 | 2 | 3): FinalDailyGpPodiumPosition {
+    return {
+        rank,
+        displayName: EMPTY_FINISH_LABEL,
+        identityType: 'empty',
+        formattedTime: null,
+    };
+}
+
+function sanitizePosition(
+    position: FinalDailyGpPodiumPosition | undefined,
+    rank: 1 | 2 | 3,
+): FinalDailyGpPodiumPosition {
+    const identityType = position?.identityType;
+    const displayName = position?.displayName?.trim();
+    const formattedTime = position?.formattedTime?.trim();
+    if (
+        (identityType !== 'reddit' && identityType !== 'private')
+        || !displayName
+        || !formattedTime
+    ) {
+        return emptyPosition(rank);
+    }
+
+    return {
+        rank,
+        displayName,
+        identityType,
+        formattedTime,
+    };
+}
+
+export function sanitizeDailyGpPodiumForPost(
+    podium: FinalDailyGpPodium,
+): DailyGpPodiumPostData {
+    return {
+        challengeId: podium.challengeId,
+        challengeDate: podium.challengeDate,
+        trackName: podium.trackName,
+        positions: [
+            sanitizePosition(podium.positions[0], 1),
+            sanitizePosition(podium.positions[1], 2),
+            sanitizePosition(podium.positions[2], 3),
+        ],
+    };
+}
+
+function formatPodiumDisplayName(position: FinalDailyGpPodiumPosition): string {
+    if (position.identityType !== 'reddit') return position.displayName;
+    return position.displayName.startsWith('u/')
+        ? position.displayName
+        : `u/${position.displayName}`;
+}
+
+export function formatDailyMiniRacerPodiumTitle(podium: DailyGpPodiumPostData): string {
+    return `Mini Racer Podium, ${formatChallengeDate(podium.challengeDate)}: ${podium.trackName}`;
+}
+
+export function formatDailyMiniRacerPodiumTextFallback(
+    podium: DailyGpPodiumPostData,
+): string {
+    const medalLabels = ['Gold', 'Silver', 'Bronze'];
+    return [
+        '# Mini Racer Final Podium',
+        '',
+        `Track: **${podium.trackName}**`,
+        `Date: ${formatChallengeDate(podium.challengeDate, true)}`,
+        '',
+        ...podium.positions.map((position, index) => {
+            const time = position.formattedTime ? ` - ${position.formattedTime}` : '';
+            return `${index + 1}. ${medalLabels[index]} - ${formatPodiumDisplayName(position)}${time}`;
+        }),
+        '',
+        'These are the final verified results after the track left the seven-day playable window.',
+    ].join('\n');
+}
+
+export async function enableDailyPodiumAutopost(subredditName: string): Promise<void> {
+    const now = new Date().toISOString();
+    await upsertDailyPodiumAutopostSubscription(subredditName, (previous) => ({
+        subredditName,
+        enabled: true,
+        enabledAt: previous?.enabledAt || now,
+        updatedAt: now,
+        lastPostedChallengeId: previous?.lastPostedChallengeId ?? null,
+        lastPostedAt: previous?.lastPostedAt ?? null,
+        lastPostUrl: previous?.lastPostUrl ?? null,
+    }));
+}
+
+async function updatePodiumSubscription(
+    subredditName: string,
+    challengeId: string,
+    postUrl: string,
+    postedAt: string,
+): Promise<void> {
+    await upsertDailyPodiumAutopostSubscription(subredditName, (previous) => ({
+        subredditName,
+        enabled: previous?.enabled ?? false,
+        enabledAt: previous?.enabledAt ?? null,
+        updatedAt: new Date().toISOString(),
+        lastPostedChallengeId: challengeId,
+        lastPostedAt: previous?.lastPostedChallengeId === challengeId
+            ? previous.lastPostedAt ?? postedAt
+            : postedAt,
+        lastPostUrl: postUrl,
+    }));
+}
+
+async function registerDailyGpPodiumPost({
+    subredditName,
+    challengeId,
+    postId,
+    postUrl,
+}: {
+    subredditName: string;
+    challengeId: string;
+    postId: `t3_${string}`;
+    postUrl: string;
+}) {
+    const existing = await readDailyGpPodiumPostRecord(subredditName, challengeId);
+    const record = {
+        subredditName,
+        challengeId,
+        postId,
+        postUrl,
+        createdAt: existing?.postId === postId
+            ? existing.createdAt
+            : new Date().toISOString(),
+    };
+    await writeDailyGpPodiumPostRecord(record);
+    return record;
+}
+
+async function recoverDailyGpPodiumPost({
+    subredditName,
+    challengeId,
+    appSlug,
+    preferredPostUrl,
+}: {
+    subredditName: string;
+    challengeId: string;
+    appSlug: string;
+    preferredPostUrl: string | null;
+}) {
+    const listing = await (reddit as any).getPostsByUser({
+        username: appSlug,
+        sort: 'new',
+        timeframe: 'month',
+        limit: 100,
+        pageSize: 100,
+    });
+    const posts = typeof listing?.all === 'function' ? await listing.all() : [];
+    const matches: any[] = [];
+    for (const post of posts) {
+        if (normalizeName(post?.subredditName || '') !== normalizeName(subredditName)) continue;
+        try {
+            const postData = await post.getPostData();
+            if (
+                postData?.postType === 'daily-podium'
+                && postData?.challengeId === challengeId
+            ) {
+                matches.push(post);
+            }
+        } catch (_error) {
+            // Ignore unrelated or unavailable posts while recovering the canonical podium.
+        }
+    }
+    if (!matches.length) return null;
+    const post = matches.find((candidate) => candidate?.url === preferredPostUrl) || matches[0];
+    if (
+        typeof post?.id !== 'string'
+        || !post.id.startsWith('t3_')
+        || typeof post?.url !== 'string'
+        || !post.url
+    ) {
+        return null;
+    }
+    return registerDailyGpPodiumPost({
+        subredditName,
+        challengeId,
+        postId: post.id,
+        postUrl: post.url,
+    });
+}
+
+export async function resolveDailyGpPodiumPostRecord({
+    subredditName,
+    challengeId,
+    appSlug,
+    preferredPostUrl = null,
+}: {
+    subredditName: string;
+    challengeId: string;
+    appSlug: string;
+    preferredPostUrl?: string | null;
+}) {
+    const stored = await readDailyGpPodiumPostRecord(subredditName, challengeId);
+    if (stored) {
+        try {
+            await reddit.getPostById(stored.postId);
+            return stored;
+        } catch (_error) {
+            // Recover a matching app-authored podium when the stored record is stale.
+        }
+    }
+    return recoverDailyGpPodiumPost({
+        subredditName,
+        challengeId,
+        appSlug,
+        preferredPostUrl,
+    });
+}
+
+export async function ensureDailyMiniRacerPodiumPostForSubreddit(
+    subredditName: string,
+    finalPodium: FinalDailyGpPodium,
+): Promise<DailyPodiumPostResult> {
+    const subscription = await readDailyPodiumAutopostSubscription(subredditName);
+    const appSlug = getRequestAppSlug();
+    if (!appSlug) {
+        throw new Error('Reddit did not provide the Mini Racer app identity.');
+    }
+    const existing = await resolveDailyGpPodiumPostRecord({
+        subredditName,
+        challengeId: finalPodium.challengeId,
+        appSlug,
+        preferredPostUrl: subscription?.lastPostedChallengeId === finalPodium.challengeId
+            ? subscription.lastPostUrl
+            : null,
+    });
+    if (existing) {
+        await updatePodiumSubscription(
+            subredditName,
+            finalPodium.challengeId,
+            existing.postUrl,
+            existing.createdAt,
+        );
+        return { created: false, postUrl: existing.postUrl };
+    }
+
+    const lock = await acquireDailyGpPodiumPostCreationLock(
+        subredditName,
+        finalPodium.challengeId,
+    );
+    if (!lock) {
+        const raced = await resolveDailyGpPodiumPostRecord({
+            subredditName,
+            challengeId: finalPodium.challengeId,
+            appSlug,
+        });
+        if (raced) {
+            await updatePodiumSubscription(
+                subredditName,
+                finalPodium.challengeId,
+                raced.postUrl,
+                raced.createdAt,
+            );
+            return { created: false, postUrl: raced.postUrl };
+        }
+        throw new Error('This Mini Racer podium post is already being created.');
+    }
+
+    try {
+        const raced = await resolveDailyGpPodiumPostRecord({
+            subredditName,
+            challengeId: finalPodium.challengeId,
+            appSlug,
+        });
+        if (raced) {
+            await updatePodiumSubscription(
+                subredditName,
+                finalPodium.challengeId,
+                raced.postUrl,
+                raced.createdAt,
+            );
+            return { created: false, postUrl: raced.postUrl };
+        }
+
+        const podium = sanitizeDailyGpPodiumForPost(finalPodium);
+        const post = await reddit.submitCustomPost({
+            subredditName,
+            title: formatDailyMiniRacerPodiumTitle(podium),
+            entry: 'podium',
+            postData: {
+                postType: 'daily-podium',
+                challengeId: podium.challengeId,
+                podium,
+            },
+            textFallback: {
+                text: formatDailyMiniRacerPodiumTextFallback(podium),
+            },
+        });
+        if (
+            typeof post.id !== 'string'
+            || !post.id.startsWith('t3_')
+            || typeof post.url !== 'string'
+            || !post.url
+        ) {
+            throw new Error('Reddit did not return the podium post identity.');
+        }
+
+        const record = await registerDailyGpPodiumPost({
+            subredditName,
+            challengeId: finalPodium.challengeId,
+            postId: post.id as `t3_${string}`,
+            postUrl: post.url,
+        });
+        await updatePodiumSubscription(
+            subredditName,
+            finalPodium.challengeId,
+            post.url,
+            record.createdAt,
+        );
+        return { created: true, postUrl: post.url };
+    } finally {
+        await releaseDailyGpPodiumPostCreationLock(lock);
+    }
+}

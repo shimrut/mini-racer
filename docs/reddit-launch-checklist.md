@@ -39,6 +39,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] At least one example post has been created and reviewed end to end.
 - [ ] Moderator, scheduler, and repeated create actions reuse the same canonical post for the subreddit and UTC day.
 - [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.
+- [ ] Podium automation can be enabled and disabled independently from race posts, publishes the just-expired track at 00:01 UTC, and repeated scheduler/menu actions reuse one canonical podium post.
+- [ ] Podium posts show exactly three positions, preserve publication-time username/private-name choices, expose no player IDs, and use explicit placeholders when fewer than three verified racers finished.
 
 ### Quality and trust
 

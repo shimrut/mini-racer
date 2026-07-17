@@ -674,6 +674,86 @@ describe('server route contracts', () => {
         expect(assertModeratorForSubreddit).toHaveBeenCalledWith('MiniRacer');
     });
 
+    it('supports independent podium automation menus and isolates scheduled subreddit failures', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const podium = {
+            challengeId: 'daily-gp-2026-07-10',
+            challengeDate: '2026-07-10',
+            trackKey: 'circuit',
+            trackName: 'Classic Circuit',
+            positions: [
+                { rank: 1, displayName: 'RaceFan', identityType: 'reddit', formattedTime: '0:12.34' },
+                { rank: 2, displayName: 'Turbo Otter 42', identityType: 'private', formattedTime: '0:13.56' },
+                { rank: 3, displayName: 'No verified finish', identityType: 'empty', formattedTime: null },
+            ],
+        };
+        const enableDailyPodiumAutopost = vi.fn();
+        const deleteDailyPodiumAutopostSubscription = vi.fn();
+        const ensureDailyMiniRacerPodiumPostForSubreddit = vi.fn(async (subredditName) => {
+            if (subredditName === 'broken') throw new Error('podium failed');
+            return {
+                created: subredditName === 'MiniRacer' || subredditName === 'created',
+                postUrl: subredditName === 'MiniRacer' ? 'https://reddit.com/podium' : null,
+            };
+        });
+        const baseUrl = await startApp((app) => registerInternalRoutes(app, {
+            resolveMenuTargetSubredditName: async () => 'MiniRacer',
+            getServerDailyGpChallenge: vi.fn(),
+            getServerFinalDailyGpPodium: async () => podium,
+            ensureDailyMiniRacerPostForSubreddit: vi.fn(),
+            enableDailyAutopost: vi.fn(),
+            deleteDailyAutopostSubscription: vi.fn(),
+            ensureDailyMiniRacerPodiumPostForSubreddit,
+            enableDailyPodiumAutopost,
+            deleteDailyPodiumAutopostSubscription,
+            assertModeratorForSubreddit: vi.fn(),
+            ensureModeratorAnalyticsPostForSubreddit: vi.fn(),
+            readAllDailyAutopostSubscriptions: async () => [],
+            readAllDailyPodiumAutopostSubscriptions: async () => [
+                { subredditName: 'disabled', enabled: false },
+                { subredditName: 'broken', enabled: true },
+                { subredditName: 'created', enabled: true },
+            ],
+        }));
+        const request = (path) => fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetId: 't5_mini' }),
+        });
+
+        const enabled = await request('/internal/menu/podium-enable-daily');
+        expect(await readJson(enabled)).toEqual({
+            showToast: {
+                text: 'Daily Mini Racer podium posts enabled for r/MiniRacer. The latest podium is live.',
+                appearance: 'success',
+            },
+            navigateTo: 'https://reddit.com/podium',
+        });
+        expect(enableDailyPodiumAutopost).toHaveBeenCalledWith('MiniRacer');
+
+        const disabled = await request('/internal/menu/podium-disable-daily');
+        expect(await readJson(disabled)).toEqual({
+            showToast: {
+                text: 'Daily Mini Racer podium posts disabled for r/MiniRacer.',
+                appearance: 'success',
+            },
+        });
+        expect(deleteDailyPodiumAutopostSubscription).toHaveBeenCalledWith('MiniRacer');
+
+        const scheduled = await request('/internal/scheduler/daily-podium-posts');
+        expect(scheduled.status).toBe(200);
+        expect(await readJson(scheduled)).toEqual({
+            ok: true,
+            challengeId: podium.challengeId,
+            createdCount: 1,
+        });
+        expect(ensureDailyMiniRacerPodiumPostForSubreddit).toHaveBeenCalledTimes(3);
+        expect(ensureDailyMiniRacerPodiumPostForSubreddit).not.toHaveBeenCalledWith(
+            'disabled',
+            expect.anything(),
+        );
+    });
+
     it('preserves menu error toasts and scheduler-level failures', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const baseUrl = await startApp((app) => registerInternalRoutes(app, {

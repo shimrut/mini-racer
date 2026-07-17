@@ -23,6 +23,10 @@
       "game": {
         "entry": "game.html"
       },
+      "podium": {
+        "height": "tall",
+        "entry": "podium.html"
+      },
       "mod-analytics": {
         "height": "tall",
         "entry": "mod-tool.html"
@@ -57,6 +61,20 @@
         "endpoint": "/internal/menu/post-disable-daily"
       },
       {
+        "label": "Enable daily Mini Racer podium posts",
+        "description": "Publish the final podium when a track leaves the seven-day window",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/podium-enable-daily"
+      },
+      {
+        "label": "Disable daily Mini Racer podium posts",
+        "description": "Stop publishing final Mini Racer podium posts for this subreddit",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/podium-disable-daily"
+      },
+      {
         "label": "Open Mini Racer analytics",
         "description": "Open the moderator-only analytics tool for this subreddit",
         "location": "subreddit",
@@ -70,6 +88,10 @@
       "daily-mini-racer-posts": {
         "endpoint": "/internal/scheduler/daily-posts",
         "cron": "5 0 * * *"
+      },
+      "daily-mini-racer-podium-posts": {
+        "endpoint": "/internal/scheduler/daily-podium-posts",
+        "cron": "1 0 * * *"
       }
     }
   },

@@ -2,6 +2,7 @@ import { redis } from '@devvit/redis';
 import { createHash } from 'node:crypto';
 import {
     DEFAULT_TRACK_KEY,
+    getTrackName,
     hasTrack,
     TRACK_SCHEDULE_KEYS,
 } from '../../game/track/catalog.js';
@@ -33,6 +34,7 @@ import {
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
 import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
+import type { FinalDailyGpPodium } from './daily-podium-model.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 import { mintGuestPlayerToken, verifyGuestPlayerToken } from './player-token.js';
 import {
@@ -700,6 +702,58 @@ function toSnapshotRow(
     };
 }
 
+function formatPodiumTime(bestTimeMs: number): string {
+    const totalCentiseconds = Math.max(0, Math.round(bestTimeMs / 10));
+    const minutes = Math.floor(totalCentiseconds / 6_000);
+    const seconds = Math.floor((totalCentiseconds % 6_000) / 100);
+    const centiseconds = totalCentiseconds % 100;
+    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`;
+}
+
+async function readFinalPodiumPositions(
+    challenge: DailyGpChallenge,
+): Promise<FinalDailyGpPodium['positions']> {
+    const rankedMembers = await redis.zRange(
+        createRedisChallengeLeaderboardKey(challenge.id),
+        0,
+        2,
+    );
+    const rawEntries = rankedMembers.length
+        ? await redis.hMGet(
+            createRedisChallengeEntryHashKey(challenge.id),
+            rankedMembers.map((member) => member.member),
+        )
+        : [];
+    const profileMap = await readPlayerProfileMap(
+        rankedMembers.map((member) => member.member),
+    );
+
+    const rankedPositions = rankedMembers.map((member, index) => {
+        const entry = parseStoredEntry(rawEntries[index], challenge.trackKey);
+        if (!entry || entry.playerId !== member.member) return null;
+        const profile = profileMap.get(member.member);
+        const redditUsername = sanitizeRedditUsername(profile?.redditUsername);
+        const usesRedditIdentity = profile?.leaderboardIdentity === 'reddit' && Boolean(redditUsername);
+        return {
+            rank: (index + 1) as 1 | 2 | 3,
+            displayName: resolveLeaderboardDisplayName({
+                playerId: member.member,
+                preference: profile?.leaderboardIdentity,
+                redditUsername,
+            }),
+            identityType: usesRedditIdentity ? 'reddit' as const : 'private' as const,
+            formattedTime: formatPodiumTime(entry.bestTimeMs),
+        };
+    });
+
+    return ([1, 2, 3] as const).map((rank) => rankedPositions[rank - 1] ?? {
+        rank,
+        displayName: 'No verified finish',
+        identityType: 'empty' as const,
+        formattedTime: null,
+    }) as FinalDailyGpPodium['positions'];
+}
+
 async function readRowsByRankRange(
     challengeId: string,
     trackKey: string,
@@ -824,6 +878,28 @@ export async function getServerDailyGpChallengeById(
         return resolveTodayDailyGpChallenge();
     }
     return pickTodayDailyGpChallenge();
+}
+
+export async function getServerFinalDailyGpPodium(
+    now = new Date(),
+): Promise<FinalDailyGpPodium | null> {
+    const expiredDayIndex = getUtcDayIndex(now) - DAILY_GP_PLAYLIST_DAYS;
+    const challengeDate = formatUtcChallengeDate(getUtcDayStart(expiredDayIndex));
+    const challengeId = createDailyChallengeId(challengeDate);
+    const challenge = await readStoredOrBackfilledDailyGpChallenge(challengeId);
+    const availableUntilMs = challenge ? Date.parse(challenge.availableUntil) : Number.NaN;
+
+    if (!challenge || !Number.isFinite(availableUntilMs) || availableUntilMs > now.getTime()) {
+        return null;
+    }
+
+    return {
+        challengeId: challenge.id,
+        challengeDate: challenge.challengeDate,
+        trackKey: challenge.trackKey,
+        trackName: getTrackName(challenge.trackKey, challenge.trackKey),
+        positions: await readFinalPodiumPositions(challenge),
+    };
 }
 
 export async function getServerDailyGpPlayableChallenge(challengeId?: string | null): Promise<DailyGpChallenge | null> {

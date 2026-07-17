@@ -1,8 +1,14 @@
 import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
 import type { DailyGpChallenge } from '../daily-gp-model.js';
+import type { FinalDailyGpPodium } from '../daily-podium-model.js';
 
 type DailyAutopostSubscription = {
+    subredditName: string;
+    enabled: boolean;
+};
+
+type DailyPodiumAutopostSubscription = {
     subredditName: string;
     enabled: boolean;
 };
@@ -21,15 +27,23 @@ type MenuActionOptions = {
 export type InternalRouteDependencies = {
     resolveMenuTargetSubredditName(targetId: string): Promise<string | null>;
     getServerDailyGpChallenge(): Promise<DailyGpChallenge>;
+    getServerFinalDailyGpPodium(): Promise<FinalDailyGpPodium | null>;
     ensureDailyMiniRacerPostForSubreddit(
         subredditName: string,
         challenge: DailyGpChallenge,
     ): Promise<PostResult>;
     enableDailyAutopost(subredditName: string): Promise<void>;
     deleteDailyAutopostSubscription(subredditName: string): Promise<void>;
+    ensureDailyMiniRacerPodiumPostForSubreddit(
+        subredditName: string,
+        podium: FinalDailyGpPodium,
+    ): Promise<PostResult>;
+    enableDailyPodiumAutopost(subredditName: string): Promise<void>;
+    deleteDailyPodiumAutopostSubscription(subredditName: string): Promise<void>;
     assertModeratorForSubreddit(subredditName: string): Promise<string>;
     ensureModeratorAnalyticsPostForSubreddit(subredditName: string): Promise<PostResult>;
     readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]>;
+    readAllDailyPodiumAutopostSubscriptions(): Promise<DailyPodiumAutopostSubscription[]>;
 };
 
 function createMenuToast(text: string, appearance: 'neutral' | 'success' = 'neutral') {
@@ -93,6 +107,60 @@ export function registerInternalRoutes(
                 challenge,
             );
             res.json({ navigateTo: result.postUrl });
+        },
+    );
+
+    registerMenuAction(
+        app,
+        dependencies,
+        '/internal/menu/podium-enable-daily',
+        {
+            missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
+            failureLogMessage: 'Failed to enable daily Mini Racer podium posts:',
+            failureToastPrefix: 'Could not enable daily Mini Racer podium posts',
+        },
+        async (subredditName, res) => {
+            await dependencies.enableDailyPodiumAutopost(subredditName);
+            const podium = await dependencies.getServerFinalDailyGpPodium();
+            if (!podium) {
+                res.json(createMenuToast(
+                    `Daily Mini Racer podium posts enabled for r/${subredditName}. No expired track is available yet.`,
+                    'success',
+                ));
+                return;
+            }
+
+            const result = await dependencies.ensureDailyMiniRacerPodiumPostForSubreddit(
+                subredditName,
+                podium,
+            );
+            res.json({
+                showToast: {
+                    text: result.created
+                        ? `Daily Mini Racer podium posts enabled for r/${subredditName}. The latest podium is live.`
+                        : `Daily Mini Racer podium posts enabled for r/${subredditName}. The latest podium already exists.`,
+                    appearance: 'success',
+                },
+                ...(result.created && result.postUrl ? { navigateTo: result.postUrl } : {}),
+            });
+        },
+    );
+
+    registerMenuAction(
+        app,
+        dependencies,
+        '/internal/menu/podium-disable-daily',
+        {
+            missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
+            failureLogMessage: 'Failed to disable daily Mini Racer podium posts:',
+            failureToastPrefix: 'Could not disable daily Mini Racer podium posts',
+        },
+        async (subredditName, res) => {
+            await dependencies.deleteDailyPodiumAutopostSubscription(subredditName);
+            res.json(createMenuToast(
+                `Daily Mini Racer podium posts disabled for r/${subredditName}.`,
+                'success',
+            ));
         },
     );
 
@@ -212,6 +280,43 @@ export function registerInternalRoutes(
         } catch (error) {
             console.error('Failed scheduled Mini Racer daily post run:', error);
             res.status(500).json({ ok: false, error: 'Scheduled daily post run failed' });
+        }
+    });
+
+    app.post('/internal/scheduler/daily-podium-posts', async (_req, res) => {
+        try {
+            const podium = await dependencies.getServerFinalDailyGpPodium();
+            if (!podium) {
+                res.status(200).json({ ok: true, challengeId: null, createdCount: 0 });
+                return;
+            }
+
+            const subscriptions = await dependencies.readAllDailyPodiumAutopostSubscriptions();
+            let createdCount = 0;
+            for (const subscription of subscriptions) {
+                if (!subscription.enabled) continue;
+                try {
+                    const result = await dependencies.ensureDailyMiniRacerPodiumPostForSubreddit(
+                        subscription.subredditName,
+                        podium,
+                    );
+                    if (result.created) createdCount += 1;
+                } catch (error) {
+                    console.error(
+                        `Failed scheduled Mini Racer podium post for r/${subscription.subredditName}:`,
+                        error,
+                    );
+                }
+            }
+
+            res.status(200).json({
+                ok: true,
+                challengeId: podium.challengeId,
+                createdCount,
+            });
+        } catch (error) {
+            console.error('Failed scheduled Mini Racer daily podium post run:', error);
+            res.status(500).json({ ok: false, error: 'Scheduled daily podium post run failed' });
         }
     });
 }

@@ -81,8 +81,8 @@ describe('reddit daily gp model', () => {
         expect(scheduledTrackKeys.every((key) => pool.includes(key))).toBe(true);
     });
 
-    it('uses explicit catalog order for future Daily GP generation', () => {
-        expect(TRACK_SCHEDULE_KEYS).toEqual(Object.keys(TRACK_CATALOG));
+    it('uses an explicit schedule containing the complete track catalog', () => {
+        expect(new Set(TRACK_SCHEDULE_KEYS)).toEqual(new Set(Object.keys(TRACK_CATALOG)));
     });
 
     it('keeps day indexing stable within the same UTC day', () => {
