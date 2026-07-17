@@ -1,5 +1,6 @@
 # Changelog
 
+- Softened the final podium layout: quieter backdrop, thinner finish-line accent, and simpler ranking rows without medal labels or glow chrome.
 - Added a **Play Now** control on final podium posts that opens today's featured Mini Racer track.
 - Fixed the final podium custom post so the red finish-line trail meets the car (dash mask no longer blanks the right side) and the daily track schematic shows as a faint background immediately on load instead of after avatar or car-asset waits.
 - Replaced the podium's hand-drawn fallback with Reddit's official hosted default Snoo. Reddit accounts whose standard profile icon is not exposed by Devvit now use that official fallback, and the legacy avatar cache is versioned so existing podiums adopt it immediately.
