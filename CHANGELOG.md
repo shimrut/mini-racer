@@ -1,5 +1,6 @@
 # Changelog
 
+- Fixed final podium row spacing: tighter rank-to-avatar gaps, shorter rows, and less empty padding around the list.
 - Tightened final podium spacing and lowered the track watermark so results read clearer against the backdrop.
 - Removed the dashed empty-time box and gold-place star accents from final podium posts for a quieter layout.
 - Added a **Play Now** control on final podium posts that opens today's featured Mini Racer track.
