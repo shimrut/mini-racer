@@ -1,3 +1,8 @@
+import { TRACKS } from './game/track/tracks.js';
+import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
+import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
+import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
+
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
 const EMPTY_TIME = '—';
@@ -171,6 +176,69 @@ async function boot() {
     const podium = renderPodium(document, readPodiumPostData());
     const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
     if (hydrated !== podium) renderPodium(document, hydrated);
+    renderPodiumTrack(podium.trackName);
+}
+
+let trackCarPromise = null;
+
+function loadTrackCar() {
+    if (trackCarPromise) return trackCarPromise;
+    const loader = new CarSpriteLoader();
+    trackCarPromise = new Promise((resolve) => {
+        loader.load(STOCK_CAR_ASSET_NAME, {
+            onLoaded: resolve,
+            onError: () => {
+                console.warn(`Unable to load ${STOCK_CAR_ASSET_NAME} in the podium post.`);
+                resolve(null);
+            },
+        });
+    });
+    return trackCarPromise;
+}
+
+function resolveTrackByName(trackName) {
+    if (typeof trackName !== 'string') return null;
+    const target = trackName.trim().toLowerCase();
+    for (const [trackKey, track] of Object.entries(TRACKS)) {
+        if (track && typeof track.name === 'string' && track.name.trim().toLowerCase() === target) {
+            return { trackKey, track };
+        }
+    }
+    return null;
+}
+
+function renderPodiumTrack(trackName) {
+    const canvas = document.getElementById('podium-track');
+    if (!canvas) return;
+    const resolved = resolveTrackByName(trackName) || { trackKey: 'circuit', track: TRACKS.circuit };
+    const { trackKey, track } = resolved;
+    if (!track) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = globalThis.devicePixelRatio || 1;
+    canvas.width = Math.max(100, Math.round(rect.width * dpr));
+    canvas.height = Math.max(100, Math.round(rect.height * dpr));
+
+    const presentation = resolveTrackPresentation(trackKey, {
+        surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+    });
+
+    trackCarPromise.then((carImage) => {
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: { outer: track.outer, inner: track.inner },
+            presentation,
+            startLine: track.startLine,
+            startPos: track.startPos,
+            startAngle: track.startAngle ?? 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            showSchematicCarTrail: true,
+            moveSchematicCarPastStartLine: true,
+            schematicCarImage: carImage,
+            hideSchematicStartArrow: true,
+            runHistory: [],
+        });
+    });
 }
 
 if (typeof document !== 'undefined') {
@@ -179,4 +247,9 @@ if (typeof document !== 'undefined') {
     } else {
         boot();
     }
+
+    window.addEventListener('resize', () => {
+        const podium = renderPodium(document, readPodiumPostData());
+        renderPodiumTrack(podium.trackName);
+    });
 }
