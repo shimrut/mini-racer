@@ -17,14 +17,13 @@ Steer, finish one clean lap as fast as you can, then try again. Improvement come
 ## What players can do
 
 - Race **today’s featured track** and chase the fastest lap
-- Beat your **personal best** on each track (kept for life on that track)
-- Race against a faint **ghost** of your best verified lap (on by default; turn it off in Settings)
+- Beat your **personal best** on each track (kept for life) and race a faint **ghost** of that lap (on by default; off in Settings)
 - Climb that day’s **leaderboard** in Standings
 - Earn **medals** by beating target times on each track
 - Replay the last **7 days** of tracks from the Tracks screen
 - Change how your car looks in the **Garage** (skins and trails — handling stays the same)
 - **Share** a finished lap or a verified daily best as a Reddit comment (you preview the text first)
-- Use the **keyboard** to move through lobby, Garage, Settings, Tracks, Standings, and share dialogs
+- Navigate menus with the **keyboard**
 
 Your car look and settings are saved to your Reddit profile, so they should stick around after app updates.
 
@@ -33,9 +32,9 @@ Your car look and settings are saved to your Reddit profile, so they should stic
 - A **new track** becomes the featured race each day (day changes at midnight UTC)
 - Once a day’s track is posted, it **stays that track** — it does not get swapped later
 - Tracks stay playable for **7 days**, then drop out of the list
-- Communities can automatically publish that track's final global podium after its seven-day window closes
+- Communities can auto-publish that track’s final global podium when the window closes
 - Each track card shows a preview, your best time, medals, and how long that track is still available
-- Your personal best (and ghost) for a track come back if that track returns on a later date
+- Your personal best (and ghost) come back if that track returns later
 
 ## Standings and sharing
 
@@ -53,7 +52,7 @@ Older posts keep their original track while it is still available. If that day�
 
 Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
 
-Final podium posts use a separate moderator-controlled schedule. They show the top three verified times for the track that just expired, using each finalist's Reddit username (without a `u/` prefix) or private generated racer name according to the setting saved when the podium is published. Public Reddit identities include their Snoovatar when Devvit exposes one; Reddit accounts using a standard profile icon, private identities, unavailable avatars, and empty places use Reddit's official hosted default Snoo without revealing profile details. Podiums created before avatar data was added resolve and cache public Snoovatar lookups through the post's server context. A **Play Now** button opens today's featured track.
+Final podium posts (separate moderator opt-in) show the top three verified times for the track that just expired, with each finalist’s Reddit name or private racer name, their avatar when available, and a **Play Now** button for today’s featured track.
 
 ## Garage
 
@@ -85,11 +84,10 @@ Tips:
 
 ### After 1.2
 
-- Race against a faint **ghost** of your lifetime personal best on that track (on by default; turn it off in Settings)
-- Press **R** to restart while racing, paused, or on the finish screen
-- **Keyboard navigation** across lobby, Garage, Settings, Tracks, Standings, and share dialogs
-- Communities can auto-publish a **final podium** when a track’s seven-day window ends (separate opt-in from daily race posts)
-- Podium posts show identity-aware avatars, a clearer results layout, and a **Play Now** button for today’s featured track
+- Lifetime personal-best **ghosts** (on by default; off in Settings)
+- Press **R** to restart from play, pause, or finish
+- Keyboard navigation in menus
+- Optional **final podium** posts when a track expires, with avatars and **Play Now**
 
 ### 1.2
 
