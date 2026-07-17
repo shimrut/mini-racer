@@ -618,6 +618,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 #garage-modal .garage-trail-grid {
     grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr));
     gap: .75rem;
+    padding: .2rem;
+    box-sizing: border-box;
 }
 
 #garage-modal .garage-trail-option {

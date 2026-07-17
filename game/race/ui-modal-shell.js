@@ -105,6 +105,8 @@ export class ModalShell {
         this._shareMenuKeyboardState = createMenuKeyboardState();
         this._garageMenuKeyboardState = createMenuKeyboardState();
         this._settingsMenuKeyboardState = createMenuKeyboardState();
+        this._tracksMenuKeyboardState = createMenuKeyboardState();
+        this._standingsMenuKeyboardState = createMenuKeyboardState();
         this._modalTrapPointerMove = null;
     }
 
@@ -208,6 +210,61 @@ export class ModalShell {
         });
     }
 
+    getTracksMenuContainer() {
+        return document.getElementById('daily-playlist-list')
+            || document.getElementById('daily-playlist-modal');
+    }
+
+    getTracksMenuItems() {
+        return collectVisibleActionButtons(
+            this.getTracksMenuContainer(),
+            '.daily-playlist-entry--hero',
+            { requireLaidOut: false },
+        );
+    }
+
+    resetTracksMenuKeyboardNav() {
+        const items = this.getTracksMenuItems();
+        return resetMenuKeyboardState(this._tracksMenuKeyboardState, items, {
+            preferredIndex: 0,
+            container: this.getTracksMenuContainer(),
+            focusPreferred: true,
+        });
+    }
+
+    getStandingsMenuContainer() {
+        return this.modalLapTimes || this.modalRunsView;
+    }
+
+    getStandingsMenuItems() {
+        return filterVisibleMenuItems([
+            ...Array.from(this.modalRunsView?.querySelectorAll?.('.leaderboard-day-chip') || []),
+            ...Array.from(this.modalRunsView?.querySelectorAll?.('.leaderboard-row.is-shareable') || []),
+        ], { requireLaidOut: false });
+    }
+
+    resetStandingsMenuKeyboardNav({ keepCue = false } = {}) {
+        const items = this.getStandingsMenuItems();
+        const container = this.getStandingsMenuContainer();
+        const selectedDayIndex = items.findIndex((item) => (
+            item.classList?.contains?.('leaderboard-day-chip')
+            && item.classList?.contains?.('is-selected')
+        ));
+        const preferredIndex = selectedDayIndex >= 0 ? selectedDayIndex : 0;
+
+        if (keepCue && this._standingsMenuKeyboardState?.keyboardNavActive && items.length) {
+            this._standingsMenuKeyboardState.selectedIndex = preferredIndex;
+            applyMenuSelection(items, preferredIndex, { showCue: true, container });
+            return preferredIndex;
+        }
+
+        return resetMenuKeyboardState(this._standingsMenuKeyboardState, items, {
+            preferredIndex,
+            container,
+            focusPreferred: true,
+        });
+    }
+
     clearFinishMenuKeyboardCue() {
         const root = this.getActiveMenuActionsRoot();
         const buttons = collectVisibleActionButtons(root, ':scope > button', {
@@ -280,6 +337,14 @@ export class ModalShell {
             return;
         }
 
+        if (trapId === 'daily-playlist-modal') {
+            dismissMenuKeyboardCue(this._tracksMenuKeyboardState, this.getTracksMenuItems(), {
+                container: this.getTracksMenuContainer(),
+                preferredIndex: 0,
+            });
+            return;
+        }
+
         if (trapId !== 'modal') return;
 
         if (this.isSharePanelOpen()) {
@@ -288,6 +353,18 @@ export class ModalShell {
                 container: this.getSharePanelActionsContainer(),
                 preferredIndex: shareButtons.length ? shareButtons.length - 1 : null,
             });
+            return;
+        }
+
+        if (this.modalRunsView?.classList.contains('active-view')) {
+            dismissMenuKeyboardCue(
+                this._standingsMenuKeyboardState,
+                this.getStandingsMenuItems(),
+                {
+                    container: this.getStandingsMenuContainer(),
+                    preferredIndex: 0,
+                },
+            );
             return;
         }
 
@@ -981,15 +1058,16 @@ export class ModalShell {
         if (wasActive) {
             scheduleAfterModalPaint(() => {
                 this.content.centerLeaderboardCurrentRow();
-                if (this.backToMainBtn) {
-                    this.backToMainBtn.focus();
-                }
+                this.resetStandingsMenuKeyboardNav?.({
+                    keepCue: Boolean(this._standingsMenuKeyboardState?.keyboardNavActive),
+                });
             });
             return;
         }
         scheduleAfterModalPaint(() => {
             this.content.centerLeaderboardCurrentRow();
             this.activateModalFocusTrap(this.modal);
+            this.resetStandingsMenuKeyboardNav?.();
         });
     }
 
@@ -1275,6 +1353,29 @@ export class ModalShell {
                 buttons: this.getSettingsMenuItems(),
                 state: this._settingsMenuKeyboardState,
                 container: this.getSettingsMenuContainer(),
+            })) {
+                return;
+            }
+        }
+
+        if (this._activeTrapModal?.id === 'daily-playlist-modal') {
+            if (handleMenuListKeydown(event, {
+                buttons: this.getTracksMenuItems(),
+                state: this._tracksMenuKeyboardState,
+                container: this.getTracksMenuContainer(),
+            })) {
+                return;
+            }
+        }
+
+        if (
+            this._activeTrapModal?.id === 'modal'
+            && this.modalRunsView?.classList.contains('active-view')
+        ) {
+            if (handleMenuListKeydown(event, {
+                buttons: this.getStandingsMenuItems(),
+                state: this._standingsMenuKeyboardState,
+                container: this.getStandingsMenuContainer(),
             })) {
                 return;
             }
@@ -1613,11 +1714,11 @@ export class ModalShell {
                 button.type = 'button';
                 button.setAttribute('role', 'tab');
                 button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+                button.setAttribute('aria-disabled', isSelected ? 'true' : 'false');
                 button.setAttribute(
                     'aria-label',
                     `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
                 );
-                button.disabled = isSelected;
                 button.addEventListener('click', () => {
                     this._leaderboardRailScrollLeft = rail.scrollLeft;
                     payload?.onSelectLeaderboardDay?.(option?.challengeId);

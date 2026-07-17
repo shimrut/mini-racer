@@ -32,10 +32,12 @@ export class DailyChallengeUi {
         previewQualityLevel = 0,
         previewFrameSkip = 0,
         onSummaryUpdated = null,
+        getModalShell = () => null,
     } = {}) {
         this.previewQualityLevel = previewQualityLevel;
         this.previewFrameSkip = previewFrameSkip;
         this.onSummaryUpdated = onSummaryUpdated;
+        this.getModalShell = getModalShell;
         this._dailyChallengeSummary = null;
         this._dailyChallengeCountdownInterval = null;
         this._dailyPreviewKey = '';
@@ -245,22 +247,24 @@ export class DailyChallengeUi {
         openModalElement(modal, () => modal.classList.add('active'));
         document.body.classList.add('modal-open');
         scheduleAfterModalPaint(() => {
-            const firstPlay = modal.querySelector('.daily-playlist-entry--hero');
-            if (firstPlay instanceof HTMLButtonElement) {
-                firstPlay.focus();
-            } else {
-                this.dailyChallengePlaylistCloseBtn?.focus?.();
-            }
+            const modalShell = this.getModalShell?.();
+            modalShell?.activateModalFocusTrap?.(modal);
+            modalShell?.resetTracksMenuKeyboardNav?.();
         });
     }
 
     closePlaylistModal() {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
+        const modalShell = this.getModalShell?.();
+        modalShell?.releaseModalFocusTrap?.(modal);
         closeModalElement(modal, () => {
             modal.classList.remove('active');
             document.body.classList.remove('modal-open');
         });
+        if (modalShell?.isModalActive?.()) {
+            requestAnimationFrame(() => modalShell.activateModalFocusTrap?.(modalShell.modal));
+        }
     }
 
     isPlaylistModalOpen() {

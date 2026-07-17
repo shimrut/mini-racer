@@ -207,6 +207,7 @@ export class RealTimeRacer {
           this.startOverlay.isReturningPlayer,
         );
       },
+      getModalShell: () => this.modal,
     });
     this.startOverlay = new StartOverlay({
       dailyChallengeUi: this.dailyChallengeUi,

@@ -361,6 +361,10 @@
     color: var(--text-color);
 }
 
+.leaderboard-day-chip.is-menu-selected {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
 .leaderboard-day-chip__day {
     font-family: var(--header-font);
     font-size: 0.76rem;

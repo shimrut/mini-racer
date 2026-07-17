@@ -188,6 +188,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+    margin: -0.25rem;
+    padding: 0.25rem;
 }
 
 #settings-modal .modal-sheet-settings-identity-heading {
@@ -214,9 +216,13 @@
     accent-color: var(--accent-color);
 }
 
-#settings-modal .modal-sheet-settings-switch.is-menu-selected {
+#settings-modal .modal-sheet-settings-switch:focus-visible {
+    outline: none !important;
+}
+
+#settings-modal .modal-sheet-settings-identity-head:has(.modal-sheet-settings-switch.is-menu-selected) {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
 }
 
 #settings-modal .settings-collision-delay-stepper.is-menu-selected {
@@ -256,7 +262,12 @@
     flex: 1 1 auto;
     min-height: 0;
     gap: 0.8rem;
-    padding-bottom: 0.15rem;
+    padding: 0.2rem;
+    box-sizing: border-box;
+}
+
+#daily-playlist-list .daily-playlist-entry--hero.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .daily-playlist-empty {

@@ -199,7 +199,8 @@ describe('ui modal runs helpers', () => {
             ));
             expect(rail).toBeTruthy();
             expect(rail.children).toHaveLength(3);
-            expect(rail.children[0].disabled).toBe(true);
+            expect(rail.children[0].disabled).toBe(false);
+            expect(rail.children[0].getAttribute('aria-disabled')).toBe('true');
             expect(rail.children.map((button) => button.children[0].textContent))
                 .toEqual(['Today', 'Jul 14', 'Jul 13']);
         } finally {

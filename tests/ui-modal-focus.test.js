@@ -316,9 +316,9 @@ describe('modal pause/finish menu keyboard nav', () => {
 
     it('navigates settings items when the settings modal is trapped', () => {
         const switchEl = makeMenuButton('switch', { top: 0 });
-        const meter = makeMenuButton('meter', { top: 60 });
+        const plus = makeMenuButton('plus', { top: 60 });
         const close = makeMenuButton('close', { top: 120 });
-        const settingsItems = [switchEl, meter, close];
+        const settingsItems = [switchEl, plus, close];
         const settingsState = { keyboardNavActive: false, selectedIndex: 0 };
         const context = {
             _activeTrapModal: { id: 'settings-modal' },
@@ -342,8 +342,79 @@ describe('modal pause/finish menu keyboard nav', () => {
 
         try {
             handleModalTrapKeydown.call(context, event);
-            expect(meter.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(plus.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
             expect(settingsState.keyboardNavActive).toBe(true);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('navigates track cards in the Tracks modal', () => {
+        const firstTrack = makeMenuButton('first-track', { top: 0 });
+        const secondTrack = makeMenuButton('second-track', { top: 60 });
+        const tracksState = { keyboardNavActive: false, selectedIndex: 0 };
+        const context = {
+            _activeTrapModal: { id: 'daily-playlist-modal' },
+            _tracksMenuKeyboardState: tracksState,
+            isSharePanelOpen: () => false,
+            isPauseEscapeTarget: () => false,
+            getTracksMenuItems: () => [firstTrack, secondTrack],
+            getTracksMenuContainer: () => ({
+                classList: { toggle: vi.fn(), remove: vi.fn() },
+            }),
+        };
+        const event = {
+            key: 's',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            target: null,
+        };
+        const originalDocument = global.document;
+        global.document = { activeElement: firstTrack };
+
+        try {
+            handleModalTrapKeydown.call(context, event);
+            expect(secondTrack.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(secondTrack.focus).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('navigates day chips in the Standings modal', () => {
+        const firstDay = makeMenuButton('first-day', { left: 0 });
+        const secondDay = makeMenuButton('second-day', { left: 120 });
+        const standingsState = { keyboardNavActive: false, selectedIndex: 0 };
+        const context = {
+            _activeTrapModal: { id: 'modal' },
+            _standingsMenuKeyboardState: standingsState,
+            modalRunsView: { classList: { contains: (name) => name === 'active-view' } },
+            isSharePanelOpen: () => false,
+            isPauseEscapeTarget: () => false,
+            getStandingsMenuItems: () => [firstDay, secondDay],
+            getStandingsMenuContainer: () => ({
+                classList: { toggle: vi.fn(), remove: vi.fn() },
+            }),
+        };
+        const event = {
+            key: 'd',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            target: null,
+        };
+        const originalDocument = global.document;
+        global.document = { activeElement: firstDay };
+
+        try {
+            handleModalTrapKeydown.call(context, event);
+            expect(secondDay.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(secondDay.focus).toHaveBeenCalled();
         } finally {
             global.document = originalDocument;
         }
