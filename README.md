@@ -10,16 +10,21 @@ Every attempt is **one lap**. Cross the finish line to complete it.
 
 Hitting a wall does **not** end your run. You lose speed (and time), then keep going. If you prefer the old “bump and restart” feel, turn on **Collision Auto-Restart** in Settings (it is off by default).
 
+Press **R** to restart while racing, paused, or on the finish screen.
+
 Steer, finish one clean lap as fast as you can, then try again. Improvement comes from learning the corners — when to brake, how to exit cleanly, and how little wall contact you can get away with.
 
 ## What players can do
 
 - Race **today’s featured track** and chase the fastest lap
-- Beat your **personal best** and climb the leaderboard
+- Beat your **personal best** on each track (kept for life on that track)
+- Race against a faint **ghost** of your best verified lap (on by default; turn it off in Settings)
+- Climb that day’s **leaderboard** in Standings
 - Earn **medals** by beating target times on each track
-- Replay recent tracks from the **Tracks** screen (last 7 days)
+- Replay the last **7 days** of tracks from the Tracks screen
 - Change how your car looks in the **Garage** (skins and trails — handling stays the same)
 - **Share** a finished lap or a verified daily best as a Reddit comment (you preview the text first)
+- Use the **keyboard** to move through lobby, Garage, Settings, Tracks, Standings, and share dialogs
 
 Your car look and settings are saved to your Reddit profile, so they should stick around after app updates.
 
@@ -30,6 +35,7 @@ Your car look and settings are saved to your Reddit profile, so they should stic
 - Tracks stay playable for **7 days**, then drop out of the list
 - Communities can automatically publish that track's final global podium after its seven-day window closes
 - Each track card shows a preview, your best time, medals, and how long that track is still available
+- Your personal best (and ghost) for a track come back if that track returns on a later date
 
 ## Standings and sharing
 
@@ -41,7 +47,9 @@ Your car look and settings are saved to your Reddit profile, so they should stic
 
 ## First look on Reddit
 
-The post preview shows today’s track, the gold-medal target, a car on the start line, and a **Race Now** button. Open it and you’re ready to race.
+The post preview shows today’s track, the gold-medal target, a car on the start line, and a **Race Now** button.
+
+Older posts keep their original track while it is still available. If that day’s track has expired, opening the post takes you to **today’s** featured track instead.
 
 Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
 
@@ -74,6 +82,14 @@ Tips:
 - Players share scores as replies in that thread, from their own accounts
 
 ## What’s new
+
+### After 1.2
+
+- Race against a faint **ghost** of your lifetime personal best on that track (on by default; turn it off in Settings)
+- Press **R** to restart while racing, paused, or on the finish screen
+- **Keyboard navigation** across lobby, Garage, Settings, Tracks, Standings, and share dialogs
+- Communities can auto-publish a **final podium** when a track’s seven-day window ends (separate opt-in from daily race posts)
+- Podium posts show identity-aware avatars, a clearer results layout, and a **Play Now** button for today’s featured track
 
 ### 1.2
 
