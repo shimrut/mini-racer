@@ -9,6 +9,7 @@ function createDocument() {
         <ol>
             ${[1, 2, 3].map((rank) => `
                 <li data-rank="${rank}">
+                    <img class="podium-row__avatar podium-row__avatar--generic" src="assets/generic-snoo.svg" alt="">
                     <span class="podium-row__name"></span>
                     <span class="podium-row__time"></span>
                 </li>
@@ -35,9 +36,9 @@ describe('podium custom post', () => {
         });
 
         expect(result.positions).toEqual([
-            { rank: 1, displayName: 'u/RaceFan', identityType: 'reddit', formattedTime: '18.42' },
-            { rank: 2, displayName: 'Turbo Otter 42', identityType: 'private', formattedTime: '18.76' },
-            { rank: 3, displayName: 'No verified finish', identityType: 'empty', formattedTime: '—' },
+            { rank: 1, displayName: 'u/RaceFan', identityType: 'reddit', formattedTime: '18.42', avatarUrl: 'assets/generic-snoo.svg' },
+            { rank: 2, displayName: 'Turbo Otter 42', identityType: 'private', formattedTime: '18.76', avatarUrl: 'assets/generic-snoo.svg' },
+            { rank: 3, displayName: 'No verified finish', identityType: 'empty', formattedTime: '—', avatarUrl: 'assets/generic-snoo.svg' },
         ]);
     });
 
@@ -47,7 +48,13 @@ describe('podium custom post', () => {
             challengeDate: '2026-07-10',
             trackName: '<img src=x onerror=alert(1)>',
             positions: [
-                { rank: 1, displayName: 'u/Winner', identityType: 'reddit', formattedTime: '18.42' },
+                {
+                    rank: 1,
+                    displayName: 'u/Winner',
+                    identityType: 'reddit',
+                    formattedTime: '18.42',
+                    avatarUrl: 'https://i.redd.it/frozen-avatar.png',
+                },
             ],
         });
 
@@ -60,6 +67,15 @@ describe('podium custom post', () => {
             'No verified finish',
             'No verified finish',
         ]);
+        expect(document.querySelector('[data-rank="1"] .podium-row__avatar').getAttribute('src')).toBe(
+            'https://i.redd.it/frozen-avatar.png',
+        );
+        expect(document.querySelector('[data-rank="1"] .podium-row__avatar').alt).toBe(
+            'u/Winner Reddit avatar',
+        );
+        expect(document.querySelector('[data-rank="2"] .podium-row__avatar').getAttribute('src')).toBe(
+            'assets/generic-snoo.svg',
+        );
     });
 
     it('treats incomplete or unrecognized identities as empty positions', () => {
@@ -74,5 +90,20 @@ describe('podium custom post', () => {
         expect(result.positions[0].identityType).toBe('empty');
         expect(result.positions[1].identityType).toBe('empty');
         expect(result.positions[2].displayName).toBe('u/Driver');
+    });
+
+    it('never renders an unsafe avatar URL and labels private generic Snoos', () => {
+        const document = createDocument();
+        renderPodium(document, {
+            positions: [
+                { rank: 1, displayName: 'RaceFan', identityType: 'reddit', formattedTime: '18.42', avatarUrl: 'javascript:alert(1)' },
+                { rank: 2, displayName: 'Turbo Otter 42', identityType: 'private', formattedTime: '18.76', avatarUrl: 'https://example.com/leak.png' },
+            ],
+        });
+
+        const avatars = document.querySelectorAll('.podium-row__avatar');
+        expect(avatars[0].getAttribute('src')).toBe('assets/generic-snoo.svg');
+        expect(avatars[1].getAttribute('src')).toBe('assets/generic-snoo.svg');
+        expect(avatars[1].alt).toBe('Generic Snoo avatar');
     });
 });

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
-const { mockReddit, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted(() => ({
+const { mockReddit, mockMedia, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
         getPostById: vi.fn(),
         getPostsByUser: vi.fn(),
+        getSnoovatarUrl: vi.fn(),
     },
+    mockMedia: { upload: vi.fn() },
     mockAutopostStore: {
         readDailyPodiumAutopostSubscription: vi.fn(),
         upsertDailyPodiumAutopostSubscription: vi.fn(),
@@ -19,7 +22,7 @@ const { mockReddit, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted
     mockContext: { getRequestAppSlug: vi.fn() },
 }));
 
-vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
+vi.mock('@devvit/web/server', () => ({ media: mockMedia, reddit: mockReddit }));
 vi.mock('../src/server/daily-podium-autopost-store.js', () => mockAutopostStore);
 vi.mock('../src/server/daily-podium-post-store.js', () => mockPostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
@@ -80,6 +83,11 @@ describe('daily podium post workflow', () => {
         });
         mockReddit.getPostById.mockResolvedValue({ id: 't3_existing' });
         mockReddit.getPostsByUser.mockReturnValue({ all: vi.fn(async () => []) });
+        mockReddit.getSnoovatarUrl.mockResolvedValue('https://styles.redditmedia.com/avatar.png');
+        mockMedia.upload.mockResolvedValue({
+            mediaId: 'avatar-media',
+            mediaUrl: 'https://i.redd.it/frozen-avatar.png',
+        });
         mockContext.getRequestAppSlug.mockReturnValue('mini-racer');
     });
 
@@ -107,6 +115,11 @@ describe('daily podium post workflow', () => {
         });
     });
 
+    it('enables the Devvit media capability used to freeze Snoovatars', () => {
+        const config = JSON.parse(readFileSync(new URL('../devvit.json', import.meta.url), 'utf8'));
+        expect(config.permissions.media).toBe(true);
+    });
+
     it('creates an immutable sanitized custom post without a score thread', async () => {
         await expect(
             ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
@@ -126,7 +139,12 @@ describe('daily podium post workflow', () => {
                     challengeId: podium.challengeId,
                     challengeDate: podium.challengeDate,
                     trackName: podium.trackName,
-                    positions: podium.positions.map(({ playerId, profile, ...position }) => position),
+                    positions: podium.positions.map(({ playerId, profile, ...position }) => ({
+                        ...position,
+                        avatarUrl: position.identityType === 'reddit'
+                            ? 'https://i.redd.it/frozen-avatar.png'
+                            : null,
+                    })),
                 },
             },
             textFallback: {
@@ -140,6 +158,12 @@ describe('daily podium post workflow', () => {
         expect(serializedPostData).not.toContain('profile');
         expect(serializedPostData).not.toContain('trackKey');
         expect(serializedPostData).not.toContain('timeSec');
+        expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledOnce();
+        expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
+        expect(mockMedia.upload).toHaveBeenCalledWith({
+            url: 'https://styles.redditmedia.com/avatar.png',
+            type: 'image',
+        });
         expect(mockPostStore.writeDailyGpPodiumPostRecord).toHaveBeenCalledWith(
             expect.objectContaining({
                 subredditName: 'MiniRacer',
@@ -169,10 +193,37 @@ describe('daily podium post workflow', () => {
             displayName: 'No verified finish',
             identityType: 'empty',
             formattedTime: null,
+            avatarUrl: null,
         });
         expect(formatDailyMiniRacerPodiumTextFallback(sanitized)).toContain(
             `${index + 1}. ${['Gold', 'Silver', 'Bronze'][index]} - No verified finish`,
         );
+    });
+
+    it('uses the generic client fallback when Reddit has no usable Snoovatar', async () => {
+        mockReddit.getSnoovatarUrl.mockResolvedValue('javascript:alert(1)');
+
+        await ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium);
+
+        const postedPodium = mockReddit.submitCustomPost.mock.calls[0][0].postData.podium;
+        expect(postedPodium.positions.map((position) => position.avatarUrl)).toEqual([
+            null,
+            null,
+            null,
+        ]);
+        expect(mockMedia.upload).not.toHaveBeenCalled();
+    });
+
+    it('still publishes with the generic fallback when a Snoovatar upload fails', async () => {
+        mockMedia.upload.mockRejectedValue(new Error('media unavailable'));
+
+        await expect(
+            ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
+        ).resolves.toEqual({ created: true, postUrl: 'https://reddit.com/podium' });
+
+        expect(
+            mockReddit.submitCustomPost.mock.calls[0][0].postData.podium.positions[0].avatarUrl,
+        ).toBeNull();
     });
 
     it('reuses the canonical podium post without submitting another post', async () => {

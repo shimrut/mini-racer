@@ -186,8 +186,32 @@ body {
 }
 
 .podium-row__identity {
+    display: grid;
+    grid-template-columns: clamp(2.65rem, 7vw, 4.5rem) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(0.7rem, 2vw, 1.15rem);
     min-width: 0;
     padding-inline: clamp(0.65rem, 3vw, 2rem);
+}
+
+.podium-row__avatar {
+    width: 100%;
+    aspect-ratio: 1;
+    display: block;
+    border: 2px solid color-mix(in srgb, var(--tier) 72%, transparent);
+    border-radius: 50%;
+    background: #171d27;
+    object-fit: cover;
+}
+
+.podium-row__avatar--generic {
+    padding: 12%;
+    background: color-mix(in srgb, var(--tier) 12%, #10151e);
+    object-fit: contain;
+}
+
+.podium-row__identity-copy {
+    min-width: 0;
 }
 
 .podium-row__medal {
@@ -275,6 +299,8 @@ body {
     }
 
     .podium-row__identity {
+        grid-template-columns: 2.4rem minmax(0, 1fr);
+        gap: 0.5rem;
         padding-inline: 0.6rem;
     }
 

@@ -1,5 +1,6 @@
 # Changelog
 
+- Added identity-aware podium avatars: finalists displaying a Reddit username show their publication-time Snoovatar, while private identities and unavailable avatars use a bundled generic Snoo without exposing additional profile data.
 - Added independently enabled final podium posts at 00:01 UTC. Each post freezes the global top three verified results for the track leaving the seven-day window, respects each finalist's username/private-name setting at publication time, and safely fills empty places when fewer than three racers finished.
 - Pressing plain `R` now restarts the race while playing, paused, or on the finish screen. Modifier combinations such as Ctrl/Cmd/Alt/Shift+R keep their normal browser behavior and do not restart.
 - Fixed PB ghost motion using the raw 60 Hz simulation clock instead of the live car's interpolated render timeline, which made the ghost visibly step when first-run frame pacing was uneven.

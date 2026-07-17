@@ -11,7 +11,8 @@
         "SUBMIT_COMMENT"
       ]
     },
-    "redis": true
+    "redis": true,
+    "media": true
   },
   "post": {
     "dir": "dist/client",

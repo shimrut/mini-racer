@@ -1,6 +1,7 @@
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
 const EMPTY_TIME = '—';
+const GENERIC_SNOO_URL = 'assets/generic-snoo.svg';
 
 export function readPodiumPostData(root = globalThis) {
     const postData = root?.devvit?.context?.postData;
@@ -59,6 +60,9 @@ function normalizePosition(position, rank) {
         displayName: identityType === 'reddit' ? formatRedditName(rawName) : rawName,
         identityType,
         formattedTime,
+        avatarUrl: identityType === 'reddit'
+            ? normalizeAvatarUrl(position.avatarUrl)
+            : GENERIC_SNOO_URL,
     };
 }
 
@@ -68,6 +72,7 @@ function emptyPosition(rank) {
         displayName: EMPTY_NAME,
         identityType: 'empty',
         formattedTime: EMPTY_TIME,
+        avatarUrl: GENERIC_SNOO_URL,
     };
 }
 
@@ -75,8 +80,23 @@ function renderPosition(row, position) {
     if (!row || !position) return;
     const name = row.querySelector('.podium-row__name');
     const time = row.querySelector('.podium-row__time');
+    const avatar = row.querySelector('.podium-row__avatar');
 
     if (name) name.textContent = position.displayName;
+    if (avatar) {
+        avatar.src = position.avatarUrl;
+        avatar.alt = position.identityType === 'reddit'
+            ? `${position.displayName} Reddit avatar`
+            : position.identityType === 'private'
+                ? 'Generic Snoo avatar'
+                : '';
+        avatar.classList.toggle('podium-row__avatar--generic', position.avatarUrl === GENERIC_SNOO_URL);
+        avatar.onerror = () => {
+            avatar.onerror = null;
+            avatar.src = GENERIC_SNOO_URL;
+            avatar.classList.add('podium-row__avatar--generic');
+        };
+    }
     if (time) {
         time.textContent = position.formattedTime;
         time.setAttribute(
@@ -85,6 +105,16 @@ function renderPosition(row, position) {
         );
     }
     row.classList.toggle('podium-row--empty', position.identityType === 'empty');
+}
+
+function normalizeAvatarUrl(value) {
+    if (typeof value !== 'string') return GENERIC_SNOO_URL;
+    try {
+        const url = new URL(value);
+        return url.protocol === 'https:' ? url.href : GENERIC_SNOO_URL;
+    } catch {
+        return GENERIC_SNOO_URL;
+    }
 }
 
 function formatRedditName(value) {

@@ -1,4 +1,4 @@
-import { reddit } from '@devvit/web/server';
+import { media, reddit } from '@devvit/web/server';
 import type {
     DailyGpPodiumPostData,
     FinalDailyGpPodium,
@@ -51,6 +51,15 @@ function emptyPosition(rank: 1 | 2 | 3): FinalDailyGpPodiumPosition {
     };
 }
 
+function isSafeAvatarUrl(value: unknown): value is string {
+    if (typeof value !== 'string') return false;
+    try {
+        return new URL(value).protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
 function sanitizePosition(
     position: FinalDailyGpPodiumPosition | undefined,
     rank: 1 | 2 | 3,
@@ -77,15 +86,46 @@ function sanitizePosition(
 export function sanitizeDailyGpPodiumForPost(
     podium: FinalDailyGpPodium,
 ): DailyGpPodiumPostData {
+    const positions = [
+        sanitizePosition(podium.positions[0], 1),
+        sanitizePosition(podium.positions[1], 2),
+        sanitizePosition(podium.positions[2], 3),
+    ] as const;
     return {
         challengeId: podium.challengeId,
         challengeDate: podium.challengeDate,
         trackName: podium.trackName,
-        positions: [
-            sanitizePosition(podium.positions[0], 1),
-            sanitizePosition(podium.positions[1], 2),
-            sanitizePosition(podium.positions[2], 3),
-        ],
+        positions: positions.map((position) => ({
+            ...position,
+            avatarUrl: null,
+        })) as DailyGpPodiumPostData['positions'],
+    };
+}
+
+async function resolveRedditAvatarUrl(displayName: string): Promise<string | null> {
+    const username = displayName.replace(/^u\//i, '');
+    try {
+        const sourceUrl = await reddit.getSnoovatarUrl(username);
+        if (!isSafeAvatarUrl(sourceUrl)) return null;
+        const uploaded = await media.upload({ url: sourceUrl, type: 'image' });
+        return isSafeAvatarUrl(uploaded?.mediaUrl) ? uploaded.mediaUrl : null;
+    } catch {
+        return null;
+    }
+}
+
+export async function resolveDailyGpPodiumAvatarsForPost(
+    podium: DailyGpPodiumPostData,
+): Promise<DailyGpPodiumPostData> {
+    const positions = await Promise.all(podium.positions.map(async (position) => ({
+        ...position,
+        avatarUrl: position.identityType === 'reddit'
+            ? await resolveRedditAvatarUrl(position.displayName)
+            : null,
+    })));
+    return {
+        ...podium,
+        positions: positions as unknown as DailyGpPodiumPostData['positions'],
     };
 }
 
@@ -321,7 +361,9 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             return { created: false, postUrl: raced.postUrl };
         }
 
-        const podium = sanitizeDailyGpPodiumForPost(finalPodium);
+        const podium = await resolveDailyGpPodiumAvatarsForPost(
+            sanitizeDailyGpPodiumForPost(finalPodium),
+        );
         const post = await reddit.submitCustomPost({
             subredditName,
             title: formatDailyMiniRacerPodiumTitle(podium),

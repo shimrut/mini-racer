@@ -19,4 +19,17 @@ export type FinalDailyGpPodium = {
     ];
 };
 
-export type DailyGpPodiumPostData = Omit<FinalDailyGpPodium, 'trackKey'>;
+export type DailyGpPodiumPostPosition = FinalDailyGpPodiumPosition & {
+    avatarUrl: string | null;
+};
+
+export type DailyGpPodiumPostData = {
+    challengeId: string;
+    challengeDate: string;
+    trackName: string;
+    positions: readonly [
+        DailyGpPodiumPostPosition,
+        DailyGpPodiumPostPosition,
+        DailyGpPodiumPostPosition,
+    ];
+};

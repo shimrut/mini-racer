@@ -41,6 +41,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.
 - [ ] Podium automation can be enabled and disabled independently from race posts, publishes the just-expired track at 00:01 UTC, and repeated scheduler/menu actions reuse one canonical podium post.
 - [ ] Podium posts show exactly three positions, preserve publication-time username/private-name choices, expose no player IDs, and use explicit placeholders when fewer than three verified racers finished.
+- [ ] Podium Reddit identities show the correct frozen Snoovatar; private identities, missing Snoovatars, failed avatar uploads, and empty places show the bundled generic Snoo on desktop and mobile.
 
 ### Quality and trust
 
