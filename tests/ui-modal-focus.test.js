@@ -132,6 +132,25 @@ describe('modal escape key', () => {
     });
 });
 
+describe('modal activation key', () => {
+    it('consumes Enter when the active modal has no selected action', () => {
+        const event = {
+            key: 'Enter',
+            code: 'Enter',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        };
+
+        handleModalTrapKeydown.call({
+            _activeTrapModal: { id: 'modal-without-actions' },
+            getActiveMenuActionsRoot: () => null,
+        }, event);
+
+        expect(event.preventDefault).toHaveBeenCalled();
+        expect(event.stopPropagation).toHaveBeenCalled();
+    });
+});
+
 describe('modal pause/finish menu keyboard nav', () => {
     function makeMenuButton(id, {
         left = 0,

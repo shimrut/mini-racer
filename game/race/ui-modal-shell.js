@@ -1393,6 +1393,12 @@ export class ModalShell {
             }
         }
 
+        if (event.key === 'Enter' || event.code === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
         if (event.key !== 'Tab') return;
         const focusables = this.getFocusables(this._activeTrapModal);
         if (focusables.length === 0) return;
