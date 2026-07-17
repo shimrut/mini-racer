@@ -136,6 +136,7 @@ describe('menu keyboard nav helper', () => {
         ];
         const state = createMenuKeyboardState();
         state.selectedIndex = 2;
+        state.keyboardNavActive = true;
 
         expect(handleMenuListKeydown(makeEvent('ArrowDown'), {
             buttons,
@@ -145,6 +146,22 @@ describe('menu keyboard nav helper', () => {
 
         expect(state.selectedIndex).toBe(2);
         expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+    });
+
+    it('shows the current preferred control when navigation starts at an edge', () => {
+        const start = makeButton('race', {
+            primary: true,
+            rect: { left: 0, top: 100, width: 300, height: 60 },
+        });
+        const state = createMenuKeyboardState();
+        state.selectedIndex = 0;
+
+        expect(handleMenuListKeydown(makeEvent('ArrowDown'), {
+            buttons: [start],
+            state,
+            getActiveElement: () => start,
+        })).toBe(true);
+        expect(start.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
     });
 
     it('moves through a grid using actual control positions', () => {
@@ -159,6 +176,20 @@ describe('menu keyboard nav helper', () => {
         expect(findSpatialMenuIndex(buttons, 0, 'down')).toBe(2);
         expect(findSpatialMenuIndex(buttons, 3, 'left')).toBe(2);
         expect(findSpatialMenuIndex(buttons, 3, 'up')).toBe(1);
+    });
+
+    it('moves down to a wide button whose horizontal bounds overlap', () => {
+        const buttons = [
+            makeButton('settings', {
+                rect: { left: 220, top: 0, width: 80, height: 40 },
+            }),
+            makeButton('race', {
+                primary: true,
+                rect: { left: 0, top: 70, width: 300, height: 60 },
+            }),
+        ];
+
+        expect(findSpatialMenuIndex(buttons, 0, 'down')).toBe(1);
     });
 
     it('activates the cued item on Enter', () => {

@@ -643,7 +643,3 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
-#garage-modal .combined-action-btn.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-}
-

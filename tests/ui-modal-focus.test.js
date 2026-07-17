@@ -257,7 +257,7 @@ describe('modal pause/finish menu keyboard nav', () => {
 
         try {
             handleModalTrapKeydown.call(context, arrowEvent);
-            expect(closeBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+            expect(closeBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
             expect(shareBtn.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
 
             const escapeEvent = {
@@ -344,6 +344,53 @@ describe('modal pause/finish menu keyboard nav', () => {
             handleModalTrapKeydown.call(context, event);
             expect(meter.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
             expect(settingsState.keyboardNavActive).toBe(true);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('excludes modal dismiss buttons and the settings meter from navigation', () => {
+        const skinTab = makeMenuButton('garage-tab-skin');
+        const trailsTab = makeMenuButton('garage-tab-trails');
+        const skinOption = makeMenuButton('skin-option');
+        const garageBack = makeMenuButton('garage-close-btn');
+        const skinPanel = {
+            hidden: false,
+            querySelectorAll: () => [skinOption],
+        };
+        const trailsPanel = { hidden: true };
+
+        const settingSwitch = makeMenuButton('settings-car-audio-switch');
+        const minus = makeMenuButton('settings-collision-restart-delay-minus');
+        const meter = makeMenuButton('settings-collision-restart-delay-meter');
+        const plus = makeMenuButton('settings-collision-restart-delay-plus');
+        const settingsBack = makeMenuButton('settings-back-btn');
+        const elements = new Map([
+            ['garage-tab-skin', skinTab],
+            ['garage-tab-trails', trailsTab],
+            ['garage-close-btn', garageBack],
+            ['garage-panel-skin', skinPanel],
+            ['garage-panel-trails', trailsPanel],
+            ['settings-car-audio-switch', settingSwitch],
+            ['settings-collision-restart-delay-minus', minus],
+            ['settings-collision-restart-delay-meter', meter],
+            ['settings-collision-restart-delay-plus', plus],
+            ['settings-back-btn', settingsBack],
+        ]);
+        const originalDocument = global.document;
+        global.document = {
+            getElementById: (id) => elements.get(id) || null,
+        };
+
+        try {
+            const garageItems = ModalShell.prototype.getGarageMenuItems.call({});
+            expect(garageItems).toEqual([skinTab, trailsTab, skinOption]);
+            expect(garageItems).not.toContain(garageBack);
+
+            const settingsItems = ModalShell.prototype.getSettingsMenuItems.call({});
+            expect(settingsItems).toEqual([settingSwitch, minus, plus]);
+            expect(settingsItems).not.toContain(meter);
+            expect(settingsItems).not.toContain(settingsBack);
         } finally {
             global.document = originalDocument;
         }

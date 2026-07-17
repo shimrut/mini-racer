@@ -135,7 +135,6 @@ export class ModalShell {
     getGarageMenuItems() {
         const tabSkin = document.getElementById('garage-tab-skin');
         const tabTrails = document.getElementById('garage-tab-trails');
-        const closeBtn = document.getElementById('garage-close-btn');
         const skinPanel = document.getElementById('garage-panel-skin');
         const trailsPanel = document.getElementById('garage-panel-trails');
         const activePanel = skinPanel && !skinPanel.hidden
@@ -149,7 +148,7 @@ export class ModalShell {
             )
             : [];
         return filterVisibleMenuItems(
-            [tabSkin, tabTrails, ...options, closeBtn],
+            [tabSkin, tabTrails, ...options],
             { requireLaidOut: false },
         );
     }
@@ -196,9 +195,7 @@ export class ModalShell {
             document.getElementById('settings-pb-ghost-switch'),
             document.getElementById('settings-collision-auto-restart-switch'),
             document.getElementById('settings-collision-restart-delay-minus'),
-            document.getElementById('settings-collision-restart-delay-meter'),
             document.getElementById('settings-collision-restart-delay-plus'),
-            document.getElementById('settings-back-btn'),
         ], { requireLaidOut: false });
     }
 

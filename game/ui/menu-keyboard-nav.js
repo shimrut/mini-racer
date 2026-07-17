@@ -114,7 +114,7 @@ function resolveSelectedIndex(buttons, state, getActiveElement) {
     return findPreferredMenuIndex(buttons);
 }
 
-function getItemCenter(item) {
+function getItemRect(item) {
     const rect = item?.getBoundingClientRect?.();
     if (!rect) return null;
     const width = Number(rect.width);
@@ -123,43 +123,55 @@ function getItemCenter(item) {
     const top = Number(rect.top);
     if (![width, height, left, top].every(Number.isFinite)) return null;
     return {
-        x: left + (width / 2),
-        y: top + (height / 2),
+        left,
+        right: left + width,
+        top,
+        bottom: top + height,
+        centerX: left + (width / 2),
+        centerY: top + (height / 2),
     };
 }
 
 function getDirectionalDistance(from, to, direction) {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const primary = direction === 'left'
+    const dx = to.centerX - from.centerX;
+    const dy = to.centerY - from.centerY;
+    const primaryCenterDistance = direction === 'left'
         ? -dx
         : direction === 'right'
             ? dx
             : direction === 'up'
                 ? -dy
                 : dy;
-    const perpendicular = direction === 'left' || direction === 'right'
-        ? Math.abs(dy)
-        : Math.abs(dx);
+    const isHorizontal = direction === 'left' || direction === 'right';
+    const perpendicularGap = isHorizontal
+        ? Math.max(0, from.top - to.bottom, to.top - from.bottom)
+        : Math.max(0, from.left - to.right, to.left - from.right);
+    const primaryEdgeGap = direction === 'left'
+        ? Math.max(0, from.left - to.right)
+        : direction === 'right'
+            ? Math.max(0, to.left - from.right)
+            : direction === 'up'
+                ? Math.max(0, from.top - to.bottom)
+                : Math.max(0, to.top - from.bottom);
 
-    // Keep movement inside a 90-degree cone so "left" cannot jump to
-    // an unrelated control that is mostly above or below the current one.
-    if (primary <= 0 || primary < perpendicular) return null;
-    return primary + (perpendicular * 2);
+    // Overlapping edges count as aligned. This lets a wide button below a
+    // narrow right-aligned item remain a valid "down" target.
+    if (primaryCenterDistance <= 0 || primaryCenterDistance < perpendicularGap) return null;
+    return primaryEdgeGap + (perpendicularGap * 2) + (primaryCenterDistance * 0.01);
 }
 
 export function findSpatialMenuIndex(items, currentIndex, direction) {
     if (!items?.length || currentIndex < 0 || currentIndex >= items.length) return -1;
-    const origin = getItemCenter(items[currentIndex]);
+    const origin = getItemRect(items[currentIndex]);
     if (!origin) return -1;
 
     let bestIndex = -1;
     let bestDistance = Number.POSITIVE_INFINITY;
     for (let index = 0; index < items.length; index += 1) {
         if (index === currentIndex) continue;
-        const center = getItemCenter(items[index]);
-        if (!center) continue;
-        const distance = getDirectionalDistance(origin, center, direction);
+        const rect = getItemRect(items[index]);
+        if (!rect) continue;
+        const distance = getDirectionalDistance(origin, rect, direction);
         if (distance !== null && distance < bestDistance) {
             bestIndex = index;
             bestDistance = distance;
@@ -190,7 +202,14 @@ export function handleMenuListKeydown(event, {
     if (direction) {
         const currentIndex = resolveSelectedIndex(buttons, state, getActiveElement);
         const nextIndex = findSpatialMenuIndex(buttons, currentIndex, direction);
-        if (nextIndex < 0) return false;
+        if (nextIndex < 0) {
+            if (state.keyboardNavActive || currentIndex < 0) return false;
+            event.preventDefault?.();
+            event.stopPropagation?.();
+            state.keyboardNavActive = true;
+            applyMenuSelection(buttons, currentIndex, { showCue: true, container });
+            return true;
+        }
 
         event.preventDefault?.();
         event.stopPropagation?.();

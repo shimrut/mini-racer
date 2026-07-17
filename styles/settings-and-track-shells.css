@@ -219,17 +219,7 @@
     border-radius: var(--radius-full);
 }
 
-#settings-modal .settings-collision-delay-meter.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-    border-radius: var(--radius-sm);
-}
-
 #settings-modal .settings-collision-delay-stepper.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-}
-
-#settings-modal .combined-action-btn.is-menu-selected,
-#settings-modal #settings-back-btn.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
