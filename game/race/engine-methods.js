@@ -747,8 +747,11 @@ export const raceEngineMethods = {
     const renderScale = CONFIG.carSpriteRenderScale ?? 1;
     const drawWidth = this.carSpriteDrawWidth * renderScale;
     const drawHeight = this.carSpriteDrawHeight * renderScale;
+    const ghostRaceTimeSec = this.status === "playing"
+      ? Math.max(0, this.currentTime - this.FIXED_DT * (1 - alpha))
+      : this.currentTime;
     this.pbGhost?.render?.(ctx, {
-      raceTimeSec: this.currentTime,
+      raceTimeSec: ghostRaceTimeSec,
       gridSize: gs,
       carSprite: this.carSprite,
       drawWidth,

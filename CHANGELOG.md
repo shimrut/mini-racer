@@ -1,5 +1,7 @@
 # Changelog
 
+- Fixed PB ghost motion using the raw 60 Hz simulation clock instead of the live car's interpolated render timeline, which made the ghost visibly step when first-run frame pacing was uneven.
+
 How the game works today: [README.md](README.md#how-the-game-works).
 
 ## 0.7
@@ -8,10 +10,12 @@ How the game works today: [README.md](README.md#how-the-game-works).
   track PBs now survive daily challenge dates, return when a track is featured
   again, and can be followed as a highly transparent, collisionless copy of the
   player's selected car; the default-on ghost can be disabled in Settings.
+  Custom-post startup now prepares the resolved track's ghost before the lobby
+  appears, including historical posts and today's fallback for expired posts,
+  and the first race reuses that prepared asset instead of rebuilding it.
 - Selecting a race from Tracks now transitions directly into track preparation
   and the countdown instead of briefly restoring the home screen; PB ghost
-  retrieval finishes before countdown so the first attempt does not hitch while
-  the ghost payload is still downloading or parsing.
+  retrieval runs concurrently and no longer delays race startup.
 - Added Number One and Number Two to the Daily GP schedule with dedicated
   geometry modules and medal targets, while preserving the existing 45-track
   registry unchanged.

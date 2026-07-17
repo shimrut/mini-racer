@@ -433,15 +433,13 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.startSequence).toHaveBeenCalled();
   });
 
-  it("waits for the PB ghost request before starting a playlist track", async () => {
+  it("does not wait for the PB ghost request before starting a playlist track", async () => {
     const challenge = {
       id: "daily-ghost-pending",
       trackKey: "blueSector",
       objectiveType: "single_lap_fastest",
     };
     let resolveGhost;
-    let startSequenceOrder = 0;
-    let ghostResolvedOrder = 0;
     const ghostRequest = new Promise((resolve) => {
       resolveGhost = resolve;
     });
@@ -455,26 +453,105 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       resetCanvasPresentation: vi.fn(),
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
-      startSequence: vi.fn(() => {
-        startSequenceOrder = ghostResolvedOrder + 1;
-      }),
+      startSequence: vi.fn(),
       pbGhost: { clearTrack: vi.fn() },
-      prepareTrackPersonalBestGhost: vi.fn(() => ghostRequest.then(() => {
-        ghostResolvedOrder = 1;
-      })),
+      prepareTrackPersonalBestGhost: vi.fn(() => ghostRequest),
     };
 
-    const startPromise = RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge, {
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge, {
       startSource: "track_modal",
     });
-    expect(engine.startSequence).not.toHaveBeenCalled();
-    resolveGhost(null);
-    await startPromise;
 
     expect(engine.startSequence).toHaveBeenCalled();
-    expect(startSequenceOrder).toBe(2);
     expect(engine.startButtonPending).toBe(false);
     expect(engine.prepareTrackPersonalBestGhost).toHaveBeenCalledWith(challenge);
+    resolveGhost(null);
+    await ghostRequest;
+  });
+
+  it("reuses the ghost prepared during startup on the first play", async () => {
+    const challenge = {
+      id: "daily-gp-2026-07-17",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: challenge,
+      activeDailyChallenge: null,
+      currentTrackKey: challenge.trackKey,
+      preparedPbGhostChallengeId: challenge.id,
+      startOverlay: { hideStartOverlay: vi.fn() },
+      resetCanvasPresentation: vi.fn(),
+      applyDailyChallenge: vi.fn(),
+      trackModeStart: vi.fn(),
+      startSequence: vi.fn(),
+      pbGhost: {
+        preparedRecord: { samples: [{}, {}] },
+        clearTrack: vi.fn(),
+      },
+      prepareTrackPersonalBestGhost: vi.fn(),
+    };
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge, {
+      startSource: "main_menu",
+    });
+
+    expect(engine.pbGhost.clearTrack).not.toHaveBeenCalled();
+    expect(engine.prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
+    expect(engine.startSequence).toHaveBeenCalled();
+  });
+
+  it("loads the resolved valid post ghost as part of initial race assets", async () => {
+    const challenge = {
+      id: "daily-gp-2026-07-14",
+      trackKey: "blueSector",
+      objectiveType: "single_lap_fastest",
+    };
+    const engine = {
+      playerHistoryPromise: Promise.resolve({ isReturningPlayer: true }),
+      dailyChallengePromise: Promise.resolve(challenge),
+      setLoadingStatus: vi.fn(),
+      prepareTrackPersonalBestGhost: vi.fn().mockResolvedValue({
+        trackKey: challenge.trackKey,
+      }),
+    };
+
+    await expect(
+      RealTimeRacer.prototype.loadInitialPersonalBestGhostAsset.call(engine),
+    ).resolves.toEqual({ trackKey: challenge.trackKey });
+
+    expect(engine.setLoadingStatus).toHaveBeenCalledWith(80, "Loading Ghost...");
+    expect(engine.prepareTrackPersonalBestGhost).toHaveBeenCalledWith(challenge);
+  });
+
+  it("loads today's resolved ghost when an expired post falls back to today", async () => {
+    const featuredChallenge = {
+      id: "daily-gp-2026-07-17",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    let resolveProfile;
+    const engine = {
+      playerHistoryPromise: new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
+      dailyChallengePromise: Promise.resolve(featuredChallenge),
+      setLoadingStatus: vi.fn(),
+      prepareTrackPersonalBestGhost: vi.fn().mockResolvedValue(null),
+    };
+
+    const assetPromise = RealTimeRacer.prototype.loadInitialPersonalBestGhostAsset.call(
+      engine,
+    );
+    await Promise.resolve();
+    expect(engine.prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
+
+    resolveProfile({ isReturningPlayer: false });
+    await assetPromise;
+
+    expect(engine.prepareTrackPersonalBestGhost).toHaveBeenCalledWith(featuredChallenge);
   });
 
   it("uses the default car settings for daily challenges", () => {

@@ -113,6 +113,7 @@ export class RealTimeRacer {
     this.trackPersonalBestByTrackKey = Object.create(null);
     this.pbGhost = new PbGhost({ enabled: getPbGhostEnabled() });
     this.pbGhostService = new PbGhostService();
+    this.preparedPbGhostChallengeId = null;
     this.verificationQueueTimer = null;
     this.isProcessingVerificationQueue = false;
     this.hasAnyData = false;
@@ -361,9 +362,11 @@ export class RealTimeRacer {
         };
       });
     this.dailyChallengePromise = this.loadDailyChallengeCritical();
+    this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
     Promise.allSettled([
       this.playerHistoryPromise,
       this.dailyChallengePromise,
+      this.initialPbGhostAssetPromise,
       this.carAssetPromise,
       this.trackReadyPromise,
     ]).finally(async () => {

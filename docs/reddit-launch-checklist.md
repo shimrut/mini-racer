@@ -26,6 +26,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The retry flow is fast and predictable after a finish or an enabled collision auto-restart.
 - [ ] A verified lifetime PB ghost appears on the next attempt for that track, including when the track returns on a later date.
 - [ ] The PB ghost uses the player's currently selected car and is visibly more transparent than the live player car.
+- [ ] `Race Now` keeps the custom-post loading screen visible until the resolved track ghost is prepared: valid historical posts load their own ghost, while expired posts load today's featured-track ghost.
 - [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.
 - [ ] The finish screen shows `Improve`, `Share Time`, and `Home`, and sharing displays the exact comment plus Reddit username before posting.
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.

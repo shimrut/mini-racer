@@ -70,11 +70,13 @@ describe("RealTimeRacer track layer renderer", () => {
       carSpriteAssetKey: "assets/cars/mr_mr_red.webp",
       currentTrackPresentation: { backgroundStyle: "flat" },
       currentTime: 1.2,
+      FIXED_DT: 1 / 60,
+      pbGhost: { render: vi.fn() },
       drawVisibleTrackCanvas: vi.fn(),
       getDesiredLookAhead: RealTimeRacer.prototype.getDesiredLookAhead,
     };
 
-    RealTimeRacer.prototype.render.call(engine, 1 / 60, 1);
+    RealTimeRacer.prototype.render.call(engine, 1 / 60, 0.25);
 
     expect(ctx.createLinearGradient).not.toHaveBeenCalled();
     expect(ctx.fill).not.toHaveBeenCalled();
@@ -86,6 +88,12 @@ describe("RealTimeRacer track layer renderer", () => {
       -half,
       side,
       side,
+    );
+    expect(engine.pbGhost.render).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({
+        raceTimeSec: 1.2 - (1 / 60) * 0.75,
+      }),
     );
   });
 

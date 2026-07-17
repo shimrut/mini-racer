@@ -174,14 +174,33 @@ export const dailyChallengeEngineMethods = {
   async prepareTrackPersonalBestGhost(challenge, { forceRefresh = false } = {}) {
     if (!challenge?.id || !challenge?.trackKey) {
       this.pbGhost?.clearTrack?.();
+      this.preparedPbGhostChallengeId = null;
       return null;
     }
     const record = await this.pbGhostService.getForChallenge(challenge.id, {
       forceRefresh,
     });
-    return applyTrackPersonalBest(this, challenge, record, {
+    const personalBest = applyTrackPersonalBest(this, challenge, record, {
       prepareGhost: true,
     });
+    this.preparedPbGhostChallengeId = challenge.id;
+    return personalBest;
+  },
+
+  async loadInitialPersonalBestGhostAsset() {
+    const [, challenge] = await Promise.all([
+      this.playerHistoryPromise,
+      this.dailyChallengePromise,
+    ]);
+    if (!challenge) return null;
+
+    this.setLoadingStatus(80, "Loading Ghost...");
+    try {
+      return await this.prepareTrackPersonalBestGhost(challenge);
+    } catch (error) {
+      console.error("Error loading initial personal best ghost:", error);
+      return null;
+    }
   },
 
   applyVerifiedTrackPersonalBest(challenge, record) {
@@ -563,6 +582,7 @@ export const dailyChallengeEngineMethods = {
     this.dailyChallengeBestResult = null;
     this.trackPersonalBestResult = null;
     this.pbGhost?.clearTrack?.();
+    this.preparedPbGhostChallengeId = null;
     this.syncCurrentRunPolicy();
     this.setRuntimeConfig(null);
     this.hud.setHudPrimaryMetric({
@@ -615,15 +635,17 @@ export const dailyChallengeEngineMethods = {
         });
       }
 
-      this.pbGhost?.clearTrack?.();
-      if (typeof this.prepareTrackPersonalBestGhost === "function") {
-        try {
-          // Await before countdown so fetch/parse cannot hitch the first racing frames.
-          // Restart keeps a warm prepared ghost and does not re-enter this path.
-          await this.prepareTrackPersonalBestGhost(challenge);
-        } catch (error) {
+      const hasPreparedGhostAsset =
+        this.preparedPbGhostChallengeId === challenge.id;
+      if (
+        !hasPreparedGhostAsset
+        && typeof this.prepareTrackPersonalBestGhost === "function"
+      ) {
+        this.pbGhost?.clearTrack?.();
+        this.preparedPbGhostChallengeId = null;
+        void this.prepareTrackPersonalBestGhost(challenge).catch((error) => {
           console.error("Error loading personal best ghost:", error);
-        }
+        });
       }
       this.applyDailyChallenge(challenge);
       const modeStartPayload = {

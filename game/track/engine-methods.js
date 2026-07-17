@@ -131,6 +131,7 @@ export const trackEngineMethods = {
     this.currentTrack = nextTrack;
     this.currentTrackKey = trackKey;
     this.pbGhost?.clearTrack?.();
+    this.preparedPbGhostChallengeId = null;
     if (!preserveDailyChallengeContext) {
       this.clearDailyChallengeRun();
     }
