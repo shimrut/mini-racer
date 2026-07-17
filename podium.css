@@ -372,11 +372,6 @@ body {
 }
 
 .podium-row--empty .podium-row__time {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.1em 0.55em;
-    border: 1px dashed var(--line);
-    border-radius: 0.4em;
     color: var(--muted);
     font-size: clamp(0.8rem, 2.8vw, 1.35rem);
 }
