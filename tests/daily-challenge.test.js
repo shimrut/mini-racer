@@ -4,6 +4,7 @@ import {
     formatDailyChallengePlaylistAvailabilityLabel,
     formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
+    getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
     getDailyChallengeModeSelectObjectiveLine,
@@ -15,13 +16,18 @@ import {
     getDailyChallengeSnapshot,
     getCachedDailyChallengeSnapshot,
     getDailyChallengeTrackName,
+    getMissingDailyChallengeSnapshotIds,
     cacheDailyChallengePlaylist,
     getCachedDailyChallengePlaylist,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
+    prefetchDailyChallengeSnapshots,
+    previewDailyChallengeShare,
+    confirmDailyChallengeShare,
     requestFeaturedDailyChallengeStart,
     submitDailyChallengeBestTime
 } from '../game/daily-challenge/service.js';
+import { setDailyChallengeBestTime } from '../game/daily-challenge/storage.js';
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const MINIMAL_REPLAY = { inputs: [] };
@@ -724,5 +730,326 @@ describe('daily-challenge service', () => {
             availableUntil: '2026-05-31T00:00:00.000Z',
         });
         expect(fetch.mock.calls[0][0]).toBe('/api/daily/playlist');
+    });
+
+    it('uses exclusive timing boundaries for featured and expiry card states', () => {
+        const challenge = {
+            startsAt: '2026-06-02T00:00:00.000Z',
+            endsAt: '2026-06-03T00:00:00.000Z',
+            availableUntil: '2026-06-09T00:00:00.000Z',
+        };
+
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-06-03T00:00:00.000Z'))).toEqual({
+            key: 'available',
+            label: 'Expires on Jun 09',
+        });
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-06-09T00:00:00.000Z'))).toEqual({
+            key: 'expired',
+            label: 'Expired',
+        });
+
+        const almostDay = getDailyChallengeCardStatus(
+            challenge,
+            Date.parse('2026-06-08T00:00:00.001Z'),
+        );
+        expect(almostDay.key).toBe('available');
+        expect(almostDay.label).toMatch(/^Expires in /);
+
+        const exactlyDay = getDailyChallengeCardStatus(
+            challenge,
+            Date.parse('2026-06-08T00:00:00.000Z'),
+        );
+        expect(exactlyDay).toEqual({
+            key: 'available',
+            label: 'Expires on Jun 09',
+        });
+    });
+
+    it('formats remaining playlist availability across minute, hour, and day ranges', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-03T12:00:00.000Z'));
+
+        expect(formatDailyChallengePlaylistAvailabilityLabel({
+            availableUntil: '2026-06-03T12:25:00.000Z',
+        })).toBe('25m');
+        expect(formatDailyChallengePlaylistAvailabilityLabel({
+            availableUntil: '2026-06-03T14:15:00.000Z',
+        })).toBe('2h 15m');
+        expect(formatDailyChallengePlaylistAvailabilityLabel({
+            availableUntil: '2026-06-03T14:00:00.000Z',
+        })).toBe('2h');
+        expect(formatDailyChallengePlaylistAvailabilityLabel({
+            availableUntil: '2026-06-05T15:00:00.000Z',
+        })).toBe('2d 3h');
+        expect(formatDailyChallengePlaylistAvailabilityLabel({
+            availableUntil: '2026-06-05T12:00:00.000Z',
+        })).toBe('2d');
+        expect(formatDailyChallengePlaylistAvailabilityLabel({
+            availableUntil: 'not-a-date',
+        })).toBe('');
+
+        vi.useRealTimers();
+    });
+
+    it('rejects stored results with mismatched objective or non-finite times', () => {
+        const challenge = {
+            id: VALID_UUID,
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+        };
+
+        expect(isDailyChallengeStoredResultForChallenge(null, { bestTime: 10 })).toBe(false);
+        expect(isDailyChallengeStoredResultForChallenge(challenge, null)).toBe(false);
+        expect(isDailyChallengeStoredResultForChallenge(challenge, { bestTime: Number.NaN })).toBe(false);
+        expect(isDailyChallengeStoredResultForChallenge(challenge, {
+            bestTime: 10,
+            objectiveType: 'multi_lap_total',
+        })).toBe(false);
+        expect(isDailyChallengeStoredResultForChallenge(challenge, {
+            bestTime: 10,
+            trackKey: '',
+            objectiveType: '',
+        })).toBe(true);
+    });
+
+    it('computes required laps for multi-lap challenges', () => {
+        expect(getDailyChallengeRequiredLaps(null)).toBe(1);
+        expect(getDailyChallengeRequiredLaps({ objectiveType: 'single_lap_fastest' })).toBe(1);
+        expect(getDailyChallengeRequiredLaps({
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 1 },
+        })).toBe(2);
+        expect(getDailyChallengeRequiredLaps({
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 5.9 },
+        })).toBe(5);
+        expect(getDailyChallengeRequiredLaps({
+            objectiveType: 'multi_lap_total',
+        })).toBe(2);
+    });
+
+    it('merges local and snapshot bests preferring the faster verified time', async () => {
+        const challenge = {
+            id: 'best-merge-challenge',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            status: 'active',
+            skin: 'default',
+            objectiveParams: {},
+        };
+        cacheDailyChallengePlaylist([challenge]);
+        setDailyChallengeBestTime(challenge, 14.5, 1, [4, 8]);
+
+        fetch.mockResolvedValue(createJsonResponse({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: {
+                bestTimeMs: 13200,
+                completedLaps: 1,
+                checkpointTimesSec: [3.5, 7],
+            },
+            totalCount: 1,
+            objectiveType: 'single_lap_fastest',
+        }));
+        await getDailyChallengeSnapshot({ challengeId: challenge.id, forceRefresh: true });
+
+        expect(getDailyChallengeBestResult(challenge)).toMatchObject({
+            bestTime: 13.2,
+            completedLaps: 1,
+            checkpointTimesSec: [3.5, 7],
+        });
+
+        setDailyChallengeBestTime(challenge, 12.1, 1, [3, 6]);
+        expect(getDailyChallengeBestResult(challenge)).toMatchObject({
+            bestTime: 12.1,
+            completedLaps: 1,
+        });
+    });
+
+    it('reports missing snapshot ids and prefetches only those', async () => {
+        const cachedId = 'prefetch-cached';
+        const missingId = 'prefetch-missing';
+        fetch.mockResolvedValue(createJsonResponse({
+            topRows: [{ bestTimeMs: 10000 }],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 1,
+        }));
+        await getDailyChallengeSnapshot({ challengeId: cachedId, forceRefresh: true });
+        fetch.mockClear();
+        fetch.mockResolvedValue(createJsonResponse({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 0,
+        }));
+
+        expect(getMissingDailyChallengeSnapshotIds([
+            cachedId,
+            missingId,
+            missingId,
+            '',
+            12,
+            null,
+        ])).toEqual([missingId]);
+        expect(getMissingDailyChallengeSnapshotIds('nope')).toEqual([]);
+
+        await prefetchDailyChallengeSnapshots([cachedId, missingId, missingId]);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(fetch.mock.calls[0][0]).toContain(missingId);
+    });
+
+    it('returns a mock playlist when preview fetch fails', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'localhost',
+            pathname: '/preview.html',
+            protocol: 'http:',
+            search: '?mockDaily=alloyRing',
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        const playlist = await getDailyChallengePlaylist({ forceRefresh: true });
+        expect(playlist).toHaveLength(1);
+        expect(playlist[0]).toMatchObject({
+            id: 'mock-daily-challenge-local',
+            trackKey: 'alloyRing',
+        });
+    });
+
+    it('ignores expired post-bound challenges unless allowExpiredPost is set', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: '',
+        };
+        globalThis.devvit = {
+            context: {
+                postData: {
+                    challenge: {
+                        id: 'post-expired',
+                        trackKey: 'circuit',
+                        startsAt: '2020-01-01T00:00:00.000Z',
+                        endsAt: '2020-01-02T00:00:00.000Z',
+                        availableUntil: '2020-01-08T00:00:00.000Z',
+                        objectiveType: 'single_lap_fastest',
+                        status: 'active',
+                        skin: 'default',
+                    },
+                },
+            },
+        };
+        fetch.mockResolvedValue(createJsonResponse({
+            id: 'daily-gp-featured-now',
+            trackKey: 'alloyRing',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            status: 'active',
+            skin: 'default',
+        }));
+
+        const featured = await getActiveDailyChallenge({ allowExpiredPost: false });
+        expect(featured.id).toBe('daily-gp-featured-now');
+        expect(featured.trackKey).toBe('alloyRing');
+
+        const expiredAllowed = await getActiveDailyChallenge({ allowExpiredPost: true });
+        expect(expiredAllowed.id).toBe('post-expired');
+    });
+
+    it('blocks local share helpers and rejects incomplete submit payloads', async () => {
+        window.location = {
+            hostname: 'localhost',
+            pathname: '/game.html',
+            protocol: 'http:',
+            search: '',
+        };
+
+        await expect(previewDailyChallengeShare({ challengeId: VALID_UUID })).resolves.toMatchObject({
+            ok: false,
+            status: 403,
+            body: { status: 'unavailable_locally' },
+        });
+        await expect(confirmDailyChallengeShare('token')).resolves.toMatchObject({
+            ok: false,
+            status: 403,
+        });
+        expect(fetch).not.toHaveBeenCalled();
+
+        window.location.hostname = 'example.devvit.net';
+        await expect(submitDailyChallengeBestTime({
+            challengeId: VALID_UUID,
+            trackKey: '',
+            bestTime: 12,
+            replay: MINIMAL_REPLAY,
+        })).resolves.toBe(null);
+        await expect(submitDailyChallengeBestTime({
+            challengeId: VALID_UUID,
+            trackKey: 'circuit',
+            bestTime: 60 * 60 + 1,
+            replay: MINIMAL_REPLAY,
+        })).resolves.toBe(null);
+        await expect(submitDailyChallengeBestTime({
+            challengeId: VALID_UUID,
+            trackKey: 'circuit',
+            bestTime: 12,
+            replay: null,
+        })).resolves.toBe(null);
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('does not treat invalid mockDaily alone as mock mode outside preview', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '?mockDaily=notARealTrack',
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
+    });
+
+    it('returns an empty mock snapshot when local snapshot fetch fails', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'localhost',
+            pathname: '/game.html',
+            protocol: 'http:',
+            search: '',
+            origin: 'http://localhost:5173',
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        const snapshot = await getDailyChallengeSnapshot({
+            challengeId: 'local-mock-snapshot',
+            forceRefresh: true,
+        });
+        expect(snapshot).toMatchObject({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 0,
+            objectiveType: 'single_lap_fastest',
+            playerRankLabel: '--',
+        });
+    });
+
+    it('formats missing result labels as placeholders', () => {
+        expect(formatDailyChallengeResultLabel({ objectiveType: 'single_lap_fastest' }, null)).toBe('--');
+        expect(formatDailyChallengeResultLabel({ objectiveType: 'single_lap_fastest' }, {})).toBe('--');
+        expect(formatDailyChallengeResultLabel(
+            { objectiveType: 'single_lap_fastest' },
+            { bestTime: 12.345 },
+        )).toBe('12.35s');
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', Number.NaN)).toBe('--');
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.1)).toBe('9.10s');
     });
 });
