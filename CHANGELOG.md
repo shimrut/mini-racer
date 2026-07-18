@@ -1,5 +1,6 @@
 # Changelog
 
+- Expanded server replay-validator tests for payload schema, frame-cap boundaries, failure details, ghost output, checkpoint splits, and hard-to-reach rejection branches.
 - Added unit tests for client scoreboard replay recording so input compression, frame caps, overflow discard, and payload copying are covered.
 - Made submission, PB, score-thread, sharing, and post-creation Redis locks ownership-safe. Submission and PB leases now last 30 seconds, long Reddit operations renew their lease, and stale requests cannot delete a successor's lock or commit protected writes.
 - Restored the instant lobby reveal after loading by preparing its title and controls behind the loading-screen fade while keeping Start input and Devvit `App.Ready` gated until dismissal completes.

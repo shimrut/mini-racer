@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { validateDailyGpReplay, validateDailyGpReplayDetailed } from '../src/server/replay-validator.ts';
+import {
+    MAX_REPLAY_FRAMES,
+    validateDailyGpReplay,
+    validateDailyGpReplayDetailed,
+} from '../src/server/replay-validator.ts';
+import { isValidPbGhostTrace } from '../src/server/pb-ghost-trace.ts';
 
 const CHALLENGE = {
     id: 'daily-gp-2026-05-06',
@@ -36,6 +41,16 @@ const STRAIGHT_TRACK = {
     ],
 };
 
+const CHECKPOINT_TRACK = {
+    ...STRAIGHT_TRACK,
+    checkpoints: [
+        {
+            p1: { x: 0, y: -20 },
+            p2: { x: 10, y: -20 },
+        },
+    ],
+};
+
 const SCRAPE_TRACK = {
     ...STRAIGHT_TRACK,
     startPos: { x: 4, y: -35 },
@@ -64,17 +79,23 @@ const HEAD_ON_WALL_TRACK = {
     ],
 };
 
+const FINISHING_REPLAY = {
+    targetLapNumber: 1,
+    inputs: [
+        { frames: 240, left: false, right: false, relaunchDelay: false },
+    ],
+};
+
 describe('server replay validator', () => {
-    it('computes a finish time from replay inputs', () => {
+    it('caps accepted replays at MAX_REPLAY_FRAMES', () => {
+        expect(MAX_REPLAY_FRAMES).toBe(12000);
+    });
+
+    it('computes a finish time, ghost, and millisecond rounding from replay inputs', () => {
         const result = validateDailyGpReplay({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
-            replay: {
-                targetLapNumber: 1,
-                inputs: [
-                    { frames: 240, left: false, right: false, relaunchDelay: false },
-                ],
-            },
+            replay: FINISHING_REPLAY,
         });
 
         expect(result).toMatchObject({
@@ -84,6 +105,21 @@ describe('server replay validator', () => {
         });
         expect(result.bestTimeSec).toBeGreaterThanOrEqual(2);
         expect(result.bestTimeMs).toBe(Math.round(result.bestTimeSec * 1000));
+        expect(isValidPbGhostTrace(result.ghost)).toBe(true);
+        expect(result.ghost.finishTimeMs).toBe(result.bestTimeMs);
+    });
+
+    it('returns checkpoint split times when the finishing lap crossed checkpoints', () => {
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: CHECKPOINT_TRACK,
+            replay: FINISHING_REPLAY,
+        });
+
+        expect(outcome.ok).toBe(true);
+        expect(outcome.run.checkpointTimesSec).toHaveLength(1);
+        expect(outcome.run.checkpointTimesSec[0]).toBeGreaterThan(0);
+        expect(outcome.run.checkpointTimesSec[0]).toBeLessThan(outcome.run.bestTimeSec);
     });
 
     it('rejects submissions that do not replay to a valid finish', () => {
@@ -108,6 +144,155 @@ describe('server replay validator', () => {
                 ],
             },
         })).toBe(null);
+    });
+
+    it('reports no_finish failure details for short incomplete replays', () => {
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: {
+                inputs: [
+                    { frames: 10, left: false, right: false, relaunchDelay: false },
+                ],
+            },
+        });
+
+        expect(outcome).toEqual({
+            ok: false,
+            failure: {
+                reason: 'no_finish',
+                frameCount: 10,
+                simulatedTimeSec: Math.round((10 / 60) * 1000) / 1000,
+                checkpointIndex: 0,
+                status: 'playing',
+                position: expect.objectContaining({
+                    x: expect.any(Number),
+                    y: expect.any(Number),
+                }),
+                speed: expect.any(Number),
+            },
+        });
+        expect(Number.isFinite(outcome.failure.position.x)).toBe(true);
+        expect(Number.isFinite(outcome.failure.position.y)).toBe(true);
+        expect(outcome.failure.speed).toBeGreaterThan(0);
+    });
+
+    it('rejects missing, empty, and malformed replay payloads with specific reasons', () => {
+        expect(validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: null,
+        }).failure).toEqual({ reason: 'missing_replay' });
+
+        expect(validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: 'nope',
+        }).failure).toEqual({ reason: 'missing_replay' });
+
+        expect(validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: {},
+        }).failure).toEqual({ reason: 'missing_replay_inputs' });
+
+        expect(validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: { inputs: [] },
+        }).failure).toEqual({ reason: 'missing_replay_inputs' });
+
+        expect(validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: { inputs: null },
+        }).failure).toEqual({ reason: 'missing_replay_inputs' });
+
+        const invalidSegments = [
+            null,
+            'segment',
+            { frames: 0, left: false, right: false, relaunchDelay: false },
+            { frames: -1, left: false, right: false, relaunchDelay: false },
+            { frames: 1.5, left: false, right: false, relaunchDelay: false },
+            { frames: NaN, left: false, right: false, relaunchDelay: false },
+            { frames: 1, left: 1, right: false, relaunchDelay: false },
+            { frames: 1, left: false, right: 'false', relaunchDelay: false },
+            { frames: 1, left: false, right: false, relaunchDelay: 0 },
+            { frames: 1, left: false, right: false },
+        ];
+
+        for (const segment of invalidSegments) {
+            expect(validateDailyGpReplayDetailed({
+                challenge: CHALLENGE,
+                track: STRAIGHT_TRACK,
+                replay: { inputs: [segment] },
+            }).failure).toEqual({ reason: 'invalid_replay_segment' });
+        }
+    });
+
+    it('rejects replays that exceed the frame cap and accepts the exact cap for schema', () => {
+        const tooLong = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: {
+                inputs: [
+                    { frames: MAX_REPLAY_FRAMES, left: false, right: false, relaunchDelay: false },
+                    { frames: 1, left: false, right: false, relaunchDelay: false },
+                ],
+            },
+        });
+        expect(tooLong).toEqual({
+            ok: false,
+            failure: {
+                reason: 'replay_too_long',
+                frameCount: MAX_REPLAY_FRAMES + 1,
+            },
+        });
+
+        const singleTooLong = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: {
+                inputs: [
+                    { frames: MAX_REPLAY_FRAMES + 1, left: false, right: false, relaunchDelay: false },
+                ],
+            },
+        });
+        expect(singleTooLong.failure).toEqual({
+            reason: 'replay_too_long',
+            frameCount: MAX_REPLAY_FRAMES + 1,
+        });
+
+        const atCap = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: {
+                inputs: [
+                    { frames: MAX_REPLAY_FRAMES, left: false, right: false, relaunchDelay: false },
+                ],
+            },
+        });
+        expect(atCap.ok).toBe(true);
+        expect(atCap.run.method).toBe('finish');
+    });
+
+    it('rejects unknown challenges or tracks before simulating', () => {
+        expect(validateDailyGpReplayDetailed({
+            challenge: null,
+            track: STRAIGHT_TRACK,
+            replay: FINISHING_REPLAY,
+        }).failure).toEqual({ reason: 'unknown_track' });
+
+        expect(validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: null,
+            replay: FINISHING_REPLAY,
+        }).failure).toEqual({ reason: 'unknown_track' });
+
+        expect(validateDailyGpReplayDetailed({
+            challenge: { ...CHALLENGE, trackKey: 'does-not-exist' },
+            replay: FINISHING_REPLAY,
+        }).failure).toEqual({ reason: 'unknown_track' });
     });
 
     it('accepts a finished replay after a momentum-losing wall scrape', () => {
@@ -172,5 +357,34 @@ describe('server replay validator', () => {
         // 5 frozen frames + 10 physics frames => currentTime == 10 * (1/60).
         const expected = Math.round((physicsFrames / 60) * 1000) / 1000;
         expect(outcome.failure.simulatedTimeSec).toBe(expected);
+    });
+
+    it('applies left and right steering segments during validation', () => {
+        const straight = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: {
+                inputs: [
+                    { frames: 120, left: false, right: false, relaunchDelay: false },
+                ],
+            },
+        });
+        const turned = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: {
+                inputs: [
+                    { frames: 60, left: true, right: false, relaunchDelay: false },
+                    { frames: 60, left: false, right: true, relaunchDelay: false },
+                ],
+            },
+        });
+
+        expect(straight.ok).toBe(false);
+        expect(turned.ok).toBe(false);
+        expect(turned.failure.position).not.toEqual(straight.failure.position);
+        expect(turned.failure.reason).toBe('no_finish');
+        expect(straight.failure.frameCount).toBe(120);
+        expect(turned.failure.frameCount).toBe(120);
     });
 });
