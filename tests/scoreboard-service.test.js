@@ -114,4 +114,66 @@ describe('scoreboard service', () => {
         await expect(getScoreboardSnapshot({ trackKey: 'circuit' }))
             .rejects.toThrow('Network error');
     });
+
+    it('returns empty snapshots when API routes or fetch are unavailable', async () => {
+        delete globalThis.fetch;
+        await expect(getScoreboardSnapshot({ trackKey: 'circuit' })).resolves.toMatchObject({
+            totalCount: 0,
+            topRows: []
+        });
+    });
+
+    it('dedupes concurrent identical snapshot requests and clears inflight state', async () => {
+        let resolveFetch;
+        fetch.mockImplementation(() => new Promise((resolve) => {
+            resolveFetch = resolve;
+        }));
+
+        const first = getScoreboardSnapshot({ trackKey: 'circuit', limit: 10, offset: 0 });
+        const second = getScoreboardSnapshot({ trackKey: 'circuit', limit: 10, offset: 0 });
+        expect(fetch).toHaveBeenCalledTimes(1);
+
+        resolveFetch({
+            ok: true,
+            json: async () => ({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: null,
+                totalCount: 0,
+                playerRank: null,
+                playerRankLabel: null
+            })
+        });
+        await expect(first).resolves.toMatchObject({ totalCount: 0 });
+        await expect(second).resolves.toMatchObject({ totalCount: 0 });
+
+        fetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: null,
+                totalCount: 2,
+                playerRank: null,
+                playerRankLabel: null
+            })
+        });
+        await expect(getScoreboardSnapshot({ trackKey: 'circuit', limit: 10, offset: 0 }))
+            .resolves.toMatchObject({ totalCount: 2 });
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('normalizes non-finite offsets and rejects non-ok proxy responses', async () => {
+        fetch.mockResolvedValue({
+            ok: false,
+            status: 503,
+            json: async () => ({})
+        });
+        await expect(getScoreboardSnapshot({
+            trackKey: 'circuit',
+            offset: Number.NaN
+        })).rejects.toThrow('Scoreboard proxy failed: 503');
+        const calledUrl = String(fetch.mock.calls[0][0]);
+        expect(calledUrl).toContain('offset=0');
+    });
 });

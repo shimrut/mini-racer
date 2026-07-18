@@ -13,8 +13,12 @@ import {
     createRedisChallengeLeaderboardKey,
     DAY_MS,
     DAILY_GP_PLAYLIST_DAYS,
+    encodeDailyGpLeaderboardScore,
     formatRankLabel,
+    getDailyGpCompetitionDeadlineMs,
+    getDailyGpCompetitionTtlSeconds,
     getUtcDayIndex,
+    isDailyGpChallengePlayable,
     isValidDailyGpTime,
     toBestTimeMs,
 } from '../src/server/daily-gp-model.ts';
@@ -104,9 +108,61 @@ describe('reddit daily gp model', () => {
             'dailygp:leaderboard:daily-gp-2026-05-06:entries'
         );
         expect(formatRankLabel(3)).toBe('#3');
+        expect(formatRankLabel(3.9)).toBe('#3');
+        expect(formatRankLabel(0)).toBe(null);
+        expect(formatRankLabel(-1)).toBe(null);
         expect(formatRankLabel(null)).toBe(null);
+        expect(formatRankLabel(undefined)).toBe(null);
+        expect(formatRankLabel(Number.NaN)).toBe(null);
         expect(isValidDailyGpTime(2)).toBe(true);
+        expect(isValidDailyGpTime(1.999)).toBe(false);
+        expect(isValidDailyGpTime(3600)).toBe(true);
+        expect(isValidDailyGpTime(3600.001)).toBe(false);
         expect(isValidDailyGpTime(7200)).toBe(false);
+        expect(isValidDailyGpTime('12')).toBe(false);
         expect(toBestTimeMs(12.345)).toBe(12345);
+    });
+
+    it('marks challenges playable only inside the availability window', () => {
+        const challenge = buildDailyGpChallengeForDayIndexWithTrack(
+            getUtcDayIndex(new Date('2026-05-06T00:00:00.000Z')),
+            'circuit',
+        );
+        expect(isDailyGpChallengePlayable(challenge, new Date('2026-05-05T23:59:59.999Z'))).toBe(false);
+        expect(isDailyGpChallengePlayable(challenge, new Date('2026-05-06T00:00:00.000Z'))).toBe(true);
+        expect(isDailyGpChallengePlayable(challenge, new Date('2026-05-12T23:59:59.999Z'))).toBe(true);
+        expect(isDailyGpChallengePlayable(challenge, new Date('2026-05-13T00:00:00.000Z'))).toBe(false);
+        expect(isDailyGpChallengePlayable({
+            ...challenge,
+            startsAt: 'bad',
+            availableUntil: challenge.availableUntil,
+        }, new Date('2026-05-07T00:00:00.000Z'))).toBe(false);
+    });
+
+    it('computes competition deadlines and remaining TTL seconds', () => {
+        const challenge = buildDailyGpChallengeForDayIndexWithTrack(
+            getUtcDayIndex(new Date('2026-05-06T00:00:00.000Z')),
+            'circuit',
+        );
+        expect(getDailyGpCompetitionDeadlineMs(challenge)).toBe(
+            Date.parse('2026-05-13T06:00:00.000Z'),
+        );
+        expect(getDailyGpCompetitionTtlSeconds(
+            challenge,
+            new Date('2026-05-13T05:59:01.000Z'),
+        )).toBe(59);
+        expect(getDailyGpCompetitionTtlSeconds(
+            challenge,
+            new Date('2026-05-13T06:00:00.000Z'),
+        )).toBe(0);
+        expect(getDailyGpCompetitionTtlSeconds(
+            challenge,
+            new Date('2026-05-14T00:00:00.000Z'),
+        )).toBe(0);
+        expect(getDailyGpCompetitionTtlSeconds({
+            ...challenge,
+            availableUntil: 'bad',
+        })).toBe(0);
+        expect(encodeDailyGpLeaderboardScore(12345)).toBe(12345);
     });
 });

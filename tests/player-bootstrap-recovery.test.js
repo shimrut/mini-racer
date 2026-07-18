@@ -244,4 +244,40 @@ describe("guest bootstrap recovery", () => {
     expect(state.leaderboardPlayerId).toBe("old-guest-id");
     expect(state.hasAnyData).toBe(true);
   });
+
+  it("does not log bootstrap failures on loopback hosts", async () => {
+    vi.stubGlobal("window", {
+      location: {
+        hostname: "127.0.0.1",
+        origin: "http://127.0.0.1:5173",
+        protocol: "http:",
+      },
+      localStorage,
+    });
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(500));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(state.leaderboardPlayerId).toBe("old-guest-id");
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("returns local progress when remote bootstrap has no usable URL", async () => {
+    vi.resetModules();
+    vi.doMock("../game/scoreboard/api-client.js", async () => {
+      const actual = await vi.importActual("../game/scoreboard/api-client.js");
+      return {
+        ...actual,
+        API_ROUTES: { playerBootstrapUrl: null },
+      };
+    });
+    vi.stubGlobal("fetch", vi.fn());
+    const { getPlayerProgressState } = await import("../game/storage.js");
+    const state = await getPlayerProgressState();
+    expect(state.leaderboardPlayerId).toBe("old-guest-id");
+    expect(fetch).not.toHaveBeenCalled();
+    vi.doUnmock("../game/scoreboard/api-client.js");
+  });
 });
