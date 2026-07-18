@@ -50,6 +50,43 @@ describe("guest bootstrap recovery", () => {
     vi.unstubAllGlobals();
   });
 
+  it("normalizes a null bootstrap body into empty remote progress fields", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(200, null));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(state).toMatchObject({
+      hasAnyData: false,
+      isReturningPlayer: false,
+      redditUsername: null,
+      leaderboardPlayerId: null,
+      playerPreferences: null,
+    });
+  });
+
+  it("ignores non-string reddit usernames from bootstrap payloads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(200, {
+      hasAnyData: true,
+      isReturningPlayer: true,
+      redditUsername: 42,
+      playerId: "guest:server-id",
+      guestToken: "server-token",
+      leaderboardIdentity: "reddit",
+      playerPreferences: { pbGhostEnabled: true },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(state.redditUsername).toBe(null);
+    expect(state.leaderboardPlayerId).toBe("guest:server-id");
+    expect(state.playerPreferences).toEqual({ pbGhostEnabled: true });
+  });
+
   it("rotates once after 401, retries without the rejected token, and preserves local data", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(createResponse(401))

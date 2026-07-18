@@ -1105,4 +1105,64 @@ describe('daily GP result sharing', () => {
             'Reddit did not return a score-thread comment ID.',
         );
     });
+
+    it('requires a signed-in Reddit context for preview and confirm requests', async () => {
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { username: '', subredditName: 'MiniRacer', appSlug: 'mini-racer' })).toMatchObject({
+            status: 401,
+            body: { status: 'signed_in_required' },
+        });
+
+        expect(await confirmDailyGpShare(
+            { shareToken: 'missing' },
+            { username: 'RaceFan', subredditName: '', appSlug: 'mini-racer' },
+        )).toMatchObject({
+            status: 401,
+            body: { status: 'signed_in_required' },
+        });
+    });
+
+    it('returns the existing shared comment during confirm when a prior share is still active', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        strings.set('dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380', JSON.stringify({
+            commentId: 't1_already_shared',
+            commentUrl: 'https://reddit.com/r/miniracer/comments/daily/shared',
+            commentText: 'already shared',
+            username: 'RaceFan',
+        }));
+
+        const confirmed = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+
+        expect(confirmed).toMatchObject({
+            status: 200,
+            body: {
+                status: 'already_shared',
+                commentUrl: 'https://reddit.com/r/miniracer/comments/daily/shared',
+            },
+        });
+        expect(reddit.submitComment).not.toHaveBeenCalledWith(expect.objectContaining({ runAs: 'USER' }));
+    });
+
+    it('treats corrupt stored shared-result records as absent during confirm', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        strings.set('dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380', '{not-json');
+
+        const confirmed = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+
+        expect(confirmed).toMatchObject({ status: 200, body: { status: 'shared' } });
+    });
 });

@@ -163,6 +163,70 @@ describe('scoreboard service', () => {
         expect(fetch).toHaveBeenCalledTimes(2);
     });
 
+    it('rejects non-ok proxy responses and omits guest token when unset', async () => {
+        globalThis.window.localStorage.getItem.mockReturnValue(null);
+        fetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: null,
+                totalCount: 0,
+                playerRank: null,
+                playerRankLabel: null
+            })
+        });
+
+        await getScoreboardSnapshot({ trackKey: 'circuit', offset: -5 });
+
+        const calledUrl = String(fetch.mock.calls.at(-1)[0]);
+        expect(calledUrl).toContain('offset=0');
+        expect(calledUrl).not.toContain('guestToken=');
+    });
+
+    it('uses localhost origin when window is unavailable', async () => {
+        delete globalThis.window;
+        fetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: null,
+                totalCount: 0,
+                playerRank: null,
+                playerRankLabel: null
+            })
+        });
+
+        await getScoreboardSnapshot({ trackKey: 'circuit' });
+
+        expect(String(fetch.mock.calls[0][0])).toMatch(
+            /^http:\/\/localhost\/api\/scoreboard\/snapshot\?/
+        );
+    });
+
+    it('clears inflight dedupe after a failed request so retries can run', async () => {
+        fetch
+            .mockRejectedValueOnce(new Error('temporary outage'))
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    topRows: [],
+                    nearbyRows: [],
+                    currentPlayerRow: null,
+                    totalCount: 1,
+                    playerRank: null,
+                    playerRankLabel: null
+                })
+            });
+
+        await expect(getScoreboardSnapshot({ trackKey: 'circuit' }))
+            .rejects.toThrow('temporary outage');
+        await expect(getScoreboardSnapshot({ trackKey: 'circuit' }))
+            .resolves.toMatchObject({ totalCount: 1 });
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
     it('normalizes non-finite offsets and rejects non-ok proxy responses', async () => {
         fetch.mockResolvedValue({
             ok: false,

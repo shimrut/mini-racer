@@ -606,4 +606,75 @@ describe('PB ghost trace and storage', () => {
 
         expect(record?.checkpointTimesSec).toEqual([1.2]);
     });
+
+    it('drops corrupt stored records with invalid schema fields', async () => {
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const field = createHash('sha256').update('reddit:invalid-schema', 'utf8').digest('base64url');
+        redis.hashes.set(collectionKey, new Map([[field, JSON.stringify({
+            schemaVersion: 1,
+            trackKey: 'circuit',
+            trackFingerprint: createTrackFingerprint(TRACK),
+            simulationRevision: 1,
+            bestTimeMs: 12_000,
+            updatedAt: '2030-01-01T00:00:00.000Z',
+            ghost: null,
+        })]]));
+
+        expect(await getPlayerTrackPbRecord({
+            playerId: 'reddit:invalid-schema',
+            challenge: CHALLENGE,
+            track: TRACK,
+        })).toBeNull();
+        expect(redis.hDel).toHaveBeenCalledWith(collectionKey, [field]);
+    });
+
+    it('deletes stored PBs when the challenge track key no longer matches', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:track-key',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: null,
+            ghost: null,
+        });
+
+        const mismatchedChallenge = { ...CHALLENGE, trackKey: 'harborParkLoop' };
+        expect(await getPlayerTrackPbRecord({
+            playerId: 'reddit:track-key',
+            challenge: mismatchedChallenge,
+            track: TRACK,
+        })).toBeNull();
+        expect(redis.hDel).toHaveBeenCalled();
+    });
+
+    it('drops invalid ghost traces when reading stored PB records', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:bad-ghost',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_500,
+            checkpointTimesSec: [4, 8],
+            ghost: GHOST,
+        });
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const field = [...redis.hashes.get(collectionKey).keys()][0];
+        const payload = JSON.parse(decodeCompressedValue(redis.hashes.get(collectionKey).get(field)));
+        payload.ghost = {
+            schemaVersion: 2,
+            sampleIntervalMs: PB_GHOST_SAMPLE_INTERVAL_MS,
+            finishTimeMs: 0,
+            origin: [0, 0, 0],
+            deltas: [0, 0, 0],
+        };
+        redis.hashes.get(collectionKey).set(field, JSON.stringify(payload));
+
+        const record = await getPlayerTrackPbRecord({
+            playerId: 'reddit:bad-ghost',
+            challenge: CHALLENGE,
+            track: TRACK,
+        });
+
+        expect(record?.ghost).toBeNull();
+        expect(record?.bestTimeMs).toBe(12_500);
+    });
 });

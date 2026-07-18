@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     clearDailyChallengeVerification,
+    createVerificationSnapshot,
     enqueueDailyChallengeVerification,
     getDailyChallengeVerificationEntry,
     getDailyChallengeVerificationState,
@@ -397,6 +398,187 @@ describe('verification queue', () => {
         expect(getNextVerificationAttemptAt()).toBe(now + 1_000);
         markDailyChallengeVerificationRejected('challenge-4');
         expect(getNextVerificationAttemptAt()).toBe(null);
+    });
+
+    it('does not replace an equal daily best time with a slower duplicate enqueue', () => {
+        enqueueDailyChallengeVerification({
+            challengeId: 'challenge-equal',
+            bestTime: 40,
+            replay: REPLAY,
+            checkpointTimesSec: [10, 20, 40],
+            previousCheckpointTimesSec: [11, 21, 41]
+        });
+
+        const result = enqueueDailyChallengeVerification({
+            challengeId: 'challenge-equal',
+            bestTime: 40,
+            replay: { inputs: [{ frames: 2, left: true, right: false }] },
+            checkpointTimesSec: [9, 19, 39]
+        });
+
+        expect(result).toMatchObject({ enqueued: false });
+        expect(getDailyChallengeVerificationEntry('challenge-equal')).toMatchObject({
+            bestTime: 40,
+            checkpointTimesSec: [10, 20, 40],
+            previousCheckpointTimesSec: [11, 21, 41]
+        });
+    });
+
+    it('copies checkpoint arrays and preserves custom pending status text', () => {
+        enqueueDailyChallengeVerification({
+            challengeId: 'challenge-checkpoints',
+            bestTime: 30,
+            replay: REPLAY,
+            checkpointTimesSec: [5, 15, 30]
+        });
+
+        const entry = getDailyChallengeVerificationEntry('challenge-checkpoints');
+        entry.checkpointTimesSec[0] = 99;
+        expect(getDailyChallengeVerificationEntry('challenge-checkpoints').checkpointTimesSec)
+            .toEqual([5, 15, 30]);
+
+        markDailyChallengeVerificationPending('challenge-checkpoints', Date.now() + 1_000, {
+            submissionStage: 'pending',
+            statusText: '  Waiting in queue  '
+        });
+        expect(getDailyChallengeVerificationEntry('challenge-checkpoints')).toMatchObject({
+            submissionStage: 'pending',
+            statusText: 'Waiting in queue'
+        });
+    });
+
+    it('normalizes invalid stored stages and exposes terminal snapshot states', () => {
+        delete globalThis.window;
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({
+                daily: {
+                    'challenge-stages': {
+                        challengeId: 'challenge-stages',
+                        bestTime: 44,
+                        replay: REPLAY,
+                        verificationState: 'bogus',
+                        submissionStage: 'bogus',
+                        statusText: 'Custom pending copy',
+                        nextAttemptAt: Date.now() + 60_000,
+                        expiresAt: '2099-01-01T00:00:00.000Z'
+                    }
+                }
+            })
+        });
+
+        expect(getDailyChallengeVerificationEntry('challenge-stages')).toMatchObject({
+            verificationState: 'pending',
+            submissionStage: 'pending',
+            statusText: 'Custom pending copy'
+        });
+
+        markDailyChallengeVerificationRejected('challenge-stages');
+        expect(getDailyChallengeVerificationEntry('challenge-stages')).toMatchObject({
+            verificationState: 'rejected',
+            submissionStage: 'rejected',
+            statusText: 'Rejected',
+            nextAttemptAt: null
+        });
+        expect(getVerificationSnapshotFromQueueEntry(
+            getDailyChallengeVerificationEntry('challenge-stages')
+        )).toMatchObject({
+            verificationState: 'rejected',
+            submissionStage: 'rejected',
+            statusText: 'Rejected',
+            isLoading: false
+        });
+
+        enqueueDailyChallengeVerification({
+            challengeId: 'challenge-error-text',
+            bestTime: 41,
+            replay: REPLAY
+        });
+        markDailyChallengeVerificationError('challenge-error-text');
+        expect(getDailyChallengeVerificationEntry('challenge-error-text').statusText)
+            .toBe('Submission failed');
+        markDailyChallengeVerificationError('challenge-error-text', '  Network timeout  ');
+        expect(getDailyChallengeVerificationEntry('challenge-error-text').statusText)
+            .toBe('Network timeout');
+        expect(getVerificationSnapshotFromQueueEntry(null)).toBe(null);
+    });
+
+    it('accepts numeric expiry timestamps and normalizes stored ISO values on read', () => {
+        const futureMs = Date.now() + 60_000;
+        enqueueDailyChallengeVerification({
+            challengeId: 'challenge-numeric-expiry',
+            bestTime: 33,
+            replay: REPLAY,
+            expiresAt: futureMs
+        });
+        expect(getDailyChallengeVerificationEntry('challenge-numeric-expiry').expiresAt)
+            .toBe(new Date(futureMs).toISOString());
+
+        delete globalThis.window;
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({
+                daily: {
+                    'challenge-normalize-expiry': {
+                        challengeId: 'challenge-normalize-expiry',
+                        bestTime: 30,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: Date.now() + 60_000,
+                        expiresAt: futureMs
+                    }
+                }
+            })
+        });
+
+        expect(getDailyChallengeVerificationEntry('challenge-normalize-expiry').expiresAt)
+            .toBe(new Date(futureMs).toISOString());
+        expect(readStoredQueue().daily['challenge-normalize-expiry'].expiresAt)
+            .toBe(new Date(futureMs).toISOString());
+    });
+
+    it('builds verification snapshots directly and preserves explicit submitting stages', () => {
+        expect(createVerificationSnapshot({
+            submissionStage: 'submitting',
+            verificationState: 'pending',
+            statusText: '  Uploading replay  ',
+        })).toEqual({
+            isLoading: true,
+            verificationState: 'pending',
+            submissionStage: 'submitting',
+            statusText: 'Uploading replay',
+        });
+
+        expect(createVerificationSnapshot({
+            verificationState: 'rejected',
+            submissionStage: 'rejected',
+            isLoading: false,
+        })).toMatchObject({
+            verificationState: 'rejected',
+            submissionStage: 'rejected',
+            statusText: 'Rejected',
+            isLoading: false,
+        });
+    });
+
+    it('treats malformed daily sections as empty and coerces invalid next attempt times', () => {
+        delete globalThis.window;
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({
+                daily: null
+            })
+        });
+
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+
+        enqueueDailyChallengeVerification({
+            challengeId: 'challenge-invalid-next',
+            bestTime: 25,
+            replay: REPLAY
+        });
+        const past = Date.now() - 1;
+        markDailyChallengeVerificationPending('challenge-invalid-next', 'soon');
+        const due = getDueDailyChallengeVerifications(past + 60_000);
+        expect(due).toHaveLength(1);
+        expect(Number.isFinite(due[0].nextAttemptAt)).toBe(true);
     });
 
     it('adds a fixed expiry and purges expired or unsafe legacy entries', () => {

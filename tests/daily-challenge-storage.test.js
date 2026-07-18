@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     getDailyChallengeData,
+    hasAnyDailyChallengeStoredData,
     saveDailyChallengeBestTime,
     setDailyChallengeBestTime,
     clearDailyChallengeBestTime,
@@ -43,6 +44,70 @@ describe('daily-challenge-storage', () => {
     afterEach(() => {
         vi.restoreAllMocks();
         delete globalThis.window;
+    });
+
+    it('reports whether any challenge data exists locally', () => {
+        expect(hasAnyDailyChallengeStoredData()).toBe(false);
+        saveDailyChallengeBestTime({
+            id: CHALLENGE_ID,
+            challengeDate: '2026-04-14',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest'
+        }, 42);
+        expect(hasAnyDailyChallengeStoredData()).toBe(true);
+
+        delete globalThis.window;
+        expect(hasAnyDailyChallengeStoredData()).toBe(false);
+    });
+
+    it('keeps the stored best when a slower equal-time save arrives', () => {
+        const challenge = {
+            id: CHALLENGE_ID,
+            challengeDate: '2026-04-14',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest'
+        };
+        saveDailyChallengeBestTime(challenge, 40, null, [10, 20, 40]);
+        saveDailyChallengeBestTime(challenge, 41, null, [9, 19, 41]);
+
+        expect(getDailyChallengeData(CHALLENGE_ID)).toMatchObject({
+            bestTime: 40,
+            checkpointTimesSec: [10, 20, 40]
+        });
+
+        saveDailyChallengeBestTime(challenge, 40, null, [8, 18, 40]);
+        expect(getDailyChallengeData(CHALLENGE_ID)).toMatchObject({
+            bestTime: 40,
+            checkpointTimesSec: [10, 20, 40]
+        });
+    });
+
+    it('leaves local bests untouched when rollback preconditions fail', () => {
+        const challenge = {
+            id: CHALLENGE_ID,
+            challengeDate: '2026-04-14',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest'
+        };
+        saveDailyChallengeBestTime(challenge, 12.5);
+
+        expect(rollbackDailyChallengeBestIfMatchesFailedSubmission(
+            challenge,
+            11,
+            { bestTime: 13 }
+        )).toMatchObject({ bestTime: 12.5 });
+
+        expect(rollbackDailyChallengeBestIfMatchesFailedSubmission(
+            null,
+            12.5,
+            { bestTime: 13 }
+        )).toBe(null);
+
+        expect(restoreDailyChallengeBestAfterFailedSubmission(
+            challenge,
+            { bestTime: Number.NaN }
+        )).toBe(null);
+        expect(getDailyChallengeData(CHALLENGE_ID)).toBe(null);
     });
 
     it('returns null when no data for challenge', () => {

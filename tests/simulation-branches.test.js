@@ -1358,6 +1358,32 @@ describe('updateSimulation — wall scrape config and contact resolution', () =>
         expect(state.velocity.x).toBeLessThan(0.2);
         expect(state.velocity.y).toBeLessThan(0.2);
     });
+
+    it('uses body-point separation when endpoint contacts have no safe-point offset', () => {
+        const endpointWall = [{
+            start: { x: 1, y: 1 },
+            end: { x: 2, y: 1 },
+            dx: 1,
+            dy: 0,
+            lenSq: 1,
+        }];
+        const state = createTestSimState({
+            pos: { x: 1, y: 1.34 },
+            velocity: { x: 0, y: -2 },
+            angle: -Math.PI / 2,
+        });
+
+        const events = updateSimulation(
+            state,
+            0.05,
+            { ...CONFIG, accel: 0, carRadius: 0.35, carCollisionHalfLength: 0 },
+            OPEN_TRACK,
+            endpointWall,
+        );
+
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.velocity.y).toBeGreaterThan(-2);
+    });
 });
 
 describe('updateSimulation — route trace and run-history precision', () => {

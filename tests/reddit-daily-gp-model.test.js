@@ -163,6 +163,34 @@ describe('reddit daily gp model', () => {
             ...challenge,
             availableUntil: 'bad',
         })).toBe(0);
+        expect(getDailyGpCompetitionTtlSeconds(
+            challenge,
+            new Date('2026-05-06T00:00:00.000Z'),
+        )).toBeGreaterThan(0);
         expect(encodeDailyGpLeaderboardScore(12345)).toBe(12345);
+    });
+
+    it('rejects invalid race times and unplayable challenge windows', () => {
+        const challenge = buildDailyGpChallengeForDayIndexWithTrack(
+            getUtcDayIndex(new Date('2026-05-06T00:00:00.000Z')),
+            'circuit',
+        );
+
+        expect(isValidDailyGpTime(0)).toBe(false);
+        expect(isValidDailyGpTime(-1)).toBe(false);
+        expect(isValidDailyGpTime(Number.POSITIVE_INFINITY)).toBe(false);
+        expect(isValidDailyGpTime(null)).toBe(false);
+        expect(formatRankLabel(Number.POSITIVE_INFINITY)).toBe(null);
+
+        expect(isDailyGpChallengePlayable({
+            ...challenge,
+            availableUntil: 'bad',
+        }, new Date('2026-05-07T00:00:00.000Z'))).toBe(false);
+        expect(isDailyGpChallengePlayable(challenge, new Date('2026-05-13T00:00:00.000Z')))
+            .toBe(false);
+        expect(getDailyGpCompetitionDeadlineMs({
+            ...challenge,
+            availableUntil: 'not-a-date',
+        })).toBeNaN();
     });
 });

@@ -2953,5 +2953,119 @@ describe('server daily gp store submissions', () => {
             expect(payload.playerPreferences).toBeNull();
             expect(payload.hasAnyData).toBe(false);
         });
+
+        it('returns null bootstrap when guest token minting fails', async () => {
+            const playerToken = await import('../src/server/player-token.ts');
+            const mintSpy = vi.spyOn(playerToken, 'mintGuestPlayerToken').mockResolvedValueOnce(null);
+
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+            const payload = await getServerPlayerBootstrap({ playerId: 'guest-mint-failure' });
+
+            expect(payload).toEqual({
+                playerId: null,
+                guestToken: null,
+                redditUsername: null,
+                leaderboardIdentity: 'constructed',
+                playerPreferences: null,
+                hasAnyData: false,
+                isReturningPlayer: false,
+                firstSeenAt: null,
+                lastSeenAt: null,
+            });
+            mintSpy.mockRestore();
+        });
+    });
+
+    describe('mutation coverage — submission and snapshot guards', () => {
+        it('falls back to the default track when the schedule pool is empty', async () => {
+            const scheduleSnapshot = [...TRACK_SCHEDULE_KEYS];
+            TRACK_SCHEDULE_KEYS.splice(0, TRACK_SCHEDULE_KEYS.length);
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hGetAll.mockResolvedValue({});
+            mockRedis.hSetNX.mockResolvedValue(1);
+
+            try {
+                const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+                const challenge = await getServerDailyGpChallenge();
+
+                expect(challenge.trackKey).toBe('circuit');
+            } finally {
+                TRACK_SCHEDULE_KEYS.splice(0, 0, ...scheduleSnapshot);
+            }
+        });
+
+        it('rejects submissions when the challenge track geometry is unavailable', async () => {
+            const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            const originalTrack = TRACKS[challenge.trackKey];
+            delete TRACKS[challenge.trackKey];
+
+            try {
+                const result = await submitServerDailyGpRun({
+                    playerId: 'browser-track-missing',
+                    challengeId: challenge.id,
+                    trackKey: challenge.trackKey,
+                    leaderboardIdentity: 'constructed',
+                    redditUsername: 'Track-Missing-User',
+                    bestTime: 12,
+                    replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+                    checkpointTimesSec: checkpointSplitsForChallenge(challenge, 12),
+                });
+
+                expect(result).toMatchObject({
+                    status: 500,
+                    body: {
+                        accepted: false,
+                        error: 'Daily challenge track is unavailable.',
+                    },
+                });
+            } finally {
+                TRACKS[challenge.trackKey] = originalTrack;
+            }
+        });
+
+        it('ignores prior ledger entries with unparseable startsAt when rotating tracks', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2030-06-03T12:00:00.000Z'));
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hGetAll.mockResolvedValue({
+                'daily-gp-2030-06-01': JSON.stringify({
+                    id: 'daily-gp-2030-06-01',
+                    challengeDate: '2030-06-01',
+                    trackKey: 'circuit',
+                    startsAt: 'not-a-date',
+                    endsAt: '2030-06-02T00:00:00.000Z',
+                    availableUntil: '2030-06-08T00:00:00.000Z',
+                }),
+            });
+            mockRedis.hSetNX.mockResolvedValue(1);
+
+            try {
+                const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+                const challenge = await getServerDailyGpChallenge();
+
+                expect(challenge.trackKey).toBe(TRACK_SCHEDULE_KEYS[0]);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('returns an empty page when the requested offset is beyond the leaderboard size', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.zCard.mockResolvedValue(2);
+            mockRedis.zRange.mockResolvedValue([]);
+            mockRedis.zRank.mockResolvedValue(undefined);
+            mockRedis.hMGet.mockResolvedValue([]);
+            mockRedis.mGet.mockResolvedValue([]);
+
+            const snapshot = await getServerDailyGpSnapshot({
+                challengeId: challenge.id,
+                offset: 50,
+            });
+
+            expect(snapshot.topRows).toEqual([]);
+            expect(snapshot.hasMore).toBe(false);
+        });
     });
 });

@@ -5,6 +5,7 @@ import {
     buildModalDeltaDisplay,
     buildModalStatsPlan,
     buildScoreboardRankDisplay,
+    createModalActions,
     formatCombinedRankOutOf,
     getCombinedRankNumber,
     buildLapRecord,
@@ -642,6 +643,152 @@ describe('result-flow helpers', () => {
         await expect(scheduleModalScoreboardRefresh({
             loadSnapshot: async () => ({ label: 'no-applier' })
         })).resolves.toEqual({ label: 'no-applier' });
+    });
+
+    it('builds modal action bundles and exact delta thresholds', () => {
+        const restart = () => {};
+        const primary = () => {};
+        const secondary = () => {};
+        expect(createModalActions({
+            modalKind: 'finish',
+            primaryActionLabel: 'Improve',
+            primaryAction: primary,
+            restartAction: restart,
+            secondaryActionLabel: 'Share',
+            secondaryAction: secondary
+        })).toEqual({
+            modalKind: 'finish',
+            primaryActionLabel: 'Improve',
+            primaryAction: primary,
+            restartAction: restart,
+            secondaryActionLabel: 'Share',
+            secondaryAction: secondary
+        });
+
+        expect(buildModalDeltaDisplay({ deltaToBest: 0.005 })).toEqual({
+            text: '0.00s',
+            valueClass: ''
+        });
+        expect(buildModalDeltaDisplay({ deltaToBest: 0.006 })).toEqual({
+            text: '+0.01s',
+            valueClass: 'modal-stat-value--delta-positive'
+        });
+        expect(buildModalDeltaDisplay({ deltaToBest: -0.005 })).toEqual({
+            text: '0.00s',
+            valueClass: ''
+        });
+        expect(buildModalDeltaDisplay({ deltaToBest: -0.006 })).toEqual({
+            text: '-0.01s',
+            valueClass: 'modal-stat-value--delta-negative'
+        });
+    });
+
+    it('covers remaining rank-display branches and combined rank fallbacks', () => {
+        expect(buildScoreboardRankDisplay({
+            playerRankLabel: '#4',
+            verificationState: 'pending',
+            submissionStage: 'pending'
+        })).toMatchObject({
+            labelText: 'Rank pending',
+            text: '#4'
+        });
+
+        expect(buildScoreboardRankDisplay({
+            submissionStage: 'rejected',
+            statusText: 'Rejected.'
+        })).toMatchObject({
+            labelText: 'Rank rejected',
+            text: 'N/A'
+        });
+
+        expect(buildScoreboardRankDisplay({
+            statusText: '  Verifying...  '
+        }).labelText).toBe('Verifying rank');
+
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 6,
+            totalCount: null,
+            playerRankLabel: ''
+        })).toBe('#6');
+
+        expect(getCombinedRankNumber({
+            isLoading: false,
+            playerRankLabel: '#15'
+        })).toBe(15);
+    });
+
+    it('uses lap-time fallback for new-best stats and empty lap arrays', () => {
+        expect(buildModalStatsPlan({
+            isNewBest: true,
+            bestTime: 41.2,
+            lapTimesArray: [],
+            primaryStatLabel: 'Race Time'
+        })).toMatchObject({
+            hasRuns: '',
+            args: [41.2, null, 'Race Time']
+        });
+
+        expect(buildModalStatsPlan({
+            isNewBest: true,
+            lapTime: 39.8,
+            bestTime: 41.2,
+            lapTimesArray: [39.8],
+            scoreboardSnapshot: { playerRank: 1 }
+        })).toMatchObject({
+            hasRuns: 'true',
+            args: [39.8, null, 'Lap Time'],
+            showDelta: false
+        });
+    });
+
+    it('marks non-new-best wins without lap history as having no runs', () => {
+        const plan = buildModalStatsPlan({
+            lapTime: 42.5,
+            bestTime: 40.1,
+            lapTimesArray: [],
+            primaryStatLabel: 'Lap Time',
+        });
+
+        expect(plan).toMatchObject({
+            kind: 'win',
+            display: 'grid',
+            hasRuns: '',
+            rankSnapshot: null,
+            showDelta: true,
+            lapMedal: null,
+        });
+        expect(plan.args[0]).toBe(42.5);
+        expect(plan.args[1]).toBeCloseTo(2.4, 5);
+        expect(plan.args[2]).toBe('Lap Time');
+    });
+
+    it('preserves leaderboard callbacks and day selectors in modal payloads', () => {
+        const onSelect = () => {};
+        const onLoadMore = () => {};
+        const primaryAction = () => {};
+        expect(buildModalRunsPayload({
+            listData: [20],
+            bestTime: 20,
+            lapTime: 20,
+            scoreboardTitle: 'Daily',
+            scoreboardSubhead: 'Today',
+            leaderboardDayOptions: [{ id: 'day-1' }],
+            selectedLeaderboardDayId: 'day-1',
+            onSelectLeaderboardDay: onSelect,
+            onLoadMoreLeaderboard: onLoadMore,
+            primaryActionLabel: 'Play',
+            primaryAction
+        })).toMatchObject({
+            scoreboardTitle: 'Daily',
+            scoreboardSubhead: 'Today',
+            leaderboardDayOptions: [{ id: 'day-1' }],
+            selectedLeaderboardDayId: 'day-1',
+            onSelectLeaderboardDay: onSelect,
+            onLoadMoreLeaderboard: onLoadMore,
+            primaryActionLabel: 'Play',
+            primaryAction
+        });
     });
 
     it('returns null when no loader is configured and logs refresh errors', async () => {

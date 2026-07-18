@@ -219,6 +219,70 @@ describe('pb-ghost-trace validation and recording edges', () => {
         expect(Math.abs(trace.deltas[2])).toBeLessThan(Math.PI * 1000);
     });
 
+    it('rejects invalid finish poses when fewer than two samples remain', () => {
+        expect(createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        }).finish({
+            timeSec: 0,
+            position: { x: Number.NaN, y: 0 },
+            angle: 0,
+        })).toBeNull();
+    });
+
+    it('rejects unsafe integer overflow and uses shortest angular deltas', () => {
+        expect(isValidPbGhostTrace(validTrace({
+            origin: [Number.MAX_SAFE_INTEGER, 0, 0],
+            deltas: [1, 0, 0],
+            finishTimeMs: 50,
+        }))).toBe(false);
+
+        const halfTurnMilli = Math.round(Math.PI * 1000);
+        const recorderWrap = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: halfTurnMilli / 1000,
+        });
+        recorderWrap.sample({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: -halfTurnMilli / 1000,
+        });
+        const wrapped = recorderWrap.finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: -halfTurnMilli / 1000,
+        });
+        expect(Math.abs(wrapped.deltas[2])).toBeLessThan(halfTurnMilli);
+    });
+
+    it('drops samples before the first interval and rejects negative timestamps', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: -0.5,
+            position: { x: 5, y: 5 },
+            angle: 1,
+        });
+        recorder.sample({
+            timeSec: 0.02,
+            position: { x: 1, y: 1 },
+            angle: 0.1,
+        });
+        const trace = recorder.finish({
+            timeSec: 0.05,
+            position: { x: 2, y: 2 },
+            angle: 0.2,
+        });
+        expect(trace).not.toBeNull();
+        expect(getPbGhostTraceSampleCount(trace)).toBe(2);
+        expect(trace.origin).toEqual([0, 0, 0]);
+    });
+
     it('hashes only the stable track shape fields', () => {
         const base = {
             outer: [{ x: 0, y: 0 }],

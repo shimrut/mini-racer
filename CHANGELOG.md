@@ -1,6 +1,8 @@
 # Changelog
 
 - Expanded server mutation tests for Daily GP store/share flows, PB ghost retention, and post-bound challenge resolution, covering ledger maintenance, track-rotation fallbacks, corrupt Redis records, share/score-thread lock-loss paths, and additional parsing edge cases.
+- Expanded mutation tests for daily-challenge service mock/cache fallbacks, simulation contact-normal branches, Daily GP store submission guards, share confirm idempotency, verification snapshot stages, and result-flow empty-run stats.
+- Expanded mutation tests for verification-queue expiry normalization, result-flow rank/delta branches, PB ghost trace pose validation, daily-challenge storage rollback guards, player-bootstrap payload fallbacks, PB ghost-store schema rejection, Daily GP model boundaries, and scoreboard-service inflight recovery.
 - Expanded `tests/simulation-branches.test.js` with 21 additional branch tests for event-snapshot reset, physics-config fallbacks, slip-gate hysteresis, checkpoint array repair, negative collision-hash buckets, swept nose contacts, overlap resolution, scrape-config defaults, and route-trace/run-history precision.
 - Raised `game/race/simulation.js` mutation coverage with 37 branch-focused unit tests for checkpoint splits, collision broadphase fallbacks, driving-physics gates (downforce, slip clamp, steer trim), swept/degenerate wall contacts, and scrape-severity weighting.
 - Expanded `game/daily-challenge/service.js` mutation tests for active-cache hydration/clearing, playlist prune/hydrate/dedupe/cap paths, snapshot sync and corrupted-cache reads, in-flight snapshot cleanup, card-status timing boundaries, and submit/fetch guard rails.
