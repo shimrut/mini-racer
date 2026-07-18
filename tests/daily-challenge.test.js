@@ -18,6 +18,8 @@ import {
     cacheDailyChallengePlaylist,
     getCachedDailyChallengePlaylist,
     isDailyChallengeStoredResultForChallenge,
+    isPreviewPage,
+    requestFeaturedDailyChallengeStart,
     submitDailyChallengeBestTime
 } from '../game/daily-challenge/service.js';
 
@@ -396,6 +398,148 @@ describe('daily-challenge service', () => {
         expect(fetch).toHaveBeenCalledWith('/api/daily/active', expect.any(Object));
         expect(challenge.id).toBe('mock-daily-challenge-local');
         vi.useRealTimers();
+    });
+
+    it('detects standalone preview pages by pathname', () => {
+        window.location = { pathname: '/preview.html' };
+        expect(isPreviewPage()).toBe(true);
+
+        window.location = { pathname: '/foo/Preview.HTML' };
+        expect(isPreviewPage()).toBe(true);
+
+        window.location = { pathname: '/game.html' };
+        expect(isPreviewPage()).toBe(false);
+
+        delete globalThis.window;
+        expect(isPreviewPage()).toBe(false);
+        globalThis.window = { localStorage: memoryLocalStorage };
+    });
+
+    it('uses mockDaily and localDev URL params when the active fetch fails', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        fetch.mockRejectedValue(new Error('offline'));
+
+        window.location = {
+            hostname: 'localhost',
+            pathname: '/game.html',
+            protocol: 'http:',
+            search: '?mockDaily=true'
+        };
+        expect((await getActiveDailyChallenge()).trackKey).toBe('circuit');
+
+        window.location.search = '?mockDaily=alloyRing';
+        expect((await getActiveDailyChallenge()).trackKey).toBe('alloyRing');
+
+        window.location.search = '?mockDaily=true&mockTrack=jadeSpiralCircuit';
+        expect((await getActiveDailyChallenge()).trackKey).toBe('jadeSpiralCircuit');
+
+        window.location.search = '?localDev=true';
+        expect((await getActiveDailyChallenge()).id).toBe('mock-daily-challenge-local');
+        expect((await getActiveDailyChallenge()).trackKey).toBe('circuit');
+    });
+
+    it('normalizes active challenge payloads and caches a trimmed active record', async () => {
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: ''
+        };
+        fetch.mockResolvedValue(createJsonResponse({
+            id: 'daily-gp-2026-06-03',
+            trackKey: 'circuit',
+            objectiveType: 'wat',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            status: 1,
+            objectiveParams: 'bad',
+            skin: '  desert  ',
+            physicsOverrides: { accel: 999 }
+        }));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge).toMatchObject({
+            id: 'daily-gp-2026-06-03',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+            status: 'active',
+            objectiveParams: {},
+            skin: 'desert'
+        });
+        const cached = JSON.parse(memoryLocalStorage.getItem('VectorGpActiveDailyChallengeCache'));
+        expect(cached.challenge).toEqual({
+            id: 'daily-gp-2026-06-03',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            skin: 'desert'
+        });
+        expect(cached.challenge.physicsOverrides).toBeUndefined();
+    });
+
+    it('rejects unusable active payloads and falls back to a still-current local cache', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: ''
+        };
+        memoryLocalStorage.setItem('VectorGpActiveDailyChallengeCache', JSON.stringify({
+            challenge: {
+                id: 'cached-daily',
+                trackKey: 'circuit',
+                objectiveType: 'single_lap_fastest',
+                endsAt: '2099-01-01T00:00:00.000Z',
+                availableUntil: '2099-01-08T00:00:00.000Z',
+                skin: 'default',
+                startsAt: '2026-01-01T00:00:00.000Z'
+            }
+        }));
+        fetch.mockResolvedValue(createJsonResponse({
+            id: '',
+            trackKey: 'circuit'
+        }));
+
+        const challenge = await getActiveDailyChallenge();
+        expect(challenge.id).toBe('cached-daily');
+
+        memoryLocalStorage.setItem('VectorGpActiveDailyChallengeCache', JSON.stringify({
+            challenge: {
+                id: 'expired-cache',
+                trackKey: 'circuit',
+                endsAt: '2000-01-01T00:00:00.000Z'
+            }
+        }));
+        fetch.mockRejectedValue(new Error('offline'));
+        await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
+    });
+
+    it('clears a featured start override before resolving the active challenge', async () => {
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: ''
+        };
+        requestFeaturedDailyChallengeStart();
+        expect(memoryLocalStorage.getItem('VectorGpDailyStartOverride')).toBeTruthy();
+        fetch.mockResolvedValue(createJsonResponse({
+            id: 'daily-gp-featured',
+            trackKey: 'circuit',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            status: 'active',
+            skin: 'default'
+        }));
+
+        await getActiveDailyChallenge();
+        expect(memoryLocalStorage.getItem('VectorGpDailyStartOverride')).toBeNull();
     });
 
     it('getDailyChallengeSnapshot always fetches fresh leaderboard data', async () => {

@@ -84,6 +84,10 @@ vi.mock('../src/server/replay-validator.js', () => ({
 }));
 
 const {
+    getServerDailyGpPlayerBest,
+} = await import('../src/server/daily-gp-store.js');
+const { validateDailyGpReplayDetailed } = await import('../src/server/replay-validator.js');
+const {
     DAILY_GP_SCORE_THREAD_TEXT,
     confirmDailyGpShare,
     ensureDailyGpScoreThread,
@@ -123,11 +127,26 @@ describe('daily GP result sharing', () => {
         expect(formatDailyGpShareComment(42380, 'gold', 'Classic Circuit')).toBe(
             'I earned the Gold medal 🥇 with a 42.38 lap in Classic Circuit.',
         );
+        expect(formatDailyGpShareComment(42380, 'silver', 'Classic Circuit')).toBe(
+            'I earned the Silver medal 🥈 with a 42.38 lap in Classic Circuit.',
+        );
+        expect(formatDailyGpShareComment(42380, 'bronze', 'Classic Circuit')).toBe(
+            'I earned the Bronze medal 🥉 with a 42.38 lap in Classic Circuit.',
+        );
         expect(formatDailyGpShareComment(52410, null, 'Classic Circuit')).toBe(
             'I set a 52.41 lap in Classic Circuit. 🏁',
         );
         expect(formatDailyGpShareComment(42380, 'author')).toBe(
             'I earned the Author medal 🏆 with a 42.38 lap in Mini Racer.',
+        );
+        expect(formatDailyGpShareComment(990, null)).toBe(
+            'I set a 00.99 lap in Mini Racer. 🏁',
+        );
+        expect(formatDailyGpShareComment(42385, 'gold', 'X')).toBe(
+            'I earned the Gold medal 🥇 with a 42.39 lap in X.',
+        );
+        expect(formatDailyGpShareComment(42380, 'gold', '')).toBe(
+            'I earned the Gold medal 🥇 with a 42.38 lap in Mini Racer.',
         );
     });
 
@@ -349,5 +368,157 @@ describe('daily GP result sharing', () => {
             body: { status: 'ready', username: 'RaceFan' },
         });
         expect(replacement.body.shareToken).toEqual(expect.any(String));
+    });
+
+    it('requires a signed-in Reddit context before preview or confirm', async () => {
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { username: null, subredditName: 'MiniRacer', appSlug: 'mini-racer' })).toMatchObject({
+            status: 401,
+            body: { status: 'signed_in_required' },
+        });
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { username: '  ', subredditName: 'MiniRacer', appSlug: 'mini-racer' })).toMatchObject({
+            status: 401,
+            body: { status: 'signed_in_required' },
+        });
+        expect(await confirmDailyGpShare(
+            { shareToken: 'any' },
+            { username: 'RaceFan', subredditName: 'MiniRacer', appSlug: '' },
+        )).toMatchObject({
+            status: 401,
+            body: { status: 'signed_in_required' },
+        });
+    });
+
+    it('rate-limits repeated share previews and reports retry timing', async () => {
+        for (let i = 0; i < 12; i += 1) {
+            const preview = await previewDailyGpShare({
+                source: 'standings',
+                challengeId: challenge.id,
+            }, requestContext);
+            expect(preview.status).toBe(200);
+        }
+        expect(redis.expire).toHaveBeenCalledWith(
+            'dailygp:share-rate-limit:racefan',
+            60,
+        );
+
+        const limited = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        expect(limited).toMatchObject({
+            status: 429,
+            body: {
+                status: 'rate_limited',
+                retryAfterSeconds: expect.any(Number),
+            },
+        });
+        expect(limited.body.retryAfterSeconds).toBeGreaterThan(0);
+
+        redis.expireTime.mockResolvedValueOnce(Number.NaN);
+        strings.set('dailygp:share-rate-limit:racefan', '13');
+        const fallback = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        expect(fallback.body.retryAfterSeconds).toBe(60);
+    });
+
+    it('rejects unverified finishes, missing results, and unavailable posts', async () => {
+        validateDailyGpReplayDetailed.mockReturnValueOnce({ ok: false, failure: { reason: 'no_finish' } });
+        expect(await previewDailyGpShare({
+            source: 'finish',
+            challengeId: challenge.id,
+            replay: { inputs: [{ frames: 1 }] },
+        }, requestContext)).toMatchObject({
+            status: 422,
+            body: { status: 'invalid_replay' },
+        });
+
+        expect(await previewDailyGpShare({
+            source: 'other',
+            challengeId: challenge.id,
+        }, requestContext)).toMatchObject({
+            status: 404,
+            body: { status: 'result_unavailable' },
+        });
+
+        getServerDailyGpPlayerBest.mockResolvedValueOnce(null);
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext)).toMatchObject({
+            status: 404,
+            body: { status: 'result_unavailable' },
+        });
+
+        strings.clear();
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext)).toMatchObject({
+            status: 404,
+            body: { status: 'post_unavailable' },
+        });
+    });
+
+    it('rejects expired, forbidden, and malformed share confirmations', async () => {
+        expect(await confirmDailyGpShare(
+            { shareToken: 'missing' },
+            requestContext,
+        )).toMatchObject({
+            status: 409,
+            body: { status: 'preview_expired' },
+        });
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        expect(await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            { username: 'OtherUser', subredditName: 'MiniRacer', appSlug: 'mini-racer' },
+        )).toMatchObject({
+            status: 403,
+            body: { status: 'share_forbidden' },
+        });
+
+        const allowedCase = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            { username: 'racefan', subredditName: 'miniracer', appSlug: 'mini-racer' },
+        );
+        expect(allowedCase).toMatchObject({
+            status: 200,
+            body: { status: 'shared' },
+        });
+
+        strings.set('dailygp:share-preview:bad', JSON.stringify({
+            username: 'RaceFan',
+            subredditName: 'MiniRacer',
+            source: 'finish',
+            bestTimeMs: 1000,
+            commentText: 'hi',
+        }));
+        expect(await confirmDailyGpShare(
+            { shareToken: 'bad' },
+            requestContext,
+        )).toMatchObject({
+            status: 409,
+            body: { status: 'preview_expired' },
+        });
+
+        strings.set('dailygp:share-preview:badjson', '{not-json');
+        expect(await confirmDailyGpShare(
+            { shareToken: 'badjson' },
+            requestContext,
+        )).toMatchObject({
+            status: 409,
+            body: { status: 'preview_expired' },
+        });
     });
 });

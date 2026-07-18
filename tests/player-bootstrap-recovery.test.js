@@ -128,4 +128,120 @@ describe("guest bootstrap recovery", () => {
     expect(localStorage.getItem("UnrelatedPreference")).toBe("keep-me");
     expect(state.leaderboardPlayerId).toBe("new-guest-id");
   });
+
+  it("uses local progress state without fetching on localhost", async () => {
+    vi.stubGlobal("window", {
+      location: {
+        hostname: "localhost",
+        origin: "http://localhost:5173",
+        protocol: "http:",
+      },
+      localStorage,
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(state).toMatchObject({
+      hasAnyData: true,
+      isReturningPlayer: false,
+      redditUsername: null,
+      leaderboardPlayerId: "old-guest-id",
+      playerPreferences: null,
+    });
+  });
+
+  it("normalizes a successful remote bootstrap payload and stores trimmed credentials", async () => {
+    localStorage.removeItem(GUEST_TOKEN_KEY);
+    const preferences = { soundEnabled: true };
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(200, {
+      hasAnyData: "yes",
+      isReturningPlayer: 0,
+      redditUsername: "  RaceFan  ",
+      leaderboardIdentity: "reddit",
+      playerId: "  guest:abc  ",
+      guestToken: "  new-token  ",
+      playerPreferences: preferences,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.searchParams.get("playerId")).toBe("old-guest-id");
+    expect(url.searchParams.has("guestToken")).toBe(false);
+    expect(state).toMatchObject({
+      hasAnyData: true,
+      isReturningPlayer: false,
+      redditUsername: "RaceFan",
+      leaderboardIdentity: "reddit",
+      leaderboardPlayerId: "guest:abc",
+      guestToken: "new-token",
+      playerPreferences: preferences,
+    });
+    expect(localStorage.getItem(GUEST_TOKEN_KEY)).toBe("new-token");
+  });
+
+  it("nulls blank username and non-object preferences from bootstrap payloads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(200, {
+      hasAnyData: false,
+      isReturningPlayer: true,
+      redditUsername: "   ",
+      playerId: "   ",
+      guestToken: "   ",
+      playerPreferences: "nope",
+      leaderboardIdentity: "constructed",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(state).toMatchObject({
+      hasAnyData: false,
+      isReturningPlayer: true,
+      redditUsername: null,
+      leaderboardPlayerId: null,
+      guestToken: null,
+      playerPreferences: null,
+      leaderboardIdentity: "constructed",
+    });
+  });
+
+  it("falls back to local state when fetch is unavailable on localhost", async () => {
+    vi.stubGlobal("window", {
+      location: {
+        hostname: "localhost",
+        origin: "http://localhost:5173",
+        protocol: "http:",
+      },
+      localStorage,
+    });
+    vi.stubGlobal("fetch", undefined);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(state.hasAnyData).toBe(true);
+    expect(state.leaderboardPlayerId).toBe("old-guest-id");
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("logs hosted bootstrap failures and still returns local progress", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(500));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalled();
+    expect(state.leaderboardPlayerId).toBe("old-guest-id");
+    expect(state.hasAnyData).toBe(true);
+  });
 });

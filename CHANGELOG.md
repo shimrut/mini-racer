@@ -1,5 +1,6 @@
 # Changelog
 
+- Expanded mutation soft-spot tests for player bootstrap storage, daily-challenge mock/cache normalization, and Daily GP share validation, rate limits, and comment formatting.
 - Tightened replay-validator tests against remaining mutation survivors: crash signal variants, non-finite failure details, missing winData, fixedDt fallback, and initial simulation state.
 - Expanded server replay-validator tests for payload schema, frame-cap boundaries, failure details, ghost output, checkpoint splits, and hard-to-reach rejection branches.
 - Added unit tests for client scoreboard replay recording so input compression, frame caps, overflow discard, and payload copying are covered.
