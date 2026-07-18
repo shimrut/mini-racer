@@ -241,7 +241,6 @@ const playerPreferences = {
   crashAutoRestartEnabled: false,
   crashRestartDelaySec: 0.8,
   pbGhostEnabled: true,
-  leaderboardDecimalPlaces: 3,
 };
 
 function findPlayerProfileEntry(playerId) {

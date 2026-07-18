@@ -3,10 +3,6 @@ import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/resu
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
-import {
-    getLeaderboardDecimalPlaces,
-    normalizeLeaderboardDecimalPlaces,
-} from '../settings/leaderboard-decimal-places-preference.js';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
@@ -130,9 +126,7 @@ export function mountCombinedPopoverOverlay(container, { title, overlayClass = '
 }
 
 export class ModalContentUi {
-    constructor({ getLeaderboardPrecision = getLeaderboardDecimalPlaces } = {}) {
-        this.getLeaderboardPrecision = getLeaderboardPrecision;
-    }
+    constructor() {}
 
     get modalStatsRow() { return document.getElementById('modal-stats-row'); }
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
@@ -803,11 +797,9 @@ export class ModalContentUi {
 
     formatLeaderboardTime(seconds) {
         if (!Number.isFinite(seconds)) return '--';
-        const decimalPlaces = normalizeLeaderboardDecimalPlaces(this.getLeaderboardPrecision());
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        const secondsWidth = decimalPlaces + 3;
-        return `${mins.toString().padStart(2, '0')}:${secs.toFixed(decimalPlaces).padStart(secondsWidth, '0')}`;
+        return `${mins.toString().padStart(2, '0')}:${secs.toFixed(3).padStart(6, '0')}`;
     }
 
     _resolveWinPriorPersonalBest(previousPersonalBestSec, fallbackPersonalBestSec) {

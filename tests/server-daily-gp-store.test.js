@@ -997,7 +997,6 @@ describe('server daily gp store submissions', () => {
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
             pbGhostEnabled: true,
-            leaderboardDecimalPlaces: 3,
         };
 
         const saved = await updateServerPlayerPreferences({
@@ -1021,27 +1020,6 @@ describe('server daily gp store submissions', () => {
             redditUsername: 'Pm-User',
         });
         expect(bootstrap.playerPreferences).toEqual(playerPreferences);
-    });
-
-    it('downgrades the retired four-decimal preference to three', async () => {
-        const { updateServerPlayerPreferences } = await import('../src/server/daily-gp-store.ts');
-        const saved = await updateServerPlayerPreferences({
-            playerId: 'browser-player-id',
-            redditUsername: 'Pm-User',
-            playerPreferences: {
-                carSkin: 'assets/cars/mr_mr_red.webp',
-                trailId: 'gold',
-                musicEnabled: false,
-                carAudioEnabled: true,
-                crashAutoRestartEnabled: false,
-                crashRestartDelaySec: 0.8,
-                pbGhostEnabled: true,
-                leaderboardDecimalPlaces: 4,
-            },
-        });
-
-        expect(saved.playerPreferences?.leaderboardDecimalPlaces).toBe(3);
-        expect(findWrittenPlayerProfile('reddit:pm-user').profile.preferences.leaderboardDecimalPlaces).toBe(3);
     });
 
     it('gives each player profile its own 180-day expiration', async () => {

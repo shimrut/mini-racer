@@ -32,7 +32,6 @@ describe('durable player preferences', () => {
             musicEnabled: false,
             carAudioEnabled: true,
             pbGhostEnabled: false,
-            leaderboardDecimalPlaces: 3,
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
         };
@@ -51,19 +50,5 @@ describe('durable player preferences', () => {
             crashRestartDelaySec: 0.5,
         })).toBe(true);
         expect(readPlayerPreferences().pbGhostEnabled).toBe(true);
-        expect(readPlayerPreferences().leaderboardDecimalPlaces).toBe(2);
-    });
-
-    it('downgrades the retired four-decimal preference to three', () => {
-        expect(applyPlayerPreferences({
-            carSkin: PLAYER_CAR_SKINS[0].assetName,
-            trailId: 'cyan',
-            musicEnabled: true,
-            carAudioEnabled: true,
-            crashAutoRestartEnabled: false,
-            crashRestartDelaySec: 0.5,
-            leaderboardDecimalPlaces: 4,
-        })).toBe(true);
-        expect(readPlayerPreferences().leaderboardDecimalPlaces).toBe(3);
     });
 });

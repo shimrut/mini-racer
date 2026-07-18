@@ -134,16 +134,10 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
-    it.each([
-        [2, '01:02.35'],
-        [3, '01:02.346'],
-        [4, '01:02.346'],
-    ])('formats leaderboard times with %i decimal places', (decimalPlaces, expected) => {
-        const component = new ModalContentUi({
-            getLeaderboardPrecision: () => decimalPlaces,
-        });
+    it('formats leaderboard times to millisecond precision', () => {
+        const component = new ModalContentUi();
 
-        expect(component.formatLeaderboardTime(62.34567)).toBe(expected);
+        expect(component.formatLeaderboardTime(62.34567)).toBe('01:02.346');
         expect(component.formatTime(62.34567)).toBe('01:02.35');
     });
 
