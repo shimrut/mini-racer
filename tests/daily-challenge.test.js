@@ -1988,4 +1988,135 @@ describe('daily-challenge service', () => {
 
         await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
     });
+
+    it('keeps the local best time when it is faster than the cached snapshot row', async () => {
+        const challenge = {
+            id: 'local-faster-than-snapshot',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            status: 'active',
+            skin: 'default',
+        };
+        cacheDailyChallengePlaylist([challenge]);
+        setDailyChallengeBestTime(challenge, 10.5);
+
+        fetch.mockResolvedValue(createJsonResponse({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: { bestTimeMs: 12500 },
+            totalCount: 1,
+            objectiveType: 'single_lap_fastest',
+        }));
+        await getDailyChallengeSnapshot({ challengeId: challenge.id, forceRefresh: true });
+
+        expect(getDailyChallengeBestResult(challenge)).toMatchObject({ bestTime: 10.5 });
+    });
+
+    it('rejects stored results whose objective type does not match the challenge', () => {
+        const challenge = {
+            id: VALID_UUID,
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+        };
+
+        expect(isDailyChallengeStoredResultForChallenge(challenge, {
+            bestTime: 12.4,
+            objectiveType: 'multi_lap_total',
+        })).toBe(false);
+    });
+
+    it('returns null from submit when bestTime is outside the allowed daily range', async () => {
+        await expect(submitDailyChallengeBestTime({
+            challengeId: VALID_UUID,
+            trackKey: 'circuit',
+            bestTime: 1.5,
+            replay: MINIMAL_REPLAY,
+        })).resolves.toBeNull();
+
+        await expect(submitDailyChallengeBestTime({
+            challengeId: VALID_UUID,
+            trackKey: 'circuit',
+            bestTime: 3601,
+            replay: MINIMAL_REPLAY,
+        })).resolves.toBeNull();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('formats playlist availability in days when more than 24 hours remain', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+        expect(formatDailyChallengePlaylistAvailabilityLabel({
+            availableUntil: '2026-06-04T12:00:00.000Z',
+        })).toBe('3d');
+
+        vi.useRealTimers();
+    });
+
+    it('discards an expired featured start override before fetching the active challenge', async () => {
+        memoryLocalStorage.setItem('VectorGpDailyStartOverride', JSON.stringify({
+            mode: 'featured',
+            expiresAt: Date.now() - 1000,
+        }));
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: '',
+        };
+        fetch.mockResolvedValue(createJsonResponse({
+            id: 'daily-gp-after-expired-override',
+            trackKey: 'circuit',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            status: 'active',
+            skin: 'default',
+        }));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.id).toBe('daily-gp-after-expired-override');
+        expect(memoryLocalStorage.getItem('VectorGpDailyStartOverride')).toBeNull();
+    });
+
+    it('ignores post-bound postData when the nested challenge is invalid', async () => {
+        globalThis.devvit = {
+            context: {
+                postData: {
+                    challenge: { id: '', trackKey: 'circuit' },
+                },
+            },
+        };
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: '',
+        };
+        fetch.mockResolvedValue(createJsonResponse({
+            id: 'daily-gp-valid-fetch',
+            trackKey: 'circuit',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            status: 'active',
+            skin: 'default',
+        }));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.id).toBe('daily-gp-valid-fetch');
+    });
+
+    it('returns false from isPreviewPage when window is unavailable', () => {
+        delete globalThis.window;
+        expect(isPreviewPage()).toBe(false);
+        globalThis.window = { localStorage: memoryLocalStorage };
+    });
 });

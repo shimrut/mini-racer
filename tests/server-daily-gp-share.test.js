@@ -1165,4 +1165,113 @@ describe('daily GP result sharing', () => {
 
         expect(confirmed).toMatchObject({ status: 200, body: { status: 'shared' } });
     });
+
+    it.each([
+        ['missing challengeId', {
+            username: 'RaceFan',
+            subredditName: 'MiniRacer',
+            source: 'finish',
+            bestTimeMs: 1000,
+            commentText: 'hi',
+        }],
+        ['invalid source', {
+            username: 'RaceFan',
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            source: 'other',
+            bestTimeMs: 1000,
+            commentText: 'hi',
+        }],
+        ['non-finite bestTimeMs', {
+            username: 'RaceFan',
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            source: 'finish',
+            bestTimeMs: 'fast',
+            commentText: 'hi',
+        }],
+        ['missing commentText', {
+            username: 'RaceFan',
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            source: 'finish',
+            bestTimeMs: 1000,
+        }],
+        ['missing subredditName', {
+            username: 'RaceFan',
+            challengeId: challenge.id,
+            source: 'finish',
+            bestTimeMs: 1000,
+            commentText: 'hi',
+        }],
+    ])('rejects confirm for a preview record with %s', async (_label, record) => {
+        strings.set('dailygp:share-preview:invalid-record', JSON.stringify(record));
+
+        expect(await confirmDailyGpShare({ shareToken: 'invalid-record' }, requestContext)).toMatchObject({
+            status: 409,
+            body: { status: 'preview_expired' },
+        });
+    });
+
+    it.each([
+        ['a comment id without the t1_ prefix', {
+            commentId: 'not-a-comment',
+            commentUrl: 'https://reddit.com/r/miniracer/comments/daily/shared',
+            commentText: 'already shared',
+            username: 'RaceFan',
+        }],
+        ['a missing comment url', {
+            commentId: 't1_already_shared',
+            commentText: 'already shared',
+            username: 'RaceFan',
+        }],
+    ])('treats a stored shared result with %s as unshared during preview', async (_label, shared) => {
+        strings.set(
+            'dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380',
+            JSON.stringify(shared),
+        );
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 200,
+            body: { status: 'ready', shareToken: expect.any(String) },
+        });
+    });
+
+    it('recovers the post record when no registry entry exists yet', async () => {
+        strings.clear();
+        const recoveredPost = {
+            id: 't3_recovered',
+            url: 'https://reddit.com/r/miniracer/comments/recovered',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        };
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => [recoveredPost] });
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview.status).toBe(200);
+        await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+        expect(reddit.submitComment).toHaveBeenNthCalledWith(1, {
+            id: recoveredPost.id,
+            text: DAILY_GP_SCORE_THREAD_TEXT,
+            runAs: 'APP',
+        });
+    });
+
+    it('formats centisecond boundaries without rounding up to the next displayed tenth', () => {
+        expect(formatDailyGpShareComment(42384, null, 'Track')).toBe(
+            'I set a 42.38 lap in Track. 🏁',
+        );
+        expect(formatDailyGpShareComment(42386, 'gold', 'Track')).toBe(
+            'I earned the Gold medal 🥇 with a 42.39 lap in Track.',
+        );
+    });
 });

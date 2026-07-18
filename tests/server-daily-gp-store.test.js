@@ -3068,4 +3068,188 @@ describe('server daily gp store submissions', () => {
             expect(snapshot.hasMore).toBe(false);
         });
     });
+
+    describe('mutation coverage — identity and podium guards', () => {
+        it('rejects bootstrap when the guest token does not match the supplied player id', async () => {
+            const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+            const guestToken = await mintGuestPlayerToken('guest-a');
+
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+            const payload = await getServerPlayerBootstrap({
+                playerId: 'guest-b',
+                guestToken,
+            });
+
+            expect(payload).toEqual({
+                playerId: null,
+                guestToken: null,
+                redditUsername: null,
+                leaderboardIdentity: 'constructed',
+                playerPreferences: null,
+                hasAnyData: false,
+                isReturningPlayer: false,
+                firstSeenAt: null,
+                lastSeenAt: null,
+            });
+        });
+
+        it('rejects bootstrap when a supplied guest token cannot be verified', async () => {
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+
+            const payload = await getServerPlayerBootstrap({
+                playerId: 'guest-invalid-token',
+                guestToken: 'not-a-real-token',
+            });
+
+            expect(payload.playerId).toBeNull();
+            expect(payload.guestToken).toBeNull();
+        });
+
+        it('preserves a stored constructed identity when update receives an invalid preference', async () => {
+            const { updateServerPlayerIdentity } = await import('../src/server/daily-gp-store.ts');
+            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+                playerId: 'reddit:identity-fallback',
+                leaderboardIdentity: 'constructed',
+                redditUsername: 'Identity-Fallback',
+                hasSeenGame: true,
+                hasAnyData: true,
+                firstSeenAt: '2026-01-01T00:00:00.000Z',
+                lastSeenAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            }));
+
+            const payload = await updateServerPlayerIdentity({
+                redditUsername: 'Identity-Fallback',
+                leaderboardIdentity: 'invalid',
+            });
+
+            expect(payload.leaderboardIdentity).toBe('constructed');
+        });
+
+        it('formats podium times with minutes when the verified lap exceeds one minute', async () => {
+            const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+            const challenge = {
+                id: 'daily-gp-2026-07-10',
+                challengeDate: '2026-07-10',
+                trackKey: 'circuit',
+                startsAt: '2026-07-10T00:00:00.000Z',
+                endsAt: '2026-07-11T00:00:00.000Z',
+                availableUntil: '2026-07-17T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            mockRedis.hGet.mockImplementation(async (_key, field) => (
+                field === challenge.id ? JSON.stringify(challenge) : null
+            ));
+            mockRedis.zRange.mockResolvedValue([{ member: 'reddit:slow-podium', score: 90000 }]);
+            mockRedis.hMGet.mockResolvedValue([JSON.stringify({
+                playerId: 'reddit:slow-podium',
+                trackKey: 'circuit',
+                bestTimeMs: 90000,
+                updatedAt: '2026-07-10T12:00:00.000Z',
+            })]);
+            mockRedis.mGet.mockResolvedValue([]);
+
+            const podium = await getServerFinalDailyGpPodium(new Date('2026-07-17T00:01:00.000Z'));
+
+            expect(podium.positions[0].formattedTime).toBe('1:30.00');
+        });
+
+        it('fills empty podium slots when the stored entry player id does not match the ranked member', async () => {
+            const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+            const challenge = {
+                id: 'daily-gp-2026-07-10',
+                challengeDate: '2026-07-10',
+                trackKey: 'circuit',
+                startsAt: '2026-07-10T00:00:00.000Z',
+                endsAt: '2026-07-11T00:00:00.000Z',
+                availableUntil: '2026-07-17T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            mockRedis.hGet.mockImplementation(async (_key, field) => (
+                field === challenge.id ? JSON.stringify(challenge) : null
+            ));
+            mockRedis.zRange.mockResolvedValue([{ member: 'reddit:ranked-member', score: 12000 }]);
+            mockRedis.hMGet.mockResolvedValue([JSON.stringify({
+                playerId: 'reddit:other-player',
+                trackKey: 'circuit',
+                bestTimeMs: 12000,
+                updatedAt: '2026-07-10T12:00:00.000Z',
+            })]);
+            mockRedis.mGet.mockResolvedValue([]);
+
+            const podium = await getServerFinalDailyGpPodium(new Date('2026-07-17T00:01:00.000Z'));
+
+            expect(podium.positions[0]).toMatchObject({
+                rank: 1,
+                identityType: 'empty',
+                displayName: 'No verified finish',
+                formattedTime: null,
+            });
+        });
+
+        it('ignores non-string challenge history hash values when rotating tracks', async () => {
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hGetAll.mockResolvedValue({
+                'daily-gp-2030-06-01': 42,
+            });
+            mockRedis.hSetNX.mockResolvedValue(1);
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2030-06-02T12:00:00.000Z'));
+
+            try {
+                const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+                const nextChallenge = await getServerDailyGpChallenge();
+
+                expect(nextChallenge.trackKey).toBe(TRACK_SCHEDULE_KEYS[0]);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('does not improve the leaderboard when the new submission is slower than the stored time', async () => {
+            const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockValidateDailyGpReplayDetailed.mockReturnValue({
+                ok: true,
+                run: {
+                    bestTimeSec: 15,
+                    bestTimeMs: 15000,
+                    completedLaps: 1,
+                    checkpointTimesSec: checkpointSplitsForChallenge(challenge, 15),
+                    ghost: null,
+                },
+            });
+            mockRedis.hGet.mockImplementation(async (key, field) => {
+                if (key === 'dailygp:challenges') return JSON.stringify(challenge);
+                if (key === `dailygp:leaderboard:${challenge.id}:entries` && field === 'reddit:slower-player') {
+                    return JSON.stringify({
+                        playerId: 'reddit:slower-player',
+                        trackKey: challenge.trackKey,
+                        bestTimeMs: 12000,
+                        updatedAt: '2026-01-01T00:00:00.000Z',
+                        validationMethod: 'strict-replay',
+                    });
+                }
+                return null;
+            });
+
+            const result = await submitServerDailyGpRun({
+                redditUsername: 'Slower-Player',
+                challengeId: challenge.id,
+                trackKey: challenge.trackKey,
+                replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+            });
+
+            expect(result.status).toBe(200);
+            expect(result.body.improved).toBe(false);
+            expect(result.body.bestTimeMs).toBe(12000);
+            expect(mockRedis.zAdd).not.toHaveBeenCalled();
+        });
+    });
 });

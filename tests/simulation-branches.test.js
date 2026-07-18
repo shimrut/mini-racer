@@ -1423,3 +1423,450 @@ describe('updateSimulation — route trace and run-history precision', () => {
         expect(state.runHistory.last().y).toBe(1.002);
     });
 });
+
+describe('updateSimulation — mutation-survivor precision', () => {
+    const dt = 1 / 60;
+    const noGripConfig = { ...CONFIG, accel: 0, grip: 0, downforceGrip: 0 };
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('applies the exact standstill forward-acceleration delta (L578, L582, L583)', () => {
+        const accel = 120;
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0, y: 0 },
+            angle: 0,
+            keys: { left: false, right: false }
+        });
+
+        updateSimulation(state, dt, { ...noGripConfig, accel }, OPEN_TRACK, []);
+
+        expect(state.velocity.x).toBeCloseTo((accel / KPH_PER_WORLD_UNIT) * dt, 8);
+        expect(state.velocity.y).toBeCloseTo(0, 8);
+    });
+
+    it('tapers acceleration with the speed-ratio drag factor at half max speed (L582)', () => {
+        const accel = 120;
+        const safeMax = CONFIG.maxSpeed / KPH_PER_WORLD_UNIT;
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0, y: safeMax * 0.5 },
+            angle: Math.PI / 2,
+            keys: { left: false, right: false }
+        });
+        const forwardBefore = state.velocity.y;
+
+        updateSimulation(state, dt, { ...noGripConfig, accel }, OPEN_TRACK, []);
+
+        const dragFactor = 1 - 0.5 ** 2;
+        expect(state.velocity.y - forwardBefore).toBeCloseTo((accel / KPH_PER_WORLD_UNIT) * dragFactor * dt, 8);
+    });
+
+    it('withholds thrust once the longitudinal speed budget is exhausted (L574, L578)', () => {
+        const safeMax = CONFIG.maxSpeed / KPH_PER_WORLD_UNIT;
+        const lateralY = safeMax * 0.999;
+        const longitudinalLimit = Math.sqrt(Math.max(0, safeMax * safeMax - lateralY * lateralY));
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: longitudinalLimit, y: lateralY },
+            angle: 0,
+            keys: { left: false, right: false }
+        });
+        const forwardBefore = state.velocity.x;
+
+        updateSimulation(state, dt, { ...noGripConfig, accel: 120 }, OPEN_TRACK, []);
+
+        expect(forwardBefore).toBeLessThan(longitudinalLimit + 1e-6);
+        expect(state.velocity.x).toBeCloseTo(forwardBefore, 8);
+    });
+
+    it('applies the exact reverse-brake delta toward zero forward speed (L586, L587)', () => {
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: -2, y: 0 },
+            angle: 0,
+            keys: { left: false, right: false }
+        });
+
+        updateSimulation(state, 0.1, { ...noGripConfig, accel: 0, brakePower: 20 }, OPEN_TRACK, []);
+
+        expect(state.velocity.x).toBeCloseTo(-2 + (20 / KPH_PER_WORLD_UNIT) * 0.1, 8);
+        expect(state.velocity.x).toBeLessThanOrEqual(0);
+    });
+
+    it('uses full grip when coasting and steerGripScale while steering (L603)', () => {
+        const coasting = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 3, y: 8 },
+            angle: 0,
+            keys: { left: false, right: false }
+        });
+        const steering = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 3, y: 8 },
+            angle: 0,
+            keys: { left: false, right: true }
+        });
+        const config = { ...noGripConfig, grip: 3, steerGripScale: 0.2, turnRate: 0 };
+
+        updateSimulation(coasting, 0.05, config, OPEN_TRACK, []);
+        updateSimulation(steering, 0.05, config, OPEN_TRACK, []);
+
+        expect(Math.abs(steering.velocity.y)).toBeGreaterThan(Math.abs(coasting.velocity.y));
+        expect(Math.abs(coasting.velocity.y)).toBeLessThan(8);
+        expect(Math.abs(steering.velocity.y)).toBeLessThan(8);
+    });
+
+    it('initializes non-boolean slipSpeedGateClamp before hysteresis checks (L614)', () => {
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 9.939, y: 1.1 },
+            angle: 0,
+            keys: { left: false, right: true },
+            slipSpeedGateClamp: 'stale'
+        });
+
+        updateSimulation(state, 0.01, { ...noGripConfig, turnRate: 0, highSpeedSteerTrim: 0 }, OPEN_TRACK, []);
+
+        expect(typeof state.slipSpeedGateClamp).toBe('boolean');
+        expect(state.slipSpeedGateClamp).toBe(true);
+    });
+
+    it('uses inclusive slip-gate on/off thresholds while steering (L619, L621)', () => {
+        const turnConfig = { ...noGripConfig, turnRate: 0, highSpeedSteerTrim: 0 };
+        const turnOn = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 9.939, y: 1.1 },
+            angle: 0,
+            keys: { left: false, right: true },
+            slipSpeedGateClamp: false
+        });
+        const stayOff = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 9.95, y: 1.05 },
+            angle: 0,
+            keys: { left: false, right: true },
+            slipSpeedGateClamp: false
+        });
+        const turnOff = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: Math.sqrt(100 - 0.54 * 0.54), y: 0.54 },
+            angle: 0,
+            keys: { left: false, right: true },
+            slipSpeedGateClamp: true
+        });
+
+        updateSimulation(turnOn, 0.01, turnConfig, OPEN_TRACK, []);
+        updateSimulation(stayOff, 0.01, turnConfig, OPEN_TRACK, []);
+        updateSimulation(turnOff, 0.01, turnConfig, OPEN_TRACK, []);
+
+        expect(turnOn.slipSpeedGateClamp).toBe(true);
+        expect(stayOff.slipSpeedGateClamp).toBe(false);
+        expect(turnOff.slipSpeedGateClamp).toBe(false);
+    });
+
+    it('does not rescale velocity when cached speed already equals the allowed cap (L630)', () => {
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 3, y: 4 },
+            angle: 0,
+            keys: { left: false, right: true },
+            slipSpeedGateClamp: true
+        });
+
+        updateSimulation(state, dt, {
+            ...noGripConfig,
+            turnRate: 0,
+            highSpeedSteerTrim: 0
+        }, OPEN_TRACK, []);
+
+        expect(state.cachedSpeed).toBeCloseTo(5, 8);
+        expect(state.velocity.x).toBeCloseTo(3, 6);
+        expect(state.velocity.y).toBeCloseTo(4, 6);
+    });
+
+    it('requires skid slip and speed to exceed their strict thresholds (L735, L737)', () => {
+        const exactBoundary = createTestSimState({
+            angle: 0,
+            velocity: { x: 2.4, y: 0.7 },
+            pos: { x: 0, y: 0 }
+        });
+        const aboveBoundary = createTestSimState({
+            angle: 0,
+            velocity: { x: 2.41, y: 0.72 },
+            pos: { x: 0, y: 0 }
+        });
+
+        updateSimulation(exactBoundary, 0.001, { ...CONFIG, accel: 0, grip: 0 }, OPEN_TRACK, []);
+        updateSimulation(aboveBoundary, 0.001, { ...CONFIG, accel: 0, grip: 0 }, OPEN_TRACK, []);
+
+        expect(exactBoundary.cachedSpeed).toBeCloseTo(2.5, 8);
+        expect(exactBoundary.skidMarks.length).toBe(0);
+        expect(aboveBoundary.skidMarks.length).toBe(1);
+        expect(aboveBoundary.cachedSpeed).toBeGreaterThan(2.5);
+    });
+
+    it('records run history when a rounded rear coordinate moves by exactly 0.001 (L761)', () => {
+        const state = createTestSimState({
+            velocity: { x: 0, y: 0 },
+            pos: { x: 1, y: 1 },
+            angle: 0,
+            runHistoryTimer: 0.05
+        });
+
+        updateSimulation(state, 0.001, { ...CONFIG, accel: 0, grip: 0 }, OPEN_TRACK, []);
+        expect(state.runHistory.length).toBe(1);
+        expect(state.runHistory.last()).toEqual({ x: 0.68, y: 1 });
+
+        state.pos = { x: 1.001, y: 1 };
+        state.runHistoryTimer = 0.05;
+        updateSimulation(state, 0.001, { ...CONFIG, accel: 0, grip: 0 }, OPEN_TRACK, []);
+
+        expect(state.runHistory.length).toBe(2);
+        expect(state.runHistory.last()).toEqual({ x: 0.681, y: 1 });
+    });
+
+    it('treats wall overlap as contact only when distance is strictly inside the radius (L229)', () => {
+        const wall = [{
+            start: { x: 5, y: 0 },
+            end: { x: 5, y: 10 },
+            dx: 0,
+            dy: 10,
+            lenSq: 100
+        }];
+        const radius = 0.5;
+        const config = { ...CONFIG, accel: 0, grip: 0, carRadius: radius, carCollisionHalfLength: 0 };
+        const touching = createTestSimState({
+            pos: { x: 4.5, y: 5 },
+            velocity: { x: 0, y: 0 },
+            angle: 0
+        });
+        const overlapping = createTestSimState({
+            pos: { x: 4.501, y: 5 },
+            velocity: { x: 1, y: 0 },
+            angle: 0
+        });
+
+        const touchEvents = updateSimulation(touching, 0.01, config, OPEN_TRACK, wall);
+        const touchImpact = touchEvents.wallImpact;
+        const touchPos = { x: touching.pos.x, y: touching.pos.y };
+        const overlapEvents = updateSimulation(overlapping, 0.01, config, OPEN_TRACK, wall);
+
+        expect(touchImpact).toBeNull();
+        expect(touchPos).toEqual({ x: 4.5, y: 5 });
+        expect(overlapEvents.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(overlapping.pos.x).toBeLessThan(4.501);
+    });
+
+    it('stops nose-first swept hits earlier when collision half-length is positive (L255)', () => {
+        const wall = [{
+            start: { x: 5, y: 10 },
+            end: { x: 5, y: 20 },
+            dx: 0,
+            dy: 10,
+            lenSq: 100
+        }];
+        const zeroLength = createTestSimState({
+            pos: { x: 4.55, y: 15 },
+            velocity: { x: 8, y: 0 },
+            angle: 0
+        });
+        const withLength = createTestSimState({
+            pos: { x: 4.55, y: 15 },
+            velocity: { x: 8, y: 0 },
+            angle: 0
+        });
+        const base = { ...CONFIG, accel: 0, grip: 0, carRadius: 0.275 };
+
+        const zeroEvents = updateSimulation(zeroLength, 0.05, { ...base, carCollisionHalfLength: 0 }, OPEN_TRACK, wall);
+        const lengthEvents = updateSimulation(withLength, 0.05, { ...base, carCollisionHalfLength: 0.34 }, OPEN_TRACK, wall);
+
+        expect(zeroEvents.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(lengthEvents.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(withLength.pos.x).toBeLessThan(zeroLength.pos.x);
+        expect(withLength.pos.x).toBeCloseTo(4.384, 3);
+        expect(zeroLength.pos.x).toBeCloseTo(4.724, 3);
+    });
+
+    it('resolves scrape velocity from configured bounce and tangential retention (L435, L438-L440, L443)', () => {
+        const wall = [{
+            start: { x: 5, y: 10 },
+            end: { x: 5, y: 20 },
+            dx: 0,
+            dy: 10,
+            lenSq: 100
+        }];
+        const state = createTestSimState({
+            pos: { x: 4.8, y: 15 },
+            velocity: { x: 0.1, y: 5 },
+            angle: Math.atan2(5, 0.1)
+        });
+
+        const events = updateSimulation(state, 0.1, {
+            ...CONFIG,
+            accel: 0,
+            grip: 0,
+            carRadius: 0.5,
+            wallScrapeSpeedSeverityWeight: 0,
+            wallScrapeDepthSeverityWeight: 1,
+            wallScrapeMinTangentialRetention: 0.5,
+            wallScrapeMaxTangentialRetention: 0.5,
+            wallScrapeMinBounce: 0.1,
+            wallScrapeMaxBounce: 0.1
+        }, OPEN_TRACK, wall);
+
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.velocity.x).toBeCloseTo(-0.01, 6);
+        expect(state.velocity.y).toBeCloseTo(2.5, 6);
+    });
+
+    it('skips scrape resolution during active wall contact but applies it on a fresh hit (L704, L706)', () => {
+        const wall = [{
+            start: { x: 5, y: 10 },
+            end: { x: 5, y: 20 },
+            dx: 0,
+            dy: 10,
+            lenSq: 100
+        }];
+        const config = { ...CONFIG, accel: 0, grip: 0, carRadius: 0.5 };
+        const active = createTestSimState({
+            pos: { x: 4.6, y: 15 },
+            velocity: { x: 3, y: 0 },
+            angle: 0,
+            wallContactActive: true,
+            wallImpactCooldownRemaining: 0,
+            wallContactReleaseRemaining: 0.12
+        });
+        const fresh = createTestSimState({
+            pos: { x: 4.6, y: 15 },
+            velocity: { x: 3, y: 0 },
+            angle: 0,
+            wallContactActive: false,
+            wallImpactCooldownRemaining: 0
+        });
+
+        const activeEvents = updateSimulation(active, 0.01, config, OPEN_TRACK, wall);
+        const activeImpact = activeEvents.wallImpact;
+        const freshEvents = updateSimulation(fresh, 0.01, config, OPEN_TRACK, wall);
+
+        expect(activeImpact).toBeNull();
+        expect(active.wallContactActive).toBe(true);
+        expect(active.velocity.x).toBeLessThanOrEqual(0);
+        expect(freshEvents.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(fresh.velocity.x).toBeLessThan(3);
+    });
+
+    it('adds downforce grip only for positive finite downforce values (L596)', () => {
+        const zeroDownforce = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 10, y: 5 },
+            angle: 0
+        });
+        const withDownforce = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 10, y: 5 },
+            angle: 0
+        });
+        const base = { ...CONFIG, accel: 0, grip: 2, downforceGrip: 0 };
+
+        updateSimulation(zeroDownforce, 0.05, base, OPEN_TRACK, []);
+        updateSimulation(withDownforce, 0.05, { ...base, downforceGrip: 1 }, OPEN_TRACK, []);
+
+        expect(Math.abs(withDownforce.velocity.y)).toBeLessThan(Math.abs(zeroDownforce.velocity.y));
+        expect(Math.abs(zeroDownforce.velocity.y)).toBeCloseTo(4.524187090179797, 6);
+        expect(Math.abs(withDownforce.velocity.y)).toBeCloseTo(4.294816266757254, 6);
+    });
+
+    it('applies high-speed steer trim only when the trim value is positive and finite (L538)', () => {
+        const noTrim = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0, y: 12 },
+            angle: 0,
+            keys: { left: false, right: true }
+        });
+        const withTrim = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0, y: 12 },
+            angle: 0,
+            keys: { left: false, right: true }
+        });
+        const base = { ...CONFIG, accel: 0, grip: 0, turnRate: 3 };
+
+        updateSimulation(noTrim, 0.1, { ...base, highSpeedSteerTrim: 0 }, OPEN_TRACK, []);
+        updateSimulation(withTrim, 0.1, { ...base, highSpeedSteerTrim: 0.5 }, OPEN_TRACK, []);
+
+        expect(noTrim.angle).toBeCloseTo(0.3, 6);
+        expect(withTrim.angle).toBeCloseTo(0.21009365244536937, 6);
+        expect(Math.abs(withTrim.angle)).toBeLessThan(Math.abs(noTrim.angle));
+    });
+
+    it('prefers the lower-index wall when inward speed and penetration tie (L302, L304, L305)', () => {
+        const parallelWalls = [
+            {
+                start: { x: 5, y: 0 },
+                end: { x: 5, y: 10 },
+                dx: 0,
+                dy: 10,
+                lenSq: 100
+            },
+            {
+                start: { x: 5.02, y: 0 },
+                end: { x: 5.02, y: 10 },
+                dx: 0,
+                dy: 10,
+                lenSq: 100
+            }
+        ];
+        const state = createTestSimState({
+            pos: { x: 4.7, y: 5 },
+            velocity: { x: 2, y: 0 },
+            angle: 0
+        });
+
+        const events = updateSimulation(
+            state,
+            0.01,
+            { ...CONFIG, accel: 0, grip: 0, carRadius: 0.5 },
+            OPEN_TRACK,
+            parallelWalls
+        );
+
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.pos.x).toBeCloseTo(4.159, 3);
+    });
+
+    it('resets every transient event field returned from the module singleton (L8-L19)', () => {
+        const finishTrack = {
+            startLine: { p1: { x: 0, y: 0 }, p2: { x: 10, y: 0 } },
+            checkpoints: []
+        };
+        const winState = createTestSimState({
+            currentTime: 2,
+            pos: { x: 5, y: -0.01 },
+            velocity: { x: 0, y: 20 },
+            angle: Math.PI / 2
+        });
+        const winEvents = updateSimulation(winState, 0.05, { ...CONFIG, accel: 0 }, finishTrack, []);
+        const winTriggered = winEvents.winTriggered;
+        const winData = winEvents.winData;
+
+        winState.velocity = { x: 0, y: 0 };
+        const idleEvents = updateSimulation(winState, 0.05, { ...CONFIG, accel: 0 }, finishTrack, []);
+
+        expect(winTriggered).toBe(true);
+        expect(winData).not.toBeNull();
+        expect(idleEvents.winTriggered).toBe(false);
+        expect(idleEvents.winData).toBeNull();
+        expect(idleEvents.challengeLapCompleted).toBe(false);
+        expect(idleEvents.challengeCompletedLapTime).toBeNull();
+        expect(idleEvents.challengeProgressLaps).toBe(0);
+        expect(idleEvents.challengeFailed).toBe(false);
+        expect(idleEvents.challengeFailureReason).toBeNull();
+        expect(idleEvents.wallImpact).toBeNull();
+        expect(idleEvents.crashImpact).toBeNull();
+        expect(idleEvents.crashEndedRun).toBe(false);
+        expect(idleEvents.checkpointPassed).toBeNull();
+    });
+});
