@@ -736,4 +736,88 @@ describe("daily-gp-store submission hardening", () => {
     const fallbackKey = `dailygp:submit-rate-limit:${challenge.id}:guest:${guestPlayerId}`;
     expect(redis.strings.has(fallbackKey)).toBe(true);
   });
+
+  it("returns nearby leaderboard rows when the signed-in player is off the requested page", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const members = Array.from({ length: 20 }, (_, index) => {
+      const playerId = `reddit:page-rank-${index + 1}`;
+      return {
+        playerId,
+        bestTimeMs: 15000 + index,
+      };
+    });
+    for (const [index, entry] of members.entries()) {
+      await redis.hSet(createRedisChallengeEntryHashKey(challenge.id), {
+        [entry.playerId]: JSON.stringify({
+          ...entry,
+          trackKey: challenge.trackKey,
+          updatedAt: "2026-07-16T12:00:00.000Z",
+          completedLaps: null,
+          checkpointTimesSec: null,
+          validationMethod: "strict-replay",
+          strictReplayFailureReason: null,
+        }),
+      });
+      await redis.zAdd(createRedisChallengeLeaderboardKey(challenge.id), {
+        member: entry.playerId,
+        score: encodeDailyGpLeaderboardScore(entry.bestTimeMs),
+      });
+    }
+
+    const snapshot = await getServerDailyGpSnapshot({
+      challengeId: challenge.id,
+      redditUsername: "Page-Rank-15",
+      offset: 0,
+      limit: 10,
+    });
+
+    expect(snapshot.topRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(snapshot.currentPlayerRow).toMatchObject({
+      rank: 15,
+      isCurrentPlayer: true,
+      bestTimeMs: 15014,
+    });
+    expect(snapshot.nearbyRows.map((row) => row.rank)).toEqual([13, 14, 15, 16, 17]);
+    expect(snapshot.playerRank).toBe(15);
+  });
+
+  it("rejects preference updates when the payload is not an object", async () => {
+    const result = await updateServerPlayerPreferences({
+      redditUsername: "Prefs-Not-Object",
+      playerPreferences: "not-an-object",
+    });
+
+    expect(result.playerPreferences).toBeNull();
+    expect(result.playerId).toBe("reddit:prefs-not-object");
+  });
+
+  it("returns the default identity when identity updates are unauthorized", async () => {
+    const result = await updateServerPlayerIdentity({
+      playerId: "guest-without-token",
+      leaderboardIdentity: "reddit",
+    });
+
+    expect(result).toEqual({
+      playerId: null,
+      guestToken: null,
+      leaderboardIdentity: "constructed",
+    });
+  });
+
+  it("returns an empty bootstrap payload when guest token verification fails", async () => {
+    const payload = await getServerPlayerBootstrap({
+      playerId: "guest-invalid-token",
+      guestToken: "invalid-token",
+    });
+
+    expect(payload).toMatchObject({
+      playerId: null,
+      guestToken: null,
+      playerPreferences: null,
+      hasAnyData: false,
+      isReturningPlayer: false,
+      firstSeenAt: null,
+      lastSeenAt: null,
+    });
+  });
 });

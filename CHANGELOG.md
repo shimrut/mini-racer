@@ -1,6 +1,8 @@
 # Changelog
 
+- Raised `game/race/simulation.js` mutation coverage with 37 branch-focused unit tests for checkpoint splits, collision broadphase fallbacks, driving-physics gates (downforce, slip clamp, steer trim), swept/degenerate wall contacts, and scrape-severity weighting.
 - Raised mutation coverage on weak modules with targeted unit tests: guest player tokens, car handling, moderator access, checkpoint-time normalization, PB ghost traces, result-flow rank/stats helpers, and verification-queue legacy expiry.
+- Expanded `daily-gp-store.ts` mutation tests for snapshot player-rank windowing, empty leaderboard states, stored-challenge type coercion, profile timestamp fallbacks, challenge-history maintenance edges, and submission identity rejection paths.
 - Raised `daily-gp-share.ts` mutation coverage from ~56% to ~72% and `daily-challenge/service.js` from ~57% to ~68% by covering historical Reddit-post recovery, post-registration race conditions, score-thread anchor reuse/rebuild/lock-loss paths, corrupted share/preview records, localStorage cache read/write/hydration failures, in-flight playlist and snapshot request dedupe, and remaining formatting/boundary mutants.
 - Expanded daily-challenge service tests for card-status boundaries, best-result merge, snapshot prefetch, mock playlist fallback, expired post handling, and local share/submit guards.
 - Expanded mutation soft-spot tests for player bootstrap storage, daily-challenge mock/cache normalization, and Daily GP share validation, rate limits, and comment formatting.
