@@ -42,6 +42,10 @@ import {
     getPbGhostEnabled,
     setPbGhostEnabled,
 } from './pb-ghost-preference.js';
+import {
+    getLeaderboardDecimalPlaces,
+    setLeaderboardDecimalPlaces,
+} from './leaderboard-decimal-places-preference.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
@@ -63,6 +67,7 @@ export class SettingsUi {
         this.refreshCollisionAutoRestartPanel();
         this.refreshCollisionRestartDelayPanel();
         this.refreshPbGhostPanel();
+        this.refreshLeaderboardDecimalPlacesPanel();
     }
 
     get settingsModal() { return document.getElementById('settings-modal'); }
@@ -88,6 +93,11 @@ export class SettingsUi {
     get musicHeading() { return document.getElementById('settings-music-heading'); }
     get pbGhostSwitch() { return document.getElementById('settings-pb-ghost-switch'); }
     get pbGhostHeading() { return document.getElementById('settings-pb-ghost-heading'); }
+    get leaderboardDecimalPlacesOptions() {
+        return [2, 3, 4]
+            .map((value) => document.getElementById(`settings-leaderboard-decimals-${value}`))
+            .filter(Boolean);
+    }
 
     wireCollisionRestartDelayMeter() {
         const meter = this.collisionRestartDelayMeter;
@@ -223,6 +233,13 @@ export class SettingsUi {
                 this.refreshPbGhostPanel();
             });
         }
+        for (const option of this.leaderboardDecimalPlacesOptions) {
+            option.addEventListener('click', () => {
+                setLeaderboardDecimalPlaces(option.dataset.leaderboardDecimalPlaces);
+                this.onPlayerPreferencesChanged?.();
+                this.refreshLeaderboardDecimalPlacesPanel();
+            });
+        }
         this.wireCollisionRestartDelayMeter();
     }
 
@@ -330,6 +347,15 @@ export class SettingsUi {
             headingEl: this.pbGhostHeading,
             title: 'Personal Best Ghost',
         });
+    }
+
+    refreshLeaderboardDecimalPlacesPanel() {
+        const selected = getLeaderboardDecimalPlaces();
+        for (const option of this.leaderboardDecimalPlacesOptions) {
+            const isSelected = Number(option.dataset.leaderboardDecimalPlaces) === selected;
+            option.classList.toggle('is-active', isSelected);
+            option.setAttribute('aria-checked', String(isSelected));
+        }
     }
 
     refreshCollisionRestartDelayPanel() {

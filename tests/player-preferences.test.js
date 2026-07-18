@@ -32,6 +32,7 @@ describe('durable player preferences', () => {
             musicEnabled: false,
             carAudioEnabled: true,
             pbGhostEnabled: false,
+            leaderboardDecimalPlaces: 4,
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
         };
@@ -50,5 +51,6 @@ describe('durable player preferences', () => {
             crashRestartDelaySec: 0.5,
         })).toBe(true);
         expect(readPlayerPreferences().pbGhostEnabled).toBe(true);
+        expect(readPlayerPreferences().leaderboardDecimalPlaces).toBe(2);
     });
 });

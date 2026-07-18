@@ -191,7 +191,7 @@ describe('ui modal runs helpers', () => {
                     scoreboardSnapshot: { playerRankLabel: '#2', leaderboardEntryCount: 2 },
                     onSelectLeaderboardDay: vi.fn(),
                 },
-                content: { formatTime: vi.fn() },
+                content: { formatTime: vi.fn(), formatLeaderboardTime: vi.fn() },
             });
 
             const rail = modalLapTimes.children.find((child) => (
@@ -388,7 +388,7 @@ describe('ui modal runs helpers', () => {
                         leaderboardEntryCount: 4
                     }
                 },
-                content: { formatTime: vi.fn(() => '42.32') },
+                content: { formatTime: vi.fn(() => '42.32'), formatLeaderboardTime: vi.fn(() => '00:42.32') },
                 configureRunsModalHeader,
                 _runsViewMode: 'close'
             });
@@ -401,7 +401,7 @@ describe('ui modal runs helpers', () => {
             expect(summary.children[1].getAttribute('aria-label')).toBe('4 racers');
             expect(summary.children[1].children[0].textContent).toBe('4');
             expect(summary.children[1].children[1].classList.contains('leaderboard-summary__racer-icon')).toBe(true);
-            expect(subtitleEl.textContent).toBe('42.32');
+            expect(subtitleEl.textContent).toBe('00:42.32');
             expect(subtitleEl.hidden).toBe(false);
         } finally {
             global.document = originalDocument;
@@ -478,7 +478,7 @@ describe('ui modal runs helpers', () => {
                         isRefreshing: true
                     }
                 },
-                content: { formatTime: vi.fn() }
+                content: { formatTime: vi.fn(), formatLeaderboardTime: vi.fn() }
             });
 
             const summary = header.children.find((child) => (

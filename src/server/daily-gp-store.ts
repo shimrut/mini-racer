@@ -405,6 +405,10 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
             preferences.pbGhostEnabled !== undefined
             && typeof preferences.pbGhostEnabled !== 'boolean'
         )
+        || (
+            preferences.leaderboardDecimalPlaces !== undefined
+            && ![2, 3, 4].includes(Number(preferences.leaderboardDecimalPlaces))
+        )
         || !Number.isFinite(crashRestartDelaySec)
         || crashRestartDelaySec < 0
         || crashRestartDelaySec > 1
@@ -420,6 +424,9 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
         crashAutoRestartEnabled: preferences.crashAutoRestartEnabled,
         crashRestartDelaySec: Math.round(crashRestartDelaySec * 10) / 10,
         pbGhostEnabled: preferences.pbGhostEnabled !== false,
+        leaderboardDecimalPlaces: [2, 3, 4].includes(Number(preferences.leaderboardDecimalPlaces))
+            ? Number(preferences.leaderboardDecimalPlaces) as 2 | 3 | 4
+            : 2,
     };
 }
 

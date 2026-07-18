@@ -134,6 +134,19 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
+    it.each([
+        [2, '01:02.35'],
+        [3, '01:02.346'],
+        [4, '01:02.3457'],
+    ])('formats leaderboard times with %i decimal places', (decimalPlaces, expected) => {
+        const component = new ModalContentUi({
+            getLeaderboardPrecision: () => decimalPlaces,
+        });
+
+        expect(component.formatLeaderboardTime(62.34567)).toBe(expected);
+        expect(component.formatTime(62.34567)).toBe('01:02.35');
+    });
+
     it('does not create a phantom current player row when rank is missing', () => {
         const originalDocument = global.document;
         const dom = new JSDOM('<div id="leaderboard"></div>');

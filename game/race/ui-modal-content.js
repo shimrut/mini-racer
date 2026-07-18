@@ -3,6 +3,7 @@ import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/resu
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
+import { getLeaderboardDecimalPlaces } from '../settings/leaderboard-decimal-places-preference.js';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
@@ -126,7 +127,9 @@ export function mountCombinedPopoverOverlay(container, { title, overlayClass = '
 }
 
 export class ModalContentUi {
-    constructor() {}
+    constructor({ getLeaderboardPrecision = getLeaderboardDecimalPlaces } = {}) {
+        this.getLeaderboardPrecision = getLeaderboardPrecision;
+    }
 
     get modalStatsRow() { return document.getElementById('modal-stats-row'); }
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
@@ -462,7 +465,7 @@ export class ModalContentUi {
         const runTime = document.createElement('span');
         runTime.className = 'combined-row-time';
         if (entry.bestTime != null && Number.isFinite(entry.bestTime)) {
-            runTime.textContent = this.formatTime(entry.bestTime);
+            runTime.textContent = this.formatLeaderboardTime(entry.bestTime);
         } else {
             runTime.textContent = '--';
         }
@@ -793,6 +796,15 @@ export class ModalContentUi {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toFixed(2).padStart(5, '0')}`;
+    }
+
+    formatLeaderboardTime(seconds) {
+        if (!Number.isFinite(seconds)) return '--';
+        const decimalPlaces = this.getLeaderboardPrecision();
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        const secondsWidth = decimalPlaces + 3;
+        return `${mins.toString().padStart(2, '0')}:${secs.toFixed(decimalPlaces).padStart(secondsWidth, '0')}`;
     }
 
     _resolveWinPriorPersonalBest(previousPersonalBestSec, fallbackPersonalBestSec) {

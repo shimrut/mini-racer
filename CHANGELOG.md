@@ -1,5 +1,7 @@
 # Changelog
 
+- Added a durable Settings choice for showing leaderboard times with 2, 3, or 4 decimal places; existing players keep the previous two-decimal display by default.
+
 - Reduced verified PB ghost traces by replacing timestamped millimetre JSON tuples with a fixed-20-Hz schema-v2 origin/delta representation using centimetre positions and shortest-angle deltas. A representative 12-second trace is 56.8% smaller raw and 64.3% smaller after gzip without changing playback interpolation or finish timing.
 - Started verified score submission at the finish event and returned the canonical lifetime-PB ghost in the accepted response, allowing immediate Improve attempts to use the correct verified ghost by GO without a second download.
 - Prevented stale ghost responses and rapid track switching from clearing or preparing the wrong track. When an expected verified ghost is not ready at GO, racing starts on time without a ghost and shows a two-second `GHOST UNAVAILABLE` HUD notice.

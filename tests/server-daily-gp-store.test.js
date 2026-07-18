@@ -997,6 +997,7 @@ describe('server daily gp store submissions', () => {
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
             pbGhostEnabled: true,
+            leaderboardDecimalPlaces: 4,
         };
 
         const saved = await updateServerPlayerPreferences({
