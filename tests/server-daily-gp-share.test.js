@@ -1225,6 +1225,11 @@ describe('daily GP result sharing', () => {
             commentText: 'already shared',
             username: 'RaceFan',
         }],
+        ['a missing username', {
+            commentId: 't1_already_shared',
+            commentUrl: 'https://reddit.com/r/miniracer/comments/daily/shared',
+            commentText: 'already shared',
+        }],
     ])('treats a stored shared result with %s as unshared during preview', async (_label, shared) => {
         strings.set(
             'dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380',
@@ -1272,6 +1277,12 @@ describe('daily GP result sharing', () => {
         );
         expect(formatDailyGpShareComment(42386, 'gold', 'Track')).toBe(
             'I earned the Gold medal 🥇 with a 42.39 lap in Track.',
+        );
+        expect(formatDailyGpShareComment(1000, null, 'Track')).toBe(
+            'I set a 01.00 lap in Track. 🏁',
+        );
+        expect(formatDailyGpShareComment(99990, 'silver', 'Track')).toBe(
+            'I earned the Silver medal 🥈 with a 99.99 lap in Track.',
         );
     });
 });

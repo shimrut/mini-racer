@@ -791,6 +791,66 @@ describe('result-flow helpers', () => {
         });
     });
 
+    it('treats zero as a finite previous best and keeps laps at the max-length boundary', () => {
+        expect(buildLapRecord(2, 1.5, 0)).toEqual({
+            lapNumber: 2,
+            time: 1.5,
+            deltaVsBest: 1.5,
+        });
+
+        const exact = [{ lapNumber: 1 }, { lapNumber: 2 }];
+        expect(pushRecentLap(exact, { lapNumber: 3 }, 3)).toEqual([
+            { lapNumber: 1 },
+            { lapNumber: 2 },
+            { lapNumber: 3 },
+        ]);
+    });
+
+    it('only applies explicit payload updates when an own property is present', () => {
+        const base = {
+            lapTimesArray: [20],
+            bestTime: 20,
+            currentTime: 20,
+            scoreboardSnapshot: { isLoading: true },
+        };
+
+        expect(buildModalRunsPayload(base, {
+            updates: Object.defineProperty({}, 'bestTime', {
+                value: undefined,
+                enumerable: true,
+            }),
+        })).toMatchObject({
+            bestTime: 20,
+            currentTime: 20,
+        });
+
+        expect(buildModalRunsPayload(base, {
+            updates: { bestTime: 19.5 },
+        })).toMatchObject({ bestTime: 19.5 });
+    });
+
+    it('normalizes mixed-case verification stages and strips trailing status dots', () => {
+        expect(buildScoreboardRankDisplay({
+            playerRankLabel: '#2',
+            verificationState: ' ERROR ',
+            submissionStage: ' error ',
+        })).toMatchObject({
+            labelText: 'Rank error',
+            text: '#2',
+        });
+
+        expect(buildScoreboardRankDisplay({
+            statusText: 'Rejected...',
+        })).toMatchObject({
+            labelText: 'Rank rejected',
+        });
+
+        expect(buildScoreboardRankDisplay({
+            submissionStage: ' VERIFYING ',
+            statusText: 'Verifying...',
+        }).labelText).toBe('Verifying rank');
+    });
+
     it('returns null when no loader is configured and logs refresh errors', async () => {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 

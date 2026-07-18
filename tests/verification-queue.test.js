@@ -581,6 +581,53 @@ describe('verification queue', () => {
         expect(Number.isFinite(due[0].nextAttemptAt)).toBe(true);
     });
 
+    it('purges entries whose expiry is exactly now and normalizes numeric expiresAt on read', () => {
+        const now = Date.parse('2026-07-18T12:00:00.000Z');
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({
+                daily: {
+                    'expires-exactly-now': {
+                        challengeId: 'expires-exactly-now',
+                        bestTime: 20,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: now + 60_000,
+                        expiresAt: '2026-07-18T12:00:00.000Z',
+                    },
+                    'numeric-expiry-normalize': {
+                        challengeId: 'numeric-expiry-normalize',
+                        bestTime: 21,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: now + 60_000,
+                        expiresAt: now + 120_000,
+                    },
+                },
+            }),
+        });
+
+        expect(getDailyChallengeVerificationEntry('expires-exactly-now')).toBe(null);
+        expect(getDailyChallengeVerificationEntry('numeric-expiry-normalize')?.expiresAt)
+            .toBe(new Date(now + 120_000).toISOString());
+        expect(readStoredQueue().daily['numeric-expiry-normalize'].expiresAt)
+            .toBe(new Date(now + 120_000).toISOString());
+    });
+
+    it('ignores malformed daily-gp ids when deriving legacy expiry', () => {
+        const future = Date.now() + 60_000;
+        enqueueDailyChallengeVerification({
+            challengeId: 'daily-gp-not-a-date',
+            bestTime: 30,
+            replay: REPLAY,
+            expiresAt: future,
+        });
+
+        expect(getDailyChallengeVerificationEntry('daily-gp-not-a-date')).toMatchObject({
+            challengeId: 'daily-gp-not-a-date',
+        });
+    });
+
     it('adds a fixed expiry and purges expired or unsafe legacy entries', () => {
         vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-17T00:01:00.000Z'));
         expect(enqueueDailyChallengeVerification({

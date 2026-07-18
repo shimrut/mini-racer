@@ -2119,4 +2119,124 @@ describe('daily-challenge service', () => {
         expect(isPreviewPage()).toBe(false);
         globalThis.window = { localStorage: memoryLocalStorage };
     });
+
+    it('keeps playlist rows without expiry timestamps and drops tracks removed from the catalog', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
+
+        const merged = cacheDailyChallengePlaylist([
+            {
+                id: 'no-expiry-timestamps',
+                trackKey: 'circuit',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            },
+            {
+                id: 'removed-track-row',
+                trackKey: 'notInCatalogAnymore',
+                startsAt: '2026-07-18T00:00:00.000Z',
+                endsAt: '2026-07-19T00:00:00.000Z',
+                availableUntil: '2026-07-25T00:00:00.000Z',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            },
+        ]);
+
+        expect(merged.some((challenge) => challenge.id === 'no-expiry-timestamps')).toBe(true);
+        expect(merged.some((challenge) => challenge.id === 'removed-track-row')).toBe(false);
+        expect(getCachedDailyChallengePlaylist().some((challenge) => challenge.id === 'removed-track-row'))
+            .toBe(false);
+
+        vi.useRealTimers();
+    });
+
+    it('requires at least two laps for multi-lap objectives and formats sub-minute card expiry', () => {
+        expect(getDailyChallengeRequiredLaps({
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 1 },
+        })).toBe(2);
+
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-03T12:00:00.000Z'));
+
+        expect(getDailyChallengeCardStatus({
+            endsAt: '2026-06-02T00:00:00.000Z',
+            availableUntil: '2026-06-03T12:00:30.000Z',
+        })).toEqual({
+            key: 'available',
+            label: 'Expires in 1m',
+        });
+
+        vi.useRealTimers();
+    });
+
+    it('ignores corrupt featured-start overrides and swallows playlist cache write failures', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        memoryLocalStorage.setItem('VectorGpDailyStartOverride', '{bad-json');
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: '',
+        };
+        fetch.mockResolvedValue(createJsonResponse({
+            id: 'daily-gp-after-bad-override',
+            trackKey: 'circuit',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            status: 'active',
+            skin: 'default',
+        }));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.id).toBe('daily-gp-after-bad-override');
+        expect(console.error).toHaveBeenCalledWith(
+            'Error reading daily start override:',
+            expect.any(Error),
+        );
+
+        memoryLocalStorage.setItem = () => {
+            throw new Error('quota exceeded');
+        };
+        expect(() => cacheDailyChallengePlaylist([{
+            id: 'playlist-write-failure',
+            trackKey: 'circuit',
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        }])).not.toThrow();
+        expect(console.error).toHaveBeenCalledWith(
+            'Error writing daily playlist cache:',
+            expect.any(Error),
+        );
+    });
+
+    it('does not use mock params when the preview page has no search string', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/preview.html',
+            protocol: 'https:',
+            search: '',
+        };
+        globalThis.devvit = {
+            context: {
+                postData: {
+                    challenge: { id: '', trackKey: 'circuit' },
+                },
+            },
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
+        expect(fetch).toHaveBeenCalled();
+    });
 });

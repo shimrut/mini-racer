@@ -3251,5 +3251,81 @@ describe('server daily gp store submissions', () => {
             expect(result.body.bestTimeMs).toBe(12000);
             expect(mockRedis.zAdd).not.toHaveBeenCalled();
         });
+
+        it('rejects stored challenges whose id or challengeDate fail ledger validation', async () => {
+            const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+            mockRedis.hGet.mockImplementation(async (_key, field) => {
+                if (field === 'daily-gp-bad-id') {
+                    return JSON.stringify({
+                        id: 'not-a-daily-gp-id',
+                        challengeDate: '2026-07-10',
+                        trackKey: 'circuit',
+                        startsAt: '2026-07-10T00:00:00.000Z',
+                        endsAt: '2026-07-11T00:00:00.000Z',
+                        availableUntil: '2026-07-17T00:00:00.000Z',
+                    });
+                }
+                if (field === 'daily-gp-2026-07-11') {
+                    return JSON.stringify({
+                        id: 'daily-gp-2026-07-11',
+                        challengeDate: '',
+                        trackKey: 'circuit',
+                        startsAt: '2026-07-11T00:00:00.000Z',
+                        endsAt: '2026-07-12T00:00:00.000Z',
+                        availableUntil: '2026-07-18T00:00:00.000Z',
+                    });
+                }
+                return null;
+            });
+
+            expect(await getServerDailyGpChallengeById('daily-gp-bad-id')).toBeNull();
+            expect(await getServerDailyGpChallengeById('daily-gp-2026-07-11')).toBeNull();
+        });
+
+        it('ignores ledger entries that start today when choosing the next track', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2030-06-02T12:00:00.000Z'));
+            const todayChallenge = {
+                id: 'daily-gp-2030-06-02',
+                challengeDate: '2030-06-02',
+                trackKey: TRACK_SCHEDULE_KEYS[1] || TRACK_SCHEDULE_KEYS[0],
+                startsAt: '2030-06-02T00:00:00.000Z',
+                endsAt: '2030-06-03T00:00:00.000Z',
+                availableUntil: '2030-06-09T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            const priorChallenge = {
+                id: 'daily-gp-2030-06-01',
+                challengeDate: '2030-06-01',
+                trackKey: TRACK_SCHEDULE_KEYS[0],
+                startsAt: '2030-06-01T00:00:00.000Z',
+                endsAt: '2030-06-02T00:00:00.000Z',
+                availableUntil: '2030-06-08T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hGetAll.mockResolvedValue({
+                [todayChallenge.id]: JSON.stringify(todayChallenge),
+                [priorChallenge.id]: JSON.stringify(priorChallenge),
+            });
+            mockRedis.hSetNX.mockResolvedValue(1);
+
+            try {
+                const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+                const challenge = await getServerDailyGpChallenge();
+                const priorIndex = TRACK_SCHEDULE_KEYS.indexOf(priorChallenge.trackKey);
+                const expected = TRACK_SCHEDULE_KEYS[(priorIndex + 1) % TRACK_SCHEDULE_KEYS.length];
+
+                expect(challenge.trackKey).toBe(expected);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
     });
 });

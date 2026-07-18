@@ -283,6 +283,62 @@ describe('pb-ghost-trace validation and recording edges', () => {
         expect(trace.origin).toEqual([0, 0, 0]);
     });
 
+    it('rejects traces whose reconstructed pose leaves safe integers', () => {
+        expect(isValidPbGhostTrace(validTrace({
+            origin: [0, 0, 0],
+            deltas: [Number.MAX_SAFE_INTEGER, 0, 0, 1, 0, 0],
+            finishTimeMs: 50,
+        }))).toBe(false);
+    });
+
+    it('rejects traces with more than the maximum allowed samples', () => {
+        const deltas = Array.from({ length: PB_GHOST_MAX_SAMPLES * 3 }, () => 0);
+        const finishTimeMs = (PB_GHOST_MAX_SAMPLES - 1) * PB_GHOST_SAMPLE_INTERVAL_MS;
+        expect(isValidPbGhostTrace(validTrace({
+            finishTimeMs,
+            deltas,
+        }))).toBe(false);
+    });
+
+    it('ignores recorder samples with missing position components', () => {
+        expect(createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: Number.NaN, y: 0 },
+            angle: 0,
+        }).finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 1 },
+            angle: 0.1,
+        })).toBeNull();
+
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.05,
+            position: { x: 1, y: Number.NaN },
+            angle: 0.1,
+        });
+        const trace = recorder.finish({
+            timeSec: 0.05,
+            position: { x: 2, y: 2 },
+            angle: 0.2,
+        });
+        expect(trace).not.toBeNull();
+        expect(getPbGhostTraceSampleCount(trace)).toBe(2);
+    });
+
+    it('accepts large valid traces that remain under the encoded-byte cap', () => {
+        const deltas = Array.from({ length: 999 * 3 }, () => 0);
+        const finishTimeMs = 999 * PB_GHOST_SAMPLE_INTERVAL_MS;
+        const trace = validTrace({ finishTimeMs, deltas });
+        expect(Buffer.byteLength(JSON.stringify(trace), 'utf8'))
+            .toBeLessThanOrEqual(PB_GHOST_MAX_ENCODED_BYTES);
+        expect(isValidPbGhostTrace(trace)).toBe(true);
+    });
+
     it('hashes only the stable track shape fields', () => {
         const base = {
             outer: [{ x: 0, y: 0 }],
