@@ -21,6 +21,7 @@ export class StartOverlay {
         this._startOverlayHasAnyData = false;
         this._startOverlayIsReturningPlayer = false;
         this._isReady = false;
+        this._isInteractive = false;
         this._menuKeyboardState = createMenuKeyboardState();
         this._menuKeydownHandler = null;
         this._menuPointerMoveHandler = null;
@@ -186,6 +187,7 @@ export class StartOverlay {
     }
 
     focusPrimaryAction() {
+        if (!this._isInteractive) return;
         if (!this.isStartOverlayVisible()) return;
 
         const overlay = this.startOverlay;
@@ -203,7 +205,7 @@ export class StartOverlay {
     }
 
     handleStartAction(onStart) {
-        if (!this._isReady || this.startBtn?.disabled) {
+        if (!this._isInteractive || this.startBtn?.disabled) {
             return;
         }
 
@@ -224,7 +226,11 @@ export class StartOverlay {
         if (overlay) {
             overlay.classList.toggle('is-ready', this._isReady);
         }
-        if (this._isReady) {
+    }
+
+    setInteractive(isInteractive) {
+        this._isInteractive = Boolean(isInteractive);
+        if (this._isInteractive) {
             requestAnimationFrame(() => this.focusPrimaryAction());
         }
     }

@@ -1,5 +1,6 @@
 # Changelog
 
+- Restored the instant lobby reveal after loading by preparing its title and controls behind the loading-screen fade while keeping Start input and Devvit `App.Ready` gated until dismissal completes.
 - Leaderboard rows and the pinned player time now show the full stored millisecond precision by default.
 - Added official Devvit Journeys for the expanded race flow: interactive readiness, explicit attempt starts, monotonic checkpoint progress, pause/resume interactions, and complete or incomplete attempt endings. Journey failures never block gameplay, and no player, track, replay, or custom Redis data is attached.
 

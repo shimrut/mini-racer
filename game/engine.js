@@ -382,9 +382,10 @@ export class RealTimeRacer {
         this.hasAnyData,
         this.isReturningPlayer,
       );
+      this.startOverlay.setReady(true);
 
       await this.loadingScreen.dismiss();
-      this.startOverlay.setReady(true);
+      this.startOverlay.setInteractive(true);
       void this.journeys.appReady();
       this.loadSecondaryStartupData();
     });

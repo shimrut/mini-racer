@@ -79,6 +79,7 @@ describe('ui start overlay helpers', () => {
             setStartSelectionMode: vi.fn()
         };
         const overlay = new StartOverlay(context);
+        overlay.setInteractive(true);
         vi.spyOn(overlay, "setStartOverlayActive");
         vi.spyOn(overlay, "updateStartOverlayMode");
         const focusPrimaryAction = vi.fn();
@@ -126,9 +127,12 @@ describe('ui start overlay helpers', () => {
         global.document = originalDocument;
     });
 
-    it('blocks programmatic start clicks until the loading screen has dismissed', () => {
+    it('reveals the lobby behind the loader without accepting starts until interactive', () => {
         const originalDocument = global.document;
-        global.document = { getElementById: () => null };
+        const classList = { toggle: vi.fn() };
+        global.document = {
+            getElementById: (id) => id === 'start-overlay' ? { classList } : null,
+        };
         const start = vi.fn();
         const overlay = new StartOverlay();
         Object.defineProperty(overlay, 'startBtn', {
@@ -136,10 +140,13 @@ describe('ui start overlay helpers', () => {
         });
         overlay.focusPrimaryAction = vi.fn();
 
+        overlay.setReady(true);
+        expect(classList.toggle).toHaveBeenCalledWith('is-ready', true);
+
         overlay.handleStartAction(start);
         expect(start).not.toHaveBeenCalled();
 
-        overlay.setReady(true);
+        overlay.setInteractive(true);
         overlay.handleStartAction(start);
         expect(start).toHaveBeenCalledTimes(1);
 

@@ -63,7 +63,7 @@ flowchart LR
 ### Devvit Journeys
 
 - `game/journeys/service.js` is the only client adapter for Reddit's official Devvit Journeys API. It serializes lifecycle calls, suppresses duplicate or non-increasing events, reports receipts only to the developer console, and contains SDK failures so they cannot affect loading, racing, finishing, or score submission.
-- The expanded game reports `App.Ready` only after its lobby is interactive. An explicit race action starts one Journey attempt; checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, track changes, or manual restarts end incomplete. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
+- The lobby receives its visual `is-ready` state behind the loading-screen fade so its title and controls are already present when the loader clears. Start input remains separately gated until dismissal completes; only then does the expanded game report `App.Ready`. An explicit race action starts one Journey attempt; checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, track changes, or manual restarts end incomplete. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
 - Journey payloads contain no player ID, Reddit username, guest token, challenge ID, track key, replay, device details, or lap score. The official `/api/telemetry` router enriches events in Devvit; Mini Racer adds no custom analytics route, Redis record, retention policy, or dashboard.
 
 ### UI And Modal Flow
