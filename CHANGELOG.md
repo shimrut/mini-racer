@@ -1,17 +1,17 @@
 # Changelog
 
 - Leaderboard rows and the pinned player time now show the full stored millisecond precision by default.
+- Added official Devvit Journeys for the expanded race flow: interactive readiness, explicit attempt starts, monotonic checkpoint progress, pause/resume interactions, and complete or incomplete attempt endings. Journey failures never block gameplay, and no player, track, replay, or custom Redis data is attached.
 
 - Replaced lifetime PB and ghost storage with challenge-scoped records that expire six hours after the track leaves its seven-day availability window. Daily leaderboard keys and response formats are unchanged, but now share that fixed deadline.
 - Reduced inactive player-profile and preference retention to 7 days for guests and 30 days for signed-in players without changing the stored profile format.
 - Bounded published challenge history to 30 days and added resumable maintenance that corrects known live leaderboard deadlines while preserving active entries.
 - Changed final podium automation to retry hourly during the six-hour post-expiry window. The first attempt freezes the public top-three payload so retries remain consistent and idempotent.
-- Removed custom gameplay and moderator analytics collection, APIs, menu action, dashboard assets, and dependencies. The retired non-expiring moderator-post registry is deleted by retention maintenance; historical counters expire naturally.
+- Removed custom gameplay and moderator analytics collection, APIs, Redis cleanup code, menu action, dashboard assets, and dependencies. Historical counters expire naturally.
 - Reduced verified PB ghost traces by replacing timestamped millimetre JSON tuples with a fixed-20-Hz schema-v2 origin/delta representation using centimetre positions and shortest-angle deltas. A representative 12-second trace is 56.8% smaller raw and 64.3% smaller after gzip without changing playback interpolation or finish timing.
-- Started verified score submission at the finish event and returned the canonical lifetime-PB ghost in the accepted response, allowing immediate Improve attempts to use the correct verified ghost by GO without a second download.
+- Started verified score submission at the finish event and returned the canonical challenge-PB ghost in the accepted response, allowing immediate Improve attempts to use the correct verified ghost by GO without a second download.
 - Prevented stale ghost responses and rapid track switching from clearing or preparing the wrong track. When an expected verified ghost is not ready at GO, racing starts on time without a ghost and shows a two-second `GHOST UNAVAILABLE` HUD notice.
-- Isolated daily result acceptance from lifetime-PB Redis failures by persisting both concurrently after one replay validation. PB-only failures now keep the valid daily result accepted, while daily transaction interruptions remain retryable.
-- Added aggregate-only PB ghost readiness reporting for finish-to-ready latency, GO safety margin, ready-before-GO, ghostless starts, unavailable notices, platform, and client version.
+- Isolated daily result acceptance from challenge-PB Redis failures by persisting both concurrently after one replay validation. PB-only failures now keep the valid daily result accepted, while daily transaction interruptions remain retryable.
 - Made the gold podium row larger and added matching silver/bronze side gradients.
 - Split final podium places into separate rounded rows with spacing and no borders.
 - Restyled final podium posts to match the rounded results panel reference while keeping Mini Racer type, color, and accent rules; removed the red trail divider in favor of the faint track watermark.

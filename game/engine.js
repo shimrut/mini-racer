@@ -48,6 +48,7 @@ import { getMusicEnabled } from "./settings/music-preference.js";
 import { getPbGhostEnabled } from "./settings/pb-ghost-preference.js";
 import { PbGhost } from "./ghost/pb-ghost.js";
 import { PbGhostService } from "./ghost/pb-ghost-service.js";
+import { JourneyService } from "./journeys/service.js";
 import {
   applyPlayerPreferences,
   queuePlayerPreferencesSave,
@@ -112,6 +113,7 @@ export class RealTimeRacer {
     this.trackPersonalBestByTrackKey = Object.create(null);
     this.pbGhost = new PbGhost({ enabled: getPbGhostEnabled() });
     this.pbGhostService = new PbGhostService();
+    this.journeys = new JourneyService();
     this.preparedPbGhostChallengeId = null;
     this.pbGhostSelectionChallengeId = null;
     this.pbGhostSelectionGeneration = 0;
@@ -380,9 +382,10 @@ export class RealTimeRacer {
         this.hasAnyData,
         this.isReturningPlayer,
       );
-      this.startOverlay.setReady(true);
 
       await this.loadingScreen.dismiss();
+      this.startOverlay.setReady(true);
+      void this.journeys.appReady();
       this.loadSecondaryStartupData();
     });
 

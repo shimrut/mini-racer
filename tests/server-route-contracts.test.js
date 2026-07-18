@@ -35,6 +35,24 @@ async function readJson(response) {
 }
 
 describe('server route contracts', () => {
+    it('mounts the official Devvit Journeys telemetry router', async () => {
+        const baseUrl = await startApp(() => {});
+        const response = await fetch(`${baseUrl}/api/telemetry/journey/progress`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ progress: 0.5, action: 'checkpoint' }),
+        });
+
+        expect(response.status).toBe(400);
+        expect(await readJson(response)).toEqual({
+            error: 'journeyId is required.',
+            receipt: {
+                status: 'JOURNEY_RECEIPT_INVALID',
+                message: 'Invalid: Event payload was not recorded.',
+            },
+        });
+    });
+
     it('authorizes and forwards PB ghost summary and full-trace lookups', async () => {
         const getServerPlayerTrackPbSummaries = vi.fn(async () => ({
             playerId: 'guest:guest-1',

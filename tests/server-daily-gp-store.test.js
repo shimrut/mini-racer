@@ -463,7 +463,6 @@ describe('server daily gp store submissions', () => {
             const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
             await persistServerDailyGpChallenge(currentChallenge);
 
-            expect(mockRedis.del).toHaveBeenCalledWith('dailygp:mod-analytics:posts');
             expect(mockRedis.hScan).toHaveBeenCalledWith('dailygp:challenges', 0, undefined, 50);
             expect(mockRedis.hDel).toHaveBeenCalledWith('dailygp:challenges', [oldChallenge.id]);
             expect(mockRedis.expire).toHaveBeenCalledWith(

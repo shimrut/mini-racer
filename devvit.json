@@ -5,6 +5,7 @@
     "icon": "assets/icon.png"
   },
   "permissions": {
+    "journeys": true,
     "reddit": {
       "enable": true,
       "asUser": [

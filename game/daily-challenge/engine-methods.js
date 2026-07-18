@@ -845,6 +845,7 @@ export const dailyChallengeEngineMethods = {
         this.preparedPbGhostChallengeId = null;
       }
       this.applyDailyChallenge(challenge);
+      void this.journeys?.startAttempt?.();
       this.startSequence();
     } finally {
       this.startButtonPending = false;
@@ -992,6 +993,7 @@ export const dailyChallengeEngineMethods = {
   handleInvalidDailyChallengeWin(reason = "Finish could not be verified.") {
     console.warn("Daily challenge win validation failed:", reason);
     this.status = "ready";
+    void this.journeys?.endAttempt?.({ complete: false });
     this.hud.setPauseVisible(false);
     this.hud.setHudPersonalBestsOpenAllowed(true);
 
@@ -1047,6 +1049,7 @@ export const dailyChallengeEngineMethods = {
     }
 
     this.status = "won";
+    void this.journeys?.endAttempt?.({ complete: true });
     const finalTime = winData.lapTime;
     const challenge = this.activeDailyChallenge;
     const completedLaps = Math.max(0, Math.trunc(winData.completedLaps || 0));
@@ -1254,6 +1257,8 @@ export const dailyChallengeEngineMethods = {
   restartDailyChallenge() {
     if (!this.activeDailyChallenge) return;
 
+    void this.journeys?.endAttempt?.({ complete: false });
+    void this.journeys?.startAttempt?.();
     this.reset(true, { preserveDailyChallenge: true });
   },
 };

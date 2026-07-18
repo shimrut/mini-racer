@@ -196,6 +196,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
   it("shows race wording in the pause modal for multi-lap daily challenges", () => {
     const showModal = vi.fn();
+    const interaction = vi.fn();
 
     RealTimeRacer.prototype.pauseActiveRun.call({
       status: "playing",
@@ -207,6 +208,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       activeDailyChallenge: { objectiveType: "multi_lap_total", skin: "default", trackKey: "circuit" },
       getSelectedCarAssetName: () => "assets/cars/mr_mr_red.webp",
       modal: { showModal },
+      journeys: { interaction },
       resumeActiveRun: vi.fn(),
       reset: vi.fn(),
     });
@@ -231,10 +233,77 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         settingsAction: expect.any(Function),
       }),
     );
+    expect(interaction).toHaveBeenCalledWith("pause");
+  });
+
+  it("reports resume only after a paused run becomes playable again", () => {
+    const interaction = vi.fn();
+    const engine = {
+      status: "paused",
+      journeys: { interaction },
+      carEffectsAudio: { prepareOnUserGesture: vi.fn() },
+      medalEffectsAudio: { prepareOnUserGesture: vi.fn() },
+      proceduralMusic: { prepareOnUserGesture: vi.fn() },
+      runtimeConfig: { resumeRelaunchDelay: 0.2 },
+      armRelaunchDelay: vi.fn(),
+      getNow: vi.fn(() => 123),
+      modal: { closeModal: vi.fn() },
+      updateDailyChallengeHud: vi.fn(),
+      requestRender: vi.fn(),
+    };
+
+    RealTimeRacer.prototype.resumeActiveRun.call(engine);
+
+    expect(engine.status).toBe("playing");
+    expect(interaction).toHaveBeenCalledWith("resume");
+  });
+
+  it("reports normalized checkpoint progress through Journeys", () => {
+    const progressCheckpoint = vi.fn();
+    const showCheckpointFlash = vi.fn();
+
+    RealTimeRacer.prototype.handleCheckpointPassed.call({
+      journeys: { progressCheckpoint },
+      currentTrack: { checkpoints: [{}, {}, {}] },
+      currentTrackKey: "circuit",
+      activeDailyChallenge: null,
+      sessionBestCheckpointTimesByTrackKey: Object.create(null),
+      hud: { showCheckpointFlash },
+    }, { index: 1, splitTimeSec: 4.2 });
+
+    expect(progressCheckpoint).toHaveBeenCalledWith(1, 3);
+    expect(showCheckpointFlash).toHaveBeenCalled();
+  });
+
+  it("ends rejected finishes as incomplete Journeys", () => {
+    const endAttempt = vi.fn();
+    const showModal = vi.fn();
+    const engine = {
+      status: "playing",
+      journeys: { endAttempt },
+      activeDailyChallenge: null,
+      bestLapTime: null,
+      currentTime: 12.3,
+      hud: {
+        setPauseVisible: vi.fn(),
+        setHudPersonalBestsOpenAllowed: vi.fn(),
+      },
+      modal: { showModal, modalMsg: null },
+      restartDailyChallenge: vi.fn(),
+      reset: vi.fn(),
+      openDailyChallengePlaylist: vi.fn(),
+    };
+
+    RealTimeRacer.prototype.handleInvalidDailyChallengeWin.call(engine, "invalid");
+
+    expect(engine.status).toBe("ready");
+    expect(endAttempt).toHaveBeenCalledWith({ complete: false });
+    expect(showModal).toHaveBeenCalled();
   });
 
   it("keeps leaderboard-open enabled for completed daily runs", () => {
     const showModal = vi.fn();
+    const endAttempt = vi.fn();
 
     RealTimeRacer.prototype.handleDailyChallengeWin.call(
       {
@@ -246,6 +315,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
           objectiveType: "multi_lap_total",
         },
         status: "playing",
+        journeys: { endAttempt },
         currentRunPolicy: { bestResultComparator: "time" },
         dailyChallengeBestResult: null,
         bestLapTime: null,
@@ -290,6 +360,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       }),
     );
     expect(showModal.mock.calls[0][3]).not.toHaveProperty("playlistAction");
+    expect(endAttempt).toHaveBeenCalledWith({ complete: true });
   });
 
   it("passes the pre-lap track medal into the win modal after lap storage updates", () => {
@@ -390,6 +461,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
   it("retries a completed daily run without falling back to the regular reset path", () => {
     const reset = vi.fn();
+    const endAttempt = vi.fn();
+    const startAttempt = vi.fn();
 
     RealTimeRacer.prototype.restartDailyChallenge.call({
       activeDailyChallenge: {
@@ -403,10 +476,13 @@ describe("RealTimeRacer daily challenge modal payload", () => {
           grip: 2.5,
         },
       },
+      journeys: { endAttempt, startAttempt },
       reset,
     });
 
     expect(reset).toHaveBeenCalledWith(true, { preserveDailyChallenge: true });
+    expect(endAttempt).toHaveBeenCalledWith({ complete: false });
+    expect(startAttempt).toHaveBeenCalledTimes(1);
   });
 
   it("clears daily challenge race context when leaving a challenge run", () => {
@@ -497,6 +573,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       }),
       loadTrack: vi.fn(),
       applyDailyChallenge: vi.fn(),
+      journeys: { startAttempt: vi.fn() },
       startSequence: vi.fn(function startSequence() {
         if (this.status === "ready") {
           this.status = "starting";
@@ -512,6 +589,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();
+    expect(engine.journeys.startAttempt).toHaveBeenCalledTimes(1);
     expect(engine.status).toBe("starting");
   });
 

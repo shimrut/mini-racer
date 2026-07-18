@@ -1,4 +1,5 @@
 import express from 'express';
+import { createTelemetryRouter } from '@devvit/analytics/server/reddit';
 import { isDailyGpChallengePlayable } from './daily-gp-model.js';
 import {
     getServerDailyGpChallenge,
@@ -109,6 +110,7 @@ export function createServerApp({
 } = {}) {
     const app = express();
     app.use(express.json({ limit: '256kb' }));
+    app.use(createTelemetryRouter());
     registerRoutes(app);
     return app;
 }

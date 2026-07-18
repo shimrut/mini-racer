@@ -90,7 +90,6 @@ const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY = 'dailygp:maintenance:challenge-history:v1:cursor';
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_BATCH_SIZE = 50;
-const RETIRED_MOD_ANALYTICS_POSTS_KEY = 'dailygp:mod-analytics:posts';
 const DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 5_000;
@@ -180,10 +179,6 @@ async function readStoredDailyGpChallenge(challengeId: string): Promise<DailyGpC
 
 async function maintainChallengeHistory(now = new Date()): Promise<void> {
     try {
-        // The moderator analytics surface has been retired. Its registry did
-        // not have a TTL, so remove it through this bounded daily maintenance
-        // path; historical analytics counters already expire independently.
-        await redis.del(RETIRED_MOD_ANALYTICS_POSTS_KEY);
         const storedCursor = Number(await redis.get(DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY));
         const cursor = Number.isFinite(storedCursor) && storedCursor >= 0 ? storedCursor : 0;
         const page = await redis.hScan(

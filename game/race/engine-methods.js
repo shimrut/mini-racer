@@ -256,6 +256,11 @@ export const raceEngineMethods = {
   handleCheckpointPassed({ index, splitTimeSec }) {
     if (!Number.isFinite(splitTimeSec) || index < 0) return;
 
+    void this.journeys?.progressCheckpoint?.(
+      index,
+      this.currentTrack?.checkpoints?.length || 0,
+    );
+
     const trackKey =
       typeof this.activeDailyChallenge?.trackKey === "string"
         ? this.activeDailyChallenge.trackKey
@@ -388,6 +393,7 @@ export const raceEngineMethods = {
 
     this.clearSteeringInput();
     this.status = "paused";
+    void this.journeys?.interaction?.("pause");
 
     const rawBestTime = this.bestLapTime;
     const bestTime = Number.isFinite(rawBestTime) && rawBestTime > 0
@@ -440,6 +446,7 @@ export const raceEngineMethods = {
     this.medalEffectsAudio?.prepareOnUserGesture?.();
     this.proceduralMusic?.prepareOnUserGesture?.();
     this.status = "playing";
+    void this.journeys?.interaction?.("resume");
     this.armRelaunchDelay(this.runtimeConfig.resumeRelaunchDelay);
     this.accumulator = 0;
     this.lastTime = this.getNow();
@@ -495,6 +502,9 @@ export const raceEngineMethods = {
       showStartOverlay = !autoStart,
     } = {},
   ) {
+    if (!autoStart) {
+      void this.journeys?.endAttempt?.({ complete: false });
+    }
     this.clearTimers();
     if (this.pendingStartFrame !== null) {
       cancelAnimationFrame(this.pendingStartFrame);

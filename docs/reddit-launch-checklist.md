@@ -60,6 +60,14 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Playtest/app-account fallback attribution is rejected and cleaned up instead of appearing as a successful player share.
 - [ ] Re-sharing the same result returns the existing comment; deleting it allows a new share.
 
+### Devvit Journeys playtest
+
+- [ ] `journeys` permission and the official `/api/telemetry` route are present, with no custom analytics route, store, dashboard, or Redis record.
+- [ ] `App.Ready` fires once after the expanded lobby becomes interactive; preview and podium entrypoints do not fire it.
+- [ ] Explicit Start/Retry/Improve begins an attempt, checkpoint progress never moves backward, pause/resume use fixed actions, and valid/incomplete endings match the race lifecycle.
+- [ ] Journey payloads contain no player identity, guest token, challenge or track identifier, replay data, device details, or lap score.
+- [ ] `npx devvit playtest` on `mini_racer_dev` returns a Journey receipt without affecting race behavior. `JOURNEY_RECEIPT_DENIED_NOT_ALLOWLISTED` proves routing only; `JOURNEY_RECEIPT_VALID` is required to claim ingestion.
+
 ### Cross-account testing
 
 - [ ] Developer account tested

@@ -19,6 +19,7 @@
     "mutation:dry-run": "stryker run --dryRunOnly"
   },
   "dependencies": {
+    "@devvit/analytics": "0.13.8",
     "@devvit/redis": "0.13.8",
     "@devvit/web": "0.13.8",
     "express": "^5.1.0"

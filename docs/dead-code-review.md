@@ -104,21 +104,6 @@ Validation after removal:
 - `npm test`: 57 files and 390 tests passed.
 - `npm run build`: passed.
 
-## Disabled analytics plumbing cleanup: July 15, 2026
-
-> Superseded on July 18, 2026: custom gameplay and moderator analytics were removed completely, including collection, routes, storage code, dashboard assets, tooling, and dependencies. The details below describe the earlier intermediate cleanup only.
-
-The analytics server accepts six lifecycle events: `game_opened`, `game_closed`, `game_playtime_chunk`, `race_started`, `race_ended`, and `race_restarted`. The browser still carried empty methods and call-side state for retired player-type, support, menu, mode-selection, map-selection, and pageview events.
-
-The cleanup removed those no-op methods, the unused session flag store, deferred pageview/map-selection state, race counters that only fed the disabled map event, and the track-loading options that existed only to manage that state. Active lifecycle and race event payloads were left unchanged.
-
-Validation after removal:
-
-- Focused Daily GP and analytics tests: 2 files and 25 tests passed.
-- `npm test`: 57 files and 389 tests passed.
-- `npm run build`: passed.
-- Targeted reference scans found none of the retired methods or state names in source, tests, or the built client.
-
 ## Producer-aware UI cleanup: July 15, 2026
 
 The selector scan could see producers for the `.daily-leaderboard-standing*` and `.daily-playlist-rank-btn*` classes, but those producers belonged to an unreachable intermediate standings track-picker. Current standings entry points open the selected-day leaderboard directly and switch days through the date rail or touch swipes; the separate Tracks playlist remains active.

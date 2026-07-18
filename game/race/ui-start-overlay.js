@@ -20,6 +20,7 @@ export class StartOverlay {
         this.dailyChallengeUi = dailyChallengeUi;
         this._startOverlayHasAnyData = false;
         this._startOverlayIsReturningPlayer = false;
+        this._isReady = false;
         this._menuKeyboardState = createMenuKeyboardState();
         this._menuKeydownHandler = null;
         this._menuPointerMoveHandler = null;
@@ -202,7 +203,7 @@ export class StartOverlay {
     }
 
     handleStartAction(onStart) {
-        if (this.startBtn?.disabled) {
+        if (!this._isReady || this.startBtn?.disabled) {
             return;
         }
 
@@ -218,11 +219,12 @@ export class StartOverlay {
     }
 
     setReady(isReady) {
+        this._isReady = Boolean(isReady);
         const overlay = this.startOverlay;
         if (overlay) {
-            overlay.classList.toggle('is-ready', Boolean(isReady));
+            overlay.classList.toggle('is-ready', this._isReady);
         }
-        if (isReady) {
+        if (this._isReady) {
             requestAnimationFrame(() => this.focusPrimaryAction());
         }
     }

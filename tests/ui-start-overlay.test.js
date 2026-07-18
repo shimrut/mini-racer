@@ -126,4 +126,24 @@ describe('ui start overlay helpers', () => {
         global.document = originalDocument;
     });
 
+    it('blocks programmatic start clicks until the loading screen has dismissed', () => {
+        const originalDocument = global.document;
+        global.document = { getElementById: () => null };
+        const start = vi.fn();
+        const overlay = new StartOverlay();
+        Object.defineProperty(overlay, 'startBtn', {
+            value: { disabled: false },
+        });
+        overlay.focusPrimaryAction = vi.fn();
+
+        overlay.handleStartAction(start);
+        expect(start).not.toHaveBeenCalled();
+
+        overlay.setReady(true);
+        overlay.handleStartAction(start);
+        expect(start).toHaveBeenCalledTimes(1);
+
+        global.document = originalDocument;
+    });
+
 });
