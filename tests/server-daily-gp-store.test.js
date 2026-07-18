@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACK_CATALOG, TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-backfill.ts';
+import { getDailyGpCompetitionTtlSeconds } from '../src/server/daily-gp-model.ts';
 
 const mockRedis = {
     get: vi.fn(),
@@ -14,6 +15,8 @@ const mockRedis = {
     hSet: vi.fn(),
     hSetNX: vi.fn(),
     hGetAll: vi.fn(),
+    hScan: vi.fn(),
+    hDel: vi.fn(),
     expire: vi.fn(),
     expireTime: vi.fn(),
     zAdd: vi.fn(),
@@ -95,6 +98,8 @@ describe('server daily gp store submissions', () => {
         mockRedis.hSet.mockResolvedValue(1);
         mockRedis.hSetNX.mockResolvedValue(1);
         mockRedis.hGetAll.mockResolvedValue({});
+        mockRedis.hScan.mockResolvedValue({ cursor: 0, fieldValues: [] });
+        mockRedis.hDel.mockResolvedValue(0);
         mockRedis.expire.mockResolvedValue(true);
         mockRedis.expireTime.mockResolvedValue(Math.floor(Date.now() / 1000) + 60);
         mockRedis.zAdd.mockResolvedValue(1);
@@ -181,13 +186,22 @@ describe('server daily gp store submissions', () => {
         expect(leaderboardEntry.bestTimeMs).toBe(12345);
         expect(leaderboardEntry.checkpointTimesSec).toEqual([4.2, 9.8]);
         expect(leaderboardEntry.validationMethod).toBe('strict-replay');
+        const expectedTtl = getDailyGpCompetitionTtlSeconds(challenge);
+        expect(mockRedis.expire).toHaveBeenCalledWith(
+            `dailygp:leaderboard:${challenge.id}`,
+            expect.closeTo(expectedTtl, 0),
+        );
+        expect(mockRedis.expire).toHaveBeenCalledWith(
+            `dailygp:leaderboard:${challenge.id}:entries`,
+            expect.closeTo(expectedTtl, 0),
+        );
     });
 
-    it('accepts a committed daily result when lifetime PB persistence is unavailable', async () => {
+    it('accepts a committed daily result when challenge PB persistence is unavailable', async () => {
         const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
         mockRedis.hSet.mockImplementation(async (key) => {
-            if (String(key).startsWith('dailygp:track-pbs:')) {
+            if (String(key).startsWith('dailygp:challenge-pbs:')) {
                 throw new Error('PB storage unavailable');
             }
             return 1;
@@ -261,10 +275,10 @@ describe('server daily gp store submissions', () => {
         });
 
         await vi.waitFor(() => {
-            expect(mockRedis.hSet).toHaveBeenCalledWith(
-                expect.stringMatching(/^dailygp:track-pbs:/),
-                expect.objectContaining({ [challenge.trackKey]: expect.any(String) }),
-            );
+            expect(mockRedis.hSet.mock.calls.some(([key, values]) => (
+                key === `dailygp:challenge-pbs:${challenge.id}`
+                && Object.keys(values || {}).length === 1
+            ))).toBe(true);
             expect(finishDailyWrite).toBeTypeOf('function');
         });
         finishDailyWrite(1);
@@ -412,6 +426,61 @@ describe('server daily gp store submissions', () => {
                 'daily-gp-2026-06-10': expect.stringContaining('"trackKey":"caspianBoulevard"'),
             }),
         );
+    });
+
+    it('prunes challenge history in bounded batches and corrects known leaderboard deadlines', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-02-15T12:00:00.000Z'));
+        const oldChallenge = {
+            id: 'daily-gp-2030-01-01',
+            challengeDate: '2030-01-01',
+            trackKey: 'circuit',
+            startsAt: '2030-01-01T00:00:00.000Z',
+            endsAt: '2030-01-02T00:00:00.000Z',
+            availableUntil: '2030-01-08T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const currentChallenge = {
+            ...oldChallenge,
+            id: 'daily-gp-2030-02-15',
+            challengeDate: '2030-02-15',
+            startsAt: '2030-02-15T00:00:00.000Z',
+            endsAt: '2030-02-16T00:00:00.000Z',
+            availableUntil: '2030-02-22T00:00:00.000Z',
+        };
+        mockRedis.hScan.mockResolvedValue({
+            cursor: 17,
+            fieldValues: [
+                { field: oldChallenge.id, value: JSON.stringify(oldChallenge) },
+                { field: currentChallenge.id, value: JSON.stringify(currentChallenge) },
+            ],
+        });
+
+        try {
+            const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            await persistServerDailyGpChallenge(currentChallenge);
+
+            expect(mockRedis.del).toHaveBeenCalledWith('dailygp:mod-analytics:posts');
+            expect(mockRedis.hScan).toHaveBeenCalledWith('dailygp:challenges', 0, undefined, 50);
+            expect(mockRedis.hDel).toHaveBeenCalledWith('dailygp:challenges', [oldChallenge.id]);
+            expect(mockRedis.expire).toHaveBeenCalledWith(
+                `dailygp:leaderboard:${oldChallenge.id}`,
+                0,
+            );
+            expect(mockRedis.expire).toHaveBeenCalledWith(
+                `dailygp:leaderboard:${currentChallenge.id}`,
+                getDailyGpCompetitionTtlSeconds(currentChallenge),
+            );
+            expect(mockRedis.set).toHaveBeenCalledWith(
+                'dailygp:maintenance:challenge-history:v1:cursor',
+                '17',
+            );
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('publishes the challenge whose seven-day window just expired at the UTC boundary', async () => {
@@ -1022,7 +1091,7 @@ describe('server daily gp store submissions', () => {
         expect(bootstrap.playerPreferences).toEqual(playerPreferences);
     });
 
-    it('gives each player profile its own 180-day expiration', async () => {
+    it('gives signed-in profiles an independent 30-day inactivity expiration', async () => {
         const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
         const beforeWrite = Date.now();
 
@@ -1034,9 +1103,25 @@ describe('server daily gp store submissions', () => {
         expect(first.key).not.toBe(second.key);
         expect(first.options.expiration).toBeInstanceOf(Date);
         expect(second.options.expiration).toBeInstanceOf(Date);
-        const minimumExpectedExpiry = beforeWrite + (179 * 24 * 60 * 60 * 1000);
+        const minimumExpectedExpiry = beforeWrite + (29 * 24 * 60 * 60 * 1000);
         expect(first.options.expiration.getTime()).toBeGreaterThan(minimumExpectedExpiry);
         expect(second.options.expiration.getTime()).toBeGreaterThan(minimumExpectedExpiry);
         expect(mockRedis.expire).not.toHaveBeenCalledWith('dailygp:player-profiles', expect.anything());
+    });
+
+    it('gives guest profiles a 7-day inactivity expiration', async () => {
+        const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+        const beforeWrite = Date.now();
+
+        await getServerPlayerBootstrap({ playerId: 'new-guest' });
+
+        const guest = findWrittenPlayerProfile('guest:new-guest');
+        expect(guest.options.expiration).toBeInstanceOf(Date);
+        expect(guest.options.expiration.getTime()).toBeGreaterThan(
+            beforeWrite + (6 * 24 * 60 * 60 * 1000),
+        );
+        expect(guest.options.expiration.getTime()).toBeLessThanOrEqual(
+            beforeWrite + (7 * 24 * 60 * 60 * 1000) + 1000,
+        );
     });
 });

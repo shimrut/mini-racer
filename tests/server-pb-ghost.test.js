@@ -56,7 +56,7 @@ import {
     getPlayerTrackPbRecord,
     upsertPlayerTrackPersonalBest,
 } from '../src/server/pb-ghost-store.ts';
-import { DAILY_GP_PLAYER_PROFILE_TTL_SECONDS } from '../src/server/daily-gp-model.ts';
+import { getDailyGpCompetitionTtlSeconds } from '../src/server/daily-gp-model.ts';
 
 const TRACK = {
     outer: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }],
@@ -65,6 +65,19 @@ const TRACK = {
     startPos: { x: 0, y: -1 },
     startAngle: 0,
     checkpoints: [],
+};
+
+const CHALLENGE = {
+    id: 'daily-gp-2030-01-01',
+    challengeDate: '2030-01-01',
+    trackKey: 'circuit',
+    startsAt: '2030-01-01T00:00:00.000Z',
+    endsAt: '2030-01-02T00:00:00.000Z',
+    availableUntil: '2030-01-08T00:00:00.000Z',
+    status: 'active',
+    objectiveType: 'single_lap_fastest',
+    objectiveParams: {},
+    skin: 'default',
 };
 
 const GHOST = {
@@ -220,8 +233,7 @@ describe('PB ghost trace and storage', () => {
     it('keeps only the strictly faster per-track record', async () => {
         const first = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:racer',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -229,8 +241,7 @@ describe('PB ghost trace and storage', () => {
         });
         const slower = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:racer',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 13_000,
             checkpointTimesSec: [5, 9],
@@ -241,14 +252,16 @@ describe('PB ghost trace and storage', () => {
         expect(slower.improved).toBe(false);
         expect(slower.record.bestTimeMs).toBe(12_000);
         expect(slower.record.ghost).toEqual(GHOST);
-        expect(redis.expire).not.toHaveBeenCalled();
+        expect(redis.expire).toHaveBeenLastCalledWith(
+            `dailygp:challenge-pbs:${CHALLENGE.id}`,
+            getDailyGpCompetitionTtlSeconds(CHALLENGE),
+        );
     });
 
     it('selects a retained strict daily best and the current verified ghost under one lock', async () => {
         const retained = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:retained',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 13_000,
             checkpointTimesSec: [5, 9],
@@ -272,8 +285,7 @@ describe('PB ghost trace and storage', () => {
         redis.hashes.clear();
         const tied = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:tied',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4.1, 8.1],
@@ -296,8 +308,7 @@ describe('PB ghost trace and storage', () => {
     it('enriches an equal time-only record with the current verified ghost', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:enriched',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -306,8 +317,7 @@ describe('PB ghost trace and storage', () => {
 
         const result = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:enriched',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4.1, 8.1],
@@ -332,8 +342,7 @@ describe('PB ghost trace and storage', () => {
 
         await expect(upsertPlayerTrackPersonalBest({
             playerId: 'reddit:cleanup',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -345,11 +354,10 @@ describe('PB ghost trace and storage', () => {
         expect(redis.hSet).toHaveBeenCalled();
     });
 
-    it('applies rolling retention only to guest collections', async () => {
+    it('applies the fixed competition deadline to every challenge PB collection', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'guest:racer',
-            isGuest: true,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -357,16 +365,76 @@ describe('PB ghost trace and storage', () => {
         });
 
         expect(redis.expire).toHaveBeenCalledWith(
-            expect.stringMatching(/^dailygp:track-pbs:/),
-            DAILY_GP_PLAYER_PROFILE_TTL_SECONDS,
+            `dailygp:challenge-pbs:${CHALLENGE.id}`,
+            getDailyGpCompetitionTtlSeconds(CHALLENGE),
         );
+    });
+
+    it('isolates recurring tracks by challenge and never extends either fixed deadline', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-01-02T00:00:00.000Z'));
+        const laterChallenge = {
+            ...CHALLENGE,
+            id: 'daily-gp-2030-01-08',
+            challengeDate: '2030-01-08',
+            startsAt: '2030-01-08T00:00:00.000Z',
+            endsAt: '2030-01-09T00:00:00.000Z',
+            availableUntil: '2030-01-15T00:00:00.000Z',
+        };
+
+        try {
+            await upsertPlayerTrackPersonalBest({
+                playerId: 'reddit:recurring',
+                challenge: CHALLENGE,
+                track: TRACK,
+                bestTimeMs: 12_000,
+                checkpointTimesSec: null,
+                ghost: GHOST,
+            });
+            await upsertPlayerTrackPersonalBest({
+                playerId: 'reddit:recurring',
+                challenge: laterChallenge,
+                track: TRACK,
+                bestTimeMs: 13_000,
+                checkpointTimesSec: null,
+                ghost: null,
+            });
+
+            expect([...redis.hashes.keys()]).toEqual(expect.arrayContaining([
+                `dailygp:challenge-pbs:${CHALLENGE.id}`,
+                `dailygp:challenge-pbs:${laterChallenge.id}`,
+            ]));
+            expect(redis.expirations.get(`dailygp:challenge-pbs:${CHALLENGE.id}`))
+                .toBe(getDailyGpCompetitionTtlSeconds(CHALLENGE));
+            expect(redis.expirations.get(`dailygp:challenge-pbs:${laterChallenge.id}`))
+                .toBe(getDailyGpCompetitionTtlSeconds(laterChallenge));
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('rejects PB writes after the challenge retention deadline', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-01-08T06:00:00.001Z'));
+        try {
+            await expect(upsertPlayerTrackPersonalBest({
+                playerId: 'reddit:late',
+                challenge: CHALLENGE,
+                track: TRACK,
+                bestTimeMs: 12_000,
+                checkpointTimesSec: null,
+                ghost: GHOST,
+            })).rejects.toThrow('retention deadline has passed');
+            expect(redis.hSet).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('deletes a stored PB when competitive track geometry changes', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:racer',
-            isGuest: false,
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -380,12 +448,12 @@ describe('PB ghost trace and storage', () => {
         expect(createTrackFingerprint(changedTrack)).not.toBe(createTrackFingerprint(TRACK));
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:racer',
-            trackKey: 'circuit',
+            challenge: CHALLENGE,
             track: changedTrack,
         })).toBeNull();
         expect(redis.hDel).toHaveBeenCalledWith(
-            expect.stringMatching(/^dailygp:track-pbs:/),
-            ['circuit'],
+            `dailygp:challenge-pbs:${CHALLENGE.id}`,
+            [expect.any(String)],
         );
     });
 });

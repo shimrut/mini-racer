@@ -409,6 +409,7 @@ describe("scoreboard engine verification retries", () => {
       challengeDate: "2026-04-14",
       previousBestTime: 12,
       previousCompletedLaps: 1,
+      expiresAt: "2099-01-01T00:00:00.000Z",
     });
     const entry = getDailyChallengeVerificationEntry(challengeId);
     const engine = {

@@ -8,6 +8,7 @@ import {
   markDailyChallengeVerificationPending,
   markDailyChallengeVerificationError,
   createVerificationSnapshot,
+  isDailyChallengeVerificationExpired,
 } from "./verification-queue.js";
 import {
   rollbackDailyChallengeBestIfMatchesFailedSubmission,
@@ -114,6 +115,12 @@ export const scoreboardEngineMethods = {
       !entry?.challengeId ||
       !Number.isFinite(entry?.bestTime)
     ) {
+      return;
+    }
+
+    if (isDailyChallengeVerificationExpired(entry)) {
+      clearDailyChallengeVerification(entry.challengeId);
+      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       return;
     }
 
@@ -442,6 +449,12 @@ export const scoreboardEngineMethods = {
       previousCheckpointTimesSec: Array.isArray(previousBest?.checkpointTimesSec)
         ? previousBest.checkpointTimesSec
         : null,
+      expiresAt: (() => {
+        const availableUntilMs = Date.parse(challenge?.availableUntil);
+        return Number.isFinite(availableUntilMs)
+          ? new Date(availableUntilMs + (6 * 60 * 60 * 1000)).toISOString()
+          : null;
+      })(),
     });
     if (enqueued && isTrackPbCandidate) {
       this.markTrackPersonalBestGhostPending?.(challenge);

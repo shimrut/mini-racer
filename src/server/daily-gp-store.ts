@@ -18,15 +18,17 @@ import {
     createDailyChallengeId,
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
+    DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS,
     DAILY_GP_DEFAULT_LIMIT,
+    DAILY_GP_GUEST_PROFILE_TTL_SECONDS,
     DAILY_GP_NEARBY_RADIUS,
     DAILY_GP_PLAYLIST_DAYS,
-    DAILY_GP_PLAYER_PROFILE_TTL_SECONDS,
-    DAILY_GP_REDIS_TTL_SECONDS,
+    DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS,
     encodeDailyGpLeaderboardScore,
     formatRankLabel,
     formatUtcChallengeDate,
     getUtcDayIndex,
+    getDailyGpCompetitionTtlSeconds,
     isDailyGpChallengePlayable,
     type DailyGpChallenge,
     type DailyGpLeaderboardEntry,
@@ -86,6 +88,9 @@ type PlayerBootstrapPayload = {
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';
+const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY = 'dailygp:maintenance:challenge-history:v1:cursor';
+const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_BATCH_SIZE = 50;
+const RETIRED_MOD_ANALYTICS_POSTS_KEY = 'dailygp:mod-analytics:posts';
 const DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 5_000;
@@ -173,12 +178,57 @@ async function readStoredDailyGpChallenge(challengeId: string): Promise<DailyGpC
     return parseStoredChallenge(raw);
 }
 
+async function maintainChallengeHistory(now = new Date()): Promise<void> {
+    try {
+        // The moderator analytics surface has been retired. Its registry did
+        // not have a TTL, so remove it through this bounded daily maintenance
+        // path; historical analytics counters already expire independently.
+        await redis.del(RETIRED_MOD_ANALYTICS_POSTS_KEY);
+        const storedCursor = Number(await redis.get(DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY));
+        const cursor = Number.isFinite(storedCursor) && storedCursor >= 0 ? storedCursor : 0;
+        const page = await redis.hScan(
+            DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
+            cursor,
+            undefined,
+            DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_BATCH_SIZE,
+        );
+        const cutoffMs = now.getTime() - (DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS * 1000);
+        const parsedEntries = page.fieldValues.map(({ field, value }) => ({
+            field,
+            challenge: parseStoredChallenge(value),
+        }));
+        const expiredFields = parsedEntries.flatMap(({ field, challenge }) => {
+            const startsAtMs = challenge ? Date.parse(challenge.startsAt) : Number.NaN;
+            return Number.isFinite(startsAtMs) && startsAtMs <= cutoffMs ? [field] : [];
+        });
+        await Promise.all(parsedEntries.flatMap(({ challenge }) => {
+            if (!challenge) return [];
+            const ttlSeconds = getDailyGpCompetitionTtlSeconds(challenge, now);
+            return [
+                redis.expire(createRedisChallengeLeaderboardKey(challenge.id), ttlSeconds),
+                redis.expire(createRedisChallengeEntryHashKey(challenge.id), ttlSeconds),
+            ];
+        }));
+        if (expiredFields.length) {
+            await redis.hDel(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, expiredFields);
+        }
+        await redis.set(
+            DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY,
+            String(page.cursor),
+        );
+    } catch (error) {
+        // Retention cleanup is best-effort and must not prevent challenge publication.
+        console.error('Daily GP challenge history maintenance failed:', error);
+    }
+}
+
 async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise<DailyGpChallenge> {
     await redis.hSet(
         DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
         { [challenge.id]: JSON.stringify(challenge) },
     );
-    await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_REDIS_TTL_SECONDS);
+    await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+    await maintainChallengeHistory();
     return challenge;
 }
 
@@ -293,7 +343,8 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
         JSON.stringify(challenge),
     );
     if (didSet) {
-        await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_REDIS_TTL_SECONDS);
+        await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+        await maintainChallengeHistory();
         return challenge;
     }
 
@@ -461,15 +512,18 @@ function createRedisPlayerProfileKey(playerId: string): string {
     return `dailygp:player-profile:${playerKey}`;
 }
 
-function createPlayerProfileExpirationDate(): Date {
-    return new Date(Date.now() + DAILY_GP_PLAYER_PROFILE_TTL_SECONDS * 1000);
+function createPlayerProfileExpirationDate(playerId: string): Date {
+    const ttlSeconds = playerId.startsWith('guest:')
+        ? DAILY_GP_GUEST_PROFILE_TTL_SECONDS
+        : DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS;
+    return new Date(Date.now() + ttlSeconds * 1000);
 }
 
 async function writePlayerProfile(profile: DailyGpPlayerProfile): Promise<void> {
     await redis.set(
         createRedisPlayerProfileKey(profile.playerId),
         JSON.stringify(profile),
-        { expiration: createPlayerProfileExpirationDate() },
+        { expiration: createPlayerProfileExpirationDate(profile.playerId) },
     );
 }
 
@@ -616,7 +670,7 @@ async function claimNewGuestPlayerProfile({
     const claimed = await redis.set(
         createRedisPlayerProfileKey(canonicalPlayerId),
         JSON.stringify(profile),
-        { nx: true, expiration: createPlayerProfileExpirationDate() },
+        { nx: true, expiration: createPlayerProfileExpirationDate(canonicalPlayerId) },
     );
     if (!claimed) {
         return null;
@@ -798,13 +852,6 @@ async function readEntryByPlayerId(
     return parseStoredEntry(rawEntry, trackKey);
 }
 
-async function ensureLeaderboardTtl(challengeId: string): Promise<void> {
-    await Promise.all([
-        redis.expire(createRedisChallengeLeaderboardKey(challengeId), DAILY_GP_REDIS_TTL_SECONDS),
-        redis.expire(createRedisChallengeEntryHashKey(challengeId), DAILY_GP_REDIS_TTL_SECONDS),
-    ]);
-}
-
 async function checkSubmissionRateLimit(
     challengeId: string,
     playerId: string,
@@ -960,11 +1007,9 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
 
 async function readOrSeedTrackPersonalBest({
     playerId,
-    isGuest,
     challenge,
 }: {
     playerId: string;
-    isGuest: boolean;
     challenge: DailyGpChallenge;
 }) {
     const track = TRACKS[challenge.trackKey];
@@ -972,7 +1017,7 @@ async function readOrSeedTrackPersonalBest({
 
     const existing = await getPlayerTrackPbRecord({
         playerId,
-        trackKey: challenge.trackKey,
+        challenge,
         track,
     });
     if (existing) return existing;
@@ -988,8 +1033,7 @@ async function readOrSeedTrackPersonalBest({
 
     const seeded = await seedPlayerTrackPersonalBest({
         playerId,
-        isGuest,
-        trackKey: challenge.trackKey,
+        challenge,
         track,
         bestTimeMs: retainedEntry.bestTimeMs,
         checkpointTimesSec: retainedEntry.checkpointTimesSec,
@@ -1048,7 +1092,6 @@ export async function getServerPlayerTrackPbSummaries({
         }
         const record = await readOrSeedTrackPersonalBest({
             playerId: identity.canonicalPlayerId,
-            isGuest: Boolean(identity.guestPlayerId),
             challenge,
         });
         trackPbs[challengeId] = record
@@ -1115,7 +1158,6 @@ export async function getServerPlayerPbGhost({
 
     const record = await readOrSeedTrackPersonalBest({
         playerId: identity.canonicalPlayerId,
-        isGuest: Boolean(identity.guestPlayerId),
         challenge,
     });
     return {
@@ -1618,8 +1660,9 @@ export async function submitServerDailyGpRun({
                     score: encodeDailyGpLeaderboardScore(nextBestTimeMs),
                 },
             );
-            await tx.expire(leaderboardKey, DAILY_GP_REDIS_TTL_SECONDS);
-            await tx.expire(entryHashKey, DAILY_GP_REDIS_TTL_SECONDS);
+            const competitionTtlSeconds = getDailyGpCompetitionTtlSeconds(challenge);
+            await tx.expire(leaderboardKey, competitionTtlSeconds);
+            await tx.expire(entryHashKey, competitionTtlSeconds);
             const transactionResults = await tx.exec();
             return {
                 interrupted: !Array.isArray(transactionResults) || transactionResults.length === 0,
@@ -1638,8 +1681,7 @@ export async function submitServerDailyGpRun({
             dailyWrite(),
             upsertPlayerTrackPersonalBest({
                 playerId: normalizedPlayerId,
-                isGuest: Boolean(identity.guestPlayerId),
-                trackKey: challenge.trackKey,
+                challenge,
                 track,
                 bestTimeMs: nextBestTimeMs,
                 checkpointTimesSec: normalizedCheckpointTimesSec,
@@ -1672,7 +1714,7 @@ export async function submitServerDailyGpRun({
     const storedDailyEntry = dailyPersistence!.value.entry;
     const trackPbAvailable = trackPbPersistence!.status === 'fulfilled';
     if (!trackPbAvailable) {
-        console.error('Lifetime PB persistence failed after a valid Daily GP run:', trackPbPersistence!.reason);
+        console.error('Challenge PB persistence failed after a valid Daily GP run:', trackPbPersistence!.reason);
     }
     const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
     return {

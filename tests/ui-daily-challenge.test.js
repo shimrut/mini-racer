@@ -66,6 +66,7 @@ describe('ui daily challenge helpers', () => {
                     submissionStage: 'retrying',
                     statusText: 'Retrying...',
                     nextAttemptAt: Date.now(),
+                    expiresAt: '2099-01-01T00:00:00.000Z',
                     updatedAt: '2026-04-17T15:00:00.000Z'
                 }
             }
@@ -137,6 +138,7 @@ describe('ui daily challenge helpers', () => {
                     submissionStage: 'error',
                     statusText: 'Daily challenge is no longer playable.',
                     nextAttemptAt: null,
+                    expiresAt: '2099-01-01T00:00:00.000Z',
                     updatedAt: '2026-04-17T16:00:00.000Z'
                 }
             }

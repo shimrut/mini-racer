@@ -136,6 +136,17 @@ class RedisTestDouble {
     return Object.fromEntries(this.hashes.get(key)?.entries() || []);
   }
 
+  async hScan(key, cursor, _pattern, count = 10) {
+    this._isExpired(key);
+    const entries = [...(this.hashes.get(key)?.entries() || [])];
+    const start = Math.max(0, cursor);
+    const end = Math.min(entries.length, start + count);
+    return {
+      cursor: end < entries.length ? end : 0,
+      fieldValues: entries.slice(start, end).map(([field, value]) => ({ field, value })),
+    };
+  }
+
   async zAdd(key, ...members) {
     this._isExpired(key);
     const set = this.sortedSets.get(key) || new Map();

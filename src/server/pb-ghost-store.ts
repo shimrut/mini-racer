@@ -1,6 +1,9 @@
 import { redisCompressed as redis } from '@devvit/redis';
 import { createHash, randomUUID } from 'node:crypto';
-import { DAILY_GP_PLAYER_PROFILE_TTL_SECONDS } from './daily-gp-model.js';
+import {
+    getDailyGpCompetitionTtlSeconds,
+    type DailyGpChallenge,
+} from './daily-gp-model.js';
 import {
     createTrackFingerprint,
     isValidPbGhostTrace,
@@ -22,14 +25,17 @@ export type PlayerTrackPbRecord = {
 
 const PB_LOCK_TTL_MS = 5_000;
 
-function playerCollectionKey(playerId: string): string {
-    const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
-    return `dailygp:track-pbs:${playerHash}`;
+function playerField(playerId: string): string {
+    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
 }
 
-function playerTrackLockKey(playerId: string, trackKey: string): string {
+function challengeCollectionKey(challengeId: string): string {
+    return `dailygp:challenge-pbs:${challengeId}`;
+}
+
+function playerChallengeLockKey(challengeId: string, playerId: string): string {
     const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
-    return `dailygp:track-pb-lock:${playerHash}:${trackKey}`;
+    return `dailygp:challenge-pb-lock:${challengeId}:${playerHash}`;
 }
 
 function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null {
@@ -69,27 +75,28 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
 
 async function readCompatibleRecord({
     playerId,
-    trackKey,
+    challenge,
     track,
 }: {
     playerId: string;
-    trackKey: string;
+    challenge: DailyGpChallenge;
     track: Record<string, any>;
 }): Promise<PlayerTrackPbRecord | null> {
-    const collectionKey = playerCollectionKey(playerId);
-    const raw = await redis.hGet(collectionKey, trackKey);
+    const collectionKey = challengeCollectionKey(challenge.id);
+    const field = playerField(playerId);
+    const raw = await redis.hGet(collectionKey, field);
     const record = parseRecord(raw);
     const fingerprint = createTrackFingerprint(track);
     if (!record) {
-        if (raw) await redis.hDel(collectionKey, [trackKey]);
+        if (raw) await redis.hDel(collectionKey, [field]);
         return null;
     }
     if (
-        record.trackKey !== trackKey
+        record.trackKey !== challenge.trackKey
         || record.trackFingerprint !== fingerprint
         || record.simulationRevision !== PB_GHOST_SIMULATION_REVISION
     ) {
-        await redis.hDel(collectionKey, [trackKey]);
+        await redis.hDel(collectionKey, [field]);
         return null;
     }
     return record;
@@ -104,7 +111,7 @@ async function releaseLock(key: string, value: string): Promise<void> {
 
 export async function getPlayerTrackPbRecord(input: {
     playerId: string;
-    trackKey: string;
+    challenge: DailyGpChallenge;
     track: Record<string, any>;
 }): Promise<PlayerTrackPbRecord | null> {
     return readCompatibleRecord(input);
@@ -112,8 +119,7 @@ export async function getPlayerTrackPbRecord(input: {
 
 export async function upsertPlayerTrackPersonalBest({
     playerId,
-    isGuest,
-    trackKey,
+    challenge,
     track,
     bestTimeMs,
     checkpointTimesSec,
@@ -122,8 +128,7 @@ export async function upsertPlayerTrackPersonalBest({
     updatedAt = new Date().toISOString(),
 }: {
     playerId: string;
-    isGuest: boolean;
-    trackKey: string;
+    challenge: DailyGpChallenge;
     track: Record<string, any>;
     bestTimeMs: number;
     checkpointTimesSec: number[] | null;
@@ -135,7 +140,13 @@ export async function upsertPlayerTrackPersonalBest({
     } | null;
     updatedAt?: string;
 }): Promise<{ record: PlayerTrackPbRecord; improved: boolean }> {
-    const lockKey = playerTrackLockKey(playerId, trackKey);
+    const trackKey = challenge.trackKey;
+    const ttlSeconds = getDailyGpCompetitionTtlSeconds(challenge);
+    if (ttlSeconds <= 0) {
+        throw new Error('Personal best retention deadline has passed.');
+    }
+
+    const lockKey = playerChallengeLockKey(challenge.id, playerId);
     const lockValue = randomUUID();
     const acquired = await redis.set(lockKey, lockValue, {
         nx: true,
@@ -146,7 +157,7 @@ export async function upsertPlayerTrackPersonalBest({
     }
 
     try {
-        const existing = await readCompatibleRecord({ playerId, trackKey, track });
+        const existing = await readCompatibleRecord({ playerId, challenge, track });
         const trackFingerprint = createTrackFingerprint(track);
         const current: PlayerTrackPbRecord = {
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
@@ -186,18 +197,16 @@ export async function upsertPlayerTrackPersonalBest({
         }
 
         const record = winner.record;
-        const collectionKey = playerCollectionKey(playerId);
-        await redis.hSet(collectionKey, { [trackKey]: JSON.stringify(record) });
-        if (isGuest) {
-            await redis.expire(collectionKey, DAILY_GP_PLAYER_PROFILE_TTL_SECONDS);
-        }
+        const collectionKey = challengeCollectionKey(challenge.id);
+        await redis.hSet(collectionKey, { [playerField(playerId)]: JSON.stringify(record) });
+        await redis.expire(collectionKey, ttlSeconds);
         return { record, improved: winner.source === 'current' };
     } finally {
         try {
             await releaseLock(lockKey, lockValue);
         } catch (error) {
             // Lock cleanup is best-effort; it must not replace a committed outcome.
-            console.error('Lifetime PB lock cleanup failed:', error);
+            console.error('Challenge PB lock cleanup failed:', error);
         }
     }
 }
@@ -207,8 +216,4 @@ export async function seedPlayerTrackPersonalBest(input: Omit<
     'ghost'
 >): Promise<{ record: PlayerTrackPbRecord; improved: boolean }> {
     return upsertPlayerTrackPersonalBest({ ...input, ghost: null });
-}
-
-export async function deleteAllPlayerTrackPersonalBests(playerId: string): Promise<void> {
-    await redis.del(playerCollectionKey(playerId));
 }

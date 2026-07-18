@@ -61,15 +61,6 @@ function normalizeTrackPersonalBest(record, trackKey = null) {
   };
 }
 
-function getMonotonicNow(engine) {
-  const value = engine?.getNow?.();
-  if (Number.isFinite(value)) return value;
-  if (typeof performance !== "undefined" && typeof performance.now === "function") {
-    return performance.now();
-  }
-  return Date.now();
-}
-
 function isValidCanonicalTrackPersonalBest(record, trackKey) {
   if (!record || typeof record !== "object") return false;
   if (record.trackKey !== trackKey) return false;
@@ -81,26 +72,6 @@ function isValidCanonicalTrackPersonalBest(record, trackKey) {
   }
   if (typeof record.updatedAt !== "string" || !record.updatedAt) return false;
   return record.ghost === null || normalizePbGhostRecord(record) !== null;
-}
-
-function getPbGhostReadinessState(engine, challengeId) {
-  return challengeId && engine.pbGhostReadinessByChallengeId?.[challengeId] || null;
-}
-
-function emitLatePbGhostReadyMeasurement(engine, state) {
-  if (!state?.goReported || state.readyReported || !Number.isFinite(state.readyAtMs)) return;
-  state.readyReported = true;
-  engine.analytics?.trackPbGhostReadiness?.({
-    sampleType: "ready_followup",
-    trackKey: state.trackKey,
-    finishToGhostReadySec: Math.max(0, state.readyAtMs - state.finishAtMs) / 1000,
-    readyBeforeGo: false,
-    goSafetyMarginSec: Number.isFinite(state.goAtMs)
-      ? (state.goAtMs - state.readyAtMs) / 1000
-      : null,
-    ghostlessAtGo: false,
-    noticeShown: false,
-  });
 }
 
 function getTrackPersonalBestForChallenge(engine, challenge) {
@@ -313,18 +284,6 @@ export const dailyChallengeEngineMethods = {
     }
     this.previousPreparedPbGhostByChallengeId[challenge.id] =
       this.pbGhost?.preparedRecord ?? null;
-    if (!this.pbGhostReadinessByChallengeId) {
-      this.pbGhostReadinessByChallengeId = Object.create(null);
-    }
-    this.pbGhostReadinessByChallengeId[challenge.id] = {
-      challengeId: challenge.id,
-      trackKey: challenge.trackKey,
-      finishAtMs: getMonotonicNow(this),
-      readyAtMs: null,
-      goAtMs: null,
-      goReported: false,
-      readyReported: false,
-    };
     return true;
   },
 
@@ -402,20 +361,11 @@ export const dailyChallengeEngineMethods = {
     if (ownsSelection) {
       this.preparedPbGhostChallengeId = challenge.id;
     }
-    if (record.ghost !== null && normalizePbGhostRecord(record)) {
-      const readiness = getPbGhostReadinessState(this, challenge.id);
-      if (readiness) {
-        readiness.readyAtMs = getMonotonicNow(this);
-        emitLatePbGhostReadyMeasurement(this, readiness);
-      }
-    }
     return personalBest;
   },
 
   beginPersonalBestGhostRunAtGo() {
     const challenge = this.activeDailyChallenge;
-    const challengeId = challenge?.id || null;
-    const goAtMs = getMonotonicNow(this);
     const ghostActive = this.pbGhost?.beginRun?.() === true;
     const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
     const ghostExpected = this.pbGhost?.enabled === true
@@ -423,26 +373,6 @@ export const dailyChallengeEngineMethods = {
     const noticeShown = ghostExpected
       && !ghostActive
       && this.hud?.showGhostUnavailableNotice?.() === true;
-    const readiness = getPbGhostReadinessState(this, challengeId);
-    if (readiness && !readiness.goReported) {
-      readiness.goAtMs = goAtMs;
-      readiness.goReported = true;
-      const readyAtMs = Number.isFinite(readiness.readyAtMs)
-        ? readiness.readyAtMs
-        : null;
-      if (readyAtMs !== null) readiness.readyReported = true;
-      this.analytics?.trackPbGhostReadiness?.({
-        sampleType: "go",
-        trackKey: readiness.trackKey,
-        finishToGhostReadySec: readyAtMs === null
-          ? null
-          : Math.max(0, readyAtMs - readiness.finishAtMs) / 1000,
-        readyBeforeGo: ghostActive && readyAtMs !== null && readyAtMs <= goAtMs,
-        goSafetyMarginSec: readyAtMs === null ? null : (goAtMs - readyAtMs) / 1000,
-        ghostlessAtGo: !ghostActive,
-        noticeShown,
-      });
-    }
     return { ghostActive, ghostExpected, noticeShown };
   },
 
@@ -915,14 +845,6 @@ export const dailyChallengeEngineMethods = {
         this.preparedPbGhostChallengeId = null;
       }
       this.applyDailyChallenge(challenge);
-      const modeStartPayload = {
-        trackKey: challenge.trackKey,
-      };
-      if (options.startSource) {
-        modeStartPayload.challengeId = challenge.id;
-        modeStartPayload.source = options.startSource;
-      }
-      this.trackModeStart(modeStartPayload);
       this.startSequence();
     } finally {
       this.startButtonPending = false;
@@ -1176,12 +1098,6 @@ export const dailyChallengeEngineMethods = {
             ? lastRunLap.deltaVsBest
             : null;
     this.hud.syncHud({ time: finalTime, speed: this.cachedSpeed, force: true });
-    this.analytics?.trackRaceEnded?.({
-      cause: "finish",
-      trackKey: challenge.trackKey,
-      challengeId: challenge.id,
-      runTimeSec: finalTime,
-    });
     this.hud.setBestTime(this.bestLapTime, {
       persistToTrackCard: false,
     });
@@ -1338,17 +1254,6 @@ export const dailyChallengeEngineMethods = {
   restartDailyChallenge() {
     if (!this.activeDailyChallenge) return;
 
-    if (this.status === "won") {
-      this.analytics?.trackRaceRestarted?.({
-        source: "improve_restart_after_win",
-        trackKey: this.activeDailyChallenge.trackKey,
-        challengeId: this.activeDailyChallenge.id,
-      });
-    }
-
-    this.trackModeStart({
-      trackKey: this.activeDailyChallenge.trackKey,
-    });
     this.reset(true, { preserveDailyChallenge: true });
   },
 };

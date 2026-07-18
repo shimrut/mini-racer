@@ -1,5 +1,10 @@
 # Changelog
 
+- Replaced lifetime PB and ghost storage with challenge-scoped records that expire six hours after the track leaves its seven-day availability window. Daily leaderboard keys and response formats are unchanged, but now share that fixed deadline.
+- Reduced inactive player-profile and preference retention to 7 days for guests and 30 days for signed-in players without changing the stored profile format.
+- Bounded published challenge history to 30 days and added resumable maintenance that corrects known live leaderboard deadlines while preserving active entries.
+- Changed final podium automation to retry hourly during the six-hour post-expiry window. The first attempt freezes the public top-three payload so retries remain consistent and idempotent.
+- Removed custom gameplay and moderator analytics collection, APIs, menu action, dashboard assets, and dependencies. The retired non-expiring moderator-post registry is deleted by retention maintenance; historical counters expire naturally.
 - Reduced verified PB ghost traces by replacing timestamped millimetre JSON tuples with a fixed-20-Hz schema-v2 origin/delta representation using centimetre positions and shortest-angle deltas. A representative 12-second trace is 56.8% smaller raw and 64.3% smaller after gzip without changing playback interpolation or finish timing.
 - Started verified score submission at the finish event and returned the canonical lifetime-PB ghost in the accepted response, allowing immediate Improve attempts to use the correct verified ghost by GO without a second download.
 - Prevented stale ghost responses and rapid track switching from clearing or preparing the wrong track. When an expected verified ghost is not ready at GO, racing starts on time without a ghost and shows a two-second `GHOST UNAVAILABLE` HUD notice.

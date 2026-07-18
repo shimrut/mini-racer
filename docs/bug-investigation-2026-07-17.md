@@ -15,7 +15,7 @@ No code was changed in this investigation. Severity is about player/mod impact, 
 | Resolved | Improve after a new PB can still race the old ghost | Canonical submit response is used; unresolved starts ghostless |
 | Medium | Submission lock can expire / release unsafely so two saves overlap | Low; mainly platform Redis slowdowns or two devices |
 | Medium | Post-bound challenge write can overwrite the frozen daily challenge ledger | Low; needs mismatched post challenge data |
-| Low | Malformed local verification-queue entries can reschedule forever | Rare (corrupt / legacy local storage) |
+| Resolved | Malformed or expired local verification-queue entries can reschedule forever | Purged before retry scheduling |
 
 Areas that looked solid in this pass: physics vs server replay validation, guest token recovery, and UTC day math (no clear logic bugs found).
 
@@ -157,6 +157,8 @@ Do **not** block the Improve button on a spinner for this.
 - `game/scoreboard/verification-queue.js` (`getDueDailyChallengeVerifications`)
 
 **Fix direction:** Mark invalid persisted entries as terminal errors or remove them before rescheduling.
+
+**Resolution:** Queue entries now carry the challenge competition deadline. Reads purge expired entries and legacy entries whose challenge date cannot be derived, and processing rechecks expiry before retrying.
 
 ---
 

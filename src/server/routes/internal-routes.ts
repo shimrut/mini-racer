@@ -2,6 +2,7 @@ import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
 import type { DailyGpChallenge } from '../daily-gp-model.js';
 import type { FinalDailyGpPodium } from '../daily-podium-model.js';
+import { isDailyGpPodiumPublicationOpen } from '../daily-podium-service.js';
 
 type DailyAutopostSubscription = {
     subredditName: string;
@@ -40,8 +41,6 @@ export type InternalRouteDependencies = {
     ): Promise<PostResult>;
     enableDailyPodiumAutopost(subredditName: string): Promise<void>;
     deleteDailyPodiumAutopostSubscription(subredditName: string): Promise<void>;
-    assertModeratorForSubreddit(subredditName: string): Promise<string>;
-    ensureModeratorAnalyticsPostForSubreddit(subredditName: string): Promise<PostResult>;
     readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]>;
     readAllDailyPodiumAutopostSubscriptions(): Promise<DailyPodiumAutopostSubscription[]>;
 };
@@ -122,7 +121,7 @@ export function registerInternalRoutes(
         async (subredditName, res) => {
             await dependencies.enableDailyPodiumAutopost(subredditName);
             const podium = await dependencies.getServerFinalDailyGpPodium();
-            if (!podium) {
+            if (!podium || !isDailyGpPodiumPublicationOpen(podium)) {
                 res.json(createMenuToast(
                     `Daily Mini Racer podium posts enabled for r/${subredditName}. No expired track is available yet.`,
                     'success',
@@ -211,40 +210,6 @@ export function registerInternalRoutes(
         },
     );
 
-    registerMenuAction(
-        app,
-        dependencies,
-        '/internal/menu/mod-analytics-open',
-        {
-            missingContextMessage: 'Reddit did not provide a subreddit context for this tool.',
-            failureLogMessage: 'Failed to open moderator analytics tool:',
-            failureToastPrefix: 'Could not open Mini Racer analytics',
-        },
-        async (subredditName, res) => {
-            await dependencies.assertModeratorForSubreddit(subredditName);
-            const result = await dependencies.ensureModeratorAnalyticsPostForSubreddit(
-                subredditName,
-            );
-
-            if (!result.postUrl) {
-                res.json(createMenuToast(
-                    `Mini Racer analytics could not open for r/${subredditName}.`,
-                ));
-                return;
-            }
-
-            res.json({
-                showToast: {
-                    text: result.created
-                        ? `Mini Racer analytics is ready for r/${subredditName}.`
-                        : `Opening Mini Racer analytics for r/${subredditName}.`,
-                    appearance: 'success',
-                },
-                navigateTo: result.postUrl,
-            });
-        },
-    );
-
     app.post('/internal/scheduler/daily-posts', async (_req, res) => {
         try {
             const challenge = await dependencies.getServerDailyGpChallenge();
@@ -286,7 +251,7 @@ export function registerInternalRoutes(
     app.post('/internal/scheduler/daily-podium-posts', async (_req, res) => {
         try {
             const podium = await dependencies.getServerFinalDailyGpPodium();
-            if (!podium) {
+            if (!podium || !isDailyGpPodiumPublicationOpen(podium)) {
                 res.status(200).json({ ok: true, challengeId: null, createdCount: 0 });
                 return;
             }

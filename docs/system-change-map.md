@@ -11,7 +11,7 @@ This file is the fastest way to answer three product questions before a change s
 ## Scope And Assumptions
 
 - This map covers the shipped game flow in `game.html`, `game/`, and `src/server/`.
-- It also calls out supporting tools under `tools/` when they matter to analytics or content operations.
+- It also calls out supporting tools under `tools/` when they matter to content operations.
 - It is written for planning and scoping, not as a line-by-line engineering spec.
 - Shared gameplay logic matters more than folder ownership. Several "frontend" changes also affect server validation.
 
@@ -26,12 +26,12 @@ flowchart LR
     C --> E["Race stack<br/>game/race/*"]
     C --> F["Car stack<br/>game/car/*"]
     C --> G["UI stack<br/>daily challenge, scoreboard, settings, garage"]
-    C --> H["Audio + analytics<br/>game/audio/* + game/player/service.js"]
+    C --> H["Audio<br/>game/audio/*"]
     C --> I["Browser cache<br/>localStorage/sessionStorage"]
 
     G --> J["API client layer<br/>game/scoreboard/api-client.js"]
     J --> K["Devvit/Express server<br/>boot + app factory + route registrars"]
-    K --> L["Redis-backed stores<br/>player profiles, races, analytics"]
+    K --> L["Redis-backed stores<br/>player profiles + races"]
 
     K --> M["Shared challenge model<br/>src/server/daily-gp-model.ts"]
     K --> N["Shared gameplay validation<br/>game/config.js + game/race/simulation.js + game/track/runtime.js + track definitions"]
@@ -79,8 +79,8 @@ flowchart LR
 - `game/daily-challenge/ui.js` renders the start screen card, playlist modal, preview canvas, and challenge summary state, including local submission stages like submitting, verifying, retrying, and terminal errors.
 - `game/scoreboard/service.js` fetches leaderboard snapshots and submits best times.
 - `game/scoreboard/snapshot.js` owns the shared client-side snapshot shape, row/time normalization, empty state, and mutation-safe cache cloning used by both scoreboard and Daily GP flows.
-- `game/scoreboard/engine-methods.js` starts verification from the finish event, handles retry behavior, and consumes the canonical lifetime-PB record returned by an accepted submission.
-- Daily leaderboard PBs remain challenge-specific. The HUD, result deltas, medals, track cards, and PB ghost use the separate lifetime best for the selected track. One server replay simulation validates the daily time and produces the canonical lifetime-PB ghost. Daily and lifetime-PB writes then run concurrently; the daily write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`.
+- `game/scoreboard/engine-methods.js` starts verification from the finish event, handles retry behavior until the competition deadline, and consumes the canonical challenge-PB record returned by an accepted submission.
+- Daily leaderboard rows and PB ghosts are separate challenge-scoped records with the same fixed deadline: six hours after `availableUntil`. One server replay simulation validates the daily time and produces the canonical ghost. Both writes run concurrently; the leaderboard write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`.
 - Accepted submissions return the complete canonical `trackPersonalBest` record. The client validates and installs that record before GO without another `/api/player/pb-ghost` request. A pending faster lap makes the old prepared ghost ineligible for Improve; if the canonical result is unresolved, unavailable, or malformed at GO, the attempt starts normally without a ghost and shows `GHOST UNAVAILABLE` for two seconds. A late valid response is cached for the next attempt and never changes a ghost during an active run.
 - Custom-post startup resolves the playable challenge before dismissing the loading screen and prepares that challenge's PB ghost as an initial race asset. A still-valid historical post therefore loads its historical track ghost, while an expired post resolves to the current featured challenge and loads today's ghost. The first `Race Now` start preserves this prepared asset instead of clearing and preparing it again; restarts continue reusing the same frozen record.
 - PB ghost playback uses the same interpolated render timestamp as the live car. It does not render directly from the 60 Hz fixed-step clock, so uneven or higher-refresh display frames cannot expose the ghost as repeated positions followed by jumps.
@@ -89,11 +89,9 @@ flowchart LR
 - `game/storage.js` fetches player bootstrap state and falls back to local data when needed.
 - Daily GP track selection walks the explicit `TRACK_SCHEDULE_KEYS` order from `game/track/catalog.js`, one track per day, using the most-recent published day as the playhead; `src/server/daily-gp-store.ts` persists each new day to the `dailygp:challenges` Redis ledger (first-writer-wins) so past days never change.
 - Published Daily GP playlist rows come from server-side challenge history, not from recalculating old dates against the current track file.
-- The independent podium scheduler runs at 00:01 UTC and reads the challenge whose `availableUntil` has just passed. It freezes the global top three with publication-time Reddit/private identity choices into a separate informational custom post. Reddit identities also freeze the Reddit-hosted Snoovatar URL returned by Devvit; accounts without an exposed Snoovatar, private identities, unavailable avatars, and missing places use Reddit's official hosted default Snoo. Podium posts do not share race-post records or score threads. A Play Now control requests today's featured challenge start override and opens the game entrypoint.
+- The independent podium scheduler runs hourly at minute 1 for challenges that expired during the previous six hours. The first attempt freezes a sanitized global top-three snapshot before avatar or Reddit work; later attempts reuse it until a canonical post exists or the deadline passes. Reddit identities use the Reddit-hosted Snoovatar URL returned by Devvit; accounts without an exposed Snoovatar, private identities, unavailable avatars, and missing places use Reddit's official hosted default Snoo. Podium posts do not share race-post records or score threads. A Play Now control requests today's featured challenge start override and opens the game entrypoint.
 - Explicit mock modes and standalone preview pages use a local mock challenge (`DEFAULT_TRACK_KEY`, or a track forced via `?mockDaily=<trackKey>`); normal local game runs use `/api/daily/*` or Devvit post data so they match the server-published track.
 - Daily labels are calendar-based: `Today` is used only when a challenge's stored UTC date matches the current UTC date. Opening an older Reddit post keeps that post's challenge active and playable, but its Tracks and standings labels continue to show the original date.
-- Moderator analytics "Players" and leaderboard entries measure different outcomes. Analytics counts a player after any accepted analytics event, while the leaderboard only gains a row after a finished run passes server replay validation and is accepted.
-- Client analytics emit six general lifecycle events plus one aggregate-only PB ghost readiness event. The latter records bounded finish-to-ready and GO-margin buckets, ready/ghostless/notice counts, platform, and client version without replay data, traces, or player/session association. Retired pageview, player-type, map-selection, menu, support, and mode-selection scaffolding is not part of the product contract.
 - `leaderboardEntryCount` is the number of players with accepted times. `totalCount` can be larger because it may include the subreddit member total; the UI renders the difference as `No time yet` community placeholders, not as missing player scores.
 - Daily leaderboard snapshots are persisted separately in each client's local storage for fast initial rendering. Opening a standings day shows its cached snapshot immediately, then force-refreshes that day from the server once per open standings session; closing and reopening standings starts a new session and refreshes again, while switching back to a day already refreshed in the same session reuses that server result. When a retained mobile WebView becomes visible again, the current challenge is marked stale: visible standings refresh immediately, while closed standings refresh on their next open. Submission responses include `improved`: a valid slower replay returns `accepted: true, improved: false` and causes no standings request, while `improved: true` force-refreshes only the submitted challenge after any older request for that challenge finishes. The last confirmed snapshot remains in memory and local storage until a successful refresh replaces it; while the selected day is refreshing, its cached rows stay readable with a compact header spinner, and a network failure only removes that spinner.
 - The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
@@ -107,19 +105,19 @@ flowchart LR
   Devvit server from `src/server/server-app.ts`, whose import-safe app factory
   installs the JSON middleware and registers capability-specific modules under
   `src/server/routes/`.
-- Player, competition, sharing, analytics, moderator-menu, and scheduler routes
+- Player, competition, sharing, moderator-menu, and scheduler routes
   are registered separately. Route modules own HTTP parsing and responses, while
   `src/server/server-app.ts` only wires their dependencies.
 - `src/server/request-context.ts` is the single adapter for request-scoped
   Devvit identity, subreddit, post, and rate-limit context.
 - Focused workflow modules own the server behavior outside HTTP: post-bound
-  challenge resolution, community context, daily autopost persistence and post
-  creation, moderator authorization, and moderator analytics-post lifecycle.
+  challenge resolution, community context, daily autopost persistence, post
+  creation, and moderator authorization.
   These workflows use the existing Daily GP stores and sharing services without
   changing their Redis keys or public contracts.
 - `src/server/daily-gp-model.ts` defines the challenge schedule, IDs, playable window, and Redis key model.
-- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. Player profiles use derived per-player Redis keys with independent 180-day expiration. A new guest profile is claimed once with an atomic Redis write; every later bootstrap, preference update, identity update, personalized snapshot, and submission requires the matching signed guest token. Public snapshots remain available without a token but do not expose or refresh player-specific state. If a browser loses its token, startup rotates only the guest identity and retries once while preserving local preferences and run data. The retired shared profile hash is not read or migrated, preventing stale records from replacing current preferences. The published challenge history hash uses the same TTL as the installed Devvit server.
-- `src/server/pb-ghost-store.ts` persists one compressed lifetime PB record per player and track, separate from the 45-day daily leaderboard. Signed-in records have no app TTL; guest records follow the existing rolling 180-day retention. A track-geometry fingerprint plus simulation revision invalidates incompatible PBs. Under one PB lock, persistence selects the fastest compatible existing lifetime record, retained verified daily entry, or current verified run; equal times preserve the ghost-bearing record.
+- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. The existing combined profile/preferences JSON remains in derived per-player keys, with rolling inactivity expiry of 7 days for guests and 30 days for signed-in players. A new guest profile is claimed once with an atomic Redis write; every later bootstrap, preference update, identity update, personalized snapshot, and submission requires the matching signed guest token. Public snapshots remain available without a token but do not expose or refresh player-specific state. Published challenge history is pruned in bounded batches after 30 days.
+- `src/server/pb-ghost-store.ts` persists compressed challenge-scoped PB records in one hash per challenge, with hashed player fields. The whole hash expires at `availableUntil + 6 hours` for guests and signed-in players alike. Daily leaderboard keys and payloads are unchanged and receive the same fixed deadline on writes. A track-geometry fingerprint plus simulation revision still invalidates incompatible ghosts.
 - Guest submission throttling is independent of the signed guest profile ID: the submit route hashes Devvit's server-provided LOID, falling back to the Reddit user ID, and uses that stable request identity for guest rate limits. Signed-in Reddit players remain throttled by canonical account identity, and guests fall back to their authorized profile ID only when Reddit provides neither request identifier.
 - Daily GP submission transactions watch the submitting player's existing Redis lock, not the shared leaderboard keys, so different players can commit concurrently. The server returns `accepted: true` only after `EXEC` returns a non-empty result; an empty or missing result becomes a retryable `503`, and the browser keeps the replay in its local verification queue.
 - `src/server/community-member-count.ts` reads the public `subscribersCount` through Reddit's community-info API and caches it in Redis for five minutes. Standings use accepted leaderboard entries when Reddit does not return a usable count.
@@ -139,12 +137,12 @@ flowchart LR
 | Runtime orchestrator | `game/engine.js` | State ownership and feature wiring | Almost every `game/*` feature module |
 | Track system | `game/track/catalog.js`, `game/track/definitions/*`, `game/track/tracks.js`, `game/track/geometry.js`, `game/track/runtime.js`, `game/track/assets.js`, `game/track/engine-methods.js` | Lightweight metadata and schedule order, per-track geometry, collision, cached canvases, presentation | `game/config.js`, `game/track/presentation.js` |
 | Race/physics | `game/race/simulation.js`, `game/race/engine-methods.js`, `game/car/handling.js` | Driving feel, wall scrapes, optional collision auto-restart, finish logic, replay capture | Track runtime, config, HUD, modal flow |
-| Personal-best ghost | `game/ghost/pb-ghost.js`, `game/ghost/pb-ghost-service.js`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | Lifetime per-track PB state, verified trace generation, playback, selected-car rendering | Replay validator, player identity, Redis, settings |
+| Personal-best ghost | `game/ghost/pb-ghost.js`, `game/ghost/pb-ghost-service.js`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | Challenge PB state, verified trace generation, playback, selected-car rendering | Replay validator, player identity, Redis, settings |
 | Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js` | Car art, asset loading, garage selection, trail style | `public/assets/cars/*`, generated asset list, local cache, Redis player profile |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
 | Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow, share entry point | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js`, `game/player/preferences.js` | Identity, audio toggles, collision auto-restart and delay, durable preference sync | Browser cache, player APIs, Redis profile, modal helpers |
-| Audio/analytics | `game/audio/*`, `game/player/service.js` | Sound playback and analytics events | Settings preferences, `/api/analytics/event` |
+| Audio | `game/audio/*` | Sound playback | Settings preferences |
 | Server | `src/server/index.ts`, `src/server/server-app.ts`, `src/server/routes/*`, focused workflow modules, `src/server/daily-gp-store.ts`, `src/server/daily-gp-share.ts` | Server boot, HTTP contracts, Reddit workflows, persistence, validation, scheduling, canonical posts and result comments | Redis, Reddit API, shared gameplay modules |
 
 ## API Surface
@@ -163,8 +161,6 @@ These client-facing routes are registered under `src/server/routes/`:
 - `/api/daily/submit`
 - `/api/daily/share/preview`
 - `/api/daily/share/confirm`
-- `/api/analytics/event`
-- `/api/analytics/summary`
 
 The browser-side API route and player identity entrypoint is `game/scoreboard/api-client.js`. Both leaderboard snapshot endpoints normalize their responses through `game/scoreboard/snapshot.js` before UI or cache use.
 
@@ -177,13 +173,6 @@ The browser-side API route and player identity entrypoint is `game/scoreboard/ap
 | `@devvit/web`, `@devvit/redis` | Reddit/Devvit server runtime, context, Redis, shared request types, and posting flows | `src/server/*`, Devvit post/menu flows |
 | `express` | API routing and import-safe app creation inside the Devvit server | `src/server/server-app.ts`, `src/server/routes/*` |
 
-### Product-Adjacent Dependencies
-
-| Dependency | Why it exists | Where it matters |
-| --- | --- | --- |
-| `chart.js` | Moderator analytics dashboard charts | `mod-tool.js` |
-| `flatpickr` | Date selection for moderator analytics | `mod-tool.js` |
-
 ### Build And Quality Dependencies
 
 | Dependency | Why it exists | Where it matters |
@@ -193,7 +182,6 @@ The browser-side API route and player identity entrypoint is `game/scoreboard/ap
 | `vite` | Build and local packaging | `vite.config.js` |
 | `vitest` | Test runner | `vitest.config.js`, `npm test` |
 | `@stryker-mutator/*` | Mutation testing | `stryker.config.mjs` |
-| `tailwindcss`, `@tailwindcss/cli` | Analytics dashboard CSS build, not main gameplay styling | `tools/analytics-dashboard.tailwind.css` |
 
 ## Change Impact Matrix
 
@@ -207,7 +195,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Car handling / physics tuning | `game/car/handling.js`, `game/config.js`, `game/race/simulation.js` | `src/server/replay-validator.ts`, `game/race/run-policy.js`, `game/race/engine-methods.js` | Server validation reuses shared gameplay logic, so tuning changes affect accepted runs |
 | Collision rules, win rules, checkpoint behavior | `game/race/simulation.js`, `game/race/run-policy.js` | `src/server/replay-validator.ts`, `game/daily-challenge/engine-methods.js`, `game/race/result-flow.js` | Scrape and finish logic drive both local UX and server acceptance |
 | Track layout or new track | `game/track/definitions/*`, `game/track/catalog.js`, `game/track/tracks.js`, and `game/track/runtime.js` only if geometry handling changes | `game/medals/medal-times.json`, `game/track/presentation.js`, `src/server/daily-gp-store.ts`, `docs/track-authoring.md` | Geometry drives gameplay and replay validation, while catalog order independently controls future Daily GP scheduling and metadata |
-| Personal-best ghost behavior | `game/ghost/*`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | `game/daily-challenge/engine-methods.js`, `game/scoreboard/engine-methods.js`, `src/server/replay-validator.ts`, settings and route tests | Daily improvement and lifetime track improvement are separate contracts; geometry or simulation revisions intentionally reset incompatible track PBs |
+| Personal-best ghost behavior | `game/ghost/*`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | `game/daily-challenge/engine-methods.js`, `game/scoreboard/engine-methods.js`, `src/server/replay-validator.ts`, settings and route tests | Daily ranking and challenge-PB writes are separate contracts with one fixed deadline; geometry or simulation revisions intentionally reset incompatible ghosts |
 | Track visual treatment only | `game/track/presentation.js`, `game/track/canvas.js`, `styles.css` | `game/daily-challenge/ui.js`, `game/race/ui-modal-shell.js`, `game/track/preview-renderer.js` | One presentation system feeds race view, previews, and modal thumbnails |
 | Daily challenge schedule or availability window | `game/track/catalog.js`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-store.ts`, `game/daily-challenge/service.js` | `src/server/post-bound-challenge.ts`, `README.md` if player-facing behavior changes | New challenge generation walks explicit `TRACK_SCHEDULE_KEYS`; playlist availability reads persisted published history so past days do not shift |
 | Start screen or daily card copy/layout | `game/daily-challenge/ui.js`, `game.html`, `styles.css` | `game/daily-challenge/service.js` | The UI is driven by API summary fields and modal launch actions |
@@ -217,8 +205,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the independently expiring Reddit Redis player profile as the durable source |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |
 | Replay verification / anti-cheat changes | `src/server/replay-validator.ts`, `game/race/simulation.js`, `game/track/runtime.js`, `game/config.js` | `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | This is the highest-risk area because client and server must stay logically identical |
-| Analytics event changes | `game/player/service.js`, `src/server/analytics-store.ts` | `tools/analytics-dashboard.js`, `tools/analytics/schema.sql` | New event dimensions often need both collection and reporting updates |
-| Moderator workflows, daily or podium autoposting, or public post discovery copy | `src/server/daily-post-service.ts`, `src/server/daily-podium-service.ts`, `src/server/moderator-access.ts`, `src/server/moderator-analytics-post.ts`, `src/server/reddit-post-title.ts` | `src/server/routes/internal-routes.ts`, `devvit.json`, `README.md`, `CHANGELOG.md`, route/workflow tests | These flows are server-owned and tied to Devvit/Reddit context; race and podium subscriptions and canonical records remain independent |
+| Moderator workflows, daily or podium autoposting, or public post discovery copy | `src/server/daily-post-service.ts`, `src/server/daily-podium-service.ts`, `src/server/moderator-access.ts`, `src/server/reddit-post-title.ts` | `src/server/routes/internal-routes.ts`, `devvit.json`, `README.md`, `CHANGELOG.md`, route/workflow tests | These flows are server-owned and tied to Devvit/Reddit context; race and podium subscriptions and canonical records remain independent |
 
 ## High-Risk Shared Contracts
 
@@ -239,8 +226,6 @@ These are the places where a "small" change can create regressions outside the v
 
 These are useful, but they are not on the critical player path:
 
-- `mod-tool.html`, `mod-tool.js`, `mod-tool.css`
-  Shipped moderator analytics UI and reporting support.
 - `tools/mapmaker.*`
   Track/content support tooling. Local **Save & Integrate** writes the selected
   definition and updates the catalog, schedule, and compatibility registry;
@@ -251,8 +236,6 @@ These are useful, but they are not on the critical player path:
   Auxiliary workflow tooling.
 - `preview.html`, `preview.js`, `preview.css`
   Custom Reddit post preview entrypoint and standalone local review surface. The current challenge is labeled `Today`; the preview shows its gold-medal threshold and shared gold medal artwork, and draws the stock in-game car clearly past the start line with a short trail. In-game schematic previews do not use that post-only treatment.
-- `mod-tool.*`
-  Moderator/support tooling outside the main race runtime.
 
 ## Recommended Scoping Heuristic
 
