@@ -162,6 +162,23 @@ describe('verification queue', () => {
         expect(consoleError).toHaveBeenCalledWith('Error writing verification queue:', expect.any(Error));
     });
 
+    it('treats a non-object daily section as empty when reading storage', () => {
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({ daily: 42 }),
+        });
+
+        expect(getDailyChallengeVerificationEntry('missing')).toBe(null);
+        expect(enqueueDailyChallengeVerification({
+            challengeId: 'fresh-entry',
+            bestTime: 20,
+            replay: REPLAY,
+        })).toMatchObject({
+            enqueued: true,
+            entry: expect.objectContaining({ challengeId: 'fresh-entry' }),
+        });
+        expect(readStoredQueue().daily['fresh-entry']).toBeTruthy();
+    });
+
     it('normalizes malformed stored queue sections and clones replay payloads', () => {
         delete globalThis.window;
         installLocalStorage({

@@ -876,4 +876,33 @@ describe('result-flow helpers', () => {
 
         expect(consoleError).toHaveBeenCalledWith('Error refreshing modal scoreboard data', defaultError);
     });
+
+    it('formats combined rank with total count and falls back to labels without totals', () => {
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 3,
+            totalCount: 120,
+        })).toBe('3 out of 120');
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 0,
+            totalCount: 10,
+        })).toBe('--');
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 4,
+            totalCount: 0,
+            playerRankLabel: '  #4  ',
+        })).toBe('#4');
+        expect(formatCombinedRankOutOf({
+            isLoading: true,
+            playerRank: 2,
+            totalCount: 10,
+        })).toBe('--');
+    });
+
+    it('treats hasOwnValue as false for null update sources', () => {
+        expect(buildModalRunsPayload({ bestTime: 20 }, { updates: null })).toMatchObject({ bestTime: 20 });
+        expect(buildModalRunsPayload({ bestTime: 20 }, { updates: undefined })).toMatchObject({ bestTime: 20 });
+    });
 });

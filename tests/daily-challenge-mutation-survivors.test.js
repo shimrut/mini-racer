@@ -9,9 +9,14 @@ import {
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
+    getDailyChallengeModifierBadges,
     getDailyChallengeModifierLabel,
+    getDailyChallengeObjectiveLabel,
     getDailyChallengePlaylist,
+    getDailyChallengeRequiredLaps,
     getDailyChallengeSnapshot,
+    getDailyChallengeTrackName,
+    formatDailyChallengeBestLabel,
     getMissingDailyChallengeSnapshotIds,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
@@ -643,6 +648,82 @@ describe('daily-challenge mutation survivors', () => {
             bestTime: 12,
             replay: MINIMAL_REPLAY,
         })).resolves.toBeNull();
+    });
+
+    it('uses mockDaily=true with the default track when no concrete track key is supplied', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'localhost',
+            pathname: '/preview.html',
+            protocol: 'http:',
+            search: '?mockDaily=true',
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.trackKey).toBe('circuit');
+        expect(challenge.id).toBe('mock-daily-challenge-local');
+    });
+
+    it('enables mock data when localDev=true is present in the search params', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '?localDev=true',
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.id).toBe('mock-daily-challenge-local');
+    });
+
+    it('formats labels for multi-lap challenges and clamps required laps to at least two', () => {
+        const multiLap = buildChallenge({
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 1 },
+        });
+
+        expect(getDailyChallengeObjectiveLabel(multiLap)).toBe('2 laps');
+        expect(getDailyChallengeRequiredLaps(multiLap)).toBe(2);
+        expect(getDailyChallengeCopyLabels(multiLap).hudPrimaryLabel).toBe('RACE');
+        expect(getDailyChallengeTrackName(multiLap)).not.toBe('Unknown Track');
+    });
+
+    it('formats valid result labels and best-time labels while rejecting invalid numbers', () => {
+        const challenge = buildChallenge();
+        expect(formatDailyChallengeResultLabel(challenge, { bestTime: 12.4 })).toBe('12.40s');
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.876)).toBe('9.88s');
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', Number.NaN)).toBe('--');
+    });
+
+    it('shows an expires-in label when less than one day remains on the challenge', () => {
+        const challenge = buildChallenge({
+            endsAt: '2026-07-18T00:00:00.000Z',
+            availableUntil: '2026-07-18T18:00:00.000Z',
+        });
+
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-07-18T12:00:00.000Z'))).toEqual({
+            key: 'available',
+            label: 'Expires in 6h',
+        });
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-07-18T18:00:00.000Z'))).toEqual({
+            key: 'expired',
+            label: 'Expired',
+        });
+    });
+
+    it('returns empty modifier badges for null challenges and an empty label string', () => {
+        expect(getDailyChallengeModifierBadges(null)).toEqual([]);
+        expect(getDailyChallengeModifierLabel(null)).toBe('');
+    });
+
+    it('treats isPreviewPage as false when window is unavailable', () => {
+        delete globalThis.window;
+        expect(isPreviewPage()).toBe(false);
     });
 
     it('posts share preview and confirm requests to the daily share routes', async () => {

@@ -356,4 +356,25 @@ describe('pb-ghost-trace validation and recording edges', () => {
             startAngle: 1,
         })).not.toBe(createTrackFingerprint(base));
     });
+
+    it('returns null from finish when recorder overflow discarded intermediate samples (L160)', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        for (let index = 1; index <= PB_GHOST_MAX_SAMPLES + 1; index += 1) {
+            recorder.sample({
+                timeSec: index * 0.05,
+                position: { x: index, y: index },
+                angle: index * 0.01,
+            });
+        }
+
+        expect(recorder.finish({
+            timeSec: (PB_GHOST_MAX_SAMPLES + 2) * 0.05,
+            position: { x: 99, y: 99 },
+            angle: 1,
+        })).toBeNull();
+    });
 });

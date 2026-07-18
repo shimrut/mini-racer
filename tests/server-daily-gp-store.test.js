@@ -3528,5 +3528,67 @@ describe('server daily gp store submissions', () => {
             });
             expect(snapshot.nearbyRows.map((row) => row.rank)).toEqual([5, 6, 7, 8]);
         });
+
+        it('ignores stored player profiles that do not include a non-empty playerId', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.zCard.mockResolvedValue(1);
+            mockRedis.zRange.mockResolvedValue([{ member: 'reddit:bad-profile', score: 8000 }]);
+            mockRedis.hMGet.mockResolvedValue([JSON.stringify({
+                playerId: 'reddit:bad-profile',
+                trackKey: challenge.trackKey,
+                bestTimeMs: 8000,
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            })]);
+            mockRedis.mGet.mockResolvedValue([JSON.stringify({
+                leaderboardIdentity: 'constructed',
+                hasSeenGame: false,
+                hasAnyData: true,
+                firstSeenAt: '2026-01-01T00:00:00.000Z',
+                lastSeenAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            })]);
+
+            const snapshot = await getServerDailyGpSnapshot({ challengeId: challenge.id });
+
+            expect(snapshot.topRows).toHaveLength(1);
+            expect(snapshot.topRows[0].displayName).toBeTruthy();
+        });
+
+        it('sets the rate-limit TTL only on the first submission attempt', async () => {
+            const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.incrBy
+                .mockResolvedValueOnce(1)
+                .mockResolvedValueOnce(2);
+            mockRedis.expire.mockClear();
+
+            const first = await submitServerDailyGpRun({
+                redditUsername: 'Rate-Limit-Once',
+                challengeId: challenge.id,
+                trackKey: challenge.trackKey,
+                replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+            });
+            const second = await submitServerDailyGpRun({
+                redditUsername: 'Rate-Limit-Once',
+                challengeId: challenge.id,
+                trackKey: challenge.trackKey,
+                replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+            });
+
+            expect(first.status).toBe(200);
+            expect(second.status).toBe(200);
+            const rateLimitExpires = mockRedis.expire.mock.calls.filter(([key]) => (
+                String(key).includes('rate-limit')
+            ));
+            expect(rateLimitExpires).toHaveLength(1);
+        });
+
+        it('rejects stored challenge JSON that parses to a non-object', async () => {
+            const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+            mockRedis.hGet.mockResolvedValueOnce(JSON.stringify(['not-a-challenge']));
+
+            await expect(getServerDailyGpChallengeById('daily-gp-2026-07-11')).resolves.toBeNull();
+        });
     });
 });
