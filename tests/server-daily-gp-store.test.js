@@ -463,6 +463,11 @@ describe('server daily gp store submissions', () => {
             const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
             await persistServerDailyGpChallenge(currentChallenge);
 
+            expect(mockRedis.hSetNX).toHaveBeenCalledWith(
+                'dailygp:challenges',
+                currentChallenge.id,
+                JSON.stringify(currentChallenge),
+            );
             expect(mockRedis.hScan).toHaveBeenCalledWith('dailygp:challenges', 0, undefined, 50);
             expect(mockRedis.hDel).toHaveBeenCalledWith('dailygp:challenges', [oldChallenge.id]);
             expect(mockRedis.expire).toHaveBeenCalledWith(
@@ -480,6 +485,101 @@ describe('server daily gp store submissions', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it('returns the stored challenge when post-bound persist targets an existing day', async () => {
+        const storedChallenge = {
+            id: 'daily-gp-2026-07-16',
+            challengeDate: '2026-07-16',
+            trackKey: 'circuit',
+            startsAt: '2026-07-16T00:00:00.000Z',
+            endsAt: '2026-07-17T00:00:00.000Z',
+            availableUntil: '2026-07-23T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const mismatchedPostChallenge = {
+            ...storedChallenge,
+            trackKey: 'desertBridge',
+        };
+        mockRedis.hGet.mockResolvedValue(JSON.stringify(storedChallenge));
+
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        await expect(persistServerDailyGpChallenge(mismatchedPostChallenge)).resolves.toEqual(storedChallenge);
+
+        expect(mockRedis.hSetNX).not.toHaveBeenCalled();
+        expect(mockRedis.hSet).not.toHaveBeenCalledWith(
+            'dailygp:challenges',
+            expect.anything(),
+        );
+    });
+
+    it('seeds a missing day with hSetNX on post-bound persist', async () => {
+        const challenge = {
+            id: 'daily-gp-2026-07-16',
+            challengeDate: '2026-07-16',
+            trackKey: 'circuit',
+            startsAt: '2026-07-16T00:00:00.000Z',
+            endsAt: '2026-07-17T00:00:00.000Z',
+            availableUntil: '2026-07-23T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        mockRedis.hGet.mockResolvedValue(null);
+        mockRedis.hSetNX.mockResolvedValue(1);
+
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        await expect(persistServerDailyGpChallenge(challenge)).resolves.toEqual(challenge);
+
+        expect(mockRedis.hSetNX).toHaveBeenCalledWith(
+            'dailygp:challenges',
+            challenge.id,
+            JSON.stringify(challenge),
+        );
+        expect(mockRedis.hSet).not.toHaveBeenCalledWith(
+            'dailygp:challenges',
+            expect.anything(),
+        );
+    });
+
+    it('returns the race winner when post-bound persist loses hSetNX', async () => {
+        const incomingChallenge = {
+            id: 'daily-gp-2026-07-16',
+            challengeDate: '2026-07-16',
+            trackKey: 'desertBridge',
+            startsAt: '2026-07-16T00:00:00.000Z',
+            endsAt: '2026-07-17T00:00:00.000Z',
+            availableUntil: '2026-07-23T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const winnerChallenge = {
+            ...incomingChallenge,
+            trackKey: 'circuit',
+        };
+        mockRedis.hGet
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(JSON.stringify(winnerChallenge));
+        mockRedis.hSetNX.mockResolvedValue(0);
+
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        await expect(persistServerDailyGpChallenge(incomingChallenge)).resolves.toEqual(winnerChallenge);
+
+        expect(mockRedis.hSetNX).toHaveBeenCalledWith(
+            'dailygp:challenges',
+            incomingChallenge.id,
+            JSON.stringify(incomingChallenge),
+        );
+        expect(mockRedis.hSet).not.toHaveBeenCalledWith(
+            'dailygp:challenges',
+            expect.anything(),
+        );
     });
 
     it('publishes the challenge whose seven-day window just expired at the UTC boundary', async () => {

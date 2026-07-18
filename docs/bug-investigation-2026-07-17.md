@@ -14,7 +14,7 @@ No code was changed in this investigation. Severity is about player/mod impact, 
 | Resolved | Daily / podium post creation lock can expire and allow a duplicate Reddit post | 15m NX create-claim before Reddit; registry is first-writer-wins |
 | Resolved | Improve after a new PB can still race the old ghost | Canonical submit response is used; unresolved starts ghostless |
 | Medium | Submission lock can expire / release unsafely so two saves overlap | Low; mainly platform Redis slowdowns or two devices |
-| Medium | Post-bound challenge write can overwrite the frozen daily challenge ledger | Low; needs mismatched post challenge data |
+| Resolved | Post-bound challenge write can overwrite the frozen daily challenge ledger | Low; needs mismatched post challenge data |
 | Resolved | Malformed or expired local verification-queue entries can reschedule forever | Purged before retry scheduling |
 
 Areas that looked solid in this pass: physics vs server replay validation, guest token recovery, and UTC day math (no clear logic bugs found).
@@ -143,6 +143,8 @@ Do **not** block the Improve button on a spinner for this.
 - `src/server/post-bound-challenge.ts` (`getPostBoundDailyGpChallenge`)
 
 **Fix direction:** Make post-bound persistence first-writer-wins; reject or ignore post data that does not exactly match an existing ledger entry.
+
+**Resolution:** `persistServerDailyGpChallenge` now returns any existing ledger entry for that day and only seeds missing days with `hSetNX`. Stale or mismatched post payloads cannot overwrite the frozen track.
 
 ---
 

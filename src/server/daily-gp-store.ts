@@ -348,10 +348,33 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     return reread ?? challenge;
 }
 
+/**
+ * Seed a challenge into the append-only ledger (e.g. from post-bound data).
+ * First-writer-wins via hSetNX: an existing day is never overwritten, even when
+ * the incoming payload disagrees on track or timing.
+ */
 export async function persistServerDailyGpChallenge(
     challenge: DailyGpChallenge,
 ): Promise<DailyGpChallenge> {
-    return writeStoredDailyGpChallenge(challenge);
+    const stored = await readStoredDailyGpChallenge(challenge.id);
+    if (stored) {
+        return stored;
+    }
+
+    const didSet = await redis.hSetNX(
+        DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
+        challenge.id,
+        JSON.stringify(challenge),
+    );
+    if (didSet) {
+        await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+        await maintainChallengeHistory();
+        return challenge;
+    }
+
+    // Lost the race to another writer: return the winning entry.
+    const reread = await readStoredDailyGpChallenge(challenge.id);
+    return reread ?? challenge;
 }
 
 function normalizeCommunityMemberTotal(value: unknown): number | null {
