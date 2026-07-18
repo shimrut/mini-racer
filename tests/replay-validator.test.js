@@ -182,31 +182,31 @@ describe('server replay validator', () => {
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: null,
-        }).failure).toEqual({ reason: 'missing_replay' });
+        })).toEqual({ ok: false, failure: { reason: 'missing_replay' } });
 
         expect(validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: 'nope',
-        }).failure).toEqual({ reason: 'missing_replay' });
+        })).toEqual({ ok: false, failure: { reason: 'missing_replay' } });
 
         expect(validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: {},
-        }).failure).toEqual({ reason: 'missing_replay_inputs' });
+        })).toEqual({ ok: false, failure: { reason: 'missing_replay_inputs' } });
 
         expect(validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: { inputs: [] },
-        }).failure).toEqual({ reason: 'missing_replay_inputs' });
+        })).toEqual({ ok: false, failure: { reason: 'missing_replay_inputs' } });
 
         expect(validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: { inputs: null },
-        }).failure).toEqual({ reason: 'missing_replay_inputs' });
+        })).toEqual({ ok: false, failure: { reason: 'missing_replay_inputs' } });
 
         const invalidSegments = [
             null,
@@ -226,7 +226,10 @@ describe('server replay validator', () => {
                 challenge: CHALLENGE,
                 track: STRAIGHT_TRACK,
                 replay: { inputs: [segment] },
-            }).failure).toEqual({ reason: 'invalid_replay_segment' });
+            })).toEqual({
+                ok: false,
+                failure: { reason: 'invalid_replay_segment' },
+            });
         }
     });
 
@@ -281,18 +284,27 @@ describe('server replay validator', () => {
             challenge: null,
             track: STRAIGHT_TRACK,
             replay: FINISHING_REPLAY,
-        }).failure).toEqual({ reason: 'unknown_track' });
+        })).toEqual({
+            ok: false,
+            failure: { reason: 'unknown_track' },
+        });
 
         expect(validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: null,
             replay: FINISHING_REPLAY,
-        }).failure).toEqual({ reason: 'unknown_track' });
+        })).toEqual({
+            ok: false,
+            failure: { reason: 'unknown_track' },
+        });
 
         expect(validateDailyGpReplayDetailed({
             challenge: { ...CHALLENGE, trackKey: 'does-not-exist' },
             replay: FINISHING_REPLAY,
-        }).failure).toEqual({ reason: 'unknown_track' });
+        })).toEqual({
+            ok: false,
+            failure: { reason: 'unknown_track' },
+        });
     });
 
     it('accepts a finished replay after a momentum-losing wall scrape', () => {

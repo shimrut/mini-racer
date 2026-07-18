@@ -8,6 +8,17 @@ vi.mock('../game/race/simulation.js', () => ({
     updateSimulation: mockUpdateSimulation,
 }));
 
+// Force the validator through its fixedDt fallback (Number(0) || 1/60).
+vi.mock('../game/config.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        CONFIG: {
+            ...actual.CONFIG,
+            fixedDt: 0,
+        },
+    };
+});
+
 import { validateDailyGpReplayDetailed } from '../src/server/replay-validator.ts';
 
 const CHALLENGE = {
@@ -82,6 +93,102 @@ describe('server replay validator branch coverage', () => {
         });
         expect(mockUpdateSimulation).toHaveBeenCalledTimes(1);
         expect(mockUpdateSimulation.mock.calls[0][0].keys).toEqual({ left: true, right: false });
+        expect(mockUpdateSimulation.mock.calls[0][0]).toMatchObject({
+            wallContactActive: false,
+            slipSpeedGateClamp: false,
+            activeRunId: 'server-replay-validation',
+            currentModeKey: 'daily',
+            velocity: { x: 0, y: 0 },
+            currentChallengeRun: {
+                objectiveType: 'single_lap_fastest',
+                requiredLaps: 1,
+                completedLaps: 0,
+                lastLapAt: 0,
+            },
+        });
+        expect(mockUpdateSimulation.mock.calls[0][0].currentRunPolicy).toMatchObject({
+            requiredLaps: 1,
+            objectiveType: 'single_lap_fastest',
+        });
+        expect(typeof mockUpdateSimulation.mock.calls[0][0].runHistory.last).toBe('function');
+        expect(mockUpdateSimulation.mock.calls[0][0].runHistory.last()).toBe(null);
+        const history = mockUpdateSimulation.mock.calls[0][0].runHistory;
+        const slot = history.write();
+        slot.x = 1;
+        expect(history.last()).toBe(slot);
+        history.clear();
+        expect(history.last()).toBe(null);
+    });
+
+    it('treats crashEndedRun alone as a crash even when status is still playing', () => {
+        mockUpdateSimulation.mockImplementation((state) => {
+            state.status = 'playing';
+            state.currentTime = 0.5;
+            state.pos = { x: 1, y: 2 };
+            state.cachedSpeed = 3;
+            return { crashEndedRun: true, winTriggered: false };
+        });
+
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: TRACK,
+            replay: {
+                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(outcome.ok).toBe(false);
+        expect(outcome.failure.reason).toBe('crashed');
+        expect(outcome.failure.status).toBe('playing');
+    });
+
+    it('treats status crashed alone as a crash even when crashEndedRun is false', () => {
+        mockUpdateSimulation.mockImplementation((state) => {
+            state.status = 'crashed';
+            state.currentTime = 0.5;
+            state.pos = { x: 1, y: 2 };
+            state.cachedSpeed = 3;
+            return { crashEndedRun: false, winTriggered: false };
+        });
+
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: TRACK,
+            replay: {
+                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(outcome.ok).toBe(false);
+        expect(outcome.failure.reason).toBe('crashed');
+        expect(outcome.failure.status).toBe('crashed');
+    });
+
+    it('omits non-finite failure details instead of inventing values', () => {
+        mockUpdateSimulation.mockImplementation((state) => {
+            state.status = 99;
+            state.currentTime = Number.NaN;
+            state.nextCheckpointIndex = Number.NaN;
+            state.pos = { x: Number.NaN, y: 5.5 };
+            state.cachedSpeed = Number.POSITIVE_INFINITY;
+            return { crashEndedRun: true, winTriggered: false };
+        });
+
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: TRACK,
+            replay: {
+                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(outcome).toEqual({
+            ok: false,
+            failure: {
+                reason: 'crashed',
+                frameCount: 1,
+            },
+        });
     });
 
     it('rejects when the run ends before all replay frames are consumed', () => {
@@ -132,6 +239,28 @@ describe('server replay validator branch coverage', () => {
         expect(outcome.failure.frameCount).toBe(1);
     });
 
+    it('rejects wins that omit winData entirely', () => {
+        mockUpdateSimulation.mockImplementation((state) => {
+            state.currentTime = 2;
+            state.status = 'won';
+            return {
+                crashEndedRun: false,
+                winTriggered: true,
+            };
+        });
+
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: TRACK,
+            replay: {
+                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(outcome.ok).toBe(false);
+        expect(outcome.failure.reason).toBe('missing_win_time');
+    });
+
     it('truncates completed laps and copies checkpoint times on a successful finish', () => {
         mockUpdateSimulation.mockImplementation((state) => {
             state.currentTime = 3.4567;
@@ -167,6 +296,33 @@ describe('server replay validator branch coverage', () => {
         expect(mockUpdateSimulation.mock.calls[0][0].lapCheckpointTimesSec[0]).toBe(1.25);
         expect(mockUpdateSimulation.mock.calls[0][0].keys).toEqual({ left: false, right: true });
         expect(mockUpdateSimulation.mock.calls[0][0].relaunchDelayRemaining).toBeCloseTo(1 / 60);
+        expect(mockUpdateSimulation.mock.calls[0][1]).toBeCloseTo(1 / 60);
+    });
+
+    it('falls back to 1/60 when fixedDt is missing or zero', () => {
+        mockUpdateSimulation.mockImplementation((state, dt) => {
+            state.currentTime = dt;
+            state.pos = { x: 6, y: -1 };
+            state.angle = 1.5;
+            state.status = 'won';
+            return {
+                crashEndedRun: false,
+                winTriggered: true,
+                winData: { lapTime: dt, completedLaps: 1 },
+            };
+        });
+
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: TRACK,
+            replay: {
+                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(outcome.ok).toBe(true);
+        expect(mockUpdateSimulation.mock.calls[0][1]).toBeCloseTo(1 / 60);
+        expect(outcome.run.bestTimeSec).toBeCloseTo(1 / 60);
     });
 
     it('returns null checkpoint times when the finishing state has none', () => {
