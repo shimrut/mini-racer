@@ -6,6 +6,7 @@ const { mockRedis } = vi.hoisted(() => ({
         set: vi.fn(),
         expire: vi.fn(),
         del: vi.fn(),
+        watch: vi.fn(),
     },
 }));
 
@@ -25,6 +26,19 @@ describe('daily GP post store', () => {
         mockRedis.set.mockResolvedValue('OK');
         mockRedis.expire.mockResolvedValue(true);
         mockRedis.del.mockResolvedValue(1);
+        mockRedis.watch.mockImplementation(async () => {
+            const commands = [];
+            return {
+                multi: vi.fn(async () => undefined),
+                unwatch: vi.fn(async () => undefined),
+                del: vi.fn(async (...args) => commands.push(() => mockRedis.del(...args))),
+                exec: vi.fn(async () => {
+                    const results = [];
+                    for (const command of commands) results.push(await command());
+                    return results;
+                }),
+            };
+        });
     });
 
     it('uses an owner-checked 15-minute create claim', async () => {

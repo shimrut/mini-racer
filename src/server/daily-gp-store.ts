@@ -44,6 +44,12 @@ import {
     seedPlayerTrackPersonalBest,
     upsertPlayerTrackPersonalBest,
 } from './pb-ghost-store.js';
+import {
+    acquireRedisLock,
+    beginOwnedRedisLockTransaction,
+    releaseRedisLock,
+    type RedisLock,
+} from './redis-lock.js';
 
 type SnapshotRow = {
     rank: number;
@@ -92,7 +98,7 @@ const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY = 'dailygp:maintenance:c
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_BATCH_SIZE = 50;
 const DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
-const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 5_000;
+const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 30_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function createSubmissionRateLimitKey(challengeId: string, rateLimitIdentity: string): string {
@@ -896,26 +902,13 @@ async function checkSubmissionRateLimit(
 async function acquireSubmissionLock(
     challengeId: string,
     playerId: string,
-): Promise<{ key: string; value: string } | null> {
+): Promise<RedisLock | null> {
     const key = createSubmissionLockKey(challengeId, playerId);
-    const value = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    const response = await redis.set(
-        key,
-        value,
-        { nx: true, expiration: new Date(Date.now() + DAILY_GP_SUBMISSION_LOCK_TTL_MS) },
-    );
-    return response ? { key, value } : null;
+    return acquireRedisLock(key, DAILY_GP_SUBMISSION_LOCK_TTL_MS, redis);
 }
 
-async function releaseSubmissionLock(lock: { key: string; value: string } | null): Promise<void> {
-    if (!lock) {
-        return;
-    }
-
-    const currentValue = await redis.get(lock.key);
-    if (currentValue === lock.value) {
-        await redis.del(lock.key);
-    }
+async function releaseSubmissionLock(lock: RedisLock | null): Promise<void> {
+    await releaseRedisLock(lock, redis);
 }
 
 export async function getServerDailyGpChallenge(): Promise<DailyGpChallenge> {
@@ -1665,8 +1658,10 @@ export async function submitServerDailyGpRun({
 
             const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
             const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
-            const tx = await redis.watch(submissionLock.key);
-            await tx.multi();
+            const tx = await beginOwnedRedisLockTransaction(submissionLock, redis);
+            if (!tx) {
+                return { interrupted: true, improved: false, entry: previousEntry ?? nextEntry };
+            }
             await tx.hSet(
                 entryHashKey,
                 { [normalizedPlayerId]: JSON.stringify(nextEntry) },

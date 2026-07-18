@@ -17,6 +17,14 @@ import {
     type DailyGpPostRecord,
 } from './daily-gp-post-store.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
+import {
+    acquireRedisLock,
+    beginOwnedRedisLockTransaction,
+    releaseRedisLock,
+    startRedisLockLeaseRenewal,
+    type RedisLock,
+    type RedisLockLease,
+} from './redis-lock.js';
 
 export const DAILY_GP_SCORE_THREAD_TEXT = [
     '🏁 Mini Racer score thread',
@@ -27,7 +35,8 @@ export const DAILY_GP_SCORE_THREAD_TEXT = [
 const SHARE_PREVIEW_TTL_SECONDS = 10 * 60;
 const SHARE_RATE_LIMIT_SECONDS = 60;
 const SHARE_RATE_LIMIT_MAX = 12;
-const SHARE_LOCK_TTL_MS = 10_000;
+const SHARE_LOCK_TTL_MS = 30_000;
+const SHARE_LOCK_RENEWAL_INTERVAL_MS = 10_000;
 
 type ShareSource = 'finish' | 'standings';
 type MedalTier = 'author' | 'gold' | 'silver' | 'bronze' | null;
@@ -171,18 +180,32 @@ function getValidContext(input: ShareRequestContext): {
     };
 }
 
-async function acquireLock(key: string): Promise<{ key: string; value: string } | null> {
-    const value = randomUUID();
-    const acquired = await redis.set(key, value, {
-        nx: true,
-        expiration: new Date(Date.now() + SHARE_LOCK_TTL_MS),
-    });
-    return acquired ? { key, value } : null;
+async function acquireLock(key: string): Promise<RedisLock | null> {
+    return acquireRedisLock(key, SHARE_LOCK_TTL_MS, redis);
 }
 
-async function releaseLock(lock: { key: string; value: string } | null): Promise<void> {
-    if (lock && await redis.get(lock.key) === lock.value) {
-        await redis.del(lock.key);
+async function releaseLock(lock: RedisLock | null): Promise<void> {
+    await releaseRedisLock(lock, redis);
+}
+
+async function stopAndReleaseLock(lease: RedisLockLease, lock: RedisLock): Promise<void> {
+    await lease.stop();
+    try {
+        await releaseLock(lock);
+    } catch (error) {
+        console.error('Daily GP share lock cleanup failed:', error);
+    }
+}
+
+async function stillOwnLock(lease: RedisLockLease): Promise<boolean> {
+    return lease.isOwned() && await lease.confirmOwnership();
+}
+
+async function deleteCommentBestEffort(comment: any): Promise<void> {
+    try {
+        await comment?.delete?.();
+    } catch (_error) {
+        // Best effort cleanup after losing the share claim.
     }
 }
 
@@ -320,7 +343,9 @@ export async function ensureDailyGpScoreThread(
         if (latest?.scoreThreadCommentId) return latest;
         throw new Error('Score thread is being prepared.');
     }
+    const lease = startRedisLockLeaseRenewal(lock, SHARE_LOCK_RENEWAL_INTERVAL_MS, redis);
     try {
+        if (!await stillOwnLock(lease)) throw new Error('Score thread lock ownership was lost.');
         const latest = await readDailyGpPostRecord(record.subredditName, record.challengeId) || record;
         if (latest.scoreThreadCommentId) return latest;
         const listing = await (reddit as any).getComments({
@@ -331,6 +356,7 @@ export async function ensureDailyGpScoreThread(
             pageSize: 100,
         });
         const comments = typeof listing?.all === 'function' ? await listing.all() : [];
+        if (!await stillOwnLock(lease)) throw new Error('Score thread lock ownership was lost.');
         let anchor = comments.find((comment: any) => (
             normalizeName(comment?.authorName || '') === normalizeName(appSlug)
             && comment?.body === DAILY_GP_SCORE_THREAD_TEXT
@@ -342,6 +368,7 @@ export async function ensureDailyGpScoreThread(
                 runAs: 'APP',
             });
         }
+        if (!await stillOwnLock(lease)) throw new Error('Score thread lock ownership was lost.');
         await anchor.distinguish(true);
         if (typeof anchor?.id !== 'string' || !anchor.id.startsWith('t1_')) {
             throw new Error('Reddit did not return a score-thread comment ID.');
@@ -351,10 +378,16 @@ export async function ensureDailyGpScoreThread(
             scoreThreadCommentId: anchor.id,
             updatedAt: new Date().toISOString(),
         };
-        await writeDailyGpPostRecord(next);
+        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
+        if (!transaction) throw new Error('Score thread lock ownership was lost.');
+        await writeDailyGpPostRecord(next, transaction);
+        const transactionResults = await transaction.exec();
+        if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
+            throw new Error('Score thread lock ownership was lost.');
+        }
         return next;
     } finally {
-        await releaseLock(lock);
+        await stopAndReleaseLock(lease, lock);
     }
 }
 
@@ -512,7 +545,13 @@ export async function confirmDailyGpShare(
     if (!lock) {
         return { status: 409, body: { status: 'share_in_progress', error: 'This result is already being shared.' } };
     }
+    const lease = startRedisLockLeaseRenewal(lock, SHARE_LOCK_RENEWAL_INTERVAL_MS, redis);
+    const ownershipLost = (): ShareServiceResult => ({
+        status: 409,
+        body: { status: 'share_in_progress', error: 'This result is already being shared.' },
+    });
     try {
+        if (!await stillOwnLock(lease)) return ownershipLost();
         const shared = await readActiveSharedResult(preview);
         if (shared) {
             await redis.del(tokenKey);
@@ -524,10 +563,12 @@ export async function confirmDailyGpShare(
             appSlug: validContext.appSlug,
             preferredPostUrl: validContext.preferredPostUrl,
         });
+        if (!await stillOwnLock(lease)) return ownershipLost();
         if (!post) {
             return { status: 404, body: { status: 'post_unavailable', error: 'The post for this race day is unavailable.' } };
         }
         const withThread = await ensureDailyGpScoreThread(post, validContext.appSlug);
+        if (!await stillOwnLock(lease)) return ownershipLost();
         if (!withThread.scoreThreadCommentId) {
             throw new Error('The score thread is unavailable.');
         }
@@ -536,6 +577,10 @@ export async function confirmDailyGpShare(
             text: preview.commentText,
             runAs: 'USER',
         });
+        if (!await stillOwnLock(lease)) {
+            await deleteCommentBestEffort(comment);
+            return ownershipLost();
+        }
         if (normalizeName((comment as any)?.authorName || '') !== normalizeName(preview.username)) {
             try {
                 await (comment as any).delete();
@@ -561,9 +606,19 @@ export async function confirmDailyGpShare(
             createdAt: new Date().toISOString(),
         };
         const sharedKey = createSharedResultKey(preview);
-        await redis.set(sharedKey, JSON.stringify(saved));
-        await redis.expire(sharedKey, DAILY_GP_REDIS_TTL_SECONDS);
-        await redis.del(tokenKey);
+        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
+        if (!transaction) {
+            await deleteCommentBestEffort(comment);
+            return ownershipLost();
+        }
+        await transaction.set(sharedKey, JSON.stringify(saved));
+        await transaction.expire(sharedKey, DAILY_GP_REDIS_TTL_SECONDS);
+        await transaction.del(tokenKey);
+        const transactionResults = await transaction.exec();
+        if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
+            await deleteCommentBestEffort(comment);
+            return ownershipLost();
+        }
         return {
             status: 200,
             body: {
@@ -573,6 +628,6 @@ export async function confirmDailyGpShare(
             },
         };
     } finally {
-        await releaseLock(lock);
+        await stopAndReleaseLock(lease, lock);
     }
 }

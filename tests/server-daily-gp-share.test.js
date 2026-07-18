@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const strings = new Map();
 const redis = {
@@ -15,6 +15,21 @@ const redis = {
         const next = Number(strings.get(key) || 0) + amount;
         strings.set(key, String(next));
         return next;
+    }),
+    watch: vi.fn(async () => {
+        const commands = [];
+        return {
+            multi: vi.fn(async () => undefined),
+            unwatch: vi.fn(async () => undefined),
+            set: vi.fn(async (...args) => commands.push(() => redis.set(...args))),
+            expire: vi.fn(async (...args) => commands.push(() => redis.expire(...args))),
+            del: vi.fn(async (...args) => commands.push(() => redis.del(...args))),
+            exec: vi.fn(async () => {
+                const results = [];
+                for (const command of commands) results.push(await command());
+                return results;
+            }),
+        };
     }),
 };
 
@@ -71,6 +86,7 @@ vi.mock('../src/server/replay-validator.js', () => ({
 const {
     DAILY_GP_SCORE_THREAD_TEXT,
     confirmDailyGpShare,
+    ensureDailyGpScoreThread,
     formatDailyGpShareComment,
     previewDailyGpShare,
     registerDailyGpPost,
@@ -89,12 +105,18 @@ describe('daily GP result sharing', () => {
         vi.clearAllMocks();
         submittedUserAuthor = 'RaceFan';
         submittedUserRemoved = false;
+        reddit.getComments.mockImplementation(async () => ({ all: async () => [] }));
+        reddit.submitComment.mockImplementation(async ({ runAs }) => runAs === 'APP' ? anchor : userComment);
         await registerDailyGpPost({
             subredditName: 'MiniRacer',
             challengeId: challenge.id,
             postId: 't3_daily',
             postUrl: 'https://reddit.com/r/miniracer/comments/daily',
         });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('formats the agreed medal and no-medal comment copy', () => {
@@ -127,6 +149,35 @@ describe('daily GP result sharing', () => {
         });
         expect(anchor.distinguish).toHaveBeenCalledWith(true);
         expect(registered.scoreThreadCommentId).toBe(anchor.id);
+    });
+
+    it('renews the score-thread lease while Reddit comment discovery is pending', async () => {
+        vi.useFakeTimers();
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        let finishListing;
+        reddit.getComments.mockResolvedValue({
+            all: () => new Promise((resolve) => { finishListing = () => resolve([]); }),
+        });
+
+        const pending = ensureDailyGpScoreThread(post, 'mini-racer');
+        await vi.waitFor(() => expect(finishListing).toBeTypeOf('function'));
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(redis.expire).toHaveBeenCalledWith(
+            `dailygp:score-thread-lock:${post.postId}`,
+            30,
+        );
+        await expect(ensureDailyGpScoreThread(post, 'mini-racer')).rejects.toThrow(
+            'Score thread is being prepared.',
+        );
+
+        finishListing();
+        await expect(pending).resolves.toMatchObject({ scoreThreadCommentId: anchor.id });
+        expect(reddit.submitComment.mock.calls.filter(([input]) => input.runAs === 'APP')).toHaveLength(1);
     });
 
     it('keeps the first registered postId when a later registration races', async () => {
@@ -194,6 +245,68 @@ describe('daily GP result sharing', () => {
             status: 'already_shared',
             commentUrl: userComment.url,
         });
+    });
+
+    it('renews the share lease while a Reddit user comment is pending', async () => {
+        vi.useFakeTimers();
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        let finishUserComment;
+        reddit.submitComment.mockImplementation(async ({ runAs }) => {
+            if (runAs === 'APP') return anchor;
+            return new Promise((resolve) => { finishUserComment = () => resolve(userComment); });
+        });
+
+        const pending = confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+        await vi.waitFor(() => expect(finishUserComment).toBeTypeOf('function'));
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(redis.expire.mock.calls.some(([key, seconds]) => (
+            String(key).endsWith(':lock') && seconds === 30
+        ))).toBe(true);
+
+        const overlapping = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+        expect(overlapping).toMatchObject({ status: 409, body: { status: 'share_in_progress' } });
+
+        finishUserComment();
+        await expect(pending).resolves.toMatchObject({ status: 200, body: { status: 'shared' } });
+        expect(reddit.submitComment.mock.calls.filter(([input]) => input.runAs === 'USER')).toHaveLength(1);
+    });
+
+    it('fails closed and removes its comment after losing share-lock ownership', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        let finishUserComment;
+        reddit.submitComment.mockImplementation(async ({ runAs }) => {
+            if (runAs === 'APP') return anchor;
+            return new Promise((resolve) => { finishUserComment = () => resolve(userComment); });
+        });
+
+        const pending = confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+        await vi.waitFor(() => expect(finishUserComment).toBeTypeOf('function'));
+        const shareLockKey = [...strings.keys()].find((key) => String(key).endsWith(':lock'));
+        strings.set(shareLockKey, 'successor-token');
+        finishUserComment();
+
+        await expect(pending).resolves.toMatchObject({
+            status: 409,
+            body: { status: 'share_in_progress' },
+        });
+        expect(userComment.delete).toHaveBeenCalledTimes(1);
+        expect([...strings.keys()].some((key) => String(key).startsWith('dailygp:shared-result:') && !String(key).endsWith(':lock'))).toBe(false);
+        expect(strings.get(shareLockKey)).toBe('successor-token');
     });
 
     it('fails closed and deletes a comment if Reddit does not attribute it to the player', async () => {

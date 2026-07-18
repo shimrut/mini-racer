@@ -1,6 +1,6 @@
 # Bug investigation — 17 Jul 2026
 
-Original read-only pass over Mini Racer (DailyGP) high-risk paths: daily posts, score submission locks, personal-best ghosts, post-bound challenges, and the local verification queue. Resolution notes below record the later implementation on `codex/parallelize-pb-ghost-submit`.
+Original read-only pass over Mini Racer (DailyGP) high-risk paths: daily posts, score submission locks, personal-best ghosts, post-bound challenges, and the local verification queue. Resolution notes below record the subsequent targeted fixes.
 
 No code was changed in this investigation. Severity is about player/mod impact, not how often the bug fires.
 
@@ -13,7 +13,7 @@ No code was changed in this investigation. Severity is about player/mod impact, 
 | Resolved | Switching tracks can clear / replace the wrong PB ghost | Guarded by keyed request generations and selection ownership |
 | Resolved | Daily / podium post creation lock can expire and allow a duplicate Reddit post | 15m NX create-claim before Reddit; registry is first-writer-wins |
 | Resolved | Improve after a new PB can still race the old ghost | Canonical submit response is used; unresolved starts ghostless |
-| Medium | Submission lock can expire / release unsafely so two saves overlap | Low; mainly platform Redis slowdowns or two devices |
+| Resolved | Submission lock can expire / release unsafely so two saves overlap | Owned Redis transactions and renewable 30s leases prevent stale work |
 | Resolved | Post-bound challenge write can overwrite the frozen daily challenge ledger | Low; needs mismatched post challenge data |
 | Resolved | Malformed or expired local verification-queue entries can reschedule forever | Purged before retry scheduling |
 
@@ -104,9 +104,9 @@ Do **not** block the Improve button on a spinner for this.
 
 ## 4. Overlapping score submissions for the same player
 
-**Severity:** Medium; **low day-to-day likelihood**
+**Original severity:** Medium; **low day-to-day likelihood**
 
-**What happens:** Per player/day submission locks last **5 seconds**. Unlock is non-atomic (get then delete), so a late unlock can delete a newer owner’s lock. Under slow Redis/server work, two saves can overlap on the leaderboard.
+**Original failure:** Per player/day submission locks lasted **5 seconds**. Unlock was non-atomic (get then delete), so a late unlock could delete a newer owner’s lock. Under slow Redis/server work, two saves could overlap on the leaderboard.
 
 **What “heavy delay” means:** Saving that score takes **longer than 5 seconds** while holding the lock. Normal saves are usually well under a second.
 
@@ -127,6 +127,8 @@ Do **not** block the Improve button on a spinner for this.
 2. Refresh / extend the lock while the save is still running (or use a longer TTL)
 3. Harden leaderboard writes so concurrent saves cannot let a slower time overwrite a faster one (“best time wins”)
 4. Optional: on “already in progress,” client retry after ~2–5s instead of ~1s
+
+**Resolution:** Submission and PB leases now last **30 seconds** and use a shared ownership-safe Redis transaction helper for release. Daily leaderboard writes re-check the submission token inside the watched transaction before queuing any mutation; loss of ownership returns the existing retryable `503`. PB persistence verifies the token and queues its compressed write in the same watched transaction, so ownership loss remains PB-only unavailability rather than rejecting an accepted daily result. Score-thread creation and result sharing use the same 30-second owned lease with renewal every 10 seconds while Reddit work is pending, preventing a stale request from continuing side effects or deleting a successor's lock. Daily and podium post creation keep their 15-minute claims, with ownership-safe release.
 
 ---
 

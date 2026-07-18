@@ -1,4 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { gunzipSync } from 'node:zlib';
+
+function decodeCompressedValue(value) {
+    const prefix = '__gz:b64__:';
+    return typeof value === 'string' && value.startsWith(prefix)
+        ? gunzipSync(Buffer.from(value.slice(prefix.length), 'base64')).toString('utf8')
+        : value;
+}
 
 const { redis } = vi.hoisted(() => {
     const strings = new Map();
@@ -19,7 +27,7 @@ const { redis } = vi.hoisted(() => {
                 strings.delete(key);
                 hashes.delete(key);
             }),
-            hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
+            hGet: vi.fn(async (key, field) => decodeCompressedValue(hashes.get(key)?.get(field) ?? null)),
             hSet: vi.fn(async (key, values) => {
                 const hash = hashes.get(key) ?? new Map();
                 hashes.set(key, hash);
@@ -34,6 +42,21 @@ const { redis } = vi.hoisted(() => {
             expire: vi.fn(async (key, seconds) => {
                 expirations.set(key, seconds);
                 return true;
+            }),
+            watch: vi.fn(async () => {
+                const commands = [];
+                return {
+                    multi: vi.fn(async () => undefined),
+                    unwatch: vi.fn(async () => undefined),
+                    hSet: vi.fn(async (...args) => commands.push(() => redis.hSet(...args))),
+                    expire: vi.fn(async (...args) => commands.push(() => redis.expire(...args))),
+                    del: vi.fn(async (...args) => commands.push(() => redis.del(...args))),
+                    exec: vi.fn(async () => {
+                        const results = [];
+                        for (const command of commands) results.push(await command());
+                        return results;
+                    }),
+                };
             }),
         },
     };
@@ -94,6 +117,7 @@ describe('PB ghost trace and storage', () => {
         redis.strings.clear();
         redis.hashes.clear();
         redis.expirations.clear();
+        redis.get.mockImplementation(async (key) => redis.strings.get(key) ?? null);
     });
 
     it('samples simulation time at 20 Hz and appends the exact final pose', () => {
@@ -337,8 +361,34 @@ describe('PB ghost trace and storage', () => {
         });
     });
 
+    it('does not write when a successor owns the PB lock before the transaction', async () => {
+        redis.get.mockImplementation(async (key) => (
+            String(key).startsWith('dailygp:challenge-pb-lock:')
+                ? 'successor-token'
+                : redis.strings.get(key) ?? null
+        ));
+
+        await expect(upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:stale-owner',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            ghost: GHOST,
+        })).rejects.toThrow('Personal best lock ownership was lost.');
+        expect(redis.hSet).not.toHaveBeenCalled();
+        expect(redis.del).not.toHaveBeenCalled();
+    });
+
     it('does not let lock cleanup errors replace a committed PB outcome', async () => {
-        redis.get.mockRejectedValueOnce(new Error('cleanup unavailable'));
+        let lockReads = 0;
+        redis.get.mockImplementation(async (key) => {
+            if (String(key).startsWith('dailygp:challenge-pb-lock:')) {
+                lockReads += 1;
+                if (lockReads > 1) throw new Error('cleanup unavailable');
+            }
+            return redis.strings.get(key) ?? null;
+        });
 
         await expect(upsertPlayerTrackPersonalBest({
             playerId: 'reddit:cleanup',

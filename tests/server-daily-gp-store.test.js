@@ -26,6 +26,7 @@ const mockRedis = {
     watch: vi.fn(),
 };
 const mockValidateDailyGpReplayDetailed = vi.fn();
+const ownedLocks = new Map();
 
 function checkpointSplitsForChallenge(challenge, bestTimeSec) {
     const count = TRACKS[challenge.trackKey]?.checkpoints?.length || 0;
@@ -52,19 +53,25 @@ function findWrittenPlayerProfile(playerId) {
 function createMockTransaction(options = {}) {
     const commands = [];
     const hasExecResult = Object.prototype.hasOwnProperty.call(options, 'execResult');
+    let hasLeaderboardWrite = false;
     return {
         multi: vi.fn().mockResolvedValue(undefined),
+        unwatch: vi.fn().mockResolvedValue(undefined),
+        del: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.del(...args));
+        }),
         hSet: vi.fn(async (...args) => {
             commands.push(() => mockRedis.hSet(...args));
         }),
         zAdd: vi.fn(async (...args) => {
+            hasLeaderboardWrite = true;
             commands.push(() => mockRedis.zAdd(...args));
         }),
         expire: vi.fn(async (...args) => {
             commands.push(() => mockRedis.expire(...args));
         }),
         exec: vi.fn(async () => {
-            if (hasExecResult) {
+            if (hasExecResult && hasLeaderboardWrite) {
                 return options.execResult;
             }
 
@@ -88,10 +95,19 @@ vi.mock('../src/server/replay-validator.js', () => ({
 describe('server daily gp store submissions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockRedis.get.mockResolvedValue(null);
+        ownedLocks.clear();
+        mockRedis.get.mockImplementation(async (key) => ownedLocks.get(key) ?? null);
         mockRedis.mGet.mockResolvedValue([]);
-        mockRedis.set.mockResolvedValue('OK');
-        mockRedis.del.mockResolvedValue(undefined);
+        mockRedis.set.mockImplementation(async (key, value, options = {}) => {
+            if (options.nx && ownedLocks.has(key)) return '';
+            if (String(key).includes('lock:') || String(key).includes('-lock:')) {
+                ownedLocks.set(key, value);
+            }
+            return 'OK';
+        });
+        mockRedis.del.mockImplementation(async (key) => {
+            ownedLocks.delete(key);
+        });
         mockRedis.incrBy.mockResolvedValue(1);
         mockRedis.hGet.mockResolvedValue(null);
         mockRedis.hMGet.mockResolvedValue([]);
@@ -237,11 +253,13 @@ describe('server daily gp store submissions', () => {
     it('does not let submission lock cleanup errors replace a committed daily outcome', async () => {
         const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
+        let submissionLockReads = 0;
         mockRedis.get.mockImplementation(async (key) => {
             if (String(key).startsWith('dailygp:submit-lock:')) {
-                throw new Error('cleanup unavailable');
+                submissionLockReads += 1;
+                if (submissionLockReads > 1) throw new Error('cleanup unavailable');
             }
-            return null;
+            return ownedLocks.get(key) ?? null;
         });
 
         const result = await submitServerDailyGpRun({
@@ -308,7 +326,10 @@ describe('server daily gp store submissions', () => {
             expect.objectContaining({ status: 200, body: expect.objectContaining({ accepted: true }) }),
             expect.objectContaining({ status: 200, body: expect.objectContaining({ accepted: true }) }),
         ]);
-        expect(new Set(mockRedis.watch.mock.calls.map(([key]) => key))).toEqual(new Set([
+        const watchedSubmissionKeys = mockRedis.watch.mock.calls
+            .map(([key]) => key)
+            .filter((key) => String(key).startsWith('dailygp:submit-lock:'));
+        expect(new Set(watchedSubmissionKeys)).toEqual(new Set([
             `dailygp:submit-lock:${challenge.id}:reddit:pm-a`,
             `dailygp:submit-lock:${challenge.id}:reddit:pm-b`,
         ]));
@@ -334,12 +355,16 @@ describe('server daily gp store submissions', () => {
         const challenge = await getServerDailyGpChallenge();
         vi.clearAllMocks();
         let lockAttempts = 0;
-        mockRedis.set.mockImplementation(async (key) => {
+        mockRedis.set.mockImplementation(async (key, value) => {
             if (!String(key).startsWith('dailygp:submit-lock:')) {
                 return 'OK';
             }
             lockAttempts += 1;
-            return lockAttempts === 1 ? 'OK' : null;
+            if (lockAttempts === 1) {
+                ownedLocks.set(key, value);
+                return 'OK';
+            }
+            return null;
         });
 
         const submit = () => submitServerDailyGpRun({
@@ -362,6 +387,47 @@ describe('server daily gp store submissions', () => {
             },
         });
         expect(mockRedis.zAdd).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 503 without writing when a successor owns the submission lock before WATCH', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        let submissionLockKey = null;
+        mockRedis.set.mockImplementation(async (key, value, options = {}) => {
+            if (String(key).startsWith('dailygp:submit-lock:')) {
+                submissionLockKey = key;
+                ownedLocks.set(key, value);
+            } else if (options.nx && ownedLocks.has(key)) {
+                return '';
+            } else if (String(key).includes('lock:') || String(key).includes('-lock:')) {
+                ownedLocks.set(key, value);
+            }
+            return 'OK';
+        });
+        mockRedis.get.mockImplementation(async (key) => (
+            key === submissionLockKey ? 'successor-token' : ownedLocks.get(key) ?? null
+        ));
+
+        const result = await submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            leaderboardIdentity: 'constructed',
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(result).toEqual({
+            status: 503,
+            body: {
+                accepted: false,
+                error: 'Submission save was interrupted. Retrying automatically.',
+            },
+        });
+        expect(mockRedis.zAdd).not.toHaveBeenCalled();
+        expect(mockRedis.hSet.mock.calls.some(([, values]) => values?.['reddit:pm-user'])).toBe(false);
+        expect(mockRedis.del).not.toHaveBeenCalledWith(submissionLockKey);
+        expect(await mockRedis.get(submissionLockKey)).toBe('successor-token');
     });
 
     it.each([

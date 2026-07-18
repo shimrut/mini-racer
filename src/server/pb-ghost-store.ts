@@ -1,5 +1,5 @@
 import { redisCompressed as redis } from '@devvit/redis';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
     getDailyGpCompetitionTtlSeconds,
     type DailyGpChallenge,
@@ -11,6 +11,12 @@ import {
     PB_GHOST_SIMULATION_REVISION,
     type PbGhostTrace,
 } from './pb-ghost-trace.js';
+import {
+    acquireRedisLock,
+    beginOwnedRedisLockTransaction,
+    releaseRedisLock,
+} from './redis-lock.js';
+import { encodeRedisCompressedValue } from './redis-compressed-value.js';
 
 export type PlayerTrackPbRecord = {
     schemaVersion: typeof PB_GHOST_SCHEMA_VERSION;
@@ -23,7 +29,7 @@ export type PlayerTrackPbRecord = {
     updatedAt: string;
 };
 
-const PB_LOCK_TTL_MS = 5_000;
+const PB_LOCK_TTL_MS = 30_000;
 
 function playerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
@@ -102,13 +108,6 @@ async function readCompatibleRecord({
     return record;
 }
 
-async function releaseLock(key: string, value: string): Promise<void> {
-    const storedValue = await redis.get(key);
-    if (storedValue === value) {
-        await redis.del(key);
-    }
-}
-
 export async function getPlayerTrackPbRecord(input: {
     playerId: string;
     challenge: DailyGpChallenge;
@@ -147,15 +146,10 @@ export async function upsertPlayerTrackPersonalBest({
     }
 
     const lockKey = playerChallengeLockKey(challenge.id, playerId);
-    const lockValue = randomUUID();
-    const acquired = await redis.set(lockKey, lockValue, {
-        nx: true,
-        expiration: new Date(Date.now() + PB_LOCK_TTL_MS),
-    });
-    if (!acquired) {
+    const lock = await acquireRedisLock(lockKey, PB_LOCK_TTL_MS, redis);
+    if (!lock) {
         throw new Error('Personal best update already in progress.');
     }
-
     try {
         const existing = await readCompatibleRecord({ playerId, challenge, track });
         const trackFingerprint = createTrackFingerprint(track);
@@ -197,13 +191,23 @@ export async function upsertPlayerTrackPersonalBest({
         }
 
         const record = winner.record;
+        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
+        if (!transaction) {
+            throw new Error('Personal best lock ownership was lost.');
+        }
         const collectionKey = challengeCollectionKey(challenge.id);
-        await redis.hSet(collectionKey, { [playerField(playerId)]: JSON.stringify(record) });
-        await redis.expire(collectionKey, ttlSeconds);
+        await transaction.hSet(collectionKey, {
+            [playerField(playerId)]: encodeRedisCompressedValue(JSON.stringify(record)),
+        });
+        await transaction.expire(collectionKey, ttlSeconds);
+        const transactionResults = await transaction.exec();
+        if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
+            throw new Error('Personal best lock ownership was lost.');
+        }
         return { record, improved: winner.source === 'current' };
     } finally {
         try {
-            await releaseLock(lockKey, lockValue);
+            await releaseRedisLock(lock, redis);
         } catch (error) {
             // Lock cleanup is best-effort; it must not replace a committed outcome.
             console.error('Challenge PB lock cleanup failed:', error);

@@ -1,6 +1,6 @@
-import { redis } from '@devvit/redis';
-import { randomUUID } from 'node:crypto';
+import { redis, type RedisClient, type TxClientLike } from '@devvit/redis';
 import { DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
+import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
 
 /** How long a create-claim may sit if the winner crashes before release. */
 export const DAILY_GP_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
@@ -15,7 +15,7 @@ export type DailyGpPostRecord = {
     updatedAt: string;
 };
 
-type DailyGpPostCreationLock = { key: string; value: string };
+type DailyGpPostCreationLock = RedisLock;
 
 function createPostRecordExpiration(): Date {
     return new Date(Date.now() + (DAILY_GP_REDIS_TTL_SECONDS * 1000));
@@ -71,10 +71,13 @@ export async function readDailyGpPostRecord(
     return parsePostRecord(await redis.get(createPostRecordKey(subredditName, challengeId)));
 }
 
-export async function writeDailyGpPostRecord(record: DailyGpPostRecord): Promise<void> {
+export async function writeDailyGpPostRecord(
+    record: DailyGpPostRecord,
+    client: RedisClient | TxClientLike = redis,
+): Promise<void> {
     const key = createPostRecordKey(record.subredditName, record.challengeId);
-    await redis.set(key, JSON.stringify(record));
-    await redis.expire(key, DAILY_GP_REDIS_TTL_SECONDS);
+    await client.set(key, JSON.stringify(record));
+    await client.expire(key, DAILY_GP_REDIS_TTL_SECONDS);
 }
 
 /** First-writer-wins create. Returns false if a record already exists. */
@@ -92,19 +95,11 @@ export async function acquireDailyGpPostCreationLock(
     challengeId: string,
 ): Promise<DailyGpPostCreationLock | null> {
     const key = createPostCreationLockKey(subredditName, challengeId);
-    const value = randomUUID();
-    const acquired = await redis.set(key, value, {
-        nx: true,
-        expiration: new Date(Date.now() + DAILY_GP_POST_CREATE_CLAIM_TTL_MS),
-    });
-    return acquired ? { key, value } : null;
+    return acquireRedisLock(key, DAILY_GP_POST_CREATE_CLAIM_TTL_MS, redis);
 }
 
 export async function releaseDailyGpPostCreationLock(
     lock: DailyGpPostCreationLock | null,
 ): Promise<void> {
-    if (!lock) return;
-    if (await redis.get(lock.key) === lock.value) {
-        await redis.del(lock.key);
-    }
+    await releaseRedisLock(lock, redis);
 }

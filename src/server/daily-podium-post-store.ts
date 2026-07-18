@@ -1,7 +1,7 @@
 import { redis } from '@devvit/redis';
-import { randomUUID } from 'node:crypto';
 import { DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
 import type { DailyGpPodiumPostData } from './daily-podium-model.js';
+import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
 
 /** How long a create-claim may sit if the winner crashes before release. */
 export const DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
@@ -14,7 +14,7 @@ export type DailyGpPodiumPostRecord = {
     createdAt: string;
 };
 
-type DailyGpPodiumPostCreationLock = { key: string; value: string };
+type DailyGpPodiumPostCreationLock = RedisLock;
 
 function createPodiumPostRecordExpiration(): Date {
     return new Date(Date.now() + (DAILY_GP_REDIS_TTL_SECONDS * 1000));
@@ -158,19 +158,11 @@ export async function acquireDailyGpPodiumPostCreationLock(
     challengeId: string,
 ): Promise<DailyGpPodiumPostCreationLock | null> {
     const key = createPodiumPostCreationLockKey(subredditName, challengeId);
-    const value = randomUUID();
-    const acquired = await redis.set(key, value, {
-        nx: true,
-        expiration: new Date(Date.now() + DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS),
-    });
-    return acquired ? { key, value } : null;
+    return acquireRedisLock(key, DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS, redis);
 }
 
 export async function releaseDailyGpPodiumPostCreationLock(
     lock: DailyGpPodiumPostCreationLock | null,
 ): Promise<void> {
-    if (!lock) return;
-    if (await redis.get(lock.key) === lock.value) {
-        await redis.del(lock.key);
-    }
+    await releaseRedisLock(lock, redis);
 }

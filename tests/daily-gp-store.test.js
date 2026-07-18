@@ -192,6 +192,10 @@ class RedisTestDouble {
     const commands = [];
     return {
       multi: async () => {},
+      unwatch: async () => {},
+      del: async (...args) => {
+        commands.push(() => this.del(...args));
+      },
       hSet: async (...args) => {
         commands.push(() => this.hSet(...args));
       },
