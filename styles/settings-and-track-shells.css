@@ -232,7 +232,7 @@
 
 #settings-modal .settings-decimal-options {
     display: grid;
-    grid-template-columns: repeat(3, 2.4rem);
+    grid-template-columns: repeat(2, 2.4rem);
     gap: 0.3rem;
     flex-shrink: 0;
 }

@@ -19,7 +19,7 @@ Steer, finish one clean lap as fast as you can, then try again. Improvement come
 - Race **today’s featured track** and chase the fastest lap
 - Beat your **personal best** on each track (kept for life) and race a faint **ghost** of that lap (on by default; off in Settings)
 - Climb that day’s **leaderboard** in Standings
-- Choose **2, 3, or 4 decimal places** for leaderboard times in Settings
+- Choose **2 or 3 decimal places** for leaderboard times in Settings
 - Earn **medals** by beating target times on each track
 - Replay the last **7 days** of tracks from the Tracks screen
 - Change how your car looks in the **Garage** (skins and trails — handling stays the same)

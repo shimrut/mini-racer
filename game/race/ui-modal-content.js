@@ -3,7 +3,10 @@ import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/resu
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
-import { getLeaderboardDecimalPlaces } from '../settings/leaderboard-decimal-places-preference.js';
+import {
+    getLeaderboardDecimalPlaces,
+    normalizeLeaderboardDecimalPlaces,
+} from '../settings/leaderboard-decimal-places-preference.js';
 
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
@@ -800,7 +803,7 @@ export class ModalContentUi {
 
     formatLeaderboardTime(seconds) {
         if (!Number.isFinite(seconds)) return '--';
-        const decimalPlaces = this.getLeaderboardPrecision();
+        const decimalPlaces = normalizeLeaderboardDecimalPlaces(this.getLeaderboardPrecision());
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         const secondsWidth = decimalPlaces + 3;

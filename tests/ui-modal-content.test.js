@@ -137,7 +137,7 @@ describe('ui modal content helpers', () => {
     it.each([
         [2, '01:02.35'],
         [3, '01:02.346'],
-        [4, '01:02.3457'],
+        [4, '01:02.346'],
     ])('formats leaderboard times with %i decimal places', (decimalPlaces, expected) => {
         const component = new ModalContentUi({
             getLeaderboardPrecision: () => decimalPlaces,

@@ -197,7 +197,6 @@ export class ModalShell {
             document.getElementById('settings-pb-ghost-switch'),
             document.getElementById('settings-leaderboard-decimals-2'),
             document.getElementById('settings-leaderboard-decimals-3'),
-            document.getElementById('settings-leaderboard-decimals-4'),
             document.getElementById('settings-collision-auto-restart-switch'),
             document.getElementById('settings-collision-restart-delay-minus'),
             document.getElementById('settings-collision-restart-delay-plus'),

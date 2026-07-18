@@ -28,9 +28,10 @@ describe('leaderboard decimal places preference', () => {
         expect(normalizeLeaderboardDecimalPlaces(1)).toBe(2);
         expect(normalizeLeaderboardDecimalPlaces(3.7)).toBe(2);
         expect(normalizeLeaderboardDecimalPlaces('5')).toBe(2);
+        expect(normalizeLeaderboardDecimalPlaces(4)).toBe(3);
     });
 
-    it.each([2, 3, 4])('persists %i decimal places', (decimalPlaces) => {
+    it.each([2, 3])('persists %i decimal places', (decimalPlaces) => {
         expect(setLeaderboardDecimalPlaces(decimalPlaces)).toBe(decimalPlaces);
         expect(store.get(LEADERBOARD_DECIMAL_PLACES_STORAGE_KEY)).toBe(String(decimalPlaces));
         expect(getLeaderboardDecimalPlaces()).toBe(decimalPlaces);

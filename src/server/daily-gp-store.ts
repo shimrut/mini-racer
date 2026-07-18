@@ -393,6 +393,7 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
     const carSkin = typeof preferences.carSkin === 'string' ? preferences.carSkin.trim() : '';
     const trailId = typeof preferences.trailId === 'string' ? preferences.trailId.trim() : '';
     const crashRestartDelaySec = Number(preferences.crashRestartDelaySec);
+    const leaderboardDecimalPlaces = Number(preferences.leaderboardDecimalPlaces);
     if (
         !carSkin
         || carSkin.length > 160
@@ -407,7 +408,7 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
         )
         || (
             preferences.leaderboardDecimalPlaces !== undefined
-            && ![2, 3, 4].includes(Number(preferences.leaderboardDecimalPlaces))
+            && ![2, 3, 4].includes(leaderboardDecimalPlaces)
         )
         || !Number.isFinite(crashRestartDelaySec)
         || crashRestartDelaySec < 0
@@ -424,9 +425,11 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
         crashAutoRestartEnabled: preferences.crashAutoRestartEnabled,
         crashRestartDelaySec: Math.round(crashRestartDelaySec * 10) / 10,
         pbGhostEnabled: preferences.pbGhostEnabled !== false,
-        leaderboardDecimalPlaces: [2, 3, 4].includes(Number(preferences.leaderboardDecimalPlaces))
-            ? Number(preferences.leaderboardDecimalPlaces) as 2 | 3 | 4
-            : 2,
+        leaderboardDecimalPlaces: leaderboardDecimalPlaces === 4
+            ? 3
+            : ([2, 3].includes(leaderboardDecimalPlaces)
+                ? leaderboardDecimalPlaces as 2 | 3
+                : 2),
     };
 }
 

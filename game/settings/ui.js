@@ -94,7 +94,7 @@ export class SettingsUi {
     get pbGhostSwitch() { return document.getElementById('settings-pb-ghost-switch'); }
     get pbGhostHeading() { return document.getElementById('settings-pb-ghost-heading'); }
     get leaderboardDecimalPlacesOptions() {
-        return [2, 3, 4]
+        return [2, 3]
             .map((value) => document.getElementById(`settings-leaderboard-decimals-${value}`))
             .filter(Boolean);
     }

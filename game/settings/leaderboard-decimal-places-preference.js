@@ -1,9 +1,10 @@
 export const LEADERBOARD_DECIMAL_PLACES_STORAGE_KEY = 'VectorGpLeaderboardDecimalPlaces';
-export const LEADERBOARD_DECIMAL_PLACES_OPTIONS = Object.freeze([2, 3, 4]);
+export const LEADERBOARD_DECIMAL_PLACES_OPTIONS = Object.freeze([2, 3]);
 export const LEADERBOARD_DECIMAL_PLACES_DEFAULT = 2;
 
 export function normalizeLeaderboardDecimalPlaces(value) {
     const parsed = Number(value);
+    if (parsed === 4) return 3;
     return LEADERBOARD_DECIMAL_PLACES_OPTIONS.includes(parsed)
         ? parsed
         : LEADERBOARD_DECIMAL_PLACES_DEFAULT;
