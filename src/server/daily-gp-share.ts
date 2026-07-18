@@ -13,6 +13,7 @@ import {
     readDailyGpPostRecord,
     releaseDailyGpPostCreationLock,
     writeDailyGpPostRecord,
+    writeDailyGpPostRecordIfAbsent,
     type DailyGpPostRecord,
 } from './daily-gp-post-store.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
@@ -208,18 +209,28 @@ export async function registerDailyGpPost({
     postUrl: string;
 }): Promise<DailyGpPostRecord> {
     const existing = await readDailyGpPostRecord(subredditName, challengeId);
+    if (existing) {
+        return existing;
+    }
     const now = new Date().toISOString();
     const record: DailyGpPostRecord = {
         subredditName,
         challengeId,
         postId,
         postUrl,
-        scoreThreadCommentId: existing?.postId === postId ? existing.scoreThreadCommentId : null,
-        createdAt: existing?.postId === postId ? existing.createdAt : now,
+        scoreThreadCommentId: null,
+        createdAt: now,
         updatedAt: now,
     };
-    await writeDailyGpPostRecord(record);
-    return record;
+    const wrote = await writeDailyGpPostRecordIfAbsent(record);
+    if (wrote) {
+        return record;
+    }
+    const winner = await readDailyGpPostRecord(subredditName, challengeId);
+    if (!winner) {
+        throw new Error('Daily Mini Racer post registry race left no canonical record.');
+    }
+    return winner;
 }
 
 async function recoverDailyGpPost({

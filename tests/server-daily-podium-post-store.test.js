@@ -13,11 +13,13 @@ vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 
 const {
     acquireDailyGpPodiumPostCreationLock,
+    DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS,
     deleteDailyGpPodiumPendingSnapshot,
     readDailyGpPodiumPendingSnapshot,
     readDailyGpPodiumPostRecord,
     releaseDailyGpPodiumPostCreationLock,
     writeDailyGpPodiumPostRecord,
+    writeDailyGpPodiumPostRecordIfAbsent,
     writeDailyGpPodiumPendingSnapshot,
 } = await import('../src/server/daily-podium-post-store.ts');
 
@@ -106,7 +108,9 @@ describe('daily podium post store', () => {
         );
     });
 
-    it('uses an owner-checked short creation lock', async () => {
+    it('uses an owner-checked 15-minute create claim', async () => {
+        const now = Date.parse('2026-07-17T00:01:00.000Z');
+        vi.spyOn(Date, 'now').mockReturnValue(now);
         const lock = await acquireDailyGpPodiumPostCreationLock(
             'MiniRacer',
             'daily-gp-2026-07-10',
@@ -117,11 +121,12 @@ describe('daily podium post store', () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
             lock.key,
             lock.value,
-            expect.objectContaining({
+            {
                 nx: true,
-                expiration: expect.any(Date),
-            }),
+                expiration: new Date(now + DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS),
+            },
         );
+        expect(DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS).toBe(15 * 60 * 1000);
 
         mockRedis.get.mockResolvedValue(lock.value);
         await releaseDailyGpPodiumPostCreationLock(lock);
@@ -137,5 +142,30 @@ describe('daily podium post store', () => {
         await expect(
             acquireDailyGpPodiumPostCreationLock('MiniRacer', 'daily-gp-2026-07-10'),
         ).resolves.toBeNull();
+    });
+
+    it('writes a first-writer-wins post record', async () => {
+        const now = Date.parse('2026-07-17T00:01:00.000Z');
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        const record = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            postId: 't3_podium',
+            postUrl: 'https://reddit.com/podium',
+            createdAt: '2026-07-17T00:01:00.000Z',
+        };
+
+        await expect(writeDailyGpPodiumPostRecordIfAbsent(record)).resolves.toBe(true);
+        expect(mockRedis.set).toHaveBeenCalledWith(
+            `dailygp:podium-post:miniracer:${record.challengeId}`,
+            JSON.stringify(record),
+            {
+                nx: true,
+                expiration: new Date(now + (45 * 24 * 60 * 60 * 1000)),
+            },
+        );
+
+        mockRedis.set.mockResolvedValue(null);
+        await expect(writeDailyGpPodiumPostRecordIfAbsent(record)).resolves.toBe(false);
     });
 });

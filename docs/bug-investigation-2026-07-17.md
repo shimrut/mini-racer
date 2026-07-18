@@ -11,7 +11,7 @@ No code was changed in this investigation. Severity is about player/mod impact, 
 | Severity | Issue | Day-to-day likelihood |
 | --- | --- | --- |
 | Resolved | Switching tracks can clear / replace the wrong PB ghost | Guarded by keyed request generations and selection ownership |
-| High | Daily / podium post creation lock can expire and allow a duplicate Reddit post | Low for normal auto-post; higher if cron retries or a mod creates at the same time |
+| Resolved | Daily / podium post creation lock can expire and allow a duplicate Reddit post | 15m NX create-claim before Reddit; registry is first-writer-wins |
 | Resolved | Improve after a new PB can still race the old ghost | Canonical submit response is used; unresolved starts ghostless |
 | Medium | Submission lock can expire / release unsafely so two saves overlap | Low; mainly platform Redis slowdowns or two devices |
 | Medium | Post-bound challenge write can overwrite the frozen daily challenge ledger | Low; needs mismatched post challenge data |
@@ -44,10 +44,10 @@ Areas that looked solid in this pass: physics vs server replay validation, guest
 
 **Severity:** High (impact if it happens); **low probability** for normal automatic posting alone
 
-**What happens:** Post-creation locks last **30 seconds**. If creating the Reddit post + score-thread setup takes longer than that, a second request can acquire the lock and submit another post for the same day/subreddit.
+**What happens:** Post-creation locks lasted **30 seconds**. If creating the Reddit post + score-thread setup took longer than that, a second request could acquire the lock and submit another post for the same day/subreddit. Registry writes were plain overwrites, so Redis could keep only the second `postId`.
 
 **Where:**
-- `src/server/daily-gp-post-store.ts` / `src/server/daily-podium-post-store.ts` (30s lock)
+- `src/server/daily-gp-post-store.ts` / `src/server/daily-podium-post-store.ts`
 - `src/server/daily-post-service.ts` / `src/server/daily-podium-service.ts`
 
 **When it is unlikely:**
@@ -62,6 +62,8 @@ Areas that looked solid in this pass: physics vs server replay validation, guest
 - Many subscribed subreddits + overlapping job runs under slow Reddit API
 
 **Fix direction:** Ownership-safe lock with lease renewal, and/or persist an idempotency record before calling Reddit and reconcile afterward.
+
+**Resolution:** Create-claims use NX with a **15-minute** TTL (crash recovery only; still released on success/failure). Post registry registration is first-writer-wins (`SET NX`); a later duplicate `postId` cannot overwrite the canonical record.
 
 ---
 

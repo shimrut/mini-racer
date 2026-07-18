@@ -17,7 +17,7 @@ const { mockReddit, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted
         readDailyGpPodiumPendingSnapshot: vi.fn(),
         readDailyGpPodiumPostRecord: vi.fn(),
         releaseDailyGpPodiumPostCreationLock: vi.fn(),
-        writeDailyGpPodiumPostRecord: vi.fn(),
+        writeDailyGpPodiumPostRecordIfAbsent: vi.fn(),
         writeDailyGpPodiumPendingSnapshot: vi.fn(),
     },
     mockContext: { getRequestAppSlug: vi.fn() },
@@ -75,7 +75,7 @@ describe('daily podium post workflow', () => {
             value: 'owner',
         });
         mockPostStore.releaseDailyGpPodiumPostCreationLock.mockResolvedValue(undefined);
-        mockPostStore.writeDailyGpPodiumPostRecord.mockResolvedValue(undefined);
+        mockPostStore.writeDailyGpPodiumPostRecordIfAbsent.mockResolvedValue(true);
         mockPostStore.writeDailyGpPodiumPendingSnapshot.mockResolvedValue(undefined);
         mockPostStore.deleteDailyGpPodiumPendingSnapshot.mockResolvedValue(undefined);
         mockAutopostStore.readDailyPodiumAutopostSubscription.mockResolvedValue(null);
@@ -165,7 +165,7 @@ describe('daily podium post workflow', () => {
                 positions: expect.any(Array),
             }),
         });
-        expect(mockPostStore.writeDailyGpPodiumPostRecord).toHaveBeenCalledWith(
+        expect(mockPostStore.writeDailyGpPodiumPostRecordIfAbsent).toHaveBeenCalledWith(
             expect.objectContaining({
                 subredditName: 'MiniRacer',
                 challengeId: podium.challengeId,
@@ -304,7 +304,7 @@ describe('daily podium post workflow', () => {
             postUrl: recoveredPodium.url,
         });
         expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
-        expect(mockPostStore.writeDailyGpPodiumPostRecord).toHaveBeenCalledWith(
+        expect(mockPostStore.writeDailyGpPodiumPostRecordIfAbsent).toHaveBeenCalledWith(
             expect.objectContaining({
                 postId: recoveredPodium.id,
                 challengeId: podium.challengeId,

@@ -14,7 +14,7 @@ import {
     readDailyGpPodiumPendingSnapshot,
     readDailyGpPodiumPostRecord,
     releaseDailyGpPodiumPostCreationLock,
-    writeDailyGpPodiumPostRecord,
+    writeDailyGpPodiumPostRecordIfAbsent,
     writeDailyGpPodiumPendingSnapshot,
 } from './daily-podium-post-store.js';
 import { getRequestAppSlug } from './request-context.js';
@@ -231,17 +231,25 @@ async function registerDailyGpPodiumPost({
     postUrl: string;
 }) {
     const existing = await readDailyGpPodiumPostRecord(subredditName, challengeId);
+    if (existing) {
+        return existing;
+    }
     const record = {
         subredditName,
         challengeId,
         postId,
         postUrl,
-        createdAt: existing?.postId === postId
-            ? existing.createdAt
-            : new Date().toISOString(),
+        createdAt: new Date().toISOString(),
     };
-    await writeDailyGpPodiumPostRecord(record);
-    return record;
+    const wrote = await writeDailyGpPodiumPostRecordIfAbsent(record);
+    if (wrote) {
+        return record;
+    }
+    const winner = await readDailyGpPodiumPostRecord(subredditName, challengeId);
+    if (!winner) {
+        throw new Error('Daily Mini Racer podium post registry race left no canonical record.');
+    }
+    return winner;
 }
 
 async function recoverDailyGpPodiumPost({

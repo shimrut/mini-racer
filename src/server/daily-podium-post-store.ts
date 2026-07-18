@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
 import type { DailyGpPodiumPostData } from './daily-podium-model.js';
 
+/** How long a create-claim may sit if the winner crashes before release. */
+export const DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
+
 export type DailyGpPodiumPostRecord = {
     subredditName: string;
     challengeId: string;
@@ -12,6 +15,10 @@ export type DailyGpPodiumPostRecord = {
 };
 
 type DailyGpPodiumPostCreationLock = { key: string; value: string };
+
+function createPodiumPostRecordExpiration(): Date {
+    return new Date(Date.now() + (DAILY_GP_REDIS_TTL_SECONDS * 1000));
+}
 
 export type DailyGpPodiumPendingSnapshot = {
     subredditName: string;
@@ -134,6 +141,18 @@ export async function writeDailyGpPodiumPostRecord(
     await redis.expire(key, DAILY_GP_REDIS_TTL_SECONDS);
 }
 
+/** First-writer-wins create. Returns false if a record already exists. */
+export async function writeDailyGpPodiumPostRecordIfAbsent(
+    record: DailyGpPodiumPostRecord,
+): Promise<boolean> {
+    const key = createPodiumPostRecordKey(record.subredditName, record.challengeId);
+    const result = await redis.set(key, JSON.stringify(record), {
+        nx: true,
+        expiration: createPodiumPostRecordExpiration(),
+    });
+    return Boolean(result);
+}
+
 export async function acquireDailyGpPodiumPostCreationLock(
     subredditName: string,
     challengeId: string,
@@ -142,7 +161,7 @@ export async function acquireDailyGpPodiumPostCreationLock(
     const value = randomUUID();
     const acquired = await redis.set(key, value, {
         nx: true,
-        expiration: new Date(Date.now() + 30_000),
+        expiration: new Date(Date.now() + DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS),
     });
     return acquired ? { key, value } : null;
 }

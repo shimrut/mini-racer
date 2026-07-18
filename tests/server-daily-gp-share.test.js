@@ -129,6 +129,24 @@ describe('daily GP result sharing', () => {
         expect(registered.scoreThreadCommentId).toBe(anchor.id);
     });
 
+    it('keeps the first registered postId when a later registration races', async () => {
+        const original = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        const raced = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_duplicate',
+            postUrl: 'https://reddit.com/r/miniracer/comments/duplicate',
+        });
+
+        expect(raced).toEqual(original);
+        expect(raced.postId).toBe('t3_daily');
+    });
+
     it('previews, confirms as the Reddit user, and makes repeat shares idempotent', async () => {
         const preview = await previewDailyGpShare({
             source: 'finish',
