@@ -1,0 +1,87 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+    getCachedDailyChallengeSnapshot,
+    getDailyChallengeSnapshot
+} from '../game/daily-challenge/service.js';
+
+// This file gets its own fresh module graph, so the snapshot cache has never
+// been hydrated from storage yet. The very first call that touches the
+// snapshot cache in this file determines what hydration reads, so keep this
+// file focused on that one scenario.
+
+function createMemoryLocalStorage(initial = {}) {
+    const data = new Map(Object.entries(initial));
+    return {
+        getItem: (k) => (data.has(k) ? data.get(k) : null),
+        setItem: (k, v) => { data.set(k, v); },
+        removeItem: (k) => { data.delete(k); }
+    };
+}
+
+describe('daily-challenge snapshot cache storage', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        delete globalThis.window;
+        delete globalThis.fetch;
+    });
+
+    it('hydrates only the valid, non-expired entries from a stored snapshot cache', () => {
+        const validSnapshot = {
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 0,
+            leaderboardEntryCount: 0,
+            objectiveType: 'single_lap_fastest',
+            playerRank: null,
+            playerRankLabel: '--'
+        };
+        globalThis.window = {
+            localStorage: createMemoryLocalStorage({
+                VectorGpDailyChallengeSnapshotCache: JSON.stringify({
+                    entries: {
+                        'valid-hydrated-challenge': {
+                            snapshot: validSnapshot,
+                            expiresAt: Date.now() + 60_000
+                        },
+                        'expired-hydrated-challenge': {
+                            snapshot: validSnapshot,
+                            expiresAt: Date.now() - 60_000
+                        },
+                        'malformed-hydrated-challenge': null
+                    }
+                })
+            })
+        };
+
+        expect(getCachedDailyChallengeSnapshot('valid-hydrated-challenge')).toMatchObject(validSnapshot);
+        expect(getCachedDailyChallengeSnapshot('expired-hydrated-challenge')).toBeNull();
+        expect(getCachedDailyChallengeSnapshot('malformed-hydrated-challenge')).toBeNull();
+    });
+
+    it('keeps the in-memory snapshot cache updated even when persisting it throws', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        globalThis.window = { localStorage: createMemoryLocalStorage() };
+        globalThis.window.localStorage.setItem = () => { throw new Error('quota exceeded'); };
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: null,
+                totalCount: 0,
+                objectiveType: 'single_lap_fastest'
+            })
+        });
+
+        const challengeId = 'write-error-snapshot-challenge';
+        await getDailyChallengeSnapshot({ challengeId, forceRefresh: true });
+
+        expect(getCachedDailyChallengeSnapshot(challengeId)).not.toBeNull();
+        expect(console.error).toHaveBeenCalledWith(
+            'Error writing daily snapshot cache:',
+            expect.any(Error)
+        );
+    });
+});

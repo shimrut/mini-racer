@@ -123,6 +123,12 @@ describe('daily GP result sharing', () => {
         vi.useRealTimers();
     });
 
+    it('pins the exact score-thread anchor copy', () => {
+        expect(DAILY_GP_SCORE_THREAD_TEXT).toBe(
+            '🏁 Mini Racer score thread\n\nShare your lap time from the game and it will appear as a reply here from your Reddit account.',
+        );
+    });
+
     it('formats the agreed medal and no-medal comment copy', () => {
         expect(formatDailyGpShareComment(42380, 'gold', 'Classic Circuit')).toBe(
             'I earned the Gold medal 🥇 with a 42.38 lap in Classic Circuit.',
@@ -519,6 +525,447 @@ describe('daily GP result sharing', () => {
         )).toMatchObject({
             status: 409,
             body: { status: 'preview_expired' },
+        });
+    });
+
+    it('recovers a historical post by matching subreddit and challenge, preferring the requested URL', async () => {
+        strings.clear();
+        const otherMatch = {
+            id: 't3_othermatch',
+            url: 'https://reddit.com/r/miniracer/comments/othermatch',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        };
+        const preferredMatch = {
+            id: 't3_preferred',
+            url: 'https://reddit.com/r/miniracer/comments/preferred',
+            subredditName: 'MINIRACER',
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        };
+        const wrongSubreddit = {
+            id: 't3_wrongsub',
+            url: 'https://reddit.com/r/other/comments/wrongsub',
+            subredditName: 'SomeOtherSub',
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        };
+        const wrongChallenge = {
+            id: 't3_wrongchallenge',
+            url: 'https://reddit.com/r/miniracer/comments/wrongchallenge',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({ challengeId: 'a-different-challenge' })),
+        };
+        const unavailablePost = {
+            id: 't3_unavailable',
+            url: 'https://reddit.com/r/miniracer/comments/unavailable',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => { throw new Error('post data unavailable'); }),
+        };
+        reddit.getPostsByUser.mockResolvedValueOnce({
+            all: async () => [wrongSubreddit, wrongChallenge, unavailablePost, otherMatch, preferredMatch],
+        });
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { ...requestContext, preferredPostUrl: preferredMatch.url });
+
+        expect(preview.status).toBe(200);
+        expect(reddit.getPostsByUser).toHaveBeenCalledWith({
+            username: 'mini-racer',
+            sort: 'new',
+            timeframe: 'month',
+            limit: 100,
+            pageSize: 100,
+        });
+
+        await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+        expect(reddit.submitComment).toHaveBeenNthCalledWith(1, {
+            id: preferredMatch.id,
+            text: DAILY_GP_SCORE_THREAD_TEXT,
+            runAs: 'APP',
+        });
+    });
+
+    it('falls back to the first matching historical post when no preferred URL matches', async () => {
+        strings.clear();
+        const firstMatch = {
+            id: 't3_firstmatch',
+            url: 'https://reddit.com/r/miniracer/comments/firstmatch',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        };
+        const secondMatch = {
+            id: 't3_secondmatch',
+            url: 'https://reddit.com/r/miniracer/comments/secondmatch',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        };
+        reddit.getPostsByUser.mockResolvedValueOnce({
+            all: async () => [firstMatch, secondMatch],
+        });
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(reddit.submitComment).toHaveBeenNthCalledWith(1, {
+            id: firstMatch.id,
+            text: DAILY_GP_SCORE_THREAD_TEXT,
+            runAs: 'APP',
+        });
+    });
+
+    it('reports the post as unavailable when no historical post matches and when listings cannot be enumerated', async () => {
+        strings.clear();
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => [] });
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext)).toMatchObject({
+            status: 404,
+            body: { status: 'post_unavailable' },
+        });
+
+        reddit.getPostsByUser.mockResolvedValueOnce({});
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext)).toMatchObject({
+            status: 404,
+            body: { status: 'post_unavailable' },
+        });
+
+        reddit.getPostsByUser.mockResolvedValueOnce({
+            all: async () => [{
+                id: 'not-a-t3-id',
+                url: 'https://reddit.com/r/miniracer/comments/badid',
+                subredditName: 'MiniRacer',
+                getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+            }],
+        });
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext)).toMatchObject({
+            status: 404,
+            body: { status: 'post_unavailable' },
+        });
+    });
+
+    it('returns the concurrent winner record when its own create-claim write loses the race', async () => {
+        await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        redis.get.mockResolvedValueOnce(null);
+
+        const loser = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_loser',
+            postUrl: 'https://reddit.com/r/miniracer/comments/loser',
+        });
+
+        expect(loser.postId).toBe('t3_daily');
+    });
+
+    it('throws when a post registration race leaves no canonical record behind', async () => {
+        strings.clear();
+        strings.set(`dailygp:post:miniracer:${challenge.id}`, 'not-json');
+
+        await expect(registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_loser',
+            postUrl: 'https://reddit.com/r/miniracer/comments/loser',
+        })).rejects.toThrow('Daily Mini Racer post registry race left no canonical record.');
+    });
+
+    it('treats a corrupted shared-result record as unshared instead of failing', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        const sharedKey = [...strings.keys()].find((key) => key.startsWith('dailygp:shared-result:') && !key.endsWith(':lock'));
+        strings.set(sharedKey, '{not-json');
+
+        const confirmed = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(confirmed).toMatchObject({ status: 200, body: { status: 'shared' } });
+    });
+
+    it('falls back to the configured rate-limit window when Redis reports a non-positive expiry', async () => {
+        for (let i = 0; i < 12; i += 1) {
+            await previewDailyGpShare({
+                source: 'standings',
+                challengeId: challenge.id,
+            }, requestContext);
+        }
+        redis.expireTime.mockResolvedValueOnce(0);
+
+        const limited = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(limited.body.retryAfterSeconds).toBe(60);
+    });
+
+    it('requires a subreddit and app slug in addition to a username before sharing', async () => {
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { username: 'RaceFan', subredditName: '  ', appSlug: 'mini-racer' })).toMatchObject({
+            status: 401,
+            body: { status: 'signed_in_required' },
+        });
+        expect(await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { username: 'RaceFan', subredditName: 'MiniRacer', appSlug: 42 })).toMatchObject({
+            status: 401,
+            body: { status: 'signed_in_required' },
+        });
+    });
+
+    it('ignores a whitespace-only preferred post URL when recovering a historical post', async () => {
+        strings.clear();
+        const onlyMatch = {
+            id: 't3_onlymatch',
+            url: 'https://reddit.com/r/miniracer/comments/onlymatch',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        };
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => [onlyMatch] });
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { ...requestContext, preferredPostUrl: '   ' });
+        await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(reddit.submitComment).toHaveBeenNthCalledWith(1, {
+            id: onlyMatch.id,
+            text: DAILY_GP_SCORE_THREAD_TEXT,
+            runAs: 'APP',
+        });
+    });
+
+    it('reuses an already-posted score-thread anchor instead of creating a duplicate', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        const existingAnchor = { ...anchor, body: DAILY_GP_SCORE_THREAD_TEXT };
+        reddit.getComments.mockResolvedValueOnce({ all: async () => [existingAnchor] });
+
+        const result = await ensureDailyGpScoreThread(post, 'mini-racer');
+
+        expect(result.scoreThreadCommentId).toBe(anchor.id);
+        expect(anchor.distinguish).toHaveBeenCalledWith(true);
+        expect(reddit.submitComment).not.toHaveBeenCalled();
+    });
+
+    it('returns immediately when the stored score-thread comment is still valid', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        const withThread = await ensureDailyGpScoreThread(post, 'mini-racer');
+        reddit.getComments.mockClear();
+
+        const again = await ensureDailyGpScoreThread(withThread, 'mini-racer');
+
+        expect(again).toEqual(withThread);
+        expect(reddit.getCommentById).toHaveBeenCalledWith(anchor.id);
+        expect(reddit.getComments).not.toHaveBeenCalled();
+    });
+
+    it('rebuilds the score thread when the stored comment id can no longer be resolved', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        const staleRecord = { ...post, scoreThreadCommentId: 't1_stale' };
+        reddit.getCommentById.mockRejectedValueOnce(new Error('gone'));
+
+        const rebuilt = await ensureDailyGpScoreThread(staleRecord, 'mini-racer');
+
+        expect(reddit.getCommentById).toHaveBeenCalledWith('t1_stale');
+        expect(rebuilt.scoreThreadCommentId).toBe(anchor.id);
+        expect(reddit.submitComment).toHaveBeenCalledWith({
+            id: post.postId,
+            text: DAILY_GP_SCORE_THREAD_TEXT,
+            runAs: 'APP',
+        });
+    });
+
+    it('rebuilds the score thread when the stored comment was removed', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        const staleRecord = { ...post, scoreThreadCommentId: 't1_stale' };
+        reddit.getCommentById.mockResolvedValueOnce({ removed: true });
+
+        const rebuilt = await ensureDailyGpScoreThread(staleRecord, 'mini-racer');
+
+        expect(rebuilt.scoreThreadCommentId).toBe(anchor.id);
+        expect(reddit.submitComment).toHaveBeenCalledWith({
+            id: post.postId,
+            text: DAILY_GP_SCORE_THREAD_TEXT,
+            runAs: 'APP',
+        });
+    });
+
+    it('returns the latest record when the score-thread lock is busy but another worker already finished', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        const completed = { ...post, scoreThreadCommentId: anchor.id, updatedAt: new Date().toISOString() };
+        strings.set(`dailygp:post:miniracer:${challenge.id}`, JSON.stringify(completed));
+        strings.set(`dailygp:score-thread-lock:${post.postId}`, 'someone-elses-lock-value');
+
+        const result = await ensureDailyGpScoreThread(post, 'mini-racer');
+
+        expect(result).toMatchObject({ scoreThreadCommentId: anchor.id });
+        expect(reddit.submitComment).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the score-thread lock is lost right before its transaction commits', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        let finishDistinguish;
+        anchor.distinguish.mockImplementationOnce(() => new Promise((resolve) => { finishDistinguish = resolve; }));
+
+        const pending = ensureDailyGpScoreThread(post, 'mini-racer');
+        await vi.waitFor(() => expect(finishDistinguish).toBeTypeOf('function'));
+        const lockKey = [...strings.keys()].find((key) => key.startsWith('dailygp:score-thread-lock:'));
+        strings.set(lockKey, 'someone-elses-lock-value');
+        finishDistinguish();
+
+        await expect(pending).rejects.toThrow('Score thread lock ownership was lost.');
+    });
+
+    it('fails closed when the score-thread transaction commits with no results', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        redis.watch.mockImplementationOnce(async () => ({
+            multi: vi.fn(async () => undefined),
+            unwatch: vi.fn(async () => undefined),
+            set: vi.fn(async () => undefined),
+            expire: vi.fn(async () => undefined),
+            del: vi.fn(async () => undefined),
+            exec: vi.fn(async () => []),
+        }));
+
+        await expect(ensureDailyGpScoreThread(post, 'mini-racer')).rejects.toThrow(
+            'Score thread lock ownership was lost.',
+        );
+    });
+
+    it('reports the post as unavailable when confirm recovery cannot find any matching post', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        strings.delete(`dailygp:post:miniracer:${challenge.id}`);
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => [] });
+
+        const confirmed = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(confirmed).toMatchObject({ status: 404, body: { status: 'post_unavailable' } });
+    });
+
+    it('falls back to the post URL when Reddit omits a URL for the shared comment', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        reddit.submitComment.mockImplementation(async ({ runAs }) => (
+            runAs === 'APP' ? anchor : { ...userComment, url: undefined }
+        ));
+
+        const confirmed = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(confirmed).toMatchObject({
+            status: 200,
+            body: { status: 'shared', commentUrl: 'https://reddit.com/r/miniracer/comments/daily' },
+        });
+    });
+
+    it('fails closed when the share-result transaction commits with no results', async () => {
+        const setup = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        await confirmDailyGpShare({ shareToken: setup.body.shareToken }, requestContext);
+        submittedUserRemoved = true;
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        redis.watch.mockImplementationOnce(async () => ({
+            multi: vi.fn(async () => undefined),
+            unwatch: vi.fn(async () => undefined),
+            set: vi.fn(async () => undefined),
+            expire: vi.fn(async () => undefined),
+            del: vi.fn(async () => undefined),
+            exec: vi.fn(async () => []),
+        }));
+
+        const confirmed = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(confirmed).toMatchObject({ status: 409, body: { status: 'share_in_progress' } });
+    });
+
+    it('expires a ready preview exactly ten minutes after it is created', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview.body.expiresAt).toBe('2026-07-18T12:10:00.000Z');
+    });
+
+    it('reports no verified result when the finished challenge cannot be found', async () => {
+        const { getServerDailyGpPlayableChallenge } = await import('../src/server/daily-gp-store.js');
+        getServerDailyGpPlayableChallenge.mockResolvedValueOnce(null);
+
+        expect(await previewDailyGpShare({
+            source: 'finish',
+            challengeId: challenge.id,
+            replay: { inputs: [{ frames: 1 }] },
+        }, requestContext)).toMatchObject({
+            status: 404,
+            body: { status: 'result_unavailable' },
         });
     });
 });

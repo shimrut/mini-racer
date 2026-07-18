@@ -8,6 +8,7 @@ import {
     getNextVerificationAttemptAt,
     getVerificationRetryDelayMs,
     getVerificationSnapshotFromQueueEntry,
+    isDailyChallengeVerificationExpired,
     markDailyChallengeVerificationError,
     markDailyChallengeVerificationPending,
     markDailyChallengeVerificationRejected,
@@ -60,6 +61,79 @@ describe('verification queue', () => {
         expect(getDailyChallengeVerificationEntry('challenge-1')).toBe(null);
         expect(getDueDailyChallengeVerifications()).toEqual([]);
         expect(getNextVerificationAttemptAt()).toBe(null);
+    });
+
+    it('derives legacy expiry from challengeDate or daily-gp challenge ids', () => {
+        const playlistMs = 7 * 24 * 60 * 60 * 1000;
+        const bufferMs = 6 * 60 * 60 * 1000;
+        const startsAt = Date.parse('2026-07-18T00:00:00.000Z');
+        const expectedExpiry = new Date(startsAt + playlistMs + bufferMs).toISOString();
+
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({
+                daily: {
+                    'legacy-date': {
+                        challengeId: 'legacy-date',
+                        bestTime: 20,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: Date.now() + 60_000,
+                        challengeDate: '2026-07-18'
+                    },
+                    'daily-gp-2026-07-18': {
+                        challengeId: 'daily-gp-2026-07-18',
+                        bestTime: 21,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: Date.now() + 60_000
+                    },
+                    'expired-legacy': {
+                        challengeId: 'expired-legacy',
+                        bestTime: 22,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: Date.now() + 60_000,
+                        challengeDate: '2020-01-01'
+                    },
+                    'no-expiry': {
+                        challengeId: 'no-expiry',
+                        bestTime: 23,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: Date.now() + 60_000
+                    }
+                }
+            })
+        });
+
+        expect(getDailyChallengeVerificationEntry('legacy-date')?.expiresAt).toBe(expectedExpiry);
+        expect(getDailyChallengeVerificationEntry('daily-gp-2026-07-18')?.expiresAt).toBe(expectedExpiry);
+        expect(getDailyChallengeVerificationEntry('expired-legacy')).toBe(null);
+        expect(getDailyChallengeVerificationEntry('no-expiry')).toBe(null);
+        expect(readStoredQueue().daily['expired-legacy']).toBeUndefined();
+        expect(readStoredQueue().daily['no-expiry']).toBeUndefined();
+    });
+
+    it('detects expired entries and rejects enqueue past expiry', () => {
+        const now = Date.parse('2026-07-18T12:00:00.000Z');
+        expect(isDailyChallengeVerificationExpired(null, now)).toBe(true);
+        expect(isDailyChallengeVerificationExpired({}, now)).toBe(true);
+        expect(isDailyChallengeVerificationExpired({
+            expiresAt: '2026-07-18T11:00:00.000Z'
+        }, now)).toBe(true);
+        expect(isDailyChallengeVerificationExpired({
+            expiresAt: '2026-07-18T13:00:00.000Z'
+        }, now)).toBe(false);
+        expect(isDailyChallengeVerificationExpired({
+            challengeDate: '2026-07-18'
+        }, now)).toBe(false);
+
+        expect(enqueueDailyChallengeVerification({
+            challengeId: 'already-expired',
+            bestTime: 20,
+            replay: REPLAY,
+            expiresAt: '2020-01-01T00:00:00.000Z'
+        })).toEqual({ enqueued: false, entry: null });
     });
 
     it('handles corrupt storage and write failures without throwing', () => {

@@ -87,6 +87,129 @@ describe('result-flow helpers', () => {
 
     });
 
+    it('applies explicit modal run updates including null snapshots', () => {
+        const base = {
+            lapTimesArray: [20],
+            bestTime: 20,
+            currentTime: 21,
+            scoreboardSnapshot: { isLoading: true },
+            scoreboardMode: 'daily'
+        };
+
+        expect(buildModalRunsPayload(base, {
+            updates: {
+                bestTime: 19.5,
+                currentTime: 19.5,
+                lapTimesArray: [19.5, 20],
+                scoreboardSnapshot: { playerRank: 2 }
+            }
+        })).toMatchObject({
+            bestTime: 19.5,
+            currentTime: 19.5,
+            lapTimesArray: [19.5, 20],
+            scoreboardSnapshot: { playerRank: 2 }
+        });
+
+        expect(buildModalRunsPayload(base, {
+            updates: {
+                bestTime: undefined,
+                scoreboardSnapshot: null
+            }
+        })).toMatchObject({
+            bestTime: 20,
+            scoreboardSnapshot: null
+        });
+
+        expect(buildModalRunsPayload(base, { updates: null })).toMatchObject({
+            bestTime: 20,
+            scoreboardSnapshot: { isLoading: true }
+        });
+        expect(buildModalRunsPayload(base, { updates: 'bad' })).toMatchObject({
+            bestTime: 20
+        });
+    });
+
+    it('builds modal runs view options from payload fields', () => {
+        expect(buildModalRunsViewOptions(null)).toEqual({});
+        expect(buildModalRunsViewOptions('bad')).toEqual({});
+
+        const onSelect = () => {};
+        const onLoadMore = () => {};
+        const primaryAction = () => {};
+        expect(buildModalRunsViewOptions({
+            scoreboardChallengeId: 'daily-1',
+            scoreboardSnapshot: { isLoading: false },
+            scoreboardMode: 'global',
+            scoreboardTrackKey: 'circuit',
+            scoreboardTitle: 'Title',
+            scoreboardSubhead: 'Sub',
+            leaderboardDayOptions: [{ id: 'a' }],
+            selectedLeaderboardDayId: 'a',
+            onSelectLeaderboardDay: onSelect,
+            onLoadMoreLeaderboard: onLoadMore,
+            primaryActionLabel: 'Go',
+            primaryAction,
+            showGlobalLeaderboard: false,
+            allowLeaderboardOpen: false
+        })).toEqual({
+            scoreboardChallengeId: 'daily-1',
+            scoreboardSnapshot: { isLoading: false },
+            scoreboardMode: 'global',
+            scoreboardTrackKey: 'circuit',
+            scoreboardTitle: 'Title',
+            scoreboardSubhead: 'Sub',
+            leaderboardDayOptions: [{ id: 'a' }],
+            selectedLeaderboardDayId: 'a',
+            onSelectLeaderboardDay: onSelect,
+            onLoadMoreLeaderboard: onLoadMore,
+            primaryActionLabel: 'Go',
+            primaryAction,
+            showGlobalLeaderboard: false,
+            allowLeaderboardOpen: false
+        });
+
+        expect(buildModalRunsViewOptions({
+            leaderboardDayOptions: 'nope',
+            onSelectLeaderboardDay: 'nope',
+            onLoadMoreLeaderboard: 7,
+            primaryAction: 7,
+            showGlobalLeaderboard: undefined,
+            allowLeaderboardOpen: undefined
+        })).toMatchObject({
+            scoreboardMode: 'daily',
+            leaderboardDayOptions: null,
+            onSelectLeaderboardDay: null,
+            onLoadMoreLeaderboard: null,
+            primaryAction: null,
+            showGlobalLeaderboard: true,
+            allowLeaderboardOpen: true
+        });
+    });
+
+    it('covers remaining scoreboard rank label branches', () => {
+        expect(buildScoreboardRankDisplay({
+            submissionStage: 'verifying'
+        }).labelText).toBe('Verifying rank');
+        expect(buildScoreboardRankDisplay({
+            submissionStage: 'submitting'
+        }).labelText).toBe('Submitting rank');
+        expect(buildScoreboardRankDisplay({
+            statusText: 'Queued for retry'
+        }).labelText).toBe('Retrying rank');
+        expect(buildScoreboardRankDisplay({
+            statusText: 'Retrying soon'
+        }).labelText).toBe('Retrying rank');
+        expect(buildScoreboardRankDisplay({
+            statusText: 'Pending verification'
+        }).labelText).toBe('Rank pending');
+        expect(buildScoreboardRankDisplay({
+            verificationState: 'rejected'
+        }).labelText).toBe('Rank rejected');
+        expect(buildScoreboardRankDisplay({
+            isLoading: true
+        }).labelText).toBe('Loading rank');
+    });
+
     it('formats modal delta display states for result summaries', () => {
         expect(buildModalDeltaDisplay()).toEqual({
             text: '--',
@@ -183,26 +306,9 @@ describe('result-flow helpers', () => {
         });
     });
 
-    it('extracts numeric combined rank for medal labels', () => {
-        expect(getCombinedRankNumber(null)).toBe(null);
-        expect(getCombinedRankNumber({ isLoading: true, playerRank: 2 })).toBe(null);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRank: 3,
-            totalCount: 120
-        })).toBe(3);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            currentPlayerRow: { rank: 5 }
-        })).toBe(5);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '#12'
-        })).toBe(12);
-    });
-
     it('formats combined rank as "x out of y" when snapshot has rank and total', () => {
         expect(formatCombinedRankOutOf(null)).toBe('--');
+        expect(formatCombinedRankOutOf('bad')).toBe('--');
         expect(formatCombinedRankOutOf({ isLoading: true, playerRank: 2, totalCount: 10 })).toBe('--');
         expect(formatCombinedRankOutOf({
             isLoading: false,
@@ -220,9 +326,68 @@ describe('result-flow helpers', () => {
             totalCount: 0,
             playerRankLabel: '#2'
         })).toBe('#2');
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 2,
+            totalCount: -3,
+            playerRankLabel: '  #2  '
+        })).toBe('#2');
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 4,
+            totalCount: Number.NaN
+        })).toBe('#4');
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: null,
+            totalCount: 10,
+            playerRankLabel: '  Top 10%  '
+        })).toBe('Top 10%');
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 0,
+            totalCount: 10,
+            playerRankLabel: '   '
+        })).toBe('--');
+        expect(formatCombinedRankOutOf({
+            isLoading: false,
+            playerRank: 1,
+            totalCount: 1.9
+        })).toBe('1 out of 1');
+    });
+
+    it('extracts numeric combined rank from labels and rejects non-positive ranks', () => {
+        expect(getCombinedRankNumber(null)).toBe(null);
+        expect(getCombinedRankNumber('x')).toBe(null);
+        expect(getCombinedRankNumber({ isLoading: true, playerRank: 2 })).toBe(null);
+        expect(getCombinedRankNumber({ isLoading: false, playerRank: 0 })).toBe(null);
+        expect(getCombinedRankNumber({ isLoading: false, playerRank: -2 })).toBe(null);
+        expect(getCombinedRankNumber({ isLoading: false, playerRank: 3.9 })).toBe(3);
+        expect(getCombinedRankNumber({
+            isLoading: false,
+            currentPlayerRow: { rank: 5.2 }
+        })).toBe(5);
+        expect(getCombinedRankNumber({
+            isLoading: false,
+            currentPlayerRow: { rank: 0 }
+        })).toBe(null);
+        expect(getCombinedRankNumber({
+            isLoading: false,
+            playerRankLabel: '12'
+        })).toBe(12);
+        expect(getCombinedRankNumber({
+            isLoading: false,
+            playerRankLabel: '  #9  '
+        })).toBe(9);
+        expect(getCombinedRankNumber({
+            isLoading: false,
+            playerRankLabel: 'n/a'
+        })).toBe(null);
     });
 
     it('builds modal stats plans for pause and win summaries', () => {
+        expect(buildModalStatsPlan(null)).toBe(null);
+        expect(buildModalStatsPlan('bad')).toBe(null);
         expect(buildModalStatsPlan({
             variant: 'daily-pause',
             lapTime: 50.1,
@@ -238,18 +403,43 @@ describe('result-flow helpers', () => {
         });
 
         expect(buildModalStatsPlan({
+            hideStats: true,
+            lapTime: 50
+        })).toEqual({
+            kind: 'hide',
+            display: 'none',
+            hasRuns: null,
+            args: []
+        });
+
+        expect(buildModalStatsPlan({
             lapTime: 48.35,
             bestTime: null,
             isNewBest: true,
             primaryStatLabel: 'Race Time',
             scoreboardSnapshot: { isLoading: true },
-            lapTimesArray: [48.35]
+            lapTimesArray: [48.35],
+            lapMedal: 'gold'
         })).toEqual({
             kind: 'win',
             display: 'grid',
             hasRuns: 'true',
             args: [48.35, null, 'Race Time'],
             rankSnapshot: { isLoading: true },
+            showDelta: false,
+            lapMedal: 'gold'
+        });
+
+        expect(buildModalStatsPlan({
+            isNewBest: true,
+            bestTime: 40,
+            lapTimesArray: null
+        })).toEqual({
+            kind: 'win',
+            display: 'grid',
+            hasRuns: '',
+            args: [40, null, 'Lap Time'],
+            rankSnapshot: null,
             showDelta: false,
             lapMedal: null
         });

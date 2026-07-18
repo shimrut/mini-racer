@@ -663,4 +663,77 @@ describe("daily-gp-store submission hardening", () => {
     expect(second.body.trackPersonalBest).toEqual(first.body.trackPersonalBest);
     expect(second.body.validationMethod).toBe("strict-replay");
   });
+
+  it("trims whitespace from a guest playerId when claiming a new profile", async () => {
+    const bootstrap = await getServerPlayerBootstrap({ playerId: "  guest-with-space  " });
+
+    expect(bootstrap.playerId).toBe("guest:guest-with-space");
+  });
+
+  it("does not seed a track PB from an unverified legacy leaderboard entry", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-legacy-unverified";
+    const canonicalPlayerId = `guest:${guestPlayerId}`;
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    await redis.hSet(createRedisChallengeEntryHashKey(challenge.id), {
+      [canonicalPlayerId]: JSON.stringify({
+        playerId: canonicalPlayerId,
+        trackKey: challenge.trackKey,
+        bestTimeMs: 5000,
+        updatedAt: "2026-07-16T12:00:00.000Z",
+        completedLaps: null,
+        checkpointTimesSec: null,
+      }),
+    });
+
+    const summaries = await getServerPlayerTrackPbSummaries({
+      challengeIds: [challenge.id],
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+    });
+    const full = await getServerPlayerPbGhost({
+      challengeId: challenge.id,
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+    });
+
+    expect(summaries.trackPbs[challenge.id]).toBeNull();
+    expect(full.personalBest).toBeNull();
+  });
+
+  it("trims a supplied request rate-limit identity before scoping the guest rate limit", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-rate-trim";
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+
+    await submitServerDailyGpRun({
+      playerId: guestPlayerId,
+      guestToken,
+      challengeId: challenge.id,
+      trackKey: challenge.trackKey,
+      requestRateLimitIdentity: "  padded-identity  ",
+      replay: { targetLapNumber: 1, inputs: [] },
+    });
+
+    const rateLimitKey = `dailygp:submit-rate-limit:${challenge.id}:request:padded-identity`;
+    expect(redis.strings.has(rateLimitKey)).toBe(true);
+  });
+
+  it("ignores a request rate-limit identity that is only whitespace", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-blank-rate-identity";
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+
+    await submitServerDailyGpRun({
+      playerId: guestPlayerId,
+      guestToken,
+      challengeId: challenge.id,
+      trackKey: challenge.trackKey,
+      requestRateLimitIdentity: "   ",
+      replay: { targetLapNumber: 1, inputs: [] },
+    });
+
+    const fallbackKey = `dailygp:submit-rate-limit:${challenge.id}:guest:${guestPlayerId}`;
+    expect(redis.strings.has(fallbackKey)).toBe(true);
+  });
 });
