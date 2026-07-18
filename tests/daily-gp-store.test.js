@@ -820,4 +820,56 @@ describe("daily-gp-store submission hardening", () => {
       lastSeenAt: null,
     });
   });
+
+  it("resolves today's playable challenge even when it has not been written to the ledger yet", async () => {
+    const { getServerDailyGpPlayableChallenge } = await import("../src/server/daily-gp-store.ts");
+    const challenge = await getServerDailyGpChallenge();
+    const playable = await getServerDailyGpPlayableChallenge(challenge.id);
+
+    expect(playable).toMatchObject({
+      id: challenge.id,
+      trackKey: challenge.trackKey,
+    });
+  });
+
+  it("keeps nearby rows empty when the current player sits on the last rank of the requested page", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const members = Array.from({ length: 12 }, (_, index) => ({
+      member: `reddit:page-edge-${index + 1}`,
+      score: 50000 + index,
+    }));
+    for (const member of members) {
+      await redis.hSet(createRedisChallengeEntryHashKey(challenge.id), {
+        [member.member]: JSON.stringify({
+          playerId: member.member,
+          trackKey: challenge.trackKey,
+          bestTimeMs: member.score,
+          updatedAt: "2026-07-16T12:00:00.000Z",
+          completedLaps: null,
+          checkpointTimesSec: null,
+          validationMethod: "strict-replay",
+          strictReplayFailureReason: null,
+        }),
+      });
+      await redis.zAdd(createRedisChallengeLeaderboardKey(challenge.id), {
+        member: member.member,
+        score: encodeDailyGpLeaderboardScore(member.score),
+      });
+    }
+
+    const snapshot = await getServerDailyGpSnapshot({
+      challengeId: challenge.id,
+      redditUsername: "Page-Edge-10",
+      offset: 0,
+      limit: 10,
+    });
+
+    expect(snapshot.currentPlayerRow).toMatchObject({
+      rank: 10,
+      isCurrentPlayer: true,
+    });
+    expect(snapshot.nearbyRows).toEqual([]);
+    expect(snapshot.hasMore).toBe(true);
+    expect(snapshot.nextOffset).toBe(10);
+  });
 });

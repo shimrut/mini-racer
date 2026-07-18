@@ -1489,4 +1489,303 @@ describe('daily-challenge service', () => {
         expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ shareToken: 'tok-123' });
         expect(confirmed).toEqual({ ok: false, status: 409, body: null });
     });
+
+    it('returns an empty normalized snapshot when challengeId is missing', async () => {
+        const snapshot = await getDailyChallengeSnapshot({ challengeId: '' });
+        expect(snapshot).toMatchObject({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 0,
+        });
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('accepts a bare array playlist payload from the server', async () => {
+        fetch.mockResolvedValue(createJsonResponse([
+            {
+                id: 'daily-gp-array-payload',
+                trackKey: 'circuit',
+                startsAt: '2026-07-18T00:00:00.000Z',
+                endsAt: '2026-07-19T00:00:00.000Z',
+                availableUntil: '2026-07-25T00:00:00.000Z',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            },
+        ]));
+
+        const playlist = await getDailyChallengePlaylist({ forceRefresh: true });
+
+        expect(playlist).toHaveLength(1);
+        expect(playlist[0].id).toBe('daily-gp-array-payload');
+    });
+
+    it('deduplicates playlist merges by challenge id and caps the cache at seven days', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
+
+        cacheDailyChallengePlaylist([
+            {
+                id: 'dedupe-playlist-challenge',
+                trackKey: 'circuit',
+                startsAt: '2026-07-18T00:00:00.000Z',
+                endsAt: '2026-07-19T00:00:00.000Z',
+                availableUntil: '2026-07-25T00:00:00.000Z',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            },
+        ]);
+        cacheDailyChallengePlaylist([
+            {
+                id: 'dedupe-playlist-challenge',
+                trackKey: 'alloyRing',
+                startsAt: '2026-07-18T00:00:00.000Z',
+                endsAt: '2026-07-19T00:00:00.000Z',
+                availableUntil: '2026-07-25T00:00:00.000Z',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'desert',
+            },
+        ]);
+
+        const deduped = getCachedDailyChallengePlaylist().filter(
+            (challenge) => challenge.id === 'dedupe-playlist-challenge',
+        );
+        expect(deduped).toHaveLength(1);
+        expect(deduped[0].trackKey).toBe('alloyRing');
+
+        const eightDayPlaylist = Array.from({ length: 8 }, (_, index) => {
+            const day = 18 - index;
+            const dayString = String(day).padStart(2, '0');
+            return {
+                id: `cap-seven-${dayString}`,
+                trackKey: 'circuit',
+                startsAt: `2026-07-${dayString}T00:00:00.000Z`,
+                endsAt: `2026-07-${String(day + 1).padStart(2, '0')}T00:00:00.000Z`,
+                availableUntil: '2026-07-25T00:00:00.000Z',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+        });
+        cacheDailyChallengePlaylist(eightDayPlaylist);
+        expect(getCachedDailyChallengePlaylist()).toHaveLength(7);
+
+        vi.useRealTimers();
+    });
+
+    it('sorts playlist rows without startsAt by id and keeps multi-lap copy labels', async () => {
+        vi.resetModules();
+        const { cacheDailyChallengePlaylist } = await import('../game/daily-challenge/service.js');
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
+        globalThis.window = {
+            localStorage: {
+                getItem: () => null,
+                setItem: () => {},
+                removeItem: () => {},
+            },
+        };
+
+        const merged = cacheDailyChallengePlaylist([
+            {
+                id: 'z-no-start',
+                trackKey: 'circuit',
+                endsAt: '2026-07-19T00:00:00.000Z',
+                availableUntil: '2026-07-25T00:00:00.000Z',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            },
+            {
+                id: 'a-no-start',
+                trackKey: 'alloyRing',
+                endsAt: '2026-07-19T00:00:00.000Z',
+                availableUntil: '2026-07-25T00:00:00.000Z',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            },
+        ]);
+
+        expect(
+            merged
+                .filter((challenge) => challenge.id.endsWith('-no-start'))
+                .map((challenge) => challenge.id),
+        ).toEqual(['z-no-start', 'a-no-start']);
+
+        expect(getDailyChallengeCopyLabels({
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 4 },
+        })).toEqual({
+            hudPrimaryLabel: 'RACE',
+            primaryStatLabel: 'Race Time',
+            bestSummaryLabel: 'Best Race',
+            modeSelectLine: 'Best race time',
+        });
+
+        vi.useRealTimers();
+    });
+
+    it('deep-clones objectiveParams so cached playlist edits do not leak', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
+
+        const merged = cacheDailyChallengePlaylist([{
+            id: 'clone-objective-params-main',
+            trackKey: 'circuit',
+            startsAt: '2026-07-18T00:00:00.000Z',
+            endsAt: '2026-07-19T00:00:00.000Z',
+            availableUntil: '2026-07-25T00:00:00.000Z',
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 3 },
+            skin: 'default',
+        }]);
+
+        const cached = merged.find((challenge) => challenge.id === 'clone-objective-params-main');
+        cached.objectiveParams.lapCount = 99;
+
+        expect(
+            getCachedDailyChallengePlaylist()
+                .find((challenge) => challenge.id === 'clone-objective-params-main')
+                .objectiveParams,
+        ).toEqual({ lapCount: 3 });
+
+        vi.useRealTimers();
+    });
+
+    it('keeps challenges usable on endsAt alone when availableUntil is missing', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
+
+        const merged = cacheDailyChallengePlaylist([{
+            id: 'ends-at-only-main',
+            trackKey: 'circuit',
+            startsAt: '2026-07-18T00:00:00.000Z',
+            endsAt: '2026-07-19T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        }]);
+
+        expect(merged.map((challenge) => challenge.id)).toContain('ends-at-only-main');
+
+        vi.setSystemTime(new Date('2026-07-20T00:00:00.000Z'));
+        expect(
+            getCachedDailyChallengePlaylist()
+                .some((challenge) => challenge.id === 'ends-at-only-main'),
+        ).toBe(false);
+
+        vi.useRealTimers();
+    });
+
+    it('uses card-status date fallback when availableUntil is not parseable', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-03T12:00:00.000Z'));
+
+        expect(getDailyChallengeCardStatus({
+            endsAt: '2026-06-02T00:00:00.000Z',
+            availableUntil: 'not-a-date',
+        })).toEqual({
+            key: 'expired',
+            label: 'Expired',
+        });
+
+        expect(getDailyChallengeCardStatus({
+            endsAt: '2026-06-02T00:00:00.000Z',
+            availableUntil: '2026-06-09T00:00:00.000Z',
+        }, Date.parse('2026-06-08T23:30:00.000Z'))).toEqual({
+            key: 'available',
+            label: 'Expires in 30m',
+        });
+
+        vi.useRealTimers();
+    });
+
+    it('keeps local completed laps when a faster snapshot row omits them', async () => {
+        const challenge = {
+            id: 'completed-laps-merge-challenge',
+            trackKey: 'circuit',
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 3 },
+            startsAt: '2026-06-03T00:00:00.000Z',
+            endsAt: '2026-06-04T00:00:00.000Z',
+            availableUntil: '2026-06-10T00:00:00.000Z',
+            status: 'active',
+            skin: 'default',
+        };
+        cacheDailyChallengePlaylist([challenge]);
+        setDailyChallengeBestTime(challenge, 45.5, 3, [10, 20, 30]);
+
+        fetch.mockResolvedValue(createJsonResponse({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: {
+                bestTimeMs: 44000,
+            },
+            totalCount: 1,
+            objectiveType: 'multi_lap_total',
+        }));
+        await getDailyChallengeSnapshot({ challengeId: challenge.id, forceRefresh: true });
+
+        expect(getDailyChallengeBestResult(challenge)).toMatchObject({
+            bestTime: 44,
+            completedLaps: 3,
+        });
+    });
+
+    it('returns null from submit when fetch is unavailable or challengeId is not a string', async () => {
+        const originalFetch = globalThis.fetch;
+        delete globalThis.fetch;
+
+        await expect(submitDailyChallengeBestTime({
+            challengeId: VALID_UUID,
+            trackKey: 'circuit',
+            bestTime: 12,
+            replay: MINIMAL_REPLAY,
+        })).resolves.toBeNull();
+
+        globalThis.fetch = originalFetch;
+
+        await expect(submitDailyChallengeBestTime({
+            challengeId: 123,
+            trackKey: 'circuit',
+            bestTime: 12,
+            replay: MINIMAL_REPLAY,
+        })).resolves.toBeNull();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('no-ops featured start override writes when window storage is unavailable', () => {
+        delete globalThis.window;
+        expect(() => requestFeaturedDailyChallengeStart()).not.toThrow();
+        globalThis.window = { localStorage: memoryLocalStorage };
+    });
+
+    it('rejects an active cache whose endsAt is exactly now', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-03T12:00:00.000Z'));
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: '',
+        };
+        memoryLocalStorage.setItem('VectorGpActiveDailyChallengeCache', JSON.stringify({
+            challenge: {
+                id: 'exactly-now-cache',
+                trackKey: 'circuit',
+                objectiveType: 'single_lap_fastest',
+                endsAt: '2026-06-03T12:00:00.000Z',
+                skin: 'default',
+            },
+        }));
+        fetch.mockRejectedValue(new Error('offline'));
+
+        await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
+        vi.useRealTimers();
+    });
 });

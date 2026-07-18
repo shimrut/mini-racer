@@ -79,4 +79,47 @@ describe('daily-challenge service cache concurrency', () => {
         expect(firstResult).toEqual(secondResult);
         expect(fetch).toHaveBeenCalledTimes(1);
     });
+
+    it('clears in-flight snapshot state after a failed refresh', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/index.html',
+            protocol: 'https:',
+            search: '',
+            origin: 'https://example.devvit.net',
+        };
+        fetch
+            .mockResolvedValueOnce(createJsonResponse({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: null,
+                totalCount: 0,
+                objectiveType: 'single_lap_fastest',
+            }))
+            .mockRejectedValueOnce(new Error('refresh failed'));
+
+        const challengeId = 'inflight-cleanup-challenge';
+        await getDailyChallengeSnapshot({ challengeId, forceRefresh: true });
+
+        await expect(getDailyChallengeSnapshot({
+            challengeId,
+            forceRefresh: true,
+        })).rejects.toThrow('refresh failed');
+
+        fetch.mockResolvedValueOnce(createJsonResponse({
+            topRows: [{ rank: 1, bestTimeMs: 11000 }],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 1,
+            objectiveType: 'single_lap_fastest',
+        }));
+
+        const recovered = await getDailyChallengeSnapshot({
+            challengeId,
+            forceRefresh: true,
+        });
+        expect(recovered.topRows[0].bestTime).toBe(11);
+        expect(fetch).toHaveBeenCalledTimes(3);
+    });
 });

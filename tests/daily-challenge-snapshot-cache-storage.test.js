@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
+    cacheDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
+    getDailyChallengeBestResult,
     getDailyChallengeSnapshot
 } from '../game/daily-challenge/service.js';
+import { getDailyChallengeData } from '../game/daily-challenge/storage.js';
 
 // This file gets its own fresh module graph, so the snapshot cache has never
 // been hydrated from storage yet. The very first call that touches the
@@ -83,5 +86,69 @@ describe('daily-challenge snapshot cache storage', () => {
             'Error writing daily snapshot cache:',
             expect.any(Error)
         );
+    });
+
+    it('syncs a cached snapshot player row into daily challenge storage when the playlist knows the challenge', async () => {
+        const challenge = {
+            id: 'sync-best-from-snapshot',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+            startsAt: '2026-07-18T00:00:00.000Z',
+            endsAt: '2026-07-19T00:00:00.000Z',
+            availableUntil: '2026-07-25T00:00:00.000Z',
+            status: 'active',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        globalThis.window = { localStorage: createMemoryLocalStorage() };
+        cacheDailyChallengePlaylist([challenge]);
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: {
+                    bestTimeMs: 14250,
+                    completedLaps: 1,
+                    checkpointTimesSec: [4.1, 8.2],
+                },
+                totalCount: 1,
+                objectiveType: 'single_lap_fastest',
+            }),
+        });
+
+        await getDailyChallengeSnapshot({ challengeId: challenge.id, forceRefresh: true });
+
+        expect(getDailyChallengeData(challenge.id)).toMatchObject({
+            bestTime: 14.25,
+            completedLaps: 1,
+            checkpointTimesSec: [4.1, 8.2],
+        });
+        expect(getDailyChallengeBestResult(challenge)).toMatchObject({
+            bestTime: 14.25,
+            completedLaps: 1,
+        });
+    });
+
+    it('does not sync snapshot bests when the challenge is missing from the playlist cache', async () => {
+        globalThis.window = { localStorage: createMemoryLocalStorage() };
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                topRows: [],
+                nearbyRows: [],
+                currentPlayerRow: { bestTimeMs: 15000 },
+                totalCount: 1,
+                objectiveType: 'single_lap_fastest',
+            }),
+        });
+
+        const challengeId = 'orphan-snapshot-challenge';
+        await getDailyChallengeSnapshot({ challengeId, forceRefresh: true });
+
+        expect(getDailyChallengeData(challengeId)).toBeNull();
+        expect(getCachedDailyChallengeSnapshot(challengeId)).not.toBeNull();
     });
 });

@@ -2616,6 +2616,30 @@ describe('server daily gp store submissions', () => {
                 endsAt: '2020-01-02T00:00:00.000Z',
                 availableUntil: '2020-01-08T00:00:00.000Z',
             })],
+            ['a numeric startsAt field', JSON.stringify({
+                id: unreadableChallengeId,
+                challengeDate: '2020-01-01',
+                trackKey: 'circuit',
+                startsAt: 0,
+                endsAt: '2020-01-02T00:00:00.000Z',
+                availableUntil: '2020-01-08T00:00:00.000Z',
+            })],
+            ['a numeric endsAt field', JSON.stringify({
+                id: unreadableChallengeId,
+                challengeDate: '2020-01-01',
+                trackKey: 'circuit',
+                startsAt: '2020-01-01T00:00:00.000Z',
+                endsAt: 1,
+                availableUntil: '2020-01-08T00:00:00.000Z',
+            })],
+            ['a numeric availableUntil field', JSON.stringify({
+                id: unreadableChallengeId,
+                challengeDate: '2020-01-01',
+                trackKey: 'circuit',
+                startsAt: '2020-01-01T00:00:00.000Z',
+                endsAt: '2020-01-02T00:00:00.000Z',
+                availableUntil: 7,
+            })],
         ])('treats %s as unreadable', async (_label, raw) => {
             const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
             mockRedis.hGet.mockResolvedValue(raw);
@@ -2783,6 +2807,151 @@ describe('server daily gp store submissions', () => {
             } finally {
                 vi.useRealTimers();
             }
+        });
+    });
+
+    describe('challenge ledger rotation and maintenance', () => {
+        it('deletes expired challenge history entries during maintenance', async () => {
+            const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            const expiredChallenge = {
+                id: 'daily-gp-2020-01-01',
+                challengeDate: '2020-01-01',
+                trackKey: 'circuit',
+                startsAt: '2020-01-01T00:00:00.000Z',
+                endsAt: '2020-01-02T00:00:00.000Z',
+                availableUntil: '2020-01-08T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            const freshChallenge = {
+                id: 'daily-gp-2030-06-01',
+                challengeDate: '2030-06-01',
+                trackKey: 'circuit',
+                startsAt: '2030-06-01T00:00:00.000Z',
+                endsAt: '2030-06-02T00:00:00.000Z',
+                availableUntil: '2030-06-08T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hSetNX.mockResolvedValue(1);
+            mockRedis.hScan.mockResolvedValue({
+                cursor: 0,
+                fieldValues: [{ field: expiredChallenge.id, value: JSON.stringify(expiredChallenge) }],
+            });
+
+            await persistServerDailyGpChallenge(freshChallenge);
+
+            expect(mockRedis.hDel).toHaveBeenCalledWith('dailygp:challenges', [expiredChallenge.id]);
+        });
+
+        it('falls back to the first scheduled track when the ledger playhead left the rotation', async () => {
+            const { TRACK_SCHEDULE_KEYS } = await import('../game/track/catalog.js');
+            const scheduleSnapshot = [...TRACK_SCHEDULE_KEYS];
+            TRACK_SCHEDULE_KEYS.splice(0, TRACK_SCHEDULE_KEYS.length, 'desertBridge');
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2030-06-02T12:00:00.000Z'));
+            const priorChallenge = {
+                id: 'daily-gp-2030-06-01',
+                challengeDate: '2030-06-01',
+                trackKey: 'circuit',
+                startsAt: '2030-06-01T00:00:00.000Z',
+                endsAt: '2030-06-02T00:00:00.000Z',
+                availableUntil: '2030-06-08T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hGetAll.mockResolvedValue({
+                [priorChallenge.id]: JSON.stringify(priorChallenge),
+            });
+            mockRedis.hSetNX.mockResolvedValue(1);
+
+            try {
+                const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+                const challenge = await getServerDailyGpChallenge();
+
+                expect(challenge.trackKey).toBe('desertBridge');
+            } finally {
+                TRACK_SCHEDULE_KEYS.splice(0, TRACK_SCHEDULE_KEYS.length, ...scheduleSnapshot);
+                vi.useRealTimers();
+            }
+        });
+
+        it('returns the built today challenge when publication loses the hSetNX race and reread is empty', async () => {
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hSetNX.mockResolvedValue(0);
+
+            const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+
+            expect(challenge.id).toBe(getTodayChallengeIdForTest());
+            expect(challenge.trackKey).toBeTruthy();
+        });
+
+        it('returns a stored today challenge without writing when persistFallback is false', async () => {
+            const stored = {
+                id: getTodayChallengeIdForTest(),
+                challengeDate: getTodayChallengeIdForTest().replace('daily-gp-', ''),
+                trackKey: 'desertBridge',
+                startsAt: new Date(getUtcDayIndex(new Date()) * DAY_MS).toISOString(),
+                endsAt: new Date((getUtcDayIndex(new Date()) + 1) * DAY_MS).toISOString(),
+                availableUntil: new Date((getUtcDayIndex(new Date()) + 7) * DAY_MS).toISOString(),
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            mockRedis.hGet.mockResolvedValue(JSON.stringify(stored));
+
+            const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+            const result = await getServerDailyGpChallengeById(stored.id, { persistFallback: false });
+
+            expect(result).toEqual({
+                ...stored,
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            });
+            expect(mockRedis.hSetNX).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('player bootstrap edge cases', () => {
+        it('returns an empty bootstrap when guest claim input is invalid', async () => {
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+
+            const payload = await getServerPlayerBootstrap({ playerId: '   ' });
+
+            expect(payload).toEqual({
+                playerId: null,
+                guestToken: null,
+                redditUsername: null,
+                leaderboardIdentity: 'constructed',
+                playerPreferences: null,
+                hasAnyData: false,
+                isReturningPlayer: false,
+                firstSeenAt: null,
+                lastSeenAt: null,
+            });
+        });
+
+        it('treats malformed stored player profiles as absent during bootstrap', async () => {
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+            mockRedis.get.mockResolvedValueOnce('{not-json');
+
+            const payload = await getServerPlayerBootstrap({ redditUsername: 'Malformed-Profile' });
+
+            expect(payload.playerId).toBe('reddit:malformed-profile');
+            expect(payload.playerPreferences).toBeNull();
+            expect(payload.hasAnyData).toBe(false);
         });
     });
 });

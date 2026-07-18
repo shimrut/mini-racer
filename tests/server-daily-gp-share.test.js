@@ -968,4 +968,141 @@ describe('daily GP result sharing', () => {
             body: { status: 'result_unavailable' },
         });
     });
+
+    it('treats a missing or non-string share token as an expired preview during confirm', async () => {
+        expect(await confirmDailyGpShare({}, requestContext)).toMatchObject({
+            status: 409,
+            body: { status: 'preview_expired' },
+        });
+        expect(await confirmDailyGpShare({ shareToken: 42 }, requestContext)).toMatchObject({
+            status: 409,
+            body: { status: 'preview_expired' },
+        });
+    });
+
+    it('fails closed when Reddit returns a user comment without a t1_ id', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        reddit.submitComment.mockImplementation(async ({ runAs }) => (
+            runAs === 'APP' ? anchor : { ...userComment, id: 'not-a-comment-id' }
+        ));
+
+        await expect(confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        )).rejects.toThrow('Reddit did not return a shared-comment ID.');
+    });
+
+    it('returns share_in_progress when confirm loses ownership before persisting the shared result', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        let finishUserComment;
+        reddit.submitComment.mockImplementation(async ({ runAs }) => {
+            if (runAs === 'APP') return anchor;
+            return new Promise((resolve) => { finishUserComment = () => resolve(userComment); });
+        });
+
+        const pending = confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+        await vi.waitFor(() => expect(finishUserComment).toBeTypeOf('function'));
+        const shareLockKey = [...strings.keys()].find((key) => String(key).endsWith(':lock'));
+        strings.set(shareLockKey, 'successor-token');
+        finishUserComment();
+
+        await expect(pending).resolves.toMatchObject({
+            status: 409,
+            body: { status: 'share_in_progress' },
+        });
+    });
+
+    it('still fails closed when comment cleanup throws after Reddit misattributes the author', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        submittedUserAuthor = 'mini-racer';
+        userComment.delete.mockRejectedValueOnce(new Error('delete unavailable'));
+
+        const confirmed = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+
+        expect(confirmed).toMatchObject({
+            status: 409,
+            body: { status: 'user_action_unavailable' },
+        });
+        expect(userComment.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs share-lock cleanup failures without replacing a completed share', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const originalDel = redis.del;
+        redis.del = vi.fn(async (key) => {
+            if (String(key).endsWith(':lock')) {
+                throw new Error('cleanup unavailable');
+            }
+            return originalDel(key);
+        });
+
+        const confirmed = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+
+        expect(confirmed).toMatchObject({ status: 200, body: { status: 'shared' } });
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Daily GP share lock cleanup failed:',
+            expect.any(Error),
+        );
+        redis.del = originalDel;
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('treats comment listings without an all() iterator as empty when preparing score threads', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        reddit.getComments.mockResolvedValueOnce({});
+
+        const result = await ensureDailyGpScoreThread(post, 'mini-racer');
+
+        expect(result.scoreThreadCommentId).toBe(anchor.id);
+        expect(reddit.submitComment).toHaveBeenCalledWith({
+            id: post.postId,
+            text: DAILY_GP_SCORE_THREAD_TEXT,
+            runAs: 'APP',
+        });
+    });
+
+    it('rejects score-thread creation when Reddit returns an invalid anchor comment id', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        reddit.submitComment.mockImplementationOnce(async () => ({
+            ...anchor,
+            id: 'not-a-comment-id',
+            distinguish: vi.fn(async () => undefined),
+        }));
+
+        await expect(ensureDailyGpScoreThread(post, 'mini-racer')).rejects.toThrow(
+            'Reddit did not return a score-thread comment ID.',
+        );
+    });
 });

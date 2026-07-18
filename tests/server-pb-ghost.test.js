@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 
 function decodeCompressedValue(value) {
@@ -77,6 +78,7 @@ import {
 } from '../src/server/pb-ghost-trace.ts';
 import {
     getPlayerTrackPbRecord,
+    seedPlayerTrackPersonalBest,
     upsertPlayerTrackPersonalBest,
 } from '../src/server/pb-ghost-store.ts';
 import { getDailyGpCompetitionTtlSeconds } from '../src/server/daily-gp-model.ts';
@@ -505,5 +507,103 @@ describe('PB ghost trace and storage', () => {
             `dailygp:challenge-pbs:${CHALLENGE.id}`,
             [expect.any(String)],
         );
+    });
+
+    it('deletes corrupt PB hash entries instead of returning them', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:corrupt',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: null,
+            ghost: GHOST,
+        });
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const field = [...redis.hashes.get(collectionKey).keys()][0];
+        redis.hashes.get(collectionKey).set(field, '{not-json');
+
+        expect(await getPlayerTrackPbRecord({
+            playerId: 'reddit:corrupt',
+            challenge: CHALLENGE,
+            track: TRACK,
+        })).toBeNull();
+        expect(redis.hDel).toHaveBeenCalledWith(collectionKey, [field]);
+    });
+
+    it('rejects PB writes when another update already owns the lock', async () => {
+        const playerHash = createHash('sha256').update('reddit:busy', 'utf8').digest('base64url');
+        redis.strings.set(`dailygp:challenge-pb-lock:${CHALLENGE.id}:${playerHash}`, 'held-by-other');
+
+        await expect(upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:busy',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: null,
+            ghost: GHOST,
+        })).rejects.toThrow('Personal best update already in progress.');
+        expect(redis.hSet).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the PB transaction commits with no results', async () => {
+        redis.watch.mockImplementationOnce(async () => ({
+            multi: vi.fn(async () => undefined),
+            unwatch: vi.fn(async () => undefined),
+            hSet: vi.fn(async () => undefined),
+            expire: vi.fn(async () => undefined),
+            del: vi.fn(async () => undefined),
+            exec: vi.fn(async () => []),
+        }));
+
+        await expect(upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:empty-exec',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            ghost: GHOST,
+        })).rejects.toThrow('Personal best lock ownership was lost.');
+    });
+
+    it('stores time-only PBs through the seed helper without a ghost trace', async () => {
+        const result = await seedPlayerTrackPersonalBest({
+            playerId: 'reddit:seed-only',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 11_500,
+            checkpointTimesSec: [3.5, 7.5],
+        });
+
+        expect(result.improved).toBe(true);
+        expect(result.record).toMatchObject({
+            bestTimeMs: 11_500,
+            checkpointTimesSec: [3.5, 7.5],
+            ghost: null,
+        });
+    });
+
+    it('drops non-finite checkpoint splits when parsing stored PB records', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:bad-checkpoints',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [1.2, 8],
+            ghost: null,
+        });
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const field = [...redis.hashes.get(collectionKey).keys()][0];
+        const payload = JSON.parse(decodeCompressedValue(redis.hashes.get(collectionKey).get(field)));
+        payload.checkpointTimesSec = [1.2, 'nope', 'still-bad'];
+
+        redis.hashes.get(collectionKey).set(field, JSON.stringify(payload));
+
+        const record = await getPlayerTrackPbRecord({
+            playerId: 'reddit:bad-checkpoints',
+            challenge: CHALLENGE,
+            track: TRACK,
+        });
+
+        expect(record?.checkpointTimesSec).toEqual([1.2]);
     });
 });
