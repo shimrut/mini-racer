@@ -9,6 +9,9 @@ import {
     getDailyChallengeModeSelectObjectiveLine,
     getDailyChallengePlaylist,
     getDailyChallengeSnapshot,
+    getMissingDailyChallengeSnapshotIds,
+    isDailyChallengeStoredResultForChallenge,
+    prefetchDailyChallengeSnapshots,
     previewDailyChallengeShare,
     submitDailyChallengeBestTime,
 } from '../game/daily-challenge/service.js';
@@ -289,5 +292,112 @@ describe('daily-challenge service wave 2', () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         await expect(getActiveDailyChallenge()).rejects.toThrow('Server returned status 503');
+    });
+
+    it('keeps the local best when it is faster than the cached snapshot row', async () => {
+        const challenge = buildChallenge({ id: 'local-faster-wave2' });
+        cacheDailyChallengePlaylist([challenge]);
+
+        fetch.mockResolvedValue(createJsonResponse({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: { bestTimeMs: 11000, completedLaps: 2 },
+            totalCount: 1,
+            objectiveType: 'single_lap_fastest',
+        }));
+        await getDailyChallengeSnapshot({ challengeId: challenge.id, forceRefresh: true });
+        setDailyChallengeBestTime(challenge, 9.5, 1, [3, 6]);
+
+        expect(getDailyChallengeBestResult(challenge)).toMatchObject({
+            bestTime: 9.5,
+            completedLaps: 1,
+            checkpointTimesSec: [3, 6],
+        });
+    });
+
+    it('marks the card expired only after availableUntil has passed', () => {
+        const challenge = buildChallenge({
+            endsAt: '2026-07-18T00:00:00.000Z',
+            availableUntil: '2026-07-25T00:00:00.000Z',
+        });
+
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-07-19T12:00:00.000Z'))).toEqual({
+            key: 'available',
+            label: 'Expires on Jul 25',
+        });
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-07-25T00:00:00.000Z'))).toEqual({
+            key: 'expired',
+            label: 'Expired',
+        });
+    });
+
+    it('formats playlist availability as Expired only after the window closes', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
+
+        const challenge = buildChallenge({ availableUntil: '2026-07-18T12:00:01.000Z' });
+        expect(formatDailyChallengePlaylistAvailabilityLabel(challenge)).toBe('1m');
+
+        vi.setSystemTime(new Date('2026-07-18T12:00:01.000Z'));
+        expect(formatDailyChallengePlaylistAvailabilityLabel(challenge)).toBe('Expired');
+
+        vi.useRealTimers();
+    });
+
+    it('rejects stored results when metadata disagrees but accepts matching rows', () => {
+        const challenge = buildChallenge({ id: 'metadata-match-wave2' });
+
+        expect(isDailyChallengeStoredResultForChallenge(challenge, {
+            bestTime: 12.4,
+            trackKey: 'alloyRing',
+        })).toBe(false);
+        expect(isDailyChallengeStoredResultForChallenge(challenge, {
+            bestTime: 12.4,
+            objectiveType: 'multi_lap_total',
+        })).toBe(false);
+        expect(isDailyChallengeStoredResultForChallenge(challenge, {
+            bestTime: 12.4,
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+        })).toBe(true);
+    });
+
+    it('prefetches only challenge ids that are missing from the snapshot cache', async () => {
+        const cached = buildChallenge({ id: 'prefetch-cached' });
+        const missing = buildChallenge({ id: 'prefetch-missing' });
+        cacheDailyChallengePlaylist([cached, missing]);
+
+        fetch.mockResolvedValue(createJsonResponse({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 0,
+            objectiveType: 'single_lap_fastest',
+        }));
+        await getDailyChallengeSnapshot({ challengeId: cached.id, forceRefresh: true });
+        fetch.mockClear();
+
+        expect(getMissingDailyChallengeSnapshotIds([cached.id, missing.id, cached.id]))
+            .toEqual(['prefetch-missing']);
+
+        await prefetchDailyChallengeSnapshots([cached.id, missing.id]);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(fetch.mock.calls[0][0]).toContain('prefetch-missing');
+    });
+
+    it('uses hour-only labels when remaining minutes divide evenly', () => {
+        const challenge = buildChallenge({
+            endsAt: '2026-07-18T00:00:00.000Z',
+            availableUntil: '2026-07-18T04:00:00.000Z',
+        });
+
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-07-18T02:00:00.000Z'))).toEqual({
+            key: 'available',
+            label: 'Expires in 2h',
+        });
+        expect(getDailyChallengeCardStatus(challenge, Date.parse('2026-07-18T01:30:00.000Z'))).toEqual({
+            key: 'available',
+            label: 'Expires in 2h 30m',
+        });
     });
 });

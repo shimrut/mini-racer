@@ -195,4 +195,107 @@ describe('simulation observable kills', () => {
 
         expect(state.particles.length).toBeLessThanOrEqual(50);
     });
+
+    it('does not apply reverse braking while forward speed remains positive', () => {
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 2, y: 0 },
+            angle: 0,
+            keys: { left: false, right: false },
+        });
+
+        updateSimulation(state, 0.1, {
+            ...CONFIG,
+            accel: 0,
+            grip: 0,
+            brakePower: 40,
+        }, OPEN_TRACK, []);
+
+        expect(state.velocity.x).toBeCloseTo(2, 5);
+    });
+
+    it('applies reverse braking only while forward speed is negative', () => {
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: -2, y: 0 },
+            angle: 0,
+            keys: { left: false, right: false },
+        });
+
+        updateSimulation(state, 0.1, {
+            ...CONFIG,
+            accel: 0,
+            grip: 0,
+            brakePower: 20,
+        }, OPEN_TRACK, []);
+
+        expect(state.velocity.x).toBeGreaterThan(-2);
+        expect(state.velocity.x).toBeLessThanOrEqual(0);
+    });
+
+    it('withholds skid marks below the minimum speed threshold', () => {
+        const slow = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0.001, y: 0 },
+            angle: 0.5,
+            keys: { left: false, right: true },
+            skidMarks: createTestSimState().skidMarks,
+        });
+        const fast = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 3, y: 1 },
+            angle: 0.5,
+            keys: { left: false, right: true },
+            skidMarks: createTestSimState().skidMarks,
+        });
+        slow.skidMarks.clear();
+        fast.skidMarks.clear();
+        const config = { ...CONFIG, accel: 0, grip: 0.05, downforceGrip: 0, steerGripScale: 0.2 };
+
+        updateSimulation(slow, 0.05, config, OPEN_TRACK, []);
+        updateSimulation(fast, 0.05, config, OPEN_TRACK, []);
+
+        expect(slow.skidMarks.length).toBe(0);
+        expect(fast.skidMarks.length).toBeGreaterThan(0);
+    });
+
+    it('adds downforce grip so lateral slip decays faster than without it', () => {
+        const without = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 10, y: 5 },
+            angle: 0,
+        });
+        const withDownforce = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 10, y: 5 },
+            angle: 0,
+        });
+        const base = { ...CONFIG, accel: 0, grip: 2, downforceGrip: 0 };
+
+        updateSimulation(without, 0.05, base, OPEN_TRACK, []);
+        updateSimulation(withDownforce, 0.05, { ...base, downforceGrip: 1 }, OPEN_TRACK, []);
+
+        expect(Math.abs(withDownforce.velocity.y)).toBeLessThan(Math.abs(without.velocity.y));
+        expect(Math.abs(without.velocity.y)).toBeGreaterThan(4);
+    });
+
+    it('runs driving physics with an empty wall list but not with a null collision hash', () => {
+        const emptyWalls = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0, y: 0 },
+            angle: Math.PI / 2,
+        });
+        const noHash = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0, y: 0 },
+            angle: Math.PI / 2,
+            collisionHash: { cells: null, segments: null, queryStamp: 0, candidateSegments: [] },
+        });
+
+        updateSimulation(emptyWalls, 0.05, { ...CONFIG, accel: 100, grip: 0 }, OPEN_TRACK, []);
+        updateSimulation(noHash, 0.05, { ...CONFIG, accel: 100, grip: 0 }, OPEN_TRACK, null);
+
+        expect(emptyWalls.pos.y).toBeGreaterThan(0);
+        expect(noHash.pos.y).toBeGreaterThan(0);
+    });
 });

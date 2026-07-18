@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
+import { DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS, getDailyGpCompetitionTtlSeconds } from '../src/server/daily-gp-model.ts';
 
 const mockRedis = {
     get: vi.fn(),
@@ -160,5 +161,137 @@ describe('server daily gp store wave 2', () => {
             'dailygp:maintenance:challenge-history:v1:cursor',
             '4',
         );
+    });
+
+    it('deletes history entries at or before the cutoff but keeps entries just after it', async () => {
+        vi.useFakeTimers();
+        const now = new Date('2030-03-15T12:00:00.000Z');
+        vi.setSystemTime(now);
+        const cutoffMs = now.getTime() - (DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS * 1000);
+        const atCutoff = {
+            id: 'daily-gp-2030-01-14',
+            challengeDate: '2030-01-14',
+            trackKey: 'circuit',
+            startsAt: new Date(cutoffMs).toISOString(),
+            endsAt: '2030-01-15T00:00:00.000Z',
+            availableUntil: '2030-01-21T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const beforeCutoff = {
+            ...atCutoff,
+            id: 'daily-gp-2030-01-13',
+            challengeDate: '2030-01-13',
+            startsAt: new Date(cutoffMs - 1).toISOString(),
+        };
+        const afterCutoff = {
+            ...atCutoff,
+            id: 'daily-gp-2030-01-15',
+            challengeDate: '2030-01-15',
+            startsAt: new Date(cutoffMs + 1).toISOString(),
+        };
+        const current = {
+            id: 'daily-gp-2030-03-15',
+            challengeDate: '2030-03-15',
+            trackKey: 'circuit',
+            startsAt: '2030-03-15T00:00:00.000Z',
+            endsAt: '2030-03-16T00:00:00.000Z',
+            availableUntil: '2030-03-22T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        mockRedis.hGet.mockResolvedValue(null);
+        mockRedis.hSetNX.mockResolvedValue(1);
+        mockRedis.hScan.mockResolvedValue({
+            cursor: 2,
+            fieldValues: [
+                { field: beforeCutoff.id, value: JSON.stringify(beforeCutoff) },
+                { field: atCutoff.id, value: JSON.stringify(atCutoff) },
+                { field: afterCutoff.id, value: JSON.stringify(afterCutoff) },
+            ],
+        });
+
+        await persistServerDailyGpChallenge(current);
+
+        expect(mockRedis.hDel).toHaveBeenCalledWith(
+            'dailygp:challenges',
+            [beforeCutoff.id, atCutoff.id],
+        );
+        expect(mockRedis.expire).toHaveBeenCalledWith(
+            `dailygp:leaderboard:${afterCutoff.id}`,
+            getDailyGpCompetitionTtlSeconds(afterCutoff),
+        );
+
+        vi.useRealTimers();
+    });
+
+    it('falls back to the first catalog track when the playhead track left the schedule', async () => {
+        const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        mockRedis.hGet.mockResolvedValue(null);
+        mockRedis.hGetAll.mockResolvedValue({
+            'daily-gp-2026-07-10': JSON.stringify({
+                id: 'daily-gp-2026-07-10',
+                challengeDate: '2026-07-10',
+                trackKey: 'removed-from-schedule-track',
+                startsAt: '2026-07-10T00:00:00.000Z',
+                endsAt: '2026-07-11T00:00:00.000Z',
+                availableUntil: '2026-07-17T00:00:00.000Z',
+            }),
+        });
+        mockRedis.hSetNX.mockResolvedValue(1);
+
+        const challenge = await getServerDailyGpChallenge();
+
+        expect(challenge.trackKey).toBe(TRACK_SCHEDULE_KEYS[0]);
+    });
+
+    it('uses community totals only when they are at least one', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.zCard.mockResolvedValue(0);
+        mockRedis.zRange.mockResolvedValue([]);
+
+        const rejected = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            communityMemberTotal: 0,
+        });
+        const accepted = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            communityMemberTotal: 1,
+        });
+
+        expect(rejected.totalCount).toBe(0);
+        expect(accepted.totalCount).toBe(1);
+    });
+
+    it('returns the existing ledger entry when another writer wins the publish race', async () => {
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        const winner = {
+            id: 'daily-gp-2030-07-03',
+            challengeDate: '2030-07-03',
+            trackKey: 'circuit',
+            startsAt: '2030-07-03T00:00:00.000Z',
+            endsAt: '2030-07-04T00:00:00.000Z',
+            availableUntil: '2030-07-10T00:00:00.000Z',
+            status: 'active',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+            skin: 'default',
+        };
+        const challenger = { ...winner, trackKey: 'desertBridge' };
+        mockRedis.hGet
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(JSON.stringify(winner));
+        mockRedis.hSetNX.mockResolvedValue(0);
+
+        const result = await persistServerDailyGpChallenge(challenger);
+
+        expect(result).toEqual(winner);
+        expect(mockRedis.hSetNX).toHaveBeenCalledTimes(1);
     });
 });

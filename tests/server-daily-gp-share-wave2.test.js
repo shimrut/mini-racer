@@ -56,7 +56,11 @@ const { strings, redis, reddit, challenge } = vi.hoisted(() => {
         getPostsByUser: vi.fn(async () => ({ all: async () => [] })),
         submitComment: vi.fn(async ({ runAs }) => (
             runAs === 'APP'
-                ? { id: 't1_scorethread', authorName: 'mini-racer' }
+                ? {
+                    id: 't1_scorethread',
+                    authorName: 'mini-racer',
+                    distinguish: vi.fn(async () => undefined),
+                }
                 : { id: 't1_sharedresult', authorName: 'RaceFan', url: 'https://reddit.com/r/miniracer/comments/daily/result' }
         )),
     };
@@ -88,8 +92,12 @@ vi.mock('../src/server/replay-validator.js', () => ({
     })),
 }));
 
+const { validateDailyGpReplayDetailed } = await import('../src/server/replay-validator.js');
+const { getServerDailyGpPlayerBest } = await import('../src/server/daily-gp-store.js');
+
 const {
     confirmDailyGpShare,
+    formatDailyGpShareComment,
     previewDailyGpShare,
     registerDailyGpPost,
 } = await import('../src/server/daily-gp-share.ts');
@@ -156,5 +164,89 @@ describe('daily GP share wave 2', () => {
         expect(preview.body.status).toBe('ready');
         expect(preview.body.shareToken).toBeTruthy();
         expect(strings.has('dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380')).toBe(true);
+    });
+
+    it('formats share comments with and without medal tiers', () => {
+        expect(formatDailyGpShareComment(42380, 'gold', 'Classic Circuit')).toContain('Gold');
+        expect(formatDailyGpShareComment(42380, null, 'Classic Circuit')).toContain('42.38');
+        expect(formatDailyGpShareComment(42380, null, 'Classic Circuit')).not.toContain('medal');
+    });
+
+    it('rejects finish previews with invalid replays but accepts standings previews', async () => {
+        validateDailyGpReplayDetailed.mockReturnValueOnce({ ok: false });
+        const invalid = await previewDailyGpShare({
+            source: 'finish',
+            challengeId: challenge.id,
+            replay: { inputs: [] },
+        }, requestContext);
+        expect(invalid).toMatchObject({
+            status: 422,
+            body: { status: 'invalid_replay' },
+        });
+
+        const standings = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        expect(standings.body.status).toBe('ready');
+    });
+
+    it('returns result_unavailable when standings cannot resolve a player best', async () => {
+        getServerDailyGpPlayerBest.mockResolvedValueOnce(null);
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 404,
+            body: { status: 'result_unavailable' },
+        });
+    });
+
+    it('sets the share rate-limit TTL only on the first increment', async () => {
+        const rateLimitCalls = () => redis.expire.mock.calls.filter(
+            ([key]) => String(key).startsWith('dailygp:share-rate-limit:'),
+        );
+
+        await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(rateLimitCalls()).toHaveLength(1);
+
+        await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(rateLimitCalls()).toHaveLength(1);
+    });
+
+    it('confirms a preview token and rejects previews owned by another account', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        const forbidden = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            { ...requestContext, username: 'OtherUser' },
+        );
+        expect(forbidden).toMatchObject({
+            status: 403,
+            body: { status: 'share_forbidden' },
+        });
+
+        const confirmed = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+        expect(confirmed).toMatchObject({
+            status: 200,
+            body: { status: 'shared' },
+        });
     });
 });
