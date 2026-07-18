@@ -3328,4 +3328,205 @@ describe('server daily gp store submissions', () => {
             }
         });
     });
+
+    describe('mutation-survivor precision', () => {
+        it('stores strictReplayFailureReason only when it is a string', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.zCard.mockResolvedValue(1);
+            mockRedis.zRange.mockResolvedValue([{ member: 'reddit:reason-player', score: 9000 }]);
+            mockRedis.hMGet.mockResolvedValue([JSON.stringify({
+                playerId: 'reddit:reason-player',
+                trackKey: challenge.trackKey,
+                bestTimeMs: 9000,
+                updatedAt: '2026-01-01T00:00:00.000Z',
+                validationMethod: 'strict-replay',
+                strictReplayFailureReason: 42,
+            })]);
+
+            const snapshot = await getServerDailyGpSnapshot({
+                challengeId: challenge.id,
+                redditUsername: 'Reason-Player',
+            });
+
+            expect(snapshot.topRows).toHaveLength(1);
+            expect(snapshot.topRows[0].bestTimeMs).toBe(9000);
+        });
+
+        it('returns null playerRankLabel when the signed-in player has no leaderboard row', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.zCard.mockResolvedValue(2);
+            mockRedis.zRange.mockResolvedValue([
+                { member: 'reddit:leader', score: 5000 },
+                { member: 'reddit:second', score: 6000 },
+            ]);
+            mockRedis.hMGet.mockResolvedValue([
+                JSON.stringify({
+                    playerId: 'reddit:leader',
+                    trackKey: challenge.trackKey,
+                    bestTimeMs: 5000,
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                }),
+                JSON.stringify({
+                    playerId: 'reddit:second',
+                    trackKey: challenge.trackKey,
+                    bestTimeMs: 6000,
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                }),
+            ]);
+            mockRedis.zRank.mockResolvedValue(undefined);
+
+            const snapshot = await getServerDailyGpSnapshot({
+                challengeId: challenge.id,
+                redditUsername: 'Unranked-Player',
+            });
+
+            expect(snapshot.playerRank).toBeNull();
+            expect(snapshot.playerRankLabel).toBeNull();
+            expect(snapshot.currentPlayerRow).toBeNull();
+        });
+
+        it('returns an empty row page when the requested rank range is inverted', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.zCard.mockResolvedValue(3);
+            mockRedis.zRange.mockResolvedValue([]);
+
+            const snapshot = await getServerDailyGpSnapshot({
+                challengeId: challenge.id,
+                offset: 5,
+                limit: 2,
+            });
+
+            expect(snapshot.topRows).toEqual([]);
+            expect(snapshot.pageOffset).toBe(5);
+            expect(snapshot.pageLimit).toBe(2);
+        });
+
+        it('rejects leaderboard entries whose stored track disagrees with the challenge track', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.zCard.mockResolvedValue(1);
+            mockRedis.zRange.mockResolvedValue([{ member: 'reddit:mismatch', score: 7000 }]);
+            mockRedis.hMGet.mockResolvedValue([JSON.stringify({
+                playerId: 'reddit:mismatch',
+                trackKey: 'desertBridge',
+                bestTimeMs: 7000,
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            })]);
+
+            const snapshot = await getServerDailyGpSnapshot({ challengeId: challenge.id });
+
+            expect(snapshot.topRows).toEqual([]);
+        });
+
+        it('uses the community floor even when the leaderboard already has more entries', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            mockRedis.zCard.mockResolvedValue(3);
+            mockRedis.zRange.mockResolvedValue([
+                { member: 'reddit:a', score: 1000 },
+                { member: 'reddit:b', score: 2000 },
+                { member: 'reddit:c', score: 3000 },
+            ]);
+            mockRedis.hMGet.mockResolvedValue([
+                JSON.stringify({ playerId: 'reddit:a', trackKey: challenge.trackKey, bestTimeMs: 1000, updatedAt: '2026-01-01T00:00:00.000Z' }),
+                JSON.stringify({ playerId: 'reddit:b', trackKey: challenge.trackKey, bestTimeMs: 2000, updatedAt: '2026-01-01T00:00:00.000Z' }),
+                JSON.stringify({ playerId: 'reddit:c', trackKey: challenge.trackKey, bestTimeMs: 3000, updatedAt: '2026-01-01T00:00:00.000Z' }),
+            ]);
+
+            const snapshot = await getServerDailyGpSnapshot({
+                challengeId: challenge.id,
+                communityMemberTotal: 500,
+            });
+
+            expect(snapshot.totalCount).toBe(500);
+            expect(snapshot.leaderboardEntryCount).toBe(3);
+        });
+
+        it('returns null for getServerDailyGpChallengeById when challengeId is empty', async () => {
+            const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+
+            await expect(getServerDailyGpChallengeById('')).resolves.toBeNull();
+            await expect(getServerDailyGpChallengeById(null)).resolves.toBeNull();
+        });
+
+        it('advances the maintenance cursor even when every scanned entry is corrupt', async () => {
+            const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            const challenge = {
+                id: 'daily-gp-2030-07-01',
+                challengeDate: '2030-07-01',
+                trackKey: 'circuit',
+                startsAt: '2030-07-01T00:00:00.000Z',
+                endsAt: '2030-07-02T00:00:00.000Z',
+                availableUntil: '2030-07-08T00:00:00.000Z',
+                status: 'active',
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: {},
+                skin: 'default',
+            };
+            mockRedis.hGet.mockResolvedValue(null);
+            mockRedis.hSetNX.mockResolvedValue(1);
+            mockRedis.hScan.mockResolvedValue({
+                cursor: 12,
+                fieldValues: [
+                    { field: 'daily-gp-corrupt-a', value: '{bad-json' },
+                    { field: 'daily-gp-corrupt-b', value: '"string"' },
+                ],
+            });
+
+            await persistServerDailyGpChallenge(challenge);
+
+            expect(mockRedis.set).toHaveBeenCalledWith(
+                'dailygp:maintenance:challenge-history:v1:cursor',
+                '12',
+            );
+            expect(mockRedis.hDel).not.toHaveBeenCalled();
+        });
+
+        it('keeps nearby rows when the player rank sits inside the page but not in topRows', async () => {
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+            const members = Array.from({ length: 8 }, (_, index) => ({
+                member: `reddit:nearby-${index + 1}`,
+                score: 10000 + index,
+            }));
+            mockRedis.zCard.mockResolvedValue(8);
+            mockRedis.zRange.mockImplementation(async (_key, start, stop) => members.slice(start, stop + 1));
+            mockRedis.hMGet.mockImplementation(async (_key, ids) => ids.map((playerId) => JSON.stringify({
+                playerId,
+                trackKey: challenge.trackKey,
+                bestTimeMs: 10000 + Number(playerId.split('-').pop()) - 1,
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            })));
+            mockRedis.zRank.mockResolvedValue(6);
+            mockRedis.hGet.mockImplementation(async (key, field) => {
+                if (field === 'reddit:nearby-7') {
+                    return JSON.stringify({
+                        playerId: 'reddit:nearby-7',
+                        trackKey: challenge.trackKey,
+                        bestTimeMs: 10006,
+                        updatedAt: '2026-01-01T00:00:00.000Z',
+                    });
+                }
+                return null;
+            });
+            mockRedis.get.mockResolvedValue(null);
+
+            const snapshot = await getServerDailyGpSnapshot({
+                challengeId: challenge.id,
+                redditUsername: 'Nearby-7',
+                offset: 0,
+                limit: 5,
+            });
+
+            expect(snapshot.currentPlayerRow).toMatchObject({
+                rank: 7,
+                isCurrentPlayer: true,
+                bestTimeMs: 10006,
+            });
+            expect(snapshot.nearbyRows.map((row) => row.rank)).toEqual([5, 6, 7, 8]);
+        });
+    });
 });

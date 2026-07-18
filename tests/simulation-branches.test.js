@@ -1870,3 +1870,337 @@ describe('updateSimulation — mutation-survivor precision', () => {
         expect(idleEvents.checkpointPassed).toBeNull();
     });
 });
+
+describe('updateSimulation — collision-hash and lifecycle precision', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('falls back to hash segments when no bucket overlaps the query region (L458-L486)', () => {
+        const fallbackWall = VERTICAL_WALL(50);
+        const collisionHash = {
+            cells: new Map([['99,99', [VERTICAL_WALL(99)]]]),
+            segments: [fallbackWall],
+            cellSize: 1,
+            queryStamp: 0,
+            candidateSegments: []
+        };
+        const state = createTestSimState({
+            collisionHash,
+            pos: { x: 49.7, y: 0 },
+            velocity: { x: 4, y: 0 },
+            angle: 0
+        });
+
+        const events = updateSimulation(
+            state,
+            0.05,
+            { ...CONFIG, accel: 0, carRadius: 0.5, carCollisionHalfLength: 0 },
+            OPEN_TRACK,
+            []
+        );
+
+        expect(collisionHash.candidateSegments).toEqual([]);
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.pos.x).toBeLessThan(50);
+    });
+
+    it('returns an empty candidate list for null collision data (L325, L456-L457)', () => {
+        const state = createTestSimState({
+            collisionHash: null,
+            pos: { x: 0, y: 0 },
+            velocity: { x: 2, y: 0 },
+            angle: 0
+        });
+
+        const events = updateSimulation(state, 0.1, { ...CONFIG, accel: 0 }, OPEN_TRACK, null);
+
+        expect(events.wallImpact).toBeNull();
+        expect(state.pos.x).toBeCloseTo(0.2);
+    });
+
+    it('skips scrape feedback when a valid finish and wall contact occur in the same tick (L700-L706)', () => {
+        const finishTrack = {
+            startLine: { p1: { x: 0, y: 0 }, p2: { x: 10, y: 0 } },
+            checkpoints: []
+        };
+        const sideWall = [VERTICAL_WALL(5, -2, 2)];
+        const state = createTestSimState({
+            currentTime: 2.5,
+            pos: { x: 4.6, y: -0.2 },
+            velocity: { x: 0, y: 12 },
+            angle: Math.PI / 2
+        });
+
+        const events = updateSimulation(
+            state,
+            0.05,
+            { ...CONFIG, accel: 0, grip: 0, carRadius: 0.5, carCollisionHalfLength: 0 },
+            finishTrack,
+            sideWall
+        );
+
+        expect(events.winTriggered).toBe(true);
+        expect(events.wallImpact).toBeNull();
+        expect(state.status).toBe('won');
+        expect(state.particles).toHaveLength(0);
+    });
+
+    it('does not advance race time while relaunch delay is active (L524-L527)', () => {
+        const state = createTestSimState({
+            currentTime: 1.5,
+            relaunchDelayRemaining: 0.2,
+            pos: { x: 5, y: -0.115 },
+            velocity: { x: 0, y: 1 },
+            angle: Math.PI / 2,
+            nextCheckpointIndex: 0
+        });
+
+        const events = updateSimulation(state, 0.1, { ...CONFIG, accel: 0 }, CHECKPOINT_TRACK, []);
+
+        expect(state.currentTime).toBeCloseTo(1.5);
+        expect(state.relaunchDelayRemaining).toBeCloseTo(0.1);
+        expect(events.checkpointPassed).toBeNull();
+        expect(events.winTriggered).toBe(false);
+    });
+
+    it('uses the slower route-trace interval when frameSkip is enabled (L747)', () => {
+        const state = createTestSimState({
+            frameSkip: 1,
+            trailTimer: 0.079,
+            velocity: { x: 2, y: 0 },
+            angle: 0,
+            pos: { x: 0, y: 0 }
+        });
+
+        updateSimulation(state, 0.002, { ...CONFIG, accel: 0, grip: 0 }, OPEN_TRACK, []);
+
+        expect(state.routeTrace.length).toBe(1);
+        expect(state.trailTimer).toBeCloseTo(0.001);
+    });
+
+    it('caps retained spark particles at thirty when frameSkip is enabled (L713, L771)', () => {
+        const state = createTestSimState({
+            frameSkip: 1,
+            pos: { x: -0.25, y: -0.25 },
+            velocity: { x: 0.1, y: 0.1 },
+            angle: Math.PI / 4,
+            particles: Array.from({ length: 40 }, (_, index) => ({
+                x: index,
+                y: index,
+                vx: 0,
+                vy: 0,
+                life: 0.5,
+                maxLife: 0.5,
+                color: '#fff',
+                size: 2
+            }))
+        });
+        const wall = [{
+            start: { x: 0, y: 0 },
+            end: { x: 0, y: 4 },
+            dx: 0,
+            dy: 4,
+            lenSq: 16
+        }];
+
+        updateSimulation(state, 0.01, { ...CONFIG, accel: 0, carRadius: 0.5 }, OPEN_TRACK, wall);
+
+        expect(state.particles.length).toBeLessThanOrEqual(30);
+    });
+
+    it('creates scrape sparks with deterministic spread offsets from Math.random (L42-L43)', () => {
+        const state = createTestSimState({
+            pos: { x: -0.25, y: -0.25 },
+            velocity: { x: 0.1, y: 0.1 },
+            angle: Math.PI / 4
+        });
+        const wall = [{
+            start: { x: 0, y: 0 },
+            end: { x: 0, y: 4 },
+            dx: 0,
+            dy: 4,
+            lenSq: 16
+        }];
+        const config = { ...CONFIG, accel: 0, carRadius: 0.5 };
+
+        vi.spyOn(Math, 'random')
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0);
+        updateSimulation(state, 0.1, config, OPEN_TRACK, wall);
+
+        expect(state.particles).toHaveLength(15);
+        expect(state.particles[0].life).toBeGreaterThan(0);
+        expect(state.particles[0].maxLife).toBeGreaterThanOrEqual(state.particles[0].life);
+        expect(Number.isFinite(state.particles[0].vx)).toBe(true);
+        expect(Number.isFinite(state.particles[0].vy)).toBe(true);
+    });
+
+    it('drops expired particles while keeping live ones (L775-L784)', () => {
+        const state = createTestSimState({
+            pos: { x: 0, y: 0 },
+            velocity: { x: 0, y: 0 },
+            angle: 0,
+            particles: [
+                { x: 0, y: 0, vx: 0, vy: 0, life: 0.01, maxLife: 0.2, color: '#fff', size: 2 },
+                { x: 1, y: 1, vx: 0, vy: 0, life: 0.5, maxLife: 0.5, color: '#fff', size: 2 }
+            ]
+        });
+
+        updateSimulation(state, 0.02, { ...CONFIG, accel: 0 }, OPEN_TRACK, []);
+
+        expect(state.particles).toHaveLength(1);
+        expect(state.particles[0].life).toBeCloseTo(0.48);
+    });
+
+    it('resolves stacked overlaps across multiple contact passes (L370-L396)', () => {
+        const squeezeWalls = [
+            {
+                start: { x: 4.9, y: 4.5 },
+                end: { x: 4.9, y: 5.5 },
+                dx: 0,
+                dy: 1,
+                lenSq: 1
+            },
+            {
+                start: { x: 4.5, y: 5.0 },
+                end: { x: 5.5, y: 5.0 },
+                dx: 1,
+                dy: 0,
+                lenSq: 1
+            }
+        ];
+        const state = createTestSimState({
+            pos: { x: 4.88, y: 4.98 },
+            velocity: { x: 0.5, y: 0.5 },
+            angle: Math.PI / 4
+        });
+
+        const events = updateSimulation(
+            state,
+            0.02,
+            { ...CONFIG, accel: 0, grip: 0, carRadius: 0.2, carCollisionHalfLength: 0 },
+            OPEN_TRACK,
+            squeezeWalls
+        );
+
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.pos.x).toBeLessThan(4.9);
+        expect(state.pos.y).toBeLessThan(5.0);
+    });
+
+    it('queries hash buckets using the configured cell size (L464-L467)', () => {
+        const bucketWall = VERTICAL_WALL(0.5);
+        const collisionHash = {
+            cells: new Map([['0,0', [bucketWall]]]),
+            segments: [VERTICAL_WALL(50)],
+            cellSize: 2,
+            queryStamp: 0,
+            candidateSegments: []
+        };
+        const state = createTestSimState({
+            collisionHash,
+            pos: { x: 0.2, y: 0 },
+            velocity: { x: 4, y: 0 },
+            angle: 0
+        });
+
+        const events = updateSimulation(
+            state,
+            0.05,
+            { ...CONFIG, accel: 0, carRadius: 0.5, carCollisionHalfLength: 0 },
+            OPEN_TRACK,
+            []
+        );
+
+        expect(collisionHash.candidateSegments).toEqual([bucketWall]);
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.pos.x).toBeLessThan(0.5);
+    });
+
+    it('uses the axis-aligned fallback normal for zero-length wall segments (L158-L166)', () => {
+        const pointWall = [{
+            start: { x: 2, y: 2 },
+            end: { x: 2, y: 2 },
+            dx: 0,
+            dy: 0,
+            lenSq: 0
+        }];
+        const state = createTestSimState({
+            pos: { x: 1.6, y: 2 },
+            velocity: { x: 3, y: 0 },
+            angle: 0
+        });
+
+        const events = updateSimulation(
+            state,
+            0.05,
+            { ...CONFIG, accel: 0, carRadius: 0.35, carCollisionHalfLength: 0 },
+            OPEN_TRACK,
+            pointWall
+        );
+
+        expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
+        expect(state.velocity.x).toBeLessThan(3);
+        expect(state.pos.x).toBeLessThan(2);
+    });
+
+    it('snapshots every transient event field before the next idle tick (L8-L19, L512)', () => {
+        const state = createTestSimState({
+            currentTime: 1.25,
+            pos: { x: 5, y: -0.115 },
+            velocity: { x: 0, y: 1 },
+            angle: Math.PI / 2,
+            nextCheckpointIndex: 0
+        });
+
+        const active = updateSimulation(state, 0.05, { ...CONFIG, accel: 0 }, CHECKPOINT_TRACK, []);
+        const activeSnapshot = {
+            winTriggered: active.winTriggered,
+            winData: active.winData,
+            challengeLapCompleted: active.challengeLapCompleted,
+            challengeCompletedLapTime: active.challengeCompletedLapTime,
+            challengeProgressLaps: active.challengeProgressLaps,
+            challengeFailed: active.challengeFailed,
+            challengeFailureReason: active.challengeFailureReason,
+            wallImpact: active.wallImpact,
+            crashImpact: active.crashImpact,
+            crashEndedRun: active.crashEndedRun,
+            checkpointPassed: active.checkpointPassed
+        };
+
+        state.velocity = { x: 0, y: 0 };
+        const idle = updateSimulation(state, 0.05, { ...CONFIG, accel: 0 }, CHECKPOINT_TRACK, []);
+
+        expect(activeSnapshot.checkpointPassed).toEqual({
+            index: 0,
+            splitTimeSec: state.currentTime - 0.05
+        });
+        expect(idle).toEqual({
+            winTriggered: false,
+            winData: null,
+            challengeLapCompleted: false,
+            challengeCompletedLapTime: null,
+            challengeProgressLaps: 0,
+            challengeFailed: false,
+            challengeFailureReason: null,
+            wallImpact: null,
+            crashImpact: null,
+            crashEndedRun: false,
+            checkpointPassed: null
+        });
+    });
+});

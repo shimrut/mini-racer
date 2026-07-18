@@ -832,6 +832,24 @@ describe("daily-gp-store submission hardening", () => {
     });
   });
 
+  it("trims a padded guest token before authorizing preference updates", async () => {
+    const guestPlayerId = "guest-token-trim";
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const paddedToken = `  ${bootstrap.guestToken}  `;
+
+    const updated = await updateServerPlayerPreferences({
+      playerId: guestPlayerId,
+      guestToken: paddedToken,
+      playerPreferences,
+    });
+
+    expect(updated).toMatchObject({
+      playerId: `guest:${guestPlayerId}`,
+      guestToken: bootstrap.guestToken,
+      playerPreferences,
+    });
+  });
+
   it("keeps nearby rows empty when the current player sits on the last rank of the requested page", async () => {
     const challenge = await getServerDailyGpChallenge();
     const members = Array.from({ length: 12 }, (_, index) => ({

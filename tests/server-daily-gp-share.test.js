@@ -1285,4 +1285,210 @@ describe('daily GP result sharing', () => {
             'I earned the Silver medal 🥈 with a 99.99 lap in Track.',
         );
     });
+
+    it('attempts historical post recovery when the stored post id cannot be resolved', async () => {
+        strings.clear();
+        strings.set(`dailygp:post:miniracer:${challenge.id}`, JSON.stringify({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_stale',
+            postUrl: 'https://reddit.com/r/miniracer/comments/stale',
+            scoreThreadCommentId: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        }));
+        reddit.getPostById.mockRejectedValueOnce(new Error('post missing'));
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => [] });
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(reddit.getPostsByUser).toHaveBeenCalled();
+        expect(preview).toMatchObject({
+            status: 404,
+            body: { status: 'post_unavailable' },
+        });
+    });
+
+    it('returns already_shared during preview when the stored Reddit comment is still active', async () => {
+        strings.set(
+            'dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380',
+            JSON.stringify({
+                commentId: 't1_live_share',
+                commentUrl: 'https://reddit.com/r/miniracer/comments/daily/live',
+                commentText: 'still live',
+                username: 'RaceFan',
+            }),
+        );
+        reddit.getCommentById.mockImplementation(async (id) => (
+            id === 't1_live_share'
+                ? { id, removed: false, authorName: 'RaceFan' }
+                : anchor
+        ));
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 200,
+            body: {
+                status: 'already_shared',
+                commentUrl: 'https://reddit.com/r/miniracer/comments/daily/live',
+            },
+        });
+        expect(reddit.submitComment).not.toHaveBeenCalled();
+    });
+
+    it('clears a removed shared-result record before issuing a fresh preview', async () => {
+        strings.set(
+            'dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380',
+            JSON.stringify({
+                commentId: 't1_removed_share',
+                commentUrl: 'https://reddit.com/r/miniracer/comments/daily/removed',
+                commentText: 'removed',
+                username: 'RaceFan',
+            }),
+        );
+        reddit.getCommentById.mockImplementation(async (id) => (
+            id === 't1_removed_share'
+                ? { id, removed: true }
+                : anchor
+        ));
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview.body.status).toBe('ready');
+        expect(strings.has('dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380')).toBe(false);
+    });
+
+    it('deletes the preview token when confirm finds an already-shared result', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        strings.set(
+            'dailygp:shared-result:miniracer:daily-gp-2026-07-14:racefan:42380',
+            JSON.stringify({
+                commentId: 't1_confirm_existing',
+                commentUrl: 'https://reddit.com/r/miniracer/comments/daily/existing',
+                commentText: 'existing',
+                username: 'RaceFan',
+            }),
+        );
+        reddit.getCommentById.mockImplementation(async (id) => (
+            id === 't1_confirm_existing'
+                ? { id, removed: false, authorName: 'RaceFan' }
+                : anchor
+        ));
+
+        const confirmed = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+
+        expect(confirmed).toMatchObject({
+            status: 200,
+            body: {
+                status: 'already_shared',
+                commentUrl: 'https://reddit.com/r/miniracer/comments/daily/existing',
+            },
+        });
+        expect(strings.has(`dailygp:share-preview:${preview.body.shareToken}`)).toBe(false);
+        expect(reddit.submitComment).not.toHaveBeenCalledWith(expect.objectContaining({ runAs: 'USER' }));
+    });
+
+    it('matches score-thread anchors case-insensitively on author name', async () => {
+        const post = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        const existingAnchor = {
+            id: 't1_case_anchor',
+            authorName: 'MINI-RACER',
+            body: DAILY_GP_SCORE_THREAD_TEXT,
+            removed: false,
+            distinguish: vi.fn(async () => undefined),
+        };
+        reddit.getComments.mockResolvedValueOnce({ all: async () => [existingAnchor] });
+
+        const result = await ensureDailyGpScoreThread(post, 'mini-racer');
+
+        expect(result.scoreThreadCommentId).toBe('t1_case_anchor');
+        expect(reddit.submitComment).not.toHaveBeenCalled();
+        expect(existingAnchor.distinguish).toHaveBeenCalledWith(true);
+    });
+
+    it('rejects finish previews when the replay cannot be verified', async () => {
+        validateDailyGpReplayDetailed.mockReturnValueOnce({
+            ok: false,
+            failure: { reason: 'frame_cap' },
+        });
+
+        const preview = await previewDailyGpShare({
+            source: 'finish',
+            challengeId: challenge.id,
+            replay: { inputs: [{ frames: 1 }] },
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 422,
+            body: { status: 'invalid_replay' },
+        });
+    });
+
+    it('rejects previews for unknown share sources', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'leaderboard',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 404,
+            body: { status: 'result_unavailable' },
+        });
+    });
+
+    it('normalizes usernames when building share rate-limit keys', async () => {
+        for (let i = 0; i < 12; i += 1) {
+            await previewDailyGpShare({
+                source: 'standings',
+                challengeId: challenge.id,
+            }, { ...requestContext, username: '  RaceFan  ' });
+        }
+
+        expect(strings.has('dailygp:share-rate-limit:racefan')).toBe(true);
+        const limited = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { ...requestContext, username: 'racefan' });
+        expect(limited.status).toBe(429);
+    });
+
+    it('uses the post URL when Reddit omits a comment url during confirm', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        reddit.submitComment.mockImplementation(async ({ runAs }) => (
+            runAs === 'APP'
+                ? anchor
+                : { ...userComment, id: 't1_no_url', url: undefined }
+        ));
+
+        const confirmed = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+
+        expect(confirmed.body.commentUrl).toBe('https://reddit.com/r/miniracer/comments/daily');
+    });
 });
