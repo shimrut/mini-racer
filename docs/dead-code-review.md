@@ -106,6 +106,8 @@ Validation after removal:
 
 ## Disabled analytics plumbing cleanup: July 15, 2026
 
+> Superseded on July 18, 2026: custom gameplay and moderator analytics were removed completely, including collection, routes, storage code, dashboard assets, tooling, and dependencies. The details below describe the earlier intermediate cleanup only.
+
 The analytics server accepts six lifecycle events: `game_opened`, `game_closed`, `game_playtime_chunk`, `race_started`, `race_ended`, and `race_restarted`. The browser still carried empty methods and call-side state for retired player-type, support, menu, mode-selection, map-selection, and pageview events.
 
 The cleanup removed those no-op methods, the unused session flag store, deferred pageview/map-selection state, race counters that only fed the disabled map event, and the track-loading options that existed only to manage that state. Active lifecycle and race event payloads were left unchanged.

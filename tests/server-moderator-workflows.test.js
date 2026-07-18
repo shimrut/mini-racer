@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
     mockReddit,
-    mockRedis,
     mockContext,
     mockCommunityMemberCount,
 } = vi.hoisted(() => ({
@@ -11,10 +10,6 @@ const {
         getSubredditByName: vi.fn(),
         getPostById: vi.fn(),
         submitCustomPost: vi.fn(),
-    },
-    mockRedis: {
-        hGet: vi.fn(),
-        hSet: vi.fn(),
     },
     mockContext: {
         getRequestUsername: vi.fn(),
@@ -28,7 +23,6 @@ const {
 
 vi.mock('@devvit/web/server', () => ({
     reddit: mockReddit,
-    redis: mockRedis,
 }));
 vi.mock('../src/server/request-context.js', () => mockContext);
 vi.mock('../src/server/community-member-count.js', () => ({
@@ -40,10 +34,6 @@ const {
     isModeratorForSubreddit,
     resolveMenuTargetSubredditName,
 } = await import('../src/server/moderator-access.ts');
-const {
-    ensureModeratorAnalyticsPostForSubreddit,
-    resolveAnalyticsToolSubredditName,
-} = await import('../src/server/moderator-analytics-post.ts');
 const {
     getCommunityMemberTotalForLeaderboard,
     getPostSubredditContext,
@@ -57,8 +47,6 @@ describe('moderator and community workflows', () => {
         mockContext.readContextPostId.mockReturnValue(null);
         mockContext.readContextSubredditId.mockReturnValue(null);
         mockContext.readContextSubredditName.mockReturnValue(null);
-        mockRedis.hGet.mockResolvedValue(null);
-        mockRedis.hSet.mockResolvedValue(1);
         mockCommunityMemberCount.mockResolvedValue(321);
     });
 
@@ -84,57 +72,7 @@ describe('moderator and community workflows', () => {
         );
     });
 
-    it('reuses a stored moderator analytics post and refreshes its URL', async () => {
-        mockRedis.hGet.mockResolvedValue(JSON.stringify({
-            postId: 't3_analytics',
-            postUrl: 'https://reddit.com/old',
-            updatedAt: '2026-07-15T00:00:00.000Z',
-        }));
-        mockReddit.getPostById.mockResolvedValue({
-            url: 'https://reddit.com/new',
-        });
-
-        await expect(
-            ensureModeratorAnalyticsPostForSubreddit('MiniRacer'),
-        ).resolves.toEqual({
-            created: false,
-            postUrl: 'https://reddit.com/new',
-        });
-        expect(mockRedis.hSet).toHaveBeenCalledWith(
-            'dailygp:mod-analytics:posts',
-            { MiniRacer: expect.stringContaining('https://reddit.com/new') },
-        );
-        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
-    });
-
-    it('creates, locks, removes, and stores a moderator analytics post', async () => {
-        const post = {
-            id: 't3_analytics',
-            url: 'https://reddit.com/analytics',
-            lock: vi.fn(async () => undefined),
-            remove: vi.fn(async () => undefined),
-        };
-        mockReddit.submitCustomPost.mockResolvedValue(post);
-
-        await expect(
-            ensureModeratorAnalyticsPostForSubreddit('MiniRacer'),
-        ).resolves.toEqual({
-            created: true,
-            postUrl: 'https://reddit.com/analytics',
-        });
-        expect(post.lock).toHaveBeenCalledTimes(1);
-        expect(post.remove).toHaveBeenCalledWith(false);
-        expect(mockRedis.hSet).toHaveBeenCalledWith(
-            'dailygp:mod-analytics:posts',
-            { MiniRacer: expect.stringContaining('"postId":"t3_analytics"') },
-        );
-    });
-
-    it('resolves analytics and member-count subreddit context through documented fallbacks', async () => {
-        mockContext.readContextPostData.mockReturnValue({ subredditName: 'PostDataSub' });
-        await expect(resolveAnalyticsToolSubredditName()).resolves.toBe('PostDataSub');
-
-        mockContext.readContextPostData.mockReturnValue(null);
+    it('resolves member-count subreddit context through documented fallbacks', async () => {
         mockContext.readContextPostId.mockReturnValue('t3_daily');
         mockReddit.getPostById.mockResolvedValue({
             subredditId: 't5_mini',

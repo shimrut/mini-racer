@@ -24,7 +24,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The launch card works without inline scroll traps.
 - [ ] The expanded game works across phone and desktop layouts.
 - [ ] The retry flow is fast and predictable after a finish or an enabled collision auto-restart.
-- [ ] A verified lifetime PB ghost appears on the next attempt for that track, including when the track returns on a later date.
+- [ ] A verified PB ghost appears on the next attempt for that daily challenge and disappears six hours after the challenge leaves the seven-day playable window.
 - [ ] The PB ghost uses the player's currently selected car and is visibly more transparent than the live player car.
 - [ ] `Race Now` keeps the custom-post loading screen visible until the resolved track ghost is prepared: valid historical posts load their own ghost, while expired posts load today's featured-track ghost.
 - [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.
@@ -39,7 +39,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] At least one example post has been created and reviewed end to end.
 - [ ] Moderator, scheduler, and repeated create actions reuse the same canonical post for the subreddit and UTC day.
 - [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.
-- [ ] Podium automation can be enabled and disabled independently from race posts, publishes the just-expired track at 00:01 UTC, and repeated scheduler/menu actions reuse one canonical podium post.
+- [ ] Podium automation can be enabled and disabled independently from race posts, retries hourly during the six-hour post-expiry window, freezes the first top-three snapshot, and reuses one canonical podium post.
 - [ ] Podium posts show exactly three positions, preserve publication-time username/private-name choices, expose no player IDs, and use explicit placeholders when fewer than three verified racers finished.
 - [ ] Podium Reddit identities show the correct Snoovatar when Devvit exposes one and omit the `u/` prefix; standard-profile-icon accounts, private identities, unavailable avatars, and empty places show Reddit's official hosted default Snoo on desktop and mobile.
 - [ ] A podium created before avatar payloads were introduced backfills its public Reddit avatars through `/api/podium/avatars` without resolving or exposing private identities.
@@ -51,8 +51,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Reddit username display behaves correctly when identity is enabled.
 - [ ] Guest fallback identity behaves correctly when Reddit username display is unavailable or off.
 - [ ] Invalid or suspicious replay submissions are rejected cleanly.
-- [ ] A daily leaderboard improvement and a lifetime track PB improvement are displayed and stored independently.
-- [ ] Existing retained verified results seed a time-only track PB without showing a fabricated ghost.
+- [ ] A daily leaderboard improvement and its challenge PB/ghost improvement are displayed and stored independently while sharing the same fixed expiry deadline.
+- [ ] An existing verified challenge result can seed a time-only PB without showing a fabricated ghost.
 - [ ] A geometry or simulation revision rejects an incompatible stored ghost instead of rendering it on the changed track.
 - [ ] Error states are understandable and do not leave the player stuck.
 - [ ] `SUBMIT_COMMENT` user-action permission is present in `devvit.json`, and the reviewed app version is approved for regular-user attribution.

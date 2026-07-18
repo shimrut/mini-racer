@@ -13,9 +13,12 @@ vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 
 const {
     acquireDailyGpPodiumPostCreationLock,
+    deleteDailyGpPodiumPendingSnapshot,
+    readDailyGpPodiumPendingSnapshot,
     readDailyGpPodiumPostRecord,
     releaseDailyGpPodiumPostCreationLock,
     writeDailyGpPodiumPostRecord,
+    writeDailyGpPodiumPendingSnapshot,
 } = await import('../src/server/daily-podium-post-store.ts');
 
 describe('daily podium post store', () => {
@@ -65,6 +68,42 @@ describe('daily podium post store', () => {
         await expect(
             readDailyGpPodiumPostRecord('MiniRacer', 'daily-gp-2026-07-10'),
         ).resolves.toBeNull();
+    });
+
+    it('stores a pending sanitized snapshot only until the publication deadline', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-17T00:01:00.000Z'));
+        const snapshot = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            expiresAt: '2026-07-17T06:00:00.000Z',
+            podium: {
+                challengeId: 'daily-gp-2026-07-10',
+                challengeDate: '2026-07-10',
+                trackName: 'Circuit',
+                positions: [1, 2, 3].map((rank) => ({
+                    rank,
+                    displayName: 'No verified finish',
+                    identityType: 'empty',
+                    formattedTime: null,
+                    avatarUrl: null,
+                })),
+            },
+        };
+        mockRedis.get.mockResolvedValue(JSON.stringify(snapshot));
+
+        await expect(
+            readDailyGpPodiumPendingSnapshot('MiniRacer', snapshot.challengeId),
+        ).resolves.toEqual(snapshot);
+        await writeDailyGpPodiumPendingSnapshot(snapshot);
+        expect(mockRedis.set).toHaveBeenCalledWith(
+            `dailygp:podium-pending:miniracer:${snapshot.challengeId}`,
+            JSON.stringify(snapshot),
+            { nx: true, expiration: new Date(snapshot.expiresAt) },
+        );
+        await deleteDailyGpPodiumPendingSnapshot('MiniRacer', snapshot.challengeId);
+        expect(mockRedis.del).toHaveBeenCalledWith(
+            `dailygp:podium-pending:miniracer:${snapshot.challengeId}`,
+        );
     });
 
     it('uses an owner-checked short creation lock', async () => {

@@ -3,7 +3,6 @@ import { createServerApp } from '../src/server/server-app.ts';
 import { registerPlayerRoutes } from '../src/server/routes/player-routes.ts';
 import { registerCompetitionRoutes } from '../src/server/routes/competition-routes.ts';
 import { registerShareRoutes } from '../src/server/routes/share-routes.ts';
-import { registerAnalyticsRoutes } from '../src/server/routes/analytics-routes.ts';
 import { registerInternalRoutes } from '../src/server/routes/internal-routes.ts';
 import { registerPbGhostRoutes } from '../src/server/routes/pb-ghost-routes.ts';
 
@@ -438,129 +437,6 @@ describe('server route contracts', () => {
         });
     });
 
-    it('preserves analytics CORS and moderator authorization responses', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => {});
-        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
-            getRequestUsername: () => null,
-            readContextPostId: () => null,
-            readContextSubredditName: () => 'mini_racer_dev',
-            resolveAnalyticsToolSubredditName: async () => 'mini_racer_dev',
-            assertModeratorForSubreddit: async () => {
-                throw new Error('Moderator access required for r/mini_racer_dev.');
-            },
-            submitServerAnalyticsEvent: vi.fn(),
-            getServerAnalyticsSummary: vi.fn(),
-        }));
-
-        const preflight = await fetch(`${baseUrl}/api/analytics/summary`, {
-            method: 'OPTIONS',
-        });
-        expect(preflight.status).toBe(204);
-        expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
-        expect(preflight.headers.get('access-control-allow-methods')).toBe('GET,POST,OPTIONS');
-
-        const forbidden = await fetch(`${baseUrl}/api/analytics/summary`);
-        expect(forbidden.status).toBe(403);
-        expect(await readJson(forbidden)).toEqual({
-            error: 'Moderator access required for r/mini_racer_dev.',
-        });
-    });
-
-    it('preserves analytics event status and summary query forwarding', async () => {
-        const submitServerAnalyticsEvent = vi.fn()
-            .mockResolvedValueOnce({ accepted: true })
-            .mockResolvedValueOnce({ accepted: false, error: 'invalid event' });
-        const getServerAnalyticsSummary = vi.fn(async () => ({ players: 12 }));
-        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
-            getRequestUsername: () => 'RaceFan',
-            readContextPostId: () => 't3_daily',
-            readContextSubredditName: () => 'MiniRacer',
-            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
-            assertModeratorForSubreddit: vi.fn(async () => 'RaceMod'),
-            submitServerAnalyticsEvent,
-            getServerAnalyticsSummary,
-        }));
-
-        const accepted = await fetch(`${baseUrl}/api/analytics/event`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event: 'game_opened' }),
-        });
-        expect(accepted.status).toBe(200);
-        expect(submitServerAnalyticsEvent).toHaveBeenNthCalledWith(1, {
-            event: 'game_opened',
-            context: {
-                redditUsername: 'RaceFan',
-                postId: 't3_daily',
-                subredditName: 'MiniRacer',
-            },
-        });
-
-        const rejected = await fetch(`${baseUrl}/api/analytics/event`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event: 'retired_event' }),
-        });
-        expect(rejected.status).toBe(400);
-        expect(await readJson(rejected)).toEqual({
-            accepted: false,
-            error: 'invalid event',
-        });
-
-        const summary = await fetch(
-            `${baseUrl}/api/analytics/summary?from=2026-07-01&to=2026-07-16&range=custom`,
-        );
-        expect(summary.status).toBe(200);
-        expect(await readJson(summary)).toEqual({ players: 12 });
-        expect(getServerAnalyticsSummary).toHaveBeenCalledWith({
-            from: '2026-07-01',
-            to: '2026-07-16',
-            range: 'custom',
-        });
-    });
-
-    it('preserves analytics missing-context and server-failure statuses', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => {});
-        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
-            getRequestUsername: () => null,
-            readContextPostId: () => null,
-            readContextSubredditName: () => null,
-            resolveAnalyticsToolSubredditName: vi.fn()
-                .mockResolvedValueOnce(null)
-                .mockResolvedValueOnce('MiniRacer'),
-            assertModeratorForSubreddit: vi.fn(async () => 'RaceMod'),
-            submitServerAnalyticsEvent: vi.fn(async () => {
-                throw new Error('event failed');
-            }),
-            getServerAnalyticsSummary: vi.fn(async () => {
-                throw new Error('summary failed');
-            }),
-        }));
-
-        const missing = await fetch(`${baseUrl}/api/analytics/summary`);
-        expect(missing.status).toBe(400);
-        expect(await readJson(missing)).toEqual({
-            error: 'Missing subreddit context for analytics.',
-        });
-
-        const eventFailure = await fetch(`${baseUrl}/api/analytics/event`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: '{}',
-        });
-        expect(eventFailure.status).toBe(500);
-        expect(await readJson(eventFailure)).toEqual({
-            accepted: false,
-            error: 'Analytics event failed',
-        });
-
-        const summaryFailure = await fetch(`${baseUrl}/api/analytics/summary`);
-        expect(summaryFailure.status).toBe(500);
-        expect(await readJson(summaryFailure)).toEqual({
-            error: 'summary failed',
-        });
-    });
-
     it('preserves menu fallbacks and scheduler isolation', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const ensureDailyMiniRacerPostForSubreddit = vi.fn(async (subredditName) => {
@@ -575,8 +451,6 @@ describe('server route contracts', () => {
             ensureDailyMiniRacerPostForSubreddit,
             enableDailyAutopost: vi.fn(),
             deleteDailyAutopostSubscription: vi.fn(),
-            assertModeratorForSubreddit: vi.fn(),
-            ensureModeratorAnalyticsPostForSubreddit: vi.fn(),
             readAllDailyAutopostSubscriptions: async () => [
                 { subredditName: 'disabled', enabled: false },
                 { subredditName: 'broken', enabled: true },
@@ -608,14 +482,9 @@ describe('server route contracts', () => {
         expect(ensureDailyMiniRacerPostForSubreddit).toHaveBeenCalledTimes(2);
     });
 
-    it('preserves all moderator menu success responses and side effects', async () => {
+    it('preserves daily-post moderator menu success responses and side effects', async () => {
         const enableDailyAutopost = vi.fn();
         const deleteDailyAutopostSubscription = vi.fn();
-        const assertModeratorForSubreddit = vi.fn();
-        const ensureModeratorAnalyticsPostForSubreddit = vi.fn(async () => ({
-            created: true,
-            postUrl: 'https://reddit.com/analytics',
-        }));
         const ensureDailyMiniRacerPostForSubreddit = vi.fn()
             .mockResolvedValueOnce({
                 created: false,
@@ -631,8 +500,6 @@ describe('server route contracts', () => {
             ensureDailyMiniRacerPostForSubreddit,
             enableDailyAutopost,
             deleteDailyAutopostSubscription,
-            assertModeratorForSubreddit,
-            ensureModeratorAnalyticsPostForSubreddit,
             readAllDailyAutopostSubscriptions: async () => [],
         }));
         const request = (path) => fetch(`${baseUrl}${path}`, {
@@ -665,19 +532,11 @@ describe('server route contracts', () => {
         });
         expect(deleteDailyAutopostSubscription).toHaveBeenCalledWith('MiniRacer');
 
-        const analytics = await request('/internal/menu/mod-analytics-open');
-        expect(await readJson(analytics)).toEqual({
-            showToast: {
-                text: 'Mini Racer analytics is ready for r/MiniRacer.',
-                appearance: 'success',
-            },
-            navigateTo: 'https://reddit.com/analytics',
-        });
-        expect(assertModeratorForSubreddit).toHaveBeenCalledWith('MiniRacer');
     });
 
     it('supports independent podium automation menus and isolates scheduled subreddit failures', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-17T00:01:00.000Z'));
         const podium = {
             challengeId: 'daily-gp-2026-07-10',
             challengeDate: '2026-07-10',
@@ -708,8 +567,6 @@ describe('server route contracts', () => {
             ensureDailyMiniRacerPodiumPostForSubreddit,
             enableDailyPodiumAutopost,
             deleteDailyPodiumAutopostSubscription,
-            assertModeratorForSubreddit: vi.fn(),
-            ensureModeratorAnalyticsPostForSubreddit: vi.fn(),
             readAllDailyAutopostSubscriptions: async () => [],
             readAllDailyPodiumAutopostSubscriptions: async () => [
                 { subredditName: 'disabled', enabled: false },
@@ -766,8 +623,6 @@ describe('server route contracts', () => {
             ensureDailyMiniRacerPostForSubreddit: vi.fn(),
             enableDailyAutopost: vi.fn(),
             deleteDailyAutopostSubscription: vi.fn(),
-            assertModeratorForSubreddit: vi.fn(),
-            ensureModeratorAnalyticsPostForSubreddit: vi.fn(),
             readAllDailyAutopostSubscriptions: async () => [],
         }));
 

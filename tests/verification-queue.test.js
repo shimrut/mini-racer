@@ -97,7 +97,8 @@ describe('verification queue', () => {
                         bestTime: 42,
                         replay: { inputs: [{ frames: 1 }] },
                         verificationState: 'pending',
-                        nextAttemptAt: 10
+                        nextAttemptAt: 10,
+                        expiresAt: '2099-01-01T00:00:00.000Z'
                     }
                 }
             })
@@ -128,7 +129,8 @@ describe('verification queue', () => {
             trackKey: 'circuit',
             previousBestTime: 50.5,
             previousCompletedLaps: 1.8,
-            previousCheckpointTimesSec: [10, 20, 50.5]
+            previousCheckpointTimesSec: [10, 20, 50.5],
+            expiresAt: '2099-01-01T00:00:00.000Z'
         }).enqueued).toBe(true);
 
         expect(enqueueDailyChallengeVerification({
@@ -321,5 +323,40 @@ describe('verification queue', () => {
         expect(getNextVerificationAttemptAt()).toBe(now + 1_000);
         markDailyChallengeVerificationRejected('challenge-4');
         expect(getNextVerificationAttemptAt()).toBe(null);
+    });
+
+    it('adds a fixed expiry and purges expired or unsafe legacy entries', () => {
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-17T00:01:00.000Z'));
+        expect(enqueueDailyChallengeVerification({
+            challengeId: 'daily-gp-2026-07-10',
+            challengeDate: '2026-07-10',
+            bestTime: 40,
+            replay: REPLAY,
+            expiresAt: '2026-07-17T06:00:00.000Z'
+        }).entry).toMatchObject({
+            expiresAt: '2026-07-17T06:00:00.000Z'
+        });
+
+        delete globalThis.window;
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({
+                daily: {
+                    expired: {
+                        challengeId: 'daily-gp-2026-07-09',
+                        challengeDate: '2026-07-09',
+                        verificationState: 'pending',
+                        nextAttemptAt: 1
+                    },
+                    unsafe: {
+                        challengeId: 'legacy-without-date',
+                        verificationState: 'pending',
+                        nextAttemptAt: 1
+                    }
+                }
+            })
+        });
+
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+        expect(readStoredQueue()).toEqual({ daily: {} });
     });
 });

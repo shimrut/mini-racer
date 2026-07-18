@@ -207,11 +207,6 @@ export const raceEngineMethods = {
   },
 
   restartCurrentRunAfterCollision() {
-    this.analytics?.trackRaceRestarted?.({
-      source: "auto_restart_after_collision",
-      trackKey: this.currentTrackKey,
-      challengeId: this.activeDailyChallenge?.id || null,
-    });
     this.status = "playing";
     this.pbGhost?.beginRun?.();
     this.scoreboardReplay.reset();

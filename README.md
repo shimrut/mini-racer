@@ -17,7 +17,7 @@ Steer, finish one clean lap as fast as you can, then try again. Improvement come
 ## What players can do
 
 - Race **today’s featured track** and chase the fastest lap
-- Beat your **personal best** on each track (kept for life) and race a faint **ghost** of that lap (on by default; off in Settings)
+- Beat your **personal best** on each available daily track and race a faint **ghost** of that lap (on by default; off in Settings)
 - Climb that day’s **leaderboard** in Standings
 - Compare leaderboard times at full **millisecond precision**
 - Earn **medals** by beating target times on each track
@@ -26,7 +26,7 @@ Steer, finish one clean lap as fast as you can, then try again. Improvement come
 - **Share** a finished lap or a verified daily best as a Reddit comment (you preview the text first)
 - Navigate menus with the **keyboard**
 
-Your car look and settings are saved to your Reddit profile, so they should stick around after app updates.
+Your car look and settings are saved to your player profile. Guest data expires after 7 inactive days; signed-in data expires after 30 inactive days.
 
 ## Daily tracks
 
@@ -35,7 +35,7 @@ Your car look and settings are saved to your Reddit profile, so they should stic
 - Tracks stay playable for **7 days**, then drop out of the list
 - Communities can auto-publish that track’s final global podium when the window closes
 - Each track card shows a preview, your best time, medals, and how long that track is still available
-- Your personal best (and ghost) come back if that track returns later
+- Your personal best and ghost remain available until 6 hours after that daily track leaves the seven-day list
 
 ## Standings and sharing
 
@@ -70,9 +70,8 @@ Install Mini Racer in your subreddit, then use the subreddit menu:
 | **Create Mini Racer post** | Creates a playable race post for today |
 | **Enable daily Mini Racer posts** | Auto-posts a new race each day (UTC) |
 | **Disable daily Mini Racer posts** | Stops the daily auto-posts |
-| **Enable daily Mini Racer podium posts** | Auto-posts the final podium at 00:01 UTC when a track expires |
+| **Enable daily Mini Racer podium posts** | Auto-posts the final podium after a track expires, with hourly retries during the six-hour publication window |
 | **Disable daily Mini Racer podium posts** | Stops final podium auto-posts without affecting race posts |
-| **Open Mini Racer analytics** | Opens moderator-only analytics for the community |
 
 Tips:
 
@@ -85,7 +84,7 @@ Tips:
 
 ### After 1.2
 
-- Lifetime personal-best **ghosts** (on by default; off in Settings)
+- Personal-best **ghosts** for available daily tracks (on by default; off in Settings)
 - Press **R** to restart from play, pause, or finish
 - Keyboard navigation in menus
 - Optional **final podium** posts when a track expires, with avatars and **Play Now**

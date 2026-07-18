@@ -171,15 +171,7 @@ function runAll() {
         'modal-sheet-panel--'
     ]);
 
-    // 2. mod-tool.css -> moderator tool
-    console.log('Analyzing mod-tool.css...');
-    const modFiles = [
-        path.resolve('mod-tool.html'),
-        path.resolve('mod-tool.js')
-    ];
-    reports['mod-tool.css'] = analyzeCSS('mod-tool.css', modFiles, []);
-
-    // 3. preview.css -> preview page
+    // 2. preview.css -> preview page
     console.log('Analyzing preview.css...');
     const previewFiles = [
         path.resolve('preview.html'),
@@ -187,9 +179,9 @@ function runAll() {
     ];
     reports['preview.css'] = analyzeCSS('preview.css', previewFiles, []);
 
-    // 4. temp_additions.css -> all (dead css check)
+    // 3. temp_additions.css -> all (dead css check)
     console.log('Analyzing temp_additions.css...');
-    const allFiles = [...gameFiles, ...modFiles, ...previewFiles];
+    const allFiles = [...gameFiles, ...previewFiles];
     reports['temp_additions.css'] = analyzeCSS('temp_additions.css', allFiles, []);
 
     // Print summary table

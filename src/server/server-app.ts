@@ -17,15 +17,10 @@ import {
     previewDailyGpShare,
 } from './daily-gp-share.js';
 import {
-    getServerAnalyticsSummary,
-    submitServerAnalyticsEvent,
-} from './analytics-store.js';
-import {
     getRequestRateLimitIdentity,
     getRequestUsername,
     readContextPostId,
     readContextPostData,
-    readContextSubredditName,
 } from './request-context.js';
 import { getPostBoundDailyGpChallenge } from './post-bound-challenge.js';
 import { getCommunityMemberTotalForLeaderboard } from './community-context.js';
@@ -46,18 +41,10 @@ import {
     deleteDailyPodiumAutopostSubscription,
     readAllDailyPodiumAutopostSubscriptions,
 } from './daily-podium-autopost-store.js';
-import {
-    assertModeratorForSubreddit,
-    resolveMenuTargetSubredditName,
-} from './moderator-access.js';
-import {
-    ensureModeratorAnalyticsPostForSubreddit,
-    resolveAnalyticsToolSubredditName,
-} from './moderator-analytics-post.js';
+import { resolveMenuTargetSubredditName } from './moderator-access.js';
 import { registerPlayerRoutes } from './routes/player-routes.js';
 import { registerCompetitionRoutes } from './routes/competition-routes.js';
 import { registerShareRoutes } from './routes/share-routes.js';
-import { registerAnalyticsRoutes } from './routes/analytics-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
 import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 import { registerPodiumRoutes } from './routes/podium-routes.js';
@@ -100,15 +87,6 @@ function registerProductionRoutes(app: express.Application): void {
             confirmDailyGpShare(input, requestContext)
         ),
     });
-    registerAnalyticsRoutes(app, {
-        getRequestUsername,
-        readContextPostId,
-        readContextSubredditName,
-        resolveAnalyticsToolSubredditName,
-        assertModeratorForSubreddit,
-        submitServerAnalyticsEvent: (input) => submitServerAnalyticsEvent(input),
-        getServerAnalyticsSummary: (input) => getServerAnalyticsSummary(input),
-    });
     registerInternalRoutes(app, {
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
@@ -119,8 +97,6 @@ function registerProductionRoutes(app: express.Application): void {
         ensureDailyMiniRacerPodiumPostForSubreddit,
         enableDailyPodiumAutopost,
         deleteDailyPodiumAutopostSubscription,
-        assertModeratorForSubreddit,
-        ensureModeratorAnalyticsPostForSubreddit,
         readAllDailyAutopostSubscriptions,
         readAllDailyPodiumAutopostSubscriptions,
     });

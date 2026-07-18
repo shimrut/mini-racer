@@ -390,7 +390,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
   it("retries a completed daily run without falling back to the regular reset path", () => {
     const reset = vi.fn();
-    const trackModeStart = vi.fn();
 
     RealTimeRacer.prototype.restartDailyChallenge.call({
       activeDailyChallenge: {
@@ -404,13 +403,9 @@ describe("RealTimeRacer daily challenge modal payload", () => {
           grip: 2.5,
         },
       },
-      trackModeStart,
       reset,
     });
 
-    expect(trackModeStart).toHaveBeenCalledWith({
-      trackKey: "harborParkLoop",
-    });
     expect(reset).toHaveBeenCalledWith(true, { preserveDailyChallenge: true });
   });
 
@@ -502,7 +497,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       }),
       loadTrack: vi.fn(),
       applyDailyChallenge: vi.fn(),
-      trackModeStart: vi.fn(),
       startSequence: vi.fn(function startSequence() {
         if (this.status === "ready") {
           this.status = "starting";
@@ -517,9 +511,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       showStartOverlay: false,
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
-    expect(engine.trackModeStart).toHaveBeenCalledWith({
-      trackKey: "harborParkLoop",
-    });
     expect(engine.startSequence).toHaveBeenCalled();
     expect(engine.status).toBe("starting");
   });
@@ -1152,7 +1143,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
   it("starts on time and shows the unavailable notice when an enabled PB has no ghost at GO", () => {
     const challenge = { id: "daily-pending-pb", trackKey: "circuit" };
-    const trackPbGhostReadiness = vi.fn();
     const showGhostUnavailableNotice = vi.fn(() => true);
     const engine = {
       activeDailyChallenge: challenge,
@@ -1164,30 +1154,11 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       trackPersonalBestByTrackKey: Object.create(null),
       pbGhost: { enabled: true, beginRun: vi.fn(() => false) },
       hud: { showGhostUnavailableNotice },
-      analytics: { trackPbGhostReadiness },
-      getNow: () => 1400,
-      pbGhostReadinessByChallengeId: {
-        [challenge.id]: {
-          challengeId: challenge.id,
-          trackKey: challenge.trackKey,
-          finishAtMs: 0,
-          readyAtMs: null,
-          goAtMs: null,
-          goReported: false,
-          readyReported: false,
-        },
-      },
     };
 
     expect(RealTimeRacer.prototype.beginPersonalBestGhostRunAtGo.call(engine))
       .toEqual({ ghostActive: false, ghostExpected: true, noticeShown: true });
     expect(showGhostUnavailableNotice).toHaveBeenCalledTimes(1);
-    expect(trackPbGhostReadiness).toHaveBeenCalledWith(expect.objectContaining({
-      sampleType: "go",
-      ghostlessAtGo: true,
-      noticeShown: true,
-      finishToGhostReadySec: null,
-    }));
   });
 
   it.each([

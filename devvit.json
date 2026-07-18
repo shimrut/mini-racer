@@ -26,10 +26,6 @@
       "podium": {
         "height": "tall",
         "entry": "podium.html"
-      },
-      "mod-analytics": {
-        "height": "tall",
-        "entry": "mod-tool.html"
       }
     }
   },
@@ -73,13 +69,6 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/podium-disable-daily"
-      },
-      {
-        "label": "Open Mini Racer analytics",
-        "description": "Open the moderator-only analytics tool for this subreddit",
-        "location": "subreddit",
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/mod-analytics-open"
       }
     ]
   },
@@ -91,7 +80,7 @@
       },
       "daily-mini-racer-podium-posts": {
         "endpoint": "/internal/scheduler/daily-podium-posts",
-        "cron": "1 0 * * *"
+        "cron": "1 * * * *"
       }
     }
   },

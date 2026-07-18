@@ -6,8 +6,11 @@ export const DAILY_GP_MAX_TIME_SECONDS = 60 * 60;
 export const DAILY_GP_NEARBY_RADIUS = 2;
 export const DAILY_GP_DEFAULT_LIMIT = 10;
 export const DAILY_GP_REDIS_TTL_SECONDS = 45 * 24 * 60 * 60;
-export const DAILY_GP_PLAYER_PROFILE_TTL_SECONDS = 180 * 24 * 60 * 60;
+export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const DAILY_GP_PLAYLIST_DAYS = 7;
+export const DAILY_GP_COMPETITION_GRACE_MS = 6 * 60 * 60 * 1000;
 
 export type DailyGpChallenge = {
     id: string;
@@ -106,6 +109,23 @@ export function isDailyGpChallengePlayable(challenge: DailyGpChallenge, now = ne
         && Number.isFinite(availableUntilMs)
         && nowMs >= startsMs
         && nowMs < availableUntilMs;
+}
+
+/**
+ * PBs, ghosts and leaderboard data share one fixed deadline. Redis only offers
+ * relative expiry, so callers recompute the remaining duration on every write.
+ */
+export function getDailyGpCompetitionDeadlineMs(challenge: DailyGpChallenge): number {
+    return Date.parse(challenge.availableUntil) + DAILY_GP_COMPETITION_GRACE_MS;
+}
+
+export function getDailyGpCompetitionTtlSeconds(
+    challenge: DailyGpChallenge,
+    now = new Date(),
+): number {
+    const deadlineMs = getDailyGpCompetitionDeadlineMs(challenge);
+    if (!Number.isFinite(deadlineMs)) return 0;
+    return Math.max(0, Math.ceil((deadlineMs - now.getTime()) / 1000));
 }
 
 export function isValidDailyGpTime(bestTimeSeconds: unknown): bestTimeSeconds is number {

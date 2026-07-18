@@ -10,7 +10,6 @@ import {
   getPlayerProgressState,
 } from "./storage.js";
 import { createRunPolicy } from "./race/run-policy.js";
-import { AnalyticsService } from "./player/service.js";
 import {
   detectDevicePerformance,
   shouldExposeDebugHooks,
@@ -118,7 +117,6 @@ export class RealTimeRacer {
     this.pbGhostSelectionGeneration = 0;
     this.pbGhostPrepareGenerationByChallengeId = Object.create(null);
     this.pendingPbGhostCandidateChallengeIds = new Set();
-    this.pbGhostReadinessByChallengeId = Object.create(null);
     this.previousPreparedPbGhostByChallengeId = Object.create(null);
     this.unavailablePbGhostChallengeIds = new Set();
     this.verificationQueueTimer = null;
@@ -203,8 +201,6 @@ export class RealTimeRacer {
     this.rankedSubmissionBlockedReason = null;
 
     this._previewPresentationOpId = 0;
-    this.analytics = new AnalyticsService();
-
     this.dailyChallengeUi = new DailyChallengeUi({
       previewQualityLevel: this.qualityLevel,
       previewFrameSkip: this.frameSkip,
@@ -410,9 +406,6 @@ export class RealTimeRacer {
         void this.leaderboards?.refreshDailyChallengeAfterResume?.(challengeId);
       }
     });
-    window.addEventListener("pagehide", () => {
-      this.analytics.trackGameClosed();
-    });
     window.addEventListener("online", () => {
       this.scheduleVerificationQueueProcessing(0);
     });
@@ -460,24 +453,6 @@ export class RealTimeRacer {
     this.garage.syncTrailSelection();
     await this.syncCarSpriteAsset();
     this.requestRender();
-  }
-
-  getModeAnalyticsPayload({
-    trackKey = this.currentTrackKey,
-    challengeId = null,
-    source = null,
-  } = {}) {
-    return {
-      mode: "daily",
-      trackKey: trackKey || null,
-      challengeId: challengeId || null,
-      source: source || null,
-    };
-  }
-
-  trackModeStart(options = {}) {
-    if (!options.source) return;
-    this.analytics.trackModeStarted(this.getModeAnalyticsPayload(options));
   }
 
   getNow() {

@@ -10,13 +10,17 @@ import {
 } from './daily-podium-autopost-store.js';
 import {
     acquireDailyGpPodiumPostCreationLock,
+    deleteDailyGpPodiumPendingSnapshot,
+    readDailyGpPodiumPendingSnapshot,
     readDailyGpPodiumPostRecord,
     releaseDailyGpPodiumPostCreationLock,
     writeDailyGpPodiumPostRecord,
+    writeDailyGpPodiumPendingSnapshot,
 } from './daily-podium-post-store.js';
 import { getRequestAppSlug } from './request-context.js';
 
 const EMPTY_FINISH_LABEL = 'No verified finish';
+const PODIUM_RETRY_WINDOW_MS = 6 * 60 * 60 * 1000;
 const SHORT_MONTH_NAMES = Object.freeze([
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -26,6 +30,25 @@ export type DailyPodiumPostResult = {
     created: boolean;
     postUrl: string | null;
 };
+
+export function getDailyGpPodiumPublicationDeadline(podium: FinalDailyGpPodium): Date | null {
+    const challengeStartMs = Date.parse(`${podium.challengeDate}T00:00:00.000Z`);
+    if (!Number.isFinite(challengeStartMs)) return null;
+    return new Date(challengeStartMs + (7 * 24 * 60 * 60 * 1000) + PODIUM_RETRY_WINDOW_MS);
+}
+
+export function isDailyGpPodiumPublicationOpen(
+    podium: FinalDailyGpPodium,
+    now = new Date(Date.now()),
+): boolean {
+    const deadline = getDailyGpPodiumPublicationDeadline(podium);
+    const availableUntilMs = deadline ? deadline.getTime() - PODIUM_RETRY_WINDOW_MS : Number.NaN;
+    return Boolean(
+        deadline
+        && availableUntilMs <= now.getTime()
+        && now.getTime() < deadline.getTime()
+    );
+}
 
 function normalizeName(value: string): string {
     return value.trim().toLowerCase();
@@ -306,6 +329,34 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
     finalPodium: FinalDailyGpPodium,
 ): Promise<DailyPodiumPostResult> {
     const subscription = await readDailyPodiumAutopostSubscription(subredditName);
+    const deadline = getDailyGpPodiumPublicationDeadline(finalPodium);
+    if (!deadline || !isDailyGpPodiumPublicationOpen(finalPodium)) {
+        throw new Error('This Mini Racer podium publication window has closed.');
+    }
+    let storedSnapshot = await readDailyGpPodiumPendingSnapshot(
+        subredditName,
+        finalPodium.challengeId,
+    );
+    if (storedSnapshot && storedSnapshot.expiresAt !== deadline.toISOString()) {
+        await deleteDailyGpPodiumPendingSnapshot(subredditName, finalPodium.challengeId);
+        storedSnapshot = null;
+    }
+    const candidatePodium = sanitizeDailyGpPodiumForPost(finalPodium);
+    if (!storedSnapshot) {
+        await writeDailyGpPodiumPendingSnapshot({
+            subredditName,
+            challengeId: finalPodium.challengeId,
+            expiresAt: deadline.toISOString(),
+            podium: candidatePodium,
+        });
+        storedSnapshot = await readDailyGpPodiumPendingSnapshot(
+            subredditName,
+            finalPodium.challengeId,
+        );
+    }
+    const frozenPodium = storedSnapshot?.expiresAt === deadline.toISOString()
+        ? storedSnapshot.podium
+        : candidatePodium;
     const appSlug = getRequestAppSlug();
     if (!appSlug) {
         throw new Error('Reddit did not provide the Mini Racer app identity.');
@@ -319,6 +370,7 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             : null,
     });
     if (existing) {
+        await deleteDailyGpPodiumPendingSnapshot(subredditName, finalPodium.challengeId);
         await updatePodiumSubscription(
             subredditName,
             finalPodium.challengeId,
@@ -339,6 +391,7 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             appSlug,
         });
         if (raced) {
+            await deleteDailyGpPodiumPendingSnapshot(subredditName, finalPodium.challengeId);
             await updatePodiumSubscription(
                 subredditName,
                 finalPodium.challengeId,
@@ -357,6 +410,7 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             appSlug,
         });
         if (raced) {
+            await deleteDailyGpPodiumPendingSnapshot(subredditName, finalPodium.challengeId);
             await updatePodiumSubscription(
                 subredditName,
                 finalPodium.challengeId,
@@ -366,9 +420,13 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             return { created: false, postUrl: raced.postUrl };
         }
 
-        const podium = await resolveDailyGpPodiumAvatarsForPost(
-            sanitizeDailyGpPodiumForPost(finalPodium),
-        );
+        if (!isDailyGpPodiumPublicationOpen(finalPodium)) {
+            throw new Error('This Mini Racer podium publication window has closed.');
+        }
+        const podium = await resolveDailyGpPodiumAvatarsForPost(frozenPodium);
+        if (!isDailyGpPodiumPublicationOpen(finalPodium)) {
+            throw new Error('This Mini Racer podium publication window has closed.');
+        }
         const post = await reddit.submitCustomPost({
             subredditName,
             title: formatDailyMiniRacerPodiumTitle(podium),
@@ -403,6 +461,7 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             post.url,
             record.createdAt,
         );
+        await deleteDailyGpPodiumPendingSnapshot(subredditName, finalPodium.challengeId);
         return { created: true, postUrl: post.url };
     } finally {
         await releaseDailyGpPodiumPostCreationLock(lock);

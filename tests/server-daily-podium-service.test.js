@@ -13,9 +13,12 @@ const { mockReddit, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted
     },
     mockPostStore: {
         acquireDailyGpPodiumPostCreationLock: vi.fn(),
+        deleteDailyGpPodiumPendingSnapshot: vi.fn(),
+        readDailyGpPodiumPendingSnapshot: vi.fn(),
         readDailyGpPodiumPostRecord: vi.fn(),
         releaseDailyGpPodiumPostCreationLock: vi.fn(),
         writeDailyGpPodiumPostRecord: vi.fn(),
+        writeDailyGpPodiumPendingSnapshot: vi.fn(),
     },
     mockContext: { getRequestAppSlug: vi.fn() },
 }));
@@ -64,13 +67,17 @@ const podium = {
 describe('daily podium post workflow', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-17T00:01:00.000Z'));
         mockPostStore.readDailyGpPodiumPostRecord.mockResolvedValue(null);
+        mockPostStore.readDailyGpPodiumPendingSnapshot.mockResolvedValue(null);
         mockPostStore.acquireDailyGpPodiumPostCreationLock.mockResolvedValue({
             key: 'lock',
             value: 'owner',
         });
         mockPostStore.releaseDailyGpPodiumPostCreationLock.mockResolvedValue(undefined);
         mockPostStore.writeDailyGpPodiumPostRecord.mockResolvedValue(undefined);
+        mockPostStore.writeDailyGpPodiumPendingSnapshot.mockResolvedValue(undefined);
+        mockPostStore.deleteDailyGpPodiumPendingSnapshot.mockResolvedValue(undefined);
         mockAutopostStore.readDailyPodiumAutopostSubscription.mockResolvedValue(null);
         mockAutopostStore.upsertDailyPodiumAutopostSubscription.mockImplementation(
             async (_name, updater) => updater(null),
@@ -149,6 +156,15 @@ describe('daily podium post workflow', () => {
         expect(serializedPostData).not.toContain('timeSec');
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledOnce();
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
+        expect(mockPostStore.writeDailyGpPodiumPendingSnapshot).toHaveBeenCalledWith({
+            subredditName: 'MiniRacer',
+            challengeId: podium.challengeId,
+            expiresAt: '2026-07-17T06:00:00.000Z',
+            podium: expect.objectContaining({
+                challengeId: podium.challengeId,
+                positions: expect.any(Array),
+            }),
+        });
         expect(mockPostStore.writeDailyGpPodiumPostRecord).toHaveBeenCalledWith(
             expect.objectContaining({
                 subredditName: 'MiniRacer',
@@ -161,6 +177,38 @@ describe('daily podium post workflow', () => {
             key: 'lock',
             value: 'owner',
         });
+    });
+
+    it('reuses the frozen sanitized snapshot after a failed post attempt', async () => {
+        const frozen = sanitizeDailyGpPodiumForPost(podium);
+        mockPostStore.readDailyGpPodiumPendingSnapshot.mockResolvedValue({
+            subredditName: 'MiniRacer',
+            challengeId: podium.challengeId,
+            expiresAt: '2026-07-17T06:00:00.000Z',
+            podium: frozen,
+        });
+        const changed = structuredClone(podium);
+        changed.positions[0].displayName = 'Changed Later';
+
+        await ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', changed);
+
+        expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
+        expect(mockReddit.getSnoovatarUrl).not.toHaveBeenCalledWith('Changed Later');
+        expect(mockPostStore.writeDailyGpPodiumPendingSnapshot).not.toHaveBeenCalled();
+        expect(mockPostStore.deleteDailyGpPodiumPendingSnapshot).toHaveBeenCalledWith(
+            'MiniRacer',
+            podium.challengeId,
+        );
+    });
+
+    it('does not publish at or after the six-hour deadline', async () => {
+        Date.now.mockReturnValue(Date.parse('2026-07-17T06:00:00.000Z'));
+
+        await expect(
+            ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
+        ).rejects.toThrow('publication window has closed');
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+        expect(mockPostStore.writeDailyGpPodiumPendingSnapshot).not.toHaveBeenCalled();
     });
 
     it.each([0, 1, 2])('fills missing podium position %s with a placeholder', (index) => {

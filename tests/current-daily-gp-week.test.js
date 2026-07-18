@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRedis = {
+    get: vi.fn(),
+    set: vi.fn(),
+    del: vi.fn(),
     hGet: vi.fn(),
     hSet: vi.fn(),
     hSetNX: vi.fn(),
     hGetAll: vi.fn(),
+    hScan: vi.fn(),
+    hDel: vi.fn(),
     expire: vi.fn(),
 };
 
@@ -16,10 +21,15 @@ vi.mock('../src/server/replay-validator.js', () => ({
 describe('current daily gp week', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockRedis.get.mockResolvedValue(null);
+        mockRedis.set.mockResolvedValue('OK');
+        mockRedis.del.mockResolvedValue(undefined);
         mockRedis.hGet.mockResolvedValue(null);
         mockRedis.hSet.mockResolvedValue(1);
         mockRedis.hSetNX.mockResolvedValue(1);
         mockRedis.hGetAll.mockResolvedValue({});
+        mockRedis.hScan.mockResolvedValue({ cursor: 0, fieldValues: [] });
+        mockRedis.hDel.mockResolvedValue(0);
         mockRedis.expire.mockResolvedValue(true);
     });
 

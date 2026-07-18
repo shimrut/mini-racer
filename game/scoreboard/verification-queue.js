@@ -1,5 +1,7 @@
 const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
+const CHALLENGE_PLAYLIST_MS = 7 * 24 * 60 * 60 * 1000;
+const COMPETITION_BUFFER_MS = 6 * 60 * 60 * 1000;
 const VERIFICATION_STAGE_SUBMITTING = "submitting";
 const VERIFICATION_STAGE_VERIFYING = "verifying";
 const VERIFICATION_STAGE_PENDING = "pending";
@@ -22,6 +24,45 @@ function createEmptyState() {
   };
 }
 
+function parseTimestamp(value) {
+  const timestamp = typeof value === "number" ? value : Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function deriveLegacyExpiry(entry) {
+  const challengeDate = typeof entry?.challengeDate === "string"
+    ? entry.challengeDate
+    : /^daily-gp-(\d{4}-\d{2}-\d{2})$/.exec(entry?.challengeId || "")?.[1];
+  const startsAt = challengeDate
+    ? Date.parse(`${challengeDate}T00:00:00.000Z`)
+    : Number.NaN;
+  return Number.isFinite(startsAt)
+    ? startsAt + CHALLENGE_PLAYLIST_MS + COMPETITION_BUFFER_MS
+    : null;
+}
+
+function resolveEntryExpiry(entry) {
+  return parseTimestamp(entry?.expiresAt) ?? deriveLegacyExpiry(entry);
+}
+
+function purgeExpiredQueueState(queueState, now = Date.now()) {
+  let changed = false;
+  for (const [challengeId, entry] of Object.entries(queueState.daily)) {
+    const expiresAt = resolveEntryExpiry(entry);
+    if (expiresAt === null || expiresAt <= now) {
+      delete queueState.daily[challengeId];
+      changed = true;
+      continue;
+    }
+    const normalizedExpiresAt = new Date(expiresAt).toISOString();
+    if (entry.expiresAt !== normalizedExpiresAt) {
+      entry.expiresAt = normalizedExpiresAt;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function readQueueState() {
   if (typeof window === "undefined" || !window.localStorage) {
     return createEmptyState();
@@ -31,10 +72,17 @@ function readQueueState() {
     const raw = window.localStorage.getItem(VERIFICATION_QUEUE_STORAGE_KEY);
     if (!raw) return createEmptyState();
     const parsed = JSON.parse(raw);
-    return {
+    const queueState = {
       daily:
         parsed?.daily && typeof parsed.daily === "object" ? parsed.daily : {},
     };
+    if (purgeExpiredQueueState(queueState)) {
+      window.localStorage.setItem(
+        VERIFICATION_QUEUE_STORAGE_KEY,
+        JSON.stringify(queueState),
+      );
+    }
+    return queueState;
   } catch (error) {
     console.error("Error reading verification queue:", error);
     return createEmptyState();
@@ -156,6 +204,7 @@ export function enqueueDailyChallengeVerification({
   previousBestTime = null,
   previousCompletedLaps = null,
   previousCheckpointTimesSec = null,
+  expiresAt = null,
 } = {}) {
   if (
     typeof challengeId !== "string" ||
@@ -163,6 +212,14 @@ export function enqueueDailyChallengeVerification({
     !Number.isFinite(bestTime) ||
     !replay
   ) {
+    return { enqueued: false, entry: null };
+  }
+
+  const resolvedExpiresAt = parseTimestamp(expiresAt)
+    ?? deriveLegacyExpiry({ challengeId, challengeDate })
+    ?? (Date.now() + CHALLENGE_PLAYLIST_MS + COMPETITION_BUFFER_MS);
+  if (resolvedExpiresAt <= Date.now()) {
+    clearDailyChallengeVerification(challengeId);
     return { enqueued: false, entry: null };
   }
 
@@ -192,6 +249,7 @@ export function enqueueDailyChallengeVerification({
     submissionStage: VERIFICATION_STAGE_SUBMITTING,
     statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
     nextAttemptAt: Date.now(),
+    expiresAt: new Date(resolvedExpiresAt).toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
@@ -280,6 +338,11 @@ export function getDueDailyChallengeVerifications(now = Date.now()) {
         normalizeNextAttemptAt(entry.nextAttemptAt) <= now,
     )
     .map((entry) => cloneEntry(entry));
+}
+
+export function isDailyChallengeVerificationExpired(entry, now = Date.now()) {
+  const expiresAt = resolveEntryExpiry(entry);
+  return expiresAt === null || expiresAt <= now;
 }
 
 export function getNextVerificationAttemptAt() {
