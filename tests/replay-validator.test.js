@@ -88,7 +88,7 @@ const FINISHING_REPLAY = {
 
 describe('server replay validator', () => {
     it('caps accepted replays at MAX_REPLAY_FRAMES', () => {
-        expect(MAX_REPLAY_FRAMES).toBe(2700);
+        expect(MAX_REPLAY_FRAMES).toBe(3000);
     });
 
     it('computes a finish time, ghost, and millisecond rounding from replay inputs', () => {

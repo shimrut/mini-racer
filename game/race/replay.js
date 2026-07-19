@@ -1,4 +1,4 @@
-export const SCOREBOARD_REPLAY_MAX_FRAMES = 2700;
+export const SCOREBOARD_REPLAY_MAX_FRAMES = 3000;
 
 export class ReplayRecorder {
   #maxFrames;

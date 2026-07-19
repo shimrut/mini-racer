@@ -6,7 +6,7 @@ import {
 
 describe('ReplayRecorder', () => {
     it('defaults the frame cap to SCOREBOARD_REPLAY_MAX_FRAMES', () => {
-        expect(SCOREBOARD_REPLAY_MAX_FRAMES).toBe(2700);
+        expect(SCOREBOARD_REPLAY_MAX_FRAMES).toBe(3000);
 
         const recorder = new ReplayRecorder();
         for (let i = 0; i < SCOREBOARD_REPLAY_MAX_FRAMES; i += 1) {
