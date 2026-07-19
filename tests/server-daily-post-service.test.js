@@ -193,4 +193,72 @@ describe('daily post workflow', () => {
             preferredPostUrl: 'https://reddit.com/daily',
         });
     });
+
+    it('requires the app slug before creating a daily post', async () => {
+        mockContext.getRequestAppSlug.mockReturnValue(null);
+        await expect(
+            ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge),
+        ).rejects.toThrow('did not provide the Mini Racer app identity');
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
+    it('reuses a raced canonical post when lock acquisition fails', async () => {
+        const raced = {
+            postUrl: 'https://reddit.com/raced',
+            createdAt: '2026-07-16T00:05:00.000Z',
+        };
+        mockPostStore.acquireDailyGpPostCreationLock.mockResolvedValue(null);
+        mockShare.resolveDailyGpPostRecord.mockResolvedValue(raced);
+        mockShare.ensureDailyGpScoreThread.mockResolvedValue(raced);
+
+        await expect(
+            ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge),
+        ).resolves.toEqual({
+            created: false,
+            postUrl: raced.postUrl,
+        });
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
+    it('reuses a canonical post created while holding the lock', async () => {
+        const raced = {
+            postUrl: 'https://reddit.com/raced',
+            createdAt: '2026-07-16T00:05:00.000Z',
+        };
+        mockShare.resolveDailyGpPostRecord
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(raced);
+        mockShare.ensureDailyGpScoreThread.mockResolvedValue(raced);
+
+        await expect(
+            ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge),
+        ).resolves.toEqual({
+            created: false,
+            postUrl: raced.postUrl,
+        });
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+        expect(mockPostStore.releaseDailyGpPostCreationLock).toHaveBeenCalled();
+    });
+
+    it('releases the creation lock when Reddit returns an invalid post identity', async () => {
+        mockReddit.submitCustomPost.mockResolvedValue({ id: 'invalid', url: 'https://reddit.com/bad' });
+        await expect(
+            ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge),
+        ).rejects.toThrow('did not return the daily post identity');
+        expect(mockPostStore.releaseDailyGpPostCreationLock).toHaveBeenCalledWith({
+            key: 'lock',
+            value: 'value',
+        });
+    });
+
+    it('returns null sharing context when the request has no subreddit', async () => {
+        mockContext.readContextSubredditName.mockReturnValue(null);
+        await expect(getDailyGpShareRequestContext()).resolves.toEqual({
+            username: 'RaceFan',
+            subredditName: null,
+            appSlug: 'mini-racer',
+            preferredPostUrl: null,
+        });
+        expect(mockAutopostStore.readDailyAutopostSubscription).not.toHaveBeenCalled();
+    });
 });

@@ -76,6 +76,33 @@ afterEach(() => {
 });
 
 describe('owned Redis locks', () => {
+    it('acquires a lock with NX and returns null when the key already exists', async () => {
+        const client = createVersionedRedis();
+        const lock = await acquireRedisLock('lock', 30_000, client);
+        expect(lock).toMatchObject({ key: 'lock', ttlMs: 30_000 });
+        expect(lock.value).toEqual(expect.any(String));
+        expect(await client.get('lock')).toBe(lock.value);
+
+        const raced = await acquireRedisLock('lock', 30_000, client);
+        expect(raced).toBeNull();
+    });
+
+    it('releases null locks without touching Redis', async () => {
+        const client = createVersionedRedis();
+        await expect(releaseRedisLock(null, client)).resolves.toBe(false);
+        expect(client.execCalls).toBe(0);
+    });
+
+    it('renews an owned lock and extends its expiration', async () => {
+        const client = createVersionedRedis();
+        const lock = await acquireRedisLock('lock', 2_500, client);
+        const before = client.expirations.get('lock');
+
+        await expect(renewRedisLock(lock, client)).resolves.toBe(true);
+        expect(client.expirations.get('lock')).toBeGreaterThan(before);
+        expect(await client.get('lock')).toBe(lock.value);
+    });
+
     it('never releases or renews a successor lock', async () => {
         const client = createVersionedRedis();
         const lock = await acquireRedisLock('lock', 30_000, client);
@@ -141,5 +168,20 @@ describe('owned Redis locks', () => {
 
         await vi.advanceTimersByTimeAsync(30_000);
         expect(client.execCalls).toBe(1);
+    });
+
+    it('marks the lease unowned when renewal fails and confirmOwnership observes the loss', async () => {
+        vi.useFakeTimers();
+        const client = createVersionedRedis();
+        const lock = await acquireRedisLock('lock', 30_000, client);
+        const lease = startRedisLockLeaseRenewal(lock, 1_000, client);
+
+        await client.set('lock', 'successor');
+        await vi.advanceTimersByTimeAsync(1_000);
+        await Promise.resolve();
+
+        expect(lease.isOwned()).toBe(false);
+        await expect(lease.confirmOwnership()).resolves.toBe(false);
+        await lease.stop();
     });
 });

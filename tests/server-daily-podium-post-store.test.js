@@ -182,4 +182,74 @@ describe('daily podium post store', () => {
         mockRedis.set.mockResolvedValue(null);
         await expect(writeDailyGpPodiumPostRecordIfAbsent(record)).resolves.toBe(false);
     });
+
+    it('rejects expired pending snapshots and malformed pending payloads', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-17T06:00:00.000Z'));
+        const expiredSnapshot = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            expiresAt: '2026-07-17T06:00:00.000Z',
+            podium: {
+                challengeId: 'daily-gp-2026-07-10',
+                challengeDate: '2026-07-10',
+                trackName: 'Circuit',
+                positions: [1, 2, 3].map((rank) => ({
+                    rank,
+                    displayName: 'No verified finish',
+                    identityType: 'empty',
+                    formattedTime: null,
+                    avatarUrl: null,
+                })),
+            },
+        };
+        await expect(writeDailyGpPodiumPendingSnapshot(expiredSnapshot)).resolves.toBe(false);
+        expect(mockRedis.set).not.toHaveBeenCalled();
+
+        mockRedis.get.mockResolvedValue(JSON.stringify({
+            ...expiredSnapshot,
+            expiresAt: 'not-a-date',
+        }));
+        await expect(
+            readDailyGpPodiumPendingSnapshot('MiniRacer', expiredSnapshot.challengeId),
+        ).resolves.toBeNull();
+
+        mockRedis.get.mockResolvedValue(JSON.stringify({
+            ...expiredSnapshot,
+            podium: {
+                ...expiredSnapshot.podium,
+                challengeId: 'daily-gp-other',
+            },
+        }));
+        await expect(
+            readDailyGpPodiumPendingSnapshot('MiniRacer', expiredSnapshot.challengeId),
+        ).resolves.toBeNull();
+
+        mockRedis.get.mockResolvedValue(JSON.stringify({
+            ...expiredSnapshot,
+            podium: {
+                ...expiredSnapshot.podium,
+                positions: expiredSnapshot.podium.positions.slice(0, 2),
+            },
+        }));
+        await expect(
+            readDailyGpPodiumPendingSnapshot('MiniRacer', expiredSnapshot.challengeId),
+        ).resolves.toBeNull();
+    });
+
+    it('rejects podium post records with empty URLs or corrupt JSON', async () => {
+        mockRedis.get.mockResolvedValue('{');
+        await expect(
+            readDailyGpPodiumPostRecord('MiniRacer', 'daily-gp-2026-07-10'),
+        ).resolves.toBeNull();
+
+        mockRedis.get.mockResolvedValue(JSON.stringify({
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            postId: 't3_podium',
+            postUrl: '',
+        }));
+        await expect(
+            readDailyGpPodiumPostRecord('MiniRacer', 'daily-gp-2026-07-10'),
+        ).resolves.toBeNull();
+    });
 });

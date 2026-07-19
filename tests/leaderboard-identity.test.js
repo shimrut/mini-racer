@@ -34,4 +34,17 @@ describe('leaderboard identity', () => {
             redditUsername: null,
         })).toBe(getConstructedLeaderboardName('player-1'));
     });
+
+    it('falls back to anonymous constructed names for missing player ids', () => {
+        expect(getConstructedLeaderboardName('')).toBe('Anonymous Racer');
+        expect(getConstructedLeaderboardName(null)).toBe('Anonymous Racer');
+        expect(sanitizeRedditUsername(42)).toBeNull();
+    });
+
+    it('builds stable constructed aliases for the same player id', () => {
+        const first = getConstructedLeaderboardName('player-stable');
+        const second = getConstructedLeaderboardName('player-stable');
+        expect(first).toBe(second);
+        expect(first).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+( \d+)?$/);
+    });
 });

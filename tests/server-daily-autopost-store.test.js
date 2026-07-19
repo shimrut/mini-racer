@@ -29,6 +29,9 @@ describe('daily autopost store', () => {
     });
 
     it('preserves the existing record defaults and rejects malformed JSON', () => {
+        expect(parseDailyAutopostSubscription('MiniRacer', null)).toBeNull();
+        expect(parseDailyAutopostSubscription('MiniRacer', undefined)).toBeNull();
+        expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify('enabled'))).toBeNull();
         expect(parseDailyAutopostSubscription('MiniRacer', '{')).toBeNull();
         expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify({
             enabled: false,

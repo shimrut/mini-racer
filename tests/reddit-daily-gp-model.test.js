@@ -78,6 +78,12 @@ describe('reddit daily gp model', () => {
         ));
     });
 
+    it('returns null for unknown or malformed backfill challenge ids', () => {
+        expect(getBackfilledDailyGpChallenge('daily-gp-not-a-date')).toBeNull();
+        expect(getBackfilledDailyGpChallenge('weekly-gp-2026-06-02')).toBeNull();
+        expect(getBackfilledDailyGpChallenge('daily-gp-2099-01-01')).toBeNull();
+    });
+
     it('uses every playable track key as the generation pool', () => {
         const scheduledTrackKeys = Object.values(PUBLISHED_DAILY_GP_TRACKS_BY_DATE);
         const pool = TRACK_SCHEDULE_KEYS;

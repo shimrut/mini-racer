@@ -29,6 +29,9 @@ describe('daily podium autopost store', () => {
     });
 
     it('parses valid subscriptions and rejects malformed records', () => {
+        expect(parseDailyPodiumAutopostSubscription('MiniRacer', null)).toBeNull();
+        expect(parseDailyPodiumAutopostSubscription('MiniRacer', undefined)).toBeNull();
+        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify('enabled'))).toBeNull();
         expect(parseDailyPodiumAutopostSubscription('MiniRacer', '{')).toBeNull();
         expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify({
             enabled: false,
