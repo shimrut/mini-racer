@@ -1,5 +1,6 @@
 # Changelog
 
+- Exported leaderboard name catalogs and FNV hash helper; added catalog/hash/suffix mutation assertions so constructed-name StringLiteral and ArithmeticOperator survivors fail.
 - Expanded `daily-podium-service.ts` mutation tests with month-by-month date anchors, publication-window re-checks after lock/avatar resolution, exact redd.it/redditmedia.com/redditstatic.com avatar hosts, registry race winner/loser paths, recovery listing filters, subscription updater preservation, and exact markdown fallback structure.
 - Added wave-4 mutation-kill tests for `daily-challenge/service.js`, `daily-gp-store.ts`, `daily-gp-share.ts`, and `simulation.js` covering preview-page detection, playlist expiry >1s filtering, stored-result mismatch guards, community-total caps, submission rate-limit retry windows, nearby-row pagination boundaries, share confirm casing/idempotency paths, contact-epsilon ties, slip-gate activation, max-speed thrust cutoff, and checkpoint/finish gating.
 - Expanded autopost-store and leaderboard-identity mutation tests with non-empty string field guards, enabled defaults, FNV hash fixture assertions, and u/ prefix sanitization edges.

@@ -1,19 +1,19 @@
 export const LEADERBOARD_IDENTITY_CONSTRUCTED = 'constructed';
 export const LEADERBOARD_IDENTITY_REDDIT = 'reddit';
 
-const LEADERBOARD_NAME_ADJECTIVES = [
+export const LEADERBOARD_NAME_ADJECTIVES = [
     'Arctic', 'Blazing', 'Crimson', 'Electric', 'Flying', 'Golden', 'Hidden', 'Iron',
     'Jade', 'Lucky', 'Midnight', 'Neon', 'Phantom', 'Quantum', 'Rapid', 'Rocket',
     'Shadow', 'Silver', 'Turbo', 'Velvet', 'Wild', 'Winter', 'Zenith', 'Zero'
 ];
 
-const LEADERBOARD_NAME_NOUNS = [
+export const LEADERBOARD_NAME_NOUNS = [
     'Badger', 'Cobra', 'Falcon', 'Gecko', 'Jaguar', 'Koala', 'Lynx', 'Manta',
     'Mustang', 'Orca', 'Otter', 'Panther', 'Pigeon', 'Raven', 'Shark', 'Sparrow',
     'Tiger', 'Viper', 'Wolf', 'Wombat', 'Yak', 'Zebra', 'Comet', 'Meteor'
 ];
 
-function hashLeaderboardPlayerId(playerId) {
+export function hashLeaderboardPlayerId(playerId) {
     let hash = 0x811c9dc5;
     for (let index = 0; index < playerId.length; index += 1) {
         hash ^= playerId.charCodeAt(index);

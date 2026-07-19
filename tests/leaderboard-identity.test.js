@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
     LEADERBOARD_IDENTITY_CONSTRUCTED,
     LEADERBOARD_IDENTITY_REDDIT,
+    LEADERBOARD_NAME_ADJECTIVES,
+    LEADERBOARD_NAME_NOUNS,
     getConstructedLeaderboardName,
+    hashLeaderboardPlayerId,
     normalizeLeaderboardIdentityPreference,
     resolveLeaderboardDisplayName,
     sanitizeRedditUsername,
@@ -54,27 +57,55 @@ describe('leaderboard identity', () => {
         expect(sanitizeRedditUsername('   ')).toBeNull();
     });
 
-    it('uses the FNV-style hash formula for constructed adjective and noun picks', () => {
-        // Deterministic fixture: hash of "a" with the exported algorithm.
-        let hash = 0x811c9dc5;
-        hash ^= 'a'.charCodeAt(0);
-        hash = Math.imul(hash, 0x01000193);
-        hash = hash >>> 0;
-        const adjectives = [
-            'Arctic', 'Blazing', 'Crimson', 'Electric', 'Flying', 'Golden', 'Hidden', 'Iron',
-            'Jade', 'Lucky', 'Midnight', 'Neon', 'Phantom', 'Quantum', 'Rapid', 'Rocket',
-            'Shadow', 'Silver', 'Turbo', 'Velvet', 'Wild', 'Winter', 'Zenith', 'Zero',
+    it('keeps the adjective and noun catalogs intact for constructed names', () => {
+        expect(LEADERBOARD_NAME_ADJECTIVES).toHaveLength(24);
+        expect(LEADERBOARD_NAME_NOUNS).toHaveLength(24);
+        expect(LEADERBOARD_NAME_ADJECTIVES[0]).toBe('Arctic');
+        expect(LEADERBOARD_NAME_ADJECTIVES[2]).toBe('Crimson');
+        expect(LEADERBOARD_NAME_ADJECTIVES[3]).toBe('Electric');
+        expect(LEADERBOARD_NAME_ADJECTIVES[8]).toBe('Jade');
+        expect(LEADERBOARD_NAME_ADJECTIVES[16]).toBe('Shadow');
+        expect(LEADERBOARD_NAME_NOUNS[0]).toBe('Badger');
+        expect(LEADERBOARD_NAME_NOUNS[1]).toBe('Cobra');
+        expect(LEADERBOARD_NAME_NOUNS[2]).toBe('Falcon');
+    });
+
+    it('hashes player ids with FNV-1a and builds the exact constructed label', () => {
+        expect(hashLeaderboardPlayerId('')).toBe(0x811c9dc5 >>> 0);
+        expect(hashLeaderboardPlayerId('a')).toBe(
+            (Math.imul(0x811c9dc5 ^ 'a'.charCodeAt(0), 0x01000193) >>> 0),
+        );
+        expect(hashLeaderboardPlayerId('ab')).toBe(
+            (Math.imul(
+                (Math.imul(0x811c9dc5 ^ 'a'.charCodeAt(0), 0x01000193) >>> 0) ^ 'b'.charCodeAt(0),
+                0x01000193,
+            ) >>> 0),
+        );
+
+        const hash = hashLeaderboardPlayerId('a');
+        const adjective = LEADERBOARD_NAME_ADJECTIVES[hash % LEADERBOARD_NAME_ADJECTIVES.length];
+        const noun = LEADERBOARD_NAME_NOUNS[
+            Math.floor(hash / LEADERBOARD_NAME_ADJECTIVES.length) % LEADERBOARD_NAME_NOUNS.length
         ];
-        const nouns = [
-            'Badger', 'Cobra', 'Falcon', 'Gecko', 'Jaguar', 'Koala', 'Lynx', 'Manta',
-            'Mustang', 'Orca', 'Otter', 'Panther', 'Pigeon', 'Raven', 'Shark', 'Sparrow',
-            'Tiger', 'Viper', 'Wolf', 'Wombat', 'Yak', 'Zebra', 'Comet', 'Meteor',
-        ];
-        const adjective = adjectives[hash % adjectives.length];
-        const noun = nouns[Math.floor(hash / adjectives.length) % nouns.length];
         const suffixSeed = hash >>> 16;
         const suffix = suffixSeed % 4 === 0 ? '' : ` ${2 + (suffixSeed % 98)}`;
         expect(getConstructedLeaderboardName('a')).toBe(`${adjective} ${noun}${suffix}`);
+        expect(adjective).not.toBe('');
+        expect(noun).not.toBe('');
+    });
+
+    it('uses a numeric suffix unless the high hash bits are divisible by four', () => {
+        const samples = [];
+        for (let i = 0; i < 200; i += 1) {
+            samples.push(getConstructedLeaderboardName(`player-${i}`));
+        }
+        expect(samples.some((name) => / \d+$/.test(name))).toBe(true);
+        expect(samples.some((name) => !/ \d+$/.test(name))).toBe(true);
+        for (const name of samples) {
+            const [adjective, noun] = name.split(' ');
+            expect(LEADERBOARD_NAME_ADJECTIVES).toContain(adjective);
+            expect(LEADERBOARD_NAME_NOUNS).toContain(noun);
+        }
     });
 
     it('rejects empty string player ids before hashing', () => {
