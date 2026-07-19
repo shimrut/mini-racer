@@ -1,5 +1,6 @@
 # Changelog
 
+- Added wave-4 simulation mutation tests for contact-normal flips, scrape severity/suppression, collision-hash cell queries, reverse braking, and skid/history gates.
 - Added mutation-kill tests for Redis lock/compression, daily and podium post stores/services, autopost stores, history backfill, and leaderboard-identity helpers covering NX acquisition, ownership unlock/renewal, gzip threshold/fallback, corrupt JSON and null post ids, publication-window boundaries, stale-record recovery, lock-race reuse, and malformed subscription parsing.
 - Tightened rate-limit identity tests with exact utf-8 SHA-256 digests and empty-string challengeId/post-data guards for post-bound challenge resolution; ignored `.venv` in Stryker sandbox copies.
 - Added mutation-kill tests for `pb-ghost-trace.ts`, `pb-ghost-store.ts`, `game/storage.js`, `game/daily-challenge/storage.js`, and `player-token.ts` covering utf-8 token signatures, bootstrap GET/error boundaries, storage prune and rollback guards, PB ghost trace finish/overflow edges, and Redis PB schema rejection paths.
