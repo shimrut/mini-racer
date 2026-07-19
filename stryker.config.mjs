@@ -5,6 +5,7 @@ export default {
     testRunner: 'vitest',
     packageManager: 'npm',
     coverageAnalysis: 'perTest',
+    ignoreStatic: true,
     reporters: ['progress', 'clear-text', 'html'],
     thresholds: {
         high: 80,

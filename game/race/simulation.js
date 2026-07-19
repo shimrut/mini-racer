@@ -508,10 +508,13 @@ export {
     createSegment,
     getBodyPointVelocity,
     getClosestSegmentPair,
+    getCollisionCandidates,
     getSafeContactNormal,
     isStrictlyFasterInward,
+    resolveWallScrape,
     selectWallContact,
-    selectDeepestOverlap
+    selectDeepestOverlap,
+    suppressInwardContactMotion
 };
 
 export function getCarRearAxleWorldPoint(pos, angle, config) {
