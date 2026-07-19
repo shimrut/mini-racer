@@ -84,14 +84,13 @@ Tips:
 
 ### 1.3
 
-- Personal-best **ghosts** on available daily tracks (on by default; off in Settings), with smoother playback
-- Press **R** to restart from play, pause, or finish
-- Keyboard navigation in menus
-- Optional **final podium** posts when a track expires, with avatars and **Play Now**
-- New tracks in the rotation: **Number Zero** through **Number Six**
-- Leaderboard times shown at full **millisecond** precision
-- Finish screen RANK shows **Submitting… / Verifying…**, and a clear message when a run can’t be ranked (including runs that are too long)
-- Score submission starts as soon as you finish, so a verified ghost is ready faster for **Improve**
+- Race a faint **ghost** of your personal best on available daily tracks (on by default; turn it off in Settings)
+- Press **R** to restart while racing, paused, or on the finish screen
+- Move through menus with the **keyboard**
+- Optional **final podium** posts when a track’s week ends, with racers’ avatars and a **Play Now** button for today’s track
+- New tracks: **Number Zero** through **Number Six**
+- Leaderboard times show full **milliseconds**
+- Clearer finish-screen feedback while your time is being ranked, and a short message if it can’t be ranked
 
 ### 1.2
 
