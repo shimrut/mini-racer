@@ -1148,7 +1148,7 @@ export const dailyChallengeEngineMethods = {
         || (replayPayload
           ? null
           : this.scoreboardReplay.overflowed
-            ? "Replay was too long to submit. Finish a cleaner run to rank it."
+            ? "Run too long to rank."
             : "Submission replay was unavailable for this run.");
       didEnqueue = submissionError
         ? false

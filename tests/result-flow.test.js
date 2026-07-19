@@ -72,11 +72,11 @@ describe('result-flow helpers', () => {
                 isLoading: false,
                 verificationState: 'error',
                 submissionStage: 'error',
-                statusText: 'Replay was too long to submit. Finish a cleaner run to rank it.',
+                statusText: 'Run too long to rank.',
             },
         });
         expect(rankValueEl.textContent).toBe(
-            'Replay was too long to submit. Finish a cleaner run to rank it.',
+            'Run too long to rank.',
         );
         expect(rightGroupEl.hidden).toBe(false);
 
