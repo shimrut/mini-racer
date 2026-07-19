@@ -9,7 +9,7 @@ import {
     type PbGhostTrace,
 } from './pb-ghost-trace.js';
 
-export const MAX_REPLAY_FRAMES = 12_000;
+export const MAX_REPLAY_FRAMES = 2_700;
 
 type ReplaySegment = {
     frames: number;
