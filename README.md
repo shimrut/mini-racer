@@ -88,7 +88,7 @@ Tips:
 - Press **R** to restart while racing, paused, or on the finish screen
 - Move through menus with the **keyboard**
 - Leaderboard times show full **milliseconds**
-- More tracks in the daily rotation
+- When a track’s week ends, a **podium** post shows the top three racers — with avatars — and a **Play Now** button for today’s race
 
 ### 1.2
 
