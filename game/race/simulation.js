@@ -282,11 +282,15 @@ function findSegmentContact({
             carRadius,
             swept: true
         });
-        if (!selected || contact.inwardSpeed > selected.inwardSpeed + CONTACT_EPSILON) {
+        if (!selected || isStrictlyFasterInward(contact, selected)) {
             selected = contact;
         }
     }
     return selected;
+}
+
+function isStrictlyFasterInward(contact, selected) {
+    return contact.inwardSpeed > selected.inwardSpeed + CONTACT_EPSILON;
 }
 
 function selectWallContact(contacts) {
@@ -295,7 +299,7 @@ function selectWallContact(contacts) {
         const contact = contacts[index];
         if (
             !selected
-            || contact.inwardSpeed > selected.inwardSpeed + CONTACT_EPSILON
+            || isStrictlyFasterInward(contact, selected)
             || (
                 Math.abs(contact.inwardSpeed - selected.inwardSpeed) <= CONTACT_EPSILON
                 && (
@@ -309,6 +313,21 @@ function selectWallContact(contacts) {
         ) selected = contact;
     }
     return selected;
+}
+
+function selectDeepestOverlap(overlaps) {
+    let deepest = overlaps[0];
+    for (let index = 1; index < overlaps.length; index++) {
+        const contact = overlaps[index];
+        if (
+            contact.penetration > deepest.penetration + CONTACT_EPSILON
+            || (
+                Math.abs(contact.penetration - deepest.penetration) <= CONTACT_EPSILON
+                && contact.segmentIndex < deepest.segmentIndex
+            )
+        ) deepest = contact;
+    }
+    return deepest;
 }
 
 function findWallContacts({
@@ -380,17 +399,7 @@ function resolveWallContactPosition({
             includeSweep: false
         });
         if (overlaps.length === 0) break;
-        let deepest = overlaps[0];
-        for (let index = 1; index < overlaps.length; index++) {
-            const contact = overlaps[index];
-            if (
-                contact.penetration > deepest.penetration + CONTACT_EPSILON
-                || (
-                    Math.abs(contact.penetration - deepest.penetration) <= CONTACT_EPSILON
-                    && contact.segmentIndex < deepest.segmentIndex
-                )
-            ) deepest = contact;
-        }
+        const deepest = selectDeepestOverlap(overlaps);
         state.pos.x += deepest.normal.x * (deepest.penetration + padding);
         state.pos.y += deepest.normal.y * (deepest.penetration + padding);
     }
@@ -494,6 +503,13 @@ const SKID_MARK_MIN_SLIP_RATIO = 0.28;
 const SKID_MARK_MIN_SPEED = 2.5;
 
 /** World-space rear axle (skid / trail anchor) from car center `pos` and `angle`. */
+export {
+    CONTACT_EPSILON,
+    isStrictlyFasterInward,
+    selectWallContact,
+    selectDeepestOverlap
+};
+
 export function getCarRearAxleWorldPoint(pos, angle, config) {
     const vx = Math.cos(angle);
     const vy = Math.sin(angle);
