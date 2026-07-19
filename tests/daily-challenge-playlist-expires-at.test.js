@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
     cacheDailyChallengePlaylist,
     getDailyChallengeSnapshot,
+    resolveDailyPlaylistCacheExpiresAt,
 } from '../game/daily-challenge/service.js';
 
 // Fresh module graph for playlist/snapshot expiry-at boundary checks.
@@ -123,5 +124,28 @@ describe('daily-challenge playlist expires-at boundaries', () => {
         const stored = JSON.parse(storage.getItem('VectorGpDailyChallengeSnapshotCache'));
         expect(stored.entries['near-change'].expiresAt).toBe(nextUtcDayStart);
         expect(stored.entries['near-change'].expiresAt).toBeGreaterThan(nearMs);
+    });
+
+    it('picks the soonest playlist change that is more than one second away', () => {
+        vi.useFakeTimers();
+        const now = new Date('2026-07-18T12:00:00.000Z');
+        vi.setSystemTime(now);
+
+        const nearMs = now.getTime() + 500;
+        const farMs = now.getTime() + 5000;
+        const expiresAt = resolveDailyPlaylistCacheExpiresAt([
+            buildChallenge({
+                id: 'near-change',
+                endsAt: new Date(nearMs).toISOString(),
+                availableUntil: new Date(nearMs + 60_000).toISOString(),
+            }),
+            buildChallenge({
+                id: 'far-change',
+                endsAt: new Date(farMs).toISOString(),
+                availableUntil: new Date(farMs + 60_000).toISOString(),
+            }),
+        ], now.getTime());
+
+        expect(expiresAt).toBe(farMs);
     });
 });

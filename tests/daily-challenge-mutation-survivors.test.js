@@ -748,4 +748,180 @@ describe('daily-challenge mutation survivors', () => {
         });
         expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ shareToken: 'share-token-123' });
     });
+
+    it('writes trimmed skin and default objectiveType into the active challenge cache', async () => {
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '',
+        };
+        fetch.mockResolvedValueOnce(createJsonResponse(buildChallenge({
+            objectiveType: 12,
+            skin: '  neon  ',
+            endsAt: futureIso(12),
+            availableUntil: futureIso(48),
+        })));
+
+        await getActiveDailyChallenge();
+
+        const cached = JSON.parse(memoryLocalStorage.getItem('VectorGpActiveDailyChallengeCache'));
+        expect(cached.challenge.skin).toBe('neon');
+        expect(cached.challenge.objectiveType).toBe('single_lap_fastest');
+    });
+
+    it('defaults empty skin to default and non-object objectiveParams to an empty object', async () => {
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '',
+        };
+        fetch.mockResolvedValueOnce(createJsonResponse(buildChallenge({
+            skin: '   ',
+            objectiveType: 'multi_lap_total',
+            objectiveParams: null,
+            endsAt: futureIso(12),
+            availableUntil: futureIso(48),
+        })));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.skin).toBe('default');
+        expect(challenge.objectiveParams).toEqual({});
+        expect(challenge.objectiveType).toBe('multi_lap_total');
+    });
+
+    it('prefers a complete challenge embedded in Devvit postData', async () => {
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '',
+        };
+        globalThis.devvit = {
+            context: {
+                postData: {
+                    challenge: buildChallenge({
+                        id: 'post-bound-challenge',
+                        endsAt: futureIso(6),
+                        availableUntil: futureIso(24),
+                    }),
+                },
+            },
+        };
+        fetch.mockRejectedValue(new Error('should-not-fetch'));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.id).toBe('post-bound-challenge');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('ignores non-object Devvit postData and continues to fetch', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '',
+        };
+        globalThis.devvit = { context: { postData: 'nope' } };
+        fetch.mockResolvedValueOnce(createJsonResponse(buildChallenge({
+            id: 'fetched-after-bad-postdata',
+            endsAt: futureIso(6),
+            availableUntil: futureIso(24),
+        })));
+
+        const challenge = await getActiveDailyChallenge();
+
+        expect(challenge.id).toBe('fetched-after-bad-postdata');
+        expect(fetch).toHaveBeenCalled();
+    });
+
+    it('returns an empty snapshot without fetching when challengeId is missing', async () => {
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '',
+            origin: 'https://example.devvit.net',
+        };
+
+        const snapshot = await getDailyChallengeSnapshot({});
+
+        expect(snapshot.topRows).toEqual([]);
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('requests snapshots with challengeId, limit, and offset query params', async () => {
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '',
+            origin: 'https://example.devvit.net',
+        };
+        fetch.mockResolvedValueOnce(createJsonResponse({
+            topRows: [],
+            nearbyRows: [],
+            currentPlayerRow: null,
+            totalCount: 0,
+            leaderboardEntryCount: 0,
+        }));
+
+        await getDailyChallengeSnapshot({
+            challengeId: 'daily-gp-2026-07-11',
+            limit: 25,
+            offset: 10,
+            forceRefresh: true,
+        });
+
+        const requested = new URL(fetch.mock.calls[0][0], 'https://example.devvit.net');
+        expect(requested.searchParams.get('challengeId')).toBe('daily-gp-2026-07-11');
+        expect(requested.searchParams.get('limit')).toBe('25');
+        expect(requested.searchParams.get('offset')).toBe('10');
+        expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+    });
+
+    it('treats a cached active challenge as expired at the exact endsAt timestamp', async () => {
+        vi.useFakeTimers();
+        const endsAt = '2026-07-18T12:00:00.000Z';
+        vi.setSystemTime(new Date(endsAt));
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        memoryLocalStorage = createMemoryLocalStorage({
+            VectorGpActiveDailyChallengeCache: JSON.stringify({
+                challenge: {
+                    id: 'exact-end-cache',
+                    trackKey: 'circuit',
+                    objectiveType: 'single_lap_fastest',
+                    endsAt,
+                    availableUntil: '2026-07-25T00:00:00.000Z',
+                    skin: 'default',
+                },
+            }),
+        });
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '',
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
+    });
+
+    it('does not treat mockDaily=false as enabling mock mode', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        window.location = {
+            hostname: 'example.devvit.net',
+            pathname: '/game.html',
+            protocol: 'https:',
+            search: '?mockDaily=false',
+        };
+        fetch.mockRejectedValue(new Error('offline'));
+
+        await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
+    });
 });

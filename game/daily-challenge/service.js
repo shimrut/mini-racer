@@ -417,7 +417,7 @@ export function cacheDailyChallengePlaylist(challenges = []) {
     return cloneDailyPlaylist(merged);
 }
 
-function resolveDailyPlaylistCacheExpiresAt(challenges, nowMs = Date.now()) {
+export function resolveDailyPlaylistCacheExpiresAt(challenges, nowMs = Date.now()) {
     const nextKnownChange = cloneDailyPlaylist(challenges)
         .flatMap((challenge) => [
             challenge.startsAt,

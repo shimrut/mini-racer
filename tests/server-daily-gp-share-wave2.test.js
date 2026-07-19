@@ -112,6 +112,12 @@ describe('daily GP share wave 2', () => {
     beforeEach(async () => {
         strings.clear();
         vi.clearAllMocks();
+        redis.incrBy.mockImplementation(async (key, amount) => {
+            const next = Number(strings.get(key) || 0) + amount;
+            strings.set(key, String(next));
+            return next;
+        });
+        redis.expireTime.mockResolvedValue(Math.floor(Date.now() / 1000) + 60);
         await registerDailyGpPost({
             subredditName: 'MiniRacer',
             challengeId: challenge.id,
@@ -247,6 +253,98 @@ describe('daily GP share wave 2', () => {
         expect(confirmed).toMatchObject({
             status: 200,
             body: { status: 'shared' },
+        });
+    });
+
+    it('returns exact auth error copy when context is incomplete', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { username: '', subredditName: 'MiniRacer', appSlug: 'mini-racer' });
+
+        expect(preview).toEqual({
+            status: 401,
+            body: {
+                status: 'signed_in_required',
+                error: 'Sign in to Reddit to share your time.',
+            },
+        });
+    });
+
+    it('rejects non-string challenge ids for standings previews', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: 12,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 404,
+            body: {
+                status: 'post_unavailable',
+                error: 'The post for this race day is unavailable.',
+            },
+        });
+    });
+
+    it('returns rate_limited with at least one second remaining after the share cap', async () => {
+        redis.incrBy.mockImplementation(async (key, amount) => {
+            const next = Number(strings.get(key) || 0) + amount;
+            strings.set(key, String(next));
+            return 13;
+        });
+        redis.expireTime.mockResolvedValue(Math.floor(Date.now() / 1000) + 17);
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 429,
+            body: {
+                status: 'rate_limited',
+                retryAfterSeconds: 17,
+            },
+        });
+    });
+
+    it('falls back to the default share window when expireTime is not positive', async () => {
+        redis.incrBy.mockImplementation(async (key, amount) => {
+            const next = Number(strings.get(key) || 0) + amount;
+            strings.set(key, String(next));
+            return 13;
+        });
+        redis.expireTime.mockResolvedValue(0);
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 429,
+            body: {
+                status: 'rate_limited',
+                retryAfterSeconds: 60,
+            },
+        });
+    });
+
+    it('rejects finish previews with exact invalid_replay copy', async () => {
+        validateDailyGpReplayDetailed.mockReturnValueOnce({ ok: false });
+
+        const preview = await previewDailyGpShare({
+            source: 'finish',
+            challengeId: challenge.id,
+            replay: { inputs: [] },
+        }, requestContext);
+
+        expect(preview).toEqual({
+            status: 422,
+            body: {
+                status: 'invalid_replay',
+                error: 'This finished lap could not be verified.',
+            },
         });
     });
 });

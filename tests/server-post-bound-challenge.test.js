@@ -158,4 +158,64 @@ describe('post-bound daily challenge resolution', () => {
         await expect(getPostBoundDailyGpChallenge()).resolves.toBeNull();
         expect(mockStore.getServerDailyGpChallengeById).toHaveBeenCalledWith('   ');
     });
+
+    it('rejects challenge ids that are not fully anchored to daily-gp-YYYY-MM-DD', () => {
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            id: 'xdaily-gp-2026-07-16',
+        })).toBeNull();
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            id: 'daily-gp-2026-07-16x',
+        })).toBeNull();
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            id: '',
+        })).toBeNull();
+        expect(normalizePostBoundDailyGpChallenge(null)).toBeNull();
+        expect(normalizePostBoundDailyGpChallenge('daily-gp-2026-07-16')).toBeNull();
+    });
+
+    it('rejects incomplete schedule strings even when the id looks valid', () => {
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            startsAt: '',
+        })).toBeNull();
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            endsAt: 12,
+        })).toBeNull();
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            availableUntil: null,
+        })).toBeNull();
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            challengeDate: '',
+        })).toBeNull();
+    });
+
+    it('ignores a non-string challengeId from context and continues to Reddit', async () => {
+        mockContext.readContextPostData.mockReturnValue({ challengeId: 12 });
+        mockContext.readContextPostId.mockReturnValue('t3_daily');
+        mockReddit.getPostById.mockResolvedValue({
+            getPostData: vi.fn(async () => ({ challenge })),
+        });
+
+        await expect(getPostBoundDailyGpChallenge()).resolves.toEqual(challenge);
+        expect(mockStore.getServerDailyGpChallengeById).not.toHaveBeenCalled();
+        expect(mockStore.persistServerDailyGpChallenge).toHaveBeenCalledWith(challenge);
+    });
+
+    it('resolves a string challengeId from Reddit post data without persisting', async () => {
+        mockContext.readContextPostId.mockReturnValue('t3_daily');
+        mockReddit.getPostById.mockResolvedValue({
+            getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+        });
+        mockStore.getServerDailyGpChallengeById.mockResolvedValue(challenge);
+
+        await expect(getPostBoundDailyGpChallenge()).resolves.toEqual(challenge);
+        expect(mockStore.getServerDailyGpChallengeById).toHaveBeenCalledWith(challenge.id);
+        expect(mockStore.persistServerDailyGpChallenge).not.toHaveBeenCalled();
+    });
 });

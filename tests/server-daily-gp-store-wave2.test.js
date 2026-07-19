@@ -269,6 +269,57 @@ describe('server daily gp store wave 2', () => {
         expect(accepted.totalCount).toBe(1);
     });
 
+    it('treats communityMemberTotal string values as numbers when positive', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.zCard.mockResolvedValue(3);
+
+        const snapshot = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            communityMemberTotal: '12',
+        });
+
+        expect(snapshot.totalCount).toBe(12);
+        expect(snapshot.leaderboardEntryCount).toBe(3);
+    });
+
+    it('returns hasMore false when the page exactly fills the leaderboard', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.zCard.mockResolvedValue(10);
+        mockRedis.zRange.mockResolvedValue(
+            Array.from({ length: 10 }, (_, index) => ({
+                member: `reddit:page-${index}`,
+                score: 10000 + index,
+            })),
+        );
+        mockRedis.hMGet.mockResolvedValue(
+            Array.from({ length: 10 }, (_, index) => JSON.stringify({
+                playerId: `reddit:page-${index}`,
+                trackKey: challenge.trackKey,
+                bestTimeMs: 10000 + index,
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            })),
+        );
+        mockRedis.mGet.mockResolvedValue([]);
+
+        const exact = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            offset: 0,
+            limit: 10,
+        });
+        const leftover = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            offset: 0,
+            limit: 9,
+        });
+
+        expect(exact.hasMore).toBe(false);
+        expect(exact.nextOffset).toBeNull();
+        expect(leftover.hasMore).toBe(true);
+        expect(leftover.nextOffset).toBe(9);
+    });
+
     it('returns the existing ledger entry when another writer wins the publish race', async () => {
         const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
         const winner = {

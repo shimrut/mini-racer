@@ -130,7 +130,7 @@ function getUtcDayStart(dayIndex: number): Date {
     return new Date(dayIndex * DAY_MS);
 }
 
-function parseStoredChallenge(raw: string | null | undefined): DailyGpChallenge | null {
+export function parseStoredChallenge(raw: string | null | undefined): DailyGpChallenge | null {
     if (!raw) return null;
 
     try {
@@ -383,7 +383,7 @@ export async function persistServerDailyGpChallenge(
     return reread ?? challenge;
 }
 
-function normalizeCommunityMemberTotal(value: unknown): number | null {
+export function normalizeCommunityMemberTotal(value: unknown): number | null {
     const n = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(n) || n < 1) {
         return null;
@@ -407,7 +407,7 @@ function normalizeOffset(offset: unknown): number {
     return Math.max(Math.trunc(Number(offset)), 0);
 }
 
-function parseStoredEntry(
+export function parseStoredEntry(
     raw: string | null | undefined,
     expectedTrackKey?: string,
 ): DailyGpLeaderboardEntry | null {
@@ -498,7 +498,7 @@ function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | 
     };
 }
 
-function parseStoredPlayerProfile(raw: string | null | undefined): DailyGpPlayerProfile | null {
+export function parseStoredPlayerProfile(raw: string | null | undefined): DailyGpPlayerProfile | null {
     if (!raw) return null;
 
     try {
