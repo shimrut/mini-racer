@@ -82,12 +82,16 @@ Tips:
 
 ## What’s new
 
-### After 1.2
+### 1.3
 
-- Personal-best **ghosts** for available daily tracks (on by default; off in Settings)
+- Personal-best **ghosts** on available daily tracks (on by default; off in Settings), with smoother playback
 - Press **R** to restart from play, pause, or finish
 - Keyboard navigation in menus
 - Optional **final podium** posts when a track expires, with avatars and **Play Now**
+- New tracks in the rotation: **Number Zero** through **Number Six**
+- Leaderboard times shown at full **millisecond** precision
+- Finish screen RANK shows **Submitting… / Verifying…**, and a clear message when a run can’t be ranked (including runs that are too long)
+- Score submission starts as soon as you finish, so a verified ghost is ready faster for **Improve**
 
 ### 1.2
 
