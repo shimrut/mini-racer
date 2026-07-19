@@ -58,7 +58,7 @@ export function isPreviewPage() {
 }
 
 /** mockDaily=true → random track; mockDaily=<trackKey> → that track only */
-function resolveMockDailyTrackKey(params) {
+export function resolveMockDailyTrackKey(params) {
     if (!params) return null;
 
     const mockDaily = params.get('mockDaily');
@@ -122,7 +122,7 @@ function getMockDailyChallengeSnapshot() {
     });
 }
 
-function toCachedActiveChallenge(challenge) {
+export function toCachedActiveChallenge(challenge) {
     if (!challenge || typeof challenge !== 'object') return null;
     if (typeof challenge.id !== 'string' || !challenge.id) return null;
     if (typeof challenge.trackKey !== 'string' || !hasTrack(challenge.trackKey)) return null;
@@ -207,7 +207,7 @@ function writeActiveDailyCacheStorable(challenge) {
     }
 }
 
-function isCachedActiveChallengeStillCurrent(challenge) {
+export function isCachedActiveChallengeStillCurrent(challenge) {
     if (!challenge?.endsAt || typeof challenge.endsAt !== 'string') return false;
     const endsMs = Date.parse(challenge.endsAt);
     if (!Number.isFinite(endsMs)) return false;
@@ -269,7 +269,7 @@ function normalizeObjectiveType(value) {
     return value === 'multi_lap_total' ? 'multi_lap_total' : 'single_lap_fastest';
 }
 
-function normalizeDailyChallenge(raw) {
+export function normalizeDailyChallenge(raw) {
     if (!raw || typeof raw !== 'object') return null;
     if (typeof raw.id !== 'string' || !raw.id) return null;
     if (typeof raw.trackKey !== 'string' || !hasTrack(raw.trackKey)) return null;
@@ -606,7 +606,7 @@ export function getMissingDailyChallengeSnapshotIds(challengeIds = []) {
     )].filter((challengeId) => !readCachedDailySnapshot(challengeId));
 }
 
-function getObjectiveRequiredLaps(challenge) {
+export function getObjectiveRequiredLaps(challenge) {
     if (challenge?.objectiveType === 'multi_lap_total') {
         return Math.max(2, Math.trunc(challenge.objectiveParams?.lapCount || 2));
     }
@@ -664,7 +664,7 @@ export function formatDailyChallengeBestLabel(objectiveType, bestTime, completed
     return Number.isFinite(bestTime) ? `${Number(bestTime).toFixed(2)}s` : '--';
 }
 
-function formatDailyChallengeStatusDate(isoString) {
+export function formatDailyChallengeStatusDate(isoString) {
     const timeMs = Date.parse(isoString);
     if (!Number.isFinite(timeMs)) return '';
 
@@ -675,7 +675,7 @@ function formatDailyChallengeStatusDate(isoString) {
     }).format(new Date(timeMs));
 }
 
-function formatDailyChallengeRemainingDuration(remainingMs) {
+export function formatDailyChallengeRemainingDuration(remainingMs) {
     if (!Number.isFinite(remainingMs) || remainingMs <= 0) return '';
 
     const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60000));

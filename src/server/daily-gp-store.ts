@@ -391,7 +391,7 @@ export function normalizeCommunityMemberTotal(value: unknown): number | null {
     return Math.min(Math.trunc(n), 1_000_000);
 }
 
-function normalizeLimit(limit: unknown): number {
+export function normalizeLimit(limit: unknown): number {
     if (!Number.isFinite(limit)) {
         return DAILY_GP_DEFAULT_LIMIT;
     }
@@ -399,7 +399,7 @@ function normalizeLimit(limit: unknown): number {
     return Math.min(Math.max(Math.trunc(Number(limit)), 1), 100);
 }
 
-function normalizeOffset(offset: unknown): number {
+export function normalizeOffset(offset: unknown): number {
     if (!Number.isFinite(offset)) {
         return 0;
     }
@@ -459,7 +459,7 @@ export function parseStoredEntry(
     }
 }
 
-function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | null {
+export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | null {
     if (!value || typeof value !== 'object') {
         return null;
     }

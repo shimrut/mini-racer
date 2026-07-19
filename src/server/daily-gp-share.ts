@@ -72,8 +72,12 @@ export type ShareServiceResult = {
     body: Record<string, unknown>;
 };
 
-function normalizeName(value: string): string {
+export function normalizeShareName(value: string): string {
     return value.trim().toLowerCase();
+}
+
+function normalizeName(value: string): string {
+    return normalizeShareName(value);
 }
 
 function createSharePreviewKey(token: string): string {
@@ -125,7 +129,7 @@ export function formatDailyGpShareComment(
     return `I earned the ${detail.label} medal ${detail.emoji} with a ${time} lap in ${where}.`;
 }
 
-function parsePreviewRecord(raw: string | null): SharePreviewRecord | null {
+export function parseSharePreviewRecord(raw: string | null): SharePreviewRecord | null {
     if (!raw) return null;
     try {
         const parsed = JSON.parse(raw) as Partial<SharePreviewRecord>;
@@ -143,7 +147,7 @@ function parsePreviewRecord(raw: string | null): SharePreviewRecord | null {
     }
 }
 
-function parseSharedResult(raw: string | null): SharedResultRecord | null {
+export function parseShareSharedResult(raw: string | null): SharedResultRecord | null {
     if (!raw) return null;
     try {
         const parsed = JSON.parse(raw) as Partial<SharedResultRecord>;
@@ -160,7 +164,7 @@ function parseSharedResult(raw: string | null): SharedResultRecord | null {
     }
 }
 
-function getValidContext(input: ShareRequestContext): {
+export function getValidShareRequestContext(input: ShareRequestContext): {
     username: string;
     subredditName: string;
     appSlug: string;
@@ -415,7 +419,7 @@ export async function registerDailyGpPostWithScoreThread({
 
 async function readActiveSharedResult(record: SharePreviewRecord): Promise<SharedResultRecord | null> {
     const key = createSharedResultKey(record);
-    const shared = parseSharedResult(await redis.get(key));
+    const shared = parseShareSharedResult(await redis.get(key));
     if (!shared) return null;
     try {
         const comment = await reddit.getCommentById(shared.commentId);
@@ -458,7 +462,7 @@ export async function previewDailyGpShare(
     input: Record<string, unknown>,
     requestContext: ShareRequestContext,
 ): Promise<ShareServiceResult> {
-    const validContext = getValidContext(requestContext);
+    const validContext = getValidShareRequestContext(requestContext);
     if (!validContext) {
         return { status: 401, body: { status: 'signed_in_required', error: 'Sign in to Reddit to share your time.' } };
     }
@@ -525,13 +529,13 @@ export async function confirmDailyGpShare(
     input: Record<string, unknown>,
     requestContext: ShareRequestContext,
 ): Promise<ShareServiceResult> {
-    const validContext = getValidContext(requestContext);
+    const validContext = getValidShareRequestContext(requestContext);
     if (!validContext) {
         return { status: 401, body: { status: 'signed_in_required', error: 'Sign in to Reddit to share your time.' } };
     }
     const token = typeof input.shareToken === 'string' ? input.shareToken : '';
     const tokenKey = createSharePreviewKey(token);
-    const preview = parsePreviewRecord(token ? await redis.get(tokenKey) : null);
+    const preview = parseSharePreviewRecord(token ? await redis.get(tokenKey) : null);
     if (!preview) {
         return { status: 409, body: { status: 'preview_expired', error: 'This share preview expired. Try again.' } };
     }
