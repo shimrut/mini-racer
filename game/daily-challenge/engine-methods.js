@@ -1176,7 +1176,7 @@ export const dailyChallengeEngineMethods = {
             verificationState: "error",
             isLoading: false,
             submissionStage: "error",
-            statusText: submissionError || "Leaderboard submission could not be queued.",
+            statusText: submissionError || "Couldn't rank this run. Try again.",
           }),
           currentPlayerRow: {
             isCurrentPlayer: true,
