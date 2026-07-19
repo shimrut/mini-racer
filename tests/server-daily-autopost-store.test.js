@@ -87,4 +87,56 @@ describe('daily autopost store', () => {
             ['MiniRacer'],
         );
     });
+
+    it('keeps string fields only when they are non-empty strings', () => {
+        const parsed = parseDailyAutopostSubscription('MiniRacer', JSON.stringify({
+            enabled: true,
+            enabledAt: '',
+            updatedAt: '',
+            lastPostedChallengeId: '',
+            lastPostedAt: 12,
+            lastPostUrl: null,
+        }));
+
+        expect(parsed).toEqual({
+            subredditName: 'MiniRacer',
+            enabled: true,
+            enabledAt: null,
+            updatedAt: new Date(0).toISOString(),
+            lastPostedChallengeId: null,
+            lastPostedAt: null,
+            lastPostUrl: null,
+        });
+    });
+
+    it('preserves populated string schedule fields verbatim', () => {
+        expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify({
+            enabled: true,
+            enabledAt: '2026-07-01T00:00:00.000Z',
+            updatedAt: '2026-07-02T00:00:00.000Z',
+            lastPostedChallengeId: 'daily-gp-2026-07-01',
+            lastPostedAt: '2026-07-01T12:00:00.000Z',
+            lastPostUrl: 'https://reddit.com/r/x/comments/abc',
+        }))).toEqual({
+            subredditName: 'MiniRacer',
+            enabled: true,
+            enabledAt: '2026-07-01T00:00:00.000Z',
+            updatedAt: '2026-07-02T00:00:00.000Z',
+            lastPostedChallengeId: 'daily-gp-2026-07-01',
+            lastPostedAt: '2026-07-01T12:00:00.000Z',
+            lastPostUrl: 'https://reddit.com/r/x/comments/abc',
+        });
+    });
+
+    it('defaults enabled to true unless explicitly false', () => {
+        expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify({})).enabled).toBe(true);
+        expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify({ enabled: 0 })).enabled).toBe(true);
+        expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify({ enabled: false })).enabled).toBe(false);
+    });
+
+    it('rejects empty raw strings and non-object JSON payloads', () => {
+        expect(parseDailyAutopostSubscription('MiniRacer', '')).toBeNull();
+        expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify(null))).toBeNull();
+        expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify(5))).toBeNull();
+    });
 });

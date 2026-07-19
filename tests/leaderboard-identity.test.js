@@ -47,4 +47,47 @@ describe('leaderboard identity', () => {
         expect(first).toBe(second);
         expect(first).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+( \d+)?$/);
     });
+
+    it('strips only a leading u/ prefix from reddit usernames', () => {
+        expect(sanitizeRedditUsername('U/CapsUser')).toBe('CapsUser');
+        expect(sanitizeRedditUsername('midu/name')).toBe('midu/name');
+        expect(sanitizeRedditUsername('   ')).toBeNull();
+    });
+
+    it('uses the FNV-style hash formula for constructed adjective and noun picks', () => {
+        // Deterministic fixture: hash of "a" with the exported algorithm.
+        let hash = 0x811c9dc5;
+        hash ^= 'a'.charCodeAt(0);
+        hash = Math.imul(hash, 0x01000193);
+        hash = hash >>> 0;
+        const adjectives = [
+            'Arctic', 'Blazing', 'Crimson', 'Electric', 'Flying', 'Golden', 'Hidden', 'Iron',
+            'Jade', 'Lucky', 'Midnight', 'Neon', 'Phantom', 'Quantum', 'Rapid', 'Rocket',
+            'Shadow', 'Silver', 'Turbo', 'Velvet', 'Wild', 'Winter', 'Zenith', 'Zero',
+        ];
+        const nouns = [
+            'Badger', 'Cobra', 'Falcon', 'Gecko', 'Jaguar', 'Koala', 'Lynx', 'Manta',
+            'Mustang', 'Orca', 'Otter', 'Panther', 'Pigeon', 'Raven', 'Shark', 'Sparrow',
+            'Tiger', 'Viper', 'Wolf', 'Wombat', 'Yak', 'Zebra', 'Comet', 'Meteor',
+        ];
+        const adjective = adjectives[hash % adjectives.length];
+        const noun = nouns[Math.floor(hash / adjectives.length) % nouns.length];
+        const suffixSeed = hash >>> 16;
+        const suffix = suffixSeed % 4 === 0 ? '' : ` ${2 + (suffixSeed % 98)}`;
+        expect(getConstructedLeaderboardName('a')).toBe(`${adjective} ${noun}${suffix}`);
+    });
+
+    it('rejects empty string player ids before hashing', () => {
+        expect(getConstructedLeaderboardName('')).toBe('Anonymous Racer');
+        expect(getConstructedLeaderboardName(undefined)).toBe('Anonymous Racer');
+        expect(getConstructedLeaderboardName(0)).toBe('Anonymous Racer');
+    });
+
+    it('keeps constructed names when reddit preference lacks a usable username', () => {
+        expect(resolveLeaderboardDisplayName({
+            playerId: 'player-1',
+            preference: LEADERBOARD_IDENTITY_REDDIT,
+            redditUsername: '   ',
+        })).toBe(getConstructedLeaderboardName('player-1'));
+    });
 });
