@@ -84,13 +84,11 @@ Tips:
 
 ### 1.3
 
-- Race a faint **ghost** of your personal best on available daily tracks (on by default; turn it off in Settings)
+- Race a faint **ghost** of your personal best (on by default; turn it off in Settings)
 - Press **R** to restart while racing, paused, or on the finish screen
 - Move through menus with the **keyboard**
-- Optional **final podium** posts when a track’s week ends, with racers’ avatars and a **Play Now** button for today’s track
-- New tracks: **Number Zero** through **Number Six**
 - Leaderboard times show full **milliseconds**
-- Clearer finish-screen feedback while your time is being ranked, and a short message if it can’t be ranked
+- More tracks in the daily rotation
 
 ### 1.2
 
