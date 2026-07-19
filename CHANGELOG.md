@@ -53,6 +53,7 @@
 - Reduced verified PB ghost traces by replacing timestamped millimetre JSON tuples with a fixed-20-Hz schema-v2 origin/delta representation using centimetre positions and shortest-angle deltas. A representative 12-second trace is 56.8% smaller raw and 64.3% smaller after gzip without changing playback interpolation or finish timing.
 - Started verified score submission at the finish event and returned the canonical challenge-PB ghost in the accepted response, allowing immediate Improve attempts to use the correct verified ghost by GO without a second download.
 - Prevented stale ghost responses and rapid track switching from clearing or preparing the wrong track. When an expected verified ghost is not ready at GO, racing starts on time without a ghost and shows a two-second `GHOST UNAVAILABLE` HUD notice after GO disappears.
+- Restyled lap-flash warning notices (including `GHOST UNAVAILABLE`) with a dark amber background so white text stays readable.
 - Isolated daily result acceptance from challenge-PB Redis failures by persisting both concurrently after one replay validation. PB-only failures now keep the valid daily result accepted, while daily transaction interruptions remain retryable.
 - Made the gold podium row larger and added matching silver/bronze side gradients.
 - Split final podium places into separate rounded rows with spacing and no borders.

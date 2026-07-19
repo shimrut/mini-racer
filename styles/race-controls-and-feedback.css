@@ -233,7 +233,7 @@ body.start-selection-active #start-overlay {
 }
 
 .lap-flash.is-warning {
-    background: var(--warning);
+    background: rgba(120, 53, 15, 0.92);
 }
 
 .lap-flash-label {
