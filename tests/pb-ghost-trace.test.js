@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
     PB_GHOST_MAX_ENCODED_BYTES,
@@ -355,6 +356,216 @@ describe('pb-ghost-trace validation and recording edges', () => {
             ...base,
             startAngle: 1,
         })).not.toBe(createTrackFingerprint(base));
+    });
+
+    it('rejects quantized poses with null position or missing coordinates', () => {
+        expect(createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: null,
+            angle: 0,
+        }).finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 1 },
+            angle: 0.1,
+        })).toBeNull();
+
+        expect(createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { y: 0 },
+            angle: 0,
+        }).finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 1 },
+            angle: 0.1,
+        })).toBeNull();
+    });
+
+    it('accepts encoded traces up to the byte cap and rejects ones above it', () => {
+        const compactTrace = validTrace({
+            finishTimeMs: 999 * PB_GHOST_SAMPLE_INTERVAL_MS,
+            deltas: Array.from({ length: 999 * 3 }, () => 0),
+        });
+        expect(Buffer.byteLength(JSON.stringify(compactTrace), 'utf8'))
+            .toBeLessThanOrEqual(PB_GHOST_MAX_ENCODED_BYTES);
+        expect(isValidPbGhostTrace(compactTrace)).toBe(true);
+
+        const oversizedTrace = validTrace({
+            finishTimeMs: (PB_GHOST_MAX_SAMPLES - 1) * PB_GHOST_SAMPLE_INTERVAL_MS,
+            deltas: Array.from(
+                { length: (PB_GHOST_MAX_SAMPLES - 1) * 3 },
+                () => Number.MAX_SAFE_INTEGER,
+            ),
+        });
+        expect(Buffer.byteLength(JSON.stringify(oversizedTrace), 'utf8'))
+            .toBeGreaterThan(PB_GHOST_MAX_ENCODED_BYTES);
+        expect(isValidPbGhostTrace(oversizedTrace)).toBe(false);
+    });
+
+    it('keeps a half-turn angular delta unwrapped at the inclusive boundary', () => {
+        const halfTurnMilli = Math.round(Math.PI * 1000);
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: halfTurnMilli / 1000,
+        });
+        const trace = recorder.finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: halfTurnMilli / 1000,
+        });
+        expect(trace.deltas[2]).toBe(halfTurnMilli);
+    });
+
+    it('requires every origin and delta component to be a safe integer', () => {
+        expect(isValidPbGhostTrace(validTrace({
+            origin: [0, 1, Number.MAX_SAFE_INTEGER + 1],
+            deltas: [0, 0, 0],
+        }))).toBe(false);
+        expect(isValidPbGhostTrace(validTrace({
+            origin: [0, 0, 0],
+            deltas: [0, 0, 0, 1, 2, Number.MAX_SAFE_INTEGER + 1],
+            finishTimeMs: 100,
+        }))).toBe(false);
+    });
+
+    it('reconstructs multi-step pose deltas additively during validation', () => {
+        const trace = validTrace({
+            origin: [0, 0, 0],
+            deltas: [10, 20, 100, 5, 5, -50],
+            finishTimeMs: 100,
+        });
+        expect(isValidPbGhostTrace(trace)).toBe(true);
+
+        let xCm = trace.origin[0];
+        let yCm = trace.origin[1];
+        let angleMilli = trace.origin[2];
+        for (let index = 0; index < trace.deltas.length; index += 3) {
+            xCm += trace.deltas[index];
+            yCm += trace.deltas[index + 1];
+            angleMilli += trace.deltas[index + 2];
+        }
+        expect([xCm, yCm, angleMilli]).toEqual([15, 25, 50]);
+    });
+
+    it('replaces exact finish poses that share a timestamp and skips identical duplicates', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: 0,
+        });
+        const replaced = recorder.finish({
+            timeSec: 0.05,
+            position: { x: 2, y: 0 },
+            angle: 0.1,
+        });
+        expect(getPbGhostTraceSampleCount(replaced)).toBe(2);
+        expect(replaced.deltas).toEqual([200, 0, 100]);
+
+        const duplicate = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        duplicate.sample({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: 0,
+        });
+        const unchanged = duplicate.finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: 0,
+        });
+        expect(getPbGhostTraceSampleCount(unchanged)).toBe(2);
+        expect(unchanged.deltas).toEqual([100, 0, 0]);
+    });
+
+    it('overflows when the recorder reaches the maximum sample count', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        for (let index = 1; index < PB_GHOST_MAX_SAMPLES; index += 1) {
+            recorder.sample({
+                timeSec: index * 0.05,
+                position: { x: index, y: 0 },
+                angle: 0,
+            });
+        }
+        recorder.sample({
+            timeSec: PB_GHOST_MAX_SAMPLES * 0.05,
+            position: { x: 99, y: 0 },
+            angle: 0,
+        });
+        expect(recorder.finish({
+            timeSec: PB_GHOST_MAX_SAMPLES * 0.05,
+            position: { x: 99, y: 0 },
+            angle: 0,
+        })).toBeNull();
+    });
+
+    it('returns null from finish when overflowed, origin is missing, or only one pose remains', () => {
+        const overflowed = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        for (let index = 1; index <= PB_GHOST_MAX_SAMPLES; index += 1) {
+            overflowed.sample({
+                timeSec: index * 0.05,
+                position: { x: index, y: 0 },
+                angle: 0,
+            });
+        }
+        expect(overflowed.finish({
+            timeSec: (PB_GHOST_MAX_SAMPLES + 1) * 0.05,
+            position: { x: 99, y: 0 },
+            angle: 0,
+        })).toBeNull();
+
+        expect(createPbGhostTraceRecorder({
+            timeSec: Number.NaN,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        }).finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 1 },
+            angle: 0.1,
+        })).toBeNull();
+    });
+
+    it('hashes track fingerprints with utf-8 encoded stable geometry', () => {
+        const track = {
+            outer: [{ x: 0, y: 0 }],
+            inner: [{ x: 1, y: 1 }],
+            startLine: { p1: { x: 0, y: 0 }, p2: { x: 1, y: 0 } },
+            startPos: { x: 0, y: -1 },
+            startAngle: 0,
+            checkpoints: [{ x: 2, y: 2 }],
+        };
+        const stable = {
+            outer: track.outer,
+            inner: track.inner,
+            startLine: track.startLine,
+            startPos: track.startPos,
+            startAngle: track.startAngle,
+            checkpoints: track.checkpoints,
+        };
+        const expected = createHash('sha256')
+            .update(JSON.stringify(stable), 'utf8')
+            .digest('base64url');
+        expect(createTrackFingerprint(track)).toBe(expected);
     });
 
     it('returns null from finish when recorder overflow discarded intermediate samples (L160)', () => {

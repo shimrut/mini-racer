@@ -677,4 +677,126 @@ describe('PB ghost trace and storage', () => {
         expect(record?.ghost).toBeNull();
         expect(record?.bestTimeMs).toBe(12_500);
     });
+
+    it('hashes player ids with utf-8 when writing challenge PB hash fields', async () => {
+        const playerId = 'reddit:utf8-field';
+        const expectedField = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        await upsertPlayerTrackPersonalBest({
+            playerId,
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: null,
+            ghost: null,
+        });
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        expect([...redis.hashes.get(collectionKey).keys()]).toContain(expectedField);
+    });
+
+    it('deletes stored records with empty track keys or invalid schema fields', async () => {
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const emptyKeyField = createHash('sha256').update('reddit:empty-key', 'utf8').digest('base64url');
+        const badRevisionField = createHash('sha256').update('reddit:bad-revision', 'utf8').digest('base64url');
+        const missingUpdatedAtField = createHash('sha256').update('reddit:no-updated-at', 'utf8').digest('base64url');
+        redis.hashes.set(collectionKey, new Map([
+            [emptyKeyField, JSON.stringify({
+                schemaVersion: 2,
+                trackKey: '',
+                trackFingerprint: createTrackFingerprint(TRACK),
+                simulationRevision: 1,
+                bestTimeMs: 12_000,
+                updatedAt: '2030-01-01T00:00:00.000Z',
+                ghost: null,
+            })],
+            [badRevisionField, JSON.stringify({
+                schemaVersion: 2,
+                trackKey: 'circuit',
+                trackFingerprint: createTrackFingerprint(TRACK),
+                simulationRevision: 0,
+                bestTimeMs: 12_000,
+                updatedAt: '2030-01-01T00:00:00.000Z',
+                ghost: null,
+            })],
+            [missingUpdatedAtField, JSON.stringify({
+                schemaVersion: 2,
+                trackKey: 'circuit',
+                trackFingerprint: createTrackFingerprint(TRACK),
+                simulationRevision: 1,
+                bestTimeMs: 12_000,
+                updatedAt: 42,
+                ghost: null,
+            })],
+        ]));
+
+        expect(await getPlayerTrackPbRecord({
+            playerId: 'reddit:empty-key',
+            challenge: CHALLENGE,
+            track: TRACK,
+        })).toBeNull();
+        expect(await getPlayerTrackPbRecord({
+            playerId: 'reddit:bad-revision',
+            challenge: CHALLENGE,
+            track: TRACK,
+        })).toBeNull();
+        expect(await getPlayerTrackPbRecord({
+            playerId: 'reddit:no-updated-at',
+            challenge: CHALLENGE,
+            track: TRACK,
+        })).toBeNull();
+        expect(redis.hDel).toHaveBeenCalledTimes(3);
+    });
+
+    it('returns the existing record without rewriting when it already wins the comparison', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:existing-winner',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            ghost: GHOST,
+        });
+        vi.clearAllMocks();
+
+        const result = await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:existing-winner',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_500,
+            checkpointTimesSec: [5, 9],
+            ghost: null,
+        });
+
+        expect(result.improved).toBe(false);
+        expect(result.record.bestTimeMs).toBe(12_000);
+        expect(redis.hSet).not.toHaveBeenCalled();
+    });
+
+    it('logs challenge PB lock cleanup failures without replacing committed outcomes', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        let lockReads = 0;
+        redis.get.mockImplementation(async (key) => {
+            if (String(key).startsWith('dailygp:challenge-pb-lock:')) {
+                lockReads += 1;
+                if (lockReads > 1) throw new Error('release unavailable');
+            }
+            return redis.strings.get(key) ?? null;
+        });
+
+        await expect(upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:cleanup-log',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            ghost: GHOST,
+        })).resolves.toMatchObject({
+            improved: true,
+            record: { bestTimeMs: 12_000, ghost: GHOST },
+        });
+        expect(consoleError).toHaveBeenCalledWith(
+            'Challenge PB lock cleanup failed:',
+            expect.any(Error),
+        );
+        consoleError.mockRestore();
+    });
 });

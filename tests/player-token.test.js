@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockRedis } = vi.hoisted(() => ({
@@ -106,5 +107,34 @@ describe('guest player tokens', () => {
         await expect(verifyGuestPlayerToken(`${version}.${guestId}.${signature}x`)).resolves.toBeNull();
         await expect(verifyGuestPlayerToken(`${version}.${guestId}.aaaa`)).resolves.toBeNull();
         await expect(verifyGuestPlayerToken(`${version}.other-guest.${signature}`)).resolves.toBeNull();
+    });
+
+    it('signs guest ids with utf-8 bytes and rejects tokens built from other encodings', async () => {
+        const secret = 'test-secret-value';
+        const guestId = 'guest-utf8';
+        const expectedSignature = createHmac('sha256', secret)
+            .update(guestId, 'utf8')
+            .digest('base64url');
+
+        const token = await mintGuestPlayerToken(guestId);
+
+        expect(token).toBe(`v1.${guestId}.${expectedSignature}`);
+        await expect(verifyGuestPlayerToken(token)).resolves.toBe('guest-utf8');
+
+        const latin1Signature = createHmac('sha256', secret)
+            .update(Buffer.from(guestId, 'latin1'))
+            .digest('base64url');
+        if (latin1Signature !== expectedSignature) {
+            await expect(verifyGuestPlayerToken(`v1.${guestId}.${latin1Signature}`)).resolves.toBeNull();
+        }
+    });
+
+    it('compares signatures as utf-8 byte buffers with timing-safe equality', async () => {
+        const token = await mintGuestPlayerToken('guest-buffer');
+        const [, guestId, signature] = token.split('.');
+        const paddedSignature = `${signature}\u0000`;
+
+        await expect(verifyGuestPlayerToken(`v1.${guestId}.${paddedSignature}`)).resolves.toBeNull();
+        await expect(verifyGuestPlayerToken(`v1.${guestId}.${signature.slice(0, -1)}`)).resolves.toBeNull();
     });
 });

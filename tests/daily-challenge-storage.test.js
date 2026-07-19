@@ -618,4 +618,98 @@ describe('daily-challenge-storage', () => {
         setDailyChallengeBestTime(challenge, 41);
         expect(Object.keys(getDailyChallengeData(CHALLENGE_ID))).not.toContain('0');
     });
+
+    it('returns null from clearDailyChallengeBestTime for missing ids and absent entries', () => {
+        expect(clearDailyChallengeBestTime(null)).toBe(null);
+        expect(clearDailyChallengeBestTime('')).toBe(null);
+        expect(clearDailyChallengeBestTime('missing-id')).toBe(null);
+    });
+
+    it('does not restore failed submissions when the challenge id is missing', () => {
+        expect(restoreDailyChallengeBestAfterFailedSubmission(
+            { trackKey: 'circuit' },
+            { bestTime: 12.5 },
+        )).toBe(null);
+    });
+
+    it('treats array-shaped storage payloads as empty maps', () => {
+        delete globalThis.window;
+        installLocalStorage({
+            VectorGpDailyChallengeData: '[]',
+        });
+        const challenge = {
+            id: CHALLENGE_ID,
+            challengeDate: '2026-04-14',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+        };
+
+        expect(getDailyChallengeData(CHALLENGE_ID)).toBe(null);
+        expect(saveDailyChallengeBestTime(challenge, 42)).toMatchObject({
+            bestTime: 42,
+            completedLaps: null,
+        });
+    });
+
+    it('keeps the first valid best when the stored previous bestTime is not finite', () => {
+        delete globalThis.window;
+        installLocalStorage({
+            VectorGpDailyChallengeData: JSON.stringify({
+                [CHALLENGE_ID]: {
+                    challengeDate: '2026-04-14',
+                    bestTime: 'slow',
+                    checkpointTimesSec: [1, 2, 3],
+                },
+            }),
+        });
+        const challenge = {
+            id: CHALLENGE_ID,
+            challengeDate: '2026-04-14',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+        };
+
+        expect(saveDailyChallengeBestTime(challenge, 40, null, [10, 20, 40])).toMatchObject({
+            bestTime: 40,
+            checkpointTimesSec: [10, 20, 40],
+        });
+    });
+
+    it('prefers updatedAt over challengeDate when pruning stale challenge entries', () => {
+        const seed = {
+            staleUpdatedAt: {
+                challengeDate: '2026-04-22',
+                updatedAt: '2026-04-01T00:00:00.000Z',
+                bestTime: 90,
+            },
+            freshUpdatedAt: {
+                challengeDate: '2026-04-01',
+                updatedAt: '2026-04-22T00:00:00.000Z',
+                bestTime: 80,
+            },
+        };
+        for (let i = 0; i < 6; i += 1) {
+            seed[`dated-${i}`] = {
+                challengeDate: `2026-04-${String(i + 2).padStart(2, '0')}`,
+                bestTime: 70 + i,
+            };
+        }
+        delete globalThis.window;
+        installLocalStorage({
+            VectorGpDailyChallengeData: JSON.stringify(seed),
+        });
+
+        saveDailyChallengeBestTime({
+            id: CHALLENGE_ID,
+            challengeDate: '2026-04-23',
+            trackKey: 'circuit',
+            objectiveType: 'single_lap_fastest',
+        }, 18);
+
+        const parsed = readStoredChallengeMap();
+        expect(Object.keys(parsed)).toHaveLength(7);
+        expect(parsed[CHALLENGE_ID]).toBeTruthy();
+        expect(parsed.freshUpdatedAt).toBeTruthy();
+        expect(parsed.staleUpdatedAt).toBeUndefined();
+    });
 });

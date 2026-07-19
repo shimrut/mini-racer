@@ -317,4 +317,60 @@ describe("guest bootstrap recovery", () => {
     expect(fetch).not.toHaveBeenCalled();
     vi.doUnmock("../game/scoreboard/api-client.js");
   });
+
+  it("requests bootstrap with GET and the exact playerId query parameter", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(200, {
+      hasAnyData: false,
+      isReturningPlayer: false,
+      leaderboardIdentity: "constructed",
+      playerId: "guest:server-id",
+      guestToken: "server-token",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    await getPlayerProgressState();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/player/bootstrap"),
+      { method: "GET" },
+    );
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.searchParams.get("playerId")).toBe("old-guest-id");
+    expect(url.searchParams.get("guestToken")).toBe("old-guest-token");
+  });
+
+  it("logs hosted bootstrap failures with the exact HTTP status message", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(503));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    await getPlayerProgressState();
+
+    expect(consoleError).toHaveBeenCalledWith(
+      "Error loading player progress state:",
+      expect.objectContaining({ message: "Player bootstrap failed: 503" }),
+    );
+  });
+
+  it("falls back to local progress when bootstrap config is entirely missing", async () => {
+    vi.resetModules();
+    vi.doMock("../game/scoreboard/api-client.js", async () => {
+      const actual = await vi.importActual("../game/scoreboard/api-client.js");
+      return {
+        ...actual,
+        API_ROUTES: null,
+      };
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(state.leaderboardPlayerId).toBe("old-guest-id");
+    expect(consoleError).not.toHaveBeenCalled();
+    vi.doUnmock("../game/scoreboard/api-client.js");
+  });
 });
