@@ -1,5 +1,6 @@
 # Changelog
 
+- Added wave-6 mutation-kill tests for `simulation.js` covering contact-pair distance ties, epsilon normal fallbacks, swept nose resolution, repeat-contact velocity suppression, hash cell bounds, spark spread offsets, thrust drag formula, longitudinal budget gating, reverse braking, downforce grip multiplication, slip-gate hysteresis at 0.11/0.055, skid side-slip formula, route-trace frameSkip interval, run-history rounding threshold, and checkpoint finish gating.
 - Added wave-6 mutation-kill tests for `daily-challenge/service.js`, `daily-gp-store.ts`, and `daily-gp-share.ts` covering mock URL params, playlist sort/expiry boundaries, active-cache guards, stored-result validation, community-floor snapshots, podium time formatting, share auth/rate-limit/confirm guards, already-shared recovery, and exact medal/comment copy.
 - Added wave-5 mutation-kill tests for `simulation.js`, `daily-challenge/service.js`, `daily-gp-store.ts`, and `daily-gp-share.ts` covering contact-epsilon tie breaks, swept nose contacts, hash dedupe, route-trace sampling, frameSkip spark counts, post-bound skin/objective normalization, playlist merge/expiry fallbacks, active-cache fallback, strict-replay entry metadata, podium minute formatting, share rate limits, score-thread anchor reuse, historical post recovery, and user-attributed share rejection.
 - Expanded `daily-podium-service.ts` mutation tests with month-by-month date anchors, publication-window re-checks after lock/avatar resolution, exact redd.it/redditmedia.com/redditstatic.com avatar hosts, registry race winner/loser paths, recovery listing filters, subscription updater preservation, and exact markdown fallback structure.
@@ -122,4 +123,6 @@ How the game works: [README.md](README.md#how-the-game-works).
 - Daily GP playlist rows now come from server-side published history instead of recalculating past days from the current track file
 - Added server/shared backfill for the June 2-11, 2026 published Daily GP history
 - Local Daily GP runs now use the server/post-bound featured challenge path unless an explicit mock or standalone preview mode is requested
+- Wall collision and post-run flow fixes
+n explicit mock or standalone preview mode is requested
 - Wall collision and post-run flow fixes
