@@ -505,6 +505,10 @@ const SKID_MARK_MIN_SPEED = 2.5;
 /** World-space rear axle (skid / trail anchor) from car center `pos` and `angle`. */
 export {
     CONTACT_EPSILON,
+    createSegment,
+    getBodyPointVelocity,
+    getClosestSegmentPair,
+    getSafeContactNormal,
     isStrictlyFasterInward,
     selectWallContact,
     selectDeepestOverlap
