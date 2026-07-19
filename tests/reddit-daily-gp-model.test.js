@@ -12,7 +12,16 @@ import {
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
     DAY_MS,
+    DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS,
+    DAILY_GP_COMPETITION_GRACE_MS,
+    DAILY_GP_DEFAULT_LIMIT,
+    DAILY_GP_GUEST_PROFILE_TTL_SECONDS,
+    DAILY_GP_MAX_TIME_SECONDS,
+    DAILY_GP_MIN_TIME_SECONDS,
+    DAILY_GP_NEARBY_RADIUS,
     DAILY_GP_PLAYLIST_DAYS,
+    DAILY_GP_REDIS_TTL_SECONDS,
+    DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS,
     encodeDailyGpLeaderboardScore,
     formatRankLabel,
     getDailyGpCompetitionDeadlineMs,
@@ -24,6 +33,20 @@ import {
 } from '../src/server/daily-gp-model.ts';
 
 describe('reddit daily gp model', () => {
+    it('pins retention and window constants to exact second/ms budgets', () => {
+        expect(DAY_MS).toBe(86_400_000);
+        expect(DAILY_GP_MIN_TIME_SECONDS).toBe(2);
+        expect(DAILY_GP_MAX_TIME_SECONDS).toBe(3_600);
+        expect(DAILY_GP_NEARBY_RADIUS).toBe(2);
+        expect(DAILY_GP_DEFAULT_LIMIT).toBe(10);
+        expect(DAILY_GP_REDIS_TTL_SECONDS).toBe(3_888_000);
+        expect(DAILY_GP_GUEST_PROFILE_TTL_SECONDS).toBe(604_800);
+        expect(DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS).toBe(2_592_000);
+        expect(DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS).toBe(2_592_000);
+        expect(DAILY_GP_PLAYLIST_DAYS).toBe(7);
+        expect(DAILY_GP_COMPETITION_GRACE_MS).toBe(21_600_000);
+    });
+
     it('builds a deterministic UTC-scoped challenge payload', () => {
         const date = new Date('2026-05-06T12:34:56.000Z');
         const challenge = buildDailyGpChallengeForDayIndexWithTrack(

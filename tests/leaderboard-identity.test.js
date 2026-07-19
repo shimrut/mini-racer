@@ -48,7 +48,7 @@ describe('leaderboard identity', () => {
         const first = getConstructedLeaderboardName('player-stable');
         const second = getConstructedLeaderboardName('player-stable');
         expect(first).toBe(second);
-        expect(first).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+( \d+)?$/);
+        expect(first).toBe('Arctic Mustang 33');
     });
 
     it('strips only a leading u/ prefix from reddit usernames', () => {
@@ -58,16 +58,16 @@ describe('leaderboard identity', () => {
     });
 
     it('keeps the adjective and noun catalogs intact for constructed names', () => {
-        expect(LEADERBOARD_NAME_ADJECTIVES).toHaveLength(24);
-        expect(LEADERBOARD_NAME_NOUNS).toHaveLength(24);
-        expect(LEADERBOARD_NAME_ADJECTIVES[0]).toBe('Arctic');
-        expect(LEADERBOARD_NAME_ADJECTIVES[2]).toBe('Crimson');
-        expect(LEADERBOARD_NAME_ADJECTIVES[3]).toBe('Electric');
-        expect(LEADERBOARD_NAME_ADJECTIVES[8]).toBe('Jade');
-        expect(LEADERBOARD_NAME_ADJECTIVES[16]).toBe('Shadow');
-        expect(LEADERBOARD_NAME_NOUNS[0]).toBe('Badger');
-        expect(LEADERBOARD_NAME_NOUNS[1]).toBe('Cobra');
-        expect(LEADERBOARD_NAME_NOUNS[2]).toBe('Falcon');
+        expect(LEADERBOARD_NAME_ADJECTIVES).toEqual([
+            'Arctic', 'Blazing', 'Crimson', 'Electric', 'Flying', 'Golden', 'Hidden', 'Iron',
+            'Jade', 'Lucky', 'Midnight', 'Neon', 'Phantom', 'Quantum', 'Rapid', 'Rocket',
+            'Shadow', 'Silver', 'Turbo', 'Velvet', 'Wild', 'Winter', 'Zenith', 'Zero',
+        ]);
+        expect(LEADERBOARD_NAME_NOUNS).toEqual([
+            'Badger', 'Cobra', 'Falcon', 'Gecko', 'Jaguar', 'Koala', 'Lynx', 'Manta',
+            'Mustang', 'Orca', 'Otter', 'Panther', 'Pigeon', 'Raven', 'Shark', 'Sparrow',
+            'Tiger', 'Viper', 'Wolf', 'Wombat', 'Yak', 'Zebra', 'Comet', 'Meteor',
+        ]);
     });
 
     it('hashes player ids with FNV-1a and builds the exact constructed label', () => {
@@ -81,17 +81,15 @@ describe('leaderboard identity', () => {
                 0x01000193,
             ) >>> 0),
         );
+        expect(hashLeaderboardPlayerId('a')).toBe(3826002220);
+        expect(hashLeaderboardPlayerId('player-stable')).toBe(2558244288);
 
-        const hash = hashLeaderboardPlayerId('a');
-        const adjective = LEADERBOARD_NAME_ADJECTIVES[hash % LEADERBOARD_NAME_ADJECTIVES.length];
-        const noun = LEADERBOARD_NAME_NOUNS[
-            Math.floor(hash / LEADERBOARD_NAME_ADJECTIVES.length) % LEADERBOARD_NAME_NOUNS.length
-        ];
-        const suffixSeed = hash >>> 16;
-        const suffix = suffixSeed % 4 === 0 ? '' : ` ${2 + (suffixSeed % 98)}`;
-        expect(getConstructedLeaderboardName('a')).toBe(`${adjective} ${noun}${suffix}`);
-        expect(adjective).not.toBe('');
-        expect(noun).not.toBe('');
+        // No numeric suffix when high hash bits are divisible by four.
+        expect(getConstructedLeaderboardName('a')).toBe('Flying Meteor');
+        expect(getConstructedLeaderboardName('x')).toBe('Rocket Koala');
+        // Suffix uses modulo 98 (not multiply) so the printed number stays small.
+        expect(getConstructedLeaderboardName('player-stable')).toBe('Arctic Mustang 33');
+        expect(getConstructedLeaderboardName('player-1')).toBe('Turbo Mustang 54');
     });
 
     it('uses a numeric suffix unless the high hash bits are divisible by four', () => {
@@ -102,9 +100,15 @@ describe('leaderboard identity', () => {
         expect(samples.some((name) => / \d+$/.test(name))).toBe(true);
         expect(samples.some((name) => !/ \d+$/.test(name))).toBe(true);
         for (const name of samples) {
-            const [adjective, noun] = name.split(' ');
-            expect(LEADERBOARD_NAME_ADJECTIVES).toContain(adjective);
-            expect(LEADERBOARD_NAME_NOUNS).toContain(noun);
+            const match = name.match(/^([A-Z][a-z]+) ([A-Z][a-z]+)(?: (\d+))?$/);
+            expect(match).not.toBeNull();
+            expect(LEADERBOARD_NAME_ADJECTIVES).toContain(match[1]);
+            expect(LEADERBOARD_NAME_NOUNS).toContain(match[2]);
+            if (match[3] !== undefined) {
+                const suffix = Number(match[3]);
+                expect(suffix).toBeGreaterThanOrEqual(2);
+                expect(suffix).toBeLessThanOrEqual(99);
+            }
         }
     });
 
