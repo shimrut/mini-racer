@@ -252,4 +252,71 @@ describe('ui modal content helpers', () => {
 
         global.document = originalDocument;
     });
+
+    it('paints combined RANK status on first open instead of dashes or a hidden column', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div id="combined-best-lap"></div>
+                <div id="combined-stat-label-1"></div>
+                <div id="combined-stat-label-2"></div>
+                <div id="combined-next-medal-stat"></div>
+                <div id="combined-next-medal-icon-slot"></div>
+                <div id="combined-next-medal-time"></div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+        const rightGroup = container.querySelector('#combined-stats-right-group');
+        const rankValue = container.querySelector('#combined-rank-value');
+
+        component.renderCombinedResults(container, {
+            time: 12.34,
+            bestLap: 12.34,
+            scoreboardSnapshot: {
+                isLoading: true,
+                statusText: 'Submitting...',
+                submissionStage: 'submitting',
+                verificationState: 'pending',
+            },
+        });
+        expect(rankValue.textContent).toBe('Submitting...');
+        expect(rightGroup.hidden).toBe(false);
+
+        component.renderCombinedResults(container, {
+            time: 12.34,
+            bestLap: 12.34,
+            scoreboardSnapshot: {
+                isLoading: false,
+                verificationState: 'error',
+                submissionStage: 'error',
+                statusText: 'Replay was too long to submit. Finish a cleaner run to rank it.',
+            },
+        });
+        expect(rankValue.textContent).toBe(
+            'Replay was too long to submit. Finish a cleaner run to rank it.',
+        );
+        expect(rightGroup.hidden).toBe(false);
+
+        component.renderCombinedResults(container, {
+            time: 12.34,
+            bestLap: 12.34,
+            scoreboardSnapshot: {
+                isLoading: false,
+                playerRankLabel: '#3',
+                totalCount: 40,
+            },
+        });
+        expect(rankValue.querySelector('.rank-num')?.textContent).toBe('3');
+        expect(container.querySelector('#combined-rank-total').textContent).toBe('of 40');
+        expect(rightGroup.hidden).toBe(false);
+
+        global.document = originalDocument;
+    });
 });

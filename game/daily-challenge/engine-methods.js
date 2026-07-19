@@ -30,7 +30,7 @@ import {
   isDailyChallengeStoredResultForChallenge,
   prefetchDailyChallengeSnapshots,
 } from "./service.js";
-import { createVerificationSnapshot } from "../scoreboard/verification-queue.js";
+import { createVerificationSnapshot, getDailyChallengeVerificationEntry, getVerificationSnapshotFromQueueEntry } from "../scoreboard/verification-queue.js";
 import { getMedalForLapTime } from "../medals/medals.js";
 import {
   readTrackLastLapMedal,
@@ -1246,6 +1246,23 @@ export const dailyChallengeEngineMethods = {
     if (this.modal.modalMsg) {
       this.modal.modalMsg.style.display = "";
       this.modal.modalMsg.textContent = `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
+    }
+
+    if (isDailyBest && didEnqueue && !submissionError) {
+      const verificationEntry = getDailyChallengeVerificationEntry(challenge.id);
+      if (verificationEntry) {
+        this.modal.updateModalScoreboardSnapshot?.(
+          {
+            ...getVerificationSnapshotFromQueueEntry(verificationEntry),
+            currentPlayerRow: {
+              isCurrentPlayer: true,
+              bestTime: finalTime,
+              rank: null,
+              displayName: "You",
+            },
+          },
+        );
+      }
     }
 
   },

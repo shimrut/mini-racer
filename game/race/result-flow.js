@@ -121,6 +121,91 @@ export function buildScoreboardRankDisplay(scoreboardSnapshot, { fallbackText = 
     };
 }
 
+function setCombinedRankGroupVisible(rightGroupEl, visible) {
+    if (!rightGroupEl) return;
+    if (visible) {
+        rightGroupEl.hidden = false;
+        rightGroupEl.removeAttribute('hidden');
+        rightGroupEl.removeAttribute('aria-hidden');
+        return;
+    }
+    rightGroupEl.hidden = true;
+    rightGroupEl.setAttribute('hidden', '');
+    rightGroupEl.setAttribute('aria-hidden', 'true');
+}
+
+function clearCombinedRankTotal(rankTotalEl) {
+    if (!rankTotalEl) return;
+    rankTotalEl.textContent = '';
+    rankTotalEl.hidden = true;
+    rankTotalEl.setAttribute('hidden', '');
+}
+
+/** Paint combined finish-screen RANK value (first paint + live scoreboard updates). */
+export function applyCombinedRankValue({
+    rankValueEl,
+    rankTotalEl = null,
+    rightGroupEl = null,
+    scoreboardSnapshot = null,
+} = {}) {
+    if (!rankValueEl) {
+        setCombinedRankGroupVisible(rightGroupEl, false);
+        clearCombinedRankTotal(rankTotalEl);
+        return;
+    }
+
+    const rankDisplay = buildScoreboardRankDisplay(scoreboardSnapshot);
+    const shouldShowStatusText = Boolean(rankDisplay.statusText)
+        && (
+            rankDisplay.isLoading
+            || !rankDisplay.text
+            || rankDisplay.text === 'N/A'
+            || scoreboardSnapshot?.verificationState === 'error'
+            || scoreboardSnapshot?.verificationState === 'rejected'
+        );
+    rankValueEl.classList.toggle('combined-rank-value--status', shouldShowStatusText);
+
+    if (rankDisplay.isLoading) {
+        setCombinedRankGroupVisible(rightGroupEl, true);
+        rankValueEl.textContent = rankDisplay.statusText || '--';
+        clearCombinedRankTotal(rankTotalEl);
+        return;
+    }
+
+    if (shouldShowStatusText) {
+        setCombinedRankGroupVisible(rightGroupEl, true);
+        rankValueEl.textContent = rankDisplay.statusText || '';
+        clearCombinedRankTotal(rankTotalEl);
+        return;
+    }
+
+    if (!rankDisplay.text || rankDisplay.text === 'N/A') {
+        setCombinedRankGroupVisible(rightGroupEl, false);
+        rankValueEl.textContent = '';
+        if (rankTotalEl) rankTotalEl.textContent = '';
+        return;
+    }
+
+    setCombinedRankGroupVisible(rightGroupEl, true);
+    const rankText = rankDisplay.text || '';
+    if (rankText.startsWith('#')) {
+        rankValueEl.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
+    } else {
+        rankValueEl.textContent = rankText;
+    }
+
+    const totalRaw = Number(scoreboardSnapshot?.totalCount);
+    const totalVal = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
+    if (!rankTotalEl) return;
+    if (totalVal > 0) {
+        rankTotalEl.textContent = `of ${totalVal.toLocaleString()}`;
+        rankTotalEl.hidden = false;
+        rankTotalEl.removeAttribute('hidden');
+        return;
+    }
+    clearCombinedRankTotal(rankTotalEl);
+}
+
 /** Leaderboard place for medal labels and stats (null while loading or unknown). */
 export function getCombinedRankNumber(scoreboardSnapshot) {
     if (!scoreboardSnapshot || typeof scoreboardSnapshot !== 'object') return null;

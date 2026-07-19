@@ -14,6 +14,7 @@ import {
     buildModalRunsPayload,
     buildModalStatsPlan,
     buildModalRunsViewOptions,
+    applyCombinedRankValue,
     buildScoreboardRankDisplay
 } from './result-flow.js';
 import {
@@ -1512,89 +1513,12 @@ export class ModalShell {
         }
 
         if (this.modalCombinedView?.classList.contains('active-view')) {
-            const rightGroupEl = this.modalCombinedView.querySelector('#combined-stats-right-group');
-            const rankValueEl = this.modalCombinedView.querySelector('#combined-rank-value');
-            const rankTotalEl = this.modalCombinedView.querySelector('#combined-rank-total');
-            if (!rankValueEl) {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = true;
-                    rightGroupEl.setAttribute('hidden', '');
-                    rightGroupEl.setAttribute('aria-hidden', 'true');
-                }
-                if (rankValueEl) rankValueEl.textContent = '';
-                if (rankTotalEl) rankTotalEl.textContent = '';
-                return;
-            }
-
-            const rankDisplay = buildScoreboardRankDisplay(scoreboardSnapshot);
-            const shouldShowStatusText = Boolean(rankDisplay.statusText)
-                && (
-                    rankDisplay.isLoading
-                    || !rankDisplay.text
-                    || rankDisplay.text === 'N/A'
-                    || scoreboardSnapshot?.verificationState === 'error'
-                    || scoreboardSnapshot?.verificationState === 'rejected'
-                );
-            rankValueEl.classList.toggle('combined-rank-value--status', shouldShowStatusText);
-            if (rankDisplay.isLoading) {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = false;
-                    rightGroupEl.removeAttribute('hidden');
-                    rightGroupEl.removeAttribute('aria-hidden');
-                }
-                rankValueEl.textContent = rankDisplay.statusText || '--';
-                if (rankTotalEl) {
-                    rankTotalEl.textContent = '';
-                    rankTotalEl.hidden = true;
-                    rankTotalEl.setAttribute('hidden', '');
-                }
-            } else if (shouldShowStatusText) {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = false;
-                    rightGroupEl.removeAttribute('hidden');
-                    rightGroupEl.removeAttribute('aria-hidden');
-                }
-                rankValueEl.textContent = rankDisplay.statusText || '';
-                if (rankTotalEl) {
-                    rankTotalEl.textContent = '';
-                    rankTotalEl.hidden = true;
-                    rankTotalEl.setAttribute('hidden', '');
-                }
-            } else if (!rankDisplay.text || rankDisplay.text === 'N/A') {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = true;
-                    rightGroupEl.setAttribute('hidden', '');
-                    rightGroupEl.setAttribute('aria-hidden', 'true');
-                }
-                rankValueEl.textContent = '';
-                if (rankTotalEl) rankTotalEl.textContent = '';
-            } else {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = false;
-                    rightGroupEl.removeAttribute('hidden');
-                    rightGroupEl.removeAttribute('aria-hidden');
-                }
-                const rankText = rankDisplay.text || '';
-                if (rankText.startsWith('#')) {
-                    rankValueEl.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
-                } else {
-                    rankValueEl.textContent = rankText;
-                }
-                
-                const totalRaw = Number(scoreboardSnapshot?.totalCount);
-                const totalVal = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
-                if (rankTotalEl) {
-                    if (totalVal > 0) {
-                        rankTotalEl.textContent = `of ${totalVal.toLocaleString()}`;
-                        rankTotalEl.hidden = false;
-                        rankTotalEl.removeAttribute('hidden');
-                    } else {
-                        rankTotalEl.textContent = '';
-                        rankTotalEl.hidden = true;
-                        rankTotalEl.setAttribute('hidden', '');
-                    }
-                }
-            }
+            applyCombinedRankValue({
+                rankValueEl: this.modalCombinedView.querySelector('#combined-rank-value'),
+                rankTotalEl: this.modalCombinedView.querySelector('#combined-rank-total'),
+                rightGroupEl: this.modalCombinedView.querySelector('#combined-stats-right-group'),
+                scoreboardSnapshot,
+            });
             return;
         }
 

@@ -178,6 +178,91 @@ describe("scoreboard engine verification retries", () => {
 
     expect(refreshAfterAcceptedSubmission).not.toHaveBeenCalled();
     expect(getDailyChallengeVerificationEntry(challengeId)).toBe(null);
+    expect(engine.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isLoading: false,
+        playerRankLabel: null,
+        statusText: null,
+      }),
+    );
+  });
+
+  it("hides RANK when an accepted submission has no snapshot to paint", async () => {
+    const challengeId = "daily-accepted-no-snapshot";
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 41,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+    });
+    const entry = getDailyChallengeVerificationEntry(challengeId);
+    const engine = {
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: {
+        refreshDailyChallengeAfterAcceptedSubmission: vi.fn().mockResolvedValue(null),
+      },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => true),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(
+      engine,
+      entry,
+      {
+        ok: true,
+        status: 200,
+        body: {
+          accepted: true,
+          improved: true,
+          bestTimeMs: 41000,
+          completedLaps: 1,
+        },
+      },
+    );
+
+    expect(engine.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isLoading: false,
+        playerRankLabel: null,
+        statusText: null,
+      }),
+    );
+  });
+
+  it("updates an open finish modal when a verification entry expires", async () => {
+    const challengeId = "daily-expired-open-modal";
+    const entry = {
+      challengeId,
+      bestTime: 40,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+      verificationState: "pending",
+      submissionStage: "verifying",
+      nextAttemptAt: Date.now(),
+      expiresAt: "2000-01-01T00:00:00.000Z",
+      updatedAt: new Date().toISOString(),
+    };
+    const engine = {
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => true),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.processDailyChallengeVerificationEntry.call(engine, entry);
+
+    expect(engine.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isLoading: false,
+        verificationState: "error",
+        statusText: "Leaderboard submission expired.",
+      }),
+    );
   });
 
   it("updates and refetches the lifetime track PB independently from the daily leaderboard", async () => {

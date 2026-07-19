@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { RealTimeRacer } from "../game/engine.js";
 import { CarSpriteLoader, getCarAssetNameForPresetConfig, getCarAssetUrlCandidates } from "../game/car/sprite.js";
 import { readTrackLastLapMedal } from "../game/medals/last-lap-medal-storage.js";
+import {
+  enqueueDailyChallengeVerification,
+  markDailyChallengeVerificationPending,
+  resetVerificationQueueForTests,
+} from "../game/scoreboard/verification-queue.js";
 
 describe("RealTimeRacer daily challenge modal payload", () => {
   it("keeps the challenge date in the lobby summary for post-bound standings", () => {
@@ -361,6 +366,98 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     );
     expect(showModal.mock.calls[0][3]).not.toHaveProperty("playlistAction");
     expect(endAttempt).toHaveBeenCalledWith({ complete: true });
+  });
+
+  it("syncs Verifying status from the queue after the finish modal opens", () => {
+    const store = new Map();
+    globalThis.window = {
+      localStorage: {
+        getItem: (key) => (store.has(key) ? store.get(key) : null),
+        setItem: (key, value) => {
+          store.set(key, String(value));
+        },
+        removeItem: (key) => {
+          store.delete(key);
+        },
+      },
+    };
+
+    const showModal = vi.fn();
+    const updateModalScoreboardSnapshot = vi.fn();
+    const engine = {
+      isValidatedWinData: () => true,
+      currentChallengeRun: { completedLaps: 1, recentLaps: [], bestLapSecBeforeLastLap: null },
+      activeDailyChallenge: {
+        id: "daily-post-open-sync",
+        trackKey: "circuit",
+        objectiveType: "single_lap_fastest",
+        challengeDate: "2026-07-19",
+        availableUntil: "2099-01-01T00:00:00.000Z",
+      },
+      status: "playing",
+      journeys: { endAttempt: vi.fn() },
+      currentRunPolicy: { bestResultComparator: "time" },
+      dailyChallengeBestResult: null,
+      trackPersonalBestResult: null,
+      bestLapTime: null,
+      cachedSpeed: 0,
+      rankedSubmissionBlockedReason: null,
+      hasTrackMedalBeforeLastLapWrite: false,
+      trackMedalBeforeLastLapWrite: null,
+      sessionBestLapSecByTrackKey: {},
+      sessionBestCheckpointTimesByTrackKey: {},
+      hud: {
+        syncHud: vi.fn(),
+        setBestTime: vi.fn(),
+        setHudPersonalBestsOpenAllowed: vi.fn(),
+      },
+      dailyChallengeUi: {
+        getDailyChallengeScoreboardSnapshot: vi.fn(() => null),
+        refreshDailyChallengeVerificationState: vi.fn(),
+      },
+      modal: {
+        showModal,
+        updateModalScoreboardSnapshot,
+        modalMsg: null,
+      },
+      restartDailyChallenge: vi.fn(),
+      reset: vi.fn(),
+      scoreboardReplay: { getPayload: vi.fn(() => ({ inputs: [] })), overflowed: false },
+      enqueueDailyChallengeVerificationSubmission: vi.fn(() => {
+        enqueueDailyChallengeVerification({
+          challengeId: "daily-post-open-sync",
+          bestTime: 11.2,
+          replay: { inputs: [] },
+          objectiveType: "single_lap_fastest",
+          trackKey: "circuit",
+          challengeDate: "2026-07-19",
+          expiresAt: "2099-01-01T06:00:00.000Z",
+        });
+        markDailyChallengeVerificationPending("daily-post-open-sync", Date.now(), {
+          submissionStage: "verifying",
+          preserveUpdatedAt: true,
+        });
+        return true;
+      }),
+    };
+
+    resetVerificationQueueForTests();
+    RealTimeRacer.prototype.handleDailyChallengeWin.call(engine, {
+      lapTime: 11.2,
+      completedLaps: 1,
+    });
+
+    expect(showModal).toHaveBeenCalled();
+    expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isLoading: true,
+        submissionStage: "verifying",
+        statusText: "Verifying...",
+      }),
+    );
+
+    resetVerificationQueueForTests();
+    delete globalThis.window;
   });
 
   it("passes the pre-lap track medal into the win modal after lap storage updates", () => {

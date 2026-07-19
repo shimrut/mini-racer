@@ -121,6 +121,18 @@ export const scoreboardEngineMethods = {
     if (isDailyChallengeVerificationExpired(entry)) {
       clearDailyChallengeVerification(entry.challengeId);
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
+      if (
+        this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })
+      ) {
+        this.modal.updateModalScoreboardSnapshot(
+          createVerificationSnapshot({
+            verificationState: "error",
+            isLoading: false,
+            submissionStage: "error",
+            statusText: "Leaderboard submission expired.",
+          }),
+        );
+      }
       return;
     }
 
@@ -323,12 +335,19 @@ export const scoreboardEngineMethods = {
             });
       }
       if (
-        scoreboardSnapshot &&
         this.modal.matchesModalScoreboardContext({
           challengeId: entry.challengeId,
         })
       ) {
-        this.modal.updateModalScoreboardSnapshot(scoreboardSnapshot);
+        this.modal.updateModalScoreboardSnapshot(
+          scoreboardSnapshot || {
+            isLoading: false,
+            verificationState: "pending",
+            submissionStage: null,
+            statusText: null,
+            playerRankLabel: null,
+          },
+        );
       }
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       return;

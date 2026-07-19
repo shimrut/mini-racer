@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+    applyCombinedRankValue,
     buildModalRunsPayload,
     buildModalRunsViewOptions,
     buildModalDeltaDisplay,
@@ -17,6 +18,96 @@ import {
 describe('result-flow helpers', () => {
     afterEach(() => {
         vi.restoreAllMocks();
+    });
+
+    it('applies combined RANK status text, errors, and real ranks', () => {
+        const rightGroupEl = {
+            hidden: true,
+            removeAttribute: vi.fn(function removeAttribute(name) {
+                if (name === 'hidden') this.hidden = false;
+            }),
+            setAttribute: vi.fn(function setAttribute(name) {
+                if (name === 'hidden') this.hidden = true;
+            }),
+        };
+        const rankValueEl = {
+            textContent: '',
+            innerHTML: '',
+            classList: {
+                toggle: vi.fn(),
+            },
+        };
+        const rankTotalEl = {
+            textContent: 'of 9',
+            hidden: false,
+            removeAttribute: vi.fn(),
+            setAttribute: vi.fn(function setAttribute(name) {
+                if (name === 'hidden') this.hidden = true;
+            }),
+        };
+
+        applyCombinedRankValue({
+            rankValueEl,
+            rankTotalEl,
+            rightGroupEl,
+            scoreboardSnapshot: {
+                isLoading: true,
+                statusText: 'Submitting...',
+                submissionStage: 'submitting',
+            },
+        });
+        expect(rankValueEl.textContent).toBe('Submitting...');
+        expect(rightGroupEl.hidden).toBe(false);
+        expect(rankTotalEl.hidden).toBe(true);
+        expect(rankValueEl.classList.toggle).toHaveBeenCalledWith(
+            'combined-rank-value--status',
+            true,
+        );
+
+        applyCombinedRankValue({
+            rankValueEl,
+            rankTotalEl,
+            rightGroupEl,
+            scoreboardSnapshot: {
+                isLoading: false,
+                verificationState: 'error',
+                submissionStage: 'error',
+                statusText: 'Replay was too long to submit. Finish a cleaner run to rank it.',
+            },
+        });
+        expect(rankValueEl.textContent).toBe(
+            'Replay was too long to submit. Finish a cleaner run to rank it.',
+        );
+        expect(rightGroupEl.hidden).toBe(false);
+
+        applyCombinedRankValue({
+            rankValueEl,
+            rankTotalEl,
+            rightGroupEl,
+            scoreboardSnapshot: {
+                isLoading: false,
+                playerRankLabel: '#7',
+                totalCount: 120,
+            },
+        });
+        expect(rankValueEl.innerHTML).toContain('rank-num');
+        expect(rankValueEl.innerHTML).toContain('7');
+        expect(rankTotalEl.textContent).toBe('of 120');
+        expect(rankTotalEl.hidden).toBe(false);
+        expect(rightGroupEl.hidden).toBe(false);
+
+        applyCombinedRankValue({
+            rankValueEl,
+            rankTotalEl,
+            rightGroupEl,
+            scoreboardSnapshot: {
+                isLoading: false,
+                statusText: null,
+                playerRankLabel: null,
+            },
+        });
+        expect(rightGroupEl.hidden).toBe(true);
+        expect(rankValueEl.textContent).toBe('');
     });
 
     it('builds lap records and trims recent laps', () => {

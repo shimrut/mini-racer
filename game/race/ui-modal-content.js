@@ -1,5 +1,5 @@
 import { getTrackName } from '../track/catalog.js';
-import { buildModalDeltaDisplay, buildScoreboardRankDisplay } from '../race/result-flow.js';
+import { applyCombinedRankValue, buildModalDeltaDisplay } from '../race/result-flow.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
@@ -617,56 +617,12 @@ export class ModalContentUi {
             label2El.removeAttribute('aria-hidden');
             label2El.textContent = 'BEST LAP';
         }
-        if (rankValueEl) {
-            const rankDisplay = buildScoreboardRankDisplay(scoreboardSnapshot);
-            if (rankDisplay.isLoading) {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = false;
-                    rightGroupEl.removeAttribute('hidden');
-                    rightGroupEl.removeAttribute('aria-hidden');
-                }
-                rankValueEl.textContent = '--';
-                if (rankTotalEl) {
-                    rankTotalEl.textContent = '';
-                    rankTotalEl.hidden = true;
-                    rankTotalEl.setAttribute('hidden', '');
-                }
-            } else if (!rankDisplay.text || rankDisplay.text === 'N/A') {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = true;
-                    rightGroupEl.setAttribute('hidden', '');
-                    rightGroupEl.setAttribute('aria-hidden', 'true');
-                }
-                rankValueEl.textContent = '';
-                if (rankTotalEl) rankTotalEl.textContent = '';
-            } else {
-                if (rightGroupEl) {
-                    rightGroupEl.hidden = false;
-                    rightGroupEl.removeAttribute('hidden');
-                    rightGroupEl.removeAttribute('aria-hidden');
-                }
-                const rankText = rankDisplay.text || '';
-                if (rankText.startsWith('#')) {
-                    rankValueEl.innerHTML = `<span class="rank-hash">#</span><span class="rank-num">${rankText.slice(1)}</span>`;
-                } else {
-                    rankValueEl.textContent = rankText;
-                }
-                
-                const totalRaw = Number(scoreboardSnapshot?.totalCount);
-                const totalVal = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
-                if (rankTotalEl) {
-                    if (totalVal > 0) {
-                        rankTotalEl.textContent = `of ${totalVal.toLocaleString()}`;
-                        rankTotalEl.hidden = false;
-                        rankTotalEl.removeAttribute('hidden');
-                    } else {
-                        rankTotalEl.textContent = '';
-                        rankTotalEl.hidden = true;
-                        rankTotalEl.setAttribute('hidden', '');
-                    }
-                }
-            }
-        }
+        applyCombinedRankValue({
+            rankValueEl,
+            rankTotalEl,
+            rightGroupEl,
+            scoreboardSnapshot,
+        });
         if (timeEl) {
             timeEl.innerHTML = Number.isFinite(time)
                 ? `<span class="time-num">${time.toFixed(2)}</span><span class="time-unit">s</span>`
