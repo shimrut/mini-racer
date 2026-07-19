@@ -4,6 +4,8 @@ Mini Racer is a quick, one-lap racing game for Reddit.
 
 Open a Mini Racer post, tap **Race Now**, learn the track, and try again until your lap is cleaner and faster. Runs are short on purpose — restart fast, improve often.
 
+Common questions (controls, daily tracks, Standings, Garage, sharing, moderators) are answered in [FAQ.md](FAQ.md).
+
 ## How the game works
 
 Every attempt is **one lap**. Cross the finish line to complete it.
