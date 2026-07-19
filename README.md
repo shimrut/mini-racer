@@ -84,11 +84,11 @@ Tips:
 
 ### 1.3
 
-- **Personal-best ghost** — race a faint copy of your best lap on that track (on by default; turn off in Settings)
-- **Keyboard controls** — move through menus with the keyboard; press **R** to restart while racing, paused, or finished
-- **End-of-week podium** — when a track’s week ends, a podium post shows the top three (with avatars) and a **Play Now** button for today’s race
-- **More tracks** — Number Zero through Number Six join the daily rotation
-- **Sharper standings** — leaderboard times show full milliseconds
+- Race **ghost** of your PB (on by default; turn it off in Settings)
+- Press **R** to restart while racing, paused, or on the finish screen
+- Keyboard navigation through menus now available
+- Leaderboard times show full **milliseconds** for more accurate ranking
+- Custom **podium** post after a track is out of rotation
 
 ### 1.2
 

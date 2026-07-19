@@ -1,21 +1,21 @@
 {
   "alloyRing": {
     "author": 14.35,
-    "gold": 14.63,
-    "silver": 14.99,
-    "bronze": 15.42
+    "gold": 14.73,
+    "silver": 15.39,
+    "bronze": 15.92
   },
   "blueSector": {
     "author": 12.62,
-    "gold": 12.99,
-    "silver": 13.28,
-    "bronze": 13.65
+    "gold": 13.09,
+    "silver": 13.58,
+    "bronze": 14.35
   },
   "carbonBend": {
     "author": 6.55,
-    "gold": 6.71,
-    "silver": 6.84,
-    "bronze": 6.95
+    "gold": 6.81,
+    "silver": 6.94,
+    "bronze": 7.05
   },
   "cedarRidgeCircuit": {
     "author": 11.03,
@@ -55,9 +55,9 @@
   },
   "moebiusStrip": {
     "author": 10.75,
-    "gold": 11.03,
-    "silver": 11.31,
-    "bronze": 11.77
+    "gold": 11.23,
+    "silver": 11.71,
+    "bronze": 12.07
   },
   "royalPlateau": {
     "author": 8.55,
@@ -85,57 +85,57 @@
   },
   "twistedCanyon": {
     "author": 15.45,
-    "gold": 15.82,
-    "silver": 16.28,
-    "bronze": 16.87
+    "gold": 15.92,
+    "silver": 16.68,
+    "bronze": 17.27
   },
   "greenTroll": {
     "author": 12.22,
-    "gold": 12.45,
-    "silver": 12.81,
-    "bronze": 13.13
+    "gold": 12.48,
+    "silver": 13.01,
+    "bronze": 13.73
   },
   "desertBridge": {
     "author": 17.65,
     "gold": 18.03,
-    "silver": 18.47,
-    "bronze": 19.00
+    "silver": 18.77,
+    "bronze": 19.60
   },
   "templeStraight": {
     "author": 10.15,
-    "gold": 10.58,
-    "silver": 10.93,
-    "bronze": 11.19
+    "gold": 10.68,
+    "silver": 11.03,
+    "bronze": 11.49
   },
   "harborPrincipality": {
     "author": 5.92,
-    "gold": 6.12,
-    "silver": 6.45,
-    "bronze": 6.82
+    "gold": 6.18,
+    "silver": 6.47,
+    "bronze": 6.92
   },
   "serpentCrossing": {
     "author": 9.99,
-    "gold": 10.41,
-    "silver": 10.83,
-    "bronze": 11.39
+    "gold": 10.61,
+    "silver": 11.13,
+    "bronze": 11.89
   },
   "ardennesRidge": {
     "author": 9.85,
-    "gold": 10.07,
-    "silver": 10.38,
-    "bronze": 10.76
+    "gold": 10.27,
+    "silver": 10.78,
+    "bronze": 11.06
   },
   "caspianBoulevard": {
     "author": 10.42,
-    "gold": 10.63,
-    "silver": 10.79,
-    "bronze": 11.01
+    "gold": 10.73,
+    "silver": 10.89,
+    "bronze": 11.31
   },
   "albertGardens": {
     "author": 9.21,
-    "gold": 9.32,
-    "silver": 9.68,
-    "bronze": 9.94
+    "gold": 9.52,
+    "silver": 9.88,
+    "bronze": 10.14
   },
   "pretzelArena": {
     "author": 9.65,
@@ -235,56 +235,86 @@
   },
   "copperVale": {
     "author": 11.82,
-    "gold": 11.97,
-    "silver": 12.14,
-    "bronze": 12.33
+    "gold": 12.07,
+    "silver": 13.54,
+    "bronze": 14.13
   },
   "auroraRing": {
     "author": 11.17,
-    "gold": 11.31,
-    "silver": 11.52,
-    "bronze": 11.74
+    "gold": 11.61,
+    "silver": 12.02,
+    "bronze": 12.54
   },
   "lanternPier": {
     "author": 12.05,
-    "gold": 12.27,
-    "silver": 12.43,
-    "bronze": 12.68
+    "gold": 12.57,
+    "silver": 13.03,
+    "bronze": 13.68
   },
   "quartzHollow": {
     "author": 8.72,
-    "gold": 8.85,
-    "silver": 8.99,
-    "bronze": 9.12
+    "gold": 9.05,
+    "silver": 9.49,
+    "bronze": 9.72
   },
   "needleChicane": {
     "author": 12.75,
-    "gold": 12.98,
-    "silver": 13.19,
-    "bronze": 13.47
+    "gold": 13.58,
+    "silver": 14.09,
+    "bronze": 14.47
   },
   "cinderSpine": {
     "author": 14.25,
-    "gold": 14.37,
-    "silver": 14.59,
-    "bronze": 14.84
+    "gold": 14.57,
+    "silver": 15.09,
+    "bronze": 15.84
   },
   "glassSerpent": {
     "author": 17.25,
     "gold": 17.59,
-    "silver": 17.81,
-    "bronze": 18.09
+    "silver": 18.31,
+    "bronze": 19.09
+  },
+  "numberZero": {
+    "author": 7.01,
+    "gold": 7.22,
+    "silver": 7.55,
+    "bronze": 7.96
   },
   "numberOne": {
-    "author": 9.20,
-    "gold": 9.52,
-    "silver": 9.65,
-    "bronze": 9.89
+    "author": 9.25,
+    "gold": 9.82,
+    "silver": 9.95,
+    "bronze": 10.19
   },
   "numberTwo": {
     "author": 14.25,
     "gold": 14.59,
-    "silver": 14.97,
-    "bronze": 15.33
+    "silver": 15.07,
+    "bronze": 15.63
+  },
+  "numberThree": {
+    "author": 12.60,
+    "gold": 12.92,
+    "silver": 13.34,
+    "bronze": 13.71
+  },
+  "numberFour": {
+    "author": 11.15,
+    "gold": 11.72,
+    "silver": 12.17,
+    "bronze": 12.65
+  },
+  "numberFive": {
+    "author": 15.05,
+    "gold": 15.38,
+    "silver": 15.99,
+    "bronze": 16.40
+  },
+  "numberSix": {
+    "author": 16.57,
+    "gold": 16.98,
+    "silver": 17.37,
+    "bronze": 17.89
   }
 }
