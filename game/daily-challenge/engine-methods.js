@@ -370,10 +370,11 @@ export const dailyChallengeEngineMethods = {
     const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
     const ghostExpected = this.pbGhost?.enabled === true
       && Number.isFinite(trackPersonalBest?.bestTime);
-    const noticeShown = ghostExpected
+    // Show after GO clears — not while GO is still on screen.
+    const noticeNeeded = ghostExpected
       && !ghostActive
-      && this.hud?.showGhostUnavailableNotice?.() === true;
-    return { ghostActive, ghostExpected, noticeShown };
+      && typeof this.hud?.showGhostUnavailableNotice === 'function';
+    return { ghostActive, ghostExpected, noticeNeeded };
   },
 
   async loadInitialPersonalBestGhostAsset() {

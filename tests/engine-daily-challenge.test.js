@@ -1278,6 +1278,87 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     }
   });
 
+  it("shows GHOST UNAVAILABLE only after GO clears", () => {
+    vi.useFakeTimers();
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    let pendingFrame = null;
+    global.requestAnimationFrame = vi.fn((callback) => {
+      pendingFrame = callback;
+      return 1;
+    });
+
+    const showGhostUnavailableNotice = vi.fn(() => true);
+    const resetCountdown = vi.fn();
+    const engine = {
+      status: "ready",
+      pos: { x: 10, y: 6 },
+      prevPos: { x: 3, y: 2 },
+      angle: 1.2,
+      prevAngle: 0.4,
+      accumulator: 0.012,
+      activeRunId: 0,
+      activeTimers: [],
+      bestLapTime: null,
+      frameSkip: 1,
+      resetCanvasPresentation: vi.fn(),
+      isPracticeMode: () => false,
+      isDailyChallengeRun: () => false,
+      scoreboardReplay: { reset: vi.fn() },
+      recordRunPoint: vi.fn(),
+      snapRenderPoseToCurrentPose:
+        RealTimeRacer.prototype.snapRenderPoseToCurrentPose,
+      resetFrameTimingHistory: vi.fn(),
+      updateDailyChallengeHud: vi.fn(),
+      syncChallengeHudPrimaryStats: vi.fn(),
+      syncChallengeHudSecondaryStats: vi.fn(),
+      requestRender: vi.fn(),
+      beginPersonalBestGhostRunAtGo: () => ({
+        ghostActive: false,
+        ghostExpected: true,
+        noticeNeeded: true,
+      }),
+      runHistory: {
+        clear: vi.fn(),
+      },
+      hud: {
+        setHudPersonalBestsOpenAllowed: vi.fn(),
+        setPauseVisible: vi.fn(),
+        setBestTime: vi.fn(),
+        showStartLights: vi.fn(),
+        turnOnCountdownLight: vi.fn(),
+        hideStartLights: vi.fn(),
+        showGoMessage: vi.fn(),
+        resetCountdown,
+        showGhostUnavailableNotice,
+      },
+      modal: {
+        closeModal: vi.fn(),
+      },
+      startOverlay: {
+        hideStartOverlay: vi.fn(),
+      },
+    };
+
+    try {
+      RealTimeRacer.prototype.startSequence.call(engine);
+      vi.advanceTimersByTime(1100);
+      pendingFrame(2500);
+
+      expect(showGhostUnavailableNotice).not.toHaveBeenCalled();
+      expect(resetCountdown).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(300);
+
+      expect(resetCountdown).toHaveBeenCalledTimes(1);
+      expect(showGhostUnavailableNotice).toHaveBeenCalledTimes(1);
+      expect(resetCountdown.mock.invocationCallOrder[0])
+        .toBeLessThan(showGhostUnavailableNotice.mock.invocationCallOrder[0]);
+    } finally {
+      global.requestAnimationFrame = originalRequestAnimationFrame;
+      vi.useRealTimers();
+    }
+  });
+
   it("resets the submitted replay when collision auto-restart starts a fresh attempt", () => {
     const engine = {
       status: "playing",
@@ -1316,7 +1397,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.status).toBe("playing");
   });
 
-  it("starts on time and shows the unavailable notice when an enabled PB has no ghost at GO", () => {
+  it("starts on time and flags the unavailable notice when an enabled PB has no ghost at GO", () => {
     const challenge = { id: "daily-pending-pb", trackKey: "circuit" };
     const showGhostUnavailableNotice = vi.fn(() => true);
     const engine = {
@@ -1332,14 +1413,15 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     };
 
     expect(RealTimeRacer.prototype.beginPersonalBestGhostRunAtGo.call(engine))
-      .toEqual({ ghostActive: false, ghostExpected: true, noticeShown: true });
-    expect(showGhostUnavailableNotice).toHaveBeenCalledTimes(1);
+      .toEqual({ ghostActive: false, ghostExpected: true, noticeNeeded: true });
+    // Notice is deferred until GO clears in startSequence.
+    expect(showGhostUnavailableNotice).not.toHaveBeenCalled();
   });
 
   it.each([
     [false, { trackKey: "circuit", bestTime: 42 }],
     [true, null],
-  ])("does not show an unavailable notice when ghosts are disabled or no PB exists", (enabled, personalBest) => {
+  ])("does not need an unavailable notice when ghosts are disabled or no PB exists", (enabled, personalBest) => {
     const showGhostUnavailableNotice = vi.fn(() => true);
     const engine = {
       activeDailyChallenge: { id: "daily-no-notice", trackKey: "circuit" },
@@ -1352,7 +1434,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
     const result = RealTimeRacer.prototype.beginPersonalBestGhostRunAtGo.call(engine);
 
-    expect(result.noticeShown).toBe(false);
+    expect(result.noticeNeeded).toBe(false);
     expect(showGhostUnavailableNotice).not.toHaveBeenCalled();
   });
 
