@@ -93,7 +93,7 @@ vi.mock('../src/server/replay-validator.js', () => ({
 }));
 
 const { validateDailyGpReplayDetailed } = await import('../src/server/replay-validator.js');
-const { getServerDailyGpPlayerBest } = await import('../src/server/daily-gp-store.js');
+const { getServerDailyGpPlayerBest, getServerDailyGpPlayableChallenge } = await import('../src/server/daily-gp-store.js');
 
 const {
     confirmDailyGpShare,
@@ -344,6 +344,135 @@ describe('daily GP share wave 2', () => {
             body: {
                 status: 'invalid_replay',
                 error: 'This finished lap could not be verified.',
+            },
+        });
+    });
+
+    it('stores ready previews under the dailygp share-preview prefix with trimmed usernames', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, { ...requestContext, username: '  RaceFan  ' });
+
+        expect(preview.body.status).toBe('ready');
+        expect(preview.body.username).toBe('RaceFan');
+        expect(redis.set).toHaveBeenCalledWith(
+            `dailygp:share-preview:${preview.body.shareToken}`,
+            expect.any(String),
+        );
+        expect(strings.has(`dailygp:share-preview:${preview.body.shareToken}`)).toBe(true);
+    });
+
+    it('rejects confirm when the preview subreddit does not match the signed-in context', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        const forbidden = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            { ...requestContext, subredditName: 'OtherSub' },
+        );
+
+        expect(forbidden).toEqual({
+            status: 403,
+            body: {
+                status: 'share_forbidden',
+                error: 'This share preview belongs to another Reddit account.',
+            },
+        });
+    });
+
+    it('treats finish previews with non-string challenge ids as unavailable results', async () => {
+        getServerDailyGpPlayableChallenge.mockResolvedValueOnce(null);
+
+        const preview = await previewDailyGpShare({
+            source: 'finish',
+            challengeId: 42,
+            replay: { inputs: [{ frames: 1 }] },
+        }, requestContext);
+
+        expect(preview).toEqual({
+            status: 404,
+            body: {
+                status: 'result_unavailable',
+                error: 'No verified result is available to share.',
+            },
+        });
+    });
+
+    it('skips historical posts without subreddit names, urls, or t3 ids', async () => {
+        strings.clear();
+        reddit.getPostsByUser.mockResolvedValueOnce({
+            all: async () => [
+                {
+                    id: 'not-t3',
+                    url: 'https://reddit.com/r/miniracer/comments/badid',
+                    subredditName: 'MiniRacer',
+                    getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+                },
+                {
+                    id: 't3_nourl',
+                    subredditName: 'MiniRacer',
+                    getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+                },
+                {
+                    id: 't3_nosub',
+                    url: 'https://reddit.com/r/miniracer/comments/nosub',
+                    getPostData: vi.fn(async () => ({ challengeId: challenge.id })),
+                },
+            ],
+        });
+
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(preview).toMatchObject({
+            status: 404,
+            body: { status: 'post_unavailable' },
+        });
+    });
+
+    it('returns the existing registry record without rewriting it on duplicate registration', async () => {
+        const original = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/r/miniracer/comments/daily',
+        });
+        redis.set.mockClear();
+
+        const duplicate = await registerDailyGpPost({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            postId: 't3_duplicate',
+            postUrl: 'https://reddit.com/r/miniracer/comments/duplicate',
+        });
+
+        expect(duplicate).toEqual(original);
+        expect(redis.set).not.toHaveBeenCalled();
+    });
+
+    it('uses the default share window when rate-limit expiry is not finite', async () => {
+        redis.incrBy.mockImplementation(async (key, amount) => {
+            const next = Number(strings.get(key) || 0) + amount;
+            strings.set(key, String(next));
+            return 13;
+        });
+        redis.expireTime.mockResolvedValueOnce(Number.NaN);
+
+        const limited = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(limited).toEqual({
+            status: 429,
+            body: {
+                status: 'rate_limited',
+                retryAfterSeconds: 60,
             },
         });
     });
