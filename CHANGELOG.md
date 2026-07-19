@@ -1,5 +1,6 @@
 # Changelog
 
+- Expanded the Stryker mutate set with Redis lock/compression, daily and podium post stores/services, autopost stores, history backfill, and leaderboard-identity helpers.
 - Added mutation-boundary tests for Daily GP store parsers, share rate-limit/error copy, post-bound challenge id anchors, and daily-challenge cache/snapshot/playlist expiry edges; exported store parse helpers and playlist expiry resolution for direct assertions.
 - Added `tests/simulation-boundary-kills.test.js` with thrust-gate, steer/downforce Infinity, slip-gate init, and swept half-length fixtures, plus exported `selectWallContact` / `selectDeepestOverlap` helpers so CONTACT_EPSILON contact tie-breaks can be asserted directly.
 - Added 24 wave-2 mutation tests with comparison-boundary assertions and isolated hydration modules (`daily-challenge-snapshot-expiry-hydrate.test.js`, `daily-challenge-snapshot-expiry-runtime.test.js`, `daily-challenge-start-override-boundaries.test.js`) for `daily-challenge/service.js` snapshot/start-override expiry, `daily-gp-store.ts` ledger cutoff and community totals, `daily-gp-share.ts` replay/rate-limit/confirm guards, and `simulation.js` braking, skid, and downforce gates.

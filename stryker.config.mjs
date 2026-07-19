@@ -32,6 +32,9 @@ export default {
         'game/scoreboard/snapshot.js',
         'game/shared/checkpoint-times.js',
 
+        // Shared client identity helpers used by store/share
+        'game/shared/leaderboard-identity.js',
+
         // Server integrity / auth / Redis
         'src/server/daily-gp-store.ts',
         'src/server/replay-validator.ts',
@@ -42,7 +45,18 @@ export default {
         'src/server/daily-gp-share.ts',
         'src/server/pb-ghost-store.ts',
         'src/server/post-bound-challenge.ts',
-        'src/server/moderator-access.ts'
+        'src/server/moderator-access.ts',
+
+        // Redis ownership + post/podium publication integrity
+        'src/server/redis-lock.ts',
+        'src/server/redis-compressed-value.ts',
+        'src/server/daily-gp-post-store.ts',
+        'src/server/daily-podium-post-store.ts',
+        'src/server/daily-podium-service.ts',
+        'src/server/daily-post-service.ts',
+        'src/server/daily-autopost-store.ts',
+        'src/server/daily-podium-autopost-store.ts',
+        'src/server/daily-gp-history-backfill.ts'
     ],
     ignorePatterns: [
         '.cursor',
