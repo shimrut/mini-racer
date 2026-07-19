@@ -1,5 +1,6 @@
 # Changelog
 
+- Added Number Zero through Number Six tracks (definitions, catalog/registry wiring, share images) and updated track runtime integrity expectations plus the full registry fingerprint.
 - Exported simulation scrape/collision helpers and enabled Stryker `ignoreStatic` so static mutants no longer dominate runtime.
 - Added wave-7 mutation-kill tests for exported `daily-gp-store.ts` parse/normalize helpers, `daily-gp-share.ts` share normalize helpers, and `daily-challenge/service.js` coercion/formatting helpers with direct field-type assertions (empty string fallbacks, non-string coercion, and boundary labels); exported share parse/context helpers and store pagination/preference normalizers for direct assertions.
 - Added wave-6 mutation-kill tests for `daily-challenge/service.js`, `daily-gp-store.ts`, and `daily-gp-share.ts` covering mock URL params, playlist sort/expiry boundaries, active-cache guards, stored-result validation, community-floor snapshots, podium time formatting, share auth/rate-limit/confirm guards, already-shared recovery, and exact medal/comment copy.

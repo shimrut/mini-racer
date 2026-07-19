@@ -76,11 +76,16 @@ describe('track runtime integrity', () => {
     });
 
     it('preserves existing track data while intentionally extending the registry', () => {
-        const firstNewTrackIndex = TRACK_SCHEDULE_KEYS.indexOf('numberOne');
+        const firstNewTrackIndex = TRACK_SCHEDULE_KEYS.indexOf('numberZero');
         expect(firstNewTrackIndex).toBeGreaterThan(0);
         expect(TRACK_SCHEDULE_KEYS.slice(firstNewTrackIndex)).toEqual([
+            'numberZero',
             'numberOne',
             'numberTwo',
+            'numberThree',
+            'numberFour',
+            'numberFive',
+            'numberSix',
         ]);
 
         const existingTrackRegistry = Object.fromEntries(
@@ -92,7 +97,7 @@ describe('track runtime integrity', () => {
             '923415f865de38edd3737e9c035dfa657e392c3d12143f29a38f8bbc491f14f8',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '79419157c70d5e4c4e438163fe7523e399706f349dd94c4c0afa2234e959412b',
+            '39800bd2b79dab5689ba00ffc4fea5315c8d6569aaafc863173c2e85deeef050',
         );
     });
 

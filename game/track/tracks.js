@@ -43,8 +43,13 @@ import quartzHollow from './definitions/quartz-hollow.js';
 import needleChicane from './definitions/needle-chicane.js';
 import cinderSpine from './definitions/cinder-spine.js';
 import glassSerpent from './definitions/glass-serpent.js';
+import numberZero from './definitions/number-zero.js';
 import numberOne from './definitions/number-one.js';
 import numberTwo from './definitions/number-two.js';
+import numberThree from './definitions/number-three.js';
+import numberFour from './definitions/number-four.js';
+import numberFive from './definitions/number-five.js';
+import numberSix from './definitions/number-six.js';
 import { TRACK_SCHEDULE_KEYS, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -93,8 +98,13 @@ const TRACK_GEOMETRY = {
     needleChicane,
     cinderSpine,
     glassSerpent,
+    numberZero,
     numberOne,
     numberTwo,
+    numberThree,
+    numberFour,
+    numberFive,
+    numberSix,
 };
 
 // Compatibility registry for existing gameplay and server consumers.
