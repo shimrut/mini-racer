@@ -60,6 +60,7 @@ export default {
     ],
     ignorePatterns: [
         '.cursor',
+        '.venv',
         'analyses/**',
         'docs/**',
         'downloaded tracks/**',

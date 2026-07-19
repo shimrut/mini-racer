@@ -218,4 +218,62 @@ describe('post-bound daily challenge resolution', () => {
         expect(mockStore.getServerDailyGpChallengeById).toHaveBeenCalledWith(challenge.id);
         expect(mockStore.persistServerDailyGpChallenge).not.toHaveBeenCalled();
     });
+
+    it('ignores empty-string challengeId from context and continues to Reddit', async () => {
+        mockContext.readContextPostData.mockReturnValue({ challengeId: '' });
+        mockContext.readContextPostId.mockReturnValue('t3_daily');
+        mockReddit.getPostById.mockResolvedValue({
+            getPostData: vi.fn(async () => ({ challenge })),
+        });
+
+        await expect(getPostBoundDailyGpChallenge()).resolves.toEqual(challenge);
+        expect(mockStore.getServerDailyGpChallengeById).not.toHaveBeenCalled();
+        expect(mockStore.persistServerDailyGpChallenge).toHaveBeenCalledWith(challenge);
+    });
+
+    it('returns null when Reddit post data has neither challenge nor challengeId', async () => {
+        mockContext.readContextPostId.mockReturnValue('t3_daily');
+        mockReddit.getPostById.mockResolvedValue({
+            getPostData: vi.fn(async () => ({})),
+        });
+
+        await expect(getPostBoundDailyGpChallenge()).resolves.toBeNull();
+        expect(mockStore.getServerDailyGpChallengeById).not.toHaveBeenCalled();
+    });
+
+    it('ignores non-string challengeId on Reddit post data', async () => {
+        mockContext.readContextPostId.mockReturnValue('t3_daily');
+        mockReddit.getPostById.mockResolvedValue({
+            getPostData: vi.fn(async () => ({ challengeId: 99 })),
+        });
+
+        await expect(getPostBoundDailyGpChallenge()).resolves.toBeNull();
+        expect(mockStore.getServerDailyGpChallengeById).not.toHaveBeenCalled();
+    });
+
+    it('rejects missing individual schedule fields one at a time', () => {
+        for (const key of ['challengeDate', 'trackKey', 'startsAt', 'endsAt', 'availableUntil']) {
+            expect(normalizePostBoundDailyGpChallenge({
+                ...challenge,
+                [key]: undefined,
+            })).toBeNull();
+        }
+    });
+
+    it('logs and returns null when getPostData throws after post lookup', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockContext.readContextPostId.mockReturnValue('t3_daily');
+        mockReddit.getPostById.mockResolvedValue({
+            getPostData: vi.fn(async () => {
+                throw new Error('post-data-unavailable');
+            }),
+        });
+
+        await expect(getPostBoundDailyGpChallenge()).resolves.toBeNull();
+        expect(errorSpy).toHaveBeenCalledWith(
+            'Failed to resolve post-bound Mini Racer challenge:',
+            expect.any(Error),
+        );
+        errorSpy.mockRestore();
+    });
 });
