@@ -153,6 +153,71 @@ describe('daily GP post store', () => {
         }));
     });
 
+    it('normalizes subreddit names with trim and lowercase', async () => {
+        const record = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-17',
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/daily',
+            scoreThreadCommentId: null,
+            createdAt: '2026-07-17T00:05:00.000Z',
+            updatedAt: '2026-07-17T00:05:00.000Z',
+        };
+        mockRedis.get.mockResolvedValue(JSON.stringify(record));
+
+        await readDailyGpPostRecord('  MiniRacer  ', record.challengeId);
+        expect(mockRedis.get).toHaveBeenCalledWith(
+            `dailygp:post:miniracer:${record.challengeId}`,
+        );
+    });
+
+    it('rejects records missing required string fields or t3_ post ids', async () => {
+        const base = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-17',
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/daily',
+            scoreThreadCommentId: null,
+            createdAt: '2026-07-17T00:05:00.000Z',
+            updatedAt: '2026-07-17T00:05:00.000Z',
+        };
+        const rejectCases = [
+            { subredditName: 1 },
+            { challengeId: null },
+            { postId: 't1_comment' },
+            { postUrl: null },
+        ];
+        for (const patch of rejectCases) {
+            mockRedis.get.mockResolvedValue(JSON.stringify({ ...base, ...patch }));
+            await expect(
+                readDailyGpPostRecord('MiniRacer', base.challengeId),
+            ).resolves.toBeNull();
+        }
+    });
+
+    it('falls back createdAt and updatedAt to epoch when missing or non-string', async () => {
+        const base = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-17',
+            postId: 't3_daily',
+            postUrl: 'https://reddit.com/daily',
+            scoreThreadCommentId: null,
+        };
+        mockRedis.get.mockResolvedValue(JSON.stringify({
+            ...base,
+            createdAt: 123,
+            updatedAt: undefined,
+        }));
+        await expect(
+            readDailyGpPostRecord('MiniRacer', base.challengeId),
+        ).resolves.toEqual({
+            ...base,
+            scoreThreadCommentId: null,
+            createdAt: new Date(0).toISOString(),
+            updatedAt: new Date(0).toISOString(),
+        });
+    });
+
     it('writes records through the normalized Redis key', async () => {
         const record = {
             subredditName: 'MiniRacer',

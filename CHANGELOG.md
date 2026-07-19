@@ -1,5 +1,6 @@
 # Changelog
 
+- Added mutation-kill tests for `daily-podium-service.ts`, `daily-post-service.ts`, `daily-gp-post-store.ts`, and `daily-podium-post-store.ts` covering typeof/string field guards, regex date anchors, publication-window boundaries, Reddit avatar hostname checks, `t3_` post-id prefixes, `createdAt`/`updatedAt` epoch fallbacks, pending-snapshot expiration comparisons, autopost updater fallbacks, and recovery preferred-url selection.
 - Added wave-4 simulation mutation tests for contact-normal flips, scrape severity/suppression, collision-hash cell queries, reverse braking, and skid/history gates.
 - Added mutation-kill tests for Redis lock/compression, daily and podium post stores/services, autopost stores, history backfill, and leaderboard-identity helpers covering NX acquisition, ownership unlock/renewal, gzip threshold/fallback, corrupt JSON and null post ids, publication-window boundaries, stale-record recovery, lock-race reuse, and malformed subscription parsing.
 - Tightened rate-limit identity tests with exact utf-8 SHA-256 digests and empty-string challengeId/post-data guards for post-bound challenge resolution; ignored `.venv` in Stryker sandbox copies.

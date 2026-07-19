@@ -236,6 +236,70 @@ describe('daily podium post store', () => {
         ).resolves.toBeNull();
     });
 
+    it('rejects podium post records missing required string fields', async () => {
+        const base = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            postId: 't3_podium',
+            postUrl: 'https://reddit.com/podium',
+            createdAt: '2026-07-17T00:01:00.000Z',
+        };
+        const rejectCases = [
+            { subredditName: null },
+            { challengeId: 42 },
+            { postId: 'not-a-post' },
+            { postUrl: null },
+        ];
+        for (const patch of rejectCases) {
+            mockRedis.get.mockResolvedValue(JSON.stringify({ ...base, ...patch }));
+            await expect(
+                readDailyGpPodiumPostRecord('MiniRacer', base.challengeId),
+            ).resolves.toBeNull();
+        }
+    });
+
+    it('falls back createdAt to epoch when missing or non-string', async () => {
+        mockRedis.get.mockResolvedValue(JSON.stringify({
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            postId: 't3_podium',
+            postUrl: 'https://reddit.com/podium',
+        }));
+        await expect(
+            readDailyGpPodiumPostRecord('MiniRacer', 'daily-gp-2026-07-10'),
+        ).resolves.toEqual({
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            postId: 't3_podium',
+            postUrl: 'https://reddit.com/podium',
+            createdAt: new Date(0).toISOString(),
+        });
+    });
+
+    it('rejects pending snapshots at the exact expiration instant', async () => {
+        const expiresAt = '2026-07-17T06:00:00.000Z';
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse(expiresAt));
+        const snapshot = {
+            subredditName: 'MiniRacer',
+            challengeId: 'daily-gp-2026-07-10',
+            expiresAt,
+            podium: {
+                challengeId: 'daily-gp-2026-07-10',
+                challengeDate: '2026-07-10',
+                trackName: 'Circuit',
+                positions: [1, 2, 3].map((rank) => ({
+                    rank,
+                    displayName: 'No verified finish',
+                    identityType: 'empty',
+                    formattedTime: null,
+                    avatarUrl: null,
+                })),
+            },
+        };
+        await expect(writeDailyGpPodiumPendingSnapshot(snapshot)).resolves.toBe(false);
+        expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+
     it('rejects podium post records with empty URLs or corrupt JSON', async () => {
         mockRedis.get.mockResolvedValue('{');
         await expect(

@@ -251,6 +251,105 @@ describe('daily post workflow', () => {
         });
     });
 
+    it('preserves enabledAt when enabling autopost and falls back when absent', async () => {
+        const previous = {
+            subredditName: 'MiniRacer',
+            enabled: false,
+            enabledAt: '2026-07-15T00:00:00.000Z',
+            updatedAt: 'old',
+            lastPostedChallengeId: null,
+            lastPostedAt: null,
+            lastPostUrl: null,
+        };
+        mockAutopostStore.upsertDailyAutopostSubscription.mockImplementation(
+            async (_name, updater) => updater(previous),
+        );
+
+        await enableDailyAutopost('MiniRacer');
+        const withHistory = mockAutopostStore.upsertDailyAutopostSubscription.mock.calls[0][1];
+        expect(withHistory(previous)).toMatchObject({
+            enabled: true,
+            enabledAt: previous.enabledAt,
+            lastPostedChallengeId: null,
+            lastPostedAt: null,
+            lastPostUrl: null,
+        });
+
+        const fresh = withHistory(null);
+        expect(fresh.enabledAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(fresh.lastPostedChallengeId).toBeNull();
+    });
+
+    it('passes preferredPostUrl when the subscription matches the challenge', async () => {
+        mockAutopostStore.readDailyAutopostSubscription.mockResolvedValue({
+            lastPostedChallengeId: challenge.id,
+            lastPostUrl: 'https://reddit.com/preferred',
+        });
+        mockShare.resolveDailyGpPostRecord.mockResolvedValue({
+            postUrl: 'https://reddit.com/preferred',
+            createdAt: '2026-07-16T00:05:00.000Z',
+        });
+        mockShare.ensureDailyGpScoreThread.mockResolvedValue({
+            postUrl: 'https://reddit.com/preferred',
+            createdAt: '2026-07-16T00:05:00.000Z',
+        });
+
+        await ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge);
+
+        expect(mockShare.resolveDailyGpPostRecord).toHaveBeenCalledWith({
+            subredditName: 'MiniRacer',
+            challengeId: challenge.id,
+            appSlug: 'mini-racer',
+            preferredPostUrl: 'https://reddit.com/preferred',
+        });
+    });
+
+    it('preserves lastPostedAt when reusing the same challenge', async () => {
+        const existing = {
+            postUrl: 'https://reddit.com/existing',
+            createdAt: '2026-07-16T00:05:00.000Z',
+        };
+        const previous = {
+            subredditName: 'MiniRacer',
+            enabled: true,
+            enabledAt: '2026-07-15T00:00:00.000Z',
+            updatedAt: 'old',
+            lastPostedChallengeId: challenge.id,
+            lastPostedAt: '2026-07-16T00:10:00.000Z',
+            lastPostUrl: 'https://reddit.com/existing',
+        };
+        mockShare.resolveDailyGpPostRecord.mockResolvedValue(existing);
+        mockShare.ensureDailyGpScoreThread.mockResolvedValue(existing);
+        mockAutopostStore.upsertDailyAutopostSubscription.mockImplementation(
+            async (_name, updater) => updater(previous),
+        );
+
+        await ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge);
+        const updater = mockAutopostStore.upsertDailyAutopostSubscription.mock.calls[0][1];
+        expect(updater(previous)).toMatchObject({
+            enabled: true,
+            enabledAt: previous.enabledAt,
+            lastPostedChallengeId: challenge.id,
+            lastPostedAt: previous.lastPostedAt,
+            lastPostUrl: existing.postUrl,
+        });
+    });
+
+    it('rejects Reddit posts without t3_ ids or string urls', async () => {
+        const invalidPosts = [
+            { id: 'not-a-post', url: 'https://reddit.com/daily' },
+            { id: 't3_daily', url: 42 },
+            { id: 't3_daily' },
+        ];
+        for (const post of invalidPosts) {
+            mockReddit.submitCustomPost.mockResolvedValue(post);
+            await expect(
+                ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge),
+            ).rejects.toThrow('did not return the daily post identity');
+        }
+        expect(mockShare.registerDailyGpPostWithScoreThread).not.toHaveBeenCalled();
+    });
+
     it('returns null sharing context when the request has no subreddit', async () => {
         mockContext.readContextSubredditName.mockReturnValue(null);
         await expect(getDailyGpShareRequestContext()).resolves.toEqual({

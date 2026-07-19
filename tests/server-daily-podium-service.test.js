@@ -32,9 +32,11 @@ const {
     enableDailyPodiumAutopost,
     ensureDailyMiniRacerPodiumPostForSubreddit,
     formatDailyMiniRacerPodiumTextFallback,
+    formatDailyMiniRacerPodiumTitle,
     getDailyGpPodiumPublicationDeadline,
     isDailyGpPodiumPublicationOpen,
     isRedditAvatarUrl,
+    resolveRedditAvatarUrl,
     sanitizeDailyGpPodiumForPost,
 } = await import('../src/server/daily-podium-service.ts');
 
@@ -385,6 +387,191 @@ describe('daily podium post workflow', () => {
         });
     });
 
+    it('formats titles and fallback text with anchored challenge dates', () => {
+        expect(formatDailyMiniRacerPodiumTitle(podium)).toBe(
+            'Mini Racer Podium, 10 Jul: Circuit ProMax',
+        );
+        expect(formatDailyMiniRacerPodiumTitle({
+            ...podium,
+            challengeDate: '2026-13-40',
+        })).toBe('Mini Racer Podium, 2026-13-40: Circuit ProMax');
+        expect(formatDailyMiniRacerPodiumTitle({
+            ...podium,
+            challengeDate: '2026-07-10-extra',
+        })).toBe('Mini Racer Podium, 2026-07-10-extra: Circuit ProMax');
+
+        const sanitized = sanitizeDailyGpPodiumForPost(podium);
+        const fallback = formatDailyMiniRacerPodiumTextFallback(sanitized);
+        expect(fallback).toContain('Date: 10 Jul 2026');
+        expect(fallback).toContain('1. Gold - RaceFan - 18.42s');
+        expect(fallback).toContain('2. Silver - Turbo Otter 42 - 18.76s');
+    });
+
+    it('strips u/ prefixes for reddit podium names in fallback text', () => {
+        const redditPodium = structuredClone(podium);
+        redditPodium.positions[0].displayName = 'u/RaceFan';
+        const fallback = formatDailyMiniRacerPodiumTextFallback(
+            sanitizeDailyGpPodiumForPost(redditPodium),
+        );
+        expect(fallback).toContain('1. Gold - RaceFan - 18.42s');
+        expect(fallback).not.toContain('u/RaceFan');
+    });
+
+    it('sanitizes whitespace-only and unsupported identity types', () => {
+        const invalid = structuredClone(podium);
+        invalid.positions[0] = {
+            rank: 1,
+            displayName: '   ',
+            identityType: 'reddit',
+            formattedTime: '18.42s',
+        };
+        invalid.positions[1] = {
+            rank: 2,
+            displayName: 'Ghost',
+            identityType: 'guest',
+            formattedTime: '18.76s',
+        };
+        const sanitized = sanitizeDailyGpPodiumForPost(invalid);
+        expect(sanitized.positions[0].displayName).toBe('No verified finish');
+        expect(sanitized.positions[1].displayName).toBe('No verified finish');
+    });
+
+    it('accepts only https Reddit-hosted avatar URLs on approved hostnames', () => {
+        expect(isRedditAvatarUrl('https://styles.redditmedia.com/avatar.png')).toBe(true);
+        expect(isRedditAvatarUrl('https://preview.redd.it/avatar.png')).toBe(true);
+        expect(isRedditAvatarUrl('https://i.redd.it/avatar.png')).toBe(true);
+        expect(isRedditAvatarUrl('https://www.redditstatic.com/avatar.png')).toBe(true);
+        expect(isRedditAvatarUrl('http://styles.redditmedia.com/avatar.png')).toBe(false);
+        expect(isRedditAvatarUrl('https://evil-redd.it/avatar.png')).toBe(false);
+        expect(isRedditAvatarUrl('https://notreddit.com/avatar.png')).toBe(false);
+        expect(isRedditAvatarUrl('javascript:alert(1)')).toBe(false);
+        expect(isRedditAvatarUrl(null)).toBe(false);
+        expect(isRedditAvatarUrl(42)).toBe(false);
+    });
+
+    it('resolves avatars only for reddit identities with approved urls', async () => {
+        mockReddit.getSnoovatarUrl.mockResolvedValue('https://i.redd.it/avatar.png');
+        await expect(resolveRedditAvatarUrl('u/RaceFan')).resolves.toBe(
+            'https://i.redd.it/avatar.png',
+        );
+        expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
+
+        mockReddit.getSnoovatarUrl.mockResolvedValue('https://evil.com/avatar.png');
+        await expect(resolveRedditAvatarUrl('RaceFan')).resolves.toBeNull();
+    });
+
+    it('enables podium automation with a fresh enabledAt when no history exists', async () => {
+        await enableDailyPodiumAutopost('MiniRacer');
+        const updater = mockAutopostStore.upsertDailyPodiumAutopostSubscription.mock.calls[0][1];
+        const created = updater(null);
+        expect(created.enabled).toBe(true);
+        expect(created.enabledAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(created.lastPostedChallengeId).toBeNull();
+        expect(created.lastPostUrl).toBeNull();
+    });
+
+    it('discards a pending snapshot when its expiration no longer matches the deadline', async () => {
+        mockPostStore.readDailyGpPodiumPendingSnapshot.mockResolvedValue({
+            subredditName: 'MiniRacer',
+            challengeId: podium.challengeId,
+            expiresAt: '2026-07-17T05:00:00.000Z',
+            podium: sanitizeDailyGpPodiumForPost(podium),
+        });
+
+        await ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium);
+
+        expect(mockPostStore.deleteDailyGpPodiumPendingSnapshot).toHaveBeenCalledWith(
+            'MiniRacer',
+            podium.challengeId,
+        );
+        expect(mockPostStore.writeDailyGpPodiumPendingSnapshot).toHaveBeenCalledWith(
+            expect.objectContaining({ expiresAt: '2026-07-17T06:00:00.000Z' }),
+        );
+    });
+
+    it('prefers the subscription post url when recovering a canonical podium', async () => {
+        const preferred = {
+            id: 't3_preferred',
+            url: 'https://reddit.com/preferred-podium',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({
+                postType: 'daily-podium',
+                challengeId: podium.challengeId,
+            })),
+        };
+        const alternate = {
+            id: 't3_alternate',
+            url: 'https://reddit.com/alternate-podium',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({
+                postType: 'daily-podium',
+                challengeId: podium.challengeId,
+            })),
+        };
+        mockAutopostStore.readDailyPodiumAutopostSubscription.mockResolvedValue({
+            lastPostedChallengeId: podium.challengeId,
+            lastPostUrl: preferred.url,
+        });
+        mockReddit.getPostsByUser.mockReturnValue({
+            all: vi.fn(async () => [alternate, preferred]),
+        });
+
+        await expect(
+            ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
+        ).resolves.toEqual({
+            created: false,
+            postUrl: preferred.url,
+        });
+        expect(mockPostStore.writeDailyGpPodiumPostRecordIfAbsent).toHaveBeenCalledWith(
+            expect.objectContaining({ postId: preferred.id }),
+        );
+    });
+
+    it('ignores recovered posts with invalid ids or urls', async () => {
+        const invalid = {
+            id: 'invalid',
+            url: '',
+            subredditName: 'MiniRacer',
+            getPostData: vi.fn(async () => ({
+                postType: 'daily-podium',
+                challengeId: podium.challengeId,
+            })),
+        };
+        mockReddit.getPostsByUser.mockReturnValue({
+            all: vi.fn(async () => [invalid]),
+        });
+
+        await expect(
+            ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
+        ).resolves.toEqual({
+            created: true,
+            postUrl: 'https://reddit.com/podium',
+        });
+        expect(mockReddit.submitCustomPost).toHaveBeenCalled();
+    });
+
+    it('matches recovered posts using normalized subreddit names', async () => {
+        const recovered = {
+            id: 't3_recovered',
+            url: 'https://reddit.com/recovered-podium',
+            subredditName: '  MINIRACER  ',
+            getPostData: vi.fn(async () => ({
+                postType: 'daily-podium',
+                challengeId: podium.challengeId,
+            })),
+        };
+        mockReddit.getPostsByUser.mockReturnValue({
+            all: vi.fn(async () => [recovered]),
+        });
+
+        await expect(
+            ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
+        ).resolves.toEqual({
+            created: false,
+            postUrl: recovered.url,
+        });
+    });
+
     it('opens the publication window only after day seven and before the six-hour deadline', () => {
         const deadline = getDailyGpPodiumPublicationDeadline(podium);
         expect(deadline?.toISOString()).toBe('2026-07-17T06:00:00.000Z');
@@ -404,14 +591,10 @@ describe('daily podium post workflow', () => {
             ...podium,
             challengeDate: 'not-a-date',
         })).toBeNull();
-    });
-
-    it('accepts only https Reddit-hosted avatar URLs', () => {
-        expect(isRedditAvatarUrl('https://styles.redditmedia.com/avatar.png')).toBe(true);
-        expect(isRedditAvatarUrl('https://preview.redd.it/avatar.png')).toBe(true);
-        expect(isRedditAvatarUrl('http://styles.redditmedia.com/avatar.png')).toBe(false);
-        expect(isRedditAvatarUrl('javascript:alert(1)')).toBe(false);
-        expect(isRedditAvatarUrl(null)).toBe(false);
+        expect(getDailyGpPodiumPublicationDeadline({
+            ...podium,
+            challengeDate: '2026-00-00',
+        })).toBeNull();
     });
 
     it('requires the app slug before creating a podium post', async () => {
