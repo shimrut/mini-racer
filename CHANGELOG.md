@@ -1,5 +1,6 @@
 # Changelog
 
+- Added `tests/result-flow-verification-mutation-kills.test.js` with boundary assertions for combined-rank formatting, verification rank labels, modal payload guards, daily-gp expiry regex anchors, and verification-queue expiry/stage normalization.
 - Added `tests/store-share-mutation-kills.test.js` and expanded `tests/server-daily-gp-share-wave2.test.js` with boundary assertions for Daily GP store parsers, snapshot pagination, submission improvement guards, share-preview key prefixes, subreddit mismatch confirm guards, historical post recovery filters, and rate-limit expiry fallbacks.
 - Added wave-3 mutation tests for `simulation.js` (exported contact helpers, thrust/downforce/slip/scrape gates, event reset) and `daily-challenge/service.js` (mock URL params, cache trim, snapshot inflight cleanup, prefetch dedupe).
 - Expanded the Stryker mutate set with Redis lock/compression, daily and podium post stores/services, autopost stores, history backfill, and leaderboard-identity helpers.
