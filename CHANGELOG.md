@@ -1,5 +1,6 @@
 # Changelog
 
+- Added wave-4 mutation-kill tests for `daily-challenge/service.js`, `daily-gp-store.ts`, `daily-gp-share.ts`, and `simulation.js` covering preview-page detection, playlist expiry >1s filtering, stored-result mismatch guards, community-total caps, submission rate-limit retry windows, nearby-row pagination boundaries, share confirm casing/idempotency paths, contact-epsilon ties, slip-gate activation, max-speed thrust cutoff, and checkpoint/finish gating.
 - Expanded autopost-store and leaderboard-identity mutation tests with non-empty string field guards, enabled defaults, FNV hash fixture assertions, and u/ prefix sanitization edges.
 - Added mutation-kill tests for `daily-podium-service.ts`, `daily-post-service.ts`, `daily-gp-post-store.ts`, and `daily-podium-post-store.ts` covering typeof/string field guards, regex date anchors, publication-window boundaries, Reddit avatar hostname checks, `t3_` post-id prefixes, `createdAt`/`updatedAt` epoch fallbacks, pending-snapshot expiration comparisons, autopost updater fallbacks, and recovery preferred-url selection.
 - Added wave-4 simulation mutation tests for contact-normal flips, scrape severity/suppression, collision-hash cell queries, reverse braking, and skid/history gates.
