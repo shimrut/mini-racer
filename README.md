@@ -90,9 +90,6 @@ Tips:
 - Leaderboard times show full **milliseconds**
 - When a track’s week ends, a **podium** post shows the top three racers — with avatars — and a **Play Now** button for today’s race
 - New tracks in the rotation (**Number Zero** through **Number Six**)
-- Finish screen shows **Submitting… / Verifying…** while your time ranks, plus a clear message if it can’t
-- Runs longer than about **50 seconds** can’t be ranked
-- Lobby appears as soon as the game is ready
 
 ### 1.2
 
