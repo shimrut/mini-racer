@@ -78,6 +78,8 @@ Improve again after Rank finishes verifying — the ghost usually shows up on a 
 
 Standings save and ghost save can succeed separately. Your time can stick even when the ghost copy didn’t. Try another Improve after verification completes, and confirm Personal Best Ghost is On.
 
+If the time was verified before a ghost-recording fix shipped, that day’s stored copy may still have no ghost — set a new better verified time to store one.
+
 ### There’s no ghost and no notice
 
 Either you don’t have a verified best on that track yet, or Personal Best Ghost is Off in Settings. That’s normal — no warning is shown.

@@ -148,20 +148,46 @@ export function createPbGhostTraceRecorder(initialPose: {
     return {
         sample(pose: typeof initialPose): void {
             if (overflowed || pose.timeSec + Number.EPSILON < nextSampleTimeSec) return;
-            appendPose(pose);
+            // Compact traces reconstruct regular times as index * 50ms. Stamp the due
+            // grid time so sample count matches decode/validation, not raw 1/60 sim time.
+            appendPose({
+                timeSec: nextSampleTimeSec,
+                position: pose.position,
+                angle: pose.angle,
+            });
             while (nextSampleTimeSec <= pose.timeSec + Number.EPSILON) {
                 nextSampleTimeSec += sampleIntervalSec;
             }
         },
         finish(pose: typeof initialPose): PbGhostTrace | null {
             appendPose(pose, true);
-            const originPose = poses[0];
-            const finalPose = poses.at(-1);
-            if (overflowed || !originPose || !finalPose || poses.length < 2) return null;
+            if (overflowed || poses.length < 2) return null;
+            const finishPose = poses.at(-1);
+            if (!finishPose) return null;
+            const finishTimeMs = finishPose.timeMs;
+            if (!Number.isSafeInteger(finishTimeMs) || finishTimeMs <= 0) return null;
+
+            // Format requires: (n-2)*50 < finishTimeMs <= (n-1)*50
+            const requiredCount = Math.ceil(finishTimeMs / PB_GHOST_SAMPLE_INTERVAL_MS) + 1;
+            if (requiredCount < 2 || requiredCount > PB_GHOST_MAX_SAMPLES) return null;
+
+            const regularPoses = poses.slice(0, -1);
+            while (regularPoses.length + 1 < requiredCount) {
+                const padSource = regularPoses.at(-1);
+                if (!padSource) return null;
+                regularPoses.push({ ...padSource });
+            }
+            if (regularPoses.length + 1 > requiredCount) {
+                regularPoses.length = requiredCount - 1;
+            }
+            if (regularPoses.length < 1) return null;
+
+            const alignedPoses = [...regularPoses, finishPose];
+            const originPose = alignedPoses[0];
             const deltas: number[] = [];
             let previous = originPose;
-            for (let index = 1; index < poses.length; index += 1) {
-                const current = poses[index];
+            for (let index = 1; index < alignedPoses.length; index += 1) {
+                const current = alignedPoses[index];
                 deltas.push(
                     current.xCm - previous.xCm,
                     current.yCm - previous.yCm,
@@ -172,7 +198,7 @@ export function createPbGhostTraceRecorder(initialPose: {
             const trace: PbGhostTrace = {
                 schemaVersion: PB_GHOST_SCHEMA_VERSION,
                 sampleIntervalMs: PB_GHOST_SAMPLE_INTERVAL_MS,
-                finishTimeMs: finalPose.timeMs,
+                finishTimeMs,
                 origin: [originPose.xCm, originPose.yCm, originPose.angleMilli],
                 deltas,
             };
