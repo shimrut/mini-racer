@@ -194,6 +194,47 @@ describe('ui race hud helpers', () => {
         expect(lapFlash.classList.add).toHaveBeenCalledWith('is-loss');
     });
 
+    it('colors ±0.01 checkpoint deltas as gain/loss, not warning amber', () => {
+        const makeFlash = () => {
+            const lapFlash = { classList: { add: vi.fn(), remove: vi.fn() } };
+            const lapFlashLabel = { textContent: '' };
+            const lapFlashTime = { textContent: '' };
+            const lapFlashDelta = {
+                hidden: true,
+                textContent: '',
+                classList: { add: vi.fn(), remove: vi.fn() }
+            };
+            vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+                'lap-flash': lapFlash,
+                'lap-flash-label': lapFlashLabel,
+                'lap-flash-time': lapFlashTime,
+                'lap-flash-delta': lapFlashDelta
+            }[id] || null));
+            return { hud: new RaceHud(), lapFlash, lapFlashDelta };
+        };
+
+        const gain = makeFlash();
+        gain.hud.showCheckpointFlash({
+            checkpointNumber: 1,
+            splitTimeSec: 4.2,
+            deltaVsBest: -0.01
+        });
+        expect(gain.lapFlashDelta.textContent).toBe('-0.01s');
+        expect(gain.lapFlash.classList.add).toHaveBeenCalledWith('is-gain');
+        expect(gain.lapFlash.classList.add).not.toHaveBeenCalledWith('is-warning');
+
+        vi.restoreAllMocks();
+        const loss = makeFlash();
+        loss.hud.showCheckpointFlash({
+            checkpointNumber: 1,
+            splitTimeSec: 4.2,
+            deltaVsBest: 0.01
+        });
+        expect(loss.lapFlashDelta.textContent).toBe('+0.01s');
+        expect(loss.lapFlash.classList.add).toHaveBeenCalledWith('is-loss');
+        expect(loss.lapFlash.classList.add).not.toHaveBeenCalledWith('is-warning');
+    });
+
     it('shows a compact ghost-unavailable notice for two seconds', () => {
         vi.useFakeTimers();
         const lapFlash = { classList: { add: vi.fn(), remove: vi.fn() } };
