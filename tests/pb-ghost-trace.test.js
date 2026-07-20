@@ -75,6 +75,65 @@ describe('pb-ghost-trace validation and recording edges', () => {
         }))).toBe(false);
     });
 
+    it('keeps valid traces when recording at 1/60 sim steps (grid snap + count reconcile)', () => {
+        const fixedDt = 1 / 60;
+        for (let frames = 120; frames <= 1800; frames += 1) {
+            const recorder = createPbGhostTraceRecorder({
+                timeSec: 0,
+                position: { x: 0, y: 0 },
+                angle: 0,
+            });
+            let timeSec = 0;
+            for (let frame = 1; frame <= frames; frame += 1) {
+                timeSec += fixedDt;
+                recorder.sample({
+                    timeSec,
+                    position: { x: frame * 0.1, y: frame * 0.05 },
+                    angle: frame * 0.01,
+                });
+            }
+            const trace = recorder.finish({
+                timeSec,
+                position: { x: frames * 0.1, y: frames * 0.05 },
+                angle: frames * 0.01,
+            });
+            expect(trace, `frames=${frames}`).not.toBeNull();
+            expect(isValidPbGhostTrace(trace), `frames=${frames}`).toBe(true);
+            expect(trace.finishTimeMs).toBe(Math.round(timeSec * 1000));
+        }
+    });
+
+    it('records a valid ghost for the prior 121-frame / ~2017ms failure case', () => {
+        const fixedDt = 1 / 60;
+        const frames = 121;
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        let timeSec = 0;
+        for (let frame = 1; frame <= frames; frame += 1) {
+            timeSec += fixedDt;
+            recorder.sample({
+                timeSec,
+                position: { x: frame, y: 0 },
+                angle: 0,
+            });
+        }
+        const trace = recorder.finish({
+            timeSec,
+            position: { x: frames, y: 0 },
+            angle: 0,
+        });
+        expect(Math.round(timeSec * 1000)).toBe(2017);
+        expect(trace).not.toBeNull();
+        expect(isValidPbGhostTrace(trace)).toBe(true);
+        expect(trace.finishTimeMs).toBe(2017);
+        expect(getPbGhostTraceSampleCount(trace)).toBe(
+            Math.ceil(2017 / PB_GHOST_SAMPLE_INTERVAL_MS) + 1,
+        );
+    });
+
     it('reports sample counts only for well-formed delta lengths', () => {
         expect(getPbGhostTraceSampleCount(null)).toBe(0);
         expect(getPbGhostTraceSampleCount({})).toBe(0);
