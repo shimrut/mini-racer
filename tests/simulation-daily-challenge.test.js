@@ -55,7 +55,8 @@ describe('updateSimulation — daily challenge laps', () => {
 
         const events = crossFinishOnce(state);
         expect(events.winTriggered).toBe(true);
-        expect(events.winData.lapTime).toBe(state.currentTime);
+        expect(events.winData.lapTime).toBeLessThan(state.currentTime);
+        expect(events.winData.lapTime).toBeGreaterThan(state.currentTime - 1 / 60);
         expect(events.winData.completedLaps).toBe(1);
         expect(state.status).toBe('won');
     });
@@ -80,7 +81,7 @@ describe('updateSimulation — daily challenge laps', () => {
         const tAfterFirst = state.currentTime;
         const second = crossFinishOnce(state);
         expect(second.winTriggered).toBe(true);
-        expect(second.winData.lapTime).toBe(state.currentTime);
+        expect(second.winData.lapTime).toBeLessThan(state.currentTime);
         expect(second.winData.lapTime).toBeGreaterThan(tAfterFirst);
     });
 });

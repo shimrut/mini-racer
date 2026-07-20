@@ -1,9 +1,18 @@
 import { clamp, KPH_PER_WORLD_UNIT } from '../car/handling.js';
-import { getIntersection, segmentsIntersect } from '../track/geometry.js';
+import { getCrossingFraction, getIntersection } from '../track/geometry.js';
 import {
     handleFinishCrossing,
     resolveRunPolicy
 } from './run-policy.js';
+
+/** End-of-step clock is `currentTime`; crossing happened `fraction` through this `dt`. */
+export function crossingTimeSec(currentTime, dt, fraction) {
+    const t = Math.min(1, Math.max(0, Number(fraction)));
+    if (!Number.isFinite(t) || !Number.isFinite(currentTime) || !Number.isFinite(dt)) {
+        return currentTime;
+    }
+    return currentTime - dt + t * dt;
+}
 
 const _nextPos = { x: 0, y: 0 };
 const _events = {
@@ -495,10 +504,6 @@ function getCollisionCandidates(p1, p2, collisionData, collisionExtent) {
     return candidates.length > 0 ? candidates : collisionData.segments;
 }
 
-function checkFinishLine(p1, p2, startLine) {
-    return segmentsIntersect(p1, p2, startLine.p1, startLine.p2);
-}
-
 const SKID_MARK_MIN_SLIP_RATIO = 0.28;
 const SKID_MARK_MIN_SPEED = 2.5;
 
@@ -685,24 +690,38 @@ export function updateSimulation(
             const checkpoints = currentTrack.checkpoints || [];
             if (state.nextCheckpointIndex < checkpoints.length) {
                 const cp = checkpoints[state.nextCheckpointIndex];
-                if (segmentsIntersect(state.pos, _nextPos, cp.p1, cp.p2)) {
+                const checkpointFraction = getCrossingFraction(state.pos, _nextPos, cp.p1, cp.p2);
+                if (checkpointFraction !== null) {
                     if (!Array.isArray(state.lapCheckpointTimesSec)) {
                         state.lapCheckpointTimesSec = [];
                     }
-                    state.lapCheckpointTimesSec.push(state.currentTime);
+                    const splitTimeSec = crossingTimeSec(state.currentTime, dt, checkpointFraction);
+                    state.lapCheckpointTimesSec.push(splitTimeSec);
                     state.nextCheckpointIndex++;
                     _events.checkpointPassed = {
                         index: state.lapCheckpointTimesSec.length - 1,
-                        splitTimeSec: state.currentTime
+                        splitTimeSec
                     };
                 }
             }
 
-            const crossedFinish = checkFinishLine(state.pos, _nextPos, currentTrack.startLine);
+            const finishFraction = currentTrack.startLine
+                ? getCrossingFraction(
+                    state.pos,
+                    _nextPos,
+                    currentTrack.startLine.p1,
+                    currentTrack.startLine.p2
+                )
+                : null;
+            const crossedFinish = finishFraction !== null;
             const allPassed = checkpoints.length === 0 || state.nextCheckpointIndex >= checkpoints.length;
             if (crossedFinish) {
                 if (allPassed && state.currentTime >= 2.0) {
-                    Object.assign(_events, handleFinishCrossing(state, runPolicy, checkpoints.length));
+                    const finishTimeSec = crossingTimeSec(state.currentTime, dt, finishFraction);
+                    Object.assign(
+                        _events,
+                        handleFinishCrossing(state, runPolicy, checkpoints.length, finishTimeSec)
+                    );
                 }
                 state.nextCheckpointIndex = 0;
             }

@@ -1,11 +1,12 @@
 function createWinData(state, checkpointCount, extra = {}) {
+    const { lapTime: lapTimeOverride, ...rest } = extra;
     return Object.freeze({
-        lapTime: state.currentTime,
+        lapTime: Number.isFinite(lapTimeOverride) ? lapTimeOverride : state.currentTime,
         trackKey: state.currentTrackKey,
         runId: state.activeRunId,
         checkpointCount,
         completedCheckpointCount: state.nextCheckpointIndex,
-        ...extra
+        ...rest
     });
 }
 
@@ -26,13 +27,14 @@ export function resolveRunPolicy(state) {
     });
 }
 
-export function handleFinishCrossing(state, policy, checkpointCount) {
+export function handleFinishCrossing(state, policy, checkpointCount, crossingTimeSec) {
     const challengeRun = state.currentChallengeRun || null;
+    const finishTime = Number.isFinite(crossingTimeSec) ? crossingTimeSec : state.currentTime;
 
-    const completedLapTime = state.currentTime - (Number.isFinite(challengeRun?.lastLapAt) ? challengeRun.lastLapAt : 0);
+    const completedLapTime = finishTime - (Number.isFinite(challengeRun?.lastLapAt) ? challengeRun.lastLapAt : 0);
 
     if (challengeRun) {
-        challengeRun.lastLapAt = state.currentTime;
+        challengeRun.lastLapAt = finishTime;
         challengeRun.completedLaps = (challengeRun.completedLaps || 0) + 1;
     }
 
@@ -45,6 +47,7 @@ export function handleFinishCrossing(state, policy, checkpointCount) {
         state.status = 'won';
         result.winTriggered = true;
         result.winData = createWinData(state, checkpointCount, {
+            lapTime: finishTime,
             completedLaps: challengeRun?.completedLaps || 1,
         });
     }

@@ -64,10 +64,11 @@ describe('updateSimulation — checkpoints and finish', () => {
 
         expect(events.checkpointPassed).toEqual({
             index: 0,
-            splitTimeSec: state.currentTime
+            splitTimeSec: 1.265
         });
         expect(state.lapCheckpointTimesSec).toHaveLength(1);
-        expect(state.lapCheckpointTimesSec[0]).toBe(state.currentTime);
+        expect(state.lapCheckpointTimesSec[0]).toBe(1.265);
+        expect(state.lapCheckpointTimesSec[0]).toBeLessThan(state.currentTime);
         expect(state.nextCheckpointIndex).toBe(1);
         expect(events.winTriggered).toBe(false);
         expect(state.pos.y).toBeLessThan(0);
@@ -1075,7 +1076,7 @@ describe('updateSimulation — checkpoint and collision-hash branches', () => {
         expect(state.lapCheckpointTimesSec).toHaveLength(1);
         expect(events.checkpointPassed).toEqual({
             index: 0,
-            splitTimeSec: state.currentTime
+            splitTimeSec: 1.265
         });
     });
 
@@ -2187,7 +2188,7 @@ describe('updateSimulation — collision-hash and lifecycle precision', () => {
 
         expect(activeSnapshot.checkpointPassed).toEqual({
             index: 0,
-            splitTimeSec: state.currentTime - 0.05
+            splitTimeSec: 1.265
         });
         expect(idle).toEqual({
             winTriggered: false,

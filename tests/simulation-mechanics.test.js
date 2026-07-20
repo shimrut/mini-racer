@@ -210,7 +210,8 @@ describe('updateSimulation mechanics', () => {
         expect(passedCheckpointState.nextCheckpointIndex).toBe(0);
         expect(passedCheckpointState.lapCheckpointTimesSec).toHaveLength(1);
         expect(passedCheckpointState.lapCheckpointTimesSec[0]).toBeGreaterThan(2);
-        expect(passedCheckpointState.lapCheckpointTimesSec[0]).toBeLessThan(2.1);
+        expect(passedCheckpointState.lapCheckpointTimesSec[0]).toBeLessThan(passedCheckpointState.currentTime);
+        expect(completed.winData.lapTime).toBeLessThan(passedCheckpointState.currentTime);
     });
 
     it('allows a finish exactly at the two-second eligibility boundary', () => {

@@ -26,6 +26,15 @@ export function segmentsIntersect(A, B, C, D) {
     return segmentIntersectionParams(A, B, C, D) !== null;
 }
 
+/** Path fraction along A→B where A→B crosses C→D, clamped to [0, 1]; null if no hit. */
+export function getCrossingFraction(A, B, C, D) {
+    const params = segmentIntersectionParams(A, B, C, D);
+    if (!params) return null;
+    if (params.t <= 0) return 0;
+    if (params.t >= 1) return 1;
+    return params.t;
+}
+
 export function getIntersection(A, B, C, D) {
     const params = segmentIntersectionParams(A, B, C, D);
     if (!params) return null;

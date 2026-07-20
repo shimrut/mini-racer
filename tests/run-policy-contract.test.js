@@ -84,6 +84,35 @@ describe('run-policy contracts', () => {
         expect(state.status).toBe('won');
     });
 
+    it('records interpolated crossing time for win and lap deltas', () => {
+        const challengeRun = {
+            objectiveType: 'multi_lap_total',
+            requiredLaps: 2,
+            completedLaps: 0,
+            lastLapAt: 10.1
+        };
+        const policy = createRunPolicy({ challengeRun });
+        const state = createPolicyState({ currentChallengeRun: challengeRun, currentTime: 18 });
+
+        const firstLap = handleFinishCrossing(state, policy, 4, 17.85);
+        expect(firstLap.challengeLapCompleted).toBe(true);
+        expect(firstLap.challengeCompletedLapTime).toBeCloseTo(7.75);
+        expect(firstLap.challengeProgressLaps).toBe(1);
+        expect(firstLap.winTriggered).toBeUndefined();
+        expect(challengeRun.lastLapAt).toBe(17.85);
+        expect(state.status).toBe('playing');
+
+        state.currentTime = 40;
+        const secondLap = handleFinishCrossing(state, policy, 4, 39.42);
+        expect(secondLap.winTriggered).toBe(true);
+        expect(secondLap.winData).toMatchObject({
+            completedLaps: 2,
+            lapTime: 39.42
+        });
+        expect(secondLap.challengeCompletedLapTime).toBeCloseTo(21.57);
+        expect(state.status).toBe('won');
+    });
+
     it('only completes multi-lap daily challenges after the required lap count', () => {
         const challengeRun = {
             objectiveType: 'multi_lap_total',
