@@ -65,6 +65,58 @@ function shortestAngleDeltaMilli(next: number, previous: number): number {
     return delta;
 }
 
+type RawPose = {
+    timeSec: number;
+    position: { x: number; y: number };
+    angle: number;
+};
+
+function isFiniteRawPose(pose: RawPose): boolean {
+    return (
+        Number.isFinite(pose.timeSec)
+        && pose.timeSec >= 0
+        && Number.isFinite(pose.position?.x)
+        && Number.isFinite(pose.position?.y)
+        && Number.isFinite(pose.angle)
+    );
+}
+
+function cloneRawPose(pose: RawPose): RawPose {
+    return {
+        timeSec: pose.timeSec,
+        position: { x: pose.position.x, y: pose.position.y },
+        angle: pose.angle,
+    };
+}
+
+/** Shortest-arc angle delta in radians (matches client ghost playback). */
+function shortestAngleDeltaRad(next: number, previous: number): number {
+    let delta = next - previous;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return delta;
+}
+
+function lerpRawPoseAtTime(last: RawPose, current: RawPose, atTimeSec: number): RawPose {
+    const span = current.timeSec - last.timeSec;
+    if (span <= Number.EPSILON) {
+        return {
+            timeSec: atTimeSec,
+            position: { x: current.position.x, y: current.position.y },
+            angle: current.angle,
+        };
+    }
+    const progress = Math.min(1, Math.max(0, (atTimeSec - last.timeSec) / span));
+    return {
+        timeSec: atTimeSec,
+        position: {
+            x: last.position.x + (current.position.x - last.position.x) * progress,
+            y: last.position.y + (current.position.y - last.position.y) * progress,
+        },
+        angle: last.angle + shortestAngleDeltaRad(current.angle, last.angle) * progress,
+    };
+}
+
 export function getPbGhostTraceSampleCount(trace: Partial<PbGhostTrace> | null | undefined): number {
     if (!Array.isArray(trace?.deltas) || trace.deltas.length % 3 !== 0) return 0;
     return 1 + trace.deltas.length / 3;
@@ -116,8 +168,11 @@ export function createPbGhostTraceRecorder(initialPose: {
     const poses: QuantizedPose[] = [];
     let nextSampleTimeSec = 0;
     let overflowed = false;
+    let lastPose: RawPose = isFiniteRawPose(initialPose)
+        ? cloneRawPose(initialPose)
+        : { timeSec: 0, position: { x: 0, y: 0 }, angle: 0 };
 
-    function appendPose(pose: typeof initialPose, exact = false): void {
+    function appendPose(pose: RawPose, exact = false): void {
         if (overflowed) return;
         const sample = quantizePose(pose.timeSec, pose.position, pose.angle);
         if (!sample) return;
@@ -146,20 +201,22 @@ export function createPbGhostTraceRecorder(initialPose: {
     nextSampleTimeSec = sampleIntervalSec;
 
     return {
-        sample(pose: typeof initialPose): void {
-            if (overflowed || pose.timeSec + Number.EPSILON < nextSampleTimeSec) return;
-            // Compact traces reconstruct regular times as index * 50ms. Stamp the due
-            // grid time so sample count matches decode/validation, not raw 1/60 sim time.
-            appendPose({
-                timeSec: nextSampleTimeSec,
-                position: pose.position,
-                angle: pose.angle,
-            });
-            while (nextSampleTimeSec <= pose.timeSec + Number.EPSILON) {
+        sample(pose: RawPose): void {
+            if (overflowed) return;
+            // Reject bad poses without moving lastPose so the next valid frame can still lerp.
+            if (!isFiniteRawPose(pose)) return;
+
+            // Compact traces reconstruct regular times as index * 50ms. Stamp the due grid
+            // time, but lerp position/angle from the previous 60Hz pose so playback does not
+            // sit up to one physics frame ahead when the clocks drift.
+            while (pose.timeSec + Number.EPSILON >= nextSampleTimeSec) {
+                appendPose(lerpRawPoseAtTime(lastPose, pose, nextSampleTimeSec));
                 nextSampleTimeSec += sampleIntervalSec;
+                if (overflowed) break;
             }
+            lastPose = cloneRawPose(pose);
         },
-        finish(pose: typeof initialPose): PbGhostTrace | null {
+        finish(pose: RawPose): PbGhostTrace | null {
             appendPose(pose, true);
             if (overflowed || poses.length < 2) return null;
             const finishPose = poses.at(-1);

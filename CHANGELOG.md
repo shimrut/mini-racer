@@ -1,5 +1,6 @@
 # Changelog
 
+- Mid-lap PB ghost samples now blend position and angle to each 50ms grid mark between 60Hz poses, so playback no longer sits up to one physics frame ahead when the clocks drift. Finish-sample residual lead is unchanged.
 - Checkpoint/lap ±0.01 deltas use normal green/red flash colors again; amber `is-warning` is reserved for notices like GHOST UNAVAILABLE.
 - Finish and checkpoint times now interpolate within the 1/60s physics step at the line crossing, so leaderboard milliseconds are no longer stuck ending only in 0, 3, or 7.
 - Fixed verified personal-best ghosts sometimes saving as missing: ghost recording now stamps samples on the compact 50ms grid and reconciles sample count at finish so Rank can keep the time and the ghost together.
