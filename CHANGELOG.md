@@ -1,5 +1,6 @@
 # Changelog
 
+- Mid-lap PB ghost samples now blend position and angle to each 50ms grid mark between 60Hz poses, so playback no longer sits up to one physics frame ahead when the clocks drift. Finish-sample residual lead is unchanged.
 - Fixed verified personal-best ghosts sometimes saving as missing: ghost recording now stamps samples on the compact 50ms grid and reconciles sample count at finish so Rank can keep the time and the ghost together.
 - Hardened leaderboard-identity and daily-gp-model mutation tests with full name-catalog snapshots, exact constructed-name fixtures, and pinned TTL/window constant values after `ignoreStatic` exposed hybrid static survivors.
 - Added Number Zero through Number Six tracks (definitions, catalog/registry wiring, share images) and updated track runtime integrity expectations plus the full registry fingerprint.

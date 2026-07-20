@@ -134,6 +134,224 @@ describe('pb-ghost-trace validation and recording edges', () => {
         );
     });
 
+    function reconstructRegularSamples(trace) {
+        const samples = [{
+            timeMs: 0,
+            xCm: trace.origin[0],
+            yCm: trace.origin[1],
+            angleMilli: trace.origin[2],
+        }];
+        let xCm = trace.origin[0];
+        let yCm = trace.origin[1];
+        let angleMilli = trace.origin[2];
+        for (let offset = 0; offset < trace.deltas.length; offset += 3) {
+            xCm += trace.deltas[offset];
+            yCm += trace.deltas[offset + 1];
+            angleMilli += trace.deltas[offset + 2];
+            const index = 1 + offset / 3;
+            const isFinish = index === trace.deltas.length / 3;
+            samples.push({
+                timeMs: isFinish ? trace.finishTimeMs : index * PB_GHOST_SAMPLE_INTERVAL_MS,
+                xCm,
+                yCm,
+                angleMilli,
+            });
+        }
+        return samples;
+    }
+
+    it('lerps late 60Hz poses back to the due 50ms grid instead of stamping the late frame', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.03333333333333333,
+            position: { x: 1, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.06666666666666667,
+            position: { x: 3, y: 0 },
+            angle: 0,
+        });
+        const trace = recorder.finish({
+            timeSec: 0.06666666666666667,
+            position: { x: 3, y: 0 },
+            angle: 0,
+        });
+        expect(trace).not.toBeNull();
+        // progress at 50ms between 33.3ms (x=1) and 66.7ms (x=3):
+        // (0.05 - 1/30) / (1/15) = 0.5 → x = 2
+        expect(trace.origin).toEqual([0, 0, 0]);
+        expect(trace.deltas[0]).toBe(200);
+        expect(trace.deltas[1]).toBe(0);
+        expect(trace.deltas.slice(0, 3)).not.toEqual([300, 0, 0]);
+    });
+
+    it('uses the prior 60Hz pose for the first grid sample, not a lerp from t=0 across 50ms', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 1 / 60,
+            position: { x: 0.1, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 2 / 60,
+            position: { x: 0.3, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 3 / 60,
+            position: { x: 0.6, y: 0 },
+            angle: 0,
+        });
+        const trace = recorder.finish({
+            timeSec: 3 / 60,
+            position: { x: 0.6, y: 0 },
+            angle: 0,
+        });
+        expect(trace).not.toBeNull();
+        // 3/60 === 0.05 exactly → on-grid hit uses current pose x=0.6 → 60cm
+        expect(trace.deltas[0]).toBe(60);
+    });
+
+    it('handles duplicate timestamps without NaN and still finishes a valid trace', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: 0,
+        });
+        const trace = recorder.finish({
+            timeSec: 0.05,
+            position: { x: 1, y: 0 },
+            angle: 0,
+        });
+        expect(trace).not.toBeNull();
+        expect(isValidPbGhostTrace(trace)).toBe(true);
+        expect(trace.deltas.every(Number.isSafeInteger)).toBe(true);
+    });
+
+    it('emits one lerped sample per crossed grid time on a multi-interval jump', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        recorder.sample({
+            timeSec: 0.15,
+            position: { x: 3, y: 0 },
+            angle: 0,
+        });
+        const trace = recorder.finish({
+            timeSec: 0.15,
+            position: { x: 3, y: 0 },
+            angle: 0,
+        });
+        expect(trace).not.toBeNull();
+        expect(getPbGhostTraceSampleCount(trace)).toBe(4);
+        const samples = reconstructRegularSamples(trace);
+        expect(samples[1]).toMatchObject({ timeMs: 50, xCm: 100 });
+        expect(samples[2]).toMatchObject({ timeMs: 100, xCm: 200 });
+        expect(samples[3]).toMatchObject({ timeMs: 150, xCm: 300 });
+    });
+
+    it('shortest-arc lerps angle across ±π when sampling onto the grid', () => {
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: Math.PI - 0.1,
+        });
+        recorder.sample({
+            timeSec: 1 / 30,
+            position: { x: 0, y: 0 },
+            angle: Math.PI - 0.1,
+        });
+        recorder.sample({
+            timeSec: 2 / 30,
+            position: { x: 0, y: 0 },
+            angle: -Math.PI + 0.1,
+        });
+        const trace = recorder.finish({
+            timeSec: 2 / 30,
+            position: { x: 0, y: 0 },
+            angle: -Math.PI + 0.1,
+        });
+        expect(trace).not.toBeNull();
+        // Mid-grid at 50ms is halfway on the short arc (+0.1 rad from start).
+        const samples = reconstructRegularSamples(trace);
+        const midAngle = samples[1].angleMilli / 1000;
+        expect(midAngle).toBeCloseTo(Math.PI, 2);
+        expect(Math.abs(trace.deltas[2])).toBeLessThan(500);
+    });
+
+    it('keeps straight-accel ghost lead under one centimetre through the former drift region', () => {
+        const fixedDt = 1 / 60;
+        const accel = 20;
+        let timeSec = 0;
+        let speed = 0;
+        let x = 0;
+        const recorder = createPbGhostTraceRecorder({
+            timeSec: 0,
+            position: { x: 0, y: 0 },
+            angle: 0,
+        });
+        const truth = [{ t: 0, x: 0 }];
+        for (let frame = 1; frame <= 120; frame += 1) {
+            speed += accel * fixedDt;
+            x += speed * fixedDt;
+            timeSec += fixedDt;
+            recorder.sample({
+                timeSec,
+                position: { x, y: 0 },
+                angle: 0,
+            });
+            truth.push({ t: timeSec, x });
+        }
+        const trace = recorder.finish({
+            timeSec,
+            position: { x, y: 0 },
+            angle: 0,
+        });
+        expect(trace).not.toBeNull();
+        const samples = reconstructRegularSamples(trace);
+        const regular = samples.slice(0, -1);
+
+        function truthXAt(t) {
+            for (let i = 1; i < truth.length; i += 1) {
+                if (truth[i].t + 1e-15 >= t) {
+                    const before = truth[i - 1];
+                    const after = truth[i];
+                    const span = after.t - before.t || 1;
+                    return before.x + (after.x - before.x) * ((t - before.t) / span);
+                }
+            }
+            return truth.at(-1).x;
+        }
+
+        let maxLead = 0;
+        for (const sample of regular) {
+            const lead = Math.abs(sample.xCm / 100 - truthXAt(sample.timeMs / 1000));
+            if (lead > maxLead) maxLead = lead;
+        }
+        expect(maxLead).toBeLessThanOrEqual(0.01);
+    });
+
     it('reports sample counts only for well-formed delta lengths', () => {
         expect(getPbGhostTraceSampleCount(null)).toBe(0);
         expect(getPbGhostTraceSampleCount({})).toBe(0);
