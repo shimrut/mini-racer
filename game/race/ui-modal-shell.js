@@ -1655,8 +1655,9 @@ export class ModalShell {
                 });
 
                 if (option?.dayLabel === 'Today') {
+                    button.classList.add('leaderboard-day-chip--today');
                     const dayLabel = document.createElement('span');
-                    dayLabel.className = 'leaderboard-day-chip__day';
+                    dayLabel.className = 'leaderboard-day-chip__label';
                     dayLabel.textContent = 'Today';
                     button.append(dayLabel);
                 } else {
