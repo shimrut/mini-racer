@@ -603,9 +603,11 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     const engine = {
       currentDailyChallenge: { id: "daily-today", trackKey: "circuit" },
       activeDailyChallenge: { id: "daily-today", trackKey: "circuit" },
+      lastPlayedDailyChallenge: { id: "daily-playlist", trackKey: "harborParkLoop" },
       currentChallengeRun: { challengeId: "daily-today", trackKey: "circuit" },
       syncCurrentRunPolicy: vi.fn(),
       setRuntimeConfig: vi.fn(),
+      setDailyChallengeLobbySummary: vi.fn(),
       hud: {
         setHudPrimaryMetric: vi.fn(),
         setHudBestMetric: vi.fn(),
@@ -618,6 +620,65 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
     expect(engine.currentChallengeRun).toBe(null);
     expect(engine.activeDailyChallenge).toBe(null);
+    expect(engine.lastPlayedDailyChallenge).toEqual({
+      id: "daily-playlist",
+      trackKey: "harborParkLoop",
+    });
+    expect(engine.setDailyChallengeLobbySummary).toHaveBeenCalledWith({
+      id: "daily-playlist",
+      trackKey: "harborParkLoop",
+    });
+  });
+
+  it("remembers the last playlist challenge and resumes it from home Start", async () => {
+    const featured = {
+      id: "daily-today",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    const playlistChallenge = {
+      id: "daily-playlist",
+      trackKey: "harborParkLoop",
+      objectiveType: "single_lap_fastest",
+    };
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: featured,
+      activeDailyChallenge: null,
+      lastPlayedDailyChallenge: null,
+      currentTrackKey: "circuit",
+      startOverlay: { hideStartOverlay: vi.fn() },
+      resetCanvasPresentation: vi.fn(),
+      loadTrack: vi.fn(async function loadTrack(trackKey) {
+        this.currentTrackKey = trackKey;
+      }),
+      applyDailyChallenge: vi.fn(),
+      startSequence: vi.fn(),
+      journeys: { startAttempt: vi.fn() },
+    };
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, playlistChallenge, {
+      startSource: "track_modal",
+    });
+
+    expect(engine.lastPlayedDailyChallenge).toBe(playlistChallenge);
+    expect(engine.applyDailyChallenge).toHaveBeenCalledWith(playlistChallenge);
+
+    engine.activeDailyChallenge = null;
+    engine.applyDailyChallenge.mockClear();
+    engine.startSequence.mockClear();
+    engine.loadTrack.mockClear();
+    engine.journeys.startAttempt.mockClear();
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, null, {
+      startSource: "main_menu",
+    });
+
+    expect(engine.applyDailyChallenge).toHaveBeenCalledWith(playlistChallenge);
+    expect(engine.applyDailyChallenge).not.toHaveBeenCalledWith(featured);
+    expect(engine.loadTrack).not.toHaveBeenCalled();
+    expect(engine.startSequence).toHaveBeenCalled();
   });
 
   it("does not enqueue verification when the active track does not match the challenge", () => {

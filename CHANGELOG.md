@@ -1,5 +1,6 @@
 # Changelog
 
+- Home Start resumes the last track raced this session (matching the background map); today's featured daily remains the fallback when nothing has been raced yet or the last map expired.
 - Upgraded the Devvit toolchain to 0.13.9 (faster CLI uploads / playtest).
 - Set mapmaker Line Build brush default to 4u (was 5u).
 - Removed Number Eight from the Daily GP schedule (catalog, registry, definition, and share image).

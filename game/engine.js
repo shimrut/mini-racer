@@ -101,6 +101,8 @@ export class RealTimeRacer {
     this.currentRunPolicy = createRunPolicy();
     this.runtimeConfig = { ...CONFIG };
     this.activeDailyChallenge = null;
+    /** Last challenge raced this page session; home Start prefers this over featured daily. */
+    this.lastPlayedDailyChallenge = null;
     this.currentChallengeRun = null;
     this.trackMedalBeforeLastLapWrite = null;
     this.hasTrackMedalBeforeLastLapWrite = false;

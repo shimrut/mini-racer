@@ -45,6 +45,13 @@ import {
   TRACK_PRESENTATION_SURFACES,
 } from "../track/presentation.js";
 
+function isDailyChallengeStillPlayable(challenge) {
+  if (!challenge || typeof challenge !== "object") return false;
+  const availableUntilMs = Date.parse(challenge.availableUntil || "");
+  if (!Number.isFinite(availableUntilMs)) return true;
+  return Date.now() < availableUntilMs;
+}
+
 function normalizeTrackPersonalBest(record, trackKey = null) {
   if (!record || typeof record !== "object") return null;
   if (trackKey && record.trackKey && record.trackKey !== trackKey) return null;
@@ -785,10 +792,22 @@ export const dailyChallengeEngineMethods = {
     });
     this.hud.setHudBestMetric({ visible: false });
     this.updateDailyChallengeHud();
+    const lobbyChallenge = isDailyChallengeStillPlayable(this.lastPlayedDailyChallenge)
+      ? this.lastPlayedDailyChallenge
+      : this.currentDailyChallenge;
+    if (lobbyChallenge && typeof this.setDailyChallengeLobbySummary === "function") {
+      this.setDailyChallengeLobbySummary(lobbyChallenge);
+    }
   },
 
   async handleStartDailyChallenge(challengeOverride = null, options = {}) {
-    const challenge = challengeOverride || this.currentDailyChallenge || this.activeDailyChallenge;
+    const sessionChallenge = isDailyChallengeStillPlayable(this.lastPlayedDailyChallenge)
+      ? this.lastPlayedDailyChallenge
+      : null;
+    const challenge = challengeOverride
+      || sessionChallenge
+      || this.currentDailyChallenge
+      || this.activeDailyChallenge;
     const replacesCurrentRun = Boolean(challengeOverride) && this.status !== "ready";
     if (
       (this.status !== "ready" && !replacesCurrentRun) ||
@@ -822,6 +841,7 @@ export const dailyChallengeEngineMethods = {
           showStartOverlay: false,
         });
       }
+      this.lastPlayedDailyChallenge = challenge;
       this.activeDailyChallenge = challenge;
       if (challenge.trackKey && challenge.trackKey !== this.currentTrackKey) {
         await this.loadTrack(challenge.trackKey, {
