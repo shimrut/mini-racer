@@ -108,10 +108,10 @@ export const raceEngineMethods = {
   startSequence() {
     if (this.status !== "ready") return;
 
+    this.status = "starting";
     this.carEffectsAudio?.prepareOnUserGesture?.();
     this.medalEffectsAudio?.prepareOnUserGesture?.();
     this.proceduralMusic?.prepareOnUserGesture?.();
-    this.status = "starting";
     this.hud.setHudPersonalBestsOpenAllowed(false);
     this.hud.setPauseVisible(false);
     this.scoreboardReplay.reset();

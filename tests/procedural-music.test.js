@@ -100,4 +100,37 @@ describe('procedural music engine', () => {
         setIntervalSpy.mockRestore();
         clearIntervalSpy.mockRestore();
     });
+
+    it('starts scheduler after resume when context is suspended during play', async () => {
+        const setIntervalSpy = vi
+            .spyOn(globalThis, 'setInterval')
+            .mockReturnValue(456);
+        const clearIntervalSpy = vi
+            .spyOn(globalThis, 'clearInterval')
+            .mockImplementation(() => {});
+        const mockCtx = createMockAudioContext();
+        mockCtx.state = 'suspended';
+        mockCtx.resume = vi.fn(() => {
+            mockCtx.state = 'running';
+            return Promise.resolve();
+        });
+        const music = createProceduralMusic(mockCtx, {});
+
+        // Unlock the graph so syncFrame can run (graphBuilt gate).
+        music.prepareOnUserGesture();
+        await mockCtx.resume.mock.results[0].value;
+        expect(setIntervalSpy).not.toHaveBeenCalled();
+
+        mockCtx.state = 'suspended';
+        music.syncFrame({ status: 'playing', speed: 10, maxSpeedKph: 220 });
+        expect(setIntervalSpy).not.toHaveBeenCalled();
+        expect(mockCtx.resume).toHaveBeenCalled();
+
+        await mockCtx.resume.mock.results[mockCtx.resume.mock.results.length - 1].value;
+        expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+
+        music.stop();
+        setIntervalSpy.mockRestore();
+        clearIntervalSpy.mockRestore();
+    });
 });

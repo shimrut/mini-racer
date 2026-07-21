@@ -456,6 +456,24 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         return Boolean(enabled) && !tabHidden && (status === 'starting' || status === 'playing');
     }
 
+    function ensureSchedulerRunning() {
+        if (!shouldRunScheduler(gameState.status, enabledCache)) return;
+        if (!ctx) return;
+
+        if (ctx.state === 'suspended') {
+            void ctx.resume().then(() => {
+                if (shouldRunScheduler(gameState.status, enabledCache) && !schedulerIntervalId) {
+                    start();
+                }
+            });
+            return;
+        }
+
+        if (!schedulerIntervalId) {
+            start();
+        }
+    }
+
     function updateVolume(time, enabled) {
         if (!musicGain) return;
         const g = musicGain.gain;
@@ -502,9 +520,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             gameState.maxSpeedKph = maxSpeedKph || 220;
 
             if (shouldRunScheduler(status, enabled)) {
-                if (!schedulerIntervalId && ctx.state === 'running') {
-                    start();
-                }
+                ensureSchedulerRunning();
             } else {
                 stop();
             }
@@ -525,8 +541,8 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             tabHidden = Boolean(hidden);
             if (hidden) {
                 stop();
-            } else if (shouldRunScheduler(gameState.status, enabledCache)) {
-                start();
+            } else {
+                ensureSchedulerRunning();
             }
         },
 
@@ -534,13 +550,15 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             buildGraph();
             if (!ctx) return;
             if (!enabledCache) return;
+            // Resume on the gesture even when not yet starting/playing so iOS
+            // unlocks the context; ensureSchedulerRunning starts once eligible.
             if (ctx.state === 'suspended') {
                 void ctx.resume().then(() => {
-                    if (shouldRunScheduler(gameState.status, enabledCache)) start();
+                    ensureSchedulerRunning();
                 });
-            } else {
-                if (shouldRunScheduler(gameState.status, enabledCache)) start();
+                return;
             }
+            ensureSchedulerRunning();
         },
 
         stop() {
