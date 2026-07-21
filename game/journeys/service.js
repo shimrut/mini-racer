@@ -2,6 +2,14 @@ import { telemetry } from "@devvit/analytics/client/reddit";
 
 const JOURNEY_INTERACTIONS = new Set(["pause", "resume"]);
 
+export const JOURNEY_START_REASONS = new Set([
+  "initial_start",
+  "retry",
+  "improve",
+  "restart",
+  "track_switch",
+]);
+
 function logReceipt(eventName, receipt) {
   if (!receipt || typeof receipt.status !== "string") return;
   console.info(`[Devvit Journeys] ${eventName}: ${receipt.status}`);
@@ -39,16 +47,22 @@ export class JourneyService {
     return this.enqueue("app_ready", () => this.client.appReady());
   }
 
-  startAttempt() {
-    if (this.attemptActive) return this.operationQueue;
+  startAttempt({ reason = "initial_start", replaceActive = false } = {}) {
+    if (!JOURNEY_START_REASONS.has(reason)) return this.operationQueue;
 
+    const endingActive = this.attemptActive && replaceActive;
+    if (this.attemptActive && !replaceActive) return this.operationQueue;
+
+    const closeStaleJourney = !this.hasStartedAttemptOnPage && !endingActive;
+    this.hasStartedAttemptOnPage = true;
     this.attemptActive = true;
     this.highestProgress = 0;
-    const closeStaleJourney = !this.hasStartedAttemptOnPage;
-    this.hasStartedAttemptOnPage = true;
 
-    return this.enqueue("journey_start", async () => {
-      if (closeStaleJourney && this.client.getActiveJourneyId?.()) {
+    return this.enqueue(`journey_start:${reason}`, async () => {
+      if (endingActive) {
+        const endResponse = await this.client.endJourney({ complete: false });
+        this.receiptLogger("journey_end", endResponse?.receipt);
+      } else if (closeStaleJourney && this.client.getActiveJourneyId?.()) {
         const response = await this.client.endJourney({ complete: false });
         this.receiptLogger("stale_journey_end", response?.receipt);
       }

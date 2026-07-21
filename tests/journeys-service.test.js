@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { JourneyService } from "../game/journeys/service.js";
+import { JourneyService, JOURNEY_START_REASONS } from "../game/journeys/service.js";
 
 function createClient({ activeJourneyId } = {}) {
   let activeId = activeJourneyId;
@@ -102,14 +102,47 @@ describe("JourneyService", () => {
     const client = createClient();
     const service = new JourneyService({ client, receiptLogger: vi.fn() });
 
-    void service.startAttempt();
+    void service.startAttempt({ reason: "initial_start" });
     void service.endAttempt({ complete: false });
-    await service.startAttempt();
+    await service.startAttempt({ reason: "restart" });
 
     expect(client.calls).toEqual([
       ["startJourney"],
       ["endJourney", { complete: false }],
       ["startJourney"],
+    ]);
+  });
+
+  it("replaces an active attempt when replaceActive is true", async () => {
+    const client = createClient();
+    const service = new JourneyService({ client, receiptLogger: vi.fn() });
+
+    await service.startAttempt({ reason: "initial_start" });
+    await service.startAttempt({ reason: "track_switch", replaceActive: true });
+
+    expect(client.calls).toEqual([
+      ["startJourney"],
+      ["endJourney", { complete: false }],
+      ["startJourney"],
+    ]);
+  });
+
+  it("ignores unknown start reasons", async () => {
+    const client = createClient();
+    const service = new JourneyService({ client, receiptLogger: vi.fn() });
+
+    await service.startAttempt({ reason: "invalid_reason" });
+
+    expect(client.startJourney).not.toHaveBeenCalled();
+  });
+
+  it("exports the supported journey start reasons", () => {
+    expect([...JOURNEY_START_REASONS]).toEqual([
+      "initial_start",
+      "retry",
+      "improve",
+      "restart",
+      "track_switch",
     ]);
   });
 
@@ -133,7 +166,7 @@ describe("JourneyService", () => {
 
     await expect(service.startAttempt()).resolves.toBeNull();
     expect(warn).toHaveBeenCalledWith(
-      "[Devvit Journeys] journey_start failed.",
+      "[Devvit Journeys] journey_start:initial_start failed.",
       expect.any(Error),
     );
     warn.mockRestore();

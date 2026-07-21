@@ -92,6 +92,11 @@ function getPbGhostSelectionChallengeId(engine) {
     || null;
 }
 
+function resolveJourneyStartReason({ replacesCurrentRun = false } = {}) {
+  if (replacesCurrentRun) return "track_switch";
+  return "initial_start";
+}
+
 function claimPbGhostSelection(engine, challengeId) {
   const normalizedId = challengeId || null;
   if (engine.pbGhostSelectionChallengeId === normalizedId) {
@@ -809,6 +814,8 @@ export const dailyChallengeEngineMethods = {
     this.startOverlay?.hideStartOverlay?.();
     claimPbGhostSelection(this, challenge.id);
     this.startButtonPending = true;
+    const replaceActiveJourney = replacesCurrentRun
+      && challenge.trackKey !== this.currentTrackKey;
     try {
       if (replacesCurrentRun && challenge.trackKey === this.currentTrackKey) {
         this.reset(false, {
@@ -846,7 +853,10 @@ export const dailyChallengeEngineMethods = {
         this.preparedPbGhostChallengeId = null;
       }
       this.applyDailyChallenge(challenge);
-      void this.journeys?.startAttempt?.();
+      void this.journeys?.startAttempt?.({
+        reason: resolveJourneyStartReason({ replacesCurrentRun }),
+        replaceActive: replaceActiveJourney,
+      });
       this.startSequence();
     } finally {
       this.startButtonPending = false;
@@ -1018,7 +1028,7 @@ export const dailyChallengeEngineMethods = {
         ...createModalActions({
           modalKind: "rejected",
           primaryActionLabel: "Retry",
-          primaryAction: () => this.restartDailyChallenge(),
+          primaryAction: () => this.restartDailyChallenge({ reason: "retry" }),
           secondaryActionLabel: "Done",
           secondaryAction: () => this.reset(false),
         }),
@@ -1232,10 +1242,10 @@ export const dailyChallengeEngineMethods = {
         ...createModalActions({
           modalKind: "win",
           primaryActionLabel: "Retry",
-          primaryAction: () => this.restartDailyChallenge(),
           secondaryActionLabel: "Done",
           secondaryAction: () => this.reset(false),
         }),
+        restartAction: () => this.restartDailyChallenge({ reason: "improve" }),
         settingsAction: () => this.settings.openSettings(),
         shareRequest: {
           source: "finish",
@@ -1272,11 +1282,11 @@ export const dailyChallengeEngineMethods = {
     return getInvalidDailyChallengeWinReason(this, winData) === null;
   },
 
-  restartDailyChallenge() {
+  restartDailyChallenge({ reason = "restart" } = {}) {
     if (!this.activeDailyChallenge) return;
 
     void this.journeys?.endAttempt?.({ complete: false });
-    void this.journeys?.startAttempt?.();
+    void this.journeys?.startAttempt?.({ reason });
     this.reset(true, { preserveDailyChallenge: true });
   },
 };

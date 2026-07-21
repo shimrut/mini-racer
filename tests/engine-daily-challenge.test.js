@@ -579,7 +579,24 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
     expect(reset).toHaveBeenCalledWith(true, { preserveDailyChallenge: true });
     expect(endAttempt).toHaveBeenCalledWith({ complete: false });
-    expect(startAttempt).toHaveBeenCalledTimes(1);
+    expect(startAttempt).toHaveBeenCalledWith({ reason: "restart" });
+  });
+
+  it("passes improve intent when restarting from the win screen", () => {
+    const reset = vi.fn();
+    const endAttempt = vi.fn();
+    const startAttempt = vi.fn();
+
+    RealTimeRacer.prototype.restartDailyChallenge.call(
+      {
+        activeDailyChallenge: { id: "daily-1", trackKey: "harborParkLoop" },
+        journeys: { endAttempt, startAttempt },
+        reset,
+      },
+      { reason: "improve" },
+    );
+
+    expect(startAttempt).toHaveBeenCalledWith({ reason: "improve" });
   });
 
   it("clears daily challenge race context when leaving a challenge run", () => {
@@ -686,7 +703,10 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();
-    expect(engine.journeys.startAttempt).toHaveBeenCalledTimes(1);
+    expect(engine.journeys.startAttempt).toHaveBeenCalledWith({
+      reason: "track_switch",
+      replaceActive: false,
+    });
     expect(engine.status).toBe("starting");
   });
 
@@ -712,6 +732,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
       startSequence: vi.fn(),
+      journeys: { startAttempt: vi.fn() },
     };
 
     await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
@@ -723,6 +744,10 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();
+    expect(engine.journeys.startAttempt).toHaveBeenCalledWith({
+      reason: "track_switch",
+      replaceActive: true,
+    });
   });
 
   it("does not wait for the PB ghost request before starting a playlist track", async () => {

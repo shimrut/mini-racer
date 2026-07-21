@@ -373,7 +373,7 @@ export const raceEngineMethods = {
       ) {
         event.preventDefault();
         if (this.currentChallengeRun) {
-          this.restartDailyChallenge();
+          this.restartDailyChallenge({ reason: "restart" });
         } else {
           this.reset(true);
         }
@@ -422,7 +422,7 @@ export const raceEngineMethods = {
           modalKind: "pause",
           primaryActionLabel: "Resume",
           primaryAction: () => this.resumeActiveRun(),
-          restartAction: () => this.restartDailyChallenge(),
+          restartAction: () => this.restartDailyChallenge({ reason: "restart" }),
           secondaryActionLabel: "Done",
           secondaryAction: () => this.reset(false),
         }),
