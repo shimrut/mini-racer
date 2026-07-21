@@ -368,6 +368,25 @@
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
+.leaderboard-day-chip--today {
+    min-width: 2.15rem;
+    padding-inline: 0.7rem;
+}
+
+.leaderboard-day-chip__label,
+.leaderboard-day-chip__day {
+    display: block;
+    font-family: var(--header-font);
+    font-size: 0.7rem;
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    margin-right: -0.04em;
+    line-height: 1;
+    text-align: center;
+    text-transform: uppercase;
+}
+
 .leaderboard-day-chip__month {
     display: block;
     font-family: var(--header-font);
@@ -386,19 +405,6 @@
 .leaderboard-day-chip.is-selected .leaderboard-day-chip__month,
 .leaderboard-day-chip.is-menu-selected .leaderboard-day-chip__month {
     opacity: 0.92;
-}
-
-.leaderboard-day-chip__day {
-    display: block;
-    font-family: var(--header-font);
-    font-size: 0.7rem;
-    font-style: italic;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    margin-right: -0.04em;
-    line-height: 1;
-    text-align: center;
-    text-transform: uppercase;
 }
 
 .lap-times-list {
