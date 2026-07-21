@@ -300,16 +300,17 @@
 }
 
 .leaderboard-day-rail {
+    --leaderboard-day-rail-focus-pad: 2px;
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    width: 100%;
+    width: calc(100% + (var(--leaderboard-day-rail-focus-pad) * 2));
     min-height: 2rem;
-    padding: 0.2rem 0.2rem 0.35rem;
+    margin: -0.15rem calc(var(--leaderboard-day-rail-focus-pad) * -1) 0.15rem;
+    padding: var(--leaderboard-day-rail-focus-pad);
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
-    margin: -0.15rem 0 0.15rem;
     box-sizing: border-box;
 }
 
