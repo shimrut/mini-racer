@@ -41,7 +41,7 @@ Object.assign(
 | --- | --- |
 | Feature folders | `race/`, `daily-challenge/`, `track/`, `scoreboard/`, `settings/`, `ghost/`, `audio/`, `ui/`, plus `journeys/`, `medals/`, `car/`, `player/`, `shared/` |
 | Pure simulation | `game/race/simulation.js` — no DOM / network |
-| Pure result helpers | `game/race/result-flow.js`, `game/race/run-policy.js` |
+| Pure / mostly pure race helpers | `game/race/run-policy.js` (pure); `game/race/result-flow.js` (builders + one async scoreboard-refresh scheduler — no DOM/network imports) |
 | Track metadata vs geometry | `catalog.js` vs `tracks.js` + `definitions/` |
 | Scoreboard I/O vs verify | Thin `scoreboard/service.js` uses `api-client.js`; `verification-queue.js` + daily-challenge I/O are orchestrated by `scoreboard/engine-methods.js` (~495 lines — orchestration, not a thin wrapper) |
 | Server route DI | `src/server/server-app.ts` injects store functions into `routes/*` |
@@ -68,6 +68,8 @@ Object.assign(
 | `game/daily-challenge/service.js` | 1054 | Network + cache + labels |
 | `game/race/engine-methods.js` | 879 | Loop / update / render |
 | `game/engine.js` | 581 | Composition root |
+
+Nearby large files (not top split priority, but easy to miss): `ui-modal-content.js` (~847), `scoreboard/ui.js` (~831), `simulation.js` (~829 — leave alone), `medals.js` (~733), audio modules (~644 / ~587).
 
 ---
 
@@ -152,7 +154,7 @@ flowchart TB
 **Files:** `game/daily-challenge/engine-methods.js`  
 **Effort:** M · **Risk:** Medium–High (finish / verify path)
 
-**Today:** One mixin blob (~27 public methods) covering PB-ghost, lobby/prewarm, finish/win, HUD sync, apply/create/restart, and playlist modal orchestration.
+**Today:** One mixin blob (**35** public methods) covering PB-ghost, lobby/prewarm, finish/win, HUD sync, apply/create/restart, and playlist modal orchestration.
 
 **Natural clusters (keep the same public mixin API):**
 1. PB ghost — `markTrackPersonalBest*` … `applyVerifiedTrackPersonalBest`
@@ -216,8 +218,8 @@ flowchart TB
 **Treat as server-safe package surface (document / enforce):**
 - `game/track/catalog.js`, `runtime.js`, `tracks.js` (+ definitions)
 - `game/race/simulation.js`, `run-policy.js`
-- `game/config.js` physics subset / `game/car/handling.js`
-- `game/shared/checkpoint-times.js`, `leaderboard-identity.js`
+- `game/config.js` physics subset (server already imports `CONFIG`); `game/car/handling.js` (client simulation today — keep server-safe if ever shared)
+- `game/shared/checkpoint-times.js`, `leaderboard-identity.js`, `daily-gp-history-backfill.js`
 - Medals **timing** rules + `medal-times.json` (not SVG overlays)
 
 **Today’s soft spot:** `src/server/daily-gp-share.ts` imports `getMedalForLapTime` from `game/medals/medals.js`, which also imports SVG/`document` helpers via `medal-icon.js`. Timing functions themselves are pure, but the module boundary is not. `reddit-post-title.ts` already imports `medal-times.json` directly — prefer that pattern after a rules-only extract.
@@ -255,7 +257,7 @@ Optional later: thin `shared/` re-export barrel — only if it reduces confusion
 ## Patterns To Extend (do not invent new ones)
 
 1. **`*-engine-methods.js` + `Object.assign` onto `RealTimeRacer`** — split *into* this pattern, not away from it.
-2. **UI objects with injected callbacks** — `ModalShell`, `SettingsUi`, `LeaderboardsUi`, `RaceHud`, `DailyChallengeUi` constructed in `engine.js`; UI should not import the engine class.
+2. **UI objects with injected callbacks** — `ModalShell`, `SettingsUi`, `LeaderboardsUi`, `RaceHud`, `DailyChallengeUi`, plus `GarageUi` / overlays / loading constructed in `engine.js`; UI should not import the engine class.
 3. **Pure gameplay / data modules** — simulation, result-flow, run-policy, catalog, scoreboard snapshot, `daily-gp-model.ts`.
 4. **Thin persistence modules** — `daily-challenge/storage.js`, `game/storage.js`, `settings/*-preference.js`, `last-lap-medal-storage.js`.
 5. **Scoreboard pipeline** — thin service owns HTTP snapshot I/O; mixin owns verification-queue orchestration (and currently also daily-challenge submit paths).
