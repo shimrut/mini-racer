@@ -70,8 +70,7 @@ function buildDailyChallengeLeaderboardDayOption(challenge) {
             dayLabel: 'Day',
             dateLabel: '--',
             monthLabel: '',
-            dayNumberLabel: '--',
-            numericDateLabel: '--'
+            dayNumberLabel: '--'
         };
     }
 
@@ -84,7 +83,6 @@ function buildDailyChallengeLeaderboardDayOption(challenge) {
         day: 'numeric',
         timeZone: 'UTC'
     }).format(date);
-    const numericDateLabel = `${String(date.getUTCDate()).padStart(2, '0')}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
     return {
         challengeId: challenge.id,
         dayLabel: isDailyChallengeToday(challenge)
@@ -99,8 +97,7 @@ function buildDailyChallengeLeaderboardDayOption(challenge) {
             timeZone: 'UTC'
         }).format(date),
         monthLabel,
-        dayNumberLabel,
-        numericDateLabel
+        dayNumberLabel
     };
 }
 

@@ -1038,6 +1038,8 @@ export class ModalShell {
         this._modalKind = null;
         this._hidePauseTrackPreview();
         this.modalLapTimes.replaceChildren();
+        this._leaderboardDayRailOptionsKey = null;
+        this._leaderboardDayRailKey = null;
         const hasPersonalBestList = Array.isArray(lapTimesArray);
         this.content.renderLapTimesList(this.modalLapTimes, lapTimesArray, bestTime, currentTime);
         this._modalRunsPayload = buildModalRunsPayload({
@@ -1653,7 +1655,8 @@ export class ModalShell {
         const optionsKey = buildLeaderboardDayRailOptionsKey(payload);
         const railKey = buildLeaderboardDayRailKey(payload);
 
-        if (!force && railKey === this._leaderboardDayRailKey) {
+        const existingRail = this.modalLapTimes.querySelector('.leaderboard-day-rail');
+        if (!force && railKey === this._leaderboardDayRailKey && existingRail) {
             return;
         }
 

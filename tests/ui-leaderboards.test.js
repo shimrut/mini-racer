@@ -104,11 +104,7 @@ describe('ui leaderboard helpers', () => {
                 dayNumberLabel: new Intl.DateTimeFormat('en-US', {
                     day: 'numeric',
                     timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`)),
-                numericDateLabel: (() => {
-                    const date = new Date(`${today}T00:00:00.000Z`);
-                    return `${String(date.getUTCDate()).padStart(2, '0')}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-                })()
+                }).format(new Date(`${today}T00:00:00.000Z`))
             }],
             selectedLeaderboardDayId: 'daily-1'
         });
@@ -135,11 +131,7 @@ describe('ui leaderboard helpers', () => {
                 dayNumberLabel: new Intl.DateTimeFormat('en-US', {
                     day: 'numeric',
                     timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`)),
-                numericDateLabel: (() => {
-                    const date = new Date(`${today}T00:00:00.000Z`);
-                    return `${String(date.getUTCDate()).padStart(2, '0')}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-                })()
+                }).format(new Date(`${today}T00:00:00.000Z`))
             }],
             selectedLeaderboardDayId: 'daily-1'
         });
@@ -170,8 +162,7 @@ describe('ui leaderboard helpers', () => {
                     dayLabel: 'Fri',
                     dateLabel: 'Jul 10',
                     monthLabel: 'Jul',
-                    dayNumberLabel: '10',
-                    numericDateLabel: '10.07'
+                    dayNumberLabel: '10'
                 }]
             }));
         } finally {
@@ -320,8 +311,7 @@ describe('ui leaderboard helpers', () => {
                 dayLabel: 'Day',
                 dateLabel: '--',
                 monthLabel: '',
-                dayNumberLabel: '--',
-                numericDateLabel: '--'
+                dayNumberLabel: '--'
             }],
             selectedLeaderboardDayId: 'daily-2'
         });

@@ -87,6 +87,9 @@ function createTestElement(tagName = 'div') {
         prepend(...nodes) {
             this.children.unshift(...nodes);
         },
+        replaceChildren() {
+            this.children = [];
+        },
         querySelector: vi.fn((selector) => {
             if (selector === '.leaderboard-day-rail') {
                 return element.children.find((child) => child.className === 'leaderboard-day-rail') || null;
@@ -323,6 +326,48 @@ describe('ui modal runs helpers', () => {
             expect(railAfter).toBe(railBefore);
             expect(header.children.length).toBeGreaterThan(0);
             expect(context.content.renderScoreboardList).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('rebuilds the day rail after the modal container is cleared', () => {
+        const originalDocument = global.document;
+        const modalLapTimes = createTestElement('div');
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        const leaderboardDayOptions = [
+            { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+            { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+        ];
+        const context = withLeaderboardIntroMethods({
+            modalLapTimes,
+            _modalRunsPayload: {
+                showGlobalLeaderboard: true,
+                scoreboardChallengeId: 'today',
+                scoreboardTrackKey: 'circuit',
+                selectedLeaderboardDayId: 'today',
+                leaderboardDayOptions,
+                scoreboardSnapshot: { playerRankLabel: '#2', leaderboardEntryCount: 2 },
+                onSelectLeaderboardDay: vi.fn(),
+            },
+        });
+
+        try {
+            renderLeaderboardDayRail.call(context);
+            expect(modalLapTimes.children.some((child) => child.className === 'leaderboard-day-rail')).toBe(true);
+
+            modalLapTimes.replaceChildren();
+            renderLeaderboardDayRail.call(context);
+
+            const rail = modalLapTimes.children.find((child) => (
+                child.className === 'leaderboard-day-rail'
+            ));
+            expect(rail).toBeTruthy();
+            expect(rail.children).toHaveLength(2);
         } finally {
             global.document = originalDocument;
         }
