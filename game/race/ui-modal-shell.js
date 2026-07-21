@@ -1660,7 +1660,7 @@ export class ModalShell {
 
                 if (option?.dayLabel === 'Today') {
                     const dayLabel = document.createElement('span');
-                    dayLabel.className = 'leaderboard-day-chip__label';
+                    dayLabel.className = 'leaderboard-day-chip__day';
                     dayLabel.textContent = 'Today';
                     button.append(dayLabel);
                 } else {

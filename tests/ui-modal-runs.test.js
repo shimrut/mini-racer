@@ -215,7 +215,7 @@ describe('ui modal runs helpers', () => {
                 ['Jul', '13']
             ]);
             expect(rail.children[0].className).toContain('leaderboard-day-chip--today');
-            expect(rail.children[0].children[0].className).toBe('leaderboard-day-chip__label');
+            expect(rail.children[0].children[0].className).toBe('leaderboard-day-chip__day');
             expect(rail.children[1].children[0].className).toBe('leaderboard-day-chip__month');
             expect(rail.children[1].children[1].className).toBe('leaderboard-day-chip__day');
         } finally {
