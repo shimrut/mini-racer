@@ -14,6 +14,7 @@ This file is the fastest way to answer three product questions before a change s
 - It also calls out supporting tools under `tools/` when they matter to content operations.
 - It is written for planning and scoping, not as a line-by-line engineering spec.
 - Shared gameplay logic matters more than folder ownership. Several "frontend" changes also affect server validation.
+- For modularization seams and recommended file splits, see [modularization-findings.md](./modularization-findings.md).
 
 ## System At A Glance
 
