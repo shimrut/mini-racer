@@ -7,33 +7,26 @@ Open a Mini Racer post, tap **Race Now**, learn the track, and try again until y
 ## How the game works
 
 Every attempt is **one lap**. Cross the finish line to complete it.
-
-Hitting a wall does **not** end your run. You lose speed (and time), then keep going. If you prefer the old “bump and restart” feel, turn on **Collision Auto-Restart** in Settings (it is off by default).
-
 Press **R** to restart while racing, paused, or on the finish screen.
-
-Steer, finish one clean lap as fast as you can, then try again. Improvement comes from learning the corners — when to brake, how to exit cleanly, and how little wall contact you can get away with.
+Steer, finish one clean lap as fast as you can, then try again.
 
 ## What players can do
 
-- Race **today’s featured track** and chase the fastest lap
-- Beat your **personal best** on each available daily track and race a faint **ghost** of that lap (on by default; off in Settings)
-- Climb that day’s **leaderboard** in Standings
-- Compare leaderboard times at full **millisecond precision**
-- Earn **medals** by beating target times on each track
-- Replay the last **7 days** of tracks from the Tracks screen
+- Race **today's featured track** and chase your personal best
+- Earn **medals** by beating the target times on each track
+- Climb that day's **leaderboard** in Standings
+- Missed a day? You can replay the last **7 days** of tracks
 - Change how your car looks in the **Garage** (skins and trails — handling stays the same)
 - **Share** a finished lap or a verified daily best as a Reddit comment (you preview the text first)
-- Navigate menus with the **keyboard**
 
 Your car look and settings are saved to your player profile. Guest data expires after 7 inactive days; signed-in data expires after 30 inactive days.
 
 ## Daily tracks
 
 - A **new track** becomes the featured race each day (day changes at midnight UTC)
-- Once a day’s track is posted, it **stays that track** — it does not get swapped later
+- Once a day's track is posted, it **stays that track** — it does not get swapped later
 - Tracks stay playable for **7 days**, then drop out of the list
-- Communities can auto-publish that track’s final global podium when the window closes
+- Communities can auto-publish that track's final global podium when the window closes
 - Each track card shows a preview, your best time, medals, and how long that track is still available
 - Your personal best and ghost remain available until 6 hours after that daily track leaves the seven-day list
 
@@ -42,18 +35,18 @@ Your car look and settings are saved to your player profile. Guest data expires 
 - Standings show the full daily ranking as you scroll; **your rank stays visible** even if you are far down the list
 - On the finish screen: **Improve**, **Share Time**, and **Home**
 - In Standings: **Share Best** appears when you have a verified time for the day you are viewing
-- Shared results go to the post’s pinned **score thread**, as a comment from your Reddit account after you confirm
+- Shared results go to the post's pinned **score thread**, as a comment from your Reddit account after you confirm
 - Sharing the same result again reuses the existing comment instead of posting a duplicate
 
 ## First look on Reddit
 
-The post preview shows today’s track, the gold-medal target, a car on the start line, and a **Race Now** button.
+The post preview shows today's track, the gold-medal target, a car on the start line, and a **Race Now** button.
 
-Older posts keep their original track while it is still available. If that day’s track has expired, opening the post takes you to **today’s** featured track instead.
+Older posts keep their original track while it is still available. If that day's track has expired, opening the post takes you to **today's** featured track instead.
 
 Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
 
-Final podium posts (separate moderator opt-in) show the top three verified times for the track that just expired, with each finalist’s Reddit name or private racer name, their avatar when available, and a **Play Now** button for today’s featured track.
+Final podium posts (separate moderator opt-in) show the top three verified times for the track that just expired, with each finalist's Reddit name or private racer name, their avatar when available, and a **Play Now** button for today's featured track.
 
 ## Garage
 
@@ -80,7 +73,7 @@ Tips:
 - Podium posts are informational, use an independent opt-in, and never create a score thread
 - Players share scores as replies in that thread, from their own accounts
 
-## What’s new
+## What's new
 
 ### 1.4.1
 
