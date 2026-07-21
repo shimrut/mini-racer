@@ -4,6 +4,13 @@
 - Checkpoint/lap ±0.01 deltas use normal green/red flash colors again; amber `is-warning` is reserved for notices like GHOST UNAVAILABLE.
 - Finish and checkpoint times now interpolate within the 1/60s physics step at the line crossing, so leaderboard milliseconds are no longer stuck ending only in 0, 3, or 7.
 - Fixed verified personal-best ghosts sometimes saving as missing: ghost recording now stamps samples on the compact 50ms grid and reconciles sample count at finish so Rank can keep the time and the ghost together.
+- Fix standings opening before the daily playlist finishes loading by always rendering the full seven-day date rail immediately, refreshing day chips when the playlist resolves, and clearing stuck loading states after snapshot fetch failures.
+- Fix standings date rail rendering below the leaderboard list when the day strip is rebuilt during an in-place update.
+- Fix uneven standings row heights by giving empty community slots the same `leaderboard-row` class as player rows.
+- Match player row height to the share column by sizing the existing `leaderboard-row__action` slot to the share button.
+- Fix standings date rail disappearing after modal refresh by rebuilding the strip when the container is cleared while the rail cache still matches.
+- Fix standings date-rail hover flicker by keeping the day strip mounted during snapshot refresh and aligning mouse/keyboard chip highlights.
+- Standings date strip keeps Today as a single label and shows other days as a small month over a larger day number, using the same accent pill and focus ring treatment as garage tabs.
 - Hardened leaderboard-identity and daily-gp-model mutation tests with full name-catalog snapshots, exact constructed-name fixtures, and pinned TTL/window constant values after `ignoreStatic` exposed hybrid static survivors.
 - Added Number Zero through Number Six tracks (definitions, catalog/registry wiring, share images) and updated track runtime integrity expectations plus the full registry fingerprint.
 - Exported simulation scrape/collision helpers and enabled Stryker `ignoreStatic` so static mutants no longer dominate runtime.

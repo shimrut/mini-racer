@@ -29,8 +29,8 @@ const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
 const DAILY_PLAYLIST_CACHE_KEY = 'VectorGpDailyChallengePlaylistCache';
 const DAILY_SNAPSHOT_CACHE_KEY = 'VectorGpDailyChallengeSnapshotCache';
 const DAILY_START_OVERRIDE_KEY = 'VectorGpDailyStartOverride';
-const DAY_MS = 24 * 60 * 60 * 1000;
-const DAILY_PLAYLIST_DAYS = 7;
+export const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAILY_PLAYLIST_DAYS = 7;
 let dailyPlaylistCache = {
     challenges: null,
     expiresAt: 0,

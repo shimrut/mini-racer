@@ -290,11 +290,7 @@
     }
 
     .leaderboard-day-chip {
-        padding: 0.64rem 0.68rem;
-    }
-
-    .leaderboard-day-chip__day {
-        font-size: 0.7rem;
+        padding: 0.32rem 0.58rem;
     }
 
 }

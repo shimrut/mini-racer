@@ -253,6 +253,7 @@ export class RealTimeRacer {
       },
       isRunsViewActive: () => this.modal.isRunsViewActive?.(),
       updateModalScoreboardSnapshot: (snapshot) => this.modal.updateModalScoreboardSnapshot?.(snapshot),
+      updateModalLeaderboardDayOptions: (options) => this.modal.updateModalLeaderboardDayOptions?.(options),
     });
     this.collisionAutoRestartEnabled = getCollisionAutoRestartEnabled();
     this.collisionRestartDelaySec = getCollisionRestartDelaySec();

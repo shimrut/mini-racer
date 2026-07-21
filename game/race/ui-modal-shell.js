@@ -60,6 +60,33 @@ function isLeaderboardSwipeControl(target) {
     ));
 }
 
+function buildLeaderboardDayRailOptionsKey(payload) {
+    const options = Array.isArray(payload?.leaderboardDayOptions)
+        ? payload.leaderboardDayOptions
+        : [];
+    return JSON.stringify(options.map((option) => ({
+        id: option?.challengeId ?? null,
+        day: option?.dayLabel ?? null,
+        month: option?.monthLabel ?? null,
+        num: option?.dayNumberLabel ?? null,
+    })));
+}
+
+function buildLeaderboardDayRailKey(payload) {
+    return JSON.stringify({
+        selectedId: payload?.selectedLeaderboardDayId ?? null,
+        options: JSON.parse(buildLeaderboardDayRailOptionsKey(payload)),
+    });
+}
+
+function shouldRenderLeaderboardStandaloneIntro(payload) {
+    const hasPersonalBestList = Array.isArray(payload?.lapTimesArray);
+    const isLeaderboardOnly = Boolean(payload?.showGlobalLeaderboard) && !hasPersonalBestList;
+    const isDailyChallengeLeaderboard = Boolean(payload?.scoreboardChallengeId)
+        || Array.isArray(payload?.leaderboardDayOptions);
+    return isLeaderboardOnly && isDailyChallengeLeaderboard;
+}
+
 export class ModalShell {
     constructor({
         content,
@@ -1011,6 +1038,8 @@ export class ModalShell {
         this._modalKind = null;
         this._hidePauseTrackPreview();
         this.modalLapTimes.replaceChildren();
+        this._leaderboardDayRailOptionsKey = null;
+        this._leaderboardDayRailKey = null;
         const hasPersonalBestList = Array.isArray(lapTimesArray);
         this.content.renderLapTimesList(this.modalLapTimes, lapTimesArray, bestTime, currentTime);
         this._modalRunsPayload = buildModalRunsPayload({
@@ -1077,6 +1106,8 @@ export class ModalShell {
 
         this._closeSharePanel({ restoreScroll: false });
         this._leaderboardRailScrollLeft = null;
+        this._leaderboardDayRailOptionsKey = null;
+        this._leaderboardDayRailKey = null;
         this.unbindLeaderboardPagination?.();
         this.unbindLeaderboardDaySwipe?.();
         const modal = this.modal;
@@ -1494,7 +1525,8 @@ export class ModalShell {
             const scrollTop = this.modalLapTimes.scrollTop;
             const hasPersonalBestList = Array.isArray(this._modalRunsPayload.lapTimesArray);
             this.modalLapTimes.querySelector('.leaderboard-section')?.remove();
-            this.renderLeaderboardStandaloneIntro();
+            this.renderLeaderboardDayRail();
+            this.renderLeaderboardHeaderSummary();
             if (this._modalRunsPayload.showGlobalLeaderboard) {
                 const shareBest = this._leaderboardShareBestOption();
                 this.content.renderScoreboardList(
@@ -1533,6 +1565,25 @@ export class ModalShell {
         }
 
         this.applyRankModalStatContent(rankStat, scoreboardSnapshot);
+    }
+
+    updateModalLeaderboardDayOptions({
+        leaderboardDayOptions = null,
+        onSelectLeaderboardDay = null,
+    } = {}) {
+        if (!this._modalRunsPayload) return;
+
+        const updates = {};
+        if (Array.isArray(leaderboardDayOptions)) {
+            updates.leaderboardDayOptions = leaderboardDayOptions;
+        }
+        if (typeof onSelectLeaderboardDay === 'function') {
+            updates.onSelectLeaderboardDay = onSelectLeaderboardDay;
+        }
+
+        this._modalRunsPayload = buildModalRunsPayload(this._modalRunsPayload, { updates });
+        this.renderLeaderboardDayRail({ force: true });
+        this.bindLeaderboardDaySwipe?.();
     }
 
     updateModalRunSummary({
@@ -1609,25 +1660,38 @@ export class ModalShell {
     }
 
     renderLeaderboardStandaloneIntro() {
+        if (!shouldRenderLeaderboardStandaloneIntro(this._modalRunsPayload)) return;
+        this.renderLeaderboardDayRail();
+        this.renderLeaderboardHeaderSummary();
+    }
+
+    renderLeaderboardDayRail({ force = false } = {}) {
         if (!this.modalLapTimes) return;
 
         const payload = this._modalRunsPayload;
-        const hasPersonalBestList = Array.isArray(payload?.lapTimesArray);
-        const isLeaderboardOnly = Boolean(payload?.showGlobalLeaderboard) && !hasPersonalBestList;
-        const isDailyChallengeLeaderboard = Boolean(payload?.scoreboardChallengeId)
-            || Array.isArray(payload?.leaderboardDayOptions);
-        if (!isLeaderboardOnly || !isDailyChallengeLeaderboard) return;
+        if (!shouldRenderLeaderboardStandaloneIntro(payload)) return;
 
-        const trackName = payload?.scoreboardTrackKey && TRACKS[payload.scoreboardTrackKey]
-            ? TRACKS[payload.scoreboardTrackKey].name
-            : 'This track';
-        const rankDisplay = buildScoreboardRankDisplay(
-            payload?.scoreboardSnapshot,
-            { fallbackText: '—' }
-        );
-        const isRefreshing = Boolean(payload?.scoreboardSnapshot?.isRefreshing)
-            && !rankDisplay.isLoading;
+        const optionsKey = buildLeaderboardDayRailOptionsKey(payload);
+        const railKey = buildLeaderboardDayRailKey(payload);
+
+        const existingRail = this.modalLapTimes.querySelector('.leaderboard-day-rail');
+        if (!force && railKey === this._leaderboardDayRailKey && existingRail) {
+            return;
+        }
+
+        if (
+            !force
+            && optionsKey === this._leaderboardDayRailOptionsKey
+            && this._syncLeaderboardDayRailSelection(payload)
+        ) {
+            this._leaderboardDayRailKey = railKey;
+            return;
+        }
+
         this.modalLapTimes.querySelector('.leaderboard-day-rail')?.remove();
+        this._leaderboardDayRailOptionsKey = null;
+        this._leaderboardDayRailKey = null;
+
         if (
             Array.isArray(payload?.leaderboardDayOptions)
             && payload.leaderboardDayOptions.length > 1
@@ -1639,36 +1703,99 @@ export class ModalShell {
 
             for (const option of payload.leaderboardDayOptions) {
                 const button = document.createElement('button');
-                const isSelected = option?.challengeId === payload?.selectedLeaderboardDayId;
+                const hasChallengeId = Boolean(option?.challengeId);
+                const isSelected = hasChallengeId
+                    && option.challengeId === payload?.selectedLeaderboardDayId;
                 button.className = `leaderboard-day-chip${isSelected ? ' is-selected' : ''}`;
                 button.type = 'button';
+                button.dataset.challengeId = option?.challengeId || '';
                 button.setAttribute('role', 'tab');
                 button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-                button.setAttribute('aria-disabled', isSelected ? 'true' : 'false');
+                if (!hasChallengeId) {
+                    button.disabled = true;
+                    button.setAttribute('aria-disabled', 'true');
+                } else {
+                    button.setAttribute('aria-disabled', isSelected ? 'true' : 'false');
+                }
                 button.setAttribute(
                     'aria-label',
                     `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
                 );
-                button.addEventListener('click', () => {
-                    this._leaderboardRailScrollLeft = rail.scrollLeft;
-                    payload?.onSelectLeaderboardDay?.(option?.challengeId);
-                });
+                if (hasChallengeId) {
+                    button.addEventListener('click', () => {
+                        this._leaderboardRailScrollLeft = rail.scrollLeft;
+                        payload?.onSelectLeaderboardDay?.(option.challengeId);
+                    });
+                }
 
-                const dayLabel = document.createElement('span');
-                dayLabel.className = 'leaderboard-day-chip__day';
-                dayLabel.textContent = option?.dayLabel === 'Today'
-                    ? 'Today'
-                    : option?.dateLabel || '--';
+                const stack = document.createElement('span');
+                stack.className = 'leaderboard-day-chip__stack';
 
-                button.append(dayLabel);
+                if (option?.dayLabel === 'Today') {
+                    button.classList.add('leaderboard-day-chip--today');
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'leaderboard-day-chip__day';
+                    dayLabel.textContent = 'Today';
+                    stack.append(dayLabel);
+                } else {
+                    const monthLabel = document.createElement('span');
+                    monthLabel.className = 'leaderboard-day-chip__month';
+                    monthLabel.textContent = option?.monthLabel || '';
+
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'leaderboard-day-chip__day';
+                    dayLabel.textContent = option?.dayNumberLabel || option?.dateLabel || '--';
+
+                    stack.append(monthLabel, dayLabel);
+                }
+
+                button.append(stack);
                 rail.appendChild(button);
             }
 
-            this.modalLapTimes.appendChild(rail);
+            this.modalLapTimes.insertBefore(rail, this.modalLapTimes.firstChild);
             if (typeof this._leaderboardRailScrollLeft === 'number') {
                 rail.scrollLeft = this._leaderboardRailScrollLeft;
             }
         }
+
+        this._leaderboardDayRailOptionsKey = optionsKey;
+        this._leaderboardDayRailKey = railKey;
+    }
+
+    _syncLeaderboardDayRailSelection(payload) {
+        const rail = this.modalLapTimes?.querySelector('.leaderboard-day-rail');
+        const options = payload?.leaderboardDayOptions;
+        const selectedId = payload?.selectedLeaderboardDayId;
+        if (!rail || !Array.isArray(options) || options.length < 2) return false;
+
+        for (const option of options) {
+            const challengeId = option?.challengeId;
+            if (!challengeId) continue;
+            const button = rail.querySelector(`[data-challenge-id="${challengeId}"]`);
+            if (!button) return false;
+
+            const isSelected = challengeId === selectedId;
+            button.classList.toggle('is-selected', isSelected);
+            button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+            button.setAttribute('aria-disabled', isSelected ? 'true' : 'false');
+        }
+
+        return true;
+    }
+
+    renderLeaderboardHeaderSummary() {
+        if (!this.modalLapTimes) return;
+
+        const payload = this._modalRunsPayload;
+        if (!shouldRenderLeaderboardStandaloneIntro(payload)) return;
+
+        const rankDisplay = buildScoreboardRankDisplay(
+            payload?.scoreboardSnapshot,
+            { fallbackText: '—' }
+        );
+        const isRefreshing = Boolean(payload?.scoreboardSnapshot?.isRefreshing)
+            && !rankDisplay.isLoading;
 
         const rawEntryCount = payload?.scoreboardSnapshot?.leaderboardEntryCount;
         const submittedRacerCount = rawEntryCount != null && Number.isFinite(Number(rawEntryCount))
@@ -1880,10 +2007,17 @@ export class ModalShell {
             );
             if (selectedIndex < 0) return;
 
-            const nextIndex = deltaX < 0 ? selectedIndex + 1 : selectedIndex - 1;
-            const nextChallengeId = currentOptions[nextIndex]?.challengeId;
-            if (!nextChallengeId) return;
-            payload?.onSelectLeaderboardDay?.(nextChallengeId);
+            const direction = deltaX < 0 ? 1 : -1;
+            let nextIndex = selectedIndex;
+            while (true) {
+                nextIndex += direction;
+                if (nextIndex < 0 || nextIndex >= currentOptions.length) return;
+                const nextChallengeId = currentOptions[nextIndex]?.challengeId;
+                if (nextChallengeId) {
+                    payload?.onSelectLeaderboardDay?.(nextChallengeId);
+                    return;
+                }
+            }
         };
         this._leaderboardTouchCancelHandler = () => {
             this._leaderboardSwipeStart = null;
