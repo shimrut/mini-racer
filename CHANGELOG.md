@@ -1,5 +1,6 @@
 # Changelog
 
+- Set mapmaker Line Build brush default to 4u (was 5u).
 - Removed Number Eight from the Daily GP schedule (catalog, registry, definition, and share image).
 - Added Golden Marsh, Jumping Jack, and Furious Fast to the Daily GP schedule with share images and medal targets; refined Needle Chicane and Turbo Shell geometry.
 - Fixed procedural music failing to start when the Web Audio context was still suspended at race start (notably on iOS Reddit).
