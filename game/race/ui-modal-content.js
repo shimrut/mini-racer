@@ -477,7 +477,7 @@ export class ModalContentUi {
 
     const appendCommunityOpenRow = (rank) => {
         const item = document.createElement('div');
-        item.className = 'combined-row combined-row--community-open';
+        item.className = 'combined-row leaderboard-row combined-row--community-open';
 
         const runIndex = document.createElement('div');
         runIndex.className = 'combined-row-rank';
@@ -531,7 +531,7 @@ export class ModalContentUi {
         const remaining = openCommunitySlots - shown;
         if (remaining > 0) {
             const summary = document.createElement('div');
-            summary.className = 'combined-row combined-row--community-open combined-row--community-summary';
+            summary.className = 'combined-row leaderboard-row combined-row--community-open combined-row--community-summary';
             summary.setAttribute('role', 'note');
             const runIndex = document.createElement('div');
             runIndex.className = 'combined-row-rank';

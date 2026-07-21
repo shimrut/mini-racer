@@ -415,10 +415,22 @@
 
 .leaderboard-list.lap-times-list {
     --leaderboard-row-gap: .4rem;
+    --leaderboard-row-min-height: calc(0.65rem * 2 + 1.5rem);
     display: flex;
     flex-direction: column;
     gap: var(--leaderboard-row-gap);
     width: 100%;
+}
+
+.leaderboard-list .combined-row {
+    min-height: var(--leaderboard-row-min-height);
+}
+
+.leaderboard-list .combined-row-time {
+    min-height: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
 }
 
 .leaderboard-day-swipe-enabled .leaderboard-section {

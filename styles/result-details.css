@@ -287,6 +287,7 @@
     }
     .leaderboard-row {
         padding: 0.35rem 0.5rem;
+        min-height: calc(0.35rem * 2 + 1.5rem);
     }
     .leaderboard-day-rail {
         padding: 0.25rem 0.2rem 0.35rem;

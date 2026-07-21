@@ -1,5 +1,6 @@
 # Changelog
 
+- Fix uneven standings row heights by giving every leaderboard row the same minimum height and reserving space for empty time slots.
 - Fix standings date rail disappearing after modal refresh by rebuilding the strip when the container is cleared while the rail cache still matches.
 - Fix standings date-rail hover flicker by keeping the day strip mounted during snapshot refresh and aligning mouse/keyboard chip highlights.
 - Standings date strip keeps Today as a single label and shows other days as a small month over a larger day number, using the same accent pill and focus ring treatment as garage tabs.
