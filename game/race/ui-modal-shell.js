@@ -1654,12 +1654,28 @@ export class ModalShell {
                     payload?.onSelectLeaderboardDay?.(option?.challengeId);
                 });
 
-                const dayLabel = document.createElement('span');
-                dayLabel.className = 'leaderboard-day-chip__day';
-                dayLabel.textContent = option?.dayLabel === 'Today'
-                    ? 'Today'
-                    : (option?.numericDateLabel || option?.dayNumberLabel || option?.dateLabel || '--');
-                button.append(dayLabel);
+                const stack = document.createElement('span');
+                stack.className = 'leaderboard-day-chip__stack';
+
+                if (option?.dayLabel === 'Today') {
+                    button.classList.add('leaderboard-day-chip--today');
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'leaderboard-day-chip__day';
+                    dayLabel.textContent = 'Today';
+                    stack.append(dayLabel);
+                } else {
+                    const monthLabel = document.createElement('span');
+                    monthLabel.className = 'leaderboard-day-chip__month';
+                    monthLabel.textContent = option?.monthLabel || '';
+
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'leaderboard-day-chip__day';
+                    dayLabel.textContent = option?.dayNumberLabel || option?.dateLabel || '--';
+
+                    stack.append(monthLabel, dayLabel);
+                }
+
+                button.append(stack);
                 rail.appendChild(button);
             }
 

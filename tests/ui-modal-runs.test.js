@@ -184,9 +184,9 @@ describe('ui modal runs helpers', () => {
                     scoreboardTrackKey: 'circuit',
                     selectedLeaderboardDayId: 'today',
                     leaderboardDayOptions: [
-                        { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15', numericDateLabel: '15.07' },
-                        { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14', numericDateLabel: '14.07' },
-                        { challengeId: 'older', dayLabel: 'Mon', dateLabel: 'Jul 13', monthLabel: 'Jul', dayNumberLabel: '13', numericDateLabel: '13.07' },
+                        { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+                        { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+                        { challengeId: 'older', dayLabel: 'Mon', dateLabel: 'Jul 13', monthLabel: 'Jul', dayNumberLabel: '13' },
                     ],
                     scoreboardSnapshot: { playerRankLabel: '#2', leaderboardEntryCount: 2 },
                     onSelectLeaderboardDay: vi.fn(),
@@ -201,9 +201,26 @@ describe('ui modal runs helpers', () => {
             expect(rail.children).toHaveLength(3);
             expect(rail.children[0].disabled).toBe(false);
             expect(rail.children[0].getAttribute('aria-disabled')).toBe('true');
-            expect(rail.children.map((button) => button.children[0].textContent))
-                .toEqual(['Today', '14.07', '13.07']);
-            expect(rail.children[1].children[0].className).toBe('leaderboard-day-chip__day');
+            const getChipLabels = (button) => {
+                const stack = button.children[0];
+                if (stack.children.length === 1) {
+                    return stack.children[0].textContent;
+                }
+                return [
+                    stack.children[0].textContent,
+                    stack.children[1].textContent
+                ];
+            };
+            expect(rail.children.map(getChipLabels)).toEqual([
+                'Today',
+                ['Jul', '14'],
+                ['Jul', '13']
+            ]);
+            expect(rail.children[0].classList.contains('leaderboard-day-chip--today')).toBe(true);
+            const dateStack = rail.children[1].children[0];
+            expect(dateStack.className).toBe('leaderboard-day-chip__stack');
+            expect(dateStack.children[0].className).toBe('leaderboard-day-chip__month');
+            expect(dateStack.children[1].className).toBe('leaderboard-day-chip__day');
         } finally {
             global.document = originalDocument;
         }

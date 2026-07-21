@@ -319,24 +319,20 @@
 
 .leaderboard-day-chip {
     display: inline-flex;
-    min-width: 2.15rem;
-    flex: 0 0 auto;
-    flex-direction: column;
-    justify-content: center;
     align-items: center;
-    gap: 0.05rem;
-    padding: 0.32rem 0.58rem;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.35rem;
+    flex: 0 0 auto;
+    padding: 0.22rem 0.65rem;
     border: none;
     border-radius: var(--radius-full);
     background: transparent;
     color: var(--text-dim);
     font-family: var(--header-font);
-    font-size: 0.7rem;
     font-weight: 900;
     font-style: italic;
-    letter-spacing: 0.08em;
     text-transform: uppercase;
-    text-align: center;
     cursor: pointer;
     box-shadow: none;
     transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
@@ -372,17 +368,28 @@
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
+.leaderboard-day-chip__stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    min-width: 1.35rem;
+    text-align: center;
+}
+
+.leaderboard-day-chip--today .leaderboard-day-chip__stack {
+    gap: 0;
+    min-width: 0;
+}
+
 .leaderboard-day-chip__month {
     display: block;
-    font-size: 1em;
+    font-size: 0.52rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    margin-right: -0.08em;
+    letter-spacing: 0.1em;
     line-height: 1;
-    text-align: center;
     color: var(--text-muted);
-    transform: scale(0.62);
-    transform-origin: center bottom;
 }
 
 .leaderboard-day-chip.is-selected .leaderboard-day-chip__month,
@@ -392,11 +399,15 @@
 
 .leaderboard-day-chip__day {
     display: block;
-    font-size: 1em;
-    letter-spacing: 0.08em;
-    margin-right: -0.08em;
+    font-size: 0.8rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
     line-height: 1;
-    text-align: center;
+}
+
+.leaderboard-day-chip--today .leaderboard-day-chip__day {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
 }
 
 .lap-times-list {
