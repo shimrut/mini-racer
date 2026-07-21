@@ -1,6 +1,7 @@
 import { hasTrack } from '../track/catalog.js';
 import { TRACK_MODE_DAILY_GP } from '../config.js';
 import {
+    DAY_MS,
     DAILY_PLAYLIST_DAYS,
     getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
@@ -11,7 +12,6 @@ import {
 import { getScoreboardSnapshot } from './service.js';
 
 const FULL_STANDINGS_PAGE_SIZE = 50;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function mergeLeaderboardPages(currentSnapshot, nextPage) {
     if (!currentSnapshot || typeof currentSnapshot !== 'object') return nextPage || null;
@@ -75,11 +75,19 @@ function resolveAnchorDateMs(anchorChallenge, nowMs = Date.now()) {
     return Number.isFinite(timeMs) ? timeMs : nowMs;
 }
 
-function buildPlaceholderLeaderboardDayOption(challengeDate, nowMs = Date.now()) {
-    const timeMs = Date.parse(`${challengeDate}T00:00:00.000Z`);
-    if (!Number.isFinite(timeMs)) return null;
+function formatLeaderboardDayLabels(timeMs, nowMs = Date.now()) {
+    if (!Number.isFinite(timeMs)) {
+        return {
+            challengeDate: null,
+            dayLabel: 'Day',
+            dateLabel: '--',
+            monthLabel: '',
+            dayNumberLabel: '--',
+        };
+    }
 
     const date = new Date(timeMs);
+    const challengeDate = date.toISOString().slice(0, 10);
     const isToday = challengeDate === new Date(nowMs).toISOString().slice(0, 10);
     const monthLabel = new Intl.DateTimeFormat('en-US', {
         month: 'short',
@@ -91,7 +99,6 @@ function buildPlaceholderLeaderboardDayOption(challengeDate, nowMs = Date.now())
     }).format(date);
 
     return {
-        challengeId: null,
         challengeDate,
         dayLabel: isToday
             ? 'Today'
@@ -105,7 +112,26 @@ function buildPlaceholderLeaderboardDayOption(challengeDate, nowMs = Date.now())
             timeZone: 'UTC'
         }).format(date),
         monthLabel,
-        dayNumberLabel
+        dayNumberLabel,
+    };
+}
+
+function buildLeaderboardDayOptionForDate(dateKey, challenge = null, nowMs = Date.now()) {
+    if (challenge) {
+        const option = buildDailyChallengeLeaderboardDayOption(challenge, nowMs);
+        if (!option) return null;
+        return {
+            ...option,
+            challengeDate: dateKey,
+        };
+    }
+
+    const timeMs = Date.parse(`${dateKey}T00:00:00.000Z`);
+    if (!Number.isFinite(timeMs)) return null;
+
+    return {
+        challengeId: null,
+        ...formatLeaderboardDayLabels(timeMs, nowMs),
     };
 }
 
@@ -129,63 +155,26 @@ export function buildLeaderboardDayOptionsForWindow({
     const options = [];
     for (let offset = 0; offset < dayCount; offset += 1) {
         const dateKey = new Date(anchorMs - offset * DAY_MS).toISOString().slice(0, 10);
-        const challenge = challengesByDate.get(dateKey);
-        if (challenge) {
-            const option = buildDailyChallengeLeaderboardDayOption(challenge);
-            if (option) {
-                options.push({ ...option, challengeDate: dateKey });
-                continue;
-            }
-        }
-
-        const placeholder = buildPlaceholderLeaderboardDayOption(dateKey, nowMs);
-        if (placeholder) {
-            options.push(placeholder);
+        const option = buildLeaderboardDayOptionForDate(
+            dateKey,
+            challengesByDate.get(dateKey) || null,
+            nowMs,
+        );
+        if (option) {
+            options.push(option);
         }
     }
 
     return options;
 }
 
-function buildDailyChallengeLeaderboardDayOption(challenge) {
+function buildDailyChallengeLeaderboardDayOption(challenge, nowMs = Date.now()) {
     if (!isValidDailyChallenge(challenge)) return null;
 
-    const source = getDailyChallengeDateSource(challenge);
-    const timeMs = Date.parse(source);
-    if (!Number.isFinite(timeMs)) {
-        return {
-            challengeId: challenge.id,
-            dayLabel: 'Day',
-            dateLabel: '--',
-            monthLabel: '',
-            dayNumberLabel: '--'
-        };
-    }
-
-    const date = new Date(timeMs);
-    const monthLabel = new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        timeZone: 'UTC'
-    }).format(date);
-    const dayNumberLabel = new Intl.DateTimeFormat('en-US', {
-        day: 'numeric',
-        timeZone: 'UTC'
-    }).format(date);
+    const timeMs = Date.parse(getDailyChallengeDateSource(challenge));
     return {
         challengeId: challenge.id,
-        dayLabel: isDailyChallengeToday(challenge)
-            ? 'Today'
-            : new Intl.DateTimeFormat('en-US', {
-                weekday: 'short',
-                timeZone: 'UTC'
-            }).format(date),
-        dateLabel: new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: 'numeric',
-            timeZone: 'UTC'
-        }).format(date),
-        monthLabel,
-        dayNumberLabel
+        ...formatLeaderboardDayLabels(timeMs, nowMs),
     };
 }
 
