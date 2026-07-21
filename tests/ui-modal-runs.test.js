@@ -89,11 +89,26 @@ function createTestElement(tagName = 'div') {
             node.parent = this;
             return node;
         },
+        insertBefore(node, referenceNode) {
+            if (!referenceNode) {
+                return this.appendChild(node);
+            }
+            const index = this.children.indexOf(referenceNode);
+            if (index < 0) {
+                return this.appendChild(node);
+            }
+            this.children.splice(index, 0, node);
+            node.parent = this;
+            return node;
+        },
         prepend(...nodes) {
             this.children.unshift(...nodes);
         },
         replaceChildren() {
             this.children = [];
+        },
+        get firstChild() {
+            return this.children[0] ?? null;
         },
         querySelector: vi.fn((selector) => {
             if (selector === '.leaderboard-day-rail') {
@@ -401,9 +416,13 @@ describe('ui modal runs helpers', () => {
         });
 
         try {
+            const section = createTestElement('section');
+            section.className = 'leaderboard-section';
+            modalLapTimes.appendChild(section);
+
             renderLeaderboardDayRail.call(context);
-            const initialRail = modalLapTimes.children.find((child) => child.className === 'leaderboard-day-rail');
-            expect(initialRail?.children[1]?.disabled).toBe(true);
+            expect(modalLapTimes.children[0].className).toBe('leaderboard-day-rail');
+            expect(modalLapTimes.children[1]).toBe(section);
 
             updateModalLeaderboardDayOptions.call(context, {
                 leaderboardDayOptions: updatedOptions,
@@ -412,7 +431,8 @@ describe('ui modal runs helpers', () => {
 
             const updatedRail = modalLapTimes.children.find((child) => child.className === 'leaderboard-day-rail');
             expect(updatedRail).toBeTruthy();
-            expect(updatedRail).not.toBe(initialRail);
+            expect(modalLapTimes.children[0]).toBe(updatedRail);
+            expect(modalLapTimes.children[1]).toBe(section);
             expect(updatedRail.children[1]?.disabled).toBe(false);
             expect(context.bindLeaderboardDaySwipe).toHaveBeenCalled();
         } finally {

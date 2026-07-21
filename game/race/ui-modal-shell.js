@@ -1753,7 +1753,7 @@ export class ModalShell {
                 rail.appendChild(button);
             }
 
-            this.modalLapTimes.appendChild(rail);
+            this.modalLapTimes.insertBefore(rail, this.modalLapTimes.firstChild);
             if (typeof this._leaderboardRailScrollLeft === 'number') {
                 rail.scrollLeft = this._leaderboardRailScrollLeft;
             }
