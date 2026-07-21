@@ -290,16 +290,7 @@
     }
 
     .leaderboard-day-chip {
-        min-width: 2.15rem;
-        padding: 0.28rem 0.55rem;
-    }
-
-    .leaderboard-day-chip__month {
-        font-size: 0.4rem;
-    }
-
-    .leaderboard-day-chip__day {
-        font-size: 0.68rem;
+        padding: 0.32rem 0.58rem;
     }
 
 }
