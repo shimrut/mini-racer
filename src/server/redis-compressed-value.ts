@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 
-// Matches the pinned @devvit/redis 0.13.8 redisCompressed envelope. Transaction
+// Matches the pinned @devvit/redis 0.13.9 redisCompressed envelope. Transaction
 // clients bypass its proxy, so callers must queue the encoded value directly.
 const REDIS_COMPRESSION_PREFIX = '__gz:b64__:';
 

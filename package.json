@@ -19,20 +19,20 @@
     "mutation:dry-run": "stryker run --dryRunOnly"
   },
   "dependencies": {
-    "@devvit/analytics": "0.13.8",
-    "@devvit/redis": "0.13.8",
-    "@devvit/web": "0.13.8",
+    "@devvit/analytics": "0.13.9",
+    "@devvit/redis": "0.13.9",
+    "@devvit/web": "0.13.9",
     "express": "^5.1.0"
   },
   "engines": {
     "node": ">=22.2.0"
   },
   "devDependencies": {
-    "@devvit/start": "0.13.8",
+    "@devvit/start": "0.13.9",
     "@napi-rs/canvas": "^1.0.2",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
-    "devvit": "0.13.8",
+    "devvit": "0.13.9",
     "vite": "7.3.6",
     "vitest": "^3.1.1"
   }
