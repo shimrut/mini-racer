@@ -1,6 +1,6 @@
 # Changelog
 
-- Fix uneven standings row heights by applying the same compact padding and min-height to every leaderboard row, including empty community slots.
+- Fix uneven standings row heights by giving empty community slots the same `leaderboard-row` class as player rows.
 - Fix standings date rail disappearing after modal refresh by rebuilding the strip when the container is cleared while the rail cache still matches.
 - Fix standings date-rail hover flicker by keeping the day strip mounted during snapshot refresh and aligning mouse/keyboard chip highlights.
 - Standings date strip keeps Today as a single label and shows other days as a small month over a larger day number, using the same accent pill and focus ring treatment as garage tabs.

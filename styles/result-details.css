@@ -285,9 +285,8 @@
     .leaderboard-summary__value {
         font-size: 1.1rem;
     }
-    .leaderboard-list.lap-times-list {
-        --leaderboard-row-padding-block: 0.35rem;
-        --leaderboard-row-padding-inline: 0.5rem;
+    .leaderboard-row {
+        padding: 0.35rem 0.5rem;
     }
     .leaderboard-day-rail {
         padding: 0.25rem 0.2rem 0.35rem;
