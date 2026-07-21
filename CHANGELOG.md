@@ -1,6 +1,6 @@
 # Changelog
 
-- Standings date strip keeps Today as a single label and shows other days as a small month over a larger day number, using the same accent pill and focus ring treatment as garage tabs.
+- Standings date strip uses quiet filled pills for every day, accent/bright fill for the active and keyboard day, and optically centered month-over-day labels.
 - Hardened leaderboard-identity and daily-gp-model mutation tests with full name-catalog snapshots, exact constructed-name fixtures, and pinned TTL/window constant values after `ignoreStatic` exposed hybrid static survivors.
 - Added Number Zero through Number Six tracks (definitions, catalog/registry wiring, share images) and updated track runtime integrity expectations plus the full registry fingerprint.
 - Exported simulation scrape/collision helpers and enabled Stryker `ignoreStatic` so static mutants no longer dominate runtime.

@@ -292,8 +292,9 @@
         padding: 0.4rem 0;
     }
     .leaderboard-day-chip {
-        min-width: 2.85rem;
-        padding: 0.36rem 0.75rem;
+        min-width: 3.1rem;
+        min-height: 2.7rem;
+        padding: 0.48rem 0.9rem;
     }
 
     /* 2. Daily Playlist Modal */
