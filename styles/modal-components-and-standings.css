@@ -415,7 +415,9 @@
 
 .leaderboard-list.lap-times-list {
     --leaderboard-row-gap: .4rem;
-    --leaderboard-row-min-height: calc(0.65rem * 2 + 1.5rem);
+    --leaderboard-row-padding-block: 0.65rem;
+    --leaderboard-row-padding-inline: 0.75rem;
+    --leaderboard-row-min-height: calc(var(--leaderboard-row-padding-block) * 2 + 1.5rem);
     display: flex;
     flex-direction: column;
     gap: var(--leaderboard-row-gap);
@@ -423,7 +425,9 @@
 }
 
 .leaderboard-list .combined-row {
+    padding: var(--leaderboard-row-padding-block) var(--leaderboard-row-padding-inline);
     min-height: var(--leaderboard-row-min-height);
+    box-sizing: border-box;
 }
 
 .leaderboard-list .combined-row-time {
