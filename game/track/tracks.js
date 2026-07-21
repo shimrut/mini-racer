@@ -21,6 +21,7 @@ import serpentCrossing from './definitions/serpent-crossing.js';
 import ardennesRidge from './definitions/ardennes-ridge.js';
 import pretzelArena from './definitions/pretzel-arena.js';
 import albertGardens from './definitions/albert-gardens.js';
+import jumpingJack from './definitions/jumping-jack.js';
 import caspianBoulevard from './definitions/caspian-boulevard.js';
 import velvetWombat from './definitions/velvet-wombat.js';
 import cobaltRun from './definitions/cobalt-run.js';
@@ -38,6 +39,7 @@ import redLagoon from './definitions/red-lagoon.js';
 import copperVale from './definitions/copper-vale.js';
 import obsidianRidge from './definitions/obsidian-ridge.js';
 import auroraRing from './definitions/aurora-ring.js';
+import furiousFast from './definitions/furious-fast.js';
 import lanternPier from './definitions/lantern-pier.js';
 import quartzHollow from './definitions/quartz-hollow.js';
 import needleChicane from './definitions/needle-chicane.js';
@@ -50,6 +52,7 @@ import numberThree from './definitions/number-three.js';
 import numberFour from './definitions/number-four.js';
 import numberFive from './definitions/number-five.js';
 import numberSix from './definitions/number-six.js';
+import goldenMarsh from './definitions/golden-marsh.js';
 import { TRACK_SCHEDULE_KEYS, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -76,6 +79,7 @@ const TRACK_GEOMETRY = {
     ardennesRidge,
     pretzelArena,
     albertGardens,
+    jumpingJack,
     caspianBoulevard,
     velvetWombat,
     cobaltRun,
@@ -93,6 +97,7 @@ const TRACK_GEOMETRY = {
     copperVale,
     obsidianRidge,
     auroraRing,
+    furiousFast,
     lanternPier,
     quartzHollow,
     needleChicane,
@@ -105,6 +110,7 @@ const TRACK_GEOMETRY = {
     numberFour,
     numberFive,
     numberSix,
+    goldenMarsh,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

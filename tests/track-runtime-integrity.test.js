@@ -94,10 +94,10 @@ describe('track runtime integrity', () => {
                 .map((trackKey) => [trackKey, TRACKS[trackKey]]),
         );
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
-            '923415f865de38edd3737e9c035dfa657e392c3d12143f29a38f8bbc491f14f8',
+            'a3c5cc6c6e84afd239e1eb05a325da97d9a6499ff0085b27d5e5b44a95f6a462',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '39800bd2b79dab5689ba00ffc4fea5315c8d6569aaafc863173c2e85deeef050',
+            '8e75f854e69b4a3d51f5c50f16625d1c5c799d1c52186128ea8bd027361f9bef',
         );
     });
 

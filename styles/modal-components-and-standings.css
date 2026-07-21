@@ -302,7 +302,7 @@
 .leaderboard-day-rail {
     display: flex;
     align-items: center;
-    gap: 0.1rem;
+    justify-content: space-between;
     width: 100%;
     min-height: 2rem;
     padding: 0.2rem 0.2rem 0.35rem;

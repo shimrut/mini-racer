@@ -316,5 +316,23 @@
     "gold": 16.98,
     "silver": 17.37,
     "bronze": 17.89
+  },
+  "jumpingJack": {
+    "author": 11.45,
+    "gold": 11.81,
+    "silver": 12.28,
+    "bronze": 12.76
+  },
+  "goldenMarsh": {
+    "author": 9.99,
+    "gold": 10.32,
+    "silver": 10.75,
+    "bronze": 11.09
+  },
+  "furiousFast": {
+    "author": 10.80,
+    "gold": 11.28,
+    "silver": 11.71,
+    "bronze": 12.05
   }
 }
