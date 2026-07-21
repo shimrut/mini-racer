@@ -1567,6 +1567,25 @@ export class ModalShell {
         this.applyRankModalStatContent(rankStat, scoreboardSnapshot);
     }
 
+    updateModalLeaderboardDayOptions({
+        leaderboardDayOptions = null,
+        onSelectLeaderboardDay = null,
+    } = {}) {
+        if (!this._modalRunsPayload) return;
+
+        const updates = {};
+        if (Array.isArray(leaderboardDayOptions)) {
+            updates.leaderboardDayOptions = leaderboardDayOptions;
+        }
+        if (typeof onSelectLeaderboardDay === 'function') {
+            updates.onSelectLeaderboardDay = onSelectLeaderboardDay;
+        }
+
+        this._modalRunsPayload = buildModalRunsPayload(this._modalRunsPayload, { updates });
+        this.renderLeaderboardDayRail({ force: true });
+        this.bindLeaderboardDaySwipe?.();
+    }
+
     updateModalRunSummary({
         bestTime = undefined,
         currentTime = undefined,
@@ -1684,21 +1703,30 @@ export class ModalShell {
 
             for (const option of payload.leaderboardDayOptions) {
                 const button = document.createElement('button');
-                const isSelected = option?.challengeId === payload?.selectedLeaderboardDayId;
+                const hasChallengeId = Boolean(option?.challengeId);
+                const isSelected = hasChallengeId
+                    && option.challengeId === payload?.selectedLeaderboardDayId;
                 button.className = `leaderboard-day-chip${isSelected ? ' is-selected' : ''}`;
                 button.type = 'button';
                 button.dataset.challengeId = option?.challengeId || '';
                 button.setAttribute('role', 'tab');
                 button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-                button.setAttribute('aria-disabled', isSelected ? 'true' : 'false');
+                if (!hasChallengeId) {
+                    button.disabled = true;
+                    button.setAttribute('aria-disabled', 'true');
+                } else {
+                    button.setAttribute('aria-disabled', isSelected ? 'true' : 'false');
+                }
                 button.setAttribute(
                     'aria-label',
                     `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
                 );
-                button.addEventListener('click', () => {
-                    this._leaderboardRailScrollLeft = rail.scrollLeft;
-                    payload?.onSelectLeaderboardDay?.(option?.challengeId);
-                });
+                if (hasChallengeId) {
+                    button.addEventListener('click', () => {
+                        this._leaderboardRailScrollLeft = rail.scrollLeft;
+                        payload?.onSelectLeaderboardDay?.(option.challengeId);
+                    });
+                }
 
                 const stack = document.createElement('span');
                 stack.className = 'leaderboard-day-chip__stack';
@@ -1743,7 +1771,7 @@ export class ModalShell {
 
         for (const option of options) {
             const challengeId = option?.challengeId;
-            if (!challengeId) return false;
+            if (!challengeId) continue;
             const button = rail.querySelector(`[data-challenge-id="${challengeId}"]`);
             if (!button) return false;
 
@@ -1979,10 +2007,17 @@ export class ModalShell {
             );
             if (selectedIndex < 0) return;
 
-            const nextIndex = deltaX < 0 ? selectedIndex + 1 : selectedIndex - 1;
-            const nextChallengeId = currentOptions[nextIndex]?.challengeId;
-            if (!nextChallengeId) return;
-            payload?.onSelectLeaderboardDay?.(nextChallengeId);
+            const direction = deltaX < 0 ? 1 : -1;
+            let nextIndex = selectedIndex;
+            while (true) {
+                nextIndex += direction;
+                if (nextIndex < 0 || nextIndex >= currentOptions.length) return;
+                const nextChallengeId = currentOptions[nextIndex]?.challengeId;
+                if (nextChallengeId) {
+                    payload?.onSelectLeaderboardDay?.(nextChallengeId);
+                    return;
+                }
+            }
         };
         this._leaderboardTouchCancelHandler = () => {
             this._leaderboardSwipeStart = null;

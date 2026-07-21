@@ -349,6 +349,16 @@ export function buildModalRunsPayload(source, {
     if (hasOwnValue(updates, 'scoreboardSnapshot') && updates.scoreboardSnapshot !== undefined) {
         normalized.scoreboardSnapshot = updates.scoreboardSnapshot || null;
     }
+    if (hasOwnValue(updates, 'leaderboardDayOptions') && updates.leaderboardDayOptions !== undefined) {
+        normalized.leaderboardDayOptions = Array.isArray(updates.leaderboardDayOptions)
+            ? updates.leaderboardDayOptions
+            : null;
+    }
+    if (hasOwnValue(updates, 'onSelectLeaderboardDay') && updates.onSelectLeaderboardDay !== undefined) {
+        normalized.onSelectLeaderboardDay = typeof updates.onSelectLeaderboardDay === 'function'
+            ? updates.onSelectLeaderboardDay
+            : null;
+    }
 
     return normalized;
 }

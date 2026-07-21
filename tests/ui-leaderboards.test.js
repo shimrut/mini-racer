@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TRACK_MODE_DAILY_GP } from '../game/config.js';
-import { LeaderboardsUi, mergeLeaderboardPages } from '../game/scoreboard/ui.js';
+import { DAILY_PLAYLIST_DAYS } from '../game/daily-challenge/service.js';
+import {
+    LeaderboardsUi,
+    mergeLeaderboardPages,
+    buildLeaderboardDayOptionsForWindow,
+} from '../game/scoreboard/ui.js';
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -12,6 +17,13 @@ function createDeferred() {
         resolve = resolvePromise;
     });
     return { promise, resolve };
+}
+
+function buildExpectedDayOptions(challenge, playlistChallenges = []) {
+    return buildLeaderboardDayOptionsForWindow({
+        anchorChallenge: challenge,
+        playlistChallenges,
+    });
 }
 
 describe('ui leaderboard helpers', () => {
@@ -64,6 +76,12 @@ describe('ui leaderboard helpers', () => {
         const today = new Date(Date.now()).toISOString().slice(0, 10);
         const scoreboardSnapshot = { playerRankLabel: '#5' };
         const showRunsModal = vi.fn();
+        const updateModalLeaderboardDayOptions = vi.fn();
+        const fallbackChallenge = {
+            id: 'daily-1',
+            trackKey: 'circuit',
+            challengeDate: today,
+        };
         const dailyChallengeUi = {
             getSummary: vi.fn(() => ({
                 challengeId: 'daily-1',
@@ -72,69 +90,43 @@ describe('ui leaderboard helpers', () => {
                 scoreboardSnapshot: { playerRankLabel: '#9' }
             }))
         };
-        const instance = new LeaderboardsUi({ showRunsModal, dailyChallengeUi });
+        const instance = new LeaderboardsUi({
+            showRunsModal,
+            dailyChallengeUi,
+            updateModalLeaderboardDayOptions,
+        });
         vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockImplementation(async () => scoreboardSnapshot);
+        const service = await import('../game/daily-challenge/service.js');
+        vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([]);
+        const playlistDeferred = createDeferred();
+        vi.spyOn(service, 'getDailyChallengePlaylist').mockReturnValue(playlistDeferred.promise);
 
-        await instance.openDailyChallengeLeaderboard('back');
-
-        expect(instance.requestDailyChallengeLeaderboardSnapshot).toHaveBeenCalledWith(
-            'daily-1',
-            { forceRefresh: false, limit: 50, offset: 0 }
-        );
-        expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', {
+        const openPromise = instance.openDailyChallengeLeaderboard('back');
+        const expectedDayOptions = buildExpectedDayOptions(fallbackChallenge);
+        expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', expect.objectContaining({
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'circuit',
             scoreboardTitle: 'Classic Circuit',
             scoreboardSubhead: 'Classic Circuit',
             scoreboardChallengeId: 'daily-1',
             scoreboardSnapshot: { isLoading: true },
-            onLoadMoreLeaderboard: expect.any(Function),
-            leaderboardDayOptions: [{
-                challengeId: 'daily-1',
-                dayLabel: 'Today',
-                dateLabel: new Intl.DateTimeFormat('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`)),
-                monthLabel: new Intl.DateTimeFormat('en-US', {
-                    month: 'short',
-                    timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`)),
-                dayNumberLabel: new Intl.DateTimeFormat('en-US', {
-                    day: 'numeric',
-                    timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`))
-            }],
-            selectedLeaderboardDayId: 'daily-1'
-        });
-        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', {
-            scoreboardMode: TRACK_MODE_DAILY_GP,
-            scoreboardTrackKey: 'circuit',
-            scoreboardTitle: 'Classic Circuit',
-            scoreboardSubhead: 'Classic Circuit',
+            selectedLeaderboardDayId: 'daily-1',
+            leaderboardDayOptions: expectedDayOptions,
+        }));
+        expect(expectedDayOptions).toHaveLength(DAILY_PLAYLIST_DAYS);
+
+        playlistDeferred.resolve([]);
+        await openPromise;
+
+        expect(instance.requestDailyChallengeLeaderboardSnapshot).toHaveBeenCalledWith(
+            'daily-1',
+            { forceRefresh: false, limit: 50, offset: 0 }
+        );
+        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', expect.objectContaining({
             scoreboardChallengeId: 'daily-1',
             scoreboardSnapshot,
-            onLoadMoreLeaderboard: expect.any(Function),
-            leaderboardDayOptions: [{
-                challengeId: 'daily-1',
-                dayLabel: 'Today',
-                dateLabel: new Intl.DateTimeFormat('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`)),
-                monthLabel: new Intl.DateTimeFormat('en-US', {
-                    month: 'short',
-                    timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`)),
-                dayNumberLabel: new Intl.DateTimeFormat('en-US', {
-                    day: 'numeric',
-                    timeZone: 'UTC'
-                }).format(new Date(`${today}T00:00:00.000Z`))
-            }],
-            selectedLeaderboardDayId: 'daily-1'
-        });
+            leaderboardDayOptions: expectedDayOptions,
+        }));
     });
 
     it('shows the track name in the standings header instead of the challenge date', async () => {
@@ -157,14 +149,15 @@ describe('ui leaderboard helpers', () => {
             expect(showRunsModal).toHaveBeenCalledWith(null, null, null, 'close', expect.objectContaining({
                 scoreboardTitle: 'Classic Circuit',
                 selectedLeaderboardDayId: 'daily-friday',
-                leaderboardDayOptions: [{
-                    challengeId: 'daily-friday',
-                    dayLabel: 'Fri',
-                    dateLabel: 'Jul 10',
-                    monthLabel: 'Jul',
-                    dayNumberLabel: '10'
-                }]
+                leaderboardDayOptions: expect.arrayContaining([
+                    expect.objectContaining({
+                        challengeId: 'daily-friday',
+                        dayLabel: 'Fri',
+                        dateLabel: 'Jul 10',
+                    }),
+                ]),
             }));
+            expect(showRunsModal.mock.calls[0][4].leaderboardDayOptions).toHaveLength(DAILY_PLAYLIST_DAYS);
         } finally {
             Date.now = originalDateNow;
         }
@@ -298,23 +291,17 @@ describe('ui leaderboard helpers', () => {
             scoreboardSnapshot: playedSnapshot
         }, 'back');
 
-        expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', {
+        expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', expect.objectContaining({
             scoreboardSnapshot: { ...playedSnapshot, isRefreshing: true },
-            onLoadMoreLeaderboard: expect.any(Function),
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'harborParkLoop',
             scoreboardTitle: 'Harbor Park',
             scoreboardSubhead: 'Harbor Park',
             scoreboardChallengeId: 'daily-2',
-            leaderboardDayOptions: [{
-                challengeId: 'daily-2',
-                dayLabel: 'Day',
-                dateLabel: '--',
-                monthLabel: '',
-                dayNumberLabel: '--'
-            }],
-            selectedLeaderboardDayId: 'daily-2'
-        });
+            selectedLeaderboardDayId: 'daily-2',
+            leaderboardDayOptions: expect.any(Array),
+        }));
+        expect(showRunsModal.mock.calls[0][4].leaderboardDayOptions).toHaveLength(DAILY_PLAYLIST_DAYS);
         expect(requestSnapshot).toHaveBeenCalledWith('daily-2', {
             forceRefresh: true,
             limit: 50,
@@ -804,5 +791,105 @@ describe('ui leaderboard helpers', () => {
         });
 
         consoleError.mockRestore();
+    });
+
+    it('builds seven day options from the anchor challenge even when the playlist cache is empty', () => {
+        const today = '2026-07-21';
+        const options = buildLeaderboardDayOptionsForWindow({
+            anchorChallenge: {
+                id: 'daily-today',
+                trackKey: 'circuit',
+                challengeDate: today,
+            },
+            playlistChallenges: [],
+            nowMs: Date.parse(`${today}T12:00:00.000Z`),
+        });
+
+        expect(options).toHaveLength(DAILY_PLAYLIST_DAYS);
+        expect(options[0]).toMatchObject({
+            challengeId: 'daily-today',
+            dayLabel: 'Today',
+            challengeDate: today,
+        });
+        expect(options.slice(1).every((option) => option.challengeId === null)).toBe(true);
+    });
+
+    it('updates the day rail when the playlist resolves while standings stay open', async () => {
+        const today = new Date(Date.now()).toISOString().slice(0, 10);
+        const showRunsModal = vi.fn();
+        const updateModalLeaderboardDayOptions = vi.fn();
+        const dailyChallengeUi = {
+            getSummary: vi.fn(() => ({
+                challengeId: 'daily-1',
+                trackKey: 'circuit',
+                challengeDate: today,
+            })),
+        };
+        const instance = new LeaderboardsUi({
+            showRunsModal,
+            dailyChallengeUi,
+            updateModalLeaderboardDayOptions,
+        });
+        vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue({
+            playerRankLabel: '#3',
+        });
+        const service = await import('../game/daily-challenge/service.js');
+        vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([]);
+        const playlistDeferred = createDeferred();
+        vi.spyOn(service, 'getDailyChallengePlaylist').mockReturnValue(playlistDeferred.promise);
+
+        const openPromise = instance.openDailyChallengeLeaderboard('close');
+        playlistDeferred.resolve([
+            {
+                id: 'daily-1',
+                trackKey: 'circuit',
+                challengeDate: today,
+            },
+            {
+                id: 'daily-0',
+                trackKey: 'harborParkLoop',
+                challengeDate: new Date(Date.parse(`${today}T00:00:00.000Z`) - 86400000)
+                    .toISOString()
+                    .slice(0, 10),
+            },
+        ]);
+        await openPromise;
+
+        expect(updateModalLeaderboardDayOptions).toHaveBeenCalledWith(expect.objectContaining({
+            leaderboardDayOptions: expect.arrayContaining([
+                expect.objectContaining({ challengeId: 'daily-1' }),
+                expect.objectContaining({ challengeId: 'daily-0' }),
+            ]),
+        }));
+    });
+
+    it('clears loading when the refresh returns null without a cached snapshot', async () => {
+        const today = new Date(Date.now()).toISOString().slice(0, 10);
+        const showRunsModal = vi.fn();
+        const dailyChallengeUi = {
+            getSummary: vi.fn(() => ({
+                challengeId: 'daily-1',
+                trackKey: 'circuit',
+                challengeDate: today,
+            })),
+        };
+        const instance = new LeaderboardsUi({ showRunsModal, dailyChallengeUi });
+        vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue(null);
+        const service = await import('../game/daily-challenge/service.js');
+        vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([]);
+        vi.spyOn(service, 'getDailyChallengePlaylist').mockResolvedValue([]);
+
+        await instance.openDailyChallengeLeaderboard('close');
+
+        expect(showRunsModal).toHaveBeenLastCalledWith(
+            null,
+            null,
+            null,
+            'close',
+            expect.objectContaining({
+                scoreboardChallengeId: 'daily-1',
+                scoreboardSnapshot: null,
+            }),
+        );
     });
 });

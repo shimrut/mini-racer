@@ -11,6 +11,7 @@ const {
     renderLeaderboardStandaloneIntro,
     renderLeaderboardDayRail,
     updateModalScoreboardSnapshot,
+    updateModalLeaderboardDayOptions,
     configureRunsModalHeader,
     updateModalRunSummary,
     bindLeaderboardPagination,
@@ -78,10 +79,14 @@ function createTestElement(tagName = 'div') {
         toggleAttribute: vi.fn(),
         addEventListener: vi.fn(),
         append(...nodes) {
-            this.children.push(...nodes);
+            for (const node of nodes) {
+                this.children.push(node);
+                node.parent = this;
+            }
         },
         appendChild(node) {
             this.children.push(node);
+            node.parent = this;
             return node;
         },
         prepend(...nodes) {
@@ -326,6 +331,90 @@ describe('ui modal runs helpers', () => {
             expect(railAfter).toBe(railBefore);
             expect(header.children.length).toBeGreaterThan(0);
             expect(context.content.renderScoreboardList).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('renders placeholder day chips as disabled until a challenge id is available', () => {
+        const originalDocument = global.document;
+        const modalLapTimes = createTestElement('motion');
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        const context = withLeaderboardIntroMethods({
+            modalLapTimes,
+            _modalRunsPayload: {
+                showGlobalLeaderboard: true,
+                scoreboardChallengeId: 'today',
+                scoreboardTrackKey: 'circuit',
+                selectedLeaderboardDayId: 'today',
+                leaderboardDayOptions: [
+                    { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+                    { challengeId: null, dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+                ],
+                scoreboardSnapshot: { playerRankLabel: '#2' },
+                onSelectLeaderboardDay: vi.fn(),
+            },
+        });
+
+        try {
+            renderLeaderboardDayRail.call(context);
+            const rail = modalLapTimes.children.find((child) => child.className === 'leaderboard-day-rail');
+            expect(rail?.children[1]?.disabled).toBe(true);
+            expect(rail?.children[1]?.getAttribute('aria-disabled')).toBe('true');
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('rebuilds the day rail when updateModalLeaderboardDayOptions is called', () => {
+        const originalDocument = global.document;
+        const modalLapTimes = createTestElement('motion');
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        const initialOptions = [
+            { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+            { challengeId: null, dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+        ];
+        const updatedOptions = [
+            { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+            { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+        ];
+        const context = withLeaderboardIntroMethods({
+            modalLapTimes,
+            _modalRunsPayload: {
+                showGlobalLeaderboard: true,
+                scoreboardChallengeId: 'today',
+                scoreboardTrackKey: 'circuit',
+                selectedLeaderboardDayId: 'today',
+                leaderboardDayOptions: initialOptions,
+                scoreboardSnapshot: { playerRankLabel: '#2' },
+                onSelectLeaderboardDay: vi.fn(),
+            },
+            bindLeaderboardDaySwipe: vi.fn(),
+        });
+
+        try {
+            renderLeaderboardDayRail.call(context);
+            const initialRail = modalLapTimes.children.find((child) => child.className === 'leaderboard-day-rail');
+            expect(initialRail?.children[1]?.disabled).toBe(true);
+
+            updateModalLeaderboardDayOptions.call(context, {
+                leaderboardDayOptions: updatedOptions,
+                onSelectLeaderboardDay: vi.fn(),
+            });
+
+            const updatedRail = modalLapTimes.children.find((child) => child.className === 'leaderboard-day-rail');
+            expect(updatedRail).toBeTruthy();
+            expect(updatedRail).not.toBe(initialRail);
+            expect(updatedRail.children[1]?.disabled).toBe(false);
+            expect(context.bindLeaderboardDaySwipe).toHaveBeenCalled();
         } finally {
             global.document = originalDocument;
         }
