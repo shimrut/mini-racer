@@ -289,12 +289,11 @@
         padding: 0.35rem 0.5rem;
     }
     .leaderboard-day-rail {
-        gap: 1.35rem;
+        gap: 0.5rem;
     }
-
     .leaderboard-day-chip {
-        width: 3.15rem;
-        height: 2.65rem;
+        min-width: 2.1rem;
+        padding: 0.26rem 0.5rem;
     }
 
     /* 2. Daily Playlist Modal */

@@ -289,17 +289,17 @@
         font-size: 0.72rem;
     }
 
-    .leaderboard-day-rail {
-        gap: 1.35rem;
-    }
-
     .leaderboard-day-chip {
-        width: 3.15rem;
-        height: 2.65rem;
+        min-width: 2.15rem;
+        padding: 0.28rem 0.55rem;
     }
 
-    .leaderboard-day-chip--today {
-        padding-inline: 0.9rem;
+    .leaderboard-day-chip__month {
+        font-size: 0.4rem;
+    }
+
+    .leaderboard-day-chip__day {
+        font-size: 0.68rem;
     }
 
 }
