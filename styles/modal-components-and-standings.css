@@ -302,7 +302,7 @@
 .leaderboard-day-rail {
     display: flex;
     align-items: center;
-    gap: 0.85rem;
+    gap: 1rem;
     width: 100%;
     min-height: 2rem;
     padding: 0.1rem 0 0.35rem;
@@ -318,83 +318,87 @@
 
 .leaderboard-day-chip {
     display: inline-flex;
-    min-width: 0;
-    min-height: 2.35rem;
+    min-width: 2.85rem;
     flex: 0 0 auto;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 0.08rem;
-    padding: 0.42rem 0.72rem;
-    border: none;
-    border-radius: 999px;
+    gap: 0.12rem;
+    padding: 0.38rem 0.78rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
     background: transparent;
-    color: var(--text-color, var(--text-color));
+    color: var(--text-dim);
     font: inherit;
     text-align: center;
     cursor: pointer;
     box-shadow: none;
-    opacity: 0.55;
-    transition: color 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+    transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .leaderboard-day-chip:hover {
     color: var(--text-color);
-    opacity: 0.85;
+    background: rgba(148, 163, 184, 0.12);
 }
 
 .leaderboard-day-chip:disabled {
-    opacity: 1;
     cursor: default;
 }
 
 .leaderboard-day-chip.is-selected {
-    color: #ffffff;
-    opacity: 1;
+    color: var(--text-color);
     background: var(--accent-color);
+    border-color: transparent;
 }
 
 .leaderboard-day-chip.is-selected:hover {
-    color: #ffffff;
-    opacity: 1;
+    color: var(--text-color);
     background: var(--accent-color);
 }
 
 .leaderboard-day-chip.is-menu-selected {
     color: var(--text-color);
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.18);
+    background: rgba(148, 163, 184, 0.18);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .leaderboard-day-chip.is-selected.is-menu-selected {
-    color: #ffffff;
     background: var(--accent-color);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .leaderboard-day-chip__month {
+    display: block;
+    width: 100%;
     font-family: var(--header-font);
-    font-size: 0.52rem;
+    font-size: 0.55rem;
     font-style: italic;
     font-weight: 700;
     letter-spacing: 0.1em;
+    margin-right: -0.1em;
     line-height: 1;
+    text-align: center;
     text-transform: uppercase;
-    opacity: 0.72;
+    color: inherit;
+    opacity: 0.78;
 }
 
 .leaderboard-day-chip.is-selected .leaderboard-day-chip__month,
 .leaderboard-day-chip.is-menu-selected .leaderboard-day-chip__month {
-    opacity: 0.9;
+    opacity: 0.92;
 }
 
 .leaderboard-day-chip__day {
+    display: block;
+    width: 100%;
     font-family: var(--header-font);
-    font-size: 0.88rem;
+    font-size: 0.86rem;
     font-style: italic;
     font-weight: 900;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
+    margin-right: -0.06em;
     line-height: 1;
+    text-align: center;
     text-transform: uppercase;
 }
 
