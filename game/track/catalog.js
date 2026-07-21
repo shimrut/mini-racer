@@ -54,6 +54,7 @@ export const TRACK_CATALOG = {
     numberFour: { name: "Number Four" },
     numberFive: { name: "Number Five" },
     numberSix: { name: "Number Six" },
+    numberSeven: { name: "Number Seven" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -112,6 +113,7 @@ export const TRACK_SCHEDULE_KEYS = [
     'numberFour',
     'numberFive',
     'numberSix',
+    'numberSeven',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

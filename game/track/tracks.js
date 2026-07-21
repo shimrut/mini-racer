@@ -16,6 +16,7 @@ import twistedCanyon from './definitions/twisted-canyon.js';
 import greenTroll from './definitions/green-troll.js';
 import desertBridge from './definitions/desert-bridge.js';
 import templeStraight from './definitions/temple-straight.js';
+import goldenMarsh from './definitions/golden-marsh.js';
 import harborPrincipality from './definitions/harbor-principality.js';
 import serpentCrossing from './definitions/serpent-crossing.js';
 import ardennesRidge from './definitions/ardennes-ridge.js';
@@ -52,7 +53,7 @@ import numberThree from './definitions/number-three.js';
 import numberFour from './definitions/number-four.js';
 import numberFive from './definitions/number-five.js';
 import numberSix from './definitions/number-six.js';
-import goldenMarsh from './definitions/golden-marsh.js';
+import numberSeven from './definitions/number-seven.js';
 import { TRACK_SCHEDULE_KEYS, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -74,6 +75,7 @@ const TRACK_GEOMETRY = {
     greenTroll,
     desertBridge,
     templeStraight,
+    goldenMarsh,
     harborPrincipality,
     serpentCrossing,
     ardennesRidge,
@@ -110,7 +112,7 @@ const TRACK_GEOMETRY = {
     numberFour,
     numberFive,
     numberSix,
-    goldenMarsh,
+    numberSeven,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

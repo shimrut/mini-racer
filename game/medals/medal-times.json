@@ -277,45 +277,51 @@
   },
   "numberZero": {
     "author": 7.01,
-    "gold": 7.22,
-    "silver": 7.55,
-    "bronze": 7.96
+    "gold": 7.18,
+    "silver": 7.45,
+    "bronze": 7.86
   },
   "numberOne": {
     "author": 9.25,
-    "gold": 9.82,
-    "silver": 9.95,
-    "bronze": 10.19
+    "gold": 9.52,
+    "silver": 9.75,
+    "bronze": 10.09
   },
   "numberTwo": {
     "author": 14.25,
-    "gold": 14.59,
-    "silver": 15.07,
-    "bronze": 15.63
+    "gold": 14.49,
+    "silver": 14.87,
+    "bronze": 15.13
   },
   "numberThree": {
     "author": 12.60,
-    "gold": 12.92,
-    "silver": 13.34,
-    "bronze": 13.71
+    "gold": 12.82,
+    "silver": 13.14,
+    "bronze": 13.51
   },
   "numberFour": {
     "author": 11.15,
-    "gold": 11.72,
-    "silver": 12.17,
-    "bronze": 12.65
+    "gold": 11.42,
+    "silver": 11.87,
+    "bronze": 12.05
   },
   "numberFive": {
     "author": 15.05,
-    "gold": 15.38,
-    "silver": 15.99,
-    "bronze": 16.40
+    "gold": 15.28,
+    "silver": 15.61,
+    "bronze": 15.98
   },
   "numberSix": {
     "author": 16.57,
-    "gold": 16.98,
-    "silver": 17.37,
-    "bronze": 17.89
+    "gold": 16.78,
+    "silver": 17.07,
+    "bronze": 17.59
+  },
+  "numberSeven": {
+    "author": 13.40,
+    "gold": 13.61,
+    "silver": 13.89,
+    "bronze": 14.12
   },
   "jumpingJack": {
     "author": 11.45,

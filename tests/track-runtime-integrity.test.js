@@ -86,6 +86,7 @@ describe('track runtime integrity', () => {
             'numberFour',
             'numberFive',
             'numberSix',
+            'numberSeven',
         ]);
 
         const existingTrackRegistry = Object.fromEntries(
@@ -97,7 +98,7 @@ describe('track runtime integrity', () => {
             'a3c5cc6c6e84afd239e1eb05a325da97d9a6499ff0085b27d5e5b44a95f6a462',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '8e75f854e69b4a3d51f5c50f16625d1c5c799d1c52186128ea8bd027361f9bef',
+            '13344386120984298e6b482b5ab23a101a63a34e21f433f752fc1efc2515a7c1',
         );
     });
 

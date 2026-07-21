@@ -1,5 +1,6 @@
 # Changelog
 
+- Removed Number Eight from the Daily GP schedule (catalog, registry, definition, and share image).
 - Added Golden Marsh, Jumping Jack, and Furious Fast to the Daily GP schedule with share images and medal targets; refined Needle Chicane and Turbo Shell geometry.
 - Fixed procedural music failing to start when the Web Audio context was still suspended at race start (notably on iOS Reddit).
 - Tightened Devvit Journey attempt boundaries so each explicit player intent (`initial_start`, `track_switch`, `restart`, `retry`, `improve`) maps to one start/end pair, including mid-run track switches that now replace the active Journey before the next attempt begins.
