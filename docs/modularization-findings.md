@@ -55,7 +55,7 @@ Object.assign(
 | UI modals | `race/ui-modal-shell.js` (+ content / handoff helpers) | Shell knows menus, leaderboard, share, garage, settings — not just open/close |
 | Identity + API | `scoreboard/api-client.js` (~121 lines) | Player ID / guest token live next to every `/api` route table; most callers import both together |
 | Server Redis facade | `daily-gp-store.ts` | Challenge ledger, player prefs, snapshot, and submit/lock in one file |
-| Medals | `medals/medals.js` | Timing rules mixed with SVG / overlay presentation; server already imports `getMedalForLapTime` from this mixed module (pulls `medal-icon.js`) |
+| Medals | ~~`medals/medals.js` mixed~~ | Timing in `medal-timing.js` (server-safe); SVG overlays stay in `medals.js` + `medal-icon.js` |
 | Engine `this` | All `*-engine-methods.js` | Runtime god-object: any mixin can reach any other via `this` |
 
 ### Size hotspots (approx. lines)
@@ -108,7 +108,7 @@ flowchart TB
   Store --> Cat
 ```
 
-**Rule to protect:** shared physics/track modules may be imported by the server. UI/DOM modules must never be. Medals timing is the soft spot today — rules live in a module that also owns SVG overlays.
+**Rule to protect:** shared physics/track modules may be imported by the server. UI/DOM modules must never be. Medal timing lives in `medal-timing.js` (DOM-free); keep overlays and `medal-icon.js` client-only.
 
 ---
 
@@ -207,20 +207,20 @@ flowchart TB
 
 ---
 
-### 6. Formalize the shared gameplay contract (and split medals timing)
+### 6. Formalize the shared gameplay contract (and split medals timing) — **timing extract DONE**
 
 **Effort:** S–M · **Risk:** Low (timing extract) / Very low (docs)
 
-**Treat as server-safe package surface (document / enforce):**
+**Done (timing):** `game/medals/medal-timing.js` owns thresholds + `getMedalForLapTime` (no DOM). `medals.js` keeps overlays / entrance animation and re-exports timing. Server share + share-image tooling import `medal-timing.js`.
+
+**Still optional:** document / enforce the broader server-safe package surface:
 - `game/track/catalog.js`, `runtime.js`, `tracks.js` (+ definitions)
 - `game/race/simulation.js`, `run-policy.js`
 - `game/config.js` physics subset (server already imports `CONFIG`); `game/car/handling.js` (client simulation today — keep server-safe if ever shared)
 - `game/shared/checkpoint-times.js`, `leaderboard-identity.js`, `daily-gp-history-backfill.js`
-- Medals **timing** rules + `medal-times.json` (not SVG overlays)
+- `game/medals/medal-timing.js` + `medal-times.json` (not SVG overlays)
 
-**Today’s soft spot:** `src/server/daily-gp-share.ts` imports `getMedalForLapTime` from `game/medals/medals.js`, which also imports SVG/`document` helpers via `medal-icon.js`. Timing functions themselves are pure, but the module boundary is not. `reddit-post-title.ts` already imports `medal-times.json` directly — prefer that pattern after a rules-only extract.
-
-**Benefit:** Stops accidental UI/DOM imports into validation; clarifies change blast radius for physics/track edits. Medals split is more urgent than a pure docs pass.
+**Benefit:** Stops accidental UI/DOM imports into validation; clarifies change blast radius for physics/track edits.
 
 Optional later: thin `shared/` re-export barrel — only if it reduces confusion, not as a big move.
 
@@ -232,7 +232,6 @@ Optional later: thin `shared/` re-export barrel — only if it reduces confusion
 | --- | --- |
 | Split `race/engine-methods.js` render vs lifecycle | Extract Path2D / `render` (+ camera look-ahead) to `race/render.js` or `engine-render-methods.js`; leave `loop` / `update` / `reset` alone. Do **not** touch `simulation.js`. |
 | Thin engine via explicit ports | Pass small objects (`{ getChallenge, getRun, journeys, pbGhost, ui }`) into daily/scoreboard flows instead of growing `this.*` soup. Start with verification queue + share preview/confirm. |
-| Medals: rules vs presentation | Extract `getMedalForLapTime` / thresholds into a DOM-free module for server/tools; keep SVG overlays and `medal-icon.js` client-only. Prefer this over leaving share/title on the mixed file. |
 | Storage policy module | One place listing keys + read/write policy for guest vs signed-in vs challenge caches — without merging Redis and localStorage. |
 
 ---
@@ -270,7 +269,7 @@ If only a few steps get done, do them in this order:
 3. Modal shell by panel
 4. Daily-challenge engine-methods clusters (expect HUD / apply-run / playlist leftovers if only finish/ghost/lobby ship first)
 5. Server `daily-gp-store` by duty
-6. Extract medals timing from SVG overlays, then document shared server-safe imports
+6. ~~Extract medals timing from SVG overlays~~ **done** (`medal-timing.js`); optional: document shared server-safe imports
 
 Each step should be shippable alone with existing tests green.
 
@@ -283,7 +282,7 @@ Each step should be shippable alone with existing tests green.
 3. **Physics shared by import path, not package** — changing `config.js` can affect validator and visuals in one edit.
 4. **`tracks.js` mega-registry** — ~58 definition modules load with geometry consumers; file itself is small (~128 lines). `catalog.js` helps metadata-only cases.
 5. **`game.html` DOM contract** — modal refactors are always HTML + JS (+ CSS) triples.
-6. **Medals module boundary** — server share path imports timing through a client presentation module.
+6. **Medals module boundary** — share/title paths should import `medal-timing.js` (or `medal-times.json`), never overlay/`medal-icon` modules.
 
 ---
 

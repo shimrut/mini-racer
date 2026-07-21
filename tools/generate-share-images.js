@@ -10,7 +10,7 @@ import { createCanvas, Path2D as NodePath2D } from '@napi-rs/canvas';
 import { TRACK_SCHEDULE_KEYS, getTrackName } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
-import { getTrackMedalThresholds } from '../game/medals/medals.js';
+import { getTrackMedalThresholds } from '../game/medals/medal-timing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');

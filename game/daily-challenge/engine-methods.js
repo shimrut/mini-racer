@@ -33,7 +33,7 @@ import {
   prefetchDailyChallengeSnapshots,
 } from "./service.js";
 import { createVerificationSnapshot, getDailyChallengeVerificationEntry, getVerificationSnapshotFromQueueEntry } from "../scoreboard/verification-queue.js";
-import { getMedalForLapTime } from "../medals/medals.js";
+import { getMedalForLapTime } from "../medals/medal-timing.js";
 import {
   readTrackLastLapMedal,
   writeTrackLastLapMedal,
