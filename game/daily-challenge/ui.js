@@ -1,8 +1,10 @@
 import {
     formatDailyChallengeBestLabel,
-    getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
+} from './labels.js';
+import {
+    getDailyChallengeBestResult,
     getDailyChallengeTrackName
 } from './service.js';
 import {

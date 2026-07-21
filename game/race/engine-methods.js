@@ -5,6 +5,8 @@ import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
 import {
   getDailyChallengeCopyLabels,
+} from "../daily-challenge/labels.js";
+import {
   getDailyChallengeTrackName,
 } from "../daily-challenge/service.js";
 import { getTrackName } from "../track/catalog.js";

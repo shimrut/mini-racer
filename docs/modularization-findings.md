@@ -65,7 +65,7 @@ Object.assign(
 | `game/race/ui-modal-shell.js` | 2077 | Modal FSM + panels + keyboard |
 | `src/server/daily-gp-store.ts` | 1754 | Redis competition / player / submit |
 | `game/daily-challenge/engine-methods.js` | 1312 | Win / PB ghost / lobby orchestration |
-| `game/daily-challenge/service.js` | 1054 | Network + cache + labels |
+| `game/daily-challenge/service.js` | ~900 | Network + cache (labels extracted) |
 | `game/race/engine-methods.js` | 879 | Loop / update / render |
 | `game/engine.js` | 581 | Composition root |
 
@@ -114,18 +114,14 @@ flowchart TB
 
 ## Recommended Moves (ranked by leverage)
 
-### 1. Split daily-challenge service: labels vs network/cache
+### 1. Split daily-challenge service: labels vs network/cache — **DONE**
 
-**Files:** `game/daily-challenge/service.js`  
+**Files:** `game/daily-challenge/service.js` → `game/daily-challenge/labels.js`  
 **Effort:** S–M · **Risk:** Low
 
-**Today:** One module owns HTTP, localStorage caches, and pure label/copy helpers (`formatDailyChallenge*`, `getDailyChallengeCopyLabels`, card status; modifier-badge helpers exist but currently return empty stubs).
+**Done:** Formatters / copy / badges / card status live in `labels.js` (no `fetch` / `localStorage`). `service.js` re-exports them for existing test imports. UI / engine copy-only call sites import `labels.js` directly.
 
-**Change:**
-- Move formatters / copy / badges into e.g. `game/daily-challenge/labels.js` (or `copy.js`)
-- Leave fetch, playlist/snapshot/submit/share, and caches in `service.js` (optionally later `api.js` + `cache.js`)
-
-**Benefit:** UI and engine methods can use wording helpers without pulling network/storage. Clearest small win.
+**Benefit:** UI and engine methods can use wording helpers without pulling network/storage.
 
 **Success:** Label helpers have no `fetch` / `localStorage`; importers of labels no longer need the full service for copy-only use.
 
@@ -269,7 +265,7 @@ Optional later: thin `shared/` re-export barrel — only if it reduces confusion
 
 If only a few steps get done, do them in this order:
 
-1. Labels out of `daily-challenge/service.js`
+1. ~~Labels out of `daily-challenge/service.js`~~ **done** (`labels.js`)
 2. Identity out of `api-client.js`
 3. Modal shell by panel
 4. Daily-challenge engine-methods clusters (expect HUD / apply-run / playlist leftovers if only finish/ghost/lobby ship first)

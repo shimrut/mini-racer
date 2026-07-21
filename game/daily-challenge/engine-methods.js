@@ -14,12 +14,14 @@ import {
 } from "../race/result-flow.js";
 import {
   formatDailyChallengeResultLabel,
-  getActiveDailyChallenge,
   getDailyChallengeCopyLabels,
   getDailyChallengeModifierBadges,
   getDailyChallengeModifierLabel,
   getDailyChallengeObjectiveLabel,
   getDailyChallengeRequiredLaps,
+} from "./labels.js";
+import {
+  getActiveDailyChallenge,
   cacheDailyChallengePlaylist,
   getCachedDailyChallengePlaylist,
   getMissingDailyChallengeSnapshotIds,
