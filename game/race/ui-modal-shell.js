@@ -1658,7 +1658,7 @@ export class ModalShell {
                 dayLabel.className = 'leaderboard-day-chip__day';
                 dayLabel.textContent = option?.dayLabel === 'Today'
                     ? 'Today'
-                    : (option?.dayNumberLabel || option?.dateLabel || '--');
+                    : (option?.numericDateLabel || option?.dayNumberLabel || option?.dateLabel || '--');
                 button.append(dayLabel);
                 rail.appendChild(button);
             }
