@@ -293,8 +293,12 @@
         padding: 0.64rem 0.68rem;
     }
 
+    .leaderboard-day-chip__month {
+        font-size: 0.48rem;
+    }
+
     .leaderboard-day-chip__day {
-        font-size: 0.7rem;
+        font-size: 0.8rem;
     }
 
 }

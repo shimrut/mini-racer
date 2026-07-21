@@ -1654,13 +1654,22 @@ export class ModalShell {
                     payload?.onSelectLeaderboardDay?.(option?.challengeId);
                 });
 
-                const dayLabel = document.createElement('span');
-                dayLabel.className = 'leaderboard-day-chip__day';
-                dayLabel.textContent = option?.dayLabel === 'Today'
-                    ? 'Today'
-                    : option?.dateLabel || '--';
+                if (option?.dayLabel === 'Today') {
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'leaderboard-day-chip__day';
+                    dayLabel.textContent = 'Today';
+                    button.append(dayLabel);
+                } else {
+                    const monthLabel = document.createElement('span');
+                    monthLabel.className = 'leaderboard-day-chip__month';
+                    monthLabel.textContent = option?.monthLabel || '';
 
-                button.append(dayLabel);
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'leaderboard-day-chip__day';
+                    dayLabel.textContent = option?.dayNumberLabel || option?.dateLabel || '--';
+
+                    button.append(monthLabel, dayLabel);
+                }
                 rail.appendChild(button);
             }
 

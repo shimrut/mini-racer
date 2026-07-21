@@ -96,6 +96,14 @@ describe('ui leaderboard helpers', () => {
                     month: 'short',
                     day: 'numeric',
                     timeZone: 'UTC'
+                }).format(new Date(`${today}T00:00:00.000Z`)),
+                monthLabel: new Intl.DateTimeFormat('en-US', {
+                    month: 'short',
+                    timeZone: 'UTC'
+                }).format(new Date(`${today}T00:00:00.000Z`)),
+                dayNumberLabel: new Intl.DateTimeFormat('en-US', {
+                    day: 'numeric',
+                    timeZone: 'UTC'
                 }).format(new Date(`${today}T00:00:00.000Z`))
             }],
             selectedLeaderboardDayId: 'daily-1'
@@ -113,6 +121,14 @@ describe('ui leaderboard helpers', () => {
                 dayLabel: 'Today',
                 dateLabel: new Intl.DateTimeFormat('en-US', {
                     month: 'short',
+                    day: 'numeric',
+                    timeZone: 'UTC'
+                }).format(new Date(`${today}T00:00:00.000Z`)),
+                monthLabel: new Intl.DateTimeFormat('en-US', {
+                    month: 'short',
+                    timeZone: 'UTC'
+                }).format(new Date(`${today}T00:00:00.000Z`)),
+                dayNumberLabel: new Intl.DateTimeFormat('en-US', {
                     day: 'numeric',
                     timeZone: 'UTC'
                 }).format(new Date(`${today}T00:00:00.000Z`))
@@ -144,7 +160,9 @@ describe('ui leaderboard helpers', () => {
                 leaderboardDayOptions: [{
                     challengeId: 'daily-friday',
                     dayLabel: 'Fri',
-                    dateLabel: 'Jul 10'
+                    dateLabel: 'Jul 10',
+                    monthLabel: 'Jul',
+                    dayNumberLabel: '10'
                 }]
             }));
         } finally {
@@ -291,7 +309,9 @@ describe('ui leaderboard helpers', () => {
             leaderboardDayOptions: [{
                 challengeId: 'daily-2',
                 dayLabel: 'Day',
-                dateLabel: '--'
+                dateLabel: '--',
+                monthLabel: '',
+                dayNumberLabel: '--'
             }],
             selectedLeaderboardDayId: 'daily-2'
         });

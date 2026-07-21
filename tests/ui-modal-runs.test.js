@@ -184,9 +184,9 @@ describe('ui modal runs helpers', () => {
                     scoreboardTrackKey: 'circuit',
                     selectedLeaderboardDayId: 'today',
                     leaderboardDayOptions: [
-                        { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15' },
-                        { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14' },
-                        { challengeId: 'older', dayLabel: 'Mon', dateLabel: 'Jul 13' },
+                        { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+                        { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+                        { challengeId: 'older', dayLabel: 'Mon', dateLabel: 'Jul 13', monthLabel: 'Jul', dayNumberLabel: '13' },
                     ],
                     scoreboardSnapshot: { playerRankLabel: '#2', leaderboardEntryCount: 2 },
                     onSelectLeaderboardDay: vi.fn(),
@@ -201,8 +201,21 @@ describe('ui modal runs helpers', () => {
             expect(rail.children).toHaveLength(3);
             expect(rail.children[0].disabled).toBe(false);
             expect(rail.children[0].getAttribute('aria-disabled')).toBe('true');
-            expect(rail.children.map((button) => button.children[0].textContent))
-                .toEqual(['Today', 'Jul 14', 'Jul 13']);
+            expect(rail.children.map((button) => {
+                if (button.children.length === 1) {
+                    return button.children[0].textContent;
+                }
+                return [
+                    button.children[0].textContent,
+                    button.children[1].textContent
+                ];
+            })).toEqual([
+                'Today',
+                ['Jul', '14'],
+                ['Jul', '13']
+            ]);
+            expect(rail.children[1].children[0].className).toBe('leaderboard-day-chip__month');
+            expect(rail.children[1].children[1].className).toBe('leaderboard-day-chip__day');
         } finally {
             global.document = originalDocument;
         }
