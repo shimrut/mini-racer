@@ -82,6 +82,15 @@ Tips:
 
 ## What’s new
 
+### 1.4.1
+
+- Ghosts are more reliable — the **ghost unavailable** message should appear a lot less
+- Ghosts no longer jump a bit ahead right after the race starts
+- Improved leaderboard timing — times are accurate to the millisecond (no longer stuck ending in only 0, 3, or 7)
+- Fixed game music not working in the iOS Reddit app
+- Small Standings screen tweaks so it’s easier to read
+- Code maintenance
+
 ### 1.3
 
 - Race **ghost** of your PB (on by default; turn it off in Settings)
