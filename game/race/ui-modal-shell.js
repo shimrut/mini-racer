@@ -1640,11 +1640,7 @@ export class ModalShell {
             for (const option of payload.leaderboardDayOptions) {
                 const button = document.createElement('button');
                 const isSelected = option?.challengeId === payload?.selectedLeaderboardDayId;
-                button.className = [
-                    'leaderboard-day-chip',
-                    option?.dayLabel === 'Today' ? 'leaderboard-day-chip--today' : '',
-                    isSelected ? 'is-selected' : ''
-                ].filter(Boolean).join(' ');
+                button.className = `leaderboard-day-chip${isSelected ? ' is-selected' : ''}`;
                 button.type = 'button';
                 button.setAttribute('role', 'tab');
                 button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
@@ -1658,22 +1654,12 @@ export class ModalShell {
                     payload?.onSelectLeaderboardDay?.(option?.challengeId);
                 });
 
-                if (option?.dayLabel === 'Today') {
-                    const dayLabel = document.createElement('span');
-                    dayLabel.className = 'leaderboard-day-chip__day';
-                    dayLabel.textContent = 'Today';
-                    button.append(dayLabel);
-                } else {
-                    const monthLabel = document.createElement('span');
-                    monthLabel.className = 'leaderboard-day-chip__month';
-                    monthLabel.textContent = option?.monthLabel || '';
-
-                    const dayLabel = document.createElement('span');
-                    dayLabel.className = 'leaderboard-day-chip__day';
-                    dayLabel.textContent = option?.dayNumberLabel || option?.dateLabel || '--';
-
-                    button.append(monthLabel, dayLabel);
-                }
+                const dayLabel = document.createElement('span');
+                dayLabel.className = 'leaderboard-day-chip__day';
+                dayLabel.textContent = option?.dayLabel === 'Today'
+                    ? 'Today'
+                    : (option?.dayNumberLabel || option?.dateLabel || '--');
+                button.append(dayLabel);
                 rail.appendChild(button);
             }
 

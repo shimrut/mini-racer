@@ -201,23 +201,9 @@ describe('ui modal runs helpers', () => {
             expect(rail.children).toHaveLength(3);
             expect(rail.children[0].disabled).toBe(false);
             expect(rail.children[0].getAttribute('aria-disabled')).toBe('true');
-            expect(rail.children.map((button) => {
-                if (button.children.length === 1) {
-                    return button.children[0].textContent;
-                }
-                return [
-                    button.children[0].textContent,
-                    button.children[1].textContent
-                ];
-            })).toEqual([
-                'Today',
-                ['Jul', '14'],
-                ['Jul', '13']
-            ]);
-            expect(rail.children[0].className).toContain('leaderboard-day-chip--today');
-            expect(rail.children[0].children[0].className).toBe('leaderboard-day-chip__day');
-            expect(rail.children[1].children[0].className).toBe('leaderboard-day-chip__month');
-            expect(rail.children[1].children[1].className).toBe('leaderboard-day-chip__day');
+            expect(rail.children.map((button) => button.children[0].textContent))
+                .toEqual(['Today', '14', '13']);
+            expect(rail.children[1].children[0].className).toBe('leaderboard-day-chip__day');
         } finally {
             global.document = originalDocument;
         }
