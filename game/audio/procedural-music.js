@@ -453,9 +453,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
     }
 
     function shouldRunScheduler(status, enabled) {
-        return Boolean(enabled)
-            && !tabHidden
-            && (status === 'ready' || status === 'starting' || status === 'playing');
+        return Boolean(enabled) && !tabHidden && (status === 'starting' || status === 'playing');
     }
 
     function ensureSchedulerRunning() {
