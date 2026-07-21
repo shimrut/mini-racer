@@ -88,7 +88,8 @@ Tips:
 - Ghosts no longer jump a bit ahead right after the race starts
 - Improved leaderboard timing — times are accurate to the millisecond (no longer stuck ending in only 0, 3, or 7)
 - Fixed game music not working in the iOS Reddit app
-- Small Standings screen tweaks so it’s easier to read
+- Small "Standings" screen tweaks so it's easier to read
+- Once in game "Start race" starts the last played track
 - Code maintenance
 
 ### 1.3
