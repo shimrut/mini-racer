@@ -77,7 +77,7 @@ describe('procedural music engine', () => {
         music.stop();
     });
 
-    it('does not keep the scheduler running outside active racing', () => {
+    it('runs lobby music on ready and stops when paused', () => {
         const setIntervalSpy = vi
             .spyOn(globalThis, 'setInterval')
             .mockReturnValue(123);
@@ -89,7 +89,7 @@ describe('procedural music engine', () => {
 
         music.prepareOnUserGesture();
         music.syncFrame({ status: 'ready', speed: 0, maxSpeedKph: 220 });
-        expect(setIntervalSpy).not.toHaveBeenCalled();
+        expect(setIntervalSpy).toHaveBeenCalledTimes(1);
 
         music.syncFrame({ status: 'playing', speed: 10, maxSpeedKph: 220 });
         expect(setIntervalSpy).toHaveBeenCalledTimes(1);
@@ -97,6 +97,7 @@ describe('procedural music engine', () => {
         music.syncFrame({ status: 'paused', speed: 0, maxSpeedKph: 220 });
         expect(clearIntervalSpy).toHaveBeenCalledWith(123);
 
+        music.stop();
         setIntervalSpy.mockRestore();
         clearIntervalSpy.mockRestore();
     });
@@ -116,10 +117,14 @@ describe('procedural music engine', () => {
         });
         const music = createProceduralMusic(mockCtx, {});
 
-        // Unlock the graph so syncFrame can run (graphBuilt gate).
+        // Unlock graph while still ineligible (music disabled mid-test via stop path:
+        // sync with paused keeps graphBuilt after a gesture unlock).
         music.prepareOnUserGesture();
         await mockCtx.resume.mock.results[0].value;
-        expect(setIntervalSpy).not.toHaveBeenCalled();
+        // Default status is ready — lobby music starts after unlock resume.
+        expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+        music.stop();
+        setIntervalSpy.mockClear();
 
         mockCtx.state = 'suspended';
         music.syncFrame({ status: 'playing', speed: 10, maxSpeedKph: 220 });
