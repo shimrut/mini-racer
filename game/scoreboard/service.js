@@ -3,9 +3,11 @@ import { hasTrack } from '../track/catalog.js';
 import {
     API_ROUTES,
     clampRequestLimit,
+} from './api-client.js';
+import {
     getGuestPlayerToken,
     getOrCreatePlayerId,
-} from './api-client.js';
+} from './player-identity.js';
 import {
     createEmptyScoreboardSnapshot,
     normalizeScoreboardSnapshot,

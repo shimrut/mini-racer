@@ -30,7 +30,8 @@ flowchart LR
     C --> H["Audio<br/>game/audio/*"]
     C --> I["Browser cache<br/>localStorage/sessionStorage"]
 
-    G --> J["API client layer<br/>game/scoreboard/api-client.js"]
+    G --> J["API routes<br/>game/scoreboard/api-client.js"]
+    G --> K["Player identity<br/>game/scoreboard/player-identity.js"]
     J --> K["Devvit/Express server<br/>boot + app factory + route registrars"]
     K --> L["Redis-backed stores<br/>player profiles + races"]
 
@@ -173,7 +174,7 @@ These client-facing routes are registered under `src/server/routes/`:
 - `/api/daily/share/preview`
 - `/api/daily/share/confirm`
 
-The browser-side API route and player identity entrypoint is `game/scoreboard/api-client.js`. Both leaderboard snapshot endpoints normalize their responses through `game/scoreboard/snapshot.js` before UI or cache use.
+The browser-side API route table is `game/scoreboard/api-client.js`; player ID / guest token live in `game/scoreboard/player-identity.js`. Both leaderboard snapshot endpoints normalize their responses through `game/scoreboard/snapshot.js` before UI or cache use.
 
 ## Dependency Inventory
 

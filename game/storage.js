@@ -6,11 +6,13 @@ import {
 } from "./scoreboard/display-preference.js";
 import {
   API_ROUTES,
+} from "./scoreboard/api-client.js";
+import {
   getGuestPlayerToken,
   getOrCreatePlayerId,
   rotateGuestPlayerIdentity,
   setGuestPlayerToken,
-} from "./scoreboard/api-client.js";
+} from "./scoreboard/player-identity.js";
 import { isLocalEnvironment } from "./track/environment.js";
 
 async function fetchRemotePlayerProgressState() {

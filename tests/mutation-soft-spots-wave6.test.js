@@ -352,15 +352,22 @@ describe('mutation soft spots wave 6', () => {
         afterEach(() => {
             vi.unstubAllGlobals();
             vi.doUnmock('../game/scoreboard/api-client.js');
+            vi.doUnmock('../game/scoreboard/player-identity.js');
         });
 
         it('passes the player bootstrap context string to getOrCreatePlayerId', async () => {
             const getOrCreatePlayerId = vi.fn(() => 'guest:test-id');
+            vi.doMock('../game/scoreboard/player-identity.js', async () => {
+                const actual = await vi.importActual('../game/scoreboard/player-identity.js');
+                return {
+                    ...actual,
+                    getOrCreatePlayerId,
+                };
+            });
             vi.doMock('../game/scoreboard/api-client.js', async () => {
                 const actual = await vi.importActual('../game/scoreboard/api-client.js');
                 return {
                     ...actual,
-                    getOrCreatePlayerId,
                     API_ROUTES: { playerBootstrapUrl: '/api/player/bootstrap' },
                 };
             });

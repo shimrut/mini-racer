@@ -53,7 +53,7 @@ Object.assign(
 | --- | --- | --- |
 | Daily challenge | `daily-challenge/{service,storage,ui,engine-methods}.js` + server store/model | Activation, finish, verify, ghost, lobby, share, and UI share one fat surface |
 | UI modals | `race/ui-modal-shell.js` (+ content / handoff helpers) | Shell knows menus, leaderboard, share, garage, settings — not just open/close |
-| Identity + API | `scoreboard/api-client.js` (~121 lines) | Player ID / guest token live next to every `/api` route table; most callers import both together |
+| Identity + API | ~~`scoreboard/api-client.js`~~ split | Player ID / guest token in `player-identity.js`; `/api` routes in `api-client.js` |
 | Server Redis facade | `daily-gp-store.ts` | Challenge ledger, player prefs, snapshot, and submit/lock in one file |
 | Medals | `medals/medals.js` | Timing rules mixed with SVG / overlay presentation; server already imports `getMedalForLapTime` from this mixed module (pulls `medal-icon.js`) |
 | Engine `this` | All `*-engine-methods.js` | Runtime god-object: any mixin can reach any other via `this` |
@@ -190,18 +190,14 @@ flowchart TB
 
 ---
 
-### 5. Split `api-client.js` into identity vs API routes
+### 5. Split `api-client.js` into identity vs API routes — **DONE**
 
-**Files:** `game/scoreboard/api-client.js`  
+**Files:** `game/scoreboard/api-client.js` → `game/scoreboard/player-identity.js`  
 **Effort:** S · **Risk:** Low
 
-**Today:** Small mixed hub (~121 lines) — owns player ID / guest token **and** the `/api` URL table. There is no shared `fetchJson` helper yet; callers do their own `fetch`. Most call sites (`storage.js`, `preferences.js`, daily-challenge service, PB ghost service, settings UI, scoreboard service) import identity **and** `API_ROUTES` together today.
+**Done:** Player ID / guest token live in `player-identity.js`. `api-client.js` keeps the `/api` route table + `clampRequestLimit` and re-exports identity for compatibility. Call sites import identity and routes separately.
 
-**Change:**
-1. `player-identity` (or similar) — localStorage player id + guest token
-2. `api-routes` + thin `fetchJson` helper (new)
-
-**Benefit:** “Who is the player?” stops looking like “leaderboard networking.” Future call sites can import only what they need.
+**Benefit:** “Who is the player?” stops looking like “leaderboard networking.”
 
 **Success:** Identity consumers do not import route tables; HTTP consumers do not own token rotation logic.
 
@@ -266,7 +262,7 @@ Optional later: thin `shared/` re-export barrel — only if it reduces confusion
 If only a few steps get done, do them in this order:
 
 1. ~~Labels out of `daily-challenge/service.js`~~ **done** (`labels.js`)
-2. Identity out of `api-client.js`
+2. ~~Identity out of `api-client.js`~~ **done** (`player-identity.js`)
 3. Modal shell by panel
 4. Daily-challenge engine-methods clusters (expect HUD / apply-run / playlist leftovers if only finish/ghost/lobby ship first)
 5. Server `daily-gp-store` by duty

@@ -7,9 +7,11 @@ import { isLocalEnvironment } from '../track/environment.js';
 import {
     API_ROUTES,
     clampRequestLimit,
+} from '../scoreboard/api-client.js';
+import {
     getGuestPlayerToken,
     getOrCreatePlayerId,
-} from '../scoreboard/api-client.js';
+} from '../scoreboard/player-identity.js';
 import {
     getLeaderboardIdentityPreference,
 } from '../scoreboard/display-preference.js';

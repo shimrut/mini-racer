@@ -1,9 +1,11 @@
 import {
   API_ROUTES,
+} from '../scoreboard/api-client.js';
+import {
   getGuestPlayerToken,
   getOrCreatePlayerId,
   setGuestPlayerToken,
-} from '../scoreboard/api-client.js';
+} from '../scoreboard/player-identity.js';
 import { isLocalEnvironment } from '../track/environment.js';
 
 function addPlayerIdentity(url) {
