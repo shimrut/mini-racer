@@ -8,7 +8,7 @@ import {
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import {
     getMedalRowSlots,
-} from '../medals/medals.js';
+} from '../medals/medal-timing.js';
 import { readTrackLastLapMedal } from '../medals/last-lap-medal-storage.js';
 import {
     buildModalRunsPayload,

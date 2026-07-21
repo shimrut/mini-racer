@@ -21,7 +21,7 @@ import {
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
-import { getMedalForLapTime } from '../medals/medals.js';
+import { getMedalForLapTime } from '../medals/medal-timing.js';
 
 function scheduleAfterModalPaint(callback) {
     requestAnimationFrame(() => {

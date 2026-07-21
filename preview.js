@@ -10,7 +10,7 @@ import {
 } from './game/daily-challenge/service.js';
 import {
     getTrackMedalThresholds,
-} from './game/medals/medals.js';
+} from './game/medals/medal-timing.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const playButton = document.getElementById('play-button');
