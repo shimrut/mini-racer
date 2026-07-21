@@ -31,7 +31,7 @@ flowchart LR
     C --> I["Browser cache<br/>localStorage/sessionStorage"]
 
     G --> J["API routes<br/>game/scoreboard/api-client.js"]
-    G --> K["Player identity<br/>game/scoreboard/player-identity.js"]
+    G --> PI["Player identity<br/>game/scoreboard/player-identity.js"]
     J --> K["Devvit/Express server<br/>boot + app factory + route registrars"]
     K --> L["Redis-backed stores<br/>player profiles + races"]
 
