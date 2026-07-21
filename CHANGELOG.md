@@ -3,6 +3,7 @@
 - Fix standings opening before the daily playlist finishes loading by always rendering the full seven-day date rail immediately, refreshing day chips when the playlist resolves, and clearing stuck loading states after snapshot fetch failures.
 - Fix standings date rail rendering below the leaderboard list when the day strip is rebuilt during an in-place update.
 - Fix uneven standings row heights by giving empty community slots the same `leaderboard-row` class as player rows.
+- Match player row height to the share column by sizing the existing `leaderboard-row__action` slot to the share button.
 - Fix standings date rail disappearing after modal refresh by rebuilding the strip when the container is cleared while the rail cache still matches.
 - Fix standings date-rail hover flicker by keeping the day strip mounted during snapshot refresh and aligning mouse/keyboard chip highlights.
 - Standings date strip keeps Today as a single label and shows other days as a small month over a larger day number, using the same accent pill and focus ring treatment as garage tabs.
