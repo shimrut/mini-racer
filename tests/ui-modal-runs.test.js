@@ -9,6 +9,8 @@ const {
     showRunsModal,
     showModalLeaderboardPayload,
     renderLeaderboardStandaloneIntro,
+    renderLeaderboardDayRail,
+    updateModalScoreboardSnapshot,
     configureRunsModalHeader,
     updateModalRunSummary,
     bindLeaderboardPagination,
@@ -16,6 +18,16 @@ const {
     _wireLeaderboardRowShare,
     _leaderboardShareBestOption,
 } = ModalShell.prototype;
+
+function withLeaderboardIntroMethods(context = {}) {
+    return {
+        renderLeaderboardDayRail: ModalShell.prototype.renderLeaderboardDayRail,
+        renderLeaderboardHeaderSummary: ModalShell.prototype.renderLeaderboardHeaderSummary,
+        _syncLeaderboardDayRailSelection: ModalShell.prototype._syncLeaderboardDayRailSelection,
+        ...context,
+        configureRunsModalHeader: context.configureRunsModalHeader ?? vi.fn(),
+    };
+}
 
 function createClassList(initialClasses = []) {
     const classes = new Set(initialClasses);
@@ -45,7 +57,7 @@ function createClassList(initialClasses = []) {
 
 function createTestElement(tagName = 'div') {
     const attributes = {};
-    return {
+    const element = {
         tagName,
         className: '',
         textContent: '',
@@ -57,6 +69,9 @@ function createTestElement(tagName = 'div') {
         classList: createClassList(),
         setAttribute: vi.fn((name, value) => {
             attributes[name] = String(value);
+            if (name === 'data-challenge-id') {
+                element.dataset.challengeId = String(value);
+            }
         }),
         getAttribute: vi.fn((name) => attributes[name] ?? null),
         removeAttribute: vi.fn(),
@@ -72,8 +87,35 @@ function createTestElement(tagName = 'div') {
         prepend(...nodes) {
             this.children.unshift(...nodes);
         },
-        querySelector: vi.fn(() => null)
+        querySelector: vi.fn((selector) => {
+            if (selector === '.leaderboard-day-rail') {
+                return element.children.find((child) => child.className === 'leaderboard-day-rail') || null;
+            }
+            if (selector === '.leaderboard-section') {
+                return element.children.find((child) => child.className === 'leaderboard-section') || null;
+            }
+            const challengeMatch = selector.match(/^\[data-challenge-id="([^"]+)"\]$/);
+            if (challengeMatch) {
+                const challengeId = challengeMatch[1];
+                const findMatch = (node) => {
+                    if (node.dataset?.challengeId === challengeId) return node;
+                    for (const child of node.children || []) {
+                        const match = findMatch(child);
+                        if (match) return match;
+                    }
+                    return null;
+                };
+                return findMatch(element);
+            }
+            return null;
+        }),
+        remove: vi.fn(function remove() {
+            const parent = element.parent;
+            if (!parent) return;
+            parent.children = parent.children.filter((child) => child !== element);
+        }),
     };
+    return element;
 }
 
 function setActiveView(view) {
@@ -171,7 +213,7 @@ describe('ui modal runs helpers', () => {
         };
 
         try {
-            renderLeaderboardStandaloneIntro.call({
+            renderLeaderboardStandaloneIntro.call(withLeaderboardIntroMethods({
                 modalLapTimes,
                 modalRunsView: {
                     querySelector: vi.fn((selector) => (
@@ -192,7 +234,7 @@ describe('ui modal runs helpers', () => {
                     onSelectLeaderboardDay: vi.fn(),
                 },
                 content: { formatTime: vi.fn(), formatLeaderboardTime: vi.fn() },
-            });
+            }));
 
             const rail = modalLapTimes.children.find((child) => (
                 child.className === 'leaderboard-day-rail'
@@ -221,6 +263,112 @@ describe('ui modal runs helpers', () => {
             expect(dateStack.className).toBe('leaderboard-day-chip__stack');
             expect(dateStack.children[0].className).toBe('leaderboard-day-chip__month');
             expect(dateStack.children[1].className).toBe('leaderboard-day-chip__day');
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('preserves the day rail when only the standings snapshot changes', () => {
+        const originalDocument = global.document;
+        const header = createTestElement('header');
+        const modalLapTimes = createTestElement('div');
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        const leaderboardDayOptions = [
+            { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+            { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+        ];
+        const context = withLeaderboardIntroMethods({
+            modalLapTimes,
+            modalRunsView: {
+                classList: createClassList(['active-view']),
+                querySelector: vi.fn((selector) => (
+                    selector === '.reusable-modal-header' ? header : null
+                )),
+            },
+            _modalRunsPayload: {
+                showGlobalLeaderboard: true,
+                scoreboardChallengeId: 'today',
+                scoreboardTrackKey: 'circuit',
+                selectedLeaderboardDayId: 'today',
+                leaderboardDayOptions,
+                scoreboardSnapshot: { playerRankLabel: '#2', leaderboardEntryCount: 2 },
+                onSelectLeaderboardDay: vi.fn(),
+            },
+            content: { renderScoreboardList: vi.fn() },
+            bindLeaderboardPagination: vi.fn(),
+            _wireLeaderboardRowShare: vi.fn(),
+            _leaderboardShareBestOption: () => null,
+        });
+
+        try {
+            renderLeaderboardStandaloneIntro.call(context);
+            const railBefore = modalLapTimes.children.find((child) => (
+                child.className === 'leaderboard-day-rail'
+            ));
+            expect(railBefore).toBeTruthy();
+
+            updateModalScoreboardSnapshot.call(context, {
+                playerRankLabel: '#1',
+                leaderboardEntryCount: 5,
+                isRefreshing: false,
+            });
+
+            const railAfter = modalLapTimes.children.find((child) => (
+                child.className === 'leaderboard-day-rail'
+            ));
+            expect(railAfter).toBe(railBefore);
+            expect(header.children.length).toBeGreaterThan(0);
+            expect(context.content.renderScoreboardList).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('updates day rail selection in place when only the selected day changes', () => {
+        const originalDocument = global.document;
+        const modalLapTimes = createTestElement('div');
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        const leaderboardDayOptions = [
+            { challengeId: 'today', dayLabel: 'Today', dateLabel: 'Jul 15', monthLabel: 'Jul', dayNumberLabel: '15' },
+            { challengeId: 'yesterday', dayLabel: 'Tue', dateLabel: 'Jul 14', monthLabel: 'Jul', dayNumberLabel: '14' },
+        ];
+        const context = withLeaderboardIntroMethods({
+            modalLapTimes,
+            _modalRunsPayload: {
+                showGlobalLeaderboard: true,
+                scoreboardChallengeId: 'today',
+                scoreboardTrackKey: 'circuit',
+                selectedLeaderboardDayId: 'today',
+                leaderboardDayOptions,
+                scoreboardSnapshot: { playerRankLabel: '#2', leaderboardEntryCount: 2 },
+                onSelectLeaderboardDay: vi.fn(),
+            },
+        });
+
+        try {
+            renderLeaderboardDayRail.call(context);
+            const railBefore = modalLapTimes.children.find((child) => (
+                child.className === 'leaderboard-day-rail'
+            ));
+            const yesterdayChip = railBefore.children[1];
+
+            context._modalRunsPayload.selectedLeaderboardDayId = 'yesterday';
+            renderLeaderboardDayRail.call(context);
+
+            const railAfter = modalLapTimes.children.find((child) => (
+                child.className === 'leaderboard-day-rail'
+            ));
+            expect(railAfter).toBe(railBefore);
+            expect(yesterdayChip.classList.contains('is-selected')).toBe(true);
+            expect(railBefore.children[0].classList.contains('is-selected')).toBe(false);
         } finally {
             global.document = originalDocument;
         }
@@ -392,7 +540,7 @@ describe('ui modal runs helpers', () => {
         };
 
         try {
-            renderLeaderboardStandaloneIntro.call({
+            renderLeaderboardStandaloneIntro.call(withLeaderboardIntroMethods({
                 modalLapTimes,
                 modalRunsView,
                 _modalRunsPayload: {
@@ -409,7 +557,7 @@ describe('ui modal runs helpers', () => {
                 content: { formatTime: vi.fn(() => '42.32'), formatLeaderboardTime: vi.fn(() => '00:42.32') },
                 configureRunsModalHeader,
                 _runsViewMode: 'close'
-            });
+            }));
 
             const summary = header.children.find((child) => (
                 child.className === 'leaderboard-summary leaderboard-summary--header'
@@ -441,7 +589,7 @@ describe('ui modal runs helpers', () => {
         };
 
         try {
-            renderLeaderboardStandaloneIntro.call({
+            renderLeaderboardStandaloneIntro.call(withLeaderboardIntroMethods({
                 modalLapTimes,
                 modalRunsView,
                 _modalRunsPayload: {
@@ -450,7 +598,7 @@ describe('ui modal runs helpers', () => {
                     scoreboardTrackKey: 'circuit',
                     scoreboardSnapshot: { isLoading: true }
                 }
-            });
+            }));
 
             const summary = header.children.find((child) => (
                 child.className === 'leaderboard-summary leaderboard-summary--header'
@@ -482,7 +630,7 @@ describe('ui modal runs helpers', () => {
         };
 
         try {
-            renderLeaderboardStandaloneIntro.call({
+            renderLeaderboardStandaloneIntro.call(withLeaderboardIntroMethods({
                 modalLapTimes,
                 modalRunsView,
                 _modalRunsPayload: {
@@ -497,7 +645,7 @@ describe('ui modal runs helpers', () => {
                     }
                 },
                 content: { formatTime: vi.fn(), formatLeaderboardTime: vi.fn() }
-            });
+            }));
 
             const summary = header.children.find((child) => (
                 child.className === 'leaderboard-summary leaderboard-summary--header'

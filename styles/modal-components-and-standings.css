@@ -302,7 +302,7 @@
 .leaderboard-day-rail {
     display: flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.1rem;
     width: 100%;
     min-height: 2rem;
     padding: 0.2rem 0.2rem 0.35rem;
@@ -324,7 +324,6 @@
     min-width: 2.25rem;
     min-height: 2.35rem;
     flex: 0 0 auto;
-    padding: 0.22rem 0.65rem;
     border: none;
     border-radius: var(--radius-full);
     background: transparent;
@@ -335,7 +334,7 @@
     text-transform: uppercase;
     cursor: pointer;
     box-shadow: none;
-    transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    transition: color 0.15s ease;
 }
 
 .leaderboard-day-chip:hover {
@@ -359,7 +358,7 @@
 
 .leaderboard-day-chip.is-menu-selected {
     color: var(--text-color);
-    background: var(--border-strong);
+    background: var(--border-default);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
