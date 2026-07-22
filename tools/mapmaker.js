@@ -766,7 +766,7 @@ class MapmakerApp {
         this.trackSelect.value = trackKey;
         this.trackKeyInput.value = trackKey;
         this.trackNameInput.value = this.track.name;
-        this.cornerRadiusInput.value = String(this.track.cornerRadius ?? 0);
+        this.cornerRadiusInput.value = String(this.track.cornerRadius ?? 3);
         this.startAngleInput.value = String(this.track.startAngle ?? 0);
         this.syncLineSmoothingControl();
         this.syncDrawWidthControls();
@@ -1544,7 +1544,7 @@ class MapmakerApp {
         }
 
         const isLikelyTrackpadPan = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL
-            && (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 24);
+            && Math.abs(event.deltaX) > 0;
 
         if (isLikelyTrackpadPan) {
             this.state.view.panX -= event.deltaX * deltaModeScale;

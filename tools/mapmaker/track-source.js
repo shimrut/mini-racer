@@ -1,6 +1,6 @@
 const MIN_DRAW_WIDTH = 1.5;
 const MAX_DRAW_WIDTH = 20;
-const DEFAULT_DRAW_WIDTH = 5;
+const DEFAULT_DRAW_WIDTH = 4;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
 const TRACK_KEY_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
