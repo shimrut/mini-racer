@@ -406,7 +406,10 @@ class MapmakerApp {
             view: {
                 zoom: 1,
                 panX: 0,
-                panY: 0
+                panY: 0,
+                // Snapshot of content bounds while dragging a handle so extreme
+                // points do not recenter/rescale the camera mid-drag.
+                frozenBounds: null
             }
         };
 
@@ -714,6 +717,7 @@ class MapmakerApp {
         this.state.view.zoom = 1;
         this.state.view.panX = 0;
         this.state.view.panY = 0;
+        this.state.view.frozenBounds = null;
         this.setStatus('View reframed.');
         this.draw();
     }
@@ -797,6 +801,7 @@ class MapmakerApp {
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
         this.state.skipDrawClick = false;
+        this.state.view.frozenBounds = null;
         this.state.selectedHandle = { kind: 'polygon', path: this.state.tool === 'inner' ? 'inner' : 'outer', index: 0 };
         if (!this.hasTrackGeometry()) {
             this.state.tool = 'draw';
@@ -1031,6 +1036,13 @@ class MapmakerApp {
     }
 
     getTrackBounds() {
+        if (this.state.view.frozenBounds) {
+            return this.state.view.frozenBounds;
+        }
+        return this.computeTrackBounds();
+    }
+
+    computeTrackBounds() {
         if (this.state.tool === 'draw' && !this.hasTrackGeometry()) {
             return BLANK_VIEW_BOUNDS;
         }
@@ -1070,6 +1082,39 @@ class MapmakerApp {
             minY,
             maxY
         };
+    }
+
+    freezeViewBounds() {
+        if (this.state.view.frozenBounds) {
+            return;
+        }
+        const bounds = this.computeTrackBounds();
+        this.state.view.frozenBounds = {
+            minX: bounds.minX,
+            maxX: bounds.maxX,
+            minY: bounds.minY,
+            maxY: bounds.maxY
+        };
+    }
+
+    releaseViewBounds({ keepCameraSteady = true } = {}) {
+        if (!this.state.view.frozenBounds) {
+            return;
+        }
+
+        if (keepCameraSteady) {
+            const before = this.getViewport();
+            const focusScreen = { x: before.width / 2, y: before.height / 2 };
+            const focusWorld = this.screenToWorld(focusScreen.x, focusScreen.y, before);
+            this.state.view.frozenBounds = null;
+            const after = this.getViewport();
+            const focusScreenAfter = this.worldToScreen(focusWorld, after);
+            this.state.view.panX += focusScreen.x - focusScreenAfter.x;
+            this.state.view.panY += focusScreen.y - focusScreenAfter.y;
+            return;
+        }
+
+        this.state.view.frozenBounds = null;
     }
 
     getViewport() {
@@ -1445,6 +1490,7 @@ class MapmakerApp {
         const hit = this.hitTest(canvasPoint, viewport);
         if (hit) {
             this.selectHandle(hit);
+            this.freezeViewBounds();
             this.state.drag = {
                 type: 'handle',
                 handle: this.state.selectedHandle
@@ -1546,8 +1592,12 @@ class MapmakerApp {
         if (this.state.drag?.type !== 'pan') {
             this.state.skipDrawClick = false;
         }
+        if (this.state.drag?.type === 'handle') {
+            this.releaseViewBounds({ keepCameraSteady: true });
+        }
         this.state.drag = null;
         this.canvas.dataset.pan = 'false';
+        this.draw();
     }
 
     onWheel(event) {

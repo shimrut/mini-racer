@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker freezes the camera while dragging a track point so extreme points no longer pan/rescale the view mid-drag.
 - Mapmaker shows a race-scale ghost car at the start and under the Line Build cursor, plus brush sizes in car widths, so lane scale is visible while authoring.
 - Home Start resumes the last track raced this session (matching the background map); today's featured daily remains the fallback when nothing has been raced yet or the last map expired.
 - Upgraded the Devvit toolchain to 0.13.9 (faster CLI uploads / playtest).
