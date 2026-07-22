@@ -4,7 +4,7 @@
 - Upgraded the Devvit toolchain to 0.13.9 (faster CLI uploads / playtest).
 - Set mapmaker Line Build brush default to 4u (was 5u), including the module serializer fallback.
 - Mapmaker Curve Radius input now shows the same default (3) Line Build uses when a track has no stored radius.
-- Mapmaker mouse-wheel zoom treats vertical-only scrolls as zoom; trackpad pan still requires sideways delta.
+- Mapmaker trackpad two-finger scroll pans again; pinch (ctrl+wheel) and mouse-wheel line/page steps still zoom.
 - Removed Number Eight from the Daily GP schedule (catalog, registry, definition, and share image).
 - Added Golden Marsh, Jumping Jack, and Furious Fast to the Daily GP schedule with share images and medal targets; refined Needle Chicane and Turbo Shell geometry.
 - Fixed procedural music failing to start when the Web Audio context was still suspended at race start (notably on iOS Reddit).

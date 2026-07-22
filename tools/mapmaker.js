@@ -1537,16 +1537,17 @@ class MapmakerApp {
                 ? 120
                 : 1;
 
+        // Pinch-to-zoom (browsers synthesize ctrl+wheel for trackpad pinch).
         if (event.ctrlKey) {
             const zoomFactor = Math.exp((-event.deltaY * deltaModeScale) * 0.01);
             this.setZoom(this.state.view.zoom * zoomFactor, canvasPoint, viewport);
             return;
         }
 
-        const isLikelyTrackpadPan = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL
-            && Math.abs(event.deltaX) > 0;
-
-        if (isLikelyTrackpadPan) {
+        // Pixel-mode two-finger trackpad scrolls pan in both axes (including
+        // vertical-only moves where deltaX is 0). Mouse wheels usually report
+        // line/page mode and fall through to stepped zoom below.
+        if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL) {
             this.state.view.panX -= event.deltaX * deltaModeScale;
             this.state.view.panY -= event.deltaY * deltaModeScale;
             this.draw();
