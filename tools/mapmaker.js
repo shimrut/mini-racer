@@ -1,3 +1,4 @@
+import { CONFIG } from '../game/config.js';
 import { TRACKS } from '../game/track/tracks.js';
 import {
     formatTrackNumber as formatNumber,
@@ -25,6 +26,16 @@ const DEFAULT_DRAW_WIDTH = 4;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
 const DEFAULT_LINE_SMOOTHING = 0.35;
+
+// Match race collision capsule so authors can size lanes against the real car.
+const CAR_RADIUS = CONFIG.carRadius;
+const CAR_HALF_LENGTH = CONFIG.carCollisionHalfLength;
+const CAR_WIDTH = CAR_RADIUS * 2;
+const CAR_LENGTH = CAR_HALF_LENGTH * 2 + CAR_RADIUS * 2;
+
+function formatCarWidths(worldUnits) {
+    return formatNumber(worldUnits / CAR_WIDTH);
+}
 
 function cloneTracks(source) {
     if (typeof structuredClone === 'function') {
@@ -511,18 +522,30 @@ class MapmakerApp {
             return;
         }
         const metrics = this.getDraftMetrics();
+        const brushCars = formatCarWidths(metrics.width);
+        const carSize = `Car ${formatNumber(CAR_WIDTH)}×${formatNumber(CAR_LENGTH)}u.`;
+        const brushText = `Brush ${formatNumber(metrics.width)}u (~${brushCars} cars wide).`;
+        const smoothingText = `Smoothing ${formatNumber(metrics.lineSmoothing)}.`;
+
         if (!metrics.pointCount) {
-            this.drawMetricsLabel.textContent = `Brush ${formatNumber(metrics.width)}u. Smoothing ${formatNumber(metrics.lineSmoothing)}. Place the first point to start measuring straights.`;
+            let startLaneText = '';
+            if (this.hasTrackGeometry() && this.track?.startLine) {
+                const startLane = distance(this.track.startLine.p1, this.track.startLine.p2);
+                if (Number.isFinite(startLane) && startLane > 0) {
+                    startLaneText = ` Start line ${formatNumber(startLane)}u (~${formatCarWidths(startLane)} cars).`;
+                }
+            }
+            this.drawMetricsLabel.textContent = `${carSize} ${brushText} ${smoothingText}${startLaneText} Place the first point to start measuring straights.`;
             return;
         }
 
-        const parts = [`Brush ${formatNumber(metrics.width)}u.`, `Smoothing ${formatNumber(metrics.lineSmoothing)}.`];
+        const parts = [carSize, brushText, smoothingText];
         if (metrics.lastSegmentLength > 0) {
-            parts.push(`Last straight ${formatNumber(metrics.lastSegmentLength)}u.`);
+            parts.push(`Last straight ${formatNumber(metrics.lastSegmentLength)}u (~${formatCarWidths(metrics.lastSegmentLength)} cars long).`);
         }
         if (metrics.previewLength > 0) {
             const label = metrics.previewType === 'closing' ? 'Closing straight' : 'Preview straight';
-            parts.push(`${label} ${formatNumber(metrics.previewLength)}u.`);
+            parts.push(`${label} ${formatNumber(metrics.previewLength)}u (~${formatCarWidths(metrics.previewLength)} cars).`);
         }
         if (metrics.totalPreviewLength > 0) {
             parts.push(`Draft length ${formatNumber(metrics.totalPreviewLength)}u.`);
@@ -2006,25 +2029,102 @@ class MapmakerApp {
         }
     }
 
-    drawStartPosition(viewport) {
-        const point = this.worldToScreen(this.track.startPos, viewport);
-        const angle = this.track.startAngle || 0;
-        const length = 28;
+    getDraftGhostHeading() {
+        const points = this.state.draftLoop;
+        const cursor = this.state.draftCursor;
+        if (points.length >= 1 && cursor) {
+            const from = points[points.length - 1];
+            const to = this.state.draftCloseHover && points.length >= 3 ? points[0] : cursor;
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            if (Math.hypot(dx, dy) > 0.001) {
+                return Math.atan2(dy, dx);
+            }
+        }
+        if (points.length >= 2) {
+            const a = points[points.length - 2];
+            const b = points[points.length - 1];
+            return Math.atan2(b.y - a.y, b.x - a.x);
+        }
+        return Number(this.track.startAngle) || 0;
+    }
+
+    drawGhostCar(worldPoint, angle, viewport, options = {}) {
+        if (!worldPoint || !Number.isFinite(worldPoint.x) || !Number.isFinite(worldPoint.y)) {
+            return;
+        }
+        if (!Number.isFinite(angle)) {
+            angle = 0;
+        }
+
+        const muted = options.muted === true;
+        const screen = this.worldToScreen(worldPoint, viewport);
+        const radius = CAR_RADIUS * viewport.scale;
+        const halfAxis = CAR_HALF_LENGTH * viewport.scale;
+        if (radius < 0.5) {
+            return;
+        }
+
         this.ctx.save();
-        this.ctx.translate(point.x, point.y);
+        this.ctx.translate(screen.x, screen.y);
         this.ctx.rotate(angle);
         this.ctx.beginPath();
-        this.ctx.moveTo(length, 0);
-        this.ctx.lineTo(-10, -8);
-        this.ctx.lineTo(-4, 0);
-        this.ctx.lineTo(-10, 8);
+        this.ctx.moveTo(-halfAxis, -radius);
+        this.ctx.lineTo(halfAxis, -radius);
+        this.ctx.arc(halfAxis, 0, radius, -Math.PI / 2, Math.PI / 2);
+        this.ctx.lineTo(-halfAxis, radius);
+        this.ctx.arc(-halfAxis, 0, radius, Math.PI / 2, -Math.PI / 2);
         this.ctx.closePath();
-        this.ctx.fillStyle = 'rgba(251, 191, 36, 0.24)';
+        this.ctx.fillStyle = muted ? 'rgba(248, 250, 252, 0.10)' : 'rgba(248, 250, 252, 0.22)';
         this.ctx.fill();
-        this.ctx.strokeStyle = '#fbbf24';
-        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = muted ? 'rgba(248, 250, 252, 0.45)' : 'rgba(248, 250, 252, 0.92)';
+        this.ctx.lineWidth = 1.5;
         this.ctx.stroke();
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(halfAxis + radius * 0.2, 0);
+        this.ctx.lineTo(halfAxis - radius * 0.45, -radius * 0.5);
+        this.ctx.lineTo(halfAxis - radius * 0.45, radius * 0.5);
+        this.ctx.closePath();
+        this.ctx.fillStyle = muted ? 'rgba(251, 191, 36, 0.35)' : 'rgba(251, 191, 36, 0.8)';
+        this.ctx.fill();
         this.ctx.restore();
+    }
+
+    drawCarScaleLegend(viewport) {
+        const brush = this.getDrawWidth();
+        const lines = [
+            `Car ${formatNumber(CAR_WIDTH)}×${formatNumber(CAR_LENGTH)}u`,
+            `Brush ${formatNumber(brush)}u ≈ ${formatCarWidths(brush)} cars wide`,
+        ];
+        this.ctx.save();
+        this.ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'top';
+        const paddingX = 10;
+        const paddingY = 8;
+        const lineHeight = 14;
+        const textWidth = Math.max(...lines.map((line) => this.ctx.measureText(line).width));
+        const boxWidth = textWidth + paddingX * 2;
+        const boxHeight = paddingY * 2 + lineHeight * lines.length + 4;
+        const x = 12;
+        const y = 12;
+        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+        this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.rect(x, y, boxWidth, boxHeight);
+        this.ctx.fill();
+        this.ctx.stroke();
+        this.ctx.fillStyle = '#e2e8f0';
+        lines.forEach((line, index) => {
+            this.ctx.fillText(line, x + paddingX, y + paddingY + index * lineHeight);
+        });
+        this.ctx.restore();
+    }
+
+    drawStartPosition(viewport) {
+        this.drawGhostCar(this.track.startPos, this.track.startAngle || 0, viewport);
     }
 
     drawCheckpointLabels(viewport) {
@@ -2072,6 +2172,15 @@ class MapmakerApp {
 
         this.drawDraftLoop(viewport);
 
+        if (this.state.tool === 'draw' && this.state.draftCursor) {
+            this.drawGhostCar(
+                this.state.draftCursor,
+                this.getDraftGhostHeading(),
+                viewport,
+                { muted: true },
+            );
+        }
+
         const handles = this.getAllHandles().sort((a, b) => {
             const aPriority = Number(this.handleMatches(this.state.selectedHandle, a)) * 4
                 + Number(this.handleMatches(this.state.hoverHandle, a)) * 2
@@ -2082,6 +2191,7 @@ class MapmakerApp {
             return aPriority - bPriority;
         });
         handles.forEach((handle) => this.drawHandle(handle, viewport));
+        this.drawCarScaleLegend(viewport);
     }
 
     async copyCurrentTrack() {

@@ -22,6 +22,20 @@ every consumer load the large geometry registry.
 - `game/track/runtime.js`
   Converts a definition into smoothed geometry and collision data.
 
+## Scale Reference
+
+Mapmaker draws a ghost car using the real race collision size
+(`0.55u` wide × `1.23u` long):
+
+- always at the start position
+- under the cursor while Line Build is active
+
+Brush presets also show approximate car widths. Default brush `4u` is about
+**7 car-widths** across. Lanes under about `3u` (~5.5 cars) feel very tight;
+`4u`–`5u` is the usual racing band.
+
+Curve Radius controls wall corner smoothing, not the driven turn radius.
+
 ## Adding A Track
 
 1. Build and validate the layout in `tools/mapmaker.html`.

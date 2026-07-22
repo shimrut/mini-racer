@@ -211,17 +211,19 @@ select:focus {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.chip-row {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
 .tool-grid button[data-active="true"] {
     background: linear-gradient(180deg, rgba(244, 63, 94, 0.94), rgba(190, 24, 93, 0.94));
     border-color: rgba(255, 255, 255, 0.18);
 }
 
+.chip-row {
+    grid-template-columns: repeat(auto-fit, minmax(5.8rem, 1fr));
+}
+
 .chip-row button {
-    padding: 0.7rem 0.6rem;
+    padding: 0.65rem 0.45rem;
+    font-size: 0.78rem;
+    line-height: 1.25;
 }
 
 .chip-row button[data-active="true"] {
