@@ -227,6 +227,7 @@ export class RealTimeRacer {
     });
     this.startOverlay = new StartOverlay({
       dailyChallengeUi: this.dailyChallengeUi,
+      getLobbyUi: () => this.lobbyUi,
     });
     this.lobbyUi = new LobbyUi({
       onSelectDaily: () => this.showDailyLobby(),

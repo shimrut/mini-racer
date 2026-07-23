@@ -140,6 +140,18 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     text-transform: uppercase;
 }
 
+.lobby-mode-track {
+    margin: 0.35rem 0 0;
+    color: var(--text-muted);
+    font-family: var(--header-font);
+    font-size: clamp(0.85rem, 3.2vw, 1.1rem);
+    font-style: italic;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.15;
+    text-transform: uppercase;
+}
+
 .main-menu {
     display: flex;
     flex-direction: column;

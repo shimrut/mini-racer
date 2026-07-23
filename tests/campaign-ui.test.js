@@ -390,7 +390,7 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('places Daily and Campaign labels under the Mini Racer title', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         expect(html).toMatch(
-            /class="lobby-title"[\s\S]*data-lobby-mode-label/,
+            /class="lobby-title"[\s\S]*data-lobby-mode-label[\s\S]*data-lobby-mode-track/,
         );
         expect(html).not.toMatch(
             /id="lobby-daily-pane"[\s\S]*lobby-pane-heading__title">Daily</,
@@ -402,6 +402,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         const originalDocument = global.document;
         const label = createElement('p');
         label.hidden = true;
+        const track = createElement('p');
+        track.hidden = true;
         const overlay = createElement('div');
         const panes = {
             home: createElement('section'),
@@ -417,9 +419,11 @@ describe('Campaign lobby and shared modal adapters', () => {
                 const match = id.match(/^lobby-(home|daily|campaign|challenge)-pane$/);
                 return match ? panes[match[1]] : null;
             },
-            querySelector: (selector) => (
-                selector === '[data-lobby-mode-label]' ? label : null
-            ),
+            querySelector: (selector) => {
+                if (selector === '[data-lobby-mode-label]') return label;
+                if (selector === '[data-lobby-mode-track]') return track;
+                return null;
+            },
             addEventListener: vi.fn(),
         };
         const lobby = new LobbyUi();
@@ -427,18 +431,24 @@ describe('Campaign lobby and shared modal adapters', () => {
         lobby.focus = vi.fn();
         vi.stubGlobal('requestAnimationFrame', (cb) => cb());
 
+        lobby.updateDailyTrackLabel('Desert Sprint');
         lobby.showDaily();
         expect(label.hidden).toBe(false);
         expect(label.textContent).toBe('Daily');
+        expect(track.hidden).toBe(false);
+        expect(track.textContent).toBe('Desert Sprint');
         expect(body.dataset.lobbyMode).toBe('daily');
 
         lobby.showCampaign();
         expect(label.textContent).toBe('Campaign');
+        expect(track.hidden).toBe(true);
+        expect(track.textContent).toBe('');
         expect(body.dataset.lobbyMode).toBe('campaign');
 
         lobby.showHome();
         expect(label.hidden).toBe(true);
         expect(label.textContent).toBe('');
+        expect(track.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('home');
 
         global.document = originalDocument;

@@ -25,6 +25,7 @@ describe('ui start overlay helpers', () => {
             textContent: '',
             querySelector: (selector) => selector === '.main-menu__label' ? labelSpan : null
         };
+        const updateDailyTrackLabel = vi.fn();
 
         global.document = {
             body: {
@@ -38,9 +39,12 @@ describe('ui start overlay helpers', () => {
             createElement: vi.fn(() => ({ className: '', textContent: '' }))
         };
         const dailyChallengeUi = {
-            getSummary: vi.fn(() => ({ available: true }))
+            getSummary: vi.fn(() => ({ available: true, trackName: 'Desert Sprint' }))
         };
-        const overlay = new StartOverlay({ dailyChallengeUi });
+        const overlay = new StartOverlay({
+            dailyChallengeUi,
+            getLobbyUi: () => ({ updateDailyTrackLabel }),
+        });
         Object.defineProperties(overlay, {
             startOverlay: { value: { style: { display: 'flex' } } },
             startBtn: { value: startBtn }
@@ -50,12 +54,9 @@ describe('ui start overlay helpers', () => {
 
         expect(startBtn.style.display).toBe('inline-flex');
         expect(startBtn.disabled).toBe(false);
-        expect(labelSpan.replaceChildren).toHaveBeenCalledTimes(1);
-        const [primaryLabel, secondaryLabel] = labelSpan.replaceChildren.mock.calls[0];
-        expect(primaryLabel.textContent).toBe('Start Race');
-        expect(primaryLabel.className).toBe('start-btn-main');
-        expect(secondaryLabel.textContent).toBe('Daily challenge');
-        expect(secondaryLabel.className).toBe('start-btn-sub');
+        expect(labelSpan.textContent).toBe('Race');
+        expect(labelSpan.replaceChildren).not.toHaveBeenCalled();
+        expect(updateDailyTrackLabel).toHaveBeenCalledWith('Desert Sprint');
         expect(bodyClasses.has('ftu-onboarding-active')).toBe(false);
 
         global.document = originalDocument;
@@ -103,6 +104,7 @@ describe('ui start overlay helpers', () => {
             textContent: '',
             querySelector: (selector) => selector === '.main-menu__label' ? labelSpan : null
         };
+        const updateDailyTrackLabel = vi.fn();
 
         global.document = {
             body: {
@@ -112,7 +114,8 @@ describe('ui start overlay helpers', () => {
         const overlay = new StartOverlay({
             dailyChallengeUi: {
                 getSummary: vi.fn(() => null)
-            }
+            },
+            getLobbyUi: () => ({ updateDailyTrackLabel }),
         });
         Object.defineProperties(overlay, {
             startOverlay: { value: { style: { display: 'flex' } } },
@@ -123,6 +126,7 @@ describe('ui start overlay helpers', () => {
 
         expect(startBtn.disabled).toBe(true);
         expect(labelSpan.textContent).toBe('Challenge unavailable');
+        expect(updateDailyTrackLabel).toHaveBeenCalledWith('');
 
         global.document = originalDocument;
     });

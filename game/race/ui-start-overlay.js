@@ -16,8 +16,10 @@ const BLOCKING_OVERLAY_IDS = [
 export class StartOverlay {
     constructor({
         dailyChallengeUi,
+        getLobbyUi = null,
     } = {}) {
         this.dailyChallengeUi = dailyChallengeUi;
+        this.getLobbyUi = typeof getLobbyUi === 'function' ? getLobbyUi : null;
         this._startOverlayHasAnyData = false;
         this._startOverlayIsReturningPlayer = false;
         this._isReady = false;
@@ -153,26 +155,16 @@ export class StartOverlay {
             startBtn.style.display = "inline-flex";
             startBtn.disabled = !hasChallenge;
 
+            const summary = hasChallenge ? this.dailyChallengeUi?.getSummary?.() : null;
+            const trackName = typeof summary?.trackName === 'string' ? summary.trackName.trim() : '';
+            this.getLobbyUi?.()?.updateDailyTrackLabel?.(trackName);
+
             const labelSpan = startBtn.querySelector(".main-menu__label");
             if (labelSpan) {
-                if (hasChallenge) {
-                    const summary = this.dailyChallengeUi?.getSummary?.();
-                    const trackName = summary?.trackName || "Daily challenge";
-                    const primaryLabel = document.createElement("span");
-                    primaryLabel.className = "start-btn-main";
-                    primaryLabel.textContent = "Start Race";
-
-                    const secondaryLabel = document.createElement("span");
-                    secondaryLabel.className = "start-btn-sub";
-                    secondaryLabel.textContent = trackName;
-
-                    labelSpan.replaceChildren(primaryLabel, secondaryLabel);
-                } else {
-                    labelSpan.textContent = "Challenge unavailable";
-                }
+                labelSpan.textContent = hasChallenge ? "Race" : "Challenge unavailable";
             } else {
                 startBtn.textContent = hasChallenge
-                    ? "Start Race"
+                    ? "Race"
                     : "Challenge unavailable";
             }
         }

@@ -44,6 +44,7 @@ export class LobbyUi {
         this.mode = 'home';
         this.campaignState = normalizeCampaignLobbyState();
         this.challengeState = normalizeChallengeLobbyState();
+        this._dailyTrackName = '';
         this._menuKeyboardState = createMenuKeyboardState();
         this._bound = false;
         this._keydownHandler = (event) => this.handleKeydown(event);
@@ -131,15 +132,35 @@ export class LobbyUi {
         if (mode === 'daily') {
             label.hidden = false;
             label.textContent = 'Daily';
+            this.syncDailyTrackLabel();
             return;
         }
         if (mode === 'campaign') {
             label.hidden = false;
             label.textContent = 'Campaign';
+            this.updateDailyTrackLabel('');
             return;
         }
         label.hidden = true;
         label.textContent = '';
+        this.updateDailyTrackLabel('');
+    }
+
+    updateDailyTrackLabel(trackName = '') {
+        this._dailyTrackName = typeof trackName === 'string' ? trackName.trim() : '';
+        this.syncDailyTrackLabel();
+    }
+
+    syncDailyTrackLabel() {
+        const track = document.querySelector('[data-lobby-mode-track]');
+        if (!track) return;
+        if (this.mode !== 'daily' || !this._dailyTrackName) {
+            track.hidden = true;
+            track.textContent = '';
+            return;
+        }
+        track.hidden = false;
+        track.textContent = this._dailyTrackName;
     }
 
     getMode() {

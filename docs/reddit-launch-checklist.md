@@ -35,7 +35,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Daily and Campaign direct launches show Back, Standings, and Tracks as
   matching mode-action labels with a full-width Start/Continue button at the
   bottom; Back returns to Home. Mode names appear under the Mini Racer title
-  on those screens only.
+  on those screens only, and Daily also shows today's track name under that
+  mode label.
 - [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.
