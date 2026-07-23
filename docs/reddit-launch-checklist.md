@@ -30,6 +30,19 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.
 - [ ] The finish screen shows `Improve`, `Share Time`, and `Home`, and sharing displays the exact comment plus Reddit username before posting.
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
+- [ ] Standalone game launch opens Home with Daily/Campaign choices, Garage at
+  bottom-left, Settings at bottom-right, and no Home Start button.
+- [ ] Daily and Campaign direct launches show their own Start/Continue and Back
+  controls; Back returns to Home.
+- [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3` lap sequence, Gold-gate
+  the next stage, and keep independent permanent standings and PB ghosts.
+- [ ] A signed-in Campaign result creates a reusable custom challenge post;
+  guests cannot create or accept one.
+- [ ] A challenge post opens the correct frozen opponent ghost, permits its
+  locked Campaign track only for that duel, reports win/tie/loss correctly,
+  and writes no Campaign progress, PB, or leaderboard data.
+- [ ] Challenge-post reuse and the three-new-posts per
+  player/subreddit/UTC-day limit are confirmed with real Reddit context.
 
 ### Reddit-specific setup
 

@@ -24,6 +24,10 @@
       "game": {
         "entry": "game.html"
       },
+      "campaign-challenge": {
+        "height": "tall",
+        "entry": "campaign-challenge.html"
+      },
       "podium": {
         "height": "tall",
         "entry": "podium.html"

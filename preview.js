@@ -11,6 +11,7 @@ import {
 import {
     getRaceMedalThresholds,
 } from './game/medals/medal-timing.js';
+import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const playButton = document.getElementById('play-button');
@@ -86,6 +87,7 @@ function loadPostPreviewCar() {
 
 async function openGame(event) {
     try {
+        requestGameLaunchTarget('daily');
         const { requestExpandedMode } = await import('@devvit/web/client');
         await requestExpandedMode(event, 'game');
     } catch (error) {

@@ -92,6 +92,28 @@ Ghosts are per day/track. If a download isn’t ready in time, the game starts w
 
 ## Sharing
 
+### Why does Campaign say Start on one device and Continue on another?
+
+Signed-in Campaign progress is permanent for that Reddit account. Guest
+Campaign progress is stored only in the current browser, so another device or
+cleared site data starts locally from the beginning.
+
+### Why is the next Campaign track locked?
+
+Earn Gold or Author on the previous stage. Silver and Bronze remain on that
+stage's leaderboard but do not unlock the next race.
+
+### Can a challenge unlock a Campaign track?
+
+No. A player challenge is an isolated duel against a frozen verified ghost.
+Its win, tie, or loss can be shared as another challenge, but it never changes
+Campaign progress, PBs, medals, or leaderboards.
+
+### Why can’t I accept or create a player challenge?
+
+Player challenges require Reddit sign-in. Guests can view the post and
+practice Campaign locally, but cannot challenge other players.
+
 ### Share says the preview expired
 
 You waited too long on the confirm step (~**10 minutes**). Start **Share** again and post sooner.

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer Challenge</title>
+    <link rel="stylesheet" href="campaign-challenge.css">
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <script type="module" src="campaign-challenge.js"></script>
+</head>
+
+<body>
+    <main class="challenge-shell" aria-labelledby="challenge-heading">
+        <canvas id="challenge-track" class="challenge-track" aria-hidden="true"></canvas>
+        <div class="challenge-glow" aria-hidden="true"></div>
+
+        <header class="challenge-brand" aria-label="Mini Racer">
+            <span>Mini</span>
+            <strong>Racer</strong>
+        </header>
+
+        <section class="challenge-copy">
+            <p class="challenge-eyebrow">Player challenge</p>
+            <h1 id="challenge-heading"><span id="challenger-name">A racer</span> challenges you</h1>
+            <p id="challenge-track-name" class="challenge-track-name">Campaign race</p>
+            <div class="challenge-target" aria-label="Target time">
+                <span>Beat this time</span>
+                <strong id="challenge-target-time">—</strong>
+            </div>
+            <p id="challenge-format" class="challenge-format">1 LAP · VERIFIED GHOST</p>
+        </section>
+
+        <footer class="challenge-actions">
+            <p id="challenge-message" role="status" aria-live="polite"></p>
+            <button id="accept-challenge" type="button">Accept Challenge</button>
+        </footer>
+    </main>
+</body>
+
+</html>

@@ -106,6 +106,30 @@ flowchart LR
 - Daily labels are calendar-based: `Today` is used only when a challenge's stored UTC date matches the current UTC date. Opening an older Reddit post keeps that post's challenge active and playable, but its Tracks and standings labels continue to show the original date.
 - `leaderboardEntryCount` is the number of players with accepted times. `totalCount` can be larger because it may include the subreddit member total; the UI renders the difference as `No time yet` community placeholders, not as missing player scores.
 - Daily leaderboard snapshots are persisted separately in each client's local storage for fast initial rendering. Opening a standings day shows its cached snapshot immediately, then force-refreshes that day from the server once per open standings session; closing and reopening standings starts a new session and refreshes again, while switching back to a day already refreshed in the same session reuses that server result. When a retained mobile WebView becomes visible again, the current challenge is marked stale: visible standings refresh immediately, while closed standings refresh on their next open. Submission responses include `improved`: a valid slower replay returns `accepted: true, improved: false` and causes no standings request, while `improved: true` force-refreshes only the submitted challenge after any older request for that challenge finishes. The last confirmed snapshot remains in memory and local storage until a successful refresh replaces it; while the selected day is refreshing, its cached rows stay readable with a compact header spinner, and a network failure only removes that spinner.
+
+### Home, Campaign, And Player Challenges
+
+- `game/lobby/ui.js` owns the Home, Daily, Campaign, and player-challenge
+  panes. `game/modes/launch-target.js` resolves standalone Home, direct mode
+  queries, Daily post context, and Campaign challenge post context.
+- `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
+  Number Zero through Seven with fixed `1,1,1,2,2,2,3,3` laps and Gold/Author
+  gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable
+  geometry; `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
+- `game/campaign/engine-methods.js` adapts the shared simulation, replay,
+  cumulative medal flash, and PB ghost renderer to Campaign and isolated
+  player challenges. Guest Campaign progress is browser-local.
+- `src/server/campaign-store.ts` owns signed-in Campaign start state,
+  permanent progress, one permanent leaderboard and PB ghost hash per stage,
+  replay validation, and server-derived medals. Campaign records do not share
+  Daily keys or expiry policy.
+- `src/server/campaign-challenge-*` owns verified-result source resolution,
+  frozen opponent ghosts, isolated duel results, custom-post idempotency, and
+  the three-new-posts per player/subreddit/UTC-day limit. Guests cannot create
+  or accept challenges. Duel submissions never call the Campaign store.
+- `campaign-challenge.html` is the dedicated in-feed custom-post entrypoint;
+  its public post data includes only the immutable race target and no ghost,
+  player ID, or private persistence data.
 - The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
 - Standings entry points open that selected-day modal directly. The date rail and touch swipe navigation switch available days inside it; there is no intermediate standings track-picker. The separate Tracks playlist remains the race-selection flow.
 - Player standing is independent of loaded pages: every snapshot resolves `playerRank` and `currentPlayerRow`, and the standings header keeps that rank and best time visible even when the player's row is outside the loaded rank range.
@@ -154,6 +178,7 @@ flowchart LR
 | Personal-best ghost | `game/ghost/pb-ghost.js`, `game/ghost/pb-ghost-service.js`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | Challenge PB state, verified trace generation, playback, selected-car rendering | Replay validator, player identity, Redis, settings |
 | Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js` | Car art, asset loading, garage selection, trail style | `public/assets/cars/*`, generated asset list, local cache, Redis player profile |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/labels.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
+| Campaign and challenges | `game/campaign/*`, `game/lobby/*`, `game/modes/launch-target.js`, `src/server/campaign-*`, `campaign-challenge.html` | Permanent staged progression, Campaign standings/PBs, isolated verified player duels and custom posts | Shared simulation/replay/medal rules, Redis, Reddit post context |
 | Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow, share entry point | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js`, `game/player/preferences.js` | Identity, audio toggles, collision auto-restart and delay, durable preference sync | Browser cache, player APIs, Redis profile, modal helpers |
 | Audio | `game/audio/*` | Sound playback | Settings preferences |
@@ -175,6 +200,15 @@ These client-facing routes are registered under `src/server/routes/`:
 - `/api/daily/submit`
 - `/api/daily/share/preview`
 - `/api/daily/share/confirm`
+- `/api/campaign/bootstrap`
+- `/api/campaign/start`
+- `/api/campaign/snapshot`
+- `/api/campaign/submit`
+- `/api/campaign/pb-ghost`
+- `/api/campaign/challenge`
+- `/api/campaign/challenge/preview`
+- `/api/campaign/challenge/create`
+- `/api/campaign/challenge/submit`
 
 The browser-side API route table is `game/scoreboard/api-client.js`; player ID / guest token live in `game/scoreboard/player-identity.js`. Both leaderboard snapshot endpoints normalize their responses through `game/scoreboard/snapshot.js` before UI or cache use.
 

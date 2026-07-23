@@ -52,9 +52,9 @@ function hashTrackRegistry(trackRegistry) {
 }
 
 describe('track runtime integrity', () => {
-    it('keeps the compatibility registry ordered by the complete schedule', () => {
-        expect(Object.keys(TRACKS)).toEqual(TRACK_SCHEDULE_KEYS);
-        expect(new Set(TRACK_SCHEDULE_KEYS)).toEqual(new Set(Object.keys(TRACK_CATALOG)));
+    it('keeps the complete compatibility registry with Daily as an ordered subset', () => {
+        expect(Object.keys(TRACKS)).toEqual(Object.keys(TRACK_CATALOG));
+        expect(TRACK_SCHEDULE_KEYS.every((trackKey) => hasTrack(trackKey))).toBe(true);
         expect(new Set(TRACK_SCHEDULE_KEYS).size).toBe(TRACK_SCHEDULE_KEYS.length);
         Object.entries(TRACK_CATALOG).forEach(([trackKey, metadata]) => {
             expect(metadata.name.trim(), `${trackKey} needs a player-facing name`).not.toBe('');
@@ -68,7 +68,7 @@ describe('track runtime integrity', () => {
         )
             .filter((filename) => filename.endsWith('.js'))
             .sort();
-        const expectedFiles = TRACK_SCHEDULE_KEYS
+        const expectedFiles = Object.keys(TRACK_CATALOG)
             .map((trackKey) => `${toKebabCase(trackKey)}.js`)
             .sort();
 
@@ -76,9 +76,10 @@ describe('track runtime integrity', () => {
     });
 
     it('preserves existing track data while intentionally extending the registry', () => {
-        const firstNewTrackIndex = TRACK_SCHEDULE_KEYS.indexOf('numberZero');
+        const catalogKeys = Object.keys(TRACK_CATALOG);
+        const firstNewTrackIndex = catalogKeys.indexOf('numberZero');
         expect(firstNewTrackIndex).toBeGreaterThan(0);
-        expect(TRACK_SCHEDULE_KEYS.slice(firstNewTrackIndex)).toEqual([
+        expect(catalogKeys.slice(firstNewTrackIndex)).toEqual([
             'numberZero',
             'numberOne',
             'numberTwo',
@@ -89,16 +90,39 @@ describe('track runtime integrity', () => {
             'numberSeven',
         ]);
 
+        const intentionallyReviewedKeys = new Set([
+            'cobaltRun',
+            'lunarLimbo',
+            'blackstoneRun',
+            'titanTown',
+            'mistfallCircuit',
+            'numberZero',
+            'numberOne',
+            'numberTwo',
+            'numberThree',
+            'numberFour',
+            'numberFive',
+            'numberSix',
+            'numberSeven',
+        ]);
+        const unchangedTrackRegistry = Object.fromEntries(
+            Object.entries(TRACKS)
+                .filter(([trackKey]) => !intentionallyReviewedKeys.has(trackKey)),
+        );
+        expect(hashTrackRegistry(unchangedTrackRegistry)).toBe(
+            'ef5fabbd0b462bca26bfca282da9f9ebfb345e2345a7b12a2c4981c46056f6ee',
+        );
+
         const existingTrackRegistry = Object.fromEntries(
-            TRACK_SCHEDULE_KEYS
+            catalogKeys
                 .slice(0, firstNewTrackIndex)
                 .map((trackKey) => [trackKey, TRACKS[trackKey]]),
         );
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
-            'a3c5cc6c6e84afd239e1eb05a325da97d9a6499ff0085b27d5e5b44a95f6a462',
+            '9b58bdb2a83ae41caf4456faebfb85b9ccb70930865844df5abc183169250f6b',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '13344386120984298e6b482b5ab23a101a63a34e21f433f752fc1efc2515a7c1',
+            'fd6acf872b843f25e255d1af6e6016607db300172dc16f80d4006796a66a5eac',
         );
     });
 

@@ -338,7 +338,31 @@
   "furiousFast": {
     "author": 10.80,
     "gold": 11.28,
-    "silver": 11.71,
-    "bronze": 12.05
+    "silver": 12.21,
+    "bronze": 13.05
+  },
+  "titanTown": {
+    "author": 10.50,
+    "gold": 11.26,
+    "silver": 12.52,
+    "bronze": 13.13
+  },
+  "lunarLimbo": {
+    "author": 12.95,
+    "gold": 13.61,
+    "silver": 14.77,
+    "bronze": 16.09
+  },
+  "blackstoneRun": {
+    "author": 14.65,
+    "gold": 14.97,
+    "silver": 16.69,
+    "bronze": 18.21
+  },
+  "mistfallCircuit": {
+    "author": 14.00,
+    "gold": 14.67,
+    "silver": 16.29,
+    "bronze": 19.48
   }
 }

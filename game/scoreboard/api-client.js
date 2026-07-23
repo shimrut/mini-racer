@@ -22,7 +22,16 @@ export const API_ROUTES = Object.freeze({
     dailySnapshotUrl: `${API_BASE_URL}/daily/snapshot`,
     dailySubmitUrl: `${API_BASE_URL}/daily/submit`,
     dailySharePreviewUrl: `${API_BASE_URL}/daily/share/preview`,
-    dailyShareConfirmUrl: `${API_BASE_URL}/daily/share/confirm`
+    dailyShareConfirmUrl: `${API_BASE_URL}/daily/share/confirm`,
+    campaignBootstrapUrl: `${API_BASE_URL}/campaign/bootstrap`,
+    campaignStartUrl: `${API_BASE_URL}/campaign/start`,
+    campaignSnapshotUrl: `${API_BASE_URL}/campaign/snapshot`,
+    campaignSubmitUrl: `${API_BASE_URL}/campaign/submit`,
+    campaignPbGhostUrl: `${API_BASE_URL}/campaign/pb-ghost`,
+    campaignChallengePreviewUrl: `${API_BASE_URL}/campaign/challenge/preview`,
+    campaignChallengeCreateUrl: `${API_BASE_URL}/campaign/challenge/create`,
+    campaignChallengeUrl: `${API_BASE_URL}/campaign/challenge`,
+    campaignChallengeSubmitUrl: `${API_BASE_URL}/campaign/challenge/submit`
 });
 
 export function clampRequestLimit(limit, { defaultLimit, maxLimit = 100 } = {}) {

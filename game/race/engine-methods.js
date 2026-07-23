@@ -391,7 +391,11 @@ export const raceEngineMethods = {
       ) {
         event.preventDefault();
         if (this.currentChallengeRun) {
-          this.restartDailyChallenge({ reason: "restart" });
+          if (typeof this.restartActiveRace === "function") {
+            this.restartActiveRace();
+          } else {
+            this.restartDailyChallenge({ reason: "restart" });
+          }
         } else {
           this.reset(true);
         }
@@ -440,9 +444,9 @@ export const raceEngineMethods = {
           modalKind: "pause",
           primaryActionLabel: "Resume",
           primaryAction: () => this.resumeActiveRun(),
-          restartAction: () => this.restartDailyChallenge({ reason: "restart" }),
-          secondaryActionLabel: "Done",
-          secondaryAction: () => this.reset(false),
+          restartAction: () => this.restartActiveRace(),
+          secondaryActionLabel: this.activeRaceMode === "daily" ? "Done" : "Back",
+          secondaryAction: () => this.returnToActiveLobby(),
         }),
         pauseTrackPreview: {
           trackKey: this.currentTrackKey,
@@ -453,9 +457,9 @@ export const raceEngineMethods = {
           bestTime,
         },
         settingsAction: () => this.settings.openSettings(),
-        playlistAction: () => {
-          void this.openDailyChallengePlaylist();
-        },
+        playlistAction: this.activeRaceMode === "daily"
+          ? () => void this.openDailyChallengePlaylist()
+          : null,
       },
     );
   },
@@ -509,7 +513,7 @@ export const raceEngineMethods = {
     }
 
     if (events.challengeLapCompleted) {
-      this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime, {
+      this.handleActiveRaceLapCompleted(events.challengeCompletedLapTime, {
         elapsedTimeSec: events.challengeElapsedTime,
         completedLaps: events.challengeProgressLaps,
         requiredLaps: events.challengeRequiredLaps,
@@ -517,7 +521,7 @@ export const raceEngineMethods = {
       });
     }
     if (events.winTriggered) {
-      this.handleDailyChallengeWin(events.winData);
+      this.handleActiveRaceWin(events.winData);
     }
   },
 

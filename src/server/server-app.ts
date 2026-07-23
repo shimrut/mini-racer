@@ -19,9 +19,11 @@ import {
 } from './daily-gp-share.js';
 import {
     getRequestRateLimitIdentity,
+    getRequestAppSlug,
     getRequestUsername,
     readContextPostId,
     readContextPostData,
+    readContextSubredditName,
 } from './request-context.js';
 import { getPostBoundDailyGpChallenge } from './post-bound-challenge.js';
 import { getCommunityMemberTotalForLeaderboard } from './community-context.js';
@@ -49,7 +51,26 @@ import { registerShareRoutes } from './routes/share-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
 import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 import { registerPodiumRoutes } from './routes/podium-routes.js';
+import { registerCampaignRoutes } from './routes/campaign-routes.js';
+import { registerCampaignChallengeRoutes } from './routes/campaign-challenge-routes.js';
+import {
+    getServerCampaignBootstrap,
+    getServerCampaignPbGhost,
+    getServerCampaignSnapshot,
+    startServerCampaignRace,
+    submitServerCampaignRun,
+} from './campaign-store.js';
+import { createCampaignChallengeService } from './campaign-challenge-service.js';
+import {
+    resolveCampaignChallengeSource,
+    validateCampaignChallengeReplay,
+} from './campaign-challenge-runtime.js';
 import { resolveLegacyDailyGpPodiumAvatars } from './daily-podium-avatar-backfill.js';
+
+const campaignChallengeService = createCampaignChallengeService({
+    resolveSource: resolveCampaignChallengeSource,
+    validateReplay: validateCampaignChallengeReplay,
+});
 
 function registerProductionRoutes(app: express.Application): void {
     registerPlayerRoutes(app, {
@@ -67,6 +88,27 @@ function registerProductionRoutes(app: express.Application): void {
         readContextPostId,
         readContextPostData,
         resolveLegacyDailyGpPodiumAvatars,
+    });
+    registerCampaignRoutes(app, {
+        getRequestUsername,
+        getRequestRateLimitIdentity,
+        getServerCampaignBootstrap: (input) => getServerCampaignBootstrap(input),
+        startServerCampaignRace: (input) => startServerCampaignRace(input),
+        getServerCampaignSnapshot: (input) => getServerCampaignSnapshot(input),
+        submitServerCampaignRun: (input) => submitServerCampaignRun(input),
+        getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
+    });
+    registerCampaignChallengeRoutes(app, {
+        getCampaignChallengeRequestContext: () => ({
+            username: getRequestUsername(),
+            subredditName: readContextSubredditName(),
+            appSlug: getRequestAppSlug(),
+        }),
+        readContextPostData,
+        previewCampaignChallenge: campaignChallengeService.preview,
+        createCampaignChallenge: campaignChallengeService.create,
+        getCampaignChallenge: campaignChallengeService.get,
+        submitCampaignChallenge: campaignChallengeService.submit,
     });
     registerCompetitionRoutes(app, {
         getRequestUsername,

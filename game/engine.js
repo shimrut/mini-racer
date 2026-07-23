@@ -33,11 +33,14 @@ import { InteractionsUi } from "./race/ui-interactions.js";
 import { LeaderboardsUi } from "./scoreboard/ui.js";
 import { SettingsUi } from "./settings/ui.js";
 import { GarageUi } from "./settings/garage-ui.js";
+import { LobbyUi } from "./lobby/ui.js";
+import { resolveGameLaunchTarget } from "./modes/launch-target.js";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
 import { trackEngineMethods } from "./track/engine-methods.js";
 import { raceEngineMethods } from "./race/engine-methods.js";
 import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
+import { campaignEngineMethods } from "./campaign/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
 import { createProceduralMusic } from "./audio/procedural-music.js";
@@ -101,6 +104,12 @@ export class RealTimeRacer {
     this.currentRunPolicy = createRunPolicy();
     this.runtimeConfig = { ...CONFIG };
     this.activeDailyChallenge = null;
+    this.activeRaceMode = "home";
+    this.activeCampaignStage = null;
+    this.activeCampaignChallenge = null;
+    this.campaignBootstrap = null;
+    this.campaignLobbyState = null;
+    this.launchTarget = resolveGameLaunchTarget();
     /** Last challenge raced this page session; home Start prefers this over featured daily. */
     this.lastPlayedDailyChallenge = null;
     this.currentChallengeRun = null;
@@ -219,6 +228,15 @@ export class RealTimeRacer {
     this.startOverlay = new StartOverlay({
       dailyChallengeUi: this.dailyChallengeUi,
     });
+    this.lobbyUi = new LobbyUi({
+      onSelectDaily: () => this.showDailyLobby(),
+      onSelectCampaign: () => void this.showCampaignLobby(),
+      onBack: () => this.showHomeLobby(),
+      onStartCampaign: (stage) => void this.startCampaignStage(stage),
+      onSelectCampaignStage: (stage) => void this.startCampaignStage(stage),
+      onOpenCampaignStandings: (stage) => void this.openCampaignStandings(stage),
+      onAcceptChallenge: () => void this.startCampaignChallenge(),
+    });
     this.hud = new RaceHud({
       getTrackPersonalBest: () => this.bestLapTime,
       getCurrentTrackKey: () => this.currentTrackKey,
@@ -244,8 +262,12 @@ export class RealTimeRacer {
       playUnlockSound: (tier) => this.medalEffectsAudio?.scheduleMedalUnlock?.(tier),
       getGarageUi: () => this.garage,
       getRedditUsername: () => this.redditUsername,
-      previewShare: (payload) => previewDailyChallengeShare(payload),
-      confirmShare: (shareToken) => confirmDailyChallengeShare(shareToken),
+      previewShare: (payload) => payload?.kind === "campaign-challenge"
+        ? this.previewCampaignChallenge(payload)
+        : previewDailyChallengeShare(payload),
+      confirmShare: (shareToken, request) => request?.kind === "campaign-challenge"
+        ? this.confirmCampaignChallenge(shareToken)
+        : confirmDailyChallengeShare(shareToken),
     });
     this.leaderboards = new LeaderboardsUi({
       showRunsModal: (...args) => this.modal.showRunsModal(...args),
@@ -338,9 +360,9 @@ export class RealTimeRacer {
     });
     this.interactions.bindModalViewToggles();
     this.interactions.bindModalActionRowPointerFocus();
-    this.interactions.bindMenu();
     this.interactions.bindPrimaryActions();
     this.dailyChallengeUi.bindPlaylistModal();
+    this.lobbyUi.bind();
     this.garage.bind();
     this.hud.setPauseVisible(false);
 
@@ -381,10 +403,16 @@ export class RealTimeRacer {
     ]).finally(async () => {
       this.loadingScreen.update(95, "Displaying Lobby...");
 
-      this.startOverlay.showStartOverlay(
-        this.hasAnyData,
-        this.isReturningPlayer,
-      );
+      this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
+      if (this.launchTarget.mode === "daily") {
+        this.showDailyLobby();
+      } else if (this.launchTarget.mode === "campaign") {
+        await this.showCampaignLobby();
+      } else if (this.launchTarget.mode === "challenge") {
+        await this.loadChallengeLobby(this.launchTarget.challengeId);
+      } else {
+        this.showHomeLobby();
+      }
       this.startOverlay.setReady(true);
 
       await this.loadingScreen.dismiss();
@@ -488,6 +516,7 @@ export class RealTimeRacer {
   syncCurrentRunPolicy() {
     this.currentRunPolicy = createRunPolicy({
       challengeRun: this.currentChallengeRun,
+      mode: this.activeRaceMode === "home" ? "daily" : this.activeRaceMode,
     });
   }
 
@@ -506,6 +535,8 @@ export class RealTimeRacer {
       coordinateSystem:
         "origin top-left, x increases right, y increases down, units are track-grid cells",
       mode: this.status,
+      lobbyMode: this.lobbyUi?.getMode?.() || null,
+      raceMode: this.activeRaceMode,
       track: this.currentTrackKey,
       player: {
         x: Number(this.pos.x.toFixed(2)),
@@ -534,6 +565,8 @@ export class RealTimeRacer {
                 : null,
           }
         : null,
+      campaignRaceId: this.activeCampaignStage?.raceId || null,
+      playerChallengeId: this.activeCampaignChallenge?.challengeId || null,
       startLine: this.currentTrack.startLine,
       routeTracePoints: this.routeTrace.length,
       liveParticles: this.particles.length,
@@ -591,4 +624,5 @@ Object.assign(
   raceEngineMethods,
   dailyChallengeEngineMethods,
   scoreboardEngineMethods,
+  campaignEngineMethods,
 );

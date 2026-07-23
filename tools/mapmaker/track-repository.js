@@ -82,7 +82,7 @@ export function generateTracksRegistrySource(scheduleKeys) {
         ...scheduleKeys.map((trackKey) => (
             `import ${trackKey} from './definitions/${getTrackModuleFilename(trackKey)}';`
         )),
-        "import { TRACK_SCHEDULE_KEYS, getTrackName } from './catalog.js';",
+        "import { TRACK_CATALOG, getTrackName } from './catalog.js';",
         '',
         'const TRACK_GEOMETRY = {',
         ...scheduleKeys.map((trackKey) => `    ${trackKey},`),
@@ -90,7 +90,7 @@ export function generateTracksRegistrySource(scheduleKeys) {
         '',
         '// Compatibility registry for existing gameplay and server consumers.',
         'export const TRACKS = Object.fromEntries(',
-        '    TRACK_SCHEDULE_KEYS.map((trackKey) => [',
+        '    Object.keys(TRACK_CATALOG).map((trackKey) => [',
         '        trackKey,',
         '        { name: getTrackName(trackKey), ...TRACK_GEOMETRY[trackKey] },',
         '    ]),',

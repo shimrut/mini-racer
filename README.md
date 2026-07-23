@@ -1,6 +1,6 @@
 # Mini Racer
 
-Mini Racer is a quick daily racing game for Reddit.
+Mini Racer is a quick Daily and Campaign racing game for Reddit.
 
 Open a Mini Racer post, tap **Race Now**, learn the track, and try again until your lap is cleaner and faster. Runs are short on purpose — restart fast, improve often.
 
@@ -16,8 +16,12 @@ Steer, finish the complete race as fast as you can, then try again.
 - Earn **medals** by beating the target times on each track
 - Climb that day's **leaderboard** in Standings
 - Missed a day? You can replay the last **7 days** of tracks
+- Play the permanent eight-stage **Campaign**, earning Gold to unlock the next
+  fixed 1-, 2-, or 3-lap race
 - Change how your car looks in the **Garage** (skins and trails — handling stays the same)
 - **Share** a finished race or a verified daily best as a Reddit comment (you preview the text first)
+- When signed in, turn a verified Campaign or player-challenge result into a
+  custom challenge post with your frozen ghost
 
 Your car look and settings are saved to your player profile. Guest data expires after 7 inactive days; signed-in data expires after 30 inactive days.
 
@@ -39,6 +43,11 @@ Your car look and settings are saved to your player profile. Guest data expires 
 - In Standings: **Share Best** appears when you have a verified time for the day you are viewing
 - Shared results go to the post's pinned **score thread**, as a comment from your Reddit account after you confirm
 - Sharing the same result again reuses the existing comment instead of posting a duplicate
+
+Campaign has a separate permanent leaderboard for each stage. Guests can
+practice Campaign locally, but Reddit sign-in is required for permanent
+Campaign competition and all player challenges. Challenge duels are isolated:
+they do not unlock Campaign stages or change Campaign standings.
 
 ## First look on Reddit
 

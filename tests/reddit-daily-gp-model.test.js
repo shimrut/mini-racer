@@ -121,8 +121,12 @@ describe('reddit daily gp model', () => {
         expect(scheduledTrackKeys.every((key) => pool.includes(key))).toBe(true);
     });
 
-    it('uses an explicit schedule containing the complete track catalog', () => {
-        expect(new Set(TRACK_SCHEDULE_KEYS)).toEqual(new Set(Object.keys(TRACK_CATALOG)));
+    it('uses an explicit Daily schedule drawn from the complete track catalog', () => {
+        expect(TRACK_SCHEDULE_KEYS.every((trackKey) => (
+            Object.hasOwn(TRACK_CATALOG, trackKey)
+        ))).toBe(true);
+        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberZero');
+        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberSeven');
     });
 
     it('keeps day indexing stable within the same UTC day', () => {

@@ -1,5 +1,19 @@
 # Changelog
 
+- Added a permanent eight-stage Campaign using Number Zero through Number
+  Seven with fixed `1,1,1,2,2,2,3,3` lap counts, linearly scaled medal
+  targets, Gold-gated progression, permanent per-stage standings, and
+  Campaign-scoped PB ghosts.
+- Added a standalone Home screen with Daily and Campaign choices, corner
+  Garage/Settings actions, direct Daily/Campaign/challenge startup, and Back
+  navigation from each mode lobby.
+- Added signed-in player challenge custom posts backed only by verified
+  Campaign or duel results. Challenges freeze the opponent ghost, allow an
+  isolated locked-stage duel without Campaign writes, support win/tie/loss
+  result chaining, reuse identical posts, and cap new posts at three per
+  player, subreddit, and UTC day. Guests cannot create or accept challenges.
+- Removed Number Zero through Number Seven from future Daily rotation while
+  retaining them in the full playable registry for Campaign.
 - Daily GP challenges now freeze a deterministic 1/2/3-lap race format at publication: tracks with author times over 10.95 seconds use 1–2 laps, faster tracks use 1–3, medal targets scale linearly, intermediate finishes flash the cumulative qualifying medal, and only the complete race updates the permanent track medal.
 - Multi-lap ranking now shares a versioned client/server race and replay contract. New replays allow 2,500 frames per required lap, legacy published one-lap challenges retain the 3,000-frame limit, checkpoint splits remain cumulative, and PB ghosts are bound to lap count and rules revision.
 - Daily cards, playlist, finish UI, Reddit fallback/share copy, score threads, and final podium data now describe the complete race and its lap count.

@@ -9,13 +9,14 @@ every consumer load the large geometry registry.
 ## Track Files
 
 - `game/track/catalog.js`
-  Owns each track's player-facing name, `TRACK_SCHEDULE_KEYS`,
+  Owns every playable track's player-facing name plus `TRACK_SCHEDULE_KEYS`,
   `DEFAULT_TRACK_KEY`, `hasTrack()`, and `getTrackName()`.
 - `game/track/definitions/<track-slug>.js`
   Owns one track's boundaries, start position, start line, checkpoints, and
   geometry-specific options.
 - `game/track/tracks.js`
-  Assembles definition modules into the compatibility `TRACKS` registry.
+  Assembles every catalog definition into the compatibility `TRACKS` registry,
+  including Campaign-only tracks that are not in the Daily schedule.
   Rendering, collision, previews, and replay validation use this registry.
 - `game/track/geometry.js`
   Owns the shared point and line-intersection helpers.
@@ -70,6 +71,8 @@ and **Copy Integration** remain available as manual fallbacks.
 - Use `hasTrack()` to validate a track key.
 - Use `DEFAULT_TRACK_KEY` for the standard local fallback.
 - Use `TRACK_SCHEDULE_KEYS` when order controls Daily GP publication.
+- Use `game/campaign/manifest.js` when order or fixed lap count controls the
+  permanent Campaign. Do not add Campaign-only tracks to the Daily schedule.
 - Import `TRACKS` only when the caller needs boundaries, checkpoints, start
   geometry, rendering, collision, or replay validation.
 - Do not put track lists back into `game/config.js`.
@@ -83,8 +86,9 @@ challenge records.
 
 The regression suite checks:
 
-- catalog and schedule keys stay aligned;
+- schedule keys are a valid subset of the catalog;
 - the compatibility `TRACKS` registry contains every scheduled track;
+- the compatibility `TRACKS` registry also contains every Campaign track;
 - player-facing names match between catalog metadata and the assembled
   geometry registry;
 - existing track data remains unchanged when the registry is extended;

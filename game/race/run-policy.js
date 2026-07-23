@@ -11,12 +11,13 @@ function createWinData(state, checkpointCount, extra = {}) {
 }
 
 export function createRunPolicy({
-    challengeRun = null
+    challengeRun = null,
+    mode = 'daily',
 } = {}) {
     const objectiveType = challengeRun?.objectiveType || 'single_lap_fastest';
     const requiredLaps = Math.max(1, Math.trunc(challengeRun?.requiredLaps || 1));
     return {
-        id: `daily:${objectiveType}`,
+        id: `${mode}:${objectiveType}`,
         objectiveType,
         requiredLaps,
         rulesRevision: Number.isInteger(challengeRun?.rulesRevision)
@@ -27,7 +28,8 @@ export function createRunPolicy({
 
 export function resolveRunPolicy(state) {
     return state?.currentRunPolicy || createRunPolicy({
-        challengeRun: state?.currentChallengeRun || null
+        challengeRun: state?.currentChallengeRun || null,
+        mode: state?.activeRaceMode || 'daily',
     });
 }
 

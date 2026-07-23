@@ -8,9 +8,10 @@ const manifest = readFileSync(manifestUrl, 'utf8');
 const expectedImports = [
     './fonts.css',
     './styles/foundation.css',
-    './styles/race-hud-and-medals.css',
-    './styles/lobby-and-garage.css',
-    './styles/race-controls-and-feedback.css',
+            './styles/race-hud-and-medals.css',
+            './styles/lobby-and-garage.css',
+            './styles/lobby-modes.css',
+            './styles/race-controls-and-feedback.css',
     './styles/modal-and-result-shell.css',
     './styles/settings-and-track-shells.css',
     './styles/modal-components-and-standings.css',

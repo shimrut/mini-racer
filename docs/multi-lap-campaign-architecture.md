@@ -2,12 +2,30 @@
 
 ## Status
 
-Phase 1 (multi-lap Daily GP) is implemented on
-`codex/multi-lap-dailies`. Campaign remains a future phase.
+Phase 1 (multi-lap Daily GP) and the first permanent Campaign are implemented.
+The Campaign implementation lives on `codex/campaign-mode`, based on
+`codex/multi-lap-dailies`.
 
 The intended outcome is one shared race contract used by Daily GP, Campaign,
 and later modes, while each mode keeps its own selection, progression,
 leaderboard, and retention rules.
+
+### Implemented Campaign contract
+
+- Campaign ID: `numbered-v1`.
+- Stages: Number Zero through Number Seven.
+- Fixed lap counts: `1, 1, 1, 2, 2, 2, 3, 3`.
+- Unlock rule: Gold or Author on the immediately preceding stage.
+- Signed-in starts, progress, per-stage bests, PB ghosts, and leaderboards are
+  permanent Campaign records. Guest progress is local practice data only.
+- Campaign result posts freeze a verified result and ghost. Signed-in viewers
+  may race that ghost even when the corresponding Campaign stage is locked;
+  duel results never write Campaign progression, leaderboards, or PBs.
+- Any verified duel outcome can create another challenge. Exact result posts
+  are reused, while new challenge posts are limited to three per player,
+  subreddit, and UTC day.
+- Plain expanded-game startup opens Home. Daily, Campaign, and challenge posts
+  can launch directly into their respective lobby.
 
 ## Product Summary
 
@@ -45,6 +63,11 @@ This interpretation was confirmed. Use an equal chance among the allowed lap
 counts. Seed the selection from the challenge identity and track, then persist
 the chosen value in the append-only challenge ledger. Players, retries, old
 posts, and later app versions must never reroll a published challenge.
+
+## Historical implementation audit
+
+The findings below describe the pre-implementation state retained for design
+history. The blocking items were resolved by the current implementation.
 
 ## What Already Exists
 

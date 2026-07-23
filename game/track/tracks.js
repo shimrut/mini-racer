@@ -18,6 +18,7 @@ import desertBridge from './definitions/desert-bridge.js';
 import templeStraight from './definitions/temple-straight.js';
 import goldenMarsh from './definitions/golden-marsh.js';
 import harborPrincipality from './definitions/harbor-principality.js';
+import lunarLimbo from './definitions/lunar-limbo.js';
 import serpentCrossing from './definitions/serpent-crossing.js';
 import ardennesRidge from './definitions/ardennes-ridge.js';
 import pretzelArena from './definitions/pretzel-arena.js';
@@ -26,14 +27,17 @@ import jumpingJack from './definitions/jumping-jack.js';
 import caspianBoulevard from './definitions/caspian-boulevard.js';
 import velvetWombat from './definitions/velvet-wombat.js';
 import cobaltRun from './definitions/cobalt-run.js';
+import blackstoneRun from './definitions/blackstone-run.js';
 import pebblePass from './definitions/pebble-pass.js';
 import zenithRun from './definitions/zenith-run.js';
 import speedAltar from './definitions/speed-altar.js';
+import titanTown from './definitions/titan-town.js';
 import groundControl from './definitions/ground-control.js';
 import crystalineHarbor from './definitions/crystaline-harbor.js';
 import ironHook from './definitions/iron-hook.js';
 import greatBazaar from './definitions/great-bazaar.js';
 import circuitPromax from './definitions/circuit-promax.js';
+import mistfallCircuit from './definitions/mistfall-circuit.js';
 import stretchingCat from './definitions/stretching-cat.js';
 import turboShell from './definitions/turbo-shell.js';
 import redLagoon from './definitions/red-lagoon.js';
@@ -54,7 +58,7 @@ import numberFour from './definitions/number-four.js';
 import numberFive from './definitions/number-five.js';
 import numberSix from './definitions/number-six.js';
 import numberSeven from './definitions/number-seven.js';
-import { TRACK_SCHEDULE_KEYS, getTrackName } from './catalog.js';
+import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
     circuit,
@@ -77,6 +81,7 @@ const TRACK_GEOMETRY = {
     templeStraight,
     goldenMarsh,
     harborPrincipality,
+    lunarLimbo,
     serpentCrossing,
     ardennesRidge,
     pretzelArena,
@@ -85,14 +90,17 @@ const TRACK_GEOMETRY = {
     caspianBoulevard,
     velvetWombat,
     cobaltRun,
+    blackstoneRun,
     pebblePass,
     zenithRun,
     speedAltar,
+    titanTown,
     groundControl,
     crystalineHarbor,
     ironHook,
     greatBazaar,
     circuitPromax,
+    mistfallCircuit,
     stretchingCat,
     turboShell,
     redLagoon,
@@ -117,7 +125,7 @@ const TRACK_GEOMETRY = {
 
 // Compatibility registry for existing gameplay and server consumers.
 export const TRACKS = Object.fromEntries(
-    TRACK_SCHEDULE_KEYS.map((trackKey) => [
+    Object.keys(TRACK_CATALOG).map((trackKey) => [
         trackKey,
         { name: getTrackName(trackKey), ...TRACK_GEOMETRY[trackKey] },
     ]),
