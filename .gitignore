@@ -12,6 +12,7 @@ tools/*
 !tools/generate-player-car-assets.js
 !tools/generate-share-images.js
 !tools/analyze-unused-css.js
+!tools/bust-client-asset-cache.js
 !tools/mapmaker/
 !tools/mapmaker/*.js
 public/assets/logo/

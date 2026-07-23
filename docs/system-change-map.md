@@ -248,7 +248,7 @@ The browser-side API route table is `game/scoreboard/api-client.js`; player ID /
 | --- | --- | --- |
 | `@devvit/start` | Devvit integration for the Vite build | `vite.config.js` |
 | `devvit` | Local Devvit CLI for playtest, upload, and publish workflows | `package.json` scripts, `devvit.json` |
-| `vite` | Build and local packaging | `vite.config.js` |
+| `vite` | Build and local packaging | `vite.config.js`, `tools/bust-client-asset-cache.js` (content-hash query on `dist/client` `game.css` / `game.js`) |
 | `vitest` | Test runner | `vitest.config.js`, `npm test` |
 | `@stryker-mutator/*` | Mutation testing | `stryker.config.mjs` |
 
