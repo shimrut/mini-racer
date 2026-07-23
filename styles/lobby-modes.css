@@ -127,15 +127,6 @@
     flex-direction: row-reverse;
 }
 
-.lobby-utility-btn__icon {
-    display: grid;
-    width: 1.7rem;
-    height: 1.7rem;
-    place-items: center;
-    color: var(--text-dim);
-    font-size: 1.1rem;
-}
-
 .lobby-pane-heading {
     width: 100%;
     margin-bottom: 1rem;

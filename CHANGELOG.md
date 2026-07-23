@@ -1,5 +1,7 @@
 # Changelog
 
+- Restored the existing Font Awesome Garage and Settings icons on the new Home
+  screen instead of substituting platform-dependent text glyphs.
 - Added a permanent eight-stage Campaign using Number Zero through Number
   Seven with fixed `1,1,1,2,2,2,3,3` lap counts, linearly scaled medal
   targets, Gold-gated progression, permanent per-stage standings, and
