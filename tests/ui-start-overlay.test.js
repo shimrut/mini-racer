@@ -54,7 +54,7 @@ describe('ui start overlay helpers', () => {
 
         expect(startBtn.style.display).toBe('inline-flex');
         expect(startBtn.disabled).toBe(false);
-        expect(labelSpan.textContent).toBe('Race');
+        expect(labelSpan.textContent).toBe('Start Race');
         expect(labelSpan.replaceChildren).not.toHaveBeenCalled();
         expect(updateDailyTrackLabel).toHaveBeenCalledWith('Desert Sprint');
         expect(bodyClasses.has('ftu-onboarding-active')).toBe(false);

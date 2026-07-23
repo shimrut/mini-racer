@@ -161,10 +161,10 @@ export class StartOverlay {
 
             const labelSpan = startBtn.querySelector(".main-menu__label");
             if (labelSpan) {
-                labelSpan.textContent = hasChallenge ? "Race" : "Challenge unavailable";
+                labelSpan.textContent = hasChallenge ? "Start Race" : "Challenge unavailable";
             } else {
                 startBtn.textContent = hasChallenge
-                    ? "Race"
+                    ? "Start Race"
                     : "Challenge unavailable";
             }
         }
