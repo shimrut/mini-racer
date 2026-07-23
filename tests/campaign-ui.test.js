@@ -123,6 +123,12 @@ describe('Campaign lobby and shared modal adapters', () => {
         }
 
         expect(css).toMatch(
+            /\.lobby-pane--home\.main-menu\s*\{[^}]*margin-top:\s*0;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-start;/s,
+        );
+        expect(css).toMatch(
             /\.lobby-pane-actions\s*\{[^}]*align-items:\s*flex-end;/s,
         );
         expect(css).toMatch(
