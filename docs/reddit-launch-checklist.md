@@ -32,9 +32,10 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
 - [ ] Standalone game launch opens Home with Daily, Campaign, Garage, and
   Settings as matching mode-action rows, and no Home Start button.
-- [ ] Daily and Campaign direct launches show their own Start/Continue and Back
-  controls; Back returns to Home. Mode names appear under the Mini Racer
-  title on those screens only.
+- [ ] Daily and Campaign direct launches show Back, Standings, and Tracks as
+  matching mode-action labels with a full-width Start/Continue button at the
+  bottom; Back returns to Home. Mode names appear under the Mini Racer title
+  on those screens only.
 - [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.

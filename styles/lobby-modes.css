@@ -74,6 +74,22 @@
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
+.lobby-mode-action__status {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    text-align: left;
+}
+
+.lobby-mode-action__status[hidden] {
+    display: none !important;
+}
+
 .lobby-pane-actions {
     display: flex;
     flex-direction: column;
@@ -83,12 +99,16 @@
 
 .lobby-primary-row {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
     gap: 0.65rem;
     width: 95%;
     margin-top: auto;
     margin-inline: auto;
+}
+
+.lobby-primary-row:has(.lobby-back-btn) {
+    grid-template-columns: auto minmax(0, 1fr);
 }
 
 .lobby-primary-row .main-menu__item--primary {

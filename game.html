@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Mini Racer</title>
-    <link rel="stylesheet" href="styles.css?v=2.20">
+    <link rel="stylesheet" href="styles.css?v=2.21">
     <link rel="icon" href="public/favicon.ico" type="image/x-icon">
 </head>
 
@@ -90,33 +90,23 @@
 
                     <section id="lobby-daily-pane" class="lobby-pane main-menu" data-lobby-pane="daily"
                         aria-label="Daily challenge" hidden>
-                        <div class="lobby-pane-actions">
-                            <button id="daily-challenge-rank-btn" class="main-menu__item" type="button"
-                                data-lobby-action>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="main-menu__icon" viewBox="0 0 640 640"
-                                    fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M353.8 118.1L330.2 70.3C326.3 62 314.1 61.7 309.8 70.3L286.2 118.1L233.9 125.6C224.6 127 220.6 138.5 227.5 145.4L265.5 182.4L256.5 234.5C255.1 243.8 264.7 251 273.3 246.7L320.2 221.9L366.8 246.3C375.4 250.6 385.1 243.4 383.6 234.1L374.6 182L412.6 145.4C419.4 138.6 415.5 127.1 406.2 125.6L353.9 118.1zM288 320C261.5 320 240 341.5 240 368L240 528C240 554.5 261.5 576 288 576L352 576C378.5 576 400 554.5 400 528L400 368C400 341.5 378.5 320 352 320L288 320zM80 384C53.5 384 32 405.5 32 432L32 528C32 554.5 53.5 576 80 576L144 576C170.5 576 192 554.5 192 528L192 432C192 405.5 170.5 384 144 384L80 384zM448 496L448 528C448 554.5 469.5 576 496 576L560 576C586.5 576 608 554.5 608 528L608 496C608 469.5 586.5 448 560 448L496 448C469.5 448 448 469.5 448 496z" />
-                                </svg>
-                                <span class="main-menu__text">
-                                    <span class="main-menu__label">Standings</span>
-                                    <span id="daily-challenge-rank-status" class="main-menu__detail"
-                                        aria-live="polite" hidden></span>
-                                </span>
+                        <div class="lobby-mode-menu">
+                            <button id="lobby-daily-back-btn" class="lobby-mode-action" type="button"
+                                data-lobby-action aria-label="Back to modes">
+                                <span class="lobby-mode-action__label">Back</span>
                             </button>
-                            <button id="daily-challenge-playlist-btn" class="main-menu__item" type="button"
+                            <button id="daily-challenge-rank-btn" class="lobby-mode-action" type="button"
                                 data-lobby-action>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="main-menu__icon" viewBox="0 0 640 640"
-                                    fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M287.9 96L211.7 96C182.3 96 156.6 116.1 149.6 144.6L65.4 484.5C57.9 514.7 80.8 544 112 544L287.9 544L287.9 480C287.9 462.3 302.2 448 319.9 448C337.6 448 351.9 462.3 351.9 480L351.9 544L528 544C559.2 544 582.1 514.7 574.6 484.5L490.5 144.6C483.4 116.1 457.8 96 428.3 96L351.9 96L351.9 160C351.9 177.7 337.6 192 319.9 192C302.2 192 287.9 177.7 287.9 160L287.9 96zM351.9 288L351.9 352C351.9 369.7 337.6 384 319.9 384C302.2 384 287.9 369.7 287.9 352L287.9 288C287.9 270.3 302.2 256 319.9 256C337.6 256 351.9 270.3 351.9 288z" />
-                                </svg>
-                                <span class="main-menu__label">Tracks</span>
+                                <span class="lobby-mode-action__label">Standings</span>
+                                <span id="daily-challenge-rank-status" class="lobby-mode-action__status"
+                                    aria-live="polite" hidden></span>
+                            </button>
+                            <button id="daily-challenge-playlist-btn" class="lobby-mode-action" type="button"
+                                data-lobby-action>
+                                <span class="lobby-mode-action__label">Tracks</span>
                             </button>
                         </div>
                         <div class="lobby-primary-row">
-                            <button id="lobby-daily-back-btn" class="lobby-back-btn" type="button"
-                                data-lobby-action aria-label="Back to modes">Back</button>
                             <button id="daily-challenge-start-btn"
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action disabled>
@@ -127,29 +117,21 @@
 
                     <section id="lobby-campaign-pane" class="lobby-pane lobby-pane--campaign main-menu"
                         data-lobby-pane="campaign" aria-label="Campaign" hidden>
-                        <div class="lobby-pane-actions">
-                            <button id="campaign-standings-btn" class="main-menu__item" type="button"
-                                data-lobby-action>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="main-menu__icon" viewBox="0 0 640 640"
-                                    fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M353.8 118.1L330.2 70.3C326.3 62 314.1 61.7 309.8 70.3L286.2 118.1L233.9 125.6C224.6 127 220.6 138.5 227.5 145.4L265.5 182.4L256.5 234.5C255.1 243.8 264.7 251 273.3 246.7L320.2 221.9L366.8 246.3C375.4 250.6 385.1 243.4 383.6 234.1L374.6 182L412.6 145.4C419.4 138.6 415.5 127.1 406.2 125.6L353.9 118.1zM288 320C261.5 320 240 341.5 240 368L240 528C240 554.5 261.5 576 288 576L352 576C378.5 576 400 554.5 400 528L400 368C400 341.5 378.5 320 352 320L288 320zM80 384C53.5 384 32 405.5 32 432L32 528C32 554.5 53.5 576 80 576L144 576C170.5 576 192 554.5 192 528L192 432C192 405.5 170.5 384 144 384L80 384zM448 496L448 528C448 554.5 469.5 576 496 576L560 576C586.5 576 608 554.5 608 528L608 496C608 469.5 586.5 448 560 448L496 448C469.5 448 448 469.5 448 496z" />
-                                </svg>
-                                <span class="main-menu__label">Standings</span>
+                        <div class="lobby-mode-menu">
+                            <button id="lobby-campaign-back-btn" class="lobby-mode-action" type="button"
+                                data-lobby-action aria-label="Back to modes">
+                                <span class="lobby-mode-action__label">Back</span>
                             </button>
-                            <button id="campaign-tracks-btn" class="main-menu__item" type="button"
+                            <button id="campaign-standings-btn" class="lobby-mode-action" type="button"
                                 data-lobby-action>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="main-menu__icon" viewBox="0 0 640 640"
-                                    fill="currentColor" aria-hidden="true">
-                                    <path
-                                        d="M287.9 96L211.7 96C182.3 96 156.6 116.1 149.6 144.6L65.4 484.5C57.9 514.7 80.8 544 112 544L287.9 544L287.9 480C287.9 462.3 302.2 448 319.9 448C337.6 448 351.9 462.3 351.9 480L351.9 544L528 544C559.2 544 582.1 514.7 574.6 484.5L490.5 144.6C483.4 116.1 457.8 96 428.3 96L351.9 96L351.9 160C351.9 177.7 337.6 192 319.9 192C302.2 192 287.9 177.7 287.9 160L287.9 96zM351.9 288L351.9 352C351.9 369.7 337.6 384 319.9 384C302.2 384 287.9 369.7 287.9 352L287.9 288C287.9 270.3 302.2 256 319.9 256C337.6 256 351.9 270.3 351.9 288z" />
-                                </svg>
-                                <span class="main-menu__label">Tracks</span>
+                                <span class="lobby-mode-action__label">Standings</span>
+                            </button>
+                            <button id="campaign-tracks-btn" class="lobby-mode-action" type="button"
+                                data-lobby-action>
+                                <span class="lobby-mode-action__label">Tracks</span>
                             </button>
                         </div>
                         <div class="lobby-primary-row">
-                            <button id="lobby-campaign-back-btn" class="lobby-back-btn" type="button"
-                                data-lobby-action aria-label="Back to modes">Back</button>
                             <button id="campaign-primary-btn"
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action>

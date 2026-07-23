@@ -321,24 +321,34 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
-    it('keeps Daily and Campaign utilities compact, right-aligned, and icon-backed', () => {
+    it('keeps Daily and Campaign actions as mode labels with a bottom primary', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
 
         for (const buttonId of [
+            'lobby-daily-back-btn',
             'daily-challenge-rank-btn',
             'daily-challenge-playlist-btn',
+            'lobby-campaign-back-btn',
             'campaign-standings-btn',
             'campaign-tracks-btn',
         ]) {
             const buttonMarkup = html.match(
                 new RegExp(`<button id="${buttonId}"[\\s\\S]*?</button>`),
             )?.[0];
-            expect(buttonMarkup).toContain('class="main-menu__icon"');
+            expect(buttonMarkup).toContain('class="lobby-mode-action"');
+            expect(buttonMarkup).toContain('lobby-mode-action__label');
+            expect(buttonMarkup).not.toContain('class="main-menu__icon"');
         }
 
+        expect(html).toMatch(
+            /id="daily-challenge-start-btn"[\s\S]*main-menu__item--primary/,
+        );
+        expect(html).toMatch(
+            /id="campaign-primary-btn"[\s\S]*main-menu__item--primary/,
+        );
         expect(css).toMatch(
-            /\.lobby-pane-actions\s*\{[^}]*align-items:\s*flex-end;/s,
+            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-end;/s,
         );
         expect(css).toMatch(
             /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
@@ -347,9 +357,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-pane--campaign \.main-menu__item--primary\s*\{[^}]*font-size:\s*clamp\(1\.25rem,\s*5\.5vw,\s*1\.5rem\);/s,
         );
         expect(css).not.toContain('width: min(94vw, 60rem)');
-        expect(css).not.toMatch(
-            /\.lobby-pane-actions \.main-menu__item\s*\{[^}]*flex-direction:\s*row;/s,
-        );
     });
 
     it('renders Home Garage and Settings as lobby mode actions', () => {
