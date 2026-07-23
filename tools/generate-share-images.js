@@ -10,7 +10,6 @@ import { createCanvas, Path2D as NodePath2D } from '@napi-rs/canvas';
 import { TRACK_SCHEDULE_KEYS, getTrackName } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
-import { getTrackMedalThresholds } from '../game/medals/medal-timing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');
@@ -23,18 +22,12 @@ export const SHARE_IMAGE_JPEG_QUALITY = 85;
 const BG = '#010410';
 const SURFACE = '#0f172a';
 const TEXT = '#f8fafc';
-const MUTED = '#94a3b8';
 const ACCENT = '#ef4444';
 
 function ensurePath2D() {
     if (typeof globalThis.Path2D === 'undefined') {
         globalThis.Path2D = NodePath2D;
     }
-}
-
-function formatGoldTime(seconds) {
-    if (!Number.isFinite(seconds)) return null;
-    return seconds.toFixed(2).padStart(5, '0');
 }
 
 export function getShareImageRelativePath(trackKey) {
@@ -138,15 +131,6 @@ export function renderShareImageJpeg(trackKey, track = TRACKS[trackKey]) {
     ctx.fillStyle = TEXT;
     ctx.font = '700 48px sans-serif';
     ctx.fillText(trackName, 56, 104, SHARE_IMAGE_WIDTH - 112);
-
-    const gold = formatGoldTime(getTrackMedalThresholds(trackKey)?.gold);
-    if (gold) {
-        ctx.fillStyle = MUTED;
-        ctx.font = '600 24px sans-serif';
-        const label = `TIME TO BEAT  ${gold}`;
-        const metrics = ctx.measureText(label);
-        ctx.fillText(label, SHARE_IMAGE_WIDTH - 56 - metrics.width, 56);
-    }
 
     return canvas.toBuffer('image/jpeg', SHARE_IMAGE_JPEG_QUALITY);
 }

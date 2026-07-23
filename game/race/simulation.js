@@ -20,7 +20,10 @@ const _events = {
     winData: null,
     challengeLapCompleted: false,
     challengeCompletedLapTime: null,
+    challengeElapsedTime: null,
     challengeProgressLaps: 0,
+    challengeRequiredLaps: 0,
+    challengeIsFinalLap: false,
     challengeFailed: false,
     challengeFailureReason: null,
     wallImpact: null,
@@ -34,7 +37,10 @@ function resetEvents() {
     _events.winData = null;
     _events.challengeLapCompleted = false;
     _events.challengeCompletedLapTime = null;
+    _events.challengeElapsedTime = null;
     _events.challengeProgressLaps = 0;
+    _events.challengeRequiredLaps = 0;
+    _events.challengeIsFinalLap = false;
     _events.challengeFailed = false;
     _events.challengeFailureReason = null;
     _events.wallImpact = null;

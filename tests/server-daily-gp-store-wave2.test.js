@@ -330,8 +330,9 @@ describe('server daily gp store wave 2', () => {
             endsAt: '2030-07-04T00:00:00.000Z',
             availableUntil: '2030-07-10T00:00:00.000Z',
             status: 'active',
+            rulesRevision: 0,
             objectiveType: 'single_lap_fastest',
-            objectiveParams: {},
+            objectiveParams: { lapCount: 1 },
             skin: 'default',
         };
         const challenger = { ...winner, trackKey: 'desertBridge' };

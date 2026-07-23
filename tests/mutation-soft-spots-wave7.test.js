@@ -118,8 +118,9 @@ describe('wave7 store parse helpers — direct coercion', () => {
             endsAt: VALID_CHALLENGE.endsAt,
             availableUntil: VALID_CHALLENGE.availableUntil,
             status: 'active',
+            rulesRevision: 0,
             objectiveType: 'single_lap_fastest',
-            objectiveParams: {},
+            objectiveParams: { lapCount: 1 },
             skin: 'default',
         });
     });
@@ -379,7 +380,10 @@ describe('wave7 share normalize helpers — direct coercion', () => {
     });
 
     it('parseSharePreviewRecord accepts finish and standings sources', () => {
-        expect(parseSharePreviewRecord(JSON.stringify(VALID_PREVIEW))).toEqual(VALID_PREVIEW);
+        expect(parseSharePreviewRecord(JSON.stringify(VALID_PREVIEW))).toEqual({
+            ...VALID_PREVIEW,
+            lapCount: 1,
+        });
         expect(parseSharePreviewRecord(JSON.stringify({
             ...VALID_PREVIEW,
             source: 'standings',

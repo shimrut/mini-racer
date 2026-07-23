@@ -125,7 +125,7 @@ describe('daily GP result sharing', () => {
 
     it('pins the exact score-thread anchor copy', () => {
         expect(DAILY_GP_SCORE_THREAD_TEXT).toBe(
-            '🏁 Mini Racer score thread\n\nShare your lap time from the game and it will appear as a reply here from your Reddit account.',
+            '🏁 Mini Racer score thread\n\nShare your race time from the game and it will appear as a reply here from your Reddit account.',
         );
     });
 
@@ -153,6 +153,15 @@ describe('daily GP result sharing', () => {
         );
         expect(formatDailyGpShareComment(42380, 'gold', '')).toBe(
             'I earned the Gold medal 🥇 with a 42.38 lap in Mini Racer.',
+        );
+    });
+
+    it('describes multi-lap results as complete races', () => {
+        expect(formatDailyGpShareComment(24630, 'gold', 'Circuit', 2)).toBe(
+            'I earned the Gold medal 🥇 with a 24.63 2-lap race in Circuit.',
+        );
+        expect(formatDailyGpShareComment(30100, null, 'Circuit', 3)).toBe(
+            'I set a 30.10 3-lap race in Circuit. 🏁',
         );
     });
 

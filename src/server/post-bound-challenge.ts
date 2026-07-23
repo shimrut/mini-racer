@@ -1,6 +1,9 @@
 import { reddit } from '@devvit/web/server';
 import { hasTrack } from '../../game/track/catalog.js';
-import type { DailyGpChallenge } from './daily-gp-model.js';
+import {
+    normalizeDailyGpRaceContract,
+    type DailyGpChallenge,
+} from './daily-gp-model.js';
 import {
     getServerDailyGpChallengeById,
     persistServerDailyGpChallenge,
@@ -35,6 +38,9 @@ export function normalizePostBoundDailyGpChallenge(value: unknown): DailyGpChall
         return null;
     }
 
+    const raceContract = normalizeDailyGpRaceContract(record);
+    if (!raceContract) return null;
+
     return {
         id,
         challengeDate,
@@ -43,8 +49,7 @@ export function normalizePostBoundDailyGpChallenge(value: unknown): DailyGpChall
         endsAt,
         availableUntil,
         status: 'active',
-        objectiveType: 'single_lap_fastest',
-        objectiveParams: {},
+        ...raceContract,
         skin: 'default',
     };
 }

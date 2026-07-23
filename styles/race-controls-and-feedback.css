@@ -244,6 +244,25 @@ body.start-selection-active #start-overlay {
     display: none
 }
 
+.lap-flash-medal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.lap-flash-medal[hidden] {
+    display: none;
+}
+
+.lap-flash-medal .medal-svg--lap-flash {
+    width: 3.5rem;
+}
+
+.lap-flash-medal.is-no-medal {
+    opacity: .72;
+}
+
 .lap-flash-delta {
     order: 1;
     color: #ffffff;

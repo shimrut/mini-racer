@@ -658,7 +658,11 @@ describe('server daily gp store submissions', () => {
         mockRedis.hGet.mockResolvedValue(JSON.stringify(storedChallenge));
 
         const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
-        await expect(persistServerDailyGpChallenge(mismatchedPostChallenge)).resolves.toEqual(storedChallenge);
+        await expect(persistServerDailyGpChallenge(mismatchedPostChallenge)).resolves.toEqual({
+            ...storedChallenge,
+            rulesRevision: 0,
+            objectiveParams: { lapCount: 1 },
+        });
 
         expect(mockRedis.hSetNX).not.toHaveBeenCalled();
         expect(mockRedis.hSet).not.toHaveBeenCalledWith(
@@ -720,7 +724,11 @@ describe('server daily gp store submissions', () => {
         mockRedis.hSetNX.mockResolvedValue(0);
 
         const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
-        await expect(persistServerDailyGpChallenge(incomingChallenge)).resolves.toEqual(winnerChallenge);
+        await expect(persistServerDailyGpChallenge(incomingChallenge)).resolves.toEqual({
+            ...winnerChallenge,
+            rulesRevision: 0,
+            objectiveParams: { lapCount: 1 },
+        });
 
         expect(mockRedis.hSetNX).toHaveBeenCalledWith(
             'dailygp:challenges',
@@ -1017,7 +1025,11 @@ describe('server daily gp store submissions', () => {
             const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
             const challenge = await getServerDailyGpChallenge();
 
-            expect(challenge).toEqual(storedChallenge);
+            expect(challenge).toEqual({
+                ...storedChallenge,
+                rulesRevision: 0,
+                objectiveParams: { lapCount: 1 },
+            });
         } finally {
             TRACK_SCHEDULE_KEYS.reverse();
             vi.useRealTimers();
@@ -1456,8 +1468,9 @@ describe('server daily gp store submissions', () => {
             expect(result).toEqual({
                 ...stored,
                 status: 'active',
+                rulesRevision: 0,
                 objectiveType: 'single_lap_fastest',
-                objectiveParams: {},
+                objectiveParams: { lapCount: 1 },
                 skin: 'default',
             });
         });
@@ -1491,8 +1504,9 @@ describe('server daily gp store submissions', () => {
                 endsAt: '2026-08-02T00:00:00.000Z',
                 availableUntil: '2026-08-08T00:00:00.000Z',
                 status: 'active',
+                rulesRevision: 0,
                 objectiveType: 'single_lap_fastest',
-                objectiveParams: {},
+                objectiveParams: { lapCount: 1 },
                 skin: 'default',
             };
             mockRedis.hGet.mockResolvedValue(null);
@@ -2916,8 +2930,9 @@ describe('server daily gp store submissions', () => {
             expect(result).toEqual({
                 ...stored,
                 status: 'active',
+                rulesRevision: 0,
                 objectiveType: 'single_lap_fastest',
-                objectiveParams: {},
+                objectiveParams: { lapCount: 1 },
                 skin: 'default',
             });
             expect(mockRedis.hSetNX).not.toHaveBeenCalled();

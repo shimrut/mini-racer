@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACK_MODE_DAILY_GP } from '../game/config.js';
 import { RaceHud } from '../game/race/ui-hud.js';
 
+vi.mock('../game/medals/medal-icon.js', () => ({
+    createMedalIconSvg: vi.fn((medal, options) => ({ medal, options })),
+}));
+
 describe('ui race hud helpers', () => {
     beforeEach(() => {
         const headerNode = { offsetHeight: 48 };
@@ -192,6 +196,84 @@ describe('ui race hud helpers', () => {
         expect(lapFlashDelta.hidden).toBe(false);
         expect(lapFlashDelta.textContent).toBe('+0.31s');
         expect(lapFlash.classList.add).toHaveBeenCalledWith('is-loss');
+    });
+
+    it('shows an intermediary race medal without requiring a lap delta', () => {
+        const lapFlash = { classList: { add: vi.fn(), remove: vi.fn() } };
+        const lapFlashLabel = { textContent: '' };
+        const lapFlashTime = { textContent: '' };
+        const lapFlashMedal = {
+            hidden: true,
+            classList: { add: vi.fn(), remove: vi.fn() },
+            replaceChildren: vi.fn(),
+            appendChild: vi.fn(),
+        };
+        const lapFlashDelta = { hidden: false, textContent: '' };
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'lap-flash': lapFlash,
+            'lap-flash-label': lapFlashLabel,
+            'lap-flash-time': lapFlashTime,
+            'lap-flash-medal': lapFlashMedal,
+            'lap-flash-delta': lapFlashDelta,
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud.showLapFlash({
+            lapNumber: 1,
+            lapTime: 9.5,
+            deltaVsBest: null,
+            isBest: false,
+            completedLaps: 1,
+            requiredLaps: 3,
+            elapsedTimeSec: 9.5,
+            medal: 'gold',
+        });
+
+        expect(lapFlashLabel.textContent).toBe('Lap 1 / 3');
+        expect(lapFlashTime.textContent).toBe('9.50s');
+        expect(lapFlashMedal.hidden).toBe(false);
+        expect(lapFlashMedal.appendChild).toHaveBeenCalledWith(expect.objectContaining({
+            medal: 'gold',
+        }));
+        expect(lapFlashDelta.hidden).toBe(true);
+        expect(lapFlash.classList.add).toHaveBeenCalledWith('visible');
+    });
+
+    it('shows an explicit no-medal intermediary state', () => {
+        const lapFlash = { classList: { add: vi.fn(), remove: vi.fn() } };
+        const lapFlashMedal = {
+            hidden: true,
+            classList: { add: vi.fn(), remove: vi.fn() },
+            replaceChildren: vi.fn(),
+            appendChild: vi.fn(),
+        };
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'lap-flash': lapFlash,
+            'lap-flash-label': { textContent: '' },
+            'lap-flash-time': { textContent: '' },
+            'lap-flash-medal': lapFlashMedal,
+            'lap-flash-delta': { hidden: false, textContent: '' },
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud.showLapFlash({
+            lapNumber: 2,
+            lapTime: 20,
+            deltaVsBest: null,
+            isBest: false,
+            completedLaps: 2,
+            requiredLaps: 3,
+            elapsedTimeSec: 20,
+            medal: null,
+        });
+
+        expect(lapFlashMedal.hidden).toBe(false);
+        expect(lapFlashMedal.classList.add).toHaveBeenCalledWith('is-no-medal');
+        expect(lapFlashMedal.appendChild).toHaveBeenCalledWith(expect.objectContaining({
+            medal: 'white',
+            options: expect.objectContaining({ outline: true, showEmblem: false }),
+        }));
+        expect(lapFlash.classList.add).toHaveBeenCalledWith('visible');
     });
 
     it('colors ±0.01 checkpoint deltas as gain/loss, not warning amber', () => {

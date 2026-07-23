@@ -69,19 +69,53 @@ export function getAuthorMedalSeconds(trackKey) {
     return raw;
 }
 
+function normalizeRaceLapCount(lapCount) {
+    return Number.isInteger(lapCount) && lapCount >= 1 && lapCount <= 3
+        ? lapCount
+        : 1;
+}
+
+/**
+ * Medal thresholds for a complete race. One-lap APIs remain the source data;
+ * multi-lap races scale every available tier by the validated lap count.
+ * Invalid lap counts deliberately fall back to one lap.
+ * @param {string} trackKey
+ * @param {number} lapCount
+ * @returns {{ author: number | null, gold: number, silver: number, bronze: number } | null}
+ */
+export function getRaceMedalThresholds(trackKey, lapCount = 1) {
+    const oneLap = getTrackMedalThresholds(trackKey);
+    if (!oneLap) return null;
+    const requiredLaps = normalizeRaceLapCount(lapCount);
+    const author = getAuthorMedalSeconds(trackKey);
+    return {
+        author: author == null ? null : author * requiredLaps,
+        gold: oneLap.gold * requiredLaps,
+        silver: oneLap.silver * requiredLaps,
+        bronze: oneLap.bronze * requiredLaps,
+    };
+}
+
+/**
+ * Best medal earned for a race time (lower time = better).
+ * @returns {'author' | 'gold' | 'silver' | 'bronze' | null}
+ */
+export function getMedalForRaceTime(trackKey, elapsedSec, lapCount = 1) {
+    const thresholds = getRaceMedalThresholds(trackKey, lapCount);
+    if (!thresholds || !Number.isFinite(elapsedSec)) return null;
+    if (thresholds.author != null && elapsedSec <= thresholds.author) return 'author';
+    if (elapsedSec <= thresholds.gold) return 'gold';
+    if (elapsedSec <= thresholds.silver) return 'silver';
+    if (elapsedSec <= thresholds.bronze) return 'bronze';
+    return null;
+}
+
 /**
  * Best medal earned for a lap time (lower time = better).
  * @returns {'author' | 'gold' | 'silver' | 'bronze' | null}
  */
 export function getMedalForLapTime(trackKey, lapTimeSec) {
-    const t = getTrackMedalThresholds(trackKey);
-    if (!t || !Number.isFinite(lapTimeSec)) return null;
-    const authorSec = getAuthorMedalSeconds(trackKey);
-    if (authorSec != null && lapTimeSec <= authorSec) return 'author';
-    if (lapTimeSec <= t.gold) return 'gold';
-    if (lapTimeSec <= t.silver) return 'silver';
-    if (lapTimeSec <= t.bronze) return 'bronze';
-    return null;
+    return getMedalForRaceTime(trackKey, lapTimeSec, 1);
 }
 
 export function maxMedalTier(a, b) {
@@ -194,10 +228,10 @@ export function getCombinedMedalStackTiers(trackKey, lapMedal) {
  * @param {'bronze'|'silver'|'gold'|'author'} tier
  * @returns {number|null}
  */
-function getTierThresholdSeconds(trackKey, tier) {
-    const t = getTrackMedalThresholds(trackKey);
+function getTierThresholdSeconds(trackKey, tier, lapCount = 1) {
+    const t = getRaceMedalThresholds(trackKey, lapCount);
     if (!t) return null;
-    if (tier === 'author') return getAuthorMedalSeconds(trackKey);
+    if (tier === 'author') return t.author;
     if (tier === 'bronze') return t.bronze;
     if (tier === 'silver') return t.silver;
     if (tier === 'gold') return t.gold;
@@ -210,12 +244,12 @@ function getTierThresholdSeconds(trackKey, tier) {
  * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} bestStoredMedal
  * @returns {Array<{ tier: 'bronze'|'silver'|'gold'|'author', filled: boolean, thresholdSec: number|null }>}
  */
-export function getMedalRowSlots(trackKey, bestStoredMedal) {
+export function getMedalRowSlots(trackKey, bestStoredMedal, lapCount = 1) {
     const stack = getCombinedMedalStackTiers(trackKey, bestStoredMedal);
     return stack.map(({ tier, filled }) => ({
         tier,
         filled,
-        thresholdSec: getTierThresholdSeconds(trackKey, tier),
+        thresholdSec: getTierThresholdSeconds(trackKey, tier, lapCount),
     }));
 }
 

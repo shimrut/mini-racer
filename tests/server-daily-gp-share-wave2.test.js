@@ -343,7 +343,7 @@ describe('daily GP share wave 2', () => {
             status: 422,
             body: {
                 status: 'invalid_replay',
-                error: 'This finished lap could not be verified.',
+                error: 'This finished race could not be verified.',
             },
         });
     });

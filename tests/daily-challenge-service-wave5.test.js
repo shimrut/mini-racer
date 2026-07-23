@@ -87,7 +87,7 @@ describe('daily-challenge service wave5', () => {
 
         expect(challenge.id).toBe('post-bound-wave5');
         expect(challenge.skin).toBe('neon');
-        expect(challenge.objectiveParams).toEqual({});
+        expect(challenge.objectiveParams).toEqual({ lapCount: 1 });
     });
 
     it('uses mockDaily track keys from the query string on preview pages (L65-L66)', async () => {

@@ -3,6 +3,7 @@ import { updateSimulation } from '../../game/race/simulation.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../../game/track/runtime.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import { createRunPolicy } from '../../game/race/run-policy.js';
+import { getDailyChallengeRequiredLaps } from '../../game/daily-challenge/labels.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
 import {
     createPbGhostTraceRecorder,
@@ -10,6 +11,7 @@ import {
 } from './pb-ghost-trace.js';
 
 export const MAX_REPLAY_FRAMES = 3_000;
+export const REPLAY_FRAMES_PER_LAP = 2_500;
 
 type ReplaySegment = {
     frames: number;
@@ -19,6 +21,7 @@ type ReplaySegment = {
 };
 
 type ReplayPayload = {
+    rulesRevision?: unknown;
     targetLapNumber?: unknown;
     inputs?: unknown;
 };
@@ -67,7 +70,10 @@ function normalizeReplaySegment(raw: unknown): ReplaySegment | null {
     };
 }
 
-function normalizeReplayInputs(replay: unknown): { segments: ReplaySegment[]; frameCount: number } | ReplayValidationFailure {
+function normalizeReplayInputs(
+    replay: unknown,
+    maxFrames: number,
+): { segments: ReplaySegment[]; frameCount: number } | ReplayValidationFailure {
     if (!replay || typeof replay !== 'object') return { reason: 'missing_replay' };
     const payload = replay as ReplayPayload;
     if (!Array.isArray(payload.inputs) || payload.inputs.length === 0) return { reason: 'missing_replay_inputs' };
@@ -78,7 +84,7 @@ function normalizeReplayInputs(replay: unknown): { segments: ReplaySegment[]; fr
         const segment = normalizeReplaySegment(rawSegment);
         if (!segment) return { reason: 'invalid_replay_segment' };
         frameCount += segment.frames;
-        if (frameCount > MAX_REPLAY_FRAMES) return { reason: 'replay_too_long', frameCount };
+        if (frameCount > maxFrames) return { reason: 'replay_too_long', frameCount };
         segments.push(segment);
     }
     return { segments, frameCount };
@@ -100,10 +106,16 @@ function createWriteOnlyBuffer() {
     };
 }
 
-function createSimulationState(challenge: DailyGpChallenge, track: Record<string, any>) {
+function createSimulationState(
+    challenge: DailyGpChallenge,
+    track: Record<string, any>,
+    requiredLaps: number,
+    rulesRevision: number,
+) {
     const challengeRun = {
         objectiveType: challenge.objectiveType,
-        requiredLaps: 1,
+        requiredLaps,
+        rulesRevision,
         completedLaps: 0,
         lastLapAt: 0,
     };
@@ -188,16 +200,54 @@ export function validateDailyGpReplayDetailed({
         };
     }
 
-    const normalizedReplay = normalizeReplayInputs(replay);
+    const requiredLaps = getDailyChallengeRequiredLaps(challenge);
+    const challengeRulesRevision = Number.isInteger(challenge.rulesRevision)
+        ? Math.max(0, Number(challenge.rulesRevision))
+        : 0;
+    const replayPayload = replay && typeof replay === 'object'
+        ? replay as ReplayPayload
+        : null;
+    const replayRulesRevision = replayPayload?.rulesRevision == null
+        ? 0
+        : replayPayload.rulesRevision;
+    if (
+        !Number.isInteger(replayRulesRevision)
+        || replayRulesRevision < 0
+        || replayRulesRevision !== challengeRulesRevision
+    ) {
+        return {
+            ok: false,
+            failure: { reason: 'rules_revision_mismatch' },
+        };
+    }
+    const maxReplayFrames = replayRulesRevision === 0
+        ? MAX_REPLAY_FRAMES
+        : REPLAY_FRAMES_PER_LAP * requiredLaps;
+    const normalizedReplay = normalizeReplayInputs(replay, maxReplayFrames);
     if ('reason' in normalizedReplay) {
         return {
             ok: false,
             failure: normalizedReplay,
         };
     }
+    const targetLapNumber = replayPayload?.targetLapNumber == null
+        && replayRulesRevision === 0
+        ? 1
+        : replayPayload?.targetLapNumber;
+    if (!Number.isInteger(targetLapNumber) || targetLapNumber !== requiredLaps) {
+        return {
+            ok: false,
+            failure: { reason: 'target_lap_mismatch' },
+        };
+    }
     const { segments, frameCount } = normalizedReplay;
 
-    const { state, collisionSegments } = createSimulationState(challenge, track);
+    const { state, collisionSegments } = createSimulationState(
+        challenge,
+        track,
+        requiredLaps,
+        challengeRulesRevision,
+    );
     const config = { ...CONFIG };
     const fixedDt = Number(config.fixedDt) || (1 / 60);
     const ghostRecorder = createPbGhostTraceRecorder({

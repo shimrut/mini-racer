@@ -2,6 +2,16 @@
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** The only lap counts supported by the persisted Daily challenge contract. */
+export function isDailyChallengeLapCount(value) {
+    return Number.isInteger(value) && value >= 1 && value <= 3;
+}
+
+export function getStrictDailyChallengeLapCount(challenge) {
+    const lapCount = challenge?.objectiveParams?.lapCount;
+    return isDailyChallengeLapCount(lapCount) ? lapCount : null;
+}
+
 function getChallengeTimeMs(challenge, field) {
     const value = challenge?.[field];
     if (typeof value !== 'string') return NaN;
@@ -10,7 +20,8 @@ function getChallengeTimeMs(challenge, field) {
 
 export function getObjectiveRequiredLaps(challenge) {
     if (challenge?.objectiveType === 'multi_lap_total') {
-        return Math.max(2, Math.trunc(challenge.objectiveParams?.lapCount || 2));
+        const lapCount = getStrictDailyChallengeLapCount(challenge);
+        return lapCount && lapCount > 1 ? lapCount : 1;
     }
     return 1;
 }
@@ -23,7 +34,8 @@ export function getDailyChallengeObjectiveLabel(challenge) {
     if (!challenge) return 'Daily Challenge';
 
     if (challenge.objectiveType === 'multi_lap_total') {
-        return `${getObjectiveRequiredLaps(challenge)} laps`;
+        const lapCount = getObjectiveRequiredLaps(challenge);
+        return `${lapCount} ${lapCount === 1 ? 'lap' : 'laps'}`;
     }
 
     return '1 lap';

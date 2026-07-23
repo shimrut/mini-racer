@@ -114,18 +114,18 @@ describe('daily-challenge service wave4', () => {
         expect(isDailyChallengeStoredResultForChallenge(challenge, null)).toBe(false);
     });
 
-    it('requires at least two laps for multi-lap objectives and defaults invalid lap counts to two (L610-L611)', () => {
+    it('uses only supported persisted lap counts and falls back safely for malformed objectives', () => {
         const challenge = buildChallenge({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 1 },
         });
 
-        expect(getDailyChallengeRequiredLaps(challenge)).toBe(2);
+        expect(getDailyChallengeRequiredLaps(challenge)).toBe(1);
 
         expect(getDailyChallengeRequiredLaps(buildChallenge({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 4 },
-        }))).toBe(4);
+        }))).toBe(1);
 
         expect(getDailyChallengeRequiredLaps(buildChallenge({
             objectiveType: 'single_lap_fastest',

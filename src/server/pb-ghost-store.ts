@@ -23,6 +23,8 @@ export type PlayerTrackPbRecord = {
     trackKey: string;
     trackFingerprint: string;
     simulationRevision: typeof PB_GHOST_SIMULATION_REVISION;
+    rulesRevision: 0 | 1;
+    lapCount: 1 | 2 | 3;
     bestTimeMs: number;
     checkpointTimesSec: number[] | null;
     ghost: PbGhostTrace | null;
@@ -30,6 +32,20 @@ export type PlayerTrackPbRecord = {
 };
 
 const PB_LOCK_TTL_MS = 30_000;
+
+function getChallengeRaceIdentity(challenge: DailyGpChallenge): {
+    rulesRevision: 0 | 1;
+    lapCount: 1 | 2 | 3;
+} {
+    if (challenge.rulesRevision !== 1) {
+        return { rulesRevision: 0, lapCount: 1 };
+    }
+    const lapCount = challenge.objectiveParams?.lapCount;
+    return {
+        rulesRevision: 1,
+        lapCount: lapCount === 2 || lapCount === 3 ? lapCount : 1,
+    };
+}
 
 function playerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
@@ -62,11 +78,17 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
         const ghost = isValidPbGhostTrace(value.ghost)
             ? value.ghost
             : null;
+        const rulesRevision = value.rulesRevision === 1 ? 1 : 0;
+        const lapCount = rulesRevision === 1 && (value.lapCount === 2 || value.lapCount === 3)
+            ? value.lapCount
+            : 1;
         return {
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
             trackKey: value.trackKey,
             trackFingerprint: value.trackFingerprint,
             simulationRevision: PB_GHOST_SIMULATION_REVISION,
+            rulesRevision,
+            lapCount,
             bestTimeMs: Math.round(Number(value.bestTimeMs)),
             checkpointTimesSec: Array.isArray(value.checkpointTimesSec)
                 ? value.checkpointTimesSec.map(Number).filter(Number.isFinite)
@@ -93,6 +115,7 @@ async function readCompatibleRecord({
     const raw = await redis.hGet(collectionKey, field);
     const record = parseRecord(raw);
     const fingerprint = createTrackFingerprint(track);
+    const raceIdentity = getChallengeRaceIdentity(challenge);
     if (!record) {
         if (raw) await redis.hDel(collectionKey, [field]);
         return null;
@@ -101,6 +124,8 @@ async function readCompatibleRecord({
         record.trackKey !== challenge.trackKey
         || record.trackFingerprint !== fingerprint
         || record.simulationRevision !== PB_GHOST_SIMULATION_REVISION
+        || record.rulesRevision !== raceIdentity.rulesRevision
+        || record.lapCount !== raceIdentity.lapCount
     ) {
         await redis.hDel(collectionKey, [field]);
         return null;
@@ -153,11 +178,13 @@ export async function upsertPlayerTrackPersonalBest({
     try {
         const existing = await readCompatibleRecord({ playerId, challenge, track });
         const trackFingerprint = createTrackFingerprint(track);
+        const raceIdentity = getChallengeRaceIdentity(challenge);
         const current: PlayerTrackPbRecord = {
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
             trackKey,
             trackFingerprint,
             simulationRevision: PB_GHOST_SIMULATION_REVISION,
+            ...raceIdentity,
             bestTimeMs: Math.round(bestTimeMs),
             checkpointTimesSec,
             ghost,
@@ -169,6 +196,7 @@ export async function upsertPlayerTrackPersonalBest({
                 trackKey,
                 trackFingerprint,
                 simulationRevision: PB_GHOST_SIMULATION_REVISION,
+                ...raceIdentity,
                 bestTimeMs: Math.round(retainedPersonalBest.bestTimeMs),
                 checkpointTimesSec: retainedPersonalBest.checkpointTimesSec,
                 ghost: null,

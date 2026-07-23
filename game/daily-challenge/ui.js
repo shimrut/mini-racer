@@ -2,6 +2,7 @@ import {
     formatDailyChallengeBestLabel,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
+    getDailyChallengeRequiredLaps,
 } from './labels.js';
 import {
     getDailyChallengeBestResult,
@@ -21,7 +22,7 @@ import {
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
-import { getMedalForLapTime } from '../medals/medal-timing.js';
+import { getMedalForRaceTime } from '../medals/medal-timing.js';
 
 function scheduleAfterModalPaint(callback) {
     requestAnimationFrame(() => {
@@ -315,14 +316,19 @@ export class DailyChallengeUi {
             const trackName = getDailyChallengeTrackName(challenge);
             const bestResult = challenge.trackPersonalBest
                 || getDailyChallengeBestResult(challenge);
-            const bestMedal = getMedalForLapTime(challenge.trackKey, Number(bestResult?.bestTime));
+            const requiredLaps = getDailyChallengeRequiredLaps(challenge);
+            const bestMedal = getMedalForRaceTime(
+                challenge.trackKey,
+                Number(bestResult?.bestTime),
+                requiredLaps,
+            );
 
             const row = document.createElement('button');
             row.className = `daily-playlist-entry--hero${isCurrentTrack ? ' current' : ''}`;
             row.type = 'button';
             row.setAttribute(
                 'aria-label',
-                `Race ${trackName}. ${availabilityLabel}`
+                `Race ${trackName}. ${requiredLaps} ${requiredLaps === 1 ? 'lap' : 'laps'}. ${availabilityLabel}`
             );
             row.addEventListener('click', () => {
                 this.closePlaylistModal();
@@ -346,7 +352,7 @@ export class DailyChallengeUi {
 
             const status = document.createElement('span');
             status.className = 'daily-playlist-hero-day';
-            status.textContent = availabilityLabel;
+            status.textContent = `${availabilityLabel} · ${requiredLaps} ${requiredLaps === 1 ? 'Lap' : 'Laps'}`;
 
             const title = document.createElement('span');
             title.className = 'daily-playlist-hero-title';

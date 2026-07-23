@@ -1,5 +1,18 @@
+import { getAuthorMedalSeconds } from '../../game/medals/medal-timing.js';
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
+export const DAILY_GP_RULES_REVISION = 1;
+export const DAILY_GP_LEGACY_RULES_REVISION = 0;
+export const DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS = 10.95;
+
+export type DailyGpLapCount = 1 | 2 | 3;
+export type DailyGpRulesRevision = typeof DAILY_GP_LEGACY_RULES_REVISION | typeof DAILY_GP_RULES_REVISION;
+
+export type DailyGpRaceContract = Pick<
+    DailyGpChallenge,
+    'rulesRevision' | 'objectiveType' | 'objectiveParams'
+>;
 
 export const DAILY_GP_MIN_TIME_SECONDS = 2;
 export const DAILY_GP_MAX_TIME_SECONDS = 60 * 60;
@@ -20,17 +33,92 @@ export type DailyGpChallenge = {
     endsAt: string;
     availableUntil: string;
     status: 'active';
-    objectiveType: typeof DEFAULT_OBJECTIVE_TYPE;
-    objectiveParams: Record<string, never>;
+    /** 0 denotes a persisted pre-multi-lap challenge. */
+    rulesRevision: DailyGpRulesRevision;
+    objectiveType: typeof DEFAULT_OBJECTIVE_TYPE | 'multi_lap_total';
+    objectiveParams: { lapCount: DailyGpLapCount };
     skin: 'default';
 };
+
+export function isDailyGpLapCount(value: unknown): value is DailyGpLapCount {
+    return Number.isInteger(value) && value >= 1 && value <= 3;
+}
+
+/**
+ * Old persisted challenges did not have a race contract. They remain exactly
+ * one lap under revision 0. Revision 1 is intentionally strict so malformed
+ * new records cannot silently become a different competition.
+ */
+export function normalizeDailyGpRaceContract(value: unknown): DailyGpRaceContract | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const record = value as Record<string, unknown>;
+    if (!Object.hasOwn(record, 'rulesRevision')) {
+        const hasExplicitLapContract = record.objectiveParams
+            && typeof record.objectiveParams === 'object'
+            && !Array.isArray(record.objectiveParams)
+            && Object.hasOwn(record.objectiveParams, 'lapCount');
+        if (hasExplicitLapContract) {
+            return normalizeDailyGpRaceContract({
+                ...record,
+                rulesRevision: DAILY_GP_RULES_REVISION,
+            });
+        }
+        return {
+            rulesRevision: DAILY_GP_LEGACY_RULES_REVISION,
+            objectiveType: DEFAULT_OBJECTIVE_TYPE,
+            objectiveParams: { lapCount: 1 },
+        };
+    }
+
+    if (record.rulesRevision === DAILY_GP_LEGACY_RULES_REVISION) {
+        if (
+            record.objectiveType !== DEFAULT_OBJECTIVE_TYPE
+            || !record.objectiveParams
+            || typeof record.objectiveParams !== 'object'
+            || Array.isArray(record.objectiveParams)
+            || (record.objectiveParams as Record<string, unknown>).lapCount !== 1
+        ) {
+            return null;
+        }
+        return {
+            rulesRevision: DAILY_GP_LEGACY_RULES_REVISION,
+            objectiveType: DEFAULT_OBJECTIVE_TYPE,
+            objectiveParams: { lapCount: 1 },
+        };
+    }
+
+    if (record.rulesRevision !== DAILY_GP_RULES_REVISION) return null;
+    if (
+        (record.objectiveType !== DEFAULT_OBJECTIVE_TYPE && record.objectiveType !== 'multi_lap_total')
+        || !record.objectiveParams
+        || typeof record.objectiveParams !== 'object'
+        || Array.isArray(record.objectiveParams)
+    ) {
+        return null;
+    }
+
+    const lapCount = (record.objectiveParams as Record<string, unknown>).lapCount;
+    if (!isDailyGpLapCount(lapCount)) return null;
+    if (
+        (lapCount === 1 && record.objectiveType !== DEFAULT_OBJECTIVE_TYPE)
+        || (lapCount > 1 && record.objectiveType !== 'multi_lap_total')
+    ) {
+        return null;
+    }
+
+    return {
+        rulesRevision: DAILY_GP_RULES_REVISION,
+        objectiveType: record.objectiveType,
+        objectiveParams: { lapCount },
+    };
+}
 
 export type DailyGpLeaderboardEntry = {
     playerId: string;
     trackKey: string;
     bestTimeMs: number;
     updatedAt: string;
-    completedLaps: null;
+    completedLaps: DailyGpLapCount | null;
     checkpointTimesSec: number[] | null;
     validationMethod?: 'strict-replay';
     strictReplayFailureReason?: string | null;
@@ -78,6 +166,38 @@ export function createDailyChallengeId(challengeDate: string): string {
     return `daily-gp-${challengeDate}`;
 }
 
+/**
+ * A stable non-cryptographic hash is sufficient here: the chosen lap count is
+ * persisted by the challenge ledger and this merely makes first generation
+ * deterministic across server instances.
+ */
+function deterministicSeedIndex(seed: string, length: number): number {
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < seed.length; index += 1) {
+        hash ^= seed.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0) % length;
+}
+
+export function getDailyGpEligibleLapCounts(trackKey: string): readonly DailyGpLapCount[] {
+    const authorTime = getAuthorMedalSeconds(trackKey);
+    if (!Number.isFinite(authorTime)) return [1];
+    return authorTime > DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS ? [1, 2] : [1, 2, 3];
+}
+
+export function selectDailyGpLapCount(
+    challengeId: string,
+    trackKey: string,
+    rulesRevision = DAILY_GP_RULES_REVISION,
+): DailyGpLapCount {
+    const eligible = getDailyGpEligibleLapCounts(trackKey);
+    return eligible[deterministicSeedIndex(
+        `${challengeId}:${trackKey}:${rulesRevision}`,
+        eligible.length,
+    )] ?? 1;
+}
+
 export function buildDailyGpChallengeForDayIndexWithTrack(
     dayIndex: number,
     trackKey: string,
@@ -87,16 +207,20 @@ export function buildDailyGpChallengeForDayIndexWithTrack(
     const endsAt = new Date(startsAt.getTime() + DAY_MS);
     const availableUntil = new Date(startsAt.getTime() + DAILY_GP_PLAYLIST_DAYS * DAY_MS);
 
+    const id = createDailyChallengeId(challengeDate);
+    const lapCount = selectDailyGpLapCount(id, trackKey);
+
     return {
-        id: createDailyChallengeId(challengeDate),
+        id,
         challengeDate,
         trackKey,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         availableUntil: availableUntil.toISOString(),
         status: 'active',
-        objectiveType: DEFAULT_OBJECTIVE_TYPE,
-        objectiveParams: {},
+        rulesRevision: DAILY_GP_RULES_REVISION,
+        objectiveType: lapCount === 1 ? DEFAULT_OBJECTIVE_TYPE : 'multi_lap_total',
+        objectiveParams: { lapCount },
         skin: 'default',
     };
 }

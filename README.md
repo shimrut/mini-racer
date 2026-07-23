@@ -1,14 +1,14 @@
 # Mini Racer
 
-Mini Racer is a quick, one-lap racing game for Reddit.
+Mini Racer is a quick daily racing game for Reddit.
 
 Open a Mini Racer post, tap **Race Now**, learn the track, and try again until your lap is cleaner and faster. Runs are short on purpose — restart fast, improve often.
 
 ## How the game works
 
-Every attempt is **one lap**. Cross the finish line to complete it.
+Every Daily GP attempt is **1, 2, or 3 laps**, frozen when that day's challenge is published. Cross the finish line after the required laps to complete it.
 Press **R** to restart while racing, paused, or on the finish screen.
-Steer, finish one clean lap as fast as you can, then try again.
+Steer, finish the complete race as fast as you can, then try again.
 
 ## What players can do
 
@@ -17,7 +17,7 @@ Steer, finish one clean lap as fast as you can, then try again.
 - Climb that day's **leaderboard** in Standings
 - Missed a day? You can replay the last **7 days** of tracks
 - Change how your car looks in the **Garage** (skins and trails — handling stays the same)
-- **Share** a finished lap or a verified daily best as a Reddit comment (you preview the text first)
+- **Share** a finished race or a verified daily best as a Reddit comment (you preview the text first)
 
 Your car look and settings are saved to your player profile. Guest data expires after 7 inactive days; signed-in data expires after 30 inactive days.
 
@@ -25,6 +25,8 @@ Your car look and settings are saved to your player profile. Guest data expires 
 
 - A **new track** becomes the featured race each day (day changes at midnight UTC)
 - Once a day's track is posted, it **stays that track** — it does not get swapped later
+- Longer tracks randomly use 1 or 2 laps; shorter tracks randomly use 1, 2, or 3 laps
+- Medal targets scale from the one-lap targets, and intermediate finishes show the medal earned on cumulative race time
 - Tracks stay playable for **7 days**, then drop out of the list
 - Communities can auto-publish that track's final global podium when the window closes
 - Each track card shows a preview, your best time, medals, and how long that track is still available
@@ -40,7 +42,7 @@ Your car look and settings are saved to your player profile. Guest data expires 
 
 ## First look on Reddit
 
-The post preview shows today's track, the gold-medal target, a car on the start line, and a **Race Now** button.
+The post preview shows today's track, lap count, scaled gold-medal target, a car on the start line, and a **Race Now** button.
 
 Older posts keep their original track while it is still available. If that day's track has expired, opening the post takes you to **today's** featured track instead.
 

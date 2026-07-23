@@ -582,6 +582,7 @@ export class ModalContentUi {
         deltaToPersonalBest = undefined,
         previousTrackMedal = null,
         trackKey = null,
+        lapCount = 1,
         lapCheckpointTimes = null,
         pbCheckpointTimes = null,
         pbFinishSec = null
@@ -608,6 +609,7 @@ export class ModalContentUi {
                 lapMedal,
                 previousPersonalBestSec,
                 previousTrackMedal,
+                lapCount,
             });
         }
         

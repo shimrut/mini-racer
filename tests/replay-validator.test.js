@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     MAX_REPLAY_FRAMES,
+    REPLAY_FRAMES_PER_LAP,
     validateDailyGpReplay,
     validateDailyGpReplayDetailed,
 } from '../src/server/replay-validator.ts';
@@ -89,6 +90,75 @@ const FINISHING_REPLAY = {
 describe('server replay validator', () => {
     it('caps accepted replays at MAX_REPLAY_FRAMES', () => {
         expect(MAX_REPLAY_FRAMES).toBe(3000);
+        expect(REPLAY_FRAMES_PER_LAP).toBe(2500);
+    });
+
+    it('validates revision and target lap metadata before accepting a replay', () => {
+        const revisionedChallenge = {
+            ...CHALLENGE,
+            rulesRevision: 1,
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 2 },
+        };
+        const inputs = [
+            { frames: 1, left: false, right: false, relaunchDelay: false },
+        ];
+
+        expect(validateDailyGpReplayDetailed({
+            challenge: revisionedChallenge,
+            track: STRAIGHT_TRACK,
+            replay: { rulesRevision: 0, targetLapNumber: 2, inputs },
+        })).toEqual({
+            ok: false,
+            failure: { reason: 'rules_revision_mismatch' },
+        });
+        expect(validateDailyGpReplayDetailed({
+            challenge: revisionedChallenge,
+            track: STRAIGHT_TRACK,
+            replay: { rulesRevision: 1, targetLapNumber: 1, inputs },
+        })).toEqual({
+            ok: false,
+            failure: { reason: 'target_lap_mismatch' },
+        });
+        expect(validateDailyGpReplayDetailed({
+            challenge: CHALLENGE,
+            track: STRAIGHT_TRACK,
+            replay: { targetLapNumber: 2, inputs },
+        })).toEqual({
+            ok: false,
+            failure: { reason: 'target_lap_mismatch' },
+        });
+    });
+
+    it('scales the revisioned replay frame cap by required laps', () => {
+        const revisionedChallenge = {
+            ...CHALLENGE,
+            rulesRevision: 1,
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 2 },
+        };
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: revisionedChallenge,
+            track: STRAIGHT_TRACK,
+            replay: {
+                rulesRevision: 1,
+                targetLapNumber: 2,
+                inputs: [{
+                    frames: (REPLAY_FRAMES_PER_LAP * 2) + 1,
+                    left: false,
+                    right: false,
+                    relaunchDelay: false,
+                }],
+            },
+        });
+
+        expect(outcome).toEqual({
+            ok: false,
+            failure: {
+                reason: 'replay_too_long',
+                frameCount: (REPLAY_FRAMES_PER_LAP * 2) + 1,
+            },
+        });
     });
 
     it('computes a finish time, ghost, and millisecond rounding from replay inputs', () => {

@@ -118,6 +118,7 @@ function sanitizePosition(
 export function sanitizeDailyGpPodiumForPost(
     podium: FinalDailyGpPodium,
 ): DailyGpPodiumPostData {
+    const lapCount = podium.lapCount === 2 || podium.lapCount === 3 ? podium.lapCount : 1;
     const positions = [
         sanitizePosition(podium.positions[0], 1),
         sanitizePosition(podium.positions[1], 2),
@@ -127,6 +128,7 @@ export function sanitizeDailyGpPodiumForPost(
         challengeId: podium.challengeId,
         challengeDate: podium.challengeDate,
         trackName: podium.trackName,
+        lapCount,
         positions: positions.map((position) => ({
             ...position,
             avatarUrl: null,
@@ -171,12 +173,14 @@ export function formatDailyMiniRacerPodiumTitle(podium: DailyGpPodiumPostData): 
 export function formatDailyMiniRacerPodiumTextFallback(
     podium: DailyGpPodiumPostData,
 ): string {
+    const lapCount = podium.lapCount === 2 || podium.lapCount === 3 ? podium.lapCount : 1;
     const medalLabels = ['Gold', 'Silver', 'Bronze'];
     return [
         '# Mini Racer Final Podium',
         '',
         `Track: **${podium.trackName}**`,
         `Date: ${formatChallengeDate(podium.challengeDate, true)}`,
+        `Race format: ${lapCount} ${lapCount === 1 ? 'lap' : 'laps'}`,
         '',
         ...podium.positions.map((position, index) => {
             const time = position.formattedTime ? ` - ${position.formattedTime}` : '';

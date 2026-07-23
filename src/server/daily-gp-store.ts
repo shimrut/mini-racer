@@ -30,6 +30,7 @@ import {
     getUtcDayIndex,
     getDailyGpCompetitionTtlSeconds,
     isDailyGpChallengePlayable,
+    normalizeDailyGpRaceContract,
     type DailyGpChallenge,
     type DailyGpLeaderboardEntry,
     type DailyGpPlayerPreferences,
@@ -161,6 +162,9 @@ export function parseStoredChallenge(raw: string | null | undefined): DailyGpCha
             return null;
         }
 
+        const raceContract = normalizeDailyGpRaceContract(parsed);
+        if (!raceContract) return null;
+
         return {
             id,
             challengeDate,
@@ -169,8 +173,7 @@ export function parseStoredChallenge(raw: string | null | undefined): DailyGpCha
             endsAt,
             availableUntil,
             status: 'active',
-            objectiveType: 'single_lap_fastest',
-            objectiveParams: {},
+            ...raceContract,
             skin: 'default',
         };
     } catch (_error) {
@@ -445,7 +448,11 @@ export function parseStoredEntry(
         trackKey: parsedTrackKey || expectedTrackKey || '',
         bestTimeMs,
         updatedAt: parsed.updatedAt,
-        completedLaps: null,
+        completedLaps: parsed.completedLaps === 1
+            || parsed.completedLaps === 2
+            || parsed.completedLaps === 3
+            ? parsed.completedLaps
+            : null,
         checkpointTimesSec,
         validationMethod: parsed.validationMethod === 'strict-replay'
             ? parsed.validationMethod
@@ -775,7 +782,7 @@ function toSnapshotRow(
         bestTimeMs: entry.bestTimeMs,
         updatedAt: entry.updatedAt,
         isCurrentPlayer: entry.playerId === currentPlayerId,
-        completedLaps: null,
+        completedLaps: entry.completedLaps,
         checkpointTimesSec: entry.checkpointTimesSec ?? null,
     };
 }
@@ -956,6 +963,7 @@ export async function getServerFinalDailyGpPodium(
         challengeDate: challenge.challengeDate,
         trackKey: challenge.trackKey,
         trackName: getTrackName(challenge.trackKey, challenge.trackKey),
+        lapCount: challenge.objectiveParams.lapCount,
         positions: await readFinalPodiumPositions(challenge),
     };
 }
@@ -1636,7 +1644,10 @@ export async function submitServerDailyGpRun({
         trackKey: challenge.trackKey,
         bestTimeMs: nextBestTimeMs,
         updatedAt: new Date().toISOString(),
-        completedLaps: null,
+        completedLaps: strictReplayOutcome.run.completedLaps === 2
+            || strictReplayOutcome.run.completedLaps === 3
+            ? strictReplayOutcome.run.completedLaps
+            : 1,
         checkpointTimesSec: normalizedCheckpointTimesSec,
         validationMethod: 'strict-replay',
         strictReplayFailureReason: null,
@@ -1743,9 +1754,7 @@ export async function submitServerDailyGpRun({
             trackBestTimeMs: trackPbResult?.record.bestTimeMs ?? null,
             trackPbImproved: trackPbResult?.improved ?? false,
             trackGhostAvailable: Boolean(trackPbResult?.record.ghost),
-            completedLaps: dailyPersistence!.value.improved
-                ? strictReplayOutcome.run.completedLaps
-                : null,
+            completedLaps: storedDailyEntry.completedLaps,
             checkpointTimesSec: storedDailyEntry.checkpointTimesSec ?? null,
             validationMethod: storedDailyEntry.validationMethod ?? 'strict-replay',
             strictReplayFailureReason: storedDailyEntry.strictReplayFailureReason ?? null,

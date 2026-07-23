@@ -16,6 +16,7 @@ import {
     DAILY_GP_COMPETITION_GRACE_MS,
     DAILY_GP_DEFAULT_LIMIT,
     DAILY_GP_GUEST_PROFILE_TTL_SECONDS,
+    DAILY_GP_LEGACY_RULES_REVISION,
     DAILY_GP_MAX_TIME_SECONDS,
     DAILY_GP_MIN_TIME_SECONDS,
     DAILY_GP_NEARBY_RADIUS,
@@ -26,9 +27,11 @@ import {
     formatRankLabel,
     getDailyGpCompetitionDeadlineMs,
     getDailyGpCompetitionTtlSeconds,
+    getDailyGpEligibleLapCounts,
     getUtcDayIndex,
     isDailyGpChallengePlayable,
     isValidDailyGpTime,
+    selectDailyGpLapCount,
     toBestTimeMs,
 } from '../src/server/daily-gp-model.ts';
 
@@ -60,7 +63,12 @@ describe('reddit daily gp model', () => {
         expect(challenge.endsAt).toBe('2026-05-07T00:00:00.000Z');
         expect(challenge.availableUntil).toBe('2026-05-13T00:00:00.000Z');
         expect(challenge.status).toBe('active');
-        expect(challenge.objectiveType).toBe('single_lap_fastest');
+        expect(challenge.rulesRevision).toBe(1);
+        expect(challenge.objectiveParams.lapCount).toBeGreaterThanOrEqual(1);
+        expect(challenge.objectiveParams.lapCount).toBeLessThanOrEqual(3);
+        expect(challenge.objectiveType).toBe(
+            challenge.objectiveParams.lapCount === 1 ? 'single_lap_fastest' : 'multi_lap_total',
+        );
         expect(challenge.trackKey).toBe('circuit');
         expect(challenge.physicsOverrides).toBeUndefined();
     });
@@ -92,13 +100,12 @@ describe('reddit daily gp model', () => {
         expect(new Set(playlist.map((challenge) => challenge.trackKey)).size).toBe(7);
     });
 
-    it('rebuilds challenge IDs through the current generation model', () => {
+    it('keeps history backfills on the legacy one-lap contract', () => {
         const challenge = getBackfilledDailyGpChallenge('daily-gp-2026-06-02');
 
-        expect(challenge).toEqual(buildDailyGpChallengeForDayIndexWithTrack(
-            getUtcDayIndex(new Date('2026-06-02T00:00:00.000Z')),
-            'albertGardens',
-        ));
+        expect(challenge?.rulesRevision).toBe(DAILY_GP_LEGACY_RULES_REVISION);
+        expect(challenge?.objectiveType).toBe('single_lap_fastest');
+        expect(challenge?.objectiveParams).toEqual({ lapCount: 1 });
     });
 
     it('returns null for unknown or malformed backfill challenge ids', () => {
@@ -126,6 +133,24 @@ describe('reddit daily gp model', () => {
         expect(buildDailyGpChallengeForDayIndexWithTrack(getUtcDayIndex(morning), 'circuit')).toEqual(
             buildDailyGpChallengeForDayIndexWithTrack(getUtcDayIndex(evening), 'circuit'),
         );
+    });
+
+    it('selects deterministic eligible lap counts from the author-time boundary', () => {
+        expect(getDailyGpEligibleLapCounts('cedarRidgeCircuit')).toEqual([1, 2]);
+        expect(getDailyGpEligibleLapCounts('moebiusStrip')).toEqual([1, 2, 3]);
+        expect(getDailyGpEligibleLapCounts('not-a-track')).toEqual([1]);
+
+        const challengeId = 'daily-gp-2026-05-06';
+        expect(selectDailyGpLapCount(challengeId, 'moebiusStrip')).toBe(
+            selectDailyGpLapCount(challengeId, 'moebiusStrip'),
+        );
+        const outcomes = new Set(
+            Array.from({ length: 90 }, (_, day) => selectDailyGpLapCount(
+                `daily-gp-2026-08-${String(day + 1).padStart(2, '0')}`,
+                'moebiusStrip',
+            )),
+        );
+        expect(outcomes).toEqual(new Set([1, 2, 3]));
     });
 
     it('formats ids, redis keys, ranks, and submission times consistently', () => {

@@ -12,6 +12,7 @@ export type FinalDailyGpPodium = {
     challengeDate: string;
     trackKey: string;
     trackName: string;
+    lapCount: 1 | 2 | 3;
     positions: readonly [
         FinalDailyGpPodiumPosition,
         FinalDailyGpPodiumPosition,
@@ -27,6 +28,7 @@ export type DailyGpPodiumPostData = {
     challengeId: string;
     challengeDate: string;
     trackName: string;
+    lapCount: 1 | 2 | 3;
     positions: readonly [
         DailyGpPodiumPostPosition,
         DailyGpPodiumPostPosition,

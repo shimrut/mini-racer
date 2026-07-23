@@ -372,4 +372,55 @@ describe('server replay validator branch coverage', () => {
         expect(outcome.ok).toBe(true);
         expect(outcome.run.completedLaps).toBe(null);
     });
+
+    it('replays revisioned multi-lap races with cumulative checkpoint splits', () => {
+        let frame = 0;
+        mockUpdateSimulation.mockImplementation((state) => {
+            frame += 1;
+            state.currentTime = frame * 2;
+            state.lapCheckpointTimesSec.push(frame);
+            state.currentChallengeRun.completedLaps = frame;
+            state.currentChallengeRun.lastLapAt = state.currentTime;
+            if (frame < 2) {
+                return {
+                    crashEndedRun: false,
+                    challengeLapCompleted: true,
+                    winTriggered: false,
+                };
+            }
+            state.status = 'won';
+            return {
+                crashEndedRun: false,
+                challengeLapCompleted: true,
+                winTriggered: true,
+                winData: { lapTime: state.currentTime, completedLaps: 2 },
+            };
+        });
+
+        const outcome = validateDailyGpReplayDetailed({
+            challenge: {
+                ...CHALLENGE,
+                rulesRevision: 1,
+                objectiveType: 'multi_lap_total',
+                objectiveParams: { lapCount: 2 },
+            },
+            track: TRACK,
+            replay: {
+                rulesRevision: 1,
+                targetLapNumber: 2,
+                inputs: [{ frames: 2, left: false, right: false, relaunchDelay: false }],
+            },
+        });
+
+        expect(outcome.ok).toBe(true);
+        expect(outcome.run).toMatchObject({
+            bestTimeSec: 4,
+            completedLaps: 2,
+            checkpointTimesSec: [1, 2],
+        });
+        expect(mockUpdateSimulation.mock.calls[0][0].currentRunPolicy).toMatchObject({
+            requiredLaps: 2,
+            rulesRevision: 1,
+        });
+    });
 });

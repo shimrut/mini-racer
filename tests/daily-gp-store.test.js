@@ -282,7 +282,8 @@ describe("daily-gp-store submission hardening", () => {
     const guestPlayerId = "guest-security-check";
     const guestToken = await mintGuestPlayerToken(guestPlayerId);
     const forgedReplay = {
-      targetLapNumber: 1,
+      rulesRevision: challenge.rulesRevision,
+      targetLapNumber: challenge.objectiveParams.lapCount,
       inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }],
     };
     const fakeCheckpointTimes = Array.from(

@@ -1,5 +1,5 @@
 import { getTrackName } from '../../game/track/catalog.js';
-import medalTimes from '../../game/medals/medal-times.json' with { type: 'json' };
+import { getRaceMedalThresholds } from '../../game/medals/medal-timing.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
 
 const DEFAULT_DAILY_POST_TITLE_FORMAT = 'Mini Racer, {displayDate}: {trackName}';
@@ -54,8 +54,13 @@ function formatChallengeDate(value: string, includeYear = false): string {
     return `${day} ${monthName}${includeYear ? ` ${year}` : ''}`;
 }
 
-function getMedalTimeTokens(trackKey: string) {
-    const row = (medalTimes as Record<string, Record<string, unknown>>)[trackKey] || {};
+function getChallengeLapCount(challenge: DailyGpChallenge): number {
+    const lapCount = challenge.objectiveParams?.lapCount;
+    return Number.isInteger(lapCount) && lapCount >= 1 && lapCount <= 3 ? lapCount : 1;
+}
+
+function getMedalTimeTokens(trackKey: string, lapCount = 1) {
+    const row = getRaceMedalThresholds(trackKey, lapCount) || {};
     const authorMedalTime = formatSeconds(row.author);
     const goldMedalTime = formatSeconds(row.gold);
     const silverMedalTime = formatSeconds(row.silver);
@@ -96,21 +101,24 @@ export function formatDailyMiniRacerPostTitle(
         personalBest: personalBestTime,
         personalBestTime,
         trackName,
-        ...getMedalTimeTokens(challenge.trackKey),
+        ...getMedalTimeTokens(challenge.trackKey, getChallengeLapCount(challenge)),
     });
 }
 
 export function formatDailyMiniRacerTextFallback(challenge: DailyGpChallenge): string {
     const trackName = getTrackName(challenge.trackKey, challenge.trackKey);
-    const medalTimeTokens = getMedalTimeTokens(challenge.trackKey);
+    const lapCount = getChallengeLapCount(challenge);
+    const medalTimeTokens = getMedalTimeTokens(challenge.trackKey, lapCount);
+    const raceLabel = lapCount === 1 ? 'one-lap race' : `${lapCount}-lap race`;
 
     return [
         '# Mini Racer Track of the Day',
         '',
         `Today's track: **${trackName}**`,
         `Date: ${formatChallengeDate(challenge.challengeDate, true)}`,
+        `Race format: **${lapCount} ${lapCount === 1 ? 'lap' : 'laps'}**`,
         '',
-        'Mini Racer is a free, one-lap daily racing game played directly on Reddit. Race today\'s track, improve your personal best, earn medals, and compete on the live leaderboard.',
+        `Mini Racer is a free daily racing game played directly on Reddit. Complete today's ${raceLabel}, improve your personal best, earn medals, and compete on the live leaderboard.`,
         '',
         '## How to play',
         '',
@@ -118,7 +126,7 @@ export function formatDailyMiniRacerTextFallback(challenge: DailyGpChallenge): s
         '- Mobile: use the on-screen left and right controls.',
         '- There is no separate brake control. The car slows as you turn, so timing and a clean racing line matter.',
         '- Every wall collision slows the car but lets the attempt continue.',
-        '- Your fastest verified lap appears on the daily leaderboard.',
+        '- Your fastest verified complete race appears on the daily leaderboard.',
         '',
         '## Today\'s medal times',
         '',

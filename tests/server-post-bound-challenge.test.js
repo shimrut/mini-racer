@@ -31,8 +31,9 @@ const challenge = {
     endsAt: '2026-07-17T00:00:00.000Z',
     availableUntil: '2026-07-23T00:00:00.000Z',
     status: 'active',
+    rulesRevision: 0,
     objectiveType: 'single_lap_fastest',
-    objectiveParams: {},
+    objectiveParams: { lapCount: 1 },
     skin: 'default',
 };
 
@@ -54,6 +55,36 @@ describe('post-bound daily challenge resolution', () => {
         expect(normalizePostBoundDailyGpChallenge({
             ...challenge,
             id: 'not-a-daily-id',
+        })).toBeNull();
+    });
+
+    it('upgrades missing race fields on old post payloads to the legacy one-lap contract', () => {
+        const legacy = { ...challenge };
+        delete legacy.rulesRevision;
+        delete legacy.objectiveParams;
+
+        expect(normalizePostBoundDailyGpChallenge(legacy)).toMatchObject({
+            rulesRevision: 0,
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: { lapCount: 1 },
+        });
+    });
+
+    it('keeps revision-one multi-lap post payloads only when their contract agrees', () => {
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            rulesRevision: 1,
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 2 },
+        })).toMatchObject({
+            rulesRevision: 1,
+            objectiveParams: { lapCount: 2 },
+        });
+        expect(normalizePostBoundDailyGpChallenge({
+            ...challenge,
+            rulesRevision: 1,
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: { lapCount: 2 },
         })).toBeNull();
     });
 

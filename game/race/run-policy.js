@@ -14,10 +14,14 @@ export function createRunPolicy({
     challengeRun = null
 } = {}) {
     const objectiveType = challengeRun?.objectiveType || 'single_lap_fastest';
+    const requiredLaps = Math.max(1, Math.trunc(challengeRun?.requiredLaps || 1));
     return {
         id: `daily:${objectiveType}`,
         objectiveType,
-        requiredLaps: Math.max(1, Math.trunc(challengeRun?.requiredLaps || 1)),
+        requiredLaps,
+        rulesRevision: Number.isInteger(challengeRun?.rulesRevision)
+            ? Math.max(0, challengeRun.rulesRevision)
+            : 0,
     };
 }
 
@@ -41,9 +45,12 @@ export function handleFinishCrossing(state, policy, checkpointCount, crossingTim
     const result = {
         challengeLapCompleted: true,
         challengeCompletedLapTime: completedLapTime,
-        challengeProgressLaps: challengeRun?.completedLaps || 1
+        challengeElapsedTime: finishTime,
+        challengeProgressLaps: challengeRun?.completedLaps || 1,
+        challengeRequiredLaps: policy.requiredLaps,
+        challengeIsFinalLap: (challengeRun?.completedLaps || 1) >= policy.requiredLaps,
     };
-    if ((challengeRun?.completedLaps || 1) >= policy.requiredLaps) {
+    if (result.challengeIsFinalLap) {
         state.status = 'won';
         result.winTriggered = true;
         result.winData = createWinData(state, checkpointCount, {

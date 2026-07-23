@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+    getScoreboardReplayMaxFrames,
     ReplayRecorder,
+    SCOREBOARD_REPLAY_FRAMES_PER_LAP,
     SCOREBOARD_REPLAY_MAX_FRAMES,
 } from '../game/race/replay.js';
 
@@ -21,6 +23,15 @@ describe('ReplayRecorder', () => {
         expect(recorder.overflowed).toBe(true);
         expect(recorder.frameCount).toBe(SCOREBOARD_REPLAY_MAX_FRAMES);
         expect(recorder.getPayload()).toBe(null);
+    });
+
+    it('scales revisioned replay caps by lap count while preserving the legacy cap', () => {
+        expect(SCOREBOARD_REPLAY_FRAMES_PER_LAP).toBe(2500);
+        expect(getScoreboardReplayMaxFrames()).toBe(3000);
+        expect(getScoreboardReplayMaxFrames({ rulesRevision: 0, lapCount: 3 })).toBe(3000);
+        expect(getScoreboardReplayMaxFrames({ rulesRevision: 1, lapCount: 1 })).toBe(2500);
+        expect(getScoreboardReplayMaxFrames({ rulesRevision: 1, lapCount: 2 })).toBe(5000);
+        expect(getScoreboardReplayMaxFrames({ rulesRevision: 1, lapCount: 3 })).toBe(7500);
     });
 
     it('returns null payloads until at least one frame is recorded', () => {
@@ -155,6 +166,30 @@ describe('ReplayRecorder', () => {
         expect(recorder.getPayload(2)).toEqual({
             targetLapNumber: 2,
             inputs: [{ frames: 1, left: false, right: true, relaunchDelay: true }],
+        });
+    });
+
+    it('configures revisioned payload metadata and uses the configured target lap', () => {
+        const recorder = new ReplayRecorder();
+        recorder.reset({
+            maxFrames: 5000,
+            targetLapNumber: 2,
+            rulesRevision: 1,
+        });
+        recorder.record(false, true, false);
+
+        expect(recorder.getPayload(1)).toEqual({
+            rulesRevision: 1,
+            targetLapNumber: 2,
+            inputs: [{ frames: 1, left: false, right: true, relaunchDelay: false }],
+        });
+
+        recorder.reset();
+        recorder.record(true, false, false);
+        expect(recorder.getPayload()).toEqual({
+            rulesRevision: 1,
+            targetLapNumber: 2,
+            inputs: [{ frames: 1, left: true, right: false, relaunchDelay: false }],
         });
     });
 });

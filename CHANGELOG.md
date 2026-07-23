@@ -1,5 +1,8 @@
 # Changelog
 
+- Daily GP challenges now freeze a deterministic 1/2/3-lap race format at publication: tracks with author times over 10.95 seconds use 1–2 laps, faster tracks use 1–3, medal targets scale linearly, intermediate finishes flash the cumulative qualifying medal, and only the complete race updates the permanent track medal.
+- Multi-lap ranking now shares a versioned client/server race and replay contract. New replays allow 2,500 frames per required lap, legacy published one-lap challenges retain the 3,000-frame limit, checkpoint splits remain cumulative, and PB ghosts are bound to lap count and rules revision.
+- Daily cards, playlist, finish UI, Reddit fallback/share copy, score threads, and final podium data now describe the complete race and its lap count.
 - Mapmaker freezes the camera while dragging a track point so extreme points no longer pan/rescale the view mid-drag.
 - Mapmaker shows a race-scale ghost car at the start and under the Line Build cursor, plus brush sizes in car widths, so lane scale is visible while authoring.
 - Home Start resumes the last track raced this session (matching the background map); today's featured daily remains the fallback when nothing has been raced yet or the last map expired.

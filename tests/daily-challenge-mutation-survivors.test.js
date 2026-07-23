@@ -196,7 +196,9 @@ describe('daily-challenge mutation survivors', () => {
             challenge: {
                 id: 'cache-trim-challenge',
                 trackKey: 'circuit',
+                rulesRevision: 0,
                 objectiveType: 'single_lap_fastest',
+                objectiveParams: { lapCount: 1 },
                 endsAt: '2026-07-19T00:00:00.000Z',
                 availableUntil: '2026-07-25T00:00:00.000Z',
                 skin: 'default',
@@ -681,14 +683,14 @@ describe('daily-challenge mutation survivors', () => {
         expect(challenge.id).toBe('mock-daily-challenge-local');
     });
 
-    it('formats labels for multi-lap challenges and clamps required laps to at least two', () => {
+    it('falls back safely when a malformed multi-lap challenge requests one lap', () => {
         const multiLap = buildChallenge({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 1 },
         });
 
-        expect(getDailyChallengeObjectiveLabel(multiLap)).toBe('2 laps');
-        expect(getDailyChallengeRequiredLaps(multiLap)).toBe(2);
+        expect(getDailyChallengeObjectiveLabel(multiLap)).toBe('1 lap');
+        expect(getDailyChallengeRequiredLaps(multiLap)).toBe(1);
         expect(getDailyChallengeCopyLabels(multiLap).hudPrimaryLabel).toBe('RACE');
         expect(getDailyChallengeTrackName(multiLap)).not.toBe('Unknown Track');
     });
@@ -788,8 +790,8 @@ describe('daily-challenge mutation survivors', () => {
         const challenge = await getActiveDailyChallenge();
 
         expect(challenge.skin).toBe('default');
-        expect(challenge.objectiveParams).toEqual({});
-        expect(challenge.objectiveType).toBe('multi_lap_total');
+        expect(challenge.objectiveParams).toEqual({ lapCount: 1 });
+        expect(challenge.objectiveType).toBe('single_lap_fastest');
     });
 
     it('prefers a complete challenge embedded in Devvit postData', async () => {

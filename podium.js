@@ -30,6 +30,7 @@ export function normalizePodium(value) {
         challengeId: cleanText(podium.challengeId),
         challengeDate: cleanText(podium.challengeDate),
         trackName: cleanText(podium.trackName) || 'Daily GP',
+        lapCount: podium.lapCount === 2 || podium.lapCount === 3 ? podium.lapCount : 1,
         positions: Array.from({ length: PODIUM_SIZE }, (_, index) => (
             byRank.get(index + 1) || emptyPosition(index + 1)
         )),
@@ -41,9 +42,13 @@ export function renderPodium(documentRef, value) {
     const podium = normalizePodium(value);
     const trackName = documentRef.getElementById('podium-title');
     const challengeDate = documentRef.getElementById('challenge-date');
+    const raceFormat = documentRef.getElementById('race-format');
 
     if (trackName) trackName.textContent = podium.trackName;
     if (challengeDate) challengeDate.textContent = formatChallengeDate(podium.challengeDate);
+    if (raceFormat) {
+        raceFormat.textContent = `${podium.lapCount} ${podium.lapCount === 1 ? 'LAP' : 'LAPS'}`;
+    }
 
     const rows = Array.from(documentRef.querySelectorAll('[data-rank]')).slice(0, PODIUM_SIZE);
     rows.forEach((row, index) => renderPosition(row, podium.positions[index]));

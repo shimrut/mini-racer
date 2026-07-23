@@ -23,6 +23,7 @@ import {
     getDailyChallengeData,
     setDailyChallengeBestTime,
 } from './storage.js';
+import { isDailyChallengeLapCount } from './labels.js';
 
 export {
     formatDailyChallengeBestLabel,
@@ -38,6 +39,8 @@ export {
     getDailyChallengeObjectiveLabel,
     getDailyChallengeRequiredLaps,
     getObjectiveRequiredLaps,
+    getStrictDailyChallengeLapCount,
+    isDailyChallengeLapCount,
 } from './labels.js';
 
 const MIN_DAILY_TIME = 2.0;
@@ -114,15 +117,18 @@ function getMockDailyChallenge() {
         return null;
     }
     const now = Date.now();
+    const requestedLaps = Number(params?.get('mockLaps'));
+    const lapCount = isDailyChallengeLapCount(requestedLaps) ? requestedLaps : 1;
     return normalizeDailyChallenge({
         id: 'mock-daily-challenge-local',
         trackKey,
-        objectiveType: 'single_lap_fastest',
+        rulesRevision: 1,
+        objectiveType: lapCount === 1 ? 'single_lap_fastest' : 'multi_lap_total',
         startsAt: new Date(now).toISOString(),
         endsAt: new Date(now + DAY_MS).toISOString(),
         availableUntil: new Date(now + DAILY_PLAYLIST_DAYS * DAY_MS).toISOString(),
         status: 'active',
-        objectiveParams: {},
+        objectiveParams: { lapCount },
         skin: 'default'
     });
 }
@@ -141,17 +147,18 @@ function getMockDailyChallengeSnapshot() {
 }
 
 export function toCachedActiveChallenge(challenge) {
-    if (!challenge || typeof challenge !== 'object') return null;
-    if (typeof challenge.id !== 'string' || !challenge.id) return null;
-    if (typeof challenge.trackKey !== 'string' || !hasTrack(challenge.trackKey)) return null;
+    const normalized = normalizeDailyChallenge(challenge);
+    if (!normalized) return null;
 
     return {
-        id: challenge.id,
-        trackKey: challenge.trackKey,
-        objectiveType: typeof challenge.objectiveType === 'string' ? challenge.objectiveType : 'single_lap_fastest',
-        endsAt: typeof challenge.endsAt === 'string' ? challenge.endsAt : null,
-        availableUntil: typeof challenge.availableUntil === 'string' ? challenge.availableUntil : null,
-        skin: typeof challenge.skin === 'string' && challenge.skin.trim() ? challenge.skin.trim() : 'default'
+        id: normalized.id,
+        trackKey: normalized.trackKey,
+        rulesRevision: normalized.rulesRevision,
+        objectiveType: normalized.objectiveType,
+        objectiveParams: { ...normalized.objectiveParams },
+        endsAt: normalized.endsAt,
+        availableUntil: normalized.availableUntil,
+        skin: normalized.skin,
     };
 }
 
@@ -292,6 +299,48 @@ export function normalizeDailyChallenge(raw) {
     if (typeof raw.id !== 'string' || !raw.id) return null;
     if (typeof raw.trackKey !== 'string' || !hasTrack(raw.trackKey)) return null;
 
+    const objectiveParams = raw.objectiveParams && typeof raw.objectiveParams === 'object'
+        && !Array.isArray(raw.objectiveParams)
+        ? raw.objectiveParams
+        : null;
+    const hasExplicitLapCount = Boolean(objectiveParams && Object.hasOwn(objectiveParams, 'lapCount'));
+    let rulesRevision;
+    let objectiveType;
+    let lapCount;
+
+    if (!Object.hasOwn(raw, 'rulesRevision')) {
+        if (!hasExplicitLapCount) {
+            rulesRevision = 0;
+            objectiveType = 'single_lap_fastest';
+            lapCount = 1;
+        } else {
+            rulesRevision = 1;
+            objectiveType = raw.objectiveType;
+            lapCount = objectiveParams.lapCount;
+        }
+    } else if (raw.rulesRevision === 0) {
+        if (
+            raw.objectiveType !== 'single_lap_fastest'
+            || !objectiveParams
+            || objectiveParams.lapCount !== 1
+        ) return null;
+        rulesRevision = 0;
+        objectiveType = 'single_lap_fastest';
+        lapCount = 1;
+    } else if (raw.rulesRevision === 1) {
+        rulesRevision = 1;
+        objectiveType = raw.objectiveType;
+        lapCount = objectiveParams?.lapCount;
+    } else {
+        return null;
+    }
+
+    if (
+        !isDailyChallengeLapCount(lapCount)
+        || (lapCount === 1 && objectiveType !== 'single_lap_fastest')
+        || (lapCount > 1 && objectiveType !== 'multi_lap_total')
+    ) return null;
+
     return {
         id: raw.id,
         challengeDate: typeof raw.challengeDate === 'string' ? raw.challengeDate : null,
@@ -300,10 +349,9 @@ export function normalizeDailyChallenge(raw) {
         endsAt: typeof raw.endsAt === 'string' ? raw.endsAt : null,
         availableUntil: typeof raw.availableUntil === 'string' ? raw.availableUntil : null,
         status: typeof raw.status === 'string' ? raw.status : 'active',
-        objectiveType: normalizeObjectiveType(raw.objectiveType),
-        objectiveParams: raw.objectiveParams && typeof raw.objectiveParams === 'object'
-            ? raw.objectiveParams
-            : {},
+        rulesRevision,
+        objectiveType,
+        objectiveParams: { lapCount },
         skin: typeof raw.skin === 'string' && raw.skin.trim() ? raw.skin.trim() : 'default'
     };
 }

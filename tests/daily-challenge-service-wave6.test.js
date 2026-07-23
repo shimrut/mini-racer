@@ -234,12 +234,12 @@ describe('daily-challenge service wave6', () => {
         const single = buildChallenge({ objectiveType: 'single_lap_fastest' });
         const multi = buildChallenge({
             objectiveType: 'multi_lap_total',
-            objectiveParams: { lapCount: 5 },
+            objectiveParams: { lapCount: 3 },
         });
 
         expect(getDailyChallengeModeSelectObjectiveLine(single)).toBe('Best lap time');
         expect(getDailyChallengeModeSelectObjectiveLine(multi)).toBe('Best race time');
-        expect(getDailyChallengeObjectiveLabel(multi)).toBe('5 laps');
+        expect(getDailyChallengeObjectiveLabel(multi)).toBe('3 laps');
         expect(getDailyChallengeCopyLabels(single).hudPrimaryLabel).toBe('LAP');
         expect(getDailyChallengeCopyLabels(multi).primaryStatLabel).toBe('Race Time');
     });

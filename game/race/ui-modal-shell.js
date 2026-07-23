@@ -908,12 +908,17 @@ export class ModalShell {
             bestLap: lapData.bestTime,
             scoreboardSnapshot: lapData.scoreboardSnapshot,
             title: 'RACE COMPLETE',
-            statLabels: ['THIS LAP'],
+            statLabels: [
+                (lapData.requiredLaps ?? lapData.completedLaps ?? 1) > 1
+                    ? 'RACE TIME'
+                    : 'THIS LAP',
+            ],
             lapMedal: lapData.lapMedal ?? null,
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
             trackKey: lapData.trackKey || this.getCurrentTrackKey(),
+            lapCount: lapData.requiredLaps ?? lapData.completedLaps ?? 1,
             lapCheckpointTimes: lapData.lapCheckpointTimes,
             pbCheckpointTimes: lapData.pbCheckpointTimes,
             pbFinishSec: lapData.pbFinishSec,

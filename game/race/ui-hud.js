@@ -1,4 +1,6 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js';
+import { createMedalIconSvg } from '../medals/medal-icon.js';
+import { isStandardMedalTier } from '../medals/medal-timing.js';
 
 /** Speed readout: cap DOM writes (lap timer updates every frame when centiseconds change). */
 const HUD_SPEED_MIN_MS = 1000 / 15;
@@ -50,6 +52,7 @@ export class RaceHud {
             lapFlash: document.getElementById('lap-flash'),
             lapFlashLabel: document.getElementById('lap-flash-label'),
             lapFlashTime: document.getElementById('lap-flash-time'),
+            lapFlashMedal: document.getElementById('lap-flash-medal'),
             lapFlashDelta: document.getElementById('lap-flash-delta'),
         };
         this.elements.timeDisplay =
@@ -88,6 +91,7 @@ export class RaceHud {
     get lapFlash() { return this.elements.lapFlash; }
     get lapFlashLabel() { return this.elements.lapFlashLabel; }
     get lapFlashTime() { return this.elements.lapFlashTime; }
+    get lapFlashMedal() { return this.elements.lapFlashMedal; }
     get lapFlashDelta() { return this.elements.lapFlashDelta; }
 
 
@@ -338,6 +342,7 @@ export class RaceHud {
 
         this.lapFlashLabel && (this.lapFlashLabel.textContent = '');
         this.lapFlashTime && (this.lapFlashTime.textContent = '');
+        this._syncLapFlashMedal(undefined);
         this.lapFlashDelta.hidden = false;
         this.lapFlashDelta.textContent = 'GHOST UNAVAILABLE';
         this.lapFlash.classList.remove('is-gain', 'is-loss');
@@ -346,7 +351,36 @@ export class RaceHud {
         return true;
     }
 
-    _showTimingFlash({ label, timeSec, deltaVsBest, isNewBest = false, evenDeltaText = 'Even lap' }) {
+    _syncLapFlashMedal(medal) {
+        const slot = this.lapFlashMedal;
+        if (!slot) return;
+        slot.replaceChildren();
+        slot.classList?.remove?.('is-no-medal');
+        if (slot.dataset) delete slot.dataset.medal;
+        if (medal === undefined) {
+            slot.hidden = true;
+            return;
+        }
+
+        const earnedMedal = isStandardMedalTier(medal) ? medal : null;
+        slot.appendChild(createMedalIconSvg(earnedMedal || 'white', {
+            className: 'medal-svg--lap-flash',
+            outline: !earnedMedal,
+            showEmblem: Boolean(earnedMedal),
+        }));
+        slot.hidden = false;
+        if (slot.dataset) slot.dataset.medal = earnedMedal || 'none';
+        if (!earnedMedal) slot.classList?.add?.('is-no-medal');
+    }
+
+    _showTimingFlash({
+        label,
+        timeSec,
+        deltaVsBest,
+        isNewBest = false,
+        evenDeltaText = 'Even lap',
+        medal = undefined,
+    }) {
         if (!this.lapFlash || !this.lapFlashLabel || !this.lapFlashTime || !this.lapFlashDelta) return;
 
         if (this._lapFlashTimer !== null) {
@@ -354,7 +388,12 @@ export class RaceHud {
             this._lapFlashTimer = null;
         }
 
-        if (!isNewBest && (deltaVsBest === null || deltaVsBest === undefined)) {
+        this._syncLapFlashMedal(medal);
+        if (
+            medal === undefined
+            && !isNewBest
+            && (deltaVsBest === null || deltaVsBest === undefined)
+        ) {
             this.hideLapFlash();
             return;
         }
@@ -387,12 +426,32 @@ export class RaceHud {
         this._lapFlashTimer = setTimeout(() => this.hideLapFlash(), 1400);
     }
 
-    showLapFlash({ lapNumber, lapTime, deltaVsBest, isBest, isNewBest = false }) {
+    showLapFlash({
+        lapNumber,
+        lapTime,
+        deltaVsBest,
+        isBest,
+        isNewBest = false,
+        completedLaps = null,
+        requiredLaps = null,
+        elapsedTimeSec = null,
+        medal = undefined,
+    }) {
+        const hasRaceProgress = Number.isInteger(completedLaps)
+            && completedLaps > 0
+            && Number.isInteger(requiredLaps)
+            && requiredLaps > 0;
+        const displayLapNumber = hasRaceProgress ? completedLaps : lapNumber;
+        const label = hasRaceProgress
+            ? `Lap ${displayLapNumber} / ${requiredLaps}`
+            : (isBest ? `Lap ${lapNumber} Best` : `Lap ${lapNumber}`);
+        const displayTime = Number.isFinite(elapsedTimeSec) ? elapsedTimeSec : lapTime;
         this._showTimingFlash({
-            label: isBest ? `Lap ${lapNumber} Best` : `Lap ${lapNumber}`,
-            timeSec: lapTime,
+            label,
+            timeSec: displayTime,
             deltaVsBest,
-            isNewBest
+            isNewBest,
+            medal,
         });
     }
 
@@ -401,7 +460,8 @@ export class RaceHud {
             label: `CP ${checkpointNumber}`,
             timeSec: splitTimeSec,
             deltaVsBest,
-            evenDeltaText: 'Even split'
+            evenDeltaText: 'Even split',
+            medal: undefined,
         });
     }
 

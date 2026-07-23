@@ -1,7 +1,7 @@
 import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
 import { randomUUID } from 'node:crypto';
-import { getMedalForLapTime } from '../../game/medals/medal-timing.js';
+import { getMedalForRaceTime } from '../../game/medals/medal-timing.js';
 import { getTrackName } from '../../game/track/catalog.js';
 import { DAILY_GP_REDIS_TTL_SECONDS, type DailyGpChallenge } from './daily-gp-model.js';
 import {
@@ -29,7 +29,7 @@ import {
 export const DAILY_GP_SCORE_THREAD_TEXT = [
     '🏁 Mini Racer score thread',
     '',
-    'Share your lap time from the game and it will appear as a reply here from your Reddit account.',
+    'Share your race time from the game and it will appear as a reply here from your Reddit account.',
 ].join('\n');
 
 const SHARE_PREVIEW_TTL_SECONDS = 10 * 60;
@@ -47,6 +47,7 @@ type SharePreviewRecord = {
     challengeId: string;
     source: ShareSource;
     bestTimeMs: number;
+    lapCount: 1 | 2 | 3;
     medal: MedalTier;
     commentText: string;
     createdAt: string;
@@ -113,6 +114,7 @@ export function formatDailyGpShareComment(
     bestTimeMs: number,
     medal: MedalTier,
     trackName?: string,
+    lapCount = 1,
 ): string {
     const time = formatLapTime(bestTimeMs);
     const where = trackName || 'Mini Racer';
@@ -122,11 +124,12 @@ export function formatDailyGpShareComment(
         silver: { label: 'Silver', emoji: '🥈' },
         bronze: { label: 'Bronze', emoji: '🥉' },
     };
+    const raceDescription = lapCount === 1 ? 'lap' : `${lapCount}-lap race`;
     if (!medal) {
-        return `I set a ${time} lap in ${where}. 🏁`;
+        return `I set a ${time} ${raceDescription} in ${where}. 🏁`;
     }
     const detail = medals[medal];
-    return `I earned the ${detail.label} medal ${detail.emoji} with a ${time} lap in ${where}.`;
+    return `I earned the ${detail.label} medal ${detail.emoji} with a ${time} ${raceDescription} in ${where}.`;
 }
 
 export function parseSharePreviewRecord(raw: string | null): SharePreviewRecord | null {
@@ -141,7 +144,10 @@ export function parseSharePreviewRecord(raw: string | null): SharePreviewRecord 
             || !Number.isFinite(parsed.bestTimeMs)
             || typeof parsed.commentText !== 'string'
         ) return null;
-        return parsed as SharePreviewRecord;
+        return {
+            ...parsed,
+            lapCount: parsed.lapCount === 2 || parsed.lapCount === 3 ? parsed.lapCount : 1,
+        } as SharePreviewRecord;
     } catch (_error) {
         return null;
     }
@@ -483,7 +489,7 @@ export async function previewDailyGpShare(
             : Promise.resolve(null),
     ]);
     if (result === 'invalid_replay') {
-        return { status: 422, body: { status: 'invalid_replay', error: 'This finished lap could not be verified.' } };
+        return { status: 422, body: { status: 'invalid_replay', error: 'This finished race could not be verified.' } };
     }
     if (!result) {
         return { status: 404, body: { status: 'result_unavailable', error: 'No verified result is available to share.' } };
@@ -491,18 +497,25 @@ export async function previewDailyGpShare(
     if (!post) {
         return { status: 404, body: { status: 'post_unavailable', error: 'The post for this race day is unavailable.' } };
     }
-    const medal = getMedalForLapTime(result.challenge.trackKey, result.bestTimeMs / 1000) as MedalTier;
+    const lapCount = result.challenge.objectiveParams.lapCount;
+    const medal = getMedalForRaceTime(
+        result.challenge.trackKey,
+        result.bestTimeMs / 1000,
+        lapCount,
+    ) as MedalTier;
     const preview: SharePreviewRecord = {
         username: validContext.username,
         subredditName: validContext.subredditName,
         challengeId: result.challenge.id,
         source: input.source as ShareSource,
         bestTimeMs: result.bestTimeMs,
+        lapCount,
         medal,
         commentText: formatDailyGpShareComment(
             result.bestTimeMs,
             medal,
             getTrackName(result.challenge.trackKey, ''),
+            lapCount,
         ),
         createdAt: new Date().toISOString(),
     };

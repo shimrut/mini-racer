@@ -85,7 +85,7 @@ describe('daily-challenge service', () => {
         expect(
             getDailyChallengeObjectiveLabel({
                 objectiveType: 'multi_lap_total',
-                objectiveParams: { lapCount: 1 }
+                objectiveParams: { lapCount: 2 }
             })
         ).toBe('2 laps');
         expect(
@@ -439,6 +439,19 @@ describe('daily-challenge service', () => {
         window.location.search = '?mockDaily=true&mockTrack=jadeSpiralCircuit';
         expect((await getActiveDailyChallenge()).trackKey).toBe('jadeSpiralCircuit');
 
+        window.location.search = '?mockDaily=true&mockLaps=3';
+        await expect(getActiveDailyChallenge()).resolves.toMatchObject({
+            rulesRevision: 1,
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 3 },
+        });
+
+        window.location.search = '?mockDaily=true&mockLaps=4';
+        await expect(getActiveDailyChallenge()).resolves.toMatchObject({
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: { lapCount: 1 },
+        });
+
         window.location.search = '?localDev=true';
         expect((await getActiveDailyChallenge()).id).toBe('mock-daily-challenge-local');
         expect((await getActiveDailyChallenge()).trackKey).toBe('circuit');
@@ -469,16 +482,19 @@ describe('daily-challenge service', () => {
         expect(challenge).toMatchObject({
             id: 'daily-gp-2026-06-03',
             trackKey: 'circuit',
+            rulesRevision: 0,
             objectiveType: 'single_lap_fastest',
             status: 'active',
-            objectiveParams: {},
+            objectiveParams: { lapCount: 1 },
             skin: 'desert'
         });
         const cached = JSON.parse(memoryLocalStorage.getItem('VectorGpActiveDailyChallengeCache'));
         expect(cached.challenge).toEqual({
             id: 'daily-gp-2026-06-03',
             trackKey: 'circuit',
+            rulesRevision: 0,
             objectiveType: 'single_lap_fastest',
+            objectiveParams: { lapCount: 1 },
             endsAt: '2026-06-04T00:00:00.000Z',
             availableUntil: '2026-06-10T00:00:00.000Z',
             skin: 'desert'
@@ -818,14 +834,14 @@ describe('daily-challenge service', () => {
         expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 1 },
-        })).toBe(2);
+        })).toBe(1);
         expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 5.9 },
-        })).toBe(5);
+        })).toBe(1);
         expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
-        })).toBe(2);
+        })).toBe(1);
     });
 
     it('merges local and snapshot bests preferring the faster verified time', async () => {
@@ -2152,11 +2168,11 @@ describe('daily-challenge service', () => {
         vi.useRealTimers();
     });
 
-    it('requires at least two laps for multi-lap objectives and formats sub-minute card expiry', () => {
+    it('rejects malformed multi-lap objectives and formats sub-minute card expiry', () => {
         expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 1 },
-        })).toBe(2);
+        })).toBe(1);
 
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-06-03T12:00:00.000Z'));

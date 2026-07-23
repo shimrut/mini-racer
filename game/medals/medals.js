@@ -7,8 +7,10 @@ import {
     getAuthorMedalSeconds,
     getCombinedMedalStackTiers,
     getMedalForLapTime,
+    getMedalForRaceTime,
     getMedalRowSlots,
     getNextMedalTarget,
+    getRaceMedalThresholds,
     getTimeToBeatSeconds,
     getTrackMedalThresholds,
     getWinOverlayAllMedalsUnlocked,
@@ -28,8 +30,10 @@ export {
     getAuthorMedalSeconds,
     getCombinedMedalStackTiers,
     getMedalForLapTime,
+    getMedalForRaceTime,
     getMedalRowSlots,
     getNextMedalTarget,
+    getRaceMedalThresholds,
     getTimeToBeatSeconds,
     getTrackMedalThresholds,
     getWinOverlayAllMedalsUnlocked,
@@ -173,13 +177,14 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
     rowClass = '',
     iconClass = 'medal-svg--hero medal-pile-icon--deferred',
     ariaLabel = 'Medals for this track',
+    lapCount = 1,
 } = {}) {
     const row = document.createElement('div');
     row.className = rowClass ? `combined-medal-row ${rowClass}` : 'combined-medal-row';
     row.setAttribute('role', 'group');
     row.setAttribute('aria-label', ariaLabel);
 
-    const slots = getMedalRowSlots(trackKey, bestStoredMedal);
+    const slots = getMedalRowSlots(trackKey, bestStoredMedal, lapCount);
     if (slots.length === 0) {
         const slot = document.createElement('div');
         slot.className = 'combined-medal-row-slot combined-medal-row-slot--fallback';
@@ -240,6 +245,7 @@ export function renderWinCombinedMedalOverlay(
         trackKey = null,
         lapMedal = null,
         previousTrackMedal = null,
+        lapCount = 1,
     } = {},
 ) {
     if (!overlayEl) return;
@@ -264,6 +270,7 @@ export function renderWinCombinedMedalOverlay(
     appendMedalRowTo(centerWrap, trackKey, bestStoredMedal, {
         rowClass: 'win-combined-medal-overlay__row',
         ariaLabel: 'Medals earned on this track',
+        lapCount,
     });
     root.appendChild(centerWrap);
 

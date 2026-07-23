@@ -2,6 +2,7 @@ import { hasTrack } from '../../game/track/catalog.js';
 import { getBackfilledDailyGpTrackKeyForDate } from '../../game/shared/daily-gp-history-backfill.js';
 import {
     createDailyChallengeId,
+    DAILY_GP_LEGACY_RULES_REVISION,
     DAILY_GP_PLAYLIST_DAYS,
     DAY_MS,
     type DailyGpChallenge,
@@ -31,8 +32,9 @@ export function getBackfilledDailyGpChallenge(challengeId: string): DailyGpChall
         endsAt: new Date(startsAt.getTime() + DAY_MS).toISOString(),
         availableUntil: new Date(startsAt.getTime() + DAILY_GP_PLAYLIST_DAYS * DAY_MS).toISOString(),
         status: 'active',
+        rulesRevision: DAILY_GP_LEGACY_RULES_REVISION,
         objectiveType: 'single_lap_fastest',
-        objectiveParams: {},
+        objectiveParams: { lapCount: 1 },
         skin: 'default',
     };
 }

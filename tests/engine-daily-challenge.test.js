@@ -509,9 +509,14 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       scoreboardReplay: { getPayload: vi.fn(() => ({ inputs: [] })) },
     };
 
-    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 5.1);
+    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 5.1, {
+      elapsedTimeSec: 5.1,
+      completedLaps: 1,
+      requiredLaps: 1,
+      isFinalLap: true,
+    });
 
-    expect(engine.hasTrackMedalBeforeLastLapWrite).toBe(true);
+    expect(engine.hasTrackMedalBeforeLastLapWrite).toBe(false);
     expect(engine.trackMedalBeforeLastLapWrite).toBe(null);
 
     RealTimeRacer.prototype.handleDailyChallengeWin.call(engine, {
@@ -1085,7 +1090,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(setRuntimeConfig).toHaveBeenCalledWith(null);
   });
 
-  it("uses the lifetime track PB instead of the selected day's stored best", () => {
+  it("uses the PB for the selected race contract instead of another day's stored best", () => {
     const setBestTime = vi.fn();
     const engine = {
       createDailyChallengeRun: vi.fn(() => ({})),
@@ -1095,7 +1100,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       dailyChallengeBestResult: null,
       trackPersonalBestResult: null,
       trackPersonalBestByTrackKey: {
-        circuit: {
+        "daily-1": {
+          challengeId: "daily-1",
           trackKey: "circuit",
           bestTime: 41.25,
           checkpointTimesSec: [10, 20, 30],
@@ -1123,7 +1129,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       trackKey: "circuit",
       bestTime: 41.25,
     });
-    expect(engine.sessionBestLapSecByTrackKey.circuit).toBe(41.25);
+    expect(engine.sessionBestLapSecByTrackKey["daily-1"]).toBe(41.25);
   });
 
   it("uses the single stock car asset for any physics overrides", () => {
@@ -1314,6 +1320,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       resetCanvasPresentation: vi.fn(),
       isPracticeMode: () => false,
       isDailyChallengeRun: () => false,
+      activeDailyChallenge: { rulesRevision: 1 },
+      currentRunPolicy: { requiredLaps: 3, rulesRevision: 0 },
       scoreboardReplay: { reset: vi.fn() },
       recordRunPoint: vi.fn(),
       snapRenderPoseToCurrentPose:
@@ -1358,6 +1366,11 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       expect(engine.lastTime).toBe(2500);
       expect(engine.frameSkip).toBe(0);
       expect(engine.requestRender).toHaveBeenCalled();
+      expect(engine.scoreboardReplay.reset).toHaveBeenCalledWith({
+        maxFrames: 7500,
+        targetLapNumber: 3,
+        rulesRevision: 1,
+      });
     } finally {
       global.requestAnimationFrame = originalRequestAnimationFrame;
       vi.useRealTimers();
@@ -1483,12 +1496,33 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.status).toBe("playing");
   });
 
+  it("preserves cumulative checkpoint splits when resetting intermediate-lap trails", () => {
+    const engine = {
+      lapCheckpointTimesSec: [1.25, 2.5],
+      routeTrace: { clear: vi.fn() },
+      runHistory: { clear: vi.fn() },
+      runHistoryTimer: 5,
+      trailTimer: 5,
+      recordRunPoint: vi.fn(),
+      pos: { x: 2, y: 3 },
+      angle: 0,
+      runtimeConfig: { carRearAxleOffset: 0 },
+    };
+
+    RealTimeRacer.prototype._resetLapTrailAfterIntermediateLap.call(engine);
+
+    expect(engine.lapCheckpointTimesSec).toEqual([1.25, 2.5]);
+    expect(engine.routeTrace.clear).toHaveBeenCalledTimes(1);
+    expect(engine.runHistory.clear).toHaveBeenCalledTimes(1);
+  });
+
   it("starts on time and flags the unavailable notice when an enabled PB has no ghost at GO", () => {
     const challenge = { id: "daily-pending-pb", trackKey: "circuit" };
     const showGhostUnavailableNotice = vi.fn(() => true);
     const engine = {
       activeDailyChallenge: challenge,
       trackPersonalBestResult: {
+        challengeId: challenge.id,
         trackKey: challenge.trackKey,
         bestTime: 42,
         ghostAvailable: true,
@@ -1526,14 +1560,19 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
   it("rejects a malformed canonical ghost without replacing the known PB", () => {
     const challenge = { id: "daily-malformed-ghost", trackKey: "circuit" };
-    const existing = { trackKey: "circuit", bestTime: 43, ghostAvailable: true };
+    const existing = {
+      challengeId: challenge.id,
+      trackKey: "circuit",
+      bestTime: 43,
+      ghostAvailable: true,
+    };
     const clearPrepared = vi.fn();
     const installForChallenge = vi.fn();
     const engine = {
       activeDailyChallenge: challenge,
       currentDailyChallenge: challenge,
       trackPersonalBestResult: existing,
-      trackPersonalBestByTrackKey: { circuit: existing },
+      trackPersonalBestByTrackKey: { [challenge.id]: existing },
       pbGhostSelectionChallengeId: challenge.id,
       pbGhostSelectionGeneration: 1,
       pbGhostPrepareGenerationByChallengeId: { [challenge.id]: 1 },
@@ -1565,7 +1604,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
     expect(result).toBeNull();
     expect(engine.trackPersonalBestResult).toBe(existing);
-    expect(engine.trackPersonalBestByTrackKey.circuit).toBe(existing);
+    expect(engine.trackPersonalBestByTrackKey[challenge.id]).toBe(existing);
     expect(installForChallenge).not.toHaveBeenCalled();
     expect(clearPrepared).toHaveBeenCalledTimes(1);
   });

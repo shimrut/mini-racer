@@ -98,7 +98,9 @@ describe('daily-challenge service wave3', () => {
             challenge: {
                 id: 'cache-coerce-wave3',
                 trackKey: 'circuit',
+                rulesRevision: 0,
                 objectiveType: 'single_lap_fastest',
+                objectiveParams: { lapCount: 1 },
                 endsAt: '2026-07-19T00:00:00.000Z',
                 availableUntil: '2026-07-25T00:00:00.000Z',
                 skin: 'default',

@@ -51,6 +51,10 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Reddit username display behaves correctly when identity is enabled.
 - [ ] Guest fallback identity behaves correctly when Reddit username display is unavailable or off.
 - [ ] Invalid or suspicious replay submissions are rejected cleanly.
+- [ ] Published 1-, 2-, and 3-lap challenges keep the same lap count across post reloads, retries, and playlist history.
+- [ ] Intermediate finish lines flash the medal for cumulative elapsed time at that completed-lap scale, without permanently awarding it before the final finish.
+- [ ] Multi-lap submissions rank only after all required laps, preserve cumulative checkpoint splits, and reject mismatched replay rules or target lap counts.
+- [ ] Share previews, score-thread comments, text fallback, and final podium posts show the complete race time and correct lap count.
 - [ ] A daily leaderboard improvement and its challenge PB/ghost improvement are displayed and stored independently while sharing the same fixed expiry deadline.
 - [ ] An existing verified challenge result can seed a time-only PB without showing a fabricated ghost.
 - [ ] A geometry or simulation revision rejects an incompatible stored ghost instead of rendering it on the changed track.

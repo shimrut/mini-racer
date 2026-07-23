@@ -23,7 +23,8 @@ describe('run-policy contracts', () => {
         expect(createRunPolicy()).toEqual({
             id: 'daily:single_lap_fastest',
             objectiveType: 'single_lap_fastest',
-            requiredLaps: 1
+            requiredLaps: 1,
+            rulesRevision: 0,
         });
     });
 
@@ -73,7 +74,10 @@ describe('run-policy contracts', () => {
             winTriggered: true,
             challengeLapCompleted: true,
             challengeCompletedLapTime: 21.5,
+            challengeElapsedTime: 21.5,
             challengeProgressLaps: 1,
+            challengeRequiredLaps: 1,
+            challengeIsFinalLap: true,
             winData: expect.objectContaining({
                 lapTime: 21.5,
                 trackKey: 'circuit',

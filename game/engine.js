@@ -520,7 +520,20 @@ export class RealTimeRacer {
         wallContactReleaseSec: Number((Number(this.wallContactReleaseRemaining) || 0).toFixed(3)),
       },
       lapTime: Number(this.currentTime.toFixed(2)),
-      challengeLaps: this.currentChallengeRun?.recentLaps?.length || 0,
+      challenge: this.currentChallengeRun
+        ? {
+            completedLaps: this.currentChallengeRun.completedLaps || 0,
+            requiredLaps: this.currentChallengeRun.requiredLaps || 1,
+            currentLap: Math.min(
+              (this.currentChallengeRun.completedLaps || 0) + 1,
+              this.currentChallengeRun.requiredLaps || 1,
+            ),
+            intermediateMedalFlash:
+              this.hud?.lapFlash?.classList?.contains?.("visible")
+                ? this.hud?.lapFlashMedal?.dataset?.medal || null
+                : null,
+          }
+        : null,
       startLine: this.currentTrack.startLine,
       routeTracePoints: this.routeTrace.length,
       liveParticles: this.particles.length,

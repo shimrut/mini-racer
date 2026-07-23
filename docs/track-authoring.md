@@ -48,6 +48,9 @@ Curve Radius controls wall corner smoothing, not the driven turn radius.
    Existing tracks keep their position. Renames replace the old key at its
    existing position after confirmation and remove the old definition file.
 4. Add medal thresholds in `game/medals/medal-times.json`.
+   The Author threshold is also the Daily GP lap-band input: author times over
+   10.95 seconds allow 1–2 laps; author times at or below 10.95 seconds allow
+   1–3 laps. Missing or invalid Author times conservatively publish as one lap.
 5. Add or adjust `game/track/presentation.js` only when the track needs a
    non-default preview or race presentation.
 6. Update the intentional full-registry fingerprint in
@@ -90,6 +93,7 @@ The regression suite checks:
   collision geometry;
 - published Daily GP history refers only to catalog tracks;
 - every catalog track has medal thresholds.
+- every scheduled track has a valid Author threshold so its multi-lap eligibility is intentional.
 
 Run the focused checks:
 

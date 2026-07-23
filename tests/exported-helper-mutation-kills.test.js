@@ -40,7 +40,9 @@ describe('exported daily-challenge helpers — mutation kills', () => {
         })).toEqual({
             id: 'daily-gp-2026-07-01',
             trackKey: DEFAULT_TRACK_KEY,
+            rulesRevision: 0,
             objectiveType: 'single_lap_fastest',
+            objectiveParams: { lapCount: 1 },
             endsAt: null,
             availableUntil: null,
             skin: 'default',
@@ -49,14 +51,18 @@ describe('exported daily-challenge helpers — mutation kills', () => {
         expect(toCachedActiveChallenge({
             id: 'daily-gp-2026-07-01',
             trackKey: DEFAULT_TRACK_KEY,
-            objectiveType: 'multi_lap',
+            objectiveType: 'single_lap_fastest',
+            rulesRevision: 0,
+            objectiveParams: { lapCount: 1 },
             endsAt: '2026-07-02T00:00:00.000Z',
             availableUntil: '2026-07-08T00:00:00.000Z',
             skin: '  neon  ',
         })).toEqual({
             id: 'daily-gp-2026-07-01',
             trackKey: DEFAULT_TRACK_KEY,
-            objectiveType: 'multi_lap',
+            rulesRevision: 0,
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: { lapCount: 1 },
             endsAt: '2026-07-02T00:00:00.000Z',
             availableUntil: '2026-07-08T00:00:00.000Z',
             skin: 'neon',
@@ -113,8 +119,9 @@ describe('exported daily-challenge helpers — mutation kills', () => {
             endsAt: '',
             availableUntil: '',
             status: '',
+            rulesRevision: 0,
             objectiveType: 'single_lap_fastest',
-            objectiveParams: {},
+            objectiveParams: { lapCount: 1 },
             skin: 'default',
         });
         const valid = normalizeDailyChallenge({
@@ -130,7 +137,7 @@ describe('exported daily-challenge helpers — mutation kills', () => {
         });
         expect(valid?.id).toBe('daily-gp-2026-07-01');
         expect(valid?.trackKey).toBe(DEFAULT_TRACK_KEY);
-        expect(valid?.objectiveParams).toEqual({ requiredLaps: 1 });
+        expect(valid?.objectiveParams).toEqual({ lapCount: 1 });
     });
 
     it('isCachedActiveChallengeStillCurrent requires a future endsAt string', () => {
@@ -146,30 +153,30 @@ describe('exported daily-challenge helpers — mutation kills', () => {
         })).toBe(true);
     });
 
-    it('getObjectiveRequiredLaps uses multi-lap lapCount with a floor of two', () => {
+    it('getObjectiveRequiredLaps accepts only supported persisted lap counts', () => {
         expect(getObjectiveRequiredLaps(null)).toBe(1);
         expect(getObjectiveRequiredLaps({ objectiveType: 'single_lap_fastest' })).toBe(1);
-        expect(getObjectiveRequiredLaps({ objectiveType: 'multi_lap_total' })).toBe(2);
+        expect(getObjectiveRequiredLaps({ objectiveType: 'multi_lap_total' })).toBe(1);
         expect(getObjectiveRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: {},
-        })).toBe(2);
+        })).toBe(1);
         expect(getObjectiveRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 0 },
-        })).toBe(2);
+        })).toBe(1);
         expect(getObjectiveRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 1 },
-        })).toBe(2);
+        })).toBe(1);
         expect(getObjectiveRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 3.9 },
-        })).toBe(3);
+        })).toBe(1);
         expect(getObjectiveRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 5 },
-        })).toBe(5);
+        })).toBe(1);
     });
 
     it('formatDailyChallengeRemainingDuration uses compact time labels', () => {

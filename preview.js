@@ -9,7 +9,7 @@ import {
     requestFeaturedDailyChallengeStart
 } from './game/daily-challenge/service.js';
 import {
-    getTrackMedalThresholds,
+    getRaceMedalThresholds,
 } from './game/medals/medal-timing.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setTrackName(trackNameEl, currentTrack.name);
         renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
-        await applyTimeToBeat(timeToBeatEl, currentTrackKey);
+        await applyTimeToBeat(timeToBeatEl, currentTrackKey, getChallengeLapCount(challenge));
         renderChallengeStatus(challenge);
     } catch (error) {
         console.error('Error loading daily challenge preview:', error);
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (fallbackTrack) {
             renderTrackPreview(canvas, 'circuit', fallbackTrack, 'default', carImage);
         }
-        await applyTimeToBeat(timeToBeatEl, 'circuit');
+        await applyTimeToBeat(timeToBeatEl, 'circuit', 1);
     }
 
     playButton.addEventListener('click', async (event) => {
@@ -129,11 +129,17 @@ function getChallengeTrackName(challenge) {
     return TRACKS[trackKey]?.name || 'This track';
 }
 
-async function applyTimeToBeat(el, trackKey) {
+function getChallengeLapCount(challenge) {
+    const lapCount = challenge?.objectiveParams?.lapCount;
+    return Number.isInteger(lapCount) && lapCount >= 1 && lapCount <= 3 ? lapCount : 1;
+}
+
+async function applyTimeToBeat(el, trackKey, lapCount = 1) {
     if (!el) return;
+    const labelEl = el.querySelector('.hud-label');
     const textEl = el.querySelector('#time-to-beat-text');
     const medalEl = el.querySelector('#time-to-beat-medal');
-    const seconds = getTrackMedalThresholds(trackKey)?.gold;
+    const seconds = getRaceMedalThresholds(trackKey, lapCount)?.gold;
 
     if (!Number.isFinite(seconds)) {
         if (textEl) textEl.textContent = '';
@@ -145,6 +151,9 @@ async function applyTimeToBeat(el, trackKey) {
     medalEl?.replaceChildren(createMedalIconSvg('gold', {
         className: 'post-preview-gold-medal'
     }));
+    if (labelEl) {
+        labelEl.textContent = lapCount === 1 ? 'Gold Target · 1 Lap' : `Gold Target · ${lapCount} Laps`;
+    }
     if (textEl) {
         textEl.textContent = formatTimeToBeat(seconds);
     }

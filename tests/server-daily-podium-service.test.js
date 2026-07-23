@@ -140,6 +140,7 @@ describe('daily podium post workflow', () => {
                     challengeId: podium.challengeId,
                     challengeDate: podium.challengeDate,
                     trackName: podium.trackName,
+                    lapCount: 1,
                     positions: podium.positions.map(({ playerId, profile, ...position }) => ({
                         ...position,
                         avatarUrl: position.identityType === 'reddit'
@@ -1025,6 +1026,7 @@ describe('daily podium post workflow', () => {
             '',
             'Track: **Circuit ProMax**',
             'Date: 10 Jul 2026',
+            'Race format: 1 lap',
             '',
             '1. Gold - RaceFan - 18.42s',
             '2. Silver - Turbo Otter 42 - 18.76s',

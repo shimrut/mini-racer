@@ -152,7 +152,7 @@ describe('daily GP share wave6', () => {
 
     it('keeps the exact score-thread anchor copy (L29-L33)', () => {
         expect(DAILY_GP_SCORE_THREAD_TEXT).toContain('🏁 Mini Racer score thread');
-        expect(DAILY_GP_SCORE_THREAD_TEXT).toContain('Share your lap time from the game');
+        expect(DAILY_GP_SCORE_THREAD_TEXT).toContain('Share your race time from the game');
     });
 
     it('requires a signed-in username for preview (L462-L463)', async () => {
@@ -254,7 +254,7 @@ describe('daily GP share wave6', () => {
             status: 422,
             body: {
                 status: 'invalid_replay',
-                error: 'This finished lap could not be verified.',
+                error: 'This finished race could not be verified.',
             },
         });
     });

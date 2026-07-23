@@ -1,5 +1,6 @@
 import { CONFIG } from "../config.js";
 import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js";
+import { getScoreboardReplayMaxFrames } from "./replay.js";
 import { createModalActions } from "./result-flow.js";
 import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
@@ -103,7 +104,6 @@ export const raceEngineMethods = {
     this.runHistory.clear();
     this.runHistoryTimer = 0;
     this.trailTimer = 0;
-    this.lapCheckpointTimesSec = [];
     this.recordRunPoint(getCarRearAxleWorldPoint(this.pos, this.angle, this.runtimeConfig));
   },
 
@@ -116,7 +116,23 @@ export const raceEngineMethods = {
     this.proceduralMusic?.prepareOnUserGesture?.();
     this.hud.setHudPersonalBestsOpenAllowed(false);
     this.hud.setPauseVisible(false);
-    this.scoreboardReplay.reset();
+    const replayRulesRevision = Number.isInteger(this.activeDailyChallenge?.rulesRevision)
+      ? this.activeDailyChallenge.rulesRevision
+      : Number.isInteger(this.currentRunPolicy?.rulesRevision)
+        ? this.currentRunPolicy.rulesRevision
+        : 0;
+    const replayLapCount = Math.max(
+      1,
+      Math.trunc(this.currentRunPolicy?.requiredLaps || 1),
+    );
+    this.scoreboardReplay.reset({
+      maxFrames: getScoreboardReplayMaxFrames({
+        rulesRevision: replayRulesRevision,
+        lapCount: replayLapCount,
+      }),
+      targetLapNumber: replayLapCount,
+      rulesRevision: replayRulesRevision,
+    });
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
     this.syncChallengeHudPrimaryStats();
@@ -492,11 +508,16 @@ export const raceEngineMethods = {
       this.handleCheckpointPassed(events.checkpointPassed);
     }
 
+    if (events.challengeLapCompleted) {
+      this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime, {
+        elapsedTimeSec: events.challengeElapsedTime,
+        completedLaps: events.challengeProgressLaps,
+        requiredLaps: events.challengeRequiredLaps,
+        isFinalLap: events.challengeIsFinalLap,
+      });
+    }
     if (events.winTriggered) {
       this.handleDailyChallengeWin(events.winData);
-    }
-    if (events.challengeLapCompleted) {
-      this.handleDailyChallengeLapCompleted(events.challengeCompletedLapTime);
     }
   },
 

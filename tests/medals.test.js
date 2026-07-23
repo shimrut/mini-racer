@@ -4,7 +4,9 @@ import {
     TRACK_MEDAL_THRESHOLDS,
     getAuthorMedalSeconds,
     getMedalForLapTime,
+    getMedalForRaceTime,
     getNextMedalTarget,
+    getRaceMedalThresholds,
     getTimeToBeatSeconds,
     getTrackMedalThresholds,
     formatMedalTargetsLine,
@@ -54,6 +56,41 @@ describe('medals', () => {
         expect(getMedalForLapTime('circuit', t.gold + 0.01)).toBe('silver');
         expect(getMedalForLapTime('circuit', t.silver + 0.01)).toBe('bronze');
         expect(getMedalForLapTime('circuit', t.bronze + 10)).toBe(null);
+    });
+
+    it('scales every available race medal threshold by a valid lap count', () => {
+        const oneLap = getRaceMedalThresholds('circuit', 1);
+        const threeLaps = getRaceMedalThresholds('circuit', 3);
+
+        expect(threeLaps).toEqual({
+            author: oneLap.author == null ? null : oneLap.author * 3,
+            gold: oneLap.gold * 3,
+            silver: oneLap.silver * 3,
+            bronze: oneLap.bronze * 3,
+        });
+    });
+
+    it('falls back to one lap for invalid race lap counts', () => {
+        const oneLap = getRaceMedalThresholds('circuit', 1);
+        expect(getRaceMedalThresholds('circuit', 0)).toEqual(oneLap);
+        expect(getRaceMedalThresholds('circuit', 4)).toEqual(oneLap);
+        expect(getRaceMedalThresholds('circuit', 2.5)).toEqual(oneLap);
+        expect(getRaceMedalThresholds('circuit', '3')).toEqual(oneLap);
+    });
+
+    it('awards race medals against scaled total times', () => {
+        const thresholds = getRaceMedalThresholds('circuit', 2);
+        if (thresholds.author != null) {
+            expect(getMedalForRaceTime('circuit', thresholds.author, 2)).toBe('author');
+        }
+        expect(getMedalForRaceTime('circuit', thresholds.gold, 2)).toBe(
+            thresholds.author === thresholds.gold ? 'author' : 'gold',
+        );
+        expect(getMedalForRaceTime('circuit', thresholds.gold + 0.01, 2)).toBe('silver');
+        expect(getMedalForRaceTime('circuit', thresholds.silver + 0.01, 2)).toBe('bronze');
+        expect(getMedalForRaceTime('circuit', thresholds.bronze + 0.01, 2)).toBe(null);
+        expect(getMedalForRaceTime('missing-track', 10, 2)).toBe(null);
+        expect(getMedalForRaceTime('circuit', Number.NaN, 2)).toBe(null);
     });
 
     it('maxMedalTier picks the stronger tier', () => {
