@@ -136,18 +136,20 @@
 
                     <section id="lobby-campaign-pane" class="lobby-pane lobby-pane--campaign main-menu"
                         data-lobby-pane="campaign" aria-label="Campaign" hidden>
-                        <div class="lobby-pane-heading lobby-pane-heading--inline">
-                            <div>
-                                <span class="lobby-pane-heading__eyebrow">Numbered series</span>
-                                <h2 class="lobby-pane-heading__title">Campaign</h2>
-                            </div>
-                            <span id="campaign-progress-label" class="lobby-progress-label">0 / 10 Gold</span>
+                        <div class="lobby-pane-heading">
+                            <span class="lobby-pane-heading__eyebrow">Numbered series</span>
+                            <h2 class="lobby-pane-heading__title">Campaign</h2>
                         </div>
-                        <div id="campaign-stage-list" class="campaign-stage-list" role="list"
-                            aria-label="Campaign stages"></div>
-                        <p id="campaign-complete-label" class="campaign-complete-label" hidden>
-                            Campaign Complete
-                        </p>
+                        <div class="lobby-pane-actions">
+                            <button id="campaign-standings-btn" class="main-menu__item" type="button"
+                                data-lobby-action>
+                                <span class="main-menu__label">Standings</span>
+                            </button>
+                            <button id="campaign-tracks-btn" class="main-menu__item" type="button"
+                                data-lobby-action>
+                                <span class="main-menu__label">Tracks</span>
+                            </button>
+                        </div>
                         <div class="lobby-primary-row">
                             <button id="lobby-campaign-back-btn" class="lobby-back-btn" type="button"
                                 data-lobby-action aria-label="Back to modes">Back</button>

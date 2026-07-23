@@ -104,9 +104,7 @@
 }
 
 .lobby-mode-action.is-menu-selected,
-.lobby-back-btn.is-menu-selected,
-.campaign-stage__race.is-menu-selected,
-.campaign-stage__standings.is-menu-selected {
+.lobby-back-btn.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
@@ -132,13 +130,6 @@
     margin-bottom: 1rem;
 }
 
-.lobby-pane-heading--inline {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
 .lobby-pane-heading__title {
     margin: 0.15rem 0 0;
     font-size: clamp(2.25rem, 8vw, 3.75rem);
@@ -147,14 +138,6 @@
     letter-spacing: -0.04em;
     line-height: 0.9;
     text-transform: uppercase;
-}
-
-.lobby-progress-label {
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.72rem;
-    font-weight: 700;
-    white-space: nowrap;
 }
 
 .lobby-pane-actions {
@@ -196,48 +179,6 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     cursor: pointer;
-}
-
-.campaign-stage-list {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 0.25rem;
-    width: 100%;
-    min-height: 0;
-    margin: 0 0 0.75rem;
-    padding: 0.2rem;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-}
-
-.campaign-stage {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.25rem;
-}
-
-.campaign-stage__race {
-    display: grid;
-    grid-template-columns: 2.4rem minmax(0, 1fr) auto;
-    grid-template-areas:
-        "number name laps"
-        "number best medal";
-    align-items: center;
-    min-width: 0;
-    padding: 0.55rem 0.65rem;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    background: rgba(15, 23, 42, 0.76);
-    color: var(--text-color);
-    text-align: left;
-    cursor: pointer;
-}
-
-.campaign-stage__race:hover:not(:disabled),
-.campaign-stage.is-selected .campaign-stage__race {
-    border-color: var(--border-strong);
-    background: rgba(30, 41, 59, 0.92);
 }
 
 .campaign-stage__number {
@@ -294,39 +235,6 @@
 
 .campaign-stage__medal--bronze {
     color: #fb923c;
-}
-
-.campaign-stage__standings {
-    width: 3.7rem;
-    padding: 0.35rem;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: rgba(30, 41, 59, 0.88);
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.58rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    cursor: pointer;
-}
-
-.campaign-stage.is-locked {
-    opacity: 0.44;
-}
-
-.campaign-stage button:disabled {
-    cursor: not-allowed;
-}
-
-.campaign-complete-label {
-    margin: auto 0 1rem;
-    color: var(--warning);
-    font-size: 1.15rem;
-    font-style: italic;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    text-align: center;
-    text-transform: uppercase;
 }
 
 .challenge-lobby {
@@ -400,14 +308,6 @@
         font-size: 2.35rem;
     }
 
-    .campaign-stage__race {
-        grid-template-columns: 2rem minmax(0, 1fr) auto;
-        padding: 0.48rem 0.5rem;
-    }
-
-    .campaign-stage__standings {
-        width: 3.25rem;
-    }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
@@ -429,9 +329,6 @@
         overflow: hidden;
     }
 
-    .campaign-stage-list {
-        max-height: 12rem;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {

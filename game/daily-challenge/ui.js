@@ -30,6 +30,14 @@ function scheduleAfterModalPaint(callback) {
     });
 }
 
+function appendCampaignStageText(parent, className, value) {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = value;
+    parent.appendChild(span);
+    return span;
+}
+
 export class DailyChallengeUi {
     constructor({
         previewQualityLevel = 0,
@@ -244,9 +252,28 @@ export class DailyChallengeUi {
         if (!modal) return;
         configureReusableModal(modal, {
             title: 'Tracks',
+            subtitle: '',
             closeLabel: 'Back',
         });
         this.renderPlaylist(challenges, actions);
+        this.openTracksModal();
+    }
+
+    openCampaignProgressModal(campaignState, actions = null) {
+        const modal = this.dailyChallengePlaylistModal;
+        if (!modal) return;
+        configureReusableModal(modal, {
+            title: 'Tracks',
+            subtitle: campaignState?.progressLabel || '',
+            closeLabel: 'Back',
+        });
+        this.renderCampaignProgress(campaignState, actions);
+        this.openTracksModal();
+    }
+
+    openTracksModal() {
+        const modal = this.dailyChallengePlaylistModal;
+        if (!modal) return;
         openModalElement(modal, () => modal.classList.add('active'));
         document.body.classList.add('modal-open');
         scheduleAfterModalPaint(() => {
@@ -285,6 +312,7 @@ export class DailyChallengeUi {
     renderPlaylist(challenges = [], actions = null) {
         const list = this.dailyChallengePlaylistList;
         if (!list) return;
+        list.classList.remove('daily-playlist-list--campaign');
         list.replaceChildren();
         const onPlay = typeof actions === 'function'
             ? actions
@@ -375,6 +403,70 @@ export class DailyChallengeUi {
             content.append(info, medal);
             row.append(preview, content);
 
+            list.appendChild(row);
+        }
+    }
+
+    renderCampaignProgress(campaignState = {}, actions = null) {
+        const list = this.dailyChallengePlaylistList;
+        if (!list) return;
+        list.classList.add('daily-playlist-list--campaign');
+        list.replaceChildren();
+
+        const stages = Array.isArray(campaignState?.stages) ? campaignState.stages : [];
+        const onPlay = typeof actions === 'function' ? actions : actions?.onPlay;
+
+        if (!stages.length) {
+            const empty = document.createElement('div');
+            empty.className = 'daily-playlist-empty';
+            empty.textContent = 'No campaign tracks available';
+            list.appendChild(empty);
+            return;
+        }
+
+        if (campaignState.complete) {
+            const complete = document.createElement('p');
+            complete.className = 'campaign-progress-complete';
+            complete.textContent = 'Campaign Complete';
+            list.appendChild(complete);
+        }
+
+        for (const stage of stages) {
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = `daily-playlist-entry--hero campaign-progress-entry${stage.unlocked ? '' : ' is-locked'}`;
+            row.dataset.stageId = stage.id;
+            row.disabled = !stage.unlocked;
+            row.setAttribute(
+                'aria-label',
+                `${stage.trackName}, ${stage.laps} ${stage.laps === 1 ? 'lap' : 'laps'}, ${stage.unlocked ? stage.bestTimeLabel : 'locked'}`,
+            );
+            row.addEventListener('click', () => {
+                if (!stage.unlocked) return;
+                this.closePlaylistModal();
+                onPlay?.(stage);
+            });
+
+            appendCampaignStageText(row, 'campaign-stage__number', stage.numberLabel);
+            appendCampaignStageText(row, 'campaign-stage__name', stage.trackName);
+            appendCampaignStageText(
+                row,
+                'campaign-stage__laps',
+                `${stage.laps} ${stage.laps === 1 ? 'lap' : 'laps'}`,
+            );
+            appendCampaignStageText(
+                row,
+                'campaign-stage__best',
+                stage.unlocked ? stage.bestTimeLabel : 'Locked',
+            );
+            if (stage.medal) {
+                const safeMedalClass = stage.medal.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                appendCampaignStageText(
+                    row,
+                    `campaign-stage__medal campaign-stage__medal--${safeMedalClass}`,
+                    stage.medal,
+                );
+            }
             list.appendChild(row);
         }
     }

@@ -344,13 +344,18 @@ contract. Guest retention or account-upgrade behavior is a product decision.
 
 ## UI And Navigation
 
-The home screen needs an explicit mode entry point rather than treating every
-start as Daily GP:
+Home provides explicit Daily and Campaign entry points. Both mode lobbies use
+the same compact action layout:
 
-- Daily GP card: today's track, lap count, best race time, rank, Start.
-- Campaign entry: campaign progress and Continue.
-- Campaign track screen: locked/unlocked state, required medal, fixed laps,
-  best medal/time, and campaign leaderboard.
+- Standings opens the shared standings modal. Daily switches between published
+  days; Campaign switches between unlocked stages and reads the independent
+  leaderboard stored for the selected stage.
+- Tracks opens the shared Tracks modal. Daily shows the published playlist;
+  Campaign shows Gold progress, locked/unlocked state, fixed laps, best
+  medal/time, and lets the player select any unlocked stage.
+- The primary Campaign action starts or continues the first unlocked stage
+  without Gold/Author. Campaign stages are never rendered directly in the
+  lobby.
 
 During a race, shared HUD and finish UI should read the active race spec.
 Mode adapters supply the actions:
@@ -359,7 +364,7 @@ Mode adapters supply the actions:
 | --- | --- | --- |
 | Restart | Retry challenge | Retry campaign race |
 | Standings | Daily challenge leaderboard | Campaign race leaderboard |
-| Home | Daily lobby | Campaign track screen |
+| Home | Daily lobby | Campaign lobby |
 | Submit | Expiring Daily competition | Permanent campaign race |
 | Share/podium | Existing Daily behavior | Not included initially |
 

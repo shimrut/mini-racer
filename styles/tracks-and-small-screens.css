@@ -92,6 +92,46 @@
     height: 100%;
 }
 
+.daily-playlist-list--campaign {
+    gap: 0.45rem;
+}
+
+.campaign-progress-complete {
+    margin: 0.15rem 0 0.45rem;
+    color: var(--warning);
+    font-family: var(--header-font);
+    font-size: 0.9rem;
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.daily-playlist-entry--hero.campaign-progress-entry {
+    display: grid;
+    grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+    grid-template-areas:
+        "number name laps"
+        "number best medal";
+    align-items: center;
+    min-height: 4.5rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: var(--radius-sm);
+    box-shadow: none;
+}
+
+.daily-playlist-entry--hero.campaign-progress-entry:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: rgba(30, 41, 59, 0.92);
+    box-shadow: none;
+}
+
+.campaign-progress-entry.is-locked {
+    opacity: 0.44;
+    cursor: not-allowed;
+}
+
 @media (max-width: 560px) {
     #modal:has(#modal-runs-view.active-view) .modal-card,
     #settings-modal .modal-card,
@@ -188,6 +228,11 @@
 
     .daily-playlist-hero-title {
         font-size: 1.1rem;
+    }
+
+    .daily-playlist-entry--hero.campaign-progress-entry {
+        grid-template-columns: 2rem minmax(0, 1fr) auto;
+        padding: 0.6rem;
     }
 
 }

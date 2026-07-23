@@ -34,8 +34,13 @@ Mini Racer is a **game**, so the most important launch requirements are:
   bottom-left, Settings at bottom-right, and no Home Start button.
 - [ ] Daily and Campaign direct launches show their own Start/Continue and Back
   controls; Back returns to Home.
+- [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
+  Standings opens the shared modal for the current stage, and Tracks opens the
+  shared modal with Campaign progress and selectable unlocked stages.
 - [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3,3,3` lap sequence, Gold-gate
   the next stage, and keep independent permanent standings and PB ghosts.
+- [ ] Campaign standings can switch between unlocked stages without combining
+  their rows, and each stage continues paging its own leaderboard.
 - [ ] A signed-in Campaign result creates a reusable custom challenge post;
   guests cannot create or accept one.
 - [ ] A challenge post opens the correct frozen opponent ghost, permits its

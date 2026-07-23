@@ -22,14 +22,6 @@ function setText(element, value) {
     if (element) element.textContent = value;
 }
 
-function appendStageText(parent, className, value) {
-    const span = document.createElement('span');
-    span.className = className;
-    span.textContent = value;
-    parent.appendChild(span);
-    return span;
-}
-
 export class LobbyUi {
     constructor({
         onSelectDaily = null,
@@ -37,8 +29,8 @@ export class LobbyUi {
         onBack = null,
         onStartDaily = null,
         onStartCampaign = null,
-        onSelectCampaignStage = null,
         onOpenCampaignStandings = null,
+        onOpenCampaignTracks = null,
         onAcceptChallenge = null,
     } = {}) {
         this.onSelectDaily = onSelectDaily;
@@ -46,8 +38,8 @@ export class LobbyUi {
         this.onBack = onBack;
         this.onStartDaily = onStartDaily;
         this.onStartCampaign = onStartCampaign;
-        this.onSelectCampaignStage = onSelectCampaignStage;
         this.onOpenCampaignStandings = onOpenCampaignStandings;
+        this.onOpenCampaignTracks = onOpenCampaignTracks;
         this.onAcceptChallenge = onAcceptChallenge;
         this.mode = 'home';
         this.campaignState = normalizeCampaignLobbyState();
@@ -60,7 +52,6 @@ export class LobbyUi {
 
     get overlay() { return document.getElementById('start-overlay'); }
     get activePane() { return document.getElementById(`lobby-${this.mode}-pane`); }
-    get campaignStageList() { return document.getElementById('campaign-stage-list'); }
     get campaignPrimaryBtn() { return document.getElementById('campaign-primary-btn'); }
     get challengeAcceptBtn() { return document.getElementById('challenge-accept-btn'); }
 
@@ -79,6 +70,10 @@ export class LobbyUi {
             ?.addEventListener('click', () => this.onBack?.('challenge'));
         document.getElementById('daily-challenge-start-btn')
             ?.addEventListener('click', () => this.onStartDaily?.());
+        document.getElementById('campaign-standings-btn')
+            ?.addEventListener('click', () => this.onOpenCampaignStandings?.());
+        document.getElementById('campaign-tracks-btn')
+            ?.addEventListener('click', () => this.onOpenCampaignTracks?.());
         this.campaignPrimaryBtn?.addEventListener('click', () => {
             if (this.campaignState.complete || !this.campaignState.nextStage) return;
             this.onStartCampaign?.(this.campaignState.nextStage);
@@ -86,17 +81,6 @@ export class LobbyUi {
         this.challengeAcceptBtn?.addEventListener('click', () => {
             if (!this.challengeState.canAccept) return;
             this.onAcceptChallenge?.(this.challengeState);
-        });
-        this.campaignStageList?.addEventListener('click', (event) => {
-            const action = event.target?.closest?.('[data-campaign-stage-action]');
-            if (!action || action.disabled) return;
-            const stage = this.campaignState.stages.find((candidate) => candidate.id === action.dataset.stageId);
-            if (!stage) return;
-            if (action.dataset.campaignStageAction === 'standings') {
-                this.onOpenCampaignStandings?.(stage);
-            } else {
-                this.onSelectCampaignStage?.(stage);
-            }
         });
         document.addEventListener('keydown', this._keydownHandler, true);
         document.addEventListener('pointermove', this._pointerMoveHandler, true);
@@ -215,9 +199,6 @@ export class LobbyUi {
     }
 
     renderCampaign() {
-        setText(document.getElementById('campaign-progress-label'), this.campaignState.progressLabel);
-        const completeLabel = document.getElementById('campaign-complete-label');
-        if (completeLabel) completeLabel.hidden = !this.campaignState.complete;
         if (this.campaignPrimaryBtn) {
             this.campaignPrimaryBtn.hidden = this.campaignState.complete;
             this.campaignPrimaryBtn.disabled = this.campaignState.complete || !this.campaignState.nextStage;
@@ -226,62 +207,6 @@ export class LobbyUi {
                 this.campaignState.primaryLabel || '',
             );
         }
-        if (!this.campaignStageList) return;
-
-        const fragment = document.createDocumentFragment();
-        for (const stage of this.campaignState.stages) {
-            const row = document.createElement('div');
-            row.className = 'campaign-stage';
-            row.classList.toggle('is-locked', !stage.unlocked);
-            row.classList.toggle('is-selected', stage.selected);
-            row.setAttribute('role', 'listitem');
-
-            const stageButton = document.createElement('button');
-            stageButton.type = 'button';
-            stageButton.className = 'campaign-stage__race';
-            stageButton.dataset.lobbyAction = '';
-            stageButton.dataset.campaignStageAction = 'race';
-            stageButton.dataset.stageId = stage.id;
-            stageButton.disabled = !stage.unlocked;
-            stageButton.setAttribute(
-                'aria-label',
-                `${stage.trackName}, ${stage.laps} ${stage.laps === 1 ? 'lap' : 'laps'}, ${stage.unlocked ? stage.bestTimeLabel : 'locked'}`,
-            );
-            appendStageText(stageButton, 'campaign-stage__number', stage.numberLabel);
-            appendStageText(stageButton, 'campaign-stage__name', stage.trackName);
-            appendStageText(
-                stageButton,
-                'campaign-stage__laps',
-                `${stage.laps} ${stage.laps === 1 ? 'lap' : 'laps'}`,
-            );
-            appendStageText(
-                stageButton,
-                'campaign-stage__best',
-                stage.unlocked ? stage.bestTimeLabel : 'Locked',
-            );
-            if (stage.medal) {
-                const safeMedalClass = stage.medal.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                appendStageText(
-                    stageButton,
-                    `campaign-stage__medal campaign-stage__medal--${safeMedalClass}`,
-                    stage.medal,
-                );
-            }
-
-            const standingsButton = document.createElement('button');
-            standingsButton.type = 'button';
-            standingsButton.className = 'campaign-stage__standings';
-            standingsButton.dataset.lobbyAction = '';
-            standingsButton.dataset.campaignStageAction = 'standings';
-            standingsButton.dataset.stageId = stage.id;
-            standingsButton.disabled = !stage.unlocked || !stage.standingsAvailable;
-            standingsButton.setAttribute('aria-label', `${stage.trackName} standings`);
-            standingsButton.textContent = 'Rank';
-
-            row.append(stageButton, standingsButton);
-            fragment.appendChild(row);
-        }
-        this.campaignStageList.replaceChildren(fragment);
     }
 
     renderChallenge() {

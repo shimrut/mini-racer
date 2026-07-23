@@ -233,8 +233,8 @@ export class RealTimeRacer {
       onSelectCampaign: () => void this.showCampaignLobby(),
       onBack: () => this.showHomeLobby(),
       onStartCampaign: (stage) => void this.startCampaignStage(stage),
-      onSelectCampaignStage: (stage) => void this.startCampaignStage(stage),
-      onOpenCampaignStandings: (stage) => void this.openCampaignStandings(stage),
+      onOpenCampaignStandings: () => void this.openCampaignStandings(),
+      onOpenCampaignTracks: () => this.openCampaignTracks(),
       onAcceptChallenge: () => void this.startCampaignChallenge(),
     });
     this.hud = new RaceHud({

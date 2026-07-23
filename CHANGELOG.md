@@ -1,5 +1,8 @@
 # Changelog
 
+- Campaign now matches Daily's compact lobby layout: Standings opens the shared
+  standings modal with independent per-stage leaderboards, while Tracks opens
+  the shared Tracks modal with permanent Campaign progress and stage selection.
 - Restored the existing Font Awesome Garage and Settings icons on the new Home
   screen instead of substituting platform-dependent text glyphs.
 - Added a permanent ten-stage Campaign using Number Zero through Number

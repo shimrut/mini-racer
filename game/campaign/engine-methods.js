@@ -1,4 +1,7 @@
 import { getMedalForRaceTime } from '../medals/medal-timing.js';
+import { normalizeCampaignLobbyState } from '../lobby/service.js';
+import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
+import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
 import { createModalActions } from '../race/result-flow.js';
 import {
@@ -59,24 +62,44 @@ function decorateCampaignState(bootstrap) {
     };
 }
 
-function normalizeLeaderboardSnapshot(body) {
+export function normalizeCampaignLeaderboardSnapshot(body) {
     if (!body) return null;
     const normalizeRow = (row) => row ? {
         ...row,
         bestTime: Number(row.bestTimeMs) / 1000,
     } : null;
-    return {
+    const currentPlayerRow = normalizeRow(body.currentPlayerRow);
+    const playerRank = Number.isFinite(Number(currentPlayerRow?.rank))
+        ? Number(currentPlayerRow.rank)
+        : null;
+    return normalizeScoreboardSnapshot({
         ...body,
-        rows: Array.isArray(body.rows) ? body.rows.map(normalizeRow) : [],
-        currentPlayerRow: normalizeRow(body.currentPlayerRow),
-    };
+        topRows: Array.isArray(body.rows) ? body.rows.map(normalizeRow) : [],
+        currentPlayerRow,
+        leaderboardEntryCount: body.totalCount,
+        playerRank,
+        playerRankLabel: playerRank ? `#${playerRank}` : null,
+    });
+}
+
+export function buildCampaignLeaderboardOptions(campaignState) {
+    const stages = Array.isArray(campaignState?.stages) ? campaignState.stages : [];
+    return stages
+        .filter((stage) => stage.unlocked)
+        .map((stage) => ({
+            challengeId: stage.id,
+            monthLabel: 'Stage',
+            dayNumberLabel: stage.numberLabel,
+            dateLabel: stage.trackName,
+            ariaLabel: `View ${stage.trackName} campaign standings`,
+        }));
 }
 
 export const campaignEngineMethods = {
     async loadCampaignLobby({ show = true } = {}) {
         const bootstrap = await getCampaignBootstrap();
         this.campaignBootstrap = bootstrap;
-        this.campaignLobbyState = decorateCampaignState(bootstrap);
+        this.campaignLobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
         if (show) {
             if (this.status !== 'ready' || this.currentChallengeRun) {
                 this.reset(false, { showStartOverlay: false });
@@ -116,6 +139,13 @@ export const campaignEngineMethods = {
         this.activeCampaignStage = null;
         this.activeCampaignChallenge = null;
         await this.loadCampaignLobby({ show: true });
+    },
+
+    openCampaignTracks() {
+        if (!this.campaignLobbyState) return;
+        this.dailyChallengeUi.openCampaignProgressModal(this.campaignLobbyState, {
+            onPlay: (stage) => void this.startCampaignStage(stage),
+        });
     },
 
     async startCampaignStage(stageLike) {
@@ -398,20 +428,99 @@ export const campaignEngineMethods = {
         return this.showDailyLobby();
     },
 
-    async openCampaignStandings(stageLike) {
-        const stage = getCampaignStage(stageLike?.raceId || stageLike?.id);
+    async openCampaignStandings(stageLike = null) {
+        const lobbyState = this.campaignLobbyState;
+        const unlockedStages = Array.isArray(lobbyState?.stages)
+            ? lobbyState.stages.filter((stage) => stage.unlocked)
+            : [];
+        const defaultStage = lobbyState?.complete
+            ? unlockedStages.at(-1)
+            : (lobbyState?.nextStage || unlockedStages[0]);
+        const requestedStageId = typeof stageLike === 'string'
+            ? stageLike
+            : (stageLike?.raceId || stageLike?.id || defaultStage?.id);
+        const selectedLobbyStage = unlockedStages.find((stage) => stage.id === requestedStageId);
+        const stage = getCampaignStage(selectedLobbyStage?.id);
         if (!stage) return;
-        const response = await getCampaignSnapshot(stage.raceId);
-        if (!response.ok) return;
-        this.modal.showRunsModal(null, null, null, 'close', {
-            scoreboardSnapshot: normalizeLeaderboardSnapshot(response.body),
+
+        const requestId = (this._campaignStandingsRequestId || 0) + 1;
+        this._campaignStandingsRequestId = requestId;
+        const leaderboardOptions = buildCampaignLeaderboardOptions(lobbyState);
+        let currentSnapshot = null;
+        let pageRequest = null;
+
+        const onLoadMoreLeaderboard = async () => {
+            if (pageRequest) return pageRequest;
+            const nextOffset = Number(currentSnapshot?.nextOffset);
+            if (!currentSnapshot?.hasMore || !Number.isFinite(nextOffset)) {
+                return currentSnapshot;
+            }
+            pageRequest = getCampaignSnapshot(stage.raceId, {
+                limit: 50,
+                offset: nextOffset,
+            }).then((response) => {
+                if (
+                    !response.ok
+                    || requestId !== this._campaignStandingsRequestId
+                    || !this.modal.isRunsViewActive?.()
+                ) {
+                    return currentSnapshot;
+                }
+                const nextPage = normalizeCampaignLeaderboardSnapshot(response.body);
+                currentSnapshot = mergeLeaderboardPages(currentSnapshot, nextPage);
+                this.modal.updateModalScoreboardSnapshot(currentSnapshot);
+                return currentSnapshot;
+            }).catch((error) => {
+                console.error('Could not load more Campaign standings:', error);
+                return currentSnapshot;
+            }).finally(() => {
+                pageRequest = null;
+            });
+            return pageRequest;
+        };
+
+        const modalOptions = {
+            scoreboardSnapshot: { isLoading: true },
+            scoreboardMode: 'campaign',
             scoreboardChallengeId: stage.raceId,
             scoreboardTrackKey: stage.trackKey,
             scoreboardTitle: getTrackName(stage.trackKey, stage.trackKey),
             scoreboardSubhead: `Campaign · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`,
+            leaderboardDayOptions: leaderboardOptions,
+            leaderboardRailLabel: 'Campaign stages',
+            selectedLeaderboardDayId: stage.raceId,
+            onSelectLeaderboardDay: (raceId) => void this.openCampaignStandings(raceId),
+            onLoadMoreLeaderboard,
             showGlobalLeaderboard: true,
             allowLeaderboardOpen: false,
-        });
+            onClose: () => {
+                this._campaignStandingsRequestId = (this._campaignStandingsRequestId || 0) + 1;
+            },
+        };
+        this.modal.showRunsModal(null, null, null, 'close', modalOptions);
+
+        try {
+            const response = await getCampaignSnapshot(stage.raceId, { limit: 50, offset: 0 });
+            if (
+                requestId !== this._campaignStandingsRequestId
+                || !this.modal.isRunsViewActive?.()
+            ) {
+                return;
+            }
+            currentSnapshot = response.ok
+                ? normalizeCampaignLeaderboardSnapshot(response.body)
+                : normalizeScoreboardSnapshot(null);
+            this.modal.updateModalScoreboardSnapshot(currentSnapshot);
+        } catch (error) {
+            console.error('Could not load Campaign standings:', error);
+            if (
+                requestId === this._campaignStandingsRequestId
+                && this.modal.isRunsViewActive?.()
+            ) {
+                currentSnapshot = normalizeScoreboardSnapshot(null);
+                this.modal.updateModalScoreboardSnapshot(currentSnapshot);
+            }
+        }
     },
 
     previewCampaignChallenge(request) {

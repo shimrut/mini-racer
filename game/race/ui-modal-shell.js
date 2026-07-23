@@ -75,6 +75,7 @@ function buildLeaderboardDayRailOptionsKey(payload) {
 function buildLeaderboardDayRailKey(payload) {
     return JSON.stringify({
         selectedId: payload?.selectedLeaderboardDayId ?? null,
+        label: payload?.leaderboardRailLabel ?? null,
         options: JSON.parse(buildLeaderboardDayRailOptionsKey(payload)),
     });
 }
@@ -1031,11 +1032,13 @@ export class ModalShell {
 
     showRunsModal(lapTimesArray, bestTime, currentTime = null, returnMode = 'close', {
         scoreboardSnapshot = null,
+        scoreboardMode = TRACK_MODE_DAILY_GP,
         scoreboardChallengeId = null,
         scoreboardTrackKey = null,
         scoreboardTitle = null,
         scoreboardSubhead = null,
         leaderboardDayOptions = null,
+        leaderboardRailLabel = null,
         selectedLeaderboardDayId = null,
         onSelectLeaderboardDay = null,
         onLoadMoreLeaderboard = null,
@@ -1078,10 +1081,11 @@ export class ModalShell {
             scoreboardChallengeId,
             scoreboardTrackKey,
             scoreboardSnapshot,
-            scoreboardMode: TRACK_MODE_DAILY_GP,
+            scoreboardMode,
             scoreboardTitle,
             scoreboardSubhead,
             leaderboardDayOptions,
+            leaderboardRailLabel,
             selectedLeaderboardDayId,
             onSelectLeaderboardDay,
             onLoadMoreLeaderboard,
@@ -1099,7 +1103,7 @@ export class ModalShell {
             this.content.renderScoreboardList(
                 this.modalLapTimes,
                 this._modalRunsPayload.scoreboardSnapshot,
-                TRACK_MODE_DAILY_GP,
+                this._modalRunsPayload.scoreboardMode,
                 this._modalRunsPayload.scoreboardTrackKey,
                 this._modalRunsPayload.scoreboardSubhead,
                 { showHeader: hasPersonalBestList, shareBest }
@@ -1561,7 +1565,7 @@ export class ModalShell {
                 this.content.renderScoreboardList(
                     this.modalLapTimes,
                     this._modalRunsPayload.scoreboardSnapshot,
-                    TRACK_MODE_DAILY_GP,
+                    this._modalRunsPayload.scoreboardMode,
                     this._modalRunsPayload.scoreboardTrackKey,
                     this._modalRunsPayload.scoreboardSubhead,
                     { showHeader: hasPersonalBestList, shareBest }
@@ -1728,7 +1732,10 @@ export class ModalShell {
             const rail = document.createElement('div');
             rail.className = 'leaderboard-day-rail';
             rail.setAttribute('role', 'tablist');
-            rail.setAttribute('aria-label', 'Leaderboard days');
+            rail.setAttribute(
+                'aria-label',
+                payload?.leaderboardRailLabel || 'Leaderboard days',
+            );
 
             for (const option of payload.leaderboardDayOptions) {
                 const button = document.createElement('button');
@@ -1748,7 +1755,8 @@ export class ModalShell {
                 }
                 button.setAttribute(
                     'aria-label',
-                    `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
+                    option?.ariaLabel
+                        || `View leaderboard for ${option?.dayLabel || 'Day'} ${option?.dateLabel || ''}`.trim()
                 );
                 if (hasChallengeId) {
                     button.addEventListener('click', () => {
@@ -1931,6 +1939,7 @@ export class ModalShell {
 
     _leaderboardShareBestOption() {
         const payload = this._modalRunsPayload;
+        if (payload?.scoreboardMode !== TRACK_MODE_DAILY_GP) return null;
         const challengeId = payload?.scoreboardChallengeId;
         const playerBestTime = Number(payload?.scoreboardSnapshot?.currentPlayerRow?.bestTime);
         if (!Number.isFinite(playerBestTime) || !challengeId) return null;

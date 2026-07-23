@@ -332,6 +332,9 @@ export function buildModalRunsPayload(source, {
         showGlobalLeaderboard: source.showGlobalLeaderboard !== false,
         allowLeaderboardOpen: source.allowLeaderboardOpen !== false
     };
+    if (typeof source.leaderboardRailLabel === 'string' && source.leaderboardRailLabel) {
+        normalized.leaderboardRailLabel = source.leaderboardRailLabel;
+    }
 
     if (!updates || typeof updates !== 'object') {
         return normalized;
@@ -366,7 +369,7 @@ export function buildModalRunsPayload(source, {
 export function buildModalRunsViewOptions(payload) {
     if (!payload || typeof payload !== 'object') return {};
 
-    return {
+    const options = {
         scoreboardChallengeId: payload.scoreboardChallengeId || null,
         scoreboardSnapshot: payload.scoreboardSnapshot || null,
         scoreboardMode: payload.scoreboardMode || 'daily',
@@ -388,6 +391,10 @@ export function buildModalRunsViewOptions(payload) {
         showGlobalLeaderboard: payload.showGlobalLeaderboard !== false,
         allowLeaderboardOpen: payload.allowLeaderboardOpen !== false
     };
+    if (typeof payload.leaderboardRailLabel === 'string' && payload.leaderboardRailLabel) {
+        options.leaderboardRailLabel = payload.leaderboardRailLabel;
+    }
+    return options;
 }
 
 export async function scheduleModalScoreboardRefresh({

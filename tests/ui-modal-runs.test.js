@@ -385,6 +385,56 @@ describe('ui modal runs helpers', () => {
         }
     });
 
+    it('adapts the shared standings rail labels for Campaign stages', () => {
+        const originalDocument = global.document;
+        const modalLapTimes = createTestElement('motion');
+        global.document = {
+            createElement: vi.fn((tagName) => createTestElement(tagName)),
+            createElementNS: vi.fn((namespace, tagName) => createTestElement(tagName))
+        };
+
+        const context = withLeaderboardIntroMethods({
+            modalLapTimes,
+            _modalRunsPayload: {
+                showGlobalLeaderboard: true,
+                scoreboardChallengeId: 'numbered-v1-00',
+                scoreboardTrackKey: 'numberZero',
+                leaderboardRailLabel: 'Campaign stages',
+                selectedLeaderboardDayId: 'numbered-v1-00',
+                leaderboardDayOptions: [
+                    {
+                        challengeId: 'numbered-v1-00',
+                        monthLabel: 'Stage',
+                        dayNumberLabel: '00',
+                        dateLabel: 'Number Zero',
+                        ariaLabel: 'View Number Zero campaign standings',
+                    },
+                    {
+                        challengeId: 'numbered-v1-01',
+                        monthLabel: 'Stage',
+                        dayNumberLabel: '01',
+                        dateLabel: 'Number One',
+                        ariaLabel: 'View Number One campaign standings',
+                    },
+                ],
+                scoreboardSnapshot: { playerRankLabel: '#2' },
+                onSelectLeaderboardDay: vi.fn(),
+            },
+        });
+
+        try {
+            renderLeaderboardDayRail.call(context);
+            const rail = modalLapTimes.children.find((child) => (
+                child.className === 'leaderboard-day-rail'
+            ));
+            expect(rail.getAttribute('aria-label')).toBe('Campaign stages');
+            expect(rail.children[1].getAttribute('aria-label'))
+                .toBe('View Number One campaign standings');
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
     it('rebuilds the day rail when updateModalLeaderboardDayOptions is called', () => {
         const originalDocument = global.document;
         const modalLapTimes = createTestElement('motion');
@@ -821,6 +871,7 @@ describe('ui modal runs helpers', () => {
     it('builds a share-best option only when the player has a shareable time', () => {
         const ctx = {
             _modalRunsPayload: {
+                scoreboardMode: TRACK_MODE_DAILY_GP,
                 scoreboardChallengeId: 'daily-1',
                 scoreboardSnapshot: { currentPlayerRow: { bestTime: 42.317 } }
             }
@@ -831,8 +882,18 @@ describe('ui modal runs helpers', () => {
             bestTime: 42.317
         });
 
+        const campaign = {
+            _modalRunsPayload: {
+                scoreboardMode: 'campaign',
+                scoreboardChallengeId: 'numbered-v1-00',
+                scoreboardSnapshot: { currentPlayerRow: { bestTime: 42.317 } }
+            }
+        };
+        expect(_leaderboardShareBestOption.call(campaign)).toBeNull();
+
         const noChallenge = {
             _modalRunsPayload: {
+                scoreboardMode: TRACK_MODE_DAILY_GP,
                 scoreboardChallengeId: null,
                 scoreboardSnapshot: { currentPlayerRow: { bestTime: 42.317 } }
             }
@@ -841,6 +902,7 @@ describe('ui modal runs helpers', () => {
 
         const noTime = {
             _modalRunsPayload: {
+                scoreboardMode: TRACK_MODE_DAILY_GP,
                 scoreboardChallengeId: 'daily-1',
                 scoreboardSnapshot: { currentPlayerRow: { bestTime: NaN } }
             }

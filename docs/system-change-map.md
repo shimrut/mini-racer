@@ -118,7 +118,10 @@ flowchart LR
   geometry; `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
-  player challenges. Guest Campaign progress is browser-local.
+  player challenges. Guest Campaign progress is browser-local. Campaign uses
+  the same compact lobby actions and modal shells as Daily: Standings selects
+  among unlocked stage-specific leaderboards, while Tracks renders permanent
+  stage progress and starts any unlocked stage.
 - `src/server/campaign-store.ts` owns signed-in Campaign start state,
   permanent progress, one permanent leaderboard and PB ghost hash per stage,
   replay validation, and server-derived medals. Campaign records do not share
@@ -132,6 +135,11 @@ flowchart LR
   player ID, or private persistence data.
 - The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
 - Standings entry points open that selected-day modal directly. The date rail and touch swipe navigation switch available days inside it; there is no intermediate standings track-picker. The separate Tracks playlist remains the race-selection flow.
+- Campaign adapts that same standings rail to unlocked stage numbers. Every
+  selection requests `/api/campaign/snapshot` for exactly one `raceId`; results
+  and pagination remain isolated per permanent stage. The shared Tracks modal
+  swaps its Daily playlist renderer for Campaign progress when entered from the
+  Campaign lobby.
 - Player standing is independent of loaded pages: every snapshot resolves `playerRank` and `currentPlayerRow`, and the standings header keeps that rank and best time visible even when the player's row is outside the loaded rank range.
 - Leaderboard rows and the pinned player time always show three decimal places, matching the verified leaderboard's stored millisecond precision. Race HUD and result timing remain unchanged.
 - On touch devices, the standings list accepts deliberate horizontal swipes as an alternative to the day rail: swipe left for an older available day and right for a newer one. The original date strip remains visible, tappable, and horizontally scrollable; swipe navigation does not replace it. Short or vertically dominant gestures, day buttons, links, and the shareable player row keep their existing tap/scroll behavior.
