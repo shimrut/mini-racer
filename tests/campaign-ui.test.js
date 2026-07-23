@@ -352,6 +352,29 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
+    it('renders Home Garage and Settings as lobby mode actions', () => {
+        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
+
+        for (const buttonId of [
+            'lobby-home-daily-btn',
+            'lobby-home-campaign-btn',
+            'menu-btn-garage',
+            'menu-btn-settings',
+        ]) {
+            const buttonMarkup = html.match(
+                new RegExp(`<button id="${buttonId}"[\\s\\S]*?</button>`),
+            )?.[0];
+            expect(buttonMarkup).toContain('class="lobby-mode-action"');
+            expect(buttonMarkup).toContain('lobby-mode-action__label');
+            expect(buttonMarkup).not.toContain('class="main-menu__icon"');
+        }
+
+        expect(css).toContain('.lobby-mode-action');
+        expect(css).not.toContain('.lobby-utility-row');
+        expect(css).not.toContain('.lobby-utility-btn');
+    });
+
     it('places Daily and Campaign labels under the Mini Racer title', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         expect(html).toMatch(

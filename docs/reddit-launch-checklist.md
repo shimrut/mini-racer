@@ -30,8 +30,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.
 - [ ] The finish screen shows `Improve`, `Share Time`, and `Home`, and sharing displays the exact comment plus Reddit username before posting.
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
-- [ ] Standalone game launch opens Home with Daily/Campaign choices, Garage at
-  bottom-left, Settings at bottom-right, and no Home Start button.
+- [ ] Standalone game launch opens Home with Daily, Campaign, Garage, and
+  Settings as matching mode-action rows, and no Home Start button.
 - [ ] Daily and Campaign direct launches show their own Start/Continue and Back
   controls; Back returns to Home. Mode names appear under the Mini Racer
   title on those screens only.

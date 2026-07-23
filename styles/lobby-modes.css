@@ -28,7 +28,7 @@
 
 .lobby-pane--home {
     align-items: stretch;
-    justify-content: space-between;
+    justify-content: flex-start;
 }
 
 .lobby-mode-menu {
@@ -101,23 +101,6 @@
 .lobby-mode-action.is-menu-selected,
 .lobby-back-btn.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-}
-
-.lobby-utility-row {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    width: 100%;
-    margin-top: auto;
-}
-
-.lobby-utility-btn {
-    flex-direction: row;
-    padding-inline: 0;
-}
-
-.lobby-utility-btn:last-child {
-    flex-direction: row-reverse;
 }
 
 .lobby-pane-actions {
