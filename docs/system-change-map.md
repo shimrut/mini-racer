@@ -112,20 +112,27 @@ flowchart LR
 - `game/lobby/ui.js` owns the Home, Daily, Campaign, and player-challenge
   panes. `game/modes/launch-target.js` resolves standalone Home, direct mode
   queries, Daily post context, and Campaign challenge post context. The shared
-  lobby keeps the original compact `#start-group` footprint; Home mode choices
-  (Daily / Campaign) sit under the Mini Racer title, utility actions stay at
-  the bottom, and Daily/Campaign Standings and Tracks retain the original Font
-  Awesome SVG icons.
+  lobby keeps the original compact `#start-group` footprint; mode choices and
+  utility actions stay right-anchored, and Daily/Campaign Standings and Tracks
+  retain the original Font Awesome SVG icons. On Daily and Campaign screens
+  only, the mode name sits under the shared Mini Racer title instead of a
+  separate pane heading; Home and player-challenge panes are unchanged.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
   Number Zero through Nine with fixed `1,1,1,2,2,2,3,3,3,3` laps and Gold/Author
   gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable
   geometry; `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
-  player challenges. Guest Campaign progress is browser-local. Campaign uses
-  the same compact lobby actions and modal shells as Daily: Standings selects
-  among unlocked stage-specific leaderboards, while Tracks renders permanent
-  stage progress and starts any unlocked stage.
+  player challenges. Campaign finish UI is terminal-state safe: a saved run
+  still opens its result sheet when the follow-up PB ghost or lobby refresh
+  fails, while an interrupted submission response opens an explicit
+  unconfirmed-result sheet instead of leaving the stopped race on screen. A
+  saving sheet appears as soon as the finish is detected, and Campaign client
+  requests abort after 20 seconds so a stalled WebView request is terminal.
+  Guest Campaign progress is browser-local. Campaign uses the same compact
+  lobby actions and modal shells as Daily: Standings selects among unlocked
+  stage-specific leaderboards, while Tracks renders permanent stage progress
+  and starts any unlocked stage.
 - `src/server/campaign-store.ts` owns signed-in Campaign start state,
   permanent progress, one permanent leaderboard and PB ghost hash per stage,
   replay validation, and server-derived medals. Campaign records do not share

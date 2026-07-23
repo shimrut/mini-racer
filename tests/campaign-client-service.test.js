@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+    CAMPAIGN_REQUEST_TIMEOUT_MS,
     deriveCampaignProgress,
     readLocalCampaignProgress,
     saveLocalCampaignFinish,
     startLocalCampaign,
+    submitCampaignRun,
 } from '../game/campaign/service.js';
 
 function createRoot() {
@@ -18,9 +20,16 @@ function createRoot() {
 
 describe('campaign client progress', () => {
     let root;
+    let originalFetch;
 
     beforeEach(() => {
         root = createRoot();
+        originalFetch = globalThis.fetch;
+    });
+
+    afterEach(() => {
+        globalThis.fetch = originalFetch;
+        vi.useRealTimers();
     });
 
     it('starts with only Number Zero unlocked', () => {
@@ -50,5 +59,24 @@ describe('campaign client progress', () => {
         const slower = saveLocalCampaignFinish('numbered-v1-00', 7.5, root);
         expect(slower.resultsByRaceId['numbered-v1-00'].bestTimeMs)
             .toBe(first.resultsByRaceId['numbered-v1-00'].bestTimeMs);
+    });
+
+    it('aborts a Campaign request that never settles', async () => {
+        vi.useFakeTimers();
+        globalThis.fetch = vi.fn((_url, options) => new Promise((_resolve, reject) => {
+            options.signal.addEventListener('abort', () => {
+                reject(new DOMException('Campaign request timed out', 'AbortError'));
+            });
+        }));
+
+        const request = submitCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { revision: 1, segments: [] },
+        });
+        const rejection = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+
+        await vi.advanceTimersByTimeAsync(CAMPAIGN_REQUEST_TIMEOUT_MS);
+        await rejection;
     });
 });

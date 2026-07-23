@@ -118,10 +118,28 @@ export class LobbyUi {
             pane.setAttribute('aria-hidden', String(!isActive));
         }
         if (document.body?.dataset) document.body.dataset.lobbyMode = mode;
+        this.updateModeLabel(mode);
         this.overlay?.setAttribute('aria-label', this.getPaneAriaLabel(mode));
         this.resetKeyboardNav();
         requestAnimationFrame(() => this.focus());
         return true;
+    }
+
+    updateModeLabel(mode = this.mode) {
+        const label = document.querySelector('[data-lobby-mode-label]');
+        if (!label) return;
+        if (mode === 'daily') {
+            label.hidden = false;
+            label.textContent = 'Daily';
+            return;
+        }
+        if (mode === 'campaign') {
+            label.hidden = false;
+            label.textContent = 'Campaign';
+            return;
+        }
+        label.hidden = true;
+        label.textContent = '';
     }
 
     getMode() {

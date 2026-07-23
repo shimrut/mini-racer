@@ -8,6 +8,7 @@ import {
 } from './manifest.js';
 
 const LOCAL_PROGRESS_KEY = `MiniRacerCampaignProgress:${CAMPAIGN_ID}`;
+export const CAMPAIGN_REQUEST_TIMEOUT_MS = 20_000;
 
 function emptyResults() {
     return Object.create(null);
@@ -104,9 +105,21 @@ export function saveLocalCampaignFinish(raceId, timeSec, root = globalThis) {
 }
 
 async function requestJson(url, options = {}) {
-    const response = await fetch(url, options);
-    const body = await response.json().catch(() => null);
-    return { ok: response.ok, status: response.status, body };
+    const controller = typeof AbortController === 'function' && !options.signal
+        ? new AbortController()
+        : null;
+    const timeoutId = controller
+        ? setTimeout(() => controller.abort(), CAMPAIGN_REQUEST_TIMEOUT_MS)
+        : null;
+    try {
+        const response = await fetch(url, controller
+            ? { ...options, signal: controller.signal }
+            : options);
+        const body = await response.json().catch(() => null);
+        return { ok: response.ok, status: response.status, body };
+    } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+    }
 }
 
 export async function getCampaignBootstrap() {

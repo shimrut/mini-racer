@@ -31,15 +31,10 @@
     justify-content: space-between;
 }
 
-/* Home shares .main-menu, but mode picks sit under the title, not the bottom edge. */
-.lobby-pane--home.main-menu {
-    margin-top: 0;
-}
-
 .lobby-mode-menu {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: flex-end;
     gap: 0.4rem;
     width: 100%;
 }
@@ -123,21 +118,6 @@
 
 .lobby-utility-btn:last-child {
     flex-direction: row-reverse;
-}
-
-.lobby-pane-heading {
-    width: 100%;
-    margin-bottom: 1rem;
-}
-
-.lobby-pane-heading__title {
-    margin: 0.15rem 0 0;
-    font-size: clamp(2.25rem, 8vw, 3.75rem);
-    font-style: italic;
-    font-weight: 900;
-    letter-spacing: -0.04em;
-    line-height: 0.9;
-    text-transform: uppercase;
 }
 
 .lobby-pane-actions {

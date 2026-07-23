@@ -2,21 +2,24 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const campaignServiceMocks = vi.hoisted(() => ({
+    getCampaignPbGhost: vi.fn(),
     getCampaignSnapshot: vi.fn(),
+    submitCampaignChallengeRun: vi.fn(),
+    submitCampaignRun: vi.fn(),
 }));
 
 vi.mock('../game/campaign/service.js', () => ({
     createCampaignChallenge: vi.fn(),
     getCampaignBootstrap: vi.fn(),
     getCampaignChallenge: vi.fn(),
-    getCampaignPbGhost: vi.fn(),
+    getCampaignPbGhost: campaignServiceMocks.getCampaignPbGhost,
     getCampaignSnapshot: campaignServiceMocks.getCampaignSnapshot,
     previewCampaignChallenge: vi.fn(),
     saveLocalCampaignFinish: vi.fn(),
     startLocalCampaign: vi.fn(),
     startServerCampaignRace: vi.fn(),
-    submitCampaignChallengeRun: vi.fn(),
-    submitCampaignRun: vi.fn(),
+    submitCampaignChallengeRun: campaignServiceMocks.submitCampaignChallengeRun,
+    submitCampaignRun: campaignServiceMocks.submitCampaignRun,
 }));
 
 import {
@@ -33,6 +36,12 @@ function createClassList() {
         add: (...names) => names.forEach((name) => values.add(name)),
         remove: (...names) => names.forEach((name) => values.delete(name)),
         contains: (name) => values.has(name),
+        toggle: (name, force) => {
+            const shouldAdd = force === undefined ? !values.has(name) : Boolean(force);
+            if (shouldAdd) values.add(name);
+            else values.delete(name);
+            return shouldAdd;
+        },
     };
 }
 
@@ -102,10 +111,216 @@ function campaignState() {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    campaignServiceMocks.getCampaignPbGhost.mockReset();
     campaignServiceMocks.getCampaignSnapshot.mockReset();
+    campaignServiceMocks.submitCampaignChallengeRun.mockReset();
+    campaignServiceMocks.submitCampaignRun.mockReset();
 });
 
 describe('Campaign lobby and shared modal adapters', () => {
+    it('still opens the saved result when PB ghost and lobby refreshes fail', async () => {
+        const modalMsg = { style: {}, textContent: '' };
+        const context = {
+            activeCampaignStage: {
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                lapCount: 1,
+            },
+            currentChallengeRun: {},
+            campaignBootstrap: { signedIn: true, progress: {} },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            pbGhost: { prepare: vi.fn() },
+            trackPersonalBestByTrackKey: {},
+            loadCampaignLobby: vi.fn().mockRejectedValue(new Error('bootstrap offline')),
+            modal: {
+                modalMsg,
+                showModal: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                progress: { unlockedRaceIds: ['numbered-v1-00'] },
+            },
+        });
+        campaignServiceMocks.getCampaignPbGhost.mockRejectedValue(new Error('ghost offline'));
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        await campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
+
+        expect(context.status).toBe('won');
+        expect(context.modal.showModal).toHaveBeenLastCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                lapTime: 8.25,
+                completedLaps: 1,
+                requiredLaps: 1,
+            }),
+            expect.objectContaining({
+                modalKind: 'win',
+                shareRequest: {
+                    kind: 'campaign-challenge',
+                    source: 'campaign',
+                    raceId: 'numbered-v1-00',
+                },
+            }),
+        );
+        expect(modalMsg.textContent).toBe('Number Zero · 1 lap');
+    });
+
+    it('shows an actionable result instead of freezing when submission confirmation fails', async () => {
+        const modalMsg = { style: {}, textContent: '' };
+        const context = {
+            activeCampaignStage: {
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                lapCount: 1,
+            },
+            currentChallengeRun: {},
+            campaignBootstrap: { signedIn: true, progress: {} },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            pbGhost: { prepare: vi.fn() },
+            trackPersonalBestByTrackKey: {},
+            loadCampaignLobby: vi.fn().mockResolvedValue({}),
+            modal: {
+                modalMsg,
+                showModal: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        campaignServiceMocks.submitCampaignRun.mockRejectedValue(new Error('response interrupted'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
+
+        expect(context.modal.showModal).toHaveBeenLastCalledWith(
+            'Result not confirmed',
+            null,
+            expect.objectContaining({ lapTime: 8.25 }),
+            expect.objectContaining({
+                modalKind: 'rejected',
+                shareRequest: null,
+            }),
+        );
+        expect(modalMsg.textContent).toBe(
+            'Race finished, but the result could not be confirmed. Check Campaign progress before retrying.',
+        );
+    });
+
+    it('opens a saving sheet before Campaign submission settles', async () => {
+        let resolveSubmission;
+        const context = {
+            activeCampaignStage: {
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                lapCount: 1,
+            },
+            currentChallengeRun: {},
+            campaignBootstrap: { signedIn: true, progress: {} },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            pbGhost: { prepare: vi.fn() },
+            trackPersonalBestByTrackKey: {},
+            loadCampaignLobby: vi.fn().mockResolvedValue({}),
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        campaignServiceMocks.submitCampaignRun.mockImplementation(() => new Promise((resolve) => {
+            resolveSubmission = resolve;
+        }));
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: null });
+
+        const finish = campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
+        await Promise.resolve();
+
+        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Saving Campaign result',
+            'Confirming your finished race…',
+            null,
+            { modalKind: 'pending' },
+        );
+
+        resolveSubmission({
+            ok: true,
+            body: {
+                accepted: true,
+                progress: { unlockedRaceIds: ['numbered-v1-00'] },
+            },
+        });
+        await finish;
+        expect(context.modal.showModal).toHaveBeenLastCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({ lapTime: 8.25 }),
+            expect.objectContaining({ modalKind: 'win' }),
+        );
+    });
+
+    it('does not strand a Campaign challenge finish when confirmation fails', async () => {
+        const modalMsg = { style: {}, textContent: '' };
+        const context = {
+            activeCampaignChallenge: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg,
+                showModal: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        campaignServiceMocks.submitCampaignChallengeRun.mockRejectedValue(
+            new Error('response interrupted'),
+        );
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await campaignEngineMethods.handleCampaignChallengeWin.call(
+            context,
+            { lapTime: 8.25 },
+        );
+
+        expect(context.modal.showModal).toHaveBeenNthCalledWith(
+            1,
+            'Saving challenge result',
+            'Confirming your finished race…',
+            null,
+            { modalKind: 'pending' },
+        );
+        expect(context.modal.showModal).toHaveBeenLastCalledWith(
+            'Result not confirmed',
+            null,
+            expect.objectContaining({ lapTime: 8.25 }),
+            expect.objectContaining({
+                modalKind: 'rejected',
+                shareRequest: null,
+            }),
+        );
+        expect(modalMsg.textContent).toBe(
+            'Race finished, but the challenge result could not be confirmed.',
+        );
+    });
+
     it('keeps Daily and Campaign utilities compact, right-aligned, and icon-backed', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
@@ -123,12 +338,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         }
 
         expect(css).toMatch(
-            /\.lobby-pane--home\.main-menu\s*\{[^}]*margin-top:\s*0;/s,
-        );
-        expect(css).toMatch(
-            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-start;/s,
-        );
-        expect(css).toMatch(
             /\.lobby-pane-actions\s*\{[^}]*align-items:\s*flex-end;/s,
         );
         expect(css).toMatch(
@@ -141,6 +350,63 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).not.toMatch(
             /\.lobby-pane-actions \.main-menu__item\s*\{[^}]*flex-direction:\s*row;/s,
         );
+    });
+
+    it('places Daily and Campaign labels under the Mini Racer title', () => {
+        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        expect(html).toMatch(
+            /class="lobby-title"[\s\S]*data-lobby-mode-label/,
+        );
+        expect(html).not.toMatch(
+            /id="lobby-daily-pane"[\s\S]*lobby-pane-heading__title">Daily</,
+        );
+        expect(html).not.toMatch(
+            /id="lobby-campaign-pane"[\s\S]*lobby-pane-heading__title">Campaign</,
+        );
+
+        const originalDocument = global.document;
+        const label = createElement('p');
+        label.hidden = true;
+        const overlay = createElement('div');
+        const panes = {
+            home: createElement('section'),
+            daily: createElement('section'),
+            campaign: createElement('section'),
+            challenge: createElement('section'),
+        };
+        const body = { dataset: {} };
+        global.document = {
+            body,
+            getElementById: (id) => {
+                if (id === 'start-overlay') return overlay;
+                const match = id.match(/^lobby-(home|daily|campaign|challenge)-pane$/);
+                return match ? panes[match[1]] : null;
+            },
+            querySelector: (selector) => (
+                selector === '[data-lobby-mode-label]' ? label : null
+            ),
+            addEventListener: vi.fn(),
+        };
+        const lobby = new LobbyUi();
+        lobby.resetKeyboardNav = vi.fn();
+        lobby.focus = vi.fn();
+        vi.stubGlobal('requestAnimationFrame', (cb) => cb());
+
+        lobby.showDaily();
+        expect(label.hidden).toBe(false);
+        expect(label.textContent).toBe('Daily');
+        expect(body.dataset.lobbyMode).toBe('daily');
+
+        lobby.showCampaign();
+        expect(label.textContent).toBe('Campaign');
+        expect(body.dataset.lobbyMode).toBe('campaign');
+
+        lobby.showHome();
+        expect(label.hidden).toBe(true);
+        expect(label.textContent).toBe('');
+        expect(body.dataset.lobbyMode).toBe('home');
+
+        global.document = originalDocument;
     });
 
     it('wires the compact Campaign Standings and Tracks actions', () => {
