@@ -40,41 +40,17 @@
 }
 
 .lobby-mode-action {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-        "eyebrow eyebrow"
-        "label detail";
-    align-items: end;
+    display: block;
     width: min(95%, 27rem);
-    padding: 0.85rem 0;
+    padding: 0.45rem 0;
     color: var(--text-color);
     text-align: left;
     background: transparent;
     border: 0;
-    border-bottom: 1px solid var(--border-default);
     cursor: pointer;
 }
 
-.lobby-mode-action::after {
-    content: "→";
-    grid-area: detail;
-    margin-left: 1rem;
-    color: var(--accent-bright);
-    font-size: 1.35rem;
-    line-height: 1;
-    transform: translateX(0);
-    transition: transform 160ms ease;
-}
-
-.lobby-mode-action:hover::after,
-.lobby-mode-action.is-menu-selected::after {
-    transform: translateX(0.35rem);
-}
-
-.lobby-mode-action__eyebrow,
 .lobby-pane-heading__eyebrow {
-    grid-area: eyebrow;
     color: var(--text-dim);
     font-family: var(--mono-font);
     font-size: 0.65rem;
@@ -84,18 +60,13 @@
 }
 
 .lobby-mode-action__label {
-    grid-area: label;
     font-family: var(--header-font);
-    font-size: clamp(2rem, 7vw, 3.25rem);
+    font-size: clamp(1.35rem, 5vw, 1.85rem);
     font-style: italic;
     font-weight: 900;
-    letter-spacing: -0.04em;
-    line-height: 0.9;
+    letter-spacing: -0.03em;
+    line-height: 1;
     text-transform: uppercase;
-}
-
-.lobby-mode-action__detail {
-    display: none;
 }
 
 .lobby-mode-action.is-menu-selected,
@@ -264,7 +235,7 @@
 
 @media (max-width: 430px) {
     .lobby-mode-action__label {
-        font-size: 2.35rem;
+        font-size: 1.45rem;
     }
 
 }
@@ -272,9 +243,5 @@
 @media (prefers-reduced-motion: reduce) {
     .lobby-pane {
         animation: none;
-    }
-
-    .lobby-mode-action::after {
-        transition: none;
     }
 }

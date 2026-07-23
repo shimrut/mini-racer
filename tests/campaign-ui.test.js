@@ -367,12 +367,17 @@ describe('Campaign lobby and shared modal adapters', () => {
             )?.[0];
             expect(buttonMarkup).toContain('class="lobby-mode-action"');
             expect(buttonMarkup).toContain('lobby-mode-action__label');
+            expect(buttonMarkup).not.toContain('lobby-mode-action__eyebrow');
             expect(buttonMarkup).not.toContain('class="main-menu__icon"');
         }
 
         expect(css).toContain('.lobby-mode-action');
         expect(css).not.toContain('.lobby-utility-row');
         expect(css).not.toContain('.lobby-utility-btn');
+        expect(css).not.toContain('lobby-mode-action::after');
+        expect(css).not.toMatch(
+            /\.lobby-mode-action\s*\{[^}]*border-bottom:/s,
+        );
     });
 
     it('places Daily and Campaign labels under the Mini Racer title', () => {
