@@ -127,6 +127,8 @@ describe('reddit daily gp model', () => {
         ))).toBe(true);
         expect(TRACK_SCHEDULE_KEYS).not.toContain('numberZero');
         expect(TRACK_SCHEDULE_KEYS).not.toContain('numberSeven');
+        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberEight');
+        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberNine');
     });
 
     it('keeps day indexing stable within the same UTC day', () => {

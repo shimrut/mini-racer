@@ -113,7 +113,7 @@ flowchart LR
   panes. `game/modes/launch-target.js` resolves standalone Home, direct mode
   queries, Daily post context, and Campaign challenge post context.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
-  Number Zero through Seven with fixed `1,1,1,2,2,2,3,3` laps and Gold/Author
+  Number Zero through Nine with fixed `1,1,1,2,2,2,3,3,3,3` laps and Gold/Author
   gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable
   geometry; `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,

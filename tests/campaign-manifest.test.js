@@ -24,6 +24,8 @@ describe('Campaign manifest', () => {
             { raceId: 'numbered-v1-05', trackKey: 'numberFive', lapCount: 2, unlock: { type: 'medal_on_race', raceId: 'numbered-v1-04', minimumMedal: 'gold' } },
             { raceId: 'numbered-v1-06', trackKey: 'numberSix', lapCount: 3, unlock: { type: 'medal_on_race', raceId: 'numbered-v1-05', minimumMedal: 'gold' } },
             { raceId: 'numbered-v1-07', trackKey: 'numberSeven', lapCount: 3, unlock: { type: 'medal_on_race', raceId: 'numbered-v1-06', minimumMedal: 'gold' } },
+            { raceId: 'numbered-v1-08', trackKey: 'numberEight', lapCount: 3, unlock: { type: 'medal_on_race', raceId: 'numbered-v1-07', minimumMedal: 'gold' } },
+            { raceId: 'numbered-v1-09', trackKey: 'numberNine', lapCount: 3, unlock: { type: 'medal_on_race', raceId: 'numbered-v1-08', minimumMedal: 'gold' } },
         ]);
         expect(Object.isFrozen(CAMPAIGN_STAGES)).toBe(true);
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);

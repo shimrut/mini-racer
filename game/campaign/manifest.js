@@ -16,6 +16,8 @@ const STAGE_DEFINITIONS = [
     ['05', 'numberFive', 2, 'numbered-v1-04'],
     ['06', 'numberSix', 3, 'numbered-v1-05'],
     ['07', 'numberSeven', 3, 'numbered-v1-06'],
+    ['08', 'numberEight', 3, 'numbered-v1-07'],
+    ['09', 'numberNine', 3, 'numbered-v1-08'],
 ];
 
 export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(

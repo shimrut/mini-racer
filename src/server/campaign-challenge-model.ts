@@ -52,7 +52,7 @@ export type CampaignChallengeResult = {
 };
 
 export function isCampaignChallengeRaceId(value: unknown): value is string {
-    return typeof value === 'string' && /^numbered-v1-0[0-7]$/.test(value);
+    return typeof value === 'string' && /^numbered-v1-0[0-9]$/.test(value);
 }
 export function isCampaignChallengeMedal(value: unknown): value is CampaignChallengeMedal {
     return value === null

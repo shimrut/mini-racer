@@ -88,6 +88,8 @@ describe('track runtime integrity', () => {
             'numberFive',
             'numberSix',
             'numberSeven',
+            'numberEight',
+            'numberNine',
         ]);
 
         const intentionallyReviewedKeys = new Set([
@@ -104,6 +106,8 @@ describe('track runtime integrity', () => {
             'numberFive',
             'numberSix',
             'numberSeven',
+            'numberEight',
+            'numberNine',
         ]);
         const unchangedTrackRegistry = Object.fromEntries(
             Object.entries(TRACKS)
@@ -122,7 +126,7 @@ describe('track runtime integrity', () => {
             '9b58bdb2a83ae41caf4456faebfb85b9ccb70930865844df5abc183169250f6b',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'fd6acf872b843f25e255d1af6e6016607db300172dc16f80d4006796a66a5eac',
+            '8988a16f2c42f3aa54523082c9ce435fc4790ecdf8276f2787a004fe2004b9ed',
         );
     });
 

@@ -7,9 +7,11 @@ const NUMBER_WORDS = [
     'Five',
     'Six',
     'Seven',
+    'Eight',
+    'Nine',
 ];
 
-const DEFAULT_LAPS = [1, 1, 1, 2, 2, 2, 3, 3];
+const DEFAULT_LAPS = [1, 1, 1, 2, 2, 2, 3, 3, 3, 3];
 
 function toFiniteNumber(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -60,7 +62,7 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
 export function normalizeCampaignLobbyState(state = {}) {
     const sourceStages = Array.isArray(state.stages) && state.stages.length
         ? state.stages
-        : Array.from({ length: 8 }, (_, index) => ({ index, unlocked: index === 0 }));
+        : Array.from({ length: 10 }, (_, index) => ({ index, unlocked: index === 0 }));
     const stages = sourceStages.map(normalizeCampaignStage);
     const completed = Boolean(state.complete)
         || (stages.length > 0 && stages.every((stage) => (

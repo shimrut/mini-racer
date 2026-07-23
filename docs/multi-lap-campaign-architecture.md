@@ -13,8 +13,8 @@ leaderboard, and retention rules.
 ### Implemented Campaign contract
 
 - Campaign ID: `numbered-v1`.
-- Stages: Number Zero through Number Seven.
-- Fixed lap counts: `1, 1, 1, 2, 2, 2, 3, 3`.
+- Stages: Number Zero through Number Nine.
+- Fixed lap counts: `1, 1, 1, 2, 2, 2, 3, 3, 3, 3`.
 - Unlock rule: Gold or Author on the immediately preceding stage.
 - Signed-in starts, progress, per-stage bests, PB ghosts, and leaderboards are
   permanent Campaign records. Guest progress is local practice data only.

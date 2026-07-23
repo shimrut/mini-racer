@@ -34,7 +34,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
   bottom-left, Settings at bottom-right, and no Home Start button.
 - [ ] Daily and Campaign direct launches show their own Start/Continue and Back
   controls; Back returns to Home.
-- [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3` lap sequence, Gold-gate
+- [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3,3,3` lap sequence, Gold-gate
   the next stage, and keep independent permanent standings and PB ghosts.
 - [ ] A signed-in Campaign result creates a reusable custom challenge post;
   guests cannot create or accept one.

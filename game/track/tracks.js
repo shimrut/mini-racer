@@ -58,6 +58,8 @@ import numberFour from './definitions/number-four.js';
 import numberFive from './definitions/number-five.js';
 import numberSix from './definitions/number-six.js';
 import numberSeven from './definitions/number-seven.js';
+import numberEight from './definitions/number-eight.js';
+import numberNine from './definitions/number-nine.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -121,6 +123,8 @@ const TRACK_GEOMETRY = {
     numberFive,
     numberSix,
     numberSeven,
+    numberEight,
+    numberNine,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

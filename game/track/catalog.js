@@ -59,6 +59,8 @@ export const TRACK_CATALOG = {
     numberFive: { name: "Number Five" },
     numberSix: { name: "Number Six" },
     numberSeven: { name: "Number Seven" },
+    numberEight: { name: "Number Eight" },
+    numberNine: { name: "Number Nine" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
