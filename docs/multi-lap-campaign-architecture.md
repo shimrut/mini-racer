@@ -353,6 +353,9 @@ the same compact action layout:
 - Tracks opens the shared Tracks modal. Daily shows the published playlist;
   Campaign shows Gold progress, locked/unlocked state, fixed laps, best
   medal/time, and lets the player select any unlocked stage.
+- Home, Daily, and Campaign retain the original compact start-group width.
+  Daily and Campaign place the icon-backed Standings and Tracks utilities on
+  the right, matching the pre-Campaign Daily lobby.
 - The primary Campaign action starts or continues the first unlocked stage
   without Gold/Author. Campaign stages are never rendered directly in the
   lobby.

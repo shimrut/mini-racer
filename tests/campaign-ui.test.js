@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const campaignServiceMocks = vi.hoisted(() => ({
@@ -105,6 +106,37 @@ afterEach(() => {
 });
 
 describe('Campaign lobby and shared modal adapters', () => {
+    it('keeps Daily and Campaign utilities compact, right-aligned, and icon-backed', () => {
+        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
+
+        for (const buttonId of [
+            'daily-challenge-rank-btn',
+            'daily-challenge-playlist-btn',
+            'campaign-standings-btn',
+            'campaign-tracks-btn',
+        ]) {
+            const buttonMarkup = html.match(
+                new RegExp(`<button id="${buttonId}"[\\s\\S]*?</button>`),
+            )?.[0];
+            expect(buttonMarkup).toContain('class="main-menu__icon"');
+        }
+
+        expect(css).toMatch(
+            /\.lobby-pane-actions\s*\{[^}]*align-items:\s*flex-end;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-pane--campaign \.main-menu__item--primary\s*\{[^}]*font-size:\s*clamp\(1\.25rem,\s*5\.5vw,\s*1\.5rem\);/s,
+        );
+        expect(css).not.toContain('width: min(94vw, 60rem)');
+        expect(css).not.toMatch(
+            /\.lobby-pane-actions \.main-menu__item\s*\{[^}]*flex-direction:\s*row;/s,
+        );
+    });
+
     it('wires the compact Campaign Standings and Tracks actions', () => {
         const originalDocument = global.document;
         const buttons = {

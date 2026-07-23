@@ -1,5 +1,8 @@
 # Changelog
 
+- Restored the pre-Campaign compact lobby footprint across Home, Daily, and
+  Campaign. Daily and Campaign Standings/Tracks actions are right-aligned again
+  and use the original Font Awesome standings and track icons.
 - Campaign now matches Daily's compact lobby layout: Standings opens the shared
   standings modal with independent per-stage leaderboards, while Tracks opens
   the shared Tracks modal with permanent Campaign progress and stage selection.
