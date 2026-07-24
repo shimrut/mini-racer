@@ -1,6 +1,6 @@
 # Changelog
 
-- Mapmaker Line Build now puts two points on the outside of each bend and one on the inside, so raw wall corners keep lane width more even before race rounding.
+- Mapmaker Line Build keeps lane width through corners by filleting the centerline then offsetting walls (no miter flare).
 - Mapmaker now shows the same race-style track preview as the game (rounded walls, asphalt, curbs, checkered start/finish), with faint sharp construction lines still visible for editing.
 - Mapmaker start car now sits a short fixed distance behind the start/finish line instead of keeping a far drag offset.
 - Fixed Mapmaker start-car facing so the nose points toward the start/finish line instead of sitting rear-first against it.

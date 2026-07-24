@@ -39,9 +39,11 @@ Mapmaker also draws a ghost car using the real race collision size
 Brush size is fixed at `4u`, about **7 car-widths** across. That is the
 usual racing lane width for Line Build.
 
-Line Build places wall points from the drawn centerline so each bend gets
-**one point on the inside of the turn** and **two points on the outside**
-(a short cut across the outer wall). Straight stretches stay one-to-one.
+Line Build fillets each sharp bend on the drawn centerline by half the lane
+width, then offsets both walls by that same half-width. That keeps the road
+the same width through corners (no miter flare). Hard bends end up with a
+tight inner apex and a longer outer arc.
+
 Existing saved tracks are unchanged until you redraw them with Line Build.
 
 Wall Corners controls how rounded wall corners look in race
