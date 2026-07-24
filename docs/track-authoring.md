@@ -31,9 +31,8 @@ Mapmaker draws a ghost car using the real race collision size
 - always at the start position
 - under the cursor while Line Build is active
 
-Brush presets also show approximate car widths. Default brush `4u` is about
-**7 car-widths** across. Lanes under about `3u` (~5.5 cars) feel very tight;
-`4u`–`5u` is the usual racing band.
+Brush size is fixed at `4u`, about **7 car-widths** across. That is the
+usual racing lane width for Line Build.
 
 Curve Radius controls wall corner smoothing, not the driven turn radius.
 

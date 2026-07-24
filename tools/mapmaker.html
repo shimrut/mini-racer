@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.12">
+    <link rel="stylesheet" href="mapmaker.css?v=2.13">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -89,24 +89,13 @@
 
                 <label class="field">
                     <span>Line Brush Size</span>
-                    <input id="draw-width-input" type="number" min="1.5" max="20" step="0.25">
+                    <p class="field-hint">Fixed at 4u (~7 cars wide).</p>
                 </label>
 
                 <label class="field">
                     <span>Line Smoothing</span>
                     <input id="line-smoothing-input" type="number" min="0" max="1" step="0.05">
                 </label>
-
-                <div class="field">
-                    <span>Brush Presets</span>
-                    <div id="draw-width-presets" class="chip-row">
-                        <button type="button" data-draw-width="3" title="About 5.5 car widths">3u · ~5 cars</button>
-                        <button type="button" data-draw-width="4" title="About 7.3 car widths">4u · ~7 cars</button>
-                        <button type="button" data-draw-width="5" title="About 9.1 car widths">5u · ~9 cars</button>
-                        <button type="button" data-draw-width="6" title="About 10.9 car widths">6u · ~11 cars</button>
-                        <button type="button" data-draw-width="8" title="About 14.5 car widths">8u · ~15 cars</button>
-                    </div>
-                </div>
 
                 <p id="draw-metrics-label" class="panel-note">Car 0.55×1.23u. Brush 4u (~7.3 cars wide). Place the first point to start measuring straights.</p>
 

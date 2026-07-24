@@ -24,9 +24,7 @@ const TOOL_LABELS = {
 const EDITOR_TOOLS = ['outer', 'inner', 'startLine', 'startPos', 'checkpoints'];
 
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
-const MIN_DRAW_WIDTH = 1.5;
-const MAX_DRAW_WIDTH = 20;
-const DEFAULT_DRAW_WIDTH = 4;
+const FIXED_DRAW_WIDTH = 4;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
 const DEFAULT_LINE_SMOOTHING = 0.35;
@@ -337,7 +335,7 @@ function createBlankTrack(name = 'New Track') {
     return {
         name,
         cornerRadius: 3,
-        drawWidth: DEFAULT_DRAW_WIDTH,
+        drawWidth: FIXED_DRAW_WIDTH,
         lineSmoothing: DEFAULT_LINE_SMOOTHING,
         outer: [],
         inner: [],
@@ -366,9 +364,7 @@ class MapmakerApp {
         this.trackDestinationHint = document.getElementById('track-destination-hint');
         this.cornerRadiusInput = document.getElementById('corner-radius-input');
         this.startAngleInput = document.getElementById('start-angle-input');
-        this.drawWidthInput = document.getElementById('draw-width-input');
         this.lineSmoothingInput = document.getElementById('line-smoothing-input');
-        this.drawWidthPresetButtons = Array.from(document.querySelectorAll('#draw-width-presets [data-draw-width]'));
         this.drawMetricsLabel = document.getElementById('draw-metrics-label');
         this.selectedXInput = document.getElementById('selected-x-input');
         this.selectedYInput = document.getElementById('selected-y-input');
@@ -433,9 +429,8 @@ class MapmakerApp {
     }
 
     getDrawWidth() {
-        return Number.isFinite(Number(this.track.drawWidth))
-            ? clamp(Number(this.track.drawWidth), MIN_DRAW_WIDTH, MAX_DRAW_WIDTH)
-            : DEFAULT_DRAW_WIDTH;
+        this.track.drawWidth = FIXED_DRAW_WIDTH;
+        return FIXED_DRAW_WIDTH;
     }
 
     getLineSmoothing() {
@@ -450,27 +445,8 @@ class MapmakerApp {
             : 3;
     }
 
-    setDrawWidth(value, options = {}) {
-        const nextWidth = Number.isFinite(value)
-            ? clamp(value, MIN_DRAW_WIDTH, MAX_DRAW_WIDTH)
-            : DEFAULT_DRAW_WIDTH;
-        this.track.drawWidth = nextWidth;
-        this.drawWidthInput.value = formatNumber(nextWidth);
-        this.syncDrawWidthControls();
-        this.updateCanvasHint();
-        if (options.markDirty !== false) {
-            this.markDirty(options.status ?? 'Updated line-build brush size.', false);
-        } else {
-            this.draw();
-        }
-    }
-
     syncDrawWidthControls() {
-        const width = this.getDrawWidth();
-        this.drawWidthInput.value = formatNumber(width);
-        this.drawWidthPresetButtons.forEach((button) => {
-            button.dataset.active = String(Math.abs(Number(button.dataset.drawWidth) - width) < 0.001);
-        });
+        this.track.drawWidth = FIXED_DRAW_WIDTH;
         this.updateDrawMetricsLabel();
     }
 
@@ -571,12 +547,6 @@ class MapmakerApp {
             button.addEventListener('click', () => this.setTool(button.dataset.tool));
         });
 
-        this.drawWidthPresetButtons.forEach((button) => {
-            button.addEventListener('click', () => {
-                this.setDrawWidth(Number(button.dataset.drawWidth));
-            });
-        });
-
         this.trackNameInput.addEventListener('input', () => {
             this.track.name = this.trackNameInput.value || 'Untitled Track';
             this.syncTrackSelectText();
@@ -603,17 +573,6 @@ class MapmakerApp {
             const value = Number(this.startAngleInput.value);
             this.track.startAngle = Number.isFinite(value) ? value : 0;
             this.markDirty('Updated start angle.');
-        });
-
-        this.drawWidthInput.addEventListener('input', () => {
-            const rawValue = this.drawWidthInput.value.trim();
-            if (!rawValue) {
-                return;
-            }
-            this.setDrawWidth(Number(rawValue));
-        });
-        this.drawWidthInput.addEventListener('blur', () => {
-            this.drawWidthInput.value = formatNumber(this.getDrawWidth());
         });
 
         this.lineSmoothingInput.addEventListener('input', () => {

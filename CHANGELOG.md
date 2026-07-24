@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker Line Build brush is fixed at 4u; other brush sizes and presets are removed.
 - Mapmaker Save & Integrate now lets authors choose **Daily Challenge** or
   **Campaign only**. Campaign-only tracks stay in the catalog/registry but
   off the Daily schedule; the writer also accepts catalogs where the schedule
