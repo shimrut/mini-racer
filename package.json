@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "generate:car-assets": "node tools/generate-player-car-assets.js",
+    "generate:lp-assets": "node tools/generate-lp-assets.js",
     "generate:share-images": "node tools/generate-share-images.js",
     "build": "npm run generate:car-assets && npm run generate:share-images && vite build && node tools/bust-client-asset-cache.js",
     "deploy": "npm run test && npm run build && devvit upload",

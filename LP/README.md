@@ -15,3 +15,14 @@ window.LP_LINKS = {
 ```
 
 Empty values leave that button disabled.
+
+## Track background
+
+`track.jpg` is generated with the same custom-post preview track renderer as the Reddit post preview.
+
+From the repo root:
+
+```sh
+npm run generate:lp-assets
+# optional: npm run generate:lp-assets -- --track=titanTown
+```
