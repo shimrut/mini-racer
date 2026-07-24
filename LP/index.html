@@ -8,16 +8,16 @@
     <meta name="description" content="Mini Racer — pick Daily or Campaign and go race.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script src="config.js"></script>
 </head>
 
 <body>
-    <main class="shell" aria-labelledby="lp-title">
+    <main class="shell is-ready" aria-labelledby="lp-title">
         <img
             class="track"
-            src="track.jpg"
+            src="track.svg"
             alt=""
             width="1536"
             height="1024"
@@ -26,17 +26,23 @@
         >
         <div class="veil" aria-hidden="true"></div>
 
-        <header class="brand">
-            <h1 id="lp-title" class="title">
-                <span class="title__mini">Mini</span>
-                <span class="title__racer">Racer</span>
-            </h1>
-        </header>
+        <div class="panel">
+            <header class="brand">
+                <h1 id="lp-title" class="title">
+                    <span class="title__mini">Mini</span>
+                    <span class="title__racer">Racer</span>
+                </h1>
+            </header>
 
-        <nav class="modes" aria-label="Race modes">
-            <a id="lp-daily" class="mode" href="#" target="_blank" rel="noopener noreferrer">Daily</a>
-            <a id="lp-campaign" class="mode" href="#" target="_blank" rel="noopener noreferrer">Campaign</a>
-        </nav>
+            <nav class="modes" aria-label="Race modes">
+                <a id="lp-daily" class="mode" href="#" target="_blank" rel="noopener noreferrer">
+                    <span class="mode__label">Daily</span>
+                </a>
+                <a id="lp-campaign" class="mode" href="#" target="_blank" rel="noopener noreferrer">
+                    <span class="mode__label">Campaign</span>
+                </a>
+            </nav>
+        </div>
     </main>
 
     <script>
