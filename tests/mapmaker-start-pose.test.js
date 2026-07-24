@@ -24,22 +24,30 @@ describe('Mapmaker start pose', () => {
         expect(Math.abs(pickStartHeading(axis, Math.PI))).toBeCloseTo(Math.PI, 5);
     });
 
-    it('snaps the car onto the center axis facing perpendicular to the gate', () => {
-        const pose = snapStartPose({ x: 7, y: 4 }, verticalStartLine, {
-            preferredAngle: 0,
-        });
+    it('faces the start line when the seed is on the left', () => {
+        const pose = snapStartPose({ x: 7, y: 4 }, verticalStartLine);
         expect(pose).not.toBeNull();
+        // Nose points toward +X (the line), not away from it.
         expect(pose.startAngle).toBeCloseTo(0, 5);
-        expect(pose.startPos.y).toBeCloseTo(3, 5);
         expect(pose.startPos.x).toBeLessThan(10);
-        expect(Math.abs(pose.startPos.x - 10)).toBeGreaterThanOrEqual(1);
+        expect(pose.startPos.y).toBeCloseTo(3, 5);
+        expect(pose.along).toBeLessThan(0);
     });
 
-    it('keeps a minimum standoff when the seed is on the gate', () => {
+    it('faces the start line when the seed is on the right', () => {
+        const pose = snapStartPose({ x: 13, y: 4 }, verticalStartLine);
+        expect(pose).not.toBeNull();
+        expect(Math.abs(pose.startAngle)).toBeCloseTo(Math.PI, 5);
+        expect(pose.startPos.x).toBeGreaterThan(10);
+        expect(pose.along).toBeLessThan(0);
+    });
+
+    it('keeps a minimum standoff behind the gate', () => {
         const pose = snapStartPose({ x: 10, y: 3 }, verticalStartLine, {
             preferredAngle: 0,
         });
         expect(Math.abs(pose.startPos.x - 10)).toBeCloseTo(1, 5);
         expect(pose.startPos.y).toBeCloseTo(3, 5);
+        expect(pose.along).toBeCloseTo(-1, 5);
     });
 });

@@ -57,8 +57,7 @@ export function pickStartHeading(axis, preferredAngle = null) {
 
 /**
  * Snap the car onto the start-line center axis, facing perpendicular to the
- * gate. Lateral position is always centered on the line; only the along-track
- * offset follows the seed (clamped).
+ * gate with the nose toward the line (ready to cross it).
  */
 export function snapStartPose(seedPoint, startLine, options = {}) {
     const axis = getStartLineAxis(startLine);
@@ -66,22 +65,31 @@ export function snapStartPose(seedPoint, startLine, options = {}) {
         return null;
     }
 
-    const startAngle = pickStartHeading(axis, options.preferredAngle);
+    // Face toward the gate from the seed side so the nose points at the line,
+    // never with the rear against it.
+    const towardLineX = axis.mid.x - seedPoint.x;
+    const towardLineY = axis.mid.y - seedPoint.y;
+    const towardLineLength = Math.hypot(towardLineX, towardLineY);
+    const preferredAngle = towardLineLength > 0.000001
+        ? Math.atan2(towardLineY, towardLineX)
+        : options.preferredAngle;
+    const startAngle = pickStartHeading(axis, preferredAngle);
     const forward = {
         x: Math.cos(startAngle),
         y: Math.sin(startAngle),
     };
+
     const toSeed = {
         x: seedPoint.x - axis.mid.x,
         y: seedPoint.y - axis.mid.y,
     };
     let along = (toSeed.x * forward.x) + (toSeed.y * forward.y);
 
-    if (Math.abs(along) < START_POS_MIN_OFFSET) {
-        // Keep the car clearly off the gate; prefer the seed's side, else behind.
-        along = along >= 0 ? START_POS_MIN_OFFSET : -START_POS_MIN_OFFSET;
+    // Stay behind the gate relative to facing direction (along is negative).
+    if (along > -START_POS_MIN_OFFSET) {
+        along = -START_POS_MIN_OFFSET;
     }
-    along = Math.max(-START_POS_MAX_OFFSET, Math.min(START_POS_MAX_OFFSET, along));
+    along = Math.max(-START_POS_MAX_OFFSET, along);
 
     return {
         startPos: {
