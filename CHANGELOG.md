@@ -1,5 +1,9 @@
 # Changelog
 
+- Mapmaker Save & Integrate now lets authors choose **Daily Challenge** or
+  **Campaign only**. Campaign-only tracks stay in the catalog/registry but
+  off the Daily schedule; the writer also accepts catalogs where the schedule
+  is already a subset of the catalog.
 - Restored the pre-Campaign compact lobby footprint across Home, Daily, and
   Campaign. Daily and Campaign Standings/Tracks actions are right-aligned again
   and use the original Font Awesome standings and track icons.

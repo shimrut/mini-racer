@@ -301,9 +301,10 @@ These are useful, but they are not on the critical player path:
 
 - `tools/mapmaker.*`
   Track/content support tooling. Local **Save & Integrate** writes the selected
-  definition and updates the catalog, schedule, and compatibility registry;
-  new tracks append to the schedule by default. Manual module and integration
-  exports remain available as fallbacks, as described in
+  definition and updates the catalog and compatibility registry. Authors choose
+  whether the track is for **Daily Challenge** (also updates
+  `TRACK_SCHEDULE_KEYS`) or **Campaign only** (catalog/registry only). Manual
+  module and integration exports remain available as fallbacks, as described in
   `docs/track-authoring.md`.
 - `tools/runner.*`
   Auxiliary workflow tooling.

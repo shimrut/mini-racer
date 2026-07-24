@@ -1,4 +1,5 @@
 import { CONFIG } from '../game/config.js';
+import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import {
     formatTrackNumber as formatNumber,
@@ -7,6 +8,9 @@ import {
     getTrackModuleFilename,
     isValidTrackKey
 } from './mapmaker/track-source.js';
+
+const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
+const SCHEDULED_TRACK_KEYS = new Set(TRACK_SCHEDULE_KEYS);
 
 const TOOL_LABELS = {
     draw: 'line build',
@@ -358,6 +362,8 @@ class MapmakerApp {
         this.canvasHint = document.getElementById('canvas-hint');
         this.trackKeyInput = document.getElementById('track-key-input');
         this.trackNameInput = document.getElementById('track-name-input');
+        this.trackDestinationSelect = document.getElementById('track-destination-select');
+        this.trackDestinationHint = document.getElementById('track-destination-hint');
         this.cornerRadiusInput = document.getElementById('corner-radius-input');
         this.startAngleInput = document.getElementById('start-angle-input');
         this.drawWidthInput = document.getElementById('draw-width-input');
@@ -578,6 +584,15 @@ class MapmakerApp {
             this.markDirty('Updated track name.');
         });
 
+        this.trackDestinationSelect.addEventListener('change', () => {
+            this.syncDestinationHint();
+            this.markDirty(
+                this.getSelectedDestination() === 'daily'
+                    ? 'Marked track for Daily Challenge.'
+                    : 'Marked track as Campaign only.',
+            );
+        });
+
         this.cornerRadiusInput.addEventListener('input', () => {
             const value = Number(this.cornerRadiusInput.value);
             this.track.cornerRadius = Number.isFinite(value) ? value : 0;
@@ -778,6 +793,40 @@ class MapmakerApp {
             : track.name;
     }
 
+    getDestinationForTrackKey(trackKey) {
+        const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey);
+        if (originalTrackKey && SCHEDULED_TRACK_KEYS.has(originalTrackKey)) {
+            return 'daily';
+        }
+        if (SCHEDULED_TRACK_KEYS.has(trackKey)) {
+            return 'daily';
+        }
+        // Brand-new editor tracks default to Daily Challenge.
+        if (!originalTrackKey) {
+            return 'daily';
+        }
+        return 'campaign';
+    }
+
+    getSelectedDestination() {
+        const value = this.trackDestinationSelect.value;
+        return TRACK_DESTINATIONS.has(value) ? value : 'daily';
+    }
+
+    syncDestinationControl(trackKey = this.state.selectedTrackKey) {
+        this.trackDestinationSelect.value = this.getDestinationForTrackKey(trackKey);
+        this.syncDestinationHint();
+    }
+
+    syncDestinationHint() {
+        if (!this.trackDestinationHint) {
+            return;
+        }
+        this.trackDestinationHint.textContent = this.getSelectedDestination() === 'daily'
+            ? 'Adds this track to the future Daily GP rotation when you Save & Integrate.'
+            : 'Keeps this track out of Daily. Wire it into Campaign stages in the Campaign manifest.';
+    }
+
     syncTrackSelectText() {
         const option = this.trackSelect.querySelector(`option[value="${this.state.selectedTrackKey}"]`);
         if (option) {
@@ -793,6 +842,7 @@ class MapmakerApp {
         this.trackSelect.value = trackKey;
         this.trackKeyInput.value = trackKey;
         this.trackNameInput.value = this.track.name;
+        this.syncDestinationControl(trackKey);
         this.cornerRadiusInput.value = String(this.track.cornerRadius ?? 3);
         this.startAngleInput.value = String(this.track.startAngle ?? 0);
         this.syncLineSmoothingControl();
@@ -2307,11 +2357,25 @@ class MapmakerApp {
 
         const trackKey = this.state.selectedTrackKey;
         const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey) ?? null;
+        const destination = this.getSelectedDestination();
+        const currentlyScheduled = Boolean(
+            (originalTrackKey && SCHEDULED_TRACK_KEYS.has(originalTrackKey))
+            || SCHEDULED_TRACK_KEYS.has(trackKey),
+        );
         if (
             originalTrackKey
             && originalTrackKey !== trackKey
             && !window.confirm(
                 `Rename ${originalTrackKey} to ${trackKey}? This will delete the old definition file and replace its catalog, schedule, import, and registry entries.`,
+            )
+        ) {
+            return;
+        }
+        if (
+            destination === 'campaign'
+            && currentlyScheduled
+            && !window.confirm(
+                `Move ${trackKey} off the Daily Challenge schedule? It will stay in the track catalog for Campaign use, but will not appear in future Daily GP days.`,
             )
         ) {
             return;
@@ -2327,6 +2391,7 @@ class MapmakerApp {
                     trackKey,
                     originalTrackKey,
                     trackName: this.track.name,
+                    destination,
                     track: this.track,
                 }),
             });
@@ -2336,10 +2401,24 @@ class MapmakerApp {
             }
 
             this.state.originalTrackKeyByKey.set(trackKey, trackKey);
-            const schedulePosition = result.scheduleIndex + 1;
-            const scheduleText = result.action === 'created'
-                ? ` Appended at schedule position ${schedulePosition}.`
-                : '';
+            if (destination === 'daily') {
+                SCHEDULED_TRACK_KEYS.add(trackKey);
+                if (originalTrackKey && originalTrackKey !== trackKey) {
+                    SCHEDULED_TRACK_KEYS.delete(originalTrackKey);
+                }
+            } else {
+                SCHEDULED_TRACK_KEYS.delete(trackKey);
+                if (originalTrackKey) {
+                    SCHEDULED_TRACK_KEYS.delete(originalTrackKey);
+                }
+            }
+            const scheduleText = destination === 'daily'
+                ? (
+                    Number.isInteger(result.scheduleIndex) && result.scheduleIndex >= 0
+                        ? ` Added to Daily Challenge at schedule position ${result.scheduleIndex + 1}.`
+                        : ' Marked for Daily Challenge.'
+                )
+                : ' Saved as Campaign only (not on the Daily schedule).';
             const renameText = result.removedFilename
                 ? ` Removed ${result.removedFilename}.`
                 : '';

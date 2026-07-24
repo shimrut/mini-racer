@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.11">
+    <link rel="stylesheet" href="mapmaker.css?v=2.12">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -46,6 +46,18 @@
                 <label class="field">
                     <span>Display Name</span>
                     <input id="track-name-input" type="text" spellcheck="false" autocomplete="off">
+                </label>
+
+                <label class="field">
+                    <span>Use For</span>
+                    <select id="track-destination-select">
+                        <option value="daily">Daily Challenge</option>
+                        <option value="campaign">Campaign only</option>
+                    </select>
+                    <p class="field-hint" id="track-destination-hint">
+                        Daily Challenge adds this track to the future Daily GP rotation.
+                        Campaign only keeps it out of Daily; stage wiring stays in the Campaign manifest.
+                    </p>
                 </label>
 
                 <div class="field-grid">

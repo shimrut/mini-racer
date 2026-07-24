@@ -1,7 +1,9 @@
 import { applyTrackRepositoryUpdate } from './track-repository.js';
+import { isValidTrackKey } from './track-source.js';
 
 const ENDPOINT = '/__mapmaker/save-track';
 const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
+const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
 
 function isLocalHost(host = '') {
     return /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
@@ -38,6 +40,49 @@ function writeJson(response, statusCode, body) {
     response.end(JSON.stringify(body));
 }
 
+function normalizeSavePayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+        throw new Error('Mapmaker save payload is invalid.');
+    }
+
+    const trackKey = typeof payload.trackKey === 'string' ? payload.trackKey.trim() : '';
+    if (!isValidTrackKey(trackKey)) {
+        throw new Error('Track key must be a valid non-reserved JavaScript identifier.');
+    }
+
+    const rawOriginal = payload.originalTrackKey;
+    const originalTrackKey = rawOriginal == null || rawOriginal === ''
+        ? null
+        : String(rawOriginal).trim();
+    if (originalTrackKey !== null && !isValidTrackKey(originalTrackKey)) {
+        throw new Error('Original track key must be a valid non-reserved JavaScript identifier.');
+    }
+
+    const trackName = typeof payload.trackName === 'string' ? payload.trackName.trim() : '';
+    if (!trackName) {
+        throw new Error('Track name cannot be empty.');
+    }
+
+    const destination = typeof payload.destination === 'string'
+        ? payload.destination
+        : 'daily';
+    if (!TRACK_DESTINATIONS.has(destination)) {
+        throw new Error('Destination must be daily or campaign.');
+    }
+
+    if (!payload.track || typeof payload.track !== 'object') {
+        throw new Error('Track geometry payload is required.');
+    }
+
+    return {
+        trackKey,
+        originalTrackKey,
+        trackName,
+        destination,
+        track: payload.track,
+    };
+}
+
 export function mapmakerTrackAuthoringPlugin() {
     return {
         name: 'mini-racer-mapmaker-track-authoring',
@@ -61,12 +106,13 @@ export function mapmakerTrackAuthoringPlugin() {
                 }
 
                 try {
-                    const payload = await readJsonBody(request);
+                    const payload = normalizeSavePayload(await readJsonBody(request));
                     const result = applyTrackRepositoryUpdate({
                         rootDir: server.config.root,
                         trackKey: payload.trackKey,
-                        originalTrackKey: payload.originalTrackKey ?? null,
+                        originalTrackKey: payload.originalTrackKey,
                         trackName: payload.trackName,
+                        destination: payload.destination,
                         track: payload.track,
                     });
                     writeJson(response, 200, result);

@@ -43,11 +43,17 @@ Curve Radius controls wall corner smoothing, not the driven turn radius.
 2. Run `npm run mapmaker`, open
    `http://127.0.0.1:5173/tools/mapmaker.html`, and choose
    **Save & Integrate**. It writes the definition module and updates
-   `TRACK_CATALOG`, `TRACK_SCHEDULE_KEYS`, the static definition imports, and
-   the compatibility registry.
-3. New tracks are appended as the final `TRACK_SCHEDULE_KEYS` entry by default.
-   Existing tracks keep their position. Renames replace the old key at its
-   existing position after confirmation and remove the old definition file.
+   `TRACK_CATALOG`, the static definition imports, and the compatibility
+   registry. Choose **Use For** before saving:
+   - **Daily Challenge** also appends or keeps the track in
+     `TRACK_SCHEDULE_KEYS`.
+   - **Campaign only** keeps the track out of the Daily schedule.
+3. New Daily Challenge tracks are appended as the final
+   `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
+   Renames replace the old key at its existing position after confirmation
+   and remove the old definition file. Campaign-only saves never add the
+   track to the Daily schedule; wiring stages still happens in
+   `game/campaign/manifest.js`.
 4. Add medal thresholds in `game/medals/medal-times.json`.
    The Author threshold is also the Daily GP lap-band input: author times over
    10.95 seconds allow 1–2 laps; author times at or below 10.95 seconds allow

@@ -14,10 +14,17 @@ import {
 
 const CATALOG_BLOCK_RE = /export const TRACK_CATALOG = \{\n[\s\S]*?\n\};/;
 const SCHEDULE_BLOCK_RE = /export const TRACK_SCHEDULE_KEYS = \[\n[\s\S]*?\n\];/;
+const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
 
 function assertTrackKey(trackKey, label = 'Track key') {
     if (!isValidTrackKey(trackKey)) {
         throw new Error(`${label} must be a valid non-reserved JavaScript identifier.`);
+    }
+}
+
+function assertDestination(destination) {
+    if (!TRACK_DESTINATIONS.has(destination)) {
+        throw new Error('Destination must be daily or campaign.');
     }
 }
 
@@ -51,18 +58,23 @@ export function parseTrackCatalogSource(source) {
         throw new Error('Track schedule contains duplicate keys.');
     }
 
-    const catalogKeys = Object.keys(namesByKey);
-    if (JSON.stringify(catalogKeys) !== JSON.stringify(scheduleKeys)) {
-        throw new Error('Track catalog entries and schedule order are out of sync.');
+    for (const trackKey of scheduleKeys) {
+        if (!Object.prototype.hasOwnProperty.call(namesByKey, trackKey)) {
+            throw new Error(`Schedule key ${trackKey} is missing from the catalog.`);
+        }
     }
 
-    return { namesByKey, scheduleKeys };
+    return {
+        namesByKey,
+        catalogKeys: Object.keys(namesByKey),
+        scheduleKeys,
+    };
 }
 
-function generateCatalogBlock(scheduleKeys, namesByKey) {
+function generateCatalogBlock(catalogKeys, namesByKey) {
     return [
         'export const TRACK_CATALOG = {',
-        ...scheduleKeys.map((trackKey) => (
+        ...catalogKeys.map((trackKey) => (
             `    ${trackKey}: { name: ${JSON.stringify(namesByKey[trackKey])} },`
         )),
         '};',
@@ -77,15 +89,15 @@ function generateScheduleBlock(scheduleKeys) {
     ].join('\n');
 }
 
-export function generateTracksRegistrySource(scheduleKeys) {
+export function generateTracksRegistrySource(catalogKeys) {
     return [
-        ...scheduleKeys.map((trackKey) => (
+        ...catalogKeys.map((trackKey) => (
             `import ${trackKey} from './definitions/${getTrackModuleFilename(trackKey)}';`
         )),
         "import { TRACK_CATALOG, getTrackName } from './catalog.js';",
         '',
         'const TRACK_GEOMETRY = {',
-        ...scheduleKeys.map((trackKey) => `    ${trackKey},`),
+        ...catalogKeys.map((trackKey) => `    ${trackKey},`),
         '};',
         '',
         '// Compatibility registry for existing gameplay and server consumers.',
@@ -99,13 +111,52 @@ export function generateTracksRegistrySource(scheduleKeys) {
     ].join('\n');
 }
 
+function applyScheduleDestination(scheduleKeys, trackKey, destination) {
+    const scheduleIndex = scheduleKeys.indexOf(trackKey);
+    if (destination === 'daily') {
+        if (scheduleIndex === -1) {
+            scheduleKeys.push(trackKey);
+        }
+        return;
+    }
+
+    if (scheduleIndex !== -1) {
+        scheduleKeys.splice(scheduleIndex, 1);
+    }
+    if (scheduleKeys.length === 0) {
+        throw new Error('Track schedule must contain at least one key.');
+    }
+}
+
+function assertSafeDefinitionFilename(filename) {
+    if (
+        typeof filename !== 'string'
+        || !/^[a-z0-9]+(?:-[a-z0-9]+)*\.js$/.test(filename)
+    ) {
+        throw new Error('Track definition filename is unsafe.');
+    }
+}
+
+function assertPathInsideDirectory(filePath, directoryPath, label) {
+    const resolvedFile = resolve(filePath);
+    const resolvedDirectory = resolve(directoryPath);
+    if (
+        resolvedFile !== resolvedDirectory
+        && !resolvedFile.startsWith(`${resolvedDirectory}/`)
+    ) {
+        throw new Error(`${label} must stay inside the track definitions directory.`);
+    }
+}
+
 export function buildTrackRepositoryUpdate({
     catalogSource,
     trackKey,
     originalTrackKey = null,
     trackName,
+    destination = 'daily',
 }) {
     assertTrackKey(trackKey);
+    assertDestination(destination);
     if (originalTrackKey !== null) {
         assertTrackKey(originalTrackKey, 'Original track key');
     }
@@ -114,7 +165,13 @@ export function buildTrackRepositoryUpdate({
         throw new Error('Track name cannot be empty.');
     }
 
-    const { namesByKey, scheduleKeys } = parseTrackCatalogSource(catalogSource);
+    const {
+        namesByKey,
+        catalogKeys,
+        scheduleKeys,
+    } = parseTrackCatalogSource(catalogSource);
+    const nextCatalogKeys = [...catalogKeys];
+    const nextScheduleKeys = [...scheduleKeys];
     const originalExists = originalTrackKey !== null
         && Object.prototype.hasOwnProperty.call(namesByKey, originalTrackKey);
     const targetExists = Object.prototype.hasOwnProperty.call(namesByKey, trackKey);
@@ -128,37 +185,42 @@ export function buildTrackRepositoryUpdate({
     }
 
     let action = 'updated';
-    let scheduleIndex = scheduleKeys.indexOf(trackKey);
     let removedFilename = null;
 
     if (isRename) {
         action = 'renamed';
-        scheduleIndex = scheduleKeys.indexOf(originalTrackKey);
-        scheduleKeys[scheduleIndex] = trackKey;
+        const catalogIndex = nextCatalogKeys.indexOf(originalTrackKey);
+        nextCatalogKeys[catalogIndex] = trackKey;
+        const scheduleIndex = nextScheduleKeys.indexOf(originalTrackKey);
+        if (scheduleIndex !== -1) {
+            nextScheduleKeys[scheduleIndex] = trackKey;
+        }
         delete namesByKey[originalTrackKey];
         removedFilename = getTrackModuleFilename(originalTrackKey);
     } else if (!targetExists) {
         action = 'created';
-        scheduleKeys.push(trackKey);
-        scheduleIndex = scheduleKeys.length - 1;
+        nextCatalogKeys.push(trackKey);
     }
 
     namesByKey[trackKey] = normalizedName;
+    applyScheduleDestination(nextScheduleKeys, trackKey, destination);
+
     const orderedNamesByKey = Object.fromEntries(
-        scheduleKeys.map((key) => [key, namesByKey[key]]),
+        nextCatalogKeys.map((key) => [key, namesByKey[key]]),
     );
     const nextCatalogSource = catalogSource
-        .replace(CATALOG_BLOCK_RE, generateCatalogBlock(scheduleKeys, orderedNamesByKey))
-        .replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(scheduleKeys));
+        .replace(CATALOG_BLOCK_RE, generateCatalogBlock(nextCatalogKeys, orderedNamesByKey))
+        .replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(nextScheduleKeys));
 
     return {
         action,
-        scheduleIndex,
-        scheduleLength: scheduleKeys.length,
+        destination,
+        scheduleIndex: nextScheduleKeys.indexOf(trackKey),
+        scheduleLength: nextScheduleKeys.length,
         filename: getTrackModuleFilename(trackKey),
         removedFilename,
         catalogSource: nextCatalogSource,
-        tracksSource: generateTracksRegistrySource(scheduleKeys),
+        tracksSource: generateTracksRegistrySource(nextCatalogKeys),
     };
 }
 
@@ -167,6 +229,7 @@ export function applyTrackRepositoryUpdate({
     trackKey,
     originalTrackKey = null,
     trackName,
+    destination = 'daily',
     track,
 }) {
     const resolvedRoot = resolve(rootDir);
@@ -179,17 +242,39 @@ export function applyTrackRepositoryUpdate({
         trackKey,
         originalTrackKey,
         trackName,
+        destination,
     });
-    const definitionPath = join(definitionsPath, update.filename);
+    const definitionFilename = getTrackModuleFilename(trackKey);
+    assertSafeDefinitionFilename(definitionFilename);
+    if (definitionFilename !== update.filename) {
+        throw new Error('Track definition filename mismatch.');
+    }
+    const definitionPath = resolve(definitionsPath, definitionFilename);
+    assertPathInsideDirectory(definitionPath, definitionsPath, definitionFilename);
     const isExistingTarget = originalTrackKey === trackKey;
 
     if (!isExistingTarget && existsSync(definitionPath)) {
-        throw new Error(`${update.filename} already exists but is not integrated in the selected track.`);
+        throw new Error(`${definitionFilename} already exists but is not integrated in the selected track.`);
     }
+
+    let oldDefinitionPath = null;
     if (update.removedFilename) {
-        const oldDefinitionPath = join(definitionsPath, update.removedFilename);
+        assertSafeDefinitionFilename(update.removedFilename);
+        if (originalTrackKey === null) {
+            throw new Error('Cannot remove a definition without an original track key.');
+        }
+        const expectedRemovedFilename = getTrackModuleFilename(originalTrackKey);
+        if (update.removedFilename !== expectedRemovedFilename) {
+            throw new Error('Removed track definition filename mismatch.');
+        }
+        oldDefinitionPath = resolve(definitionsPath, expectedRemovedFilename);
+        assertPathInsideDirectory(
+            oldDefinitionPath,
+            definitionsPath,
+            expectedRemovedFilename,
+        );
         if (!existsSync(oldDefinitionPath)) {
-            throw new Error(`Cannot rename because ${update.removedFilename} does not exist.`);
+            throw new Error(`Cannot rename because ${expectedRemovedFilename} does not exist.`);
         }
     }
 
@@ -198,13 +283,14 @@ export function applyTrackRepositoryUpdate({
     writeFileSync(catalogPath, update.catalogSource, 'utf8');
     writeFileSync(tracksPath, update.tracksSource, 'utf8');
 
-    if (update.removedFilename) {
-        rmSync(join(definitionsPath, update.removedFilename));
+    if (oldDefinitionPath) {
+        rmSync(oldDefinitionPath);
     }
 
     return {
         action: update.action,
-        filename: update.filename,
+        destination: update.destination,
+        filename: definitionFilename,
         removedFilename: update.removedFilename,
         scheduleIndex: update.scheduleIndex,
         scheduleLength: update.scheduleLength,

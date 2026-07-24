@@ -18,6 +18,7 @@ import {
 const CATALOG_SOURCE = `export const TRACK_CATALOG = {
     circuit: { name: "Classic Circuit" },
     sunlitTemple: { name: "Sunlit Temple" },
+    numberZero: { name: "Number Zero" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -62,26 +63,62 @@ afterEach(() => {
 });
 
 describe('Mapmaker track repository integration', () => {
-    it('appends a new track as the final catalog and schedule entry', () => {
+    it('parses catalogs where the Daily schedule is a subset of the catalog', () => {
+        const parsed = parseTrackCatalogSource(CATALOG_SOURCE);
+        expect(parsed.catalogKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
+        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
+        expect(parsed.namesByKey.numberZero).toBe('Number Zero');
+    });
+
+    it('appends a new Daily track as the final catalog and schedule entry', () => {
         const update = buildTrackRepositoryUpdate({
             catalogSource: CATALOG_SOURCE,
             trackKey: 'newHarborRun',
             trackName: 'New Harbor Run',
+            destination: 'daily',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
         expect(update.action).toBe('created');
+        expect(update.destination).toBe('daily');
         expect(update.scheduleIndex).toBe(2);
         expect(parsed.scheduleKeys).toEqual([
             'circuit',
             'sunlitTemple',
             'newHarborRun',
         ]);
+        expect(parsed.catalogKeys).toEqual([
+            'circuit',
+            'sunlitTemple',
+            'numberZero',
+            'newHarborRun',
+        ]);
         expect(parsed.namesByKey.newHarborRun).toBe('New Harbor Run');
         expect(update.tracksSource).toContain(
             "import newHarborRun from './definitions/new-harbor-run.js';",
         );
+        expect(update.tracksSource).toContain('    numberZero,');
         expect(update.tracksSource).toContain('    newHarborRun,');
+    });
+
+    it('creates a Campaign-only track without adding it to the Daily schedule', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'numberTen',
+            trackName: 'Number Ten',
+            destination: 'campaign',
+        });
+        const parsed = parseTrackCatalogSource(update.catalogSource);
+
+        expect(update.action).toBe('created');
+        expect(update.destination).toBe('campaign');
+        expect(update.scheduleIndex).toBe(-1);
+        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
+        expect(parsed.catalogKeys).toContain('numberTen');
+        expect(parsed.namesByKey.numberTen).toBe('Number Ten');
+        expect(update.tracksSource).toContain(
+            "import numberTen from './definitions/number-ten.js';",
+        );
     });
 
     it('updates an existing track without changing its schedule position', () => {
@@ -90,13 +127,46 @@ describe('Mapmaker track repository integration', () => {
             trackKey: 'circuit',
             originalTrackKey: 'circuit',
             trackName: 'Classic Circuit Updated',
+            destination: 'daily',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
         expect(update.action).toBe('updated');
         expect(update.scheduleIndex).toBe(0);
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
+        expect(parsed.catalogKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
         expect(parsed.namesByKey.circuit).toBe('Classic Circuit Updated');
+    });
+
+    it('can move a scheduled track to Campaign only', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'sunlitTemple',
+            originalTrackKey: 'sunlitTemple',
+            trackName: 'Sunlit Temple',
+            destination: 'campaign',
+        });
+        const parsed = parseTrackCatalogSource(update.catalogSource);
+
+        expect(update.action).toBe('updated');
+        expect(update.scheduleIndex).toBe(-1);
+        expect(parsed.scheduleKeys).toEqual(['circuit']);
+        expect(parsed.catalogKeys).toContain('sunlitTemple');
+    });
+
+    it('can add an existing Campaign-only track to the Daily schedule', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'numberZero',
+            originalTrackKey: 'numberZero',
+            trackName: 'Number Zero',
+            destination: 'daily',
+        });
+        const parsed = parseTrackCatalogSource(update.catalogSource);
+
+        expect(update.action).toBe('updated');
+        expect(update.scheduleIndex).toBe(2);
+        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
     });
 
     it('renames a track in place and identifies the old module for removal', () => {
@@ -105,6 +175,7 @@ describe('Mapmaker track repository integration', () => {
             trackKey: 'sunriseTemple',
             originalTrackKey: 'sunlitTemple',
             trackName: 'Sunrise Temple',
+            destination: 'daily',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
@@ -113,7 +184,35 @@ describe('Mapmaker track repository integration', () => {
         expect(update.removedFilename).toBe('sunlit-temple.js');
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunriseTemple']);
         expect(parsed.namesByKey).not.toHaveProperty('sunlitTemple');
+        expect(parsed.catalogKeys).toContain('numberZero');
         expect(update.tracksSource).not.toContain('sunlitTemple');
+        expect(update.tracksSource).toContain('numberZero');
+    });
+
+    it('renames a Campaign-only track without putting it on the Daily schedule', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'numberNil',
+            originalTrackKey: 'numberZero',
+            trackName: 'Number Nil',
+            destination: 'campaign',
+        });
+        const parsed = parseTrackCatalogSource(update.catalogSource);
+
+        expect(update.action).toBe('renamed');
+        expect(update.scheduleIndex).toBe(-1);
+        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
+        expect(parsed.catalogKeys).toContain('numberNil');
+        expect(parsed.namesByKey).not.toHaveProperty('numberZero');
+    });
+
+    it('rejects an invalid destination', () => {
+        expect(() => buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'newHarborRun',
+            trackName: 'New Harbor Run',
+            destination: 'challenge',
+        })).toThrow('Destination must be daily or campaign.');
     });
 
     it('writes all repository files and deletes the old module on rename', () => {
@@ -131,11 +230,13 @@ describe('Mapmaker track repository integration', () => {
             trackKey: 'sunriseTemple',
             originalTrackKey: 'sunlitTemple',
             trackName: 'Sunrise Temple',
+            destination: 'daily',
             track: TRACK,
         });
 
         expect(result).toMatchObject({
             action: 'renamed',
+            destination: 'daily',
             filename: 'sunrise-temple.js',
             removedFilename: 'sunlit-temple.js',
             scheduleIndex: 1,
@@ -145,7 +246,11 @@ describe('Mapmaker track repository integration', () => {
             .toContain('export default {');
         expect(readFileSync(join(trackRoot, 'catalog.js'), 'utf8'))
             .toContain('sunriseTemple: { name: "Sunrise Temple" },');
+        expect(readFileSync(join(trackRoot, 'catalog.js'), 'utf8'))
+            .toContain('numberZero: { name: "Number Zero" },');
         expect(readFileSync(join(trackRoot, 'tracks.js'), 'utf8'))
             .toContain("import sunriseTemple from './definitions/sunrise-temple.js';");
+        expect(readFileSync(join(trackRoot, 'tracks.js'), 'utf8'))
+            .toContain("import numberZero from './definitions/number-zero.js';");
     });
 });
