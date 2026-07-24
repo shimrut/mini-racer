@@ -127,21 +127,22 @@ export class LobbyUi {
     }
 
     updateModeLabel(mode = this.mode) {
+        const subhead = document.querySelector('[data-lobby-subhead]');
         const label = document.querySelector('[data-lobby-mode-label]');
         if (!label) return;
         if (mode === 'daily') {
-            label.hidden = false;
+            if (subhead) subhead.hidden = false;
             label.textContent = 'Daily';
             this.syncDailyTrackLabel();
             return;
         }
         if (mode === 'campaign') {
-            label.hidden = false;
+            if (subhead) subhead.hidden = false;
             label.textContent = 'Campaign';
             this.updateDailyTrackLabel('');
             return;
         }
-        label.hidden = true;
+        if (subhead) subhead.hidden = true;
         label.textContent = '';
         this.updateDailyTrackLabel('');
     }

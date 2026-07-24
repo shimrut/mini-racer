@@ -351,13 +351,16 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-end;/s,
         );
         expect(css).toMatch(
+            /\.lobby-pane\.main-menu\s*\{[^}]*margin-top:\s*auto;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-panes\s*\{[^}]*flex-direction:\s*column;/s,
+        );
+        expect(css).toMatch(
             /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
         );
         expect(css).not.toMatch(
             /\.lobby-primary-row\s*\{[^}]*margin-top:\s*auto;/s,
-        );
-        expect(css).toMatch(
-            /\.lobby-panes\s*\{[^}]*flex-direction:\s*column;/s,
         );
         expect(css).toMatch(
             /\.lobby-pane--campaign \.main-menu__item--primary\s*\{[^}]*font-size:\s*clamp\(1\.25rem,\s*5\.5vw,\s*1\.5rem\);/s,
@@ -396,7 +399,7 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('places Daily and Campaign labels under the Mini Racer title', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         expect(html).toMatch(
-            /class="lobby-title"[\s\S]*data-lobby-mode-label[\s\S]*data-lobby-mode-track/,
+            /class="lobby-title"[\s\S]*data-lobby-subhead[\s\S]*data-lobby-mode-label[\s\S]*data-lobby-mode-track/,
         );
         expect(html).not.toMatch(
             /id="lobby-daily-pane"[\s\S]*lobby-pane-heading__title">Daily</,
@@ -406,8 +409,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
 
         const originalDocument = global.document;
+        const subhead = createElement('div');
+        subhead.hidden = true;
         const label = createElement('p');
-        label.hidden = true;
         const track = createElement('p');
         track.hidden = true;
         const overlay = createElement('div');
@@ -426,6 +430,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 return match ? panes[match[1]] : null;
             },
             querySelector: (selector) => {
+                if (selector === '[data-lobby-subhead]') return subhead;
                 if (selector === '[data-lobby-mode-label]') return label;
                 if (selector === '[data-lobby-mode-track]') return track;
                 return null;
@@ -439,20 +444,21 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         lobby.updateDailyTrackLabel('Desert Sprint');
         lobby.showDaily();
-        expect(label.hidden).toBe(false);
+        expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Daily');
         expect(track.hidden).toBe(false);
         expect(track.textContent).toBe('Desert Sprint');
         expect(body.dataset.lobbyMode).toBe('daily');
 
         lobby.showCampaign();
+        expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Campaign');
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
         expect(body.dataset.lobbyMode).toBe('campaign');
 
         lobby.showHome();
-        expect(label.hidden).toBe(true);
+        expect(subhead.hidden).toBe(true);
         expect(label.textContent).toBe('');
         expect(track.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('home');

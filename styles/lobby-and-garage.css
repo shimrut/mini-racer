@@ -55,6 +55,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    flex-shrink: 0;
+    width: 100%;
     padding-bottom: 2rem;
     background: none;
     box-shadow: none;
@@ -128,11 +130,24 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     animation: slideInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
 
+.lobby-subhead {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    width: 100%;
+    margin-top: 0.45rem;
+}
+
+.lobby-subhead[hidden] {
+    display: none !important;
+}
+
 .lobby-mode-label {
-    margin: 0.55rem 0 0;
+    margin: 0;
     color: var(--text-dim);
     font-family: var(--header-font);
-    font-size: clamp(1.35rem, 5vw, 2rem);
+    font-size: clamp(1.25rem, 3.5vw, 1.75rem);
     font-style: italic;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -141,10 +156,10 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 .lobby-mode-track {
-    margin: 0.35rem 0 0;
+    margin: 0;
     color: var(--text-muted);
     font-family: var(--header-font);
-    font-size: clamp(0.85rem, 3.2vw, 1.1rem);
+    font-size: clamp(0.8rem, 2.4vw, 1rem);
     font-style: italic;
     font-weight: 700;
     letter-spacing: 0.06em;

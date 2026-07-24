@@ -7,11 +7,12 @@
 
 .lobby-pane {
     width: 100%;
+    flex: 0 0 auto;
     min-height: 0;
     animation: lobbyPaneIn 180ms ease-out both;
 }
 
-/* One bottom pin only — same as main's .main-menu inside #start-group. */
+/* One bottom pin — same personality as main: title top, actions bottom. */
 .lobby-pane.main-menu {
     margin-top: auto;
 }
