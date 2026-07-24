@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.13">
+    <link rel="stylesheet" href="mapmaker.css?v=2.14">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -62,8 +62,14 @@
 
                 <div class="field-grid">
                     <label class="field">
-                        <span>Curve Radius</span>
-                        <input id="corner-radius-input" type="number" min="0" step="0.1">
+                        <span>Wall Corners</span>
+                        <select id="corner-radius-select">
+                            <option value="0">Sharp</option>
+                            <option value="1.5">A bit rounded</option>
+                            <option value="3" selected>Rounded</option>
+                            <option value="5">Soft</option>
+                        </select>
+                        <p class="field-hint">How rounded wall corners look in race. Does not change how wide the lane is.</p>
                     </label>
                     <label class="field">
                         <span>Start Angle</span>
@@ -151,7 +157,7 @@
                 <p id="status-text" class="panel-note">Ready.</p>
                 <ul class="shortcut-list">
                     <li><kbd>Save &amp; Integrate</kbd> writes the selected definition and updates the catalog, schedule, and registry. New tracks are appended to the schedule.</li>
-                    <li><kbd>Line Build</kbd> places loop points one by one. Use Line Smoothing for softer generated walls and Curve Radius for rendered corner rounding.</li>
+                    <li><kbd>Line Build</kbd> places loop points one by one. Use Line Smoothing for softer generated walls and Wall Corners for Sharp / Rounded / Soft race corner look.</li>
                     <li>Ghost car at the start (and under the Line Build cursor) matches race collision size so lane width is easy to judge.</li>
                     <li>Click any wall, checkpoint, or start marker to select it.</li>
                     <li><kbd>Backspace</kbd> removes the last draft point while building a new loop.</li>

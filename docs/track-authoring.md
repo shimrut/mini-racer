@@ -34,7 +34,8 @@ Mapmaker draws a ghost car using the real race collision size
 Brush size is fixed at `4u`, about **7 car-widths** across. That is the
 usual racing lane width for Line Build.
 
-Curve Radius controls wall corner smoothing, not the driven turn radius.
+Wall Corners controls how rounded wall corners look in race
+(Sharp, A bit rounded, Rounded, Soft). It is not the driven turn radius.
 
 ## Adding A Track
 

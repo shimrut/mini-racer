@@ -28,6 +28,14 @@ const FIXED_DRAW_WIDTH = 4;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
 const DEFAULT_LINE_SMOOTHING = 0.35;
+const DEFAULT_CORNER_RADIUS = 3;
+const CORNER_RADIUS_PRESETS = [
+    { value: 0, label: 'Sharp' },
+    { value: 1.5, label: 'A bit rounded' },
+    { value: 3, label: 'Rounded' },
+    { value: 5, label: 'Soft' },
+];
+const CORNER_RADIUS_VALUES = CORNER_RADIUS_PRESETS.map((preset) => preset.value);
 
 // Match race collision capsule so authors can size lanes against the real car.
 const CAR_RADIUS = CONFIG.carRadius;
@@ -334,7 +342,7 @@ function distanceToSegment(point, a, b) {
 function createBlankTrack(name = 'New Track') {
     return {
         name,
-        cornerRadius: 3,
+        cornerRadius: DEFAULT_CORNER_RADIUS,
         drawWidth: FIXED_DRAW_WIDTH,
         lineSmoothing: DEFAULT_LINE_SMOOTHING,
         outer: [],
@@ -362,7 +370,7 @@ class MapmakerApp {
         this.trackNameInput = document.getElementById('track-name-input');
         this.trackDestinationSelect = document.getElementById('track-destination-select');
         this.trackDestinationHint = document.getElementById('track-destination-hint');
-        this.cornerRadiusInput = document.getElementById('corner-radius-input');
+        this.cornerRadiusSelect = document.getElementById('corner-radius-select');
         this.startAngleInput = document.getElementById('start-angle-input');
         this.lineSmoothingInput = document.getElementById('line-smoothing-input');
         this.drawMetricsLabel = document.getElementById('draw-metrics-label');
@@ -442,7 +450,34 @@ class MapmakerApp {
     getCornerRadius() {
         return Number.isFinite(Number(this.track.cornerRadius))
             ? Math.max(0, Number(this.track.cornerRadius))
-            : 3;
+            : DEFAULT_CORNER_RADIUS;
+    }
+
+    nearestCornerRadiusPreset(value = this.getCornerRadius()) {
+        const radius = Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : DEFAULT_CORNER_RADIUS;
+        return CORNER_RADIUS_VALUES.reduce((best, candidate) => (
+            Math.abs(candidate - radius) < Math.abs(best - radius) ? candidate : best
+        ), DEFAULT_CORNER_RADIUS);
+    }
+
+    syncCornerRadiusControl() {
+        if (!this.cornerRadiusSelect) {
+            return;
+        }
+        this.cornerRadiusSelect.value = String(this.nearestCornerRadiusPreset());
+    }
+
+    setCornerRadius(value, options = {}) {
+        const nextRadius = this.nearestCornerRadiusPreset(value);
+        this.track.cornerRadius = nextRadius;
+        this.syncCornerRadiusControl();
+        if (options.markDirty !== false) {
+            const preset = CORNER_RADIUS_PRESETS.find((entry) => entry.value === nextRadius);
+            this.markDirty(
+                options.status ?? `Set wall corners to ${preset?.label ?? 'Rounded'}.`,
+                options.updateStatus !== false,
+            );
+        }
     }
 
     syncDrawWidthControls() {
@@ -563,10 +598,8 @@ class MapmakerApp {
             );
         });
 
-        this.cornerRadiusInput.addEventListener('input', () => {
-            const value = Number(this.cornerRadiusInput.value);
-            this.track.cornerRadius = Number.isFinite(value) ? value : 0;
-            this.markDirty('Updated corner radius.');
+        this.cornerRadiusSelect.addEventListener('change', () => {
+            this.setCornerRadius(Number(this.cornerRadiusSelect.value));
         });
 
         this.startAngleInput.addEventListener('input', () => {
@@ -802,7 +835,7 @@ class MapmakerApp {
         this.trackKeyInput.value = trackKey;
         this.trackNameInput.value = this.track.name;
         this.syncDestinationControl(trackKey);
-        this.cornerRadiusInput.value = String(this.track.cornerRadius ?? 3);
+        this.syncCornerRadiusControl();
         this.startAngleInput.value = String(this.track.startAngle ?? 0);
         this.syncLineSmoothingControl();
         this.syncDrawWidthControls();
@@ -1451,7 +1484,7 @@ class MapmakerApp {
         this.track.checkpoints = generated.checkpoints;
         this.track.cornerRadius = generated.cornerRadius;
         this.track.lineSmoothing = lineSmoothing;
-        this.cornerRadiusInput.value = formatNumber(this.track.cornerRadius);
+        this.syncCornerRadiusControl();
         this.syncLineSmoothingControl();
         this.startAngleInput.value = formatNumber(this.track.startAngle);
         this.state.draftLoop = [];

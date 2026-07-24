@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker Wall Corners uses plain labels (Sharp, A bit rounded, Rounded, Soft) instead of a raw curve-radius number.
 - Mapmaker Line Build brush is fixed at 4u; other brush sizes and presets are removed.
 - Mapmaker Save & Integrate now lets authors choose **Daily Challenge** or
   **Campaign only**. Campaign-only tracks stay in the catalog/registry but
