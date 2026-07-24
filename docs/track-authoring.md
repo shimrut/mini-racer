@@ -25,7 +25,12 @@ every consumer load the large geometry registry.
 
 ## Scale Reference
 
-Mapmaker draws a ghost car using the real race collision size
+Mapmaker draws a race-style track preview using the same corner rounding,
+asphalt fill, curbs, and start/finish paint as the game. Sharp outer/inner
+construction walls stay faintly visible on top so editable corners remain
+easy to see.
+
+Mapmaker also draws a ghost car using the real race collision size
 (`0.55u` wide × `1.23u` long):
 
 - always at the start position
@@ -36,6 +41,7 @@ usual racing lane width for Line Build.
 
 Wall Corners controls how rounded wall corners look in race
 (Sharp, A bit rounded, Rounded, Soft). It is not the driven turn radius.
+Changing Wall Corners updates the Mapmaker race preview immediately.
 
 Start line and checkpoint edits snap across the lane, stay perpendicular
 to the nearer track wall, and extend a bit past both walls so wall-hugging

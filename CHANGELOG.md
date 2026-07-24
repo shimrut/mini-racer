@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker now shows the same race-style track preview as the game (rounded walls, asphalt, curbs, checkered start/finish), with faint sharp construction lines still visible for editing.
 - Mapmaker start car now sits a short fixed distance behind the start/finish line instead of keeping a far drag offset.
 - Fixed Mapmaker start-car facing so the nose points toward the start/finish line instead of sitting rear-first against it.
 - Mapmaker start car angle is derived from the start/finish line: the car always faces perpendicular and snaps onto the line center when moved. The manual Start Angle field is removed.
