@@ -27,27 +27,24 @@ describe('Mapmaker start pose', () => {
     it('faces the start line when the seed is on the left', () => {
         const pose = snapStartPose({ x: 7, y: 4 }, verticalStartLine);
         expect(pose).not.toBeNull();
-        // Nose points toward +X (the line), not away from it.
         expect(pose.startAngle).toBeCloseTo(0, 5);
-        expect(pose.startPos.x).toBeLessThan(10);
+        expect(pose.startPos.x).toBeCloseTo(8.75, 5);
         expect(pose.startPos.y).toBeCloseTo(3, 5);
-        expect(pose.along).toBeLessThan(0);
+        expect(pose.along).toBeCloseTo(-1.25, 5);
     });
 
     it('faces the start line when the seed is on the right', () => {
         const pose = snapStartPose({ x: 13, y: 4 }, verticalStartLine);
         expect(pose).not.toBeNull();
         expect(Math.abs(pose.startAngle)).toBeCloseTo(Math.PI, 5);
-        expect(pose.startPos.x).toBeGreaterThan(10);
-        expect(pose.along).toBeLessThan(0);
+        expect(pose.startPos.x).toBeCloseTo(11.25, 5);
+        expect(pose.along).toBeCloseTo(-1.25, 5);
     });
 
-    it('keeps a minimum standoff behind the gate', () => {
-        const pose = snapStartPose({ x: 10, y: 3 }, verticalStartLine, {
-            preferredAngle: 0,
-        });
-        expect(Math.abs(pose.startPos.x - 10)).toBeCloseTo(1, 5);
+    it('ignores a far seed and keeps a short fixed standoff', () => {
+        const pose = snapStartPose({ x: 0, y: 3 }, verticalStartLine);
+        expect(pose.startPos.x).toBeCloseTo(8.75, 5);
         expect(pose.startPos.y).toBeCloseTo(3, 5);
-        expect(pose.along).toBeCloseTo(-1, 5);
+        expect(pose.along).toBeCloseTo(-1.25, 5);
     });
 });

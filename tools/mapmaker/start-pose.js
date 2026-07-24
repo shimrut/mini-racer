@@ -1,5 +1,4 @@
-const START_POS_MIN_OFFSET = 1;
-const START_POS_MAX_OFFSET = 8;
+const START_POS_OFFSET = 1.25;
 
 function clonePoint(point) {
     return { x: Number(point.x), y: Number(point.y) };
@@ -56,8 +55,8 @@ export function pickStartHeading(axis, preferredAngle = null) {
 }
 
 /**
- * Snap the car onto the start-line center axis, facing perpendicular to the
- * gate with the nose toward the line (ready to cross it).
+ * Snap the car onto the start-line center axis, a short fixed distance behind
+ * the gate, facing perpendicular with the nose toward the line.
  */
 export function snapStartPose(seedPoint, startLine, options = {}) {
     const axis = getStartLineAxis(startLine);
@@ -65,8 +64,7 @@ export function snapStartPose(seedPoint, startLine, options = {}) {
         return null;
     }
 
-    // Face toward the gate from the seed side so the nose points at the line,
-    // never with the rear against it.
+    // Face toward the gate from the seed side so the nose points at the line.
     const towardLineX = axis.mid.x - seedPoint.x;
     const towardLineY = axis.mid.y - seedPoint.y;
     const towardLineLength = Math.hypot(towardLineX, towardLineY);
@@ -78,18 +76,7 @@ export function snapStartPose(seedPoint, startLine, options = {}) {
         x: Math.cos(startAngle),
         y: Math.sin(startAngle),
     };
-
-    const toSeed = {
-        x: seedPoint.x - axis.mid.x,
-        y: seedPoint.y - axis.mid.y,
-    };
-    let along = (toSeed.x * forward.x) + (toSeed.y * forward.y);
-
-    // Stay behind the gate relative to facing direction (along is negative).
-    if (along > -START_POS_MIN_OFFSET) {
-        along = -START_POS_MIN_OFFSET;
-    }
-    along = Math.max(-START_POS_MAX_OFFSET, along);
+    const along = -START_POS_OFFSET;
 
     return {
         startPos: {

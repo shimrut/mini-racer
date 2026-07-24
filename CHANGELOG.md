@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker start car now sits a short fixed distance behind the start/finish line instead of keeping a far drag offset.
 - Fixed Mapmaker start-car facing so the nose points toward the start/finish line instead of sitting rear-first against it.
 - Mapmaker start car angle is derived from the start/finish line: the car always faces perpendicular and snaps onto the line center when moved. The manual Start Angle field is removed.
 - Mapmaker keeps visible start-line/checkpoint end dots for length, but dragging the line or either end moves the whole gate.
