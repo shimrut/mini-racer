@@ -18,7 +18,7 @@ Empty values leave that button disabled.
 
 ## Track background
 
-`track.jpg` is generated with the same custom-post preview track renderer as the Reddit post preview.
+`track.png` is generated with the same custom-post preview track renderer as the Reddit post preview.
 
 From the repo root:
 

@@ -273,6 +273,30 @@ function getSchematicCarPosition(startLine, startPos, startAngle, mapPoint, scal
     };
 }
 
+function buildMappedRingPath(outerPoints, innerPoints, mapPoint) {
+    const path = new Path2D();
+    if (outerPoints.length >= 2) {
+        const first = mapPoint(outerPoints[0]);
+        path.moveTo(first.x, first.y);
+        for (let i = 1; i < outerPoints.length; i += 1) {
+            const point = mapPoint(outerPoints[i]);
+            path.lineTo(point.x, point.y);
+        }
+        path.closePath();
+    }
+    // Reverse the inner ring so evenodd/nonzero ring clips stay reliable across backends.
+    if (innerPoints.length >= 2) {
+        const last = mapPoint(innerPoints[innerPoints.length - 1]);
+        path.moveTo(last.x, last.y);
+        for (let i = innerPoints.length - 2; i >= 0; i -= 1) {
+            const point = mapPoint(innerPoints[i]);
+            path.lineTo(point.x, point.y);
+        }
+        path.closePath();
+    }
+    return path;
+}
+
 function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, {
     startLine,
     startPos,
@@ -287,6 +311,7 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     const inner = trackGeometry.inner;
     const outerPath = buildMappedPath(outer, mapPoint);
     const innerPath = buildMappedPath(inner, mapPoint);
+    const roadClipPath = buildMappedRingPath(outer, inner, mapPoint);
 
     const roadColor = '#475569';
     const edgeColor = '#f8fafc';
@@ -295,13 +320,15 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // 1. Fill track surface (asphalt) only using 'evenodd' (leaves infield transparent)
-    const surfacePath = new Path2D();
-    surfacePath.addPath(outerPath);
-    surfacePath.addPath(innerPath);
-
+    // 1. Fill asphalt as outer ring minus infield.
+    // Avoid combined evenodd Path2D fills — they can punch a false wedge hole
+    // on some canvas backends (notably @napi-rs/canvas used for share/LP assets).
     ctx.fillStyle = roadColor;
-    ctx.fill(surfacePath, 'evenodd');
+    ctx.fill(outerPath);
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fill(innerPath);
+    ctx.restore();
 
     // 2. Start/finish line (clipped to road surface so it doesn't draw over the edges)
     if (startLine) {
@@ -309,7 +336,7 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
         const p2 = mapPoint(startLine.p2);
         const bandWidth = Math.max(5, Math.min(width, height) * 0.045);
         ctx.save();
-        ctx.clip(surfacePath, 'evenodd');
+        ctx.clip(roadClipPath, 'evenodd');
         drawCheckeredLine(ctx, p1, p2, bandWidth, {
             primary: CONFIG.finishLineColor,
             secondary: CONFIG.finishLineDarkColor

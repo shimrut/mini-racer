@@ -20,7 +20,7 @@ describe('generate-lp-assets', () => {
         }
     });
 
-    it('writes a JPEG using the custom-post preview track renderer', async () => {
+    it('writes a PNG using the custom-post preview track renderer', async () => {
         tempRoot = mkdtempSync(join(tmpdir(), 'mini-racer-lp-'));
         const lpRoot = join(tempRoot, 'LP');
 
@@ -35,8 +35,10 @@ describe('generate-lp-assets', () => {
 
         const bytes = readFileSync(result.outPath);
         expect(bytes.byteLength).toBeGreaterThan(1000);
-        expect(bytes[0]).toBe(0xff);
-        expect(bytes[1]).toBe(0xd8);
+        // PNG signature
+        expect(bytes.subarray(0, 8)).toEqual(
+            Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
 
         const { loadImage } = await import('@napi-rs/canvas');
         const image = await loadImage(bytes);

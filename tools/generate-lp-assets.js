@@ -5,7 +5,7 @@
  * Run: `npm run generate:lp-assets`
  * Optional: `node tools/generate-lp-assets.js --track=circuit`
  */
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createCanvas, Path2D as NodePath2D, loadImage } from '@napi-rs/canvas';
@@ -20,11 +20,13 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');
 
-export const LP_TRACK_WIDTH = 1600;
-export const LP_TRACK_HEIGHT = 900;
-export const LP_TRACK_JPEG_QUALITY = 88;
+/** Retina-friendly full-bleed size so the page does not upscale a soft JPEG. */
+export const LP_TRACK_WIDTH = 2880;
+export const LP_TRACK_HEIGHT = 1620;
 export const LP_DEFAULT_TRACK_KEY = 'circuit';
 export const LP_BG = '#020617';
+/** Keep the track inside the frame instead of touching the crop edges. */
+export const LP_TRACK_INSET_RATIO = 0.1;
 
 function ensurePath2D() {
     if (typeof globalThis.Path2D === 'undefined') {
@@ -33,7 +35,7 @@ function ensurePath2D() {
 }
 
 export function getLpTrackAbsolutePath(lpRoot = join(repoRoot, 'LP')) {
-    return join(lpRoot, 'track.jpg');
+    return join(lpRoot, 'track.png');
 }
 
 function resolveTrackKey(raw) {
@@ -96,7 +98,7 @@ export function renderLpTrackPreviewCanvas(canvas, {
     });
 }
 
-export async function renderLpTrackJpeg({
+export async function renderLpTrackPng({
     trackKey = LP_DEFAULT_TRACK_KEY,
     track = null,
     carImage = null,
@@ -110,19 +112,24 @@ export async function renderLpTrackJpeg({
 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.fillStyle = LP_BG;
     ctx.fillRect(0, 0, width, height);
 
-    const trackCanvas = createCanvas(width, height);
+    const inset = Math.round(Math.min(width, height) * LP_TRACK_INSET_RATIO);
+    const trackW = Math.max(1, width - inset * 2);
+    const trackH = Math.max(1, height - inset * 2);
+    const trackCanvas = createCanvas(trackW, trackH);
     renderLpTrackPreviewCanvas(trackCanvas, {
         trackKey: key,
         track: geometry,
         carImage: resolvedCar,
         skin: 'default',
     });
-    ctx.drawImage(trackCanvas, 0, 0);
+    ctx.drawImage(trackCanvas, inset, inset);
 
-    return canvas.toBuffer('image/jpeg', LP_TRACK_JPEG_QUALITY);
+    return canvas.toBuffer('image/png');
 }
 
 export async function generateLpTrackAsset(options = {}) {
@@ -131,12 +138,17 @@ export async function generateLpTrackAsset(options = {}) {
     const outPath = getLpTrackAbsolutePath(lpRoot);
 
     mkdirSync(lpRoot, { recursive: true });
-    const buffer = await renderLpTrackJpeg({
+    const buffer = await renderLpTrackPng({
         trackKey,
         width: options.width || LP_TRACK_WIDTH,
         height: options.height || LP_TRACK_HEIGHT,
     });
     writeFileSync(outPath, buffer);
+
+    const legacyJpeg = join(lpRoot, 'track.jpg');
+    if (existsSync(legacyJpeg)) {
+        unlinkSync(legacyJpeg);
+    }
 
     return { trackKey, outPath, bytes: buffer.byteLength };
 }
