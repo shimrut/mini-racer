@@ -32,18 +32,6 @@ describe('game launch target', () => {
             .toEqual({ mode: 'daily', challengeId: null });
     });
 
-    it('opens Campaign hub post data directly in Campaign mode', () => {
-        expect(resolveGameLaunchTarget(createRoot({ postData: { postType: 'campaign' } })))
-            .toEqual({ mode: 'campaign', challengeId: null });
-    });
-
-    it('gives Campaign hub post data precedence over a stale stored target', () => {
-        const root = createRoot({ postData: { postType: 'campaign' } });
-        requestGameLaunchTarget('daily', { root });
-        expect(resolveGameLaunchTarget(root))
-            .toEqual({ mode: 'campaign', challengeId: null });
-    });
-
     it('gives immutable challenge post data precedence over a stale stored target', () => {
         const root = createRoot({
             postData: { postType: 'campaign-challenge', challengeId: 'challenge-1' },

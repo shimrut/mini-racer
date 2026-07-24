@@ -19,11 +19,6 @@ type PostResult = {
     postUrl: string | null;
 };
 
-type LandingBundleResult = {
-    created: boolean;
-    postUrl: string | null;
-};
-
 type MenuActionOptions = {
     missingContextMessage: string;
     failureLogMessage: string;
@@ -38,10 +33,6 @@ export type InternalRouteDependencies = {
         subredditName: string,
         challenge: DailyGpChallenge,
     ): Promise<PostResult>;
-    ensureLandingBundleForSubreddit(
-        subredditName: string,
-        challenge: DailyGpChallenge,
-    ): Promise<LandingBundleResult>;
     enableDailyAutopost(subredditName: string): Promise<void>;
     deleteDailyAutopostSubscription(subredditName: string): Promise<void>;
     ensureDailyMiniRacerPodiumPostForSubreddit(
@@ -115,33 +106,6 @@ export function registerInternalRoutes(
                 challenge,
             );
             res.json({ navigateTo: result.postUrl });
-        },
-    );
-
-    registerMenuAction(
-        app,
-        dependencies,
-        '/internal/menu/landing-create',
-        {
-            missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
-            failureLogMessage: 'Failed to create Mini Racer landing post:',
-            failureToastPrefix: 'Could not create the Mini Racer landing post',
-        },
-        async (subredditName, res) => {
-            const challenge = await dependencies.getServerDailyGpChallenge();
-            const result = await dependencies.ensureLandingBundleForSubreddit(
-                subredditName,
-                challenge,
-            );
-            res.json({
-                showToast: {
-                    text: result.created
-                        ? `Mini Racer landing post created for r/${subredditName}.`
-                        : `Mini Racer landing post already exists for r/${subredditName}.`,
-                    appearance: 'success',
-                },
-                ...(result.postUrl ? { navigateTo: result.postUrl } : {}),
-            });
         },
     );
 

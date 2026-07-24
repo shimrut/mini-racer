@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer</title>
+    <meta name="description" content="Mini Racer — pick Daily or Campaign and go race.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
+</head>
+
+<body>
+    <main class="shell" aria-labelledby="lp-title">
+        <img
+            class="track"
+            src="track.jpg"
+            alt=""
+            width="1536"
+            height="1024"
+            decoding="async"
+            fetchpriority="high"
+        >
+        <div class="veil" aria-hidden="true"></div>
+
+        <header class="brand">
+            <h1 id="lp-title" class="title">
+                <span class="title__mini">Mini</span>
+                <span class="title__racer">Racer</span>
+            </h1>
+        </header>
+
+        <nav class="modes" aria-label="Race modes">
+            <a id="lp-daily" class="mode" href="#" target="_blank" rel="noopener noreferrer">Daily</a>
+            <a id="lp-campaign" class="mode" href="#" target="_blank" rel="noopener noreferrer">Campaign</a>
+        </nav>
+    </main>
+
+    <script>
+        (function () {
+            var links = window.LP_LINKS || {};
+
+            function bind(id, url) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                var href = typeof url === 'string' ? url.trim() : '';
+                if (!href) {
+                    el.setAttribute('aria-disabled', 'true');
+                    el.removeAttribute('href');
+                    return;
+                }
+                el.href = href;
+                el.removeAttribute('aria-disabled');
+            }
+
+            bind('lp-daily', links.daily);
+            bind('lp-campaign', links.campaign);
+        }());
+    </script>
+</body>
+
+</html>
