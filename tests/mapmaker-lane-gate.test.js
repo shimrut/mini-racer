@@ -62,6 +62,36 @@ describe('Mapmaker perpendicular lane gates', () => {
         expect(Math.min(dx, dy)).toBeLessThan(0.75);
     });
 
+    it('slides around a corner without teleporting across the track', () => {
+        const seeds = [
+            { x: 5, y: 1 },
+            { x: 8, y: 1 },
+            { x: 9.2, y: 1 },
+            { x: 9.5, y: 1.5 },
+            { x: 9, y: 3 },
+            { x: 9, y: 5 },
+        ];
+        let previousMid = null;
+        seeds.forEach((seed) => {
+            const gate = buildPerpendicularLaneGate(seed, OUTER, INNER, {
+                previousMidpoint: previousMid,
+            });
+            expect(gate).not.toBeNull();
+            const mid = {
+                x: (gate.p1.x + gate.p2.x) / 2,
+                y: (gate.p1.y + gate.p2.y) / 2,
+            };
+            // Stay on the bottom/right corridor, never jump to the left/top side.
+            expect(mid.x).toBeGreaterThan(4);
+            expect(mid.y).toBeLessThan(6);
+            if (previousMid) {
+                const jump = Math.hypot(mid.x - previousMid.x, mid.y - previousMid.y);
+                expect(jump).toBeLessThan(3.5);
+            }
+            previousMid = mid;
+        });
+    });
+
     it('returns null when walls are incomplete', () => {
         expect(buildPerpendicularLaneGate({ x: 5, y: 5 }, OUTER, [])).toBeNull();
     });

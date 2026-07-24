@@ -1,5 +1,6 @@
 const SEGMENT_EPSILON = 1e-9;
 const MAX_GATE_LENGTH = 20;
+const CORNER_T = 0.08;
 
 function clonePoint(point) {
     return { x: Number(point.x), y: Number(point.y) };
@@ -111,13 +112,6 @@ function inwardNormalForSegment(a, b, fromPoint, towardPoint) {
     return normal;
 }
 
-function pointOnSegment(a, b, t) {
-    return {
-        x: a.x + (b.x - a.x) * t,
-        y: a.y + (b.y - a.y) * t,
-    };
-}
-
 /**
  * First hit along a ray origin + t * direction for t in (minT, maxT].
  */
@@ -179,19 +173,22 @@ function castGateFromSegment(a, b, foot, toPolygon, towardPoint) {
         from: clonePoint(foot),
         to: clonePoint(hit.point),
         length,
+        mid: midpoint(foot, hit.point),
     };
 }
 
 /**
- * Build candidate casts from a wall hit. Near corners, try both adjacent
- * straight segments so we never bisect into a long diagonal.
+ * Build candidate casts from a wall hit.
+ * Always keep the foot at the cursor's closest wall point so dragging through
+ * a corner cannot teleport the gate to another part of the track.
  */
 function gateCandidatesFromHit(hit, polygon, toPolygon, towardPoint) {
     const len = polygon.length;
     const candidates = [];
     const segmentLength = distance(hit.a, hit.b);
+    const nearCorner = hit.t <= CORNER_T || hit.t >= 1 - CORNER_T;
 
-    if (hit.t > 0.08 && hit.t < 0.92 && segmentLength > 0.25) {
+    if (!nearCorner && segmentLength > 0.25) {
         const gate = castGateFromSegment(hit.a, hit.b, hit.closest, toPolygon, towardPoint);
         if (gate) {
             candidates.push(gate);
@@ -199,19 +196,27 @@ function gateCandidatesFromHit(hit, polygon, toPolygon, towardPoint) {
         return candidates;
     }
 
-    const indexes = [
-        (hit.segmentIndex - 1 + len) % len,
-        hit.segmentIndex,
-    ];
+    // At / near a vertex, try both adjacent wall normals from the same foot.
+    const indexes = nearCorner
+        ? [
+            (hit.segmentIndex - 1 + len) % len,
+            hit.segmentIndex,
+            (hit.segmentIndex + 1) % len,
+        ]
+        : [hit.segmentIndex];
+
+    const seen = new Set();
     indexes.forEach((segmentIndex) => {
+        if (seen.has(segmentIndex)) {
+            return;
+        }
+        seen.add(segmentIndex);
         const a = polygon[segmentIndex];
         const b = polygon[(segmentIndex + 1) % len];
         if (distance(a, b) < 0.25) {
             return;
         }
-        // Sit a little inside the segment so the normal is from a straight wall.
-        const foot = pointOnSegment(a, b, 0.18);
-        const gate = castGateFromSegment(a, b, foot, toPolygon, towardPoint);
+        const gate = castGateFromSegment(a, b, hit.closest, toPolygon, towardPoint);
         if (gate) {
             candidates.push(gate);
         }
@@ -219,16 +224,30 @@ function gateCandidatesFromHit(hit, polygon, toPolygon, towardPoint) {
     return candidates;
 }
 
+function scoreGateCandidate(gate, seedPoint, previousMidpoint = null) {
+    const seedDistance = distance(gate.mid, seedPoint);
+    const continuity = previousMidpoint
+        ? distance(gate.mid, previousMidpoint)
+        : 0;
+    // Prefer staying near the cursor / previous gate; length is a weak tie-break.
+    return seedDistance * 4 + continuity * 3 + gate.length;
+}
+
 /**
  * Build a short lane-crossing gate through seedPoint.
  * Casts perpendicular from the nearest wall into the opposite wall so both
  * ends stay on the corridor instead of linking unrelated closest points.
+ *
+ * @param {object} [options]
+ * @param {{x:number,y:number}|null} [options.previousMidpoint] Prefer continuity
+ *   with the gate's previous midpoint while dragging.
  */
-export function buildPerpendicularLaneGate(seedPoint, outer, inner) {
+export function buildPerpendicularLaneGate(seedPoint, outer, inner, options = {}) {
     if (!seedPoint || !outer || !inner || outer.length < 3 || inner.length < 3) {
         return null;
     }
 
+    const previousMidpoint = options.previousMidpoint || null;
     const outerHit = closestPointOnPolygon(seedPoint, outer);
     const innerHit = closestPointOnPolygon(seedPoint, inner);
     if (!outerHit || !innerHit) {
@@ -244,7 +263,10 @@ export function buildPerpendicularLaneGate(seedPoint, outer, inner) {
         return null;
     }
 
-    candidates.sort((left, right) => left.length - right.length);
+    candidates.sort((left, right) => (
+        scoreGateCandidate(left, seedPoint, previousMidpoint)
+        - scoreGateCandidate(right, seedPoint, previousMidpoint)
+    ));
     const chosen = candidates[0];
 
     // Always return outer endpoint as p1 and inner as p2.

@@ -1031,7 +1031,16 @@ class MapmakerApp {
         if (!gate) {
             return false;
         }
-        const snapped = buildPerpendicularLaneGate(seedPoint, this.track.outer, this.track.inner);
+        const previousMidpoint = {
+            x: (gate.p1.x + gate.p2.x) / 2,
+            y: (gate.p1.y + gate.p2.y) / 2,
+        };
+        const snapped = buildPerpendicularLaneGate(
+            seedPoint,
+            this.track.outer,
+            this.track.inner,
+            { previousMidpoint },
+        );
         if (!snapped) {
             return false;
         }
