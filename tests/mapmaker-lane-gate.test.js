@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildPerpendicularLaneGate,
     closestPointOnPolygon,
+    firstRayPolygonHit,
 } from '../tools/mapmaker/lane-gate.js';
 
 /** Axis-aligned rectangular lane: outer 0..10, inner 2..8. */
@@ -25,24 +26,47 @@ describe('Mapmaker perpendicular lane gates', () => {
         expect(hit.segmentIndex).toBe(0);
     });
 
-    it('builds a vertical gate across a horizontal outer wall', () => {
+    it('ray hits the first inner wall across a lane', () => {
+        const hit = firstRayPolygonHit({ x: 5, y: 0 }, { x: 0, y: 1 }, INNER);
+        expect(hit.point.x).toBeCloseTo(5, 3);
+        expect(hit.point.y).toBeCloseTo(2, 3);
+        expect(hit.along).toBeCloseTo(2, 3);
+    });
+
+    it('builds a short vertical gate across a horizontal outer wall', () => {
         const gate = buildPerpendicularLaneGate({ x: 5, y: 1 }, OUTER, INNER);
         expect(gate).not.toBeNull();
-        // Across a bottom horizontal wall, the gate should be vertical.
         expect(Math.abs(gate.p1.x - gate.p2.x)).toBeLessThan(0.001);
+        expect(distanceLike(gate)).toBeCloseTo(2, 3);
         expect(Math.min(gate.p1.y, gate.p2.y)).toBeCloseTo(0, 3);
         expect(Math.max(gate.p1.y, gate.p2.y)).toBeCloseTo(2, 3);
     });
 
-    it('builds a horizontal gate across a vertical outer wall', () => {
+    it('builds a short horizontal gate across a vertical outer wall', () => {
         const gate = buildPerpendicularLaneGate({ x: 9, y: 5 }, OUTER, INNER);
         expect(gate).not.toBeNull();
         expect(Math.abs(gate.p1.y - gate.p2.y)).toBeLessThan(0.001);
+        expect(distanceLike(gate)).toBeCloseTo(2, 3);
         expect(Math.min(gate.p1.x, gate.p2.x)).toBeCloseTo(8, 3);
         expect(Math.max(gate.p1.x, gate.p2.x)).toBeCloseTo(10, 3);
+    });
+
+    it('does not invent long diagonals between unrelated closest points', () => {
+        // Seed near a corner where independent closest points would slant hard.
+        const gate = buildPerpendicularLaneGate({ x: 1, y: 1 }, OUTER, INNER);
+        expect(gate).not.toBeNull();
+        expect(distanceLike(gate)).toBeLessThan(3.5);
+        // Gate should stay roughly axis-aligned (not a long 45° slash).
+        const dx = Math.abs(gate.p1.x - gate.p2.x);
+        const dy = Math.abs(gate.p1.y - gate.p2.y);
+        expect(Math.min(dx, dy)).toBeLessThan(0.75);
     });
 
     it('returns null when walls are incomplete', () => {
         expect(buildPerpendicularLaneGate({ x: 5, y: 5 }, OUTER, [])).toBeNull();
     });
 });
+
+function distanceLike(gate) {
+    return Math.hypot(gate.p1.x - gate.p2.x, gate.p1.y - gate.p2.y);
+}

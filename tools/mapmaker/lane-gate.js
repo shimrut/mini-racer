@@ -1,4 +1,5 @@
 const SEGMENT_EPSILON = 1e-9;
+const MAX_GATE_LENGTH = 20;
 
 function clonePoint(point) {
     return { x: Number(point.x), y: Number(point.y) };
@@ -18,6 +19,13 @@ function normalizeVector(x, y) {
 
 function dot(a, b) {
     return a.x * b.x + a.y * b.y;
+}
+
+function midpoint(a, b) {
+    return {
+        x: (a.x + b.x) / 2,
+        y: (a.y + b.y) / 2,
+    };
 }
 
 /**
@@ -80,76 +88,141 @@ function segmentIntersectionParams(A, B, C, D) {
     return null;
 }
 
+function segmentTangent(a, b) {
+    return normalizeVector(b.x - a.x, b.y - a.y);
+}
+
 /**
- * Intersections of an infinite line through origin along direction with a polygon.
+ * Unit inward normal for a wall segment, oriented toward towardPoint.
  */
-export function linePolygonIntersections(origin, direction, polygon) {
+function inwardNormalForSegment(a, b, fromPoint, towardPoint) {
+    const tangent = segmentTangent(a, b);
+    if (tangent.x === 0 && tangent.y === 0) {
+        return { x: 0, y: 0 };
+    }
+    let normal = { x: -tangent.y, y: tangent.x };
+    const toward = {
+        x: towardPoint.x - fromPoint.x,
+        y: towardPoint.y - fromPoint.y,
+    };
+    if (dot(normal, toward) < 0) {
+        normal = { x: -normal.x, y: -normal.y };
+    }
+    return normal;
+}
+
+function pointOnSegment(a, b, t) {
+    return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+    };
+}
+
+/**
+ * First hit along a ray origin + t * direction for t in (minT, maxT].
+ */
+export function firstRayPolygonHit(origin, direction, polygon, minT = 0.02, maxT = MAX_GATE_LENGTH) {
     if (!polygon || polygon.length < 2) {
-        return [];
+        return null;
     }
-    const dirLength = Math.hypot(direction.x, direction.y);
-    if (dirLength < 0.000001) {
-        return [];
+    const unit = normalizeVector(direction.x, direction.y);
+    if (unit.x === 0 && unit.y === 0) {
+        return null;
     }
-    const unit = {
-        x: direction.x / dirLength,
-        y: direction.y / dirLength,
-    };
-    // Long segment spanning both directions from origin.
-    const span = 10000;
-    const lineA = {
-        x: origin.x - unit.x * span,
-        y: origin.y - unit.y * span,
-    };
-    const lineB = {
-        x: origin.x + unit.x * span,
-        y: origin.y + unit.y * span,
+
+    const rayEnd = {
+        x: origin.x + unit.x * maxT,
+        y: origin.y + unit.y * maxT,
     };
 
-    const hits = [];
+    let best = null;
     for (let index = 0; index < polygon.length; index += 1) {
         const a = polygon[index];
         const b = polygon[(index + 1) % polygon.length];
-        const params = segmentIntersectionParams(lineA, lineB, a, b);
+        const params = segmentIntersectionParams(origin, rayEnd, a, b);
         if (!params) {
             continue;
         }
+        const along = params.t * maxT;
+        if (along < minT || along > maxT) {
+            continue;
+        }
         const point = {
-            x: lineA.x + (lineB.x - lineA.x) * params.t,
-            y: lineA.y + (lineB.y - lineA.y) * params.t,
+            x: origin.x + unit.x * along,
+            y: origin.y + unit.y * along,
         };
-        hits.push({
-            point,
-            along: dot({
-                x: point.x - origin.x,
-                y: point.y - origin.y,
-            }, unit),
-            segmentIndex: index,
-        });
-    }
-    return hits;
-}
-
-function pickClosestHit(hits, origin) {
-    if (!hits.length) {
-        return null;
-    }
-    let best = hits[0];
-    let bestDistance = distance(origin, best.point);
-    for (let index = 1; index < hits.length; index += 1) {
-        const candidate = hits[index];
-        const dist = distance(origin, candidate.point);
-        if (dist < bestDistance) {
-            best = candidate;
-            bestDistance = dist;
+        if (!best || along < best.along) {
+            best = {
+                point,
+                along,
+                segmentIndex: index,
+            };
         }
     }
     return best;
 }
 
+function castGateFromSegment(a, b, foot, toPolygon, towardPoint) {
+    const normal = inwardNormalForSegment(a, b, foot, towardPoint);
+    if (normal.x === 0 && normal.y === 0) {
+        return null;
+    }
+    const hit = firstRayPolygonHit(foot, normal, toPolygon);
+    if (!hit) {
+        return null;
+    }
+    const length = hit.along;
+    if (length < 0.05 || length > MAX_GATE_LENGTH) {
+        return null;
+    }
+    return {
+        from: clonePoint(foot),
+        to: clonePoint(hit.point),
+        length,
+    };
+}
+
 /**
- * Build a lane-crossing gate (outer→inner) through seedPoint, perpendicular
- * to the nearest outer-wall segment.
+ * Build candidate casts from a wall hit. Near corners, try both adjacent
+ * straight segments so we never bisect into a long diagonal.
+ */
+function gateCandidatesFromHit(hit, polygon, toPolygon, towardPoint) {
+    const len = polygon.length;
+    const candidates = [];
+    const segmentLength = distance(hit.a, hit.b);
+
+    if (hit.t > 0.08 && hit.t < 0.92 && segmentLength > 0.25) {
+        const gate = castGateFromSegment(hit.a, hit.b, hit.closest, toPolygon, towardPoint);
+        if (gate) {
+            candidates.push(gate);
+        }
+        return candidates;
+    }
+
+    const indexes = [
+        (hit.segmentIndex - 1 + len) % len,
+        hit.segmentIndex,
+    ];
+    indexes.forEach((segmentIndex) => {
+        const a = polygon[segmentIndex];
+        const b = polygon[(segmentIndex + 1) % len];
+        if (distance(a, b) < 0.25) {
+            return;
+        }
+        // Sit a little inside the segment so the normal is from a straight wall.
+        const foot = pointOnSegment(a, b, 0.18);
+        const gate = castGateFromSegment(a, b, foot, toPolygon, towardPoint);
+        if (gate) {
+            candidates.push(gate);
+        }
+    });
+    return candidates;
+}
+
+/**
+ * Build a short lane-crossing gate through seedPoint.
+ * Casts perpendicular from the nearest wall into the opposite wall so both
+ * ends stay on the corridor instead of linking unrelated closest points.
  */
 export function buildPerpendicularLaneGate(seedPoint, outer, inner) {
     if (!seedPoint || !outer || !inner || outer.length < 3 || inner.length < 3) {
@@ -162,54 +235,29 @@ export function buildPerpendicularLaneGate(seedPoint, outer, inner) {
         return null;
     }
 
-    let tangent = normalizeVector(
-        outerHit.b.x - outerHit.a.x,
-        outerHit.b.y - outerHit.a.y,
-    );
-    if (tangent.x === 0 && tangent.y === 0) {
-        tangent = normalizeVector(
-            innerHit.b.x - innerHit.a.x,
-            innerHit.b.y - innerHit.a.y,
-        );
+    const towardLane = midpoint(outerHit.closest, innerHit.closest);
+    const candidates = [
+        ...gateCandidatesFromHit(outerHit, outer, inner, towardLane),
+        ...gateCandidatesFromHit(innerHit, inner, outer, towardLane),
+    ];
+    if (!candidates.length) {
+        return null;
     }
-    if (tangent.x === 0 && tangent.y === 0) {
+
+    candidates.sort((left, right) => left.length - right.length);
+    const chosen = candidates[0];
+
+    // Always return outer endpoint as p1 and inner as p2.
+    const outerEnd = closestPointOnPolygon(chosen.from, outer);
+    const startsOnOuter = outerEnd && distance(outerEnd.closest, chosen.from) < 0.001;
+    if (startsOnOuter) {
         return {
-            p1: clonePoint(outerHit.closest),
-            p2: clonePoint(innerHit.closest),
+            p1: chosen.from,
+            p2: chosen.to,
         };
     }
-
-    let across = { x: -tangent.y, y: tangent.x };
-    const toInner = {
-        x: innerHit.closest.x - outerHit.closest.x,
-        y: innerHit.closest.y - outerHit.closest.y,
-    };
-    if (dot(across, toInner) < 0) {
-        across = { x: -across.x, y: -across.y };
-    }
-
-    const outerHits = linePolygonIntersections(seedPoint, across, outer);
-    const innerHits = linePolygonIntersections(seedPoint, across, inner);
-    const bestOuter = pickClosestHit(outerHits, seedPoint);
-    const bestInner = pickClosestHit(innerHits, seedPoint);
-
-    if (!bestOuter || !bestInner) {
-        return {
-            p1: clonePoint(outerHit.closest),
-            p2: clonePoint(innerHit.closest),
-        };
-    }
-
-    // Keep a usable gate length; degenerate hits fall back to closest wall points.
-    if (distance(bestOuter.point, bestInner.point) < 0.05) {
-        return {
-            p1: clonePoint(outerHit.closest),
-            p2: clonePoint(innerHit.closest),
-        };
-    }
-
     return {
-        p1: clonePoint(bestOuter.point),
-        p2: clonePoint(bestInner.point),
+        p1: chosen.to,
+        p2: chosen.from,
     };
 }
