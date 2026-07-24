@@ -1,5 +1,6 @@
 .lobby-panes {
     display: flex;
+    flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
 }
@@ -8,6 +9,11 @@
     width: 100%;
     min-height: 0;
     animation: lobbyPaneIn 180ms ease-out both;
+}
+
+/* One bottom pin only — same as main's .main-menu inside #start-group. */
+.lobby-pane.main-menu {
+    margin-top: auto;
 }
 
 .lobby-pane[hidden] {
@@ -26,16 +32,11 @@
     }
 }
 
-.lobby-pane--home {
-    align-items: stretch;
-    justify-content: flex-start;
-}
-
 .lobby-mode-menu {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.4rem;
+    gap: 0.5rem;
     width: 100%;
 }
 
@@ -103,7 +104,6 @@
     align-items: stretch;
     gap: 0.65rem;
     width: 95%;
-    margin-top: auto;
     margin-inline: auto;
 }
 

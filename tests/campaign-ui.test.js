@@ -353,6 +353,12 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).toMatch(
             /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
         );
+        expect(css).not.toMatch(
+            /\.lobby-primary-row\s*\{[^}]*margin-top:\s*auto;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-panes\s*\{[^}]*flex-direction:\s*column;/s,
+        );
         expect(css).toMatch(
             /\.lobby-pane--campaign \.main-menu__item--primary\s*\{[^}]*font-size:\s*clamp\(1\.25rem,\s*5\.5vw,\s*1\.5rem\);/s,
         );

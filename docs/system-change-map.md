@@ -112,13 +112,14 @@ flowchart LR
 - `game/lobby/ui.js` owns the Home, Daily, Campaign, and player-challenge
   panes. `game/modes/launch-target.js` resolves standalone Home, direct mode
   queries, Daily post context, and Campaign challenge post context. The shared
-  lobby keeps the original compact `#start-group` footprint; Home, Daily, and
-  Campaign list their secondary actions as compact right-anchored mode-action
-  labels without eyebrows, arrows, icons, or bottom borders. Daily/Campaign keep
-  a full-width primary Race/Start button at the bottom. On Daily and Campaign
-  screens only, the mode name sits under the shared Mini Racer title instead of
-  a separate pane heading; Daily also shows today's track name under that mode
-  label. Home and player-challenge panes are unchanged.
+  lobby keeps the original compact `#start-group` footprint and a single
+  bottom-pinned menu cluster (`margin-top: auto` once on the active pane),
+  matching main spacing. Home, Daily, and Campaign list secondary actions as
+  compact right-anchored mode-action labels without eyebrows, arrows, icons, or
+  bottom borders. Daily/Campaign keep a full-width primary Race/Start button in
+  that same cluster. On Daily and Campaign screens only, the mode name sits
+  under the shared Mini Racer title; Daily also shows today's track name under
+  that mode label. Home and player-challenge panes are unchanged.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
   Number Zero through Nine with fixed `1,1,1,2,2,2,3,3,3,3` laps and Gold/Author
   gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable
