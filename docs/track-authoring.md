@@ -39,7 +39,8 @@ Wall Corners controls how rounded wall corners look in race
 
 Start line and checkpoint edits snap across the lane, stay perpendicular
 to the nearer track wall, and extend a bit past both walls so wall-hugging
-cars still trigger them.
+cars still trigger them. The start car always faces perpendicular to the
+start/finish line and snaps onto that line's center axis when moved.
 
 ## Adding A Track
 

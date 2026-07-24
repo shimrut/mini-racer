@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker start car angle is derived from the start/finish line: the car always faces perpendicular and snaps onto the line center when moved. The manual Start Angle field is removed.
 - Mapmaker keeps visible start-line/checkpoint end dots for length, but dragging the line or either end moves the whole gate.
 - Mapmaker start lines and checkpoints now stick out past both walls so wall-hugging cars still trigger them.
 - Fixed Mapmaker start-line/checkpoint snapping so dragging through a corner no longer jumps the gate to another part of the track.

@@ -6,6 +6,7 @@ import {
     extendGatePastWalls,
     GATE_WALL_OVERHANG,
 } from './mapmaker/lane-gate.js';
+import { snapStartPose } from './mapmaker/start-pose.js';
 import {
     formatTrackNumber as formatNumber,
     generateTrackIntegrationSnippet,
@@ -378,7 +379,6 @@ class MapmakerApp {
         this.trackDestinationSelect = document.getElementById('track-destination-select');
         this.trackDestinationHint = document.getElementById('track-destination-hint');
         this.cornerRadiusSelect = document.getElementById('corner-radius-select');
-        this.startAngleInput = document.getElementById('start-angle-input');
         this.lineSmoothingInput = document.getElementById('line-smoothing-input');
         this.drawMetricsLabel = document.getElementById('draw-metrics-label');
         this.selectedXInput = document.getElementById('selected-x-input');
@@ -610,12 +610,6 @@ class MapmakerApp {
             this.setCornerRadius(Number(this.cornerRadiusSelect.value));
         });
 
-        this.startAngleInput.addEventListener('input', () => {
-            const value = Number(this.startAngleInput.value);
-            this.track.startAngle = Number.isFinite(value) ? value : 0;
-            this.markDirty('Updated start angle.');
-        });
-
         this.lineSmoothingInput.addEventListener('input', () => {
             const rawValue = this.lineSmoothingInput.value.trim();
             if (!rawValue) {
@@ -646,12 +640,24 @@ class MapmakerApp {
             if (gate) {
                 return;
             }
+            const handle = this.state.selectedHandle;
+            const nextX = Number(this.selectedXInput.value);
+            const nextY = Number(this.selectedYInput.value);
+            if (
+                handle?.kind === 'startPos'
+                && Number.isFinite(nextX)
+                && Number.isFinite(nextY)
+            ) {
+                this.snapStartPoseToLine({
+                    seedPoint: { x: nextX, y: nextY },
+                    status: 'Updated start car (snapped perpendicular to start line).',
+                });
+                return;
+            }
             const point = this.getSelectedPointRef();
             if (!point) {
                 return;
             }
-            const nextX = Number(this.selectedXInput.value);
-            const nextY = Number(this.selectedYInput.value);
             if (Number.isFinite(nextX)) {
                 point.x = nextX;
             }
@@ -846,7 +852,6 @@ class MapmakerApp {
         this.trackNameInput.value = this.track.name;
         this.syncDestinationControl(trackKey);
         this.syncCornerRadiusControl();
-        this.startAngleInput.value = String(this.track.startAngle ?? 0);
         this.syncLineSmoothingControl();
         this.syncDrawWidthControls();
         this.state.draftLoop = [];
@@ -1048,12 +1053,44 @@ class MapmakerApp {
         gate.p1.y = snapped.p1.y;
         gate.p2.x = snapped.p2.x;
         gate.p2.y = snapped.p2.y;
+        if (this.state.selectedHandle?.kind === 'startLine') {
+            this.snapStartPoseToLine({
+                seedPoint: this.track.startPos,
+                markDirty: false,
+            });
+        }
         this.syncSelectedInputs();
         if (options.markDirty !== false) {
             const label = this.state.selectedHandle?.kind === 'checkpoint'
                 ? 'Snapped checkpoint across the lane.'
                 : 'Snapped start line across the lane.';
             this.markDirty(options.status ?? label, options.updateStatus !== false);
+        }
+        return true;
+    }
+
+    snapStartPoseToLine(options = {}) {
+        if (!this.hasTrackGeometry()) {
+            return false;
+        }
+        const seedPoint = options.seedPoint || this.track.startPos;
+        const snapped = snapStartPose(seedPoint, this.track.startLine, {
+            preferredAngle: this.track.startAngle,
+        });
+        if (!snapped) {
+            return false;
+        }
+        this.track.startPos.x = snapped.startPos.x;
+        this.track.startPos.y = snapped.startPos.y;
+        this.track.startAngle = snapped.startAngle;
+        this.syncSelectedInputs();
+        if (options.markDirty !== false) {
+            this.markDirty(
+                options.status ?? 'Snapped start car perpendicular to the start line.',
+                options.updateStatus !== false,
+            );
+        } else {
+            this.draw();
         }
         return true;
     }
@@ -1118,6 +1155,10 @@ class MapmakerApp {
         }
         if (!this.hasTrackGeometry()) {
             this.canvasHint.textContent = 'This track has no walls yet. Switch to Line Build and close the loop first.';
+            return;
+        }
+        if (this.state.tool === 'startPos') {
+            this.canvasHint.textContent = 'Drag the start car. It stays centered on the start line and always faces perpendicular to it.';
             return;
         }
         if (this.state.tool === 'startLine' || this.state.tool === 'checkpoints') {
@@ -1559,7 +1600,6 @@ class MapmakerApp {
         this.track.lineSmoothing = lineSmoothing;
         this.syncCornerRadiusControl();
         this.syncLineSmoothingControl();
-        this.startAngleInput.value = formatNumber(this.track.startAngle);
         this.state.draftLoop = [];
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
@@ -1649,13 +1689,12 @@ class MapmakerApp {
         }
 
         if (this.state.tool === 'startPos') {
-            const point = this.track.startPos;
             const worldPoint = this.screenToWorld(canvasPoint.x, canvasPoint.y, viewport);
-            point.x = worldPoint.x;
-            point.y = worldPoint.y;
             this.state.selectedHandle = { kind: 'startPos' };
-            this.syncSelectedInputs();
-            this.markDirty('Moved start position.');
+            this.snapStartPoseToLine({
+                seedPoint: worldPoint,
+                status: 'Moved start car (snapped perpendicular to start line).',
+            });
             return;
         }
 
@@ -1695,6 +1734,14 @@ class MapmakerApp {
                     updateStatus: false,
                 });
                 this.draw();
+                return;
+            }
+            if (handle?.kind === 'startPos') {
+                this.snapStartPoseToLine({
+                    seedPoint: worldPoint,
+                    status: 'Moved start car (snapped perpendicular to start line).',
+                    updateStatus: false,
+                });
                 return;
             }
             const point = this.getSelectedPointRef();
@@ -1861,6 +1908,13 @@ class MapmakerApp {
                     status: handle.kind === 'checkpoint'
                         ? 'Nudged checkpoint (snapped perpendicular to walls).'
                         : 'Nudged start line (snapped perpendicular to walls).',
+                });
+                return;
+            }
+            if (handle?.kind === 'startPos') {
+                this.snapStartPoseToLine({
+                    seedPoint: { x: nextX, y: nextY },
+                    status: 'Nudged start car (snapped perpendicular to start line).',
                 });
                 return;
             }

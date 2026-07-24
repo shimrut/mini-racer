@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.15">
+    <link rel="stylesheet" href="mapmaker.css?v=2.16">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -60,22 +60,16 @@
                     </p>
                 </label>
 
-                <div class="field-grid">
-                    <label class="field">
-                        <span>Wall Corners</span>
-                        <select id="corner-radius-select">
-                            <option value="0">Sharp</option>
-                            <option value="1.5">A bit rounded</option>
-                            <option value="3" selected>Rounded</option>
-                            <option value="5">Soft</option>
-                        </select>
-                        <p class="field-hint">How rounded wall corners look in race. Does not change how wide the lane is.</p>
-                    </label>
-                    <label class="field">
-                        <span>Start Angle</span>
-                        <input id="start-angle-input" type="number" step="0.01">
-                    </label>
-                </div>
+                <label class="field">
+                    <span>Wall Corners</span>
+                    <select id="corner-radius-select">
+                        <option value="0">Sharp</option>
+                        <option value="1.5">A bit rounded</option>
+                        <option value="3" selected>Rounded</option>
+                        <option value="5">Soft</option>
+                    </select>
+                    <p class="field-hint">How rounded wall corners look in race. Does not change how wide the lane is.</p>
+                </label>
             </section>
 
             <section class="maker-panel">
