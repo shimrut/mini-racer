@@ -1,6 +1,8 @@
 const SEGMENT_EPSILON = 1e-9;
 const MAX_GATE_LENGTH = 20;
 const CORNER_T = 0.08;
+/** Push gate ends past walls so wall-hugging cars still cross the segment. */
+export const GATE_WALL_OVERHANG = 0.75;
 
 function clonePoint(point) {
     return { x: Number(point.x), y: Number(point.y) };
@@ -234,6 +236,34 @@ function scoreGateCandidate(gate, seedPoint, previousMidpoint = null) {
 }
 
 /**
+ * Extend a wall-to-wall gate past both walls so cars scraping the edge still
+ * cross the checkpoint / start-line segment.
+ */
+export function extendGatePastWalls(p1, p2, overhang = GATE_WALL_OVERHANG) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 0.000001 || !(overhang > 0)) {
+        return {
+            p1: clonePoint(p1),
+            p2: clonePoint(p2),
+        };
+    }
+    const ux = dx / length;
+    const uy = dy / length;
+    return {
+        p1: {
+            x: p1.x - ux * overhang,
+            y: p1.y - uy * overhang,
+        },
+        p2: {
+            x: p2.x + ux * overhang,
+            y: p2.y + uy * overhang,
+        },
+    };
+}
+
+/**
  * Build a short lane-crossing gate through seedPoint.
  * Casts perpendicular from the nearest wall into the opposite wall so both
  * ends stay on the corridor instead of linking unrelated closest points.
@@ -269,17 +299,11 @@ export function buildPerpendicularLaneGate(seedPoint, outer, inner, options = {}
     ));
     const chosen = candidates[0];
 
-    // Always return outer endpoint as p1 and inner as p2.
+    // Always return outer endpoint as p1 and inner as p2, then extend past walls.
     const outerEnd = closestPointOnPolygon(chosen.from, outer);
     const startsOnOuter = outerEnd && distance(outerEnd.closest, chosen.from) < 0.001;
-    if (startsOnOuter) {
-        return {
-            p1: chosen.from,
-            p2: chosen.to,
-        };
-    }
-    return {
-        p1: chosen.to,
-        p2: chosen.from,
-    };
+    const wallSpan = startsOnOuter
+        ? { p1: chosen.from, p2: chosen.to }
+        : { p1: chosen.to, p2: chosen.from };
+    return extendGatePastWalls(wallSpan.p1, wallSpan.p2);
 }

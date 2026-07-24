@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker start lines and checkpoints now stick out past both walls so wall-hugging cars still trigger them.
 - Fixed Mapmaker start-line/checkpoint snapping so dragging through a corner no longer jumps the gate to another part of the track.
 - Mapmaker start line and checkpoint edits snap wall-to-wall and stay perpendicular to the track walls.
 - Mapmaker Wall Corners uses plain labels (Sharp, A bit rounded, Rounded, Soft) instead of a raw curve-radius number.

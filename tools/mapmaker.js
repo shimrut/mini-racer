@@ -1,7 +1,11 @@
 import { CONFIG } from '../game/config.js';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
-import { buildPerpendicularLaneGate } from './mapmaker/lane-gate.js';
+import {
+    buildPerpendicularLaneGate,
+    extendGatePastWalls,
+    GATE_WALL_OVERHANG,
+} from './mapmaker/lane-gate.js';
 import {
     formatTrackNumber as formatNumber,
     generateTrackIntegrationSnippet,
@@ -291,27 +295,29 @@ function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) 
     );
     const checkpointCount = Math.min(4, Math.max(3, Math.floor(outer.length / 12)));
     const checkpoints = [];
+    const gateHalf = halfWidth + GATE_WALL_OVERHANG;
     for (let index = 1; index <= checkpointCount; index += 1) {
         const sample = sampleClosedLoopAtDistance(centerline, (loopLength * index) / (checkpointCount + 1));
         const normal = { x: -sample.tangent.y, y: sample.tangent.x };
         checkpoints.push({
             p1: {
-                x: sample.point.x + normal.x * halfWidth,
-                y: sample.point.y + normal.y * halfWidth
+                x: sample.point.x + normal.x * gateHalf,
+                y: sample.point.y + normal.y * gateHalf
             },
             p2: {
-                x: sample.point.x - normal.x * halfWidth,
-                y: sample.point.y - normal.y * halfWidth
+                x: sample.point.x - normal.x * gateHalf,
+                y: sample.point.y - normal.y * gateHalf
             }
         });
     }
 
+    const startSpan = extendGatePastWalls(outer[startIndex], inner[startIndex]);
     return normalizeTrackLayout({
         outer: outer.map(clonePoint),
         inner: inner.map(clonePoint),
         startLine: {
-            p1: clonePoint(outer[startIndex]),
-            p2: clonePoint(inner[startIndex])
+            p1: clonePoint(startSpan.p1),
+            p2: clonePoint(startSpan.p2)
         },
         startPos: midpoint(outer[nextIndex], inner[nextIndex]),
         startAngle,
@@ -1120,7 +1126,7 @@ class MapmakerApp {
             return;
         }
         if (this.state.tool === 'startLine' || this.state.tool === 'checkpoints') {
-            this.canvasHint.textContent = 'Drag a handle to slide the line along the track. It snaps perpendicular across the outer and inner walls.';
+            this.canvasHint.textContent = 'Drag a handle to slide the line along the track. It snaps across the lane, stays perpendicular, and sticks out past both walls.';
             return;
         }
         this.canvasHint.textContent = 'Click the track to select, then drag to edit or use the sidebar for precise values.';

@@ -37,8 +37,9 @@ usual racing lane width for Line Build.
 Wall Corners controls how rounded wall corners look in race
 (Sharp, A bit rounded, Rounded, Soft). It is not the driven turn radius.
 
-Start line and checkpoint edits snap wall-to-wall and stay perpendicular
-to the nearer track wall, so gates always cross the lane cleanly.
+Start line and checkpoint edits snap across the lane, stay perpendicular
+to the nearer track wall, and extend a bit past both walls so wall-hugging
+cars still trigger them.
 
 ## Adding A Track
 
