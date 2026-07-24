@@ -40,9 +40,9 @@ Brush size is fixed at `4u`, about **7 car-widths** across. That is the
 usual racing lane width for Line Build.
 
 Line Build fillets each sharp bend on the drawn centerline by half the lane
-width, then offsets both walls by that same half-width. That keeps the road
-the same width through corners (no miter flare). Hard bends end up with a
-tight inner apex and a longer outer arc.
+width, then offsets both walls by that same half-width. Bends tighter than
+half the lane are widened first so the inside wall cannot cross itself.
+That keeps the road the same width through corners.
 
 Existing saved tracks are unchanged until you redraw them with Line Build.
 

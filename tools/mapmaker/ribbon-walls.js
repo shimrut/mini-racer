@@ -1,18 +1,16 @@
 /**
  * Build constant-width outer/inner walls from a centerline.
  *
- * Sharp centerline corners are filleted with radius = halfWidth, then each
- * sample is offset left/right by halfWidth. That keeps lane width steady
- * through bends (no miter flare).
- *
- * At a hard bend this yields ~1 inner apex (fillet center) and several outer
- * points on an arc of radius 2 * halfWidth.
+ * Tight bends (radius < halfWidth) are inflated first so the inner offset
+ * cannot loop through itself. Sharp corners are filleted at halfWidth, then
+ * every sample is offset by ±halfWidth.
  */
 
-const STRAIGHT_DOT = 0.985; // ~10° or less → no fillet
+const STRAIGHT_DOT = 0.985;
 const MERGE_DISTANCE = 0.04;
 const MIN_ARC_STEPS = 2;
-const MAX_ARC_STEPS = 10;
+const MAX_ARC_STEPS = 12;
+const INFLATE_ITERS = 10;
 
 function clonePoint(point) {
     return { x: Number(point.x), y: Number(point.y) };
@@ -82,6 +80,88 @@ function cornerFrame(prev, curr, next) {
     const turnCross = incoming.x * outgoing.y - incoming.y * outgoing.x;
     const turnAngle = Math.atan2(turnCross, turnDot);
     return { incoming, outgoing, turnDot, turnCross, turnAngle };
+}
+
+function localBendRadius(prev, curr, next) {
+    const a = distance(curr, next);
+    const b = distance(prev, next);
+    const c = distance(prev, curr);
+    const area2 = Math.abs(
+        (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x),
+    );
+    if (area2 < 1e-8) {
+        return Infinity;
+    }
+    return (a * b * c) / area2;
+}
+
+function circumcenter(prev, curr, next) {
+    const d = 2 * (
+        prev.x * (curr.y - next.y) + curr.x * (next.y - prev.y) + next.x * (prev.y - curr.y)
+    );
+    if (Math.abs(d) < 1e-9) {
+        return null;
+    }
+    const prevSq = prev.x * prev.x + prev.y * prev.y;
+    const currSq = curr.x * curr.x + curr.y * curr.y;
+    const nextSq = next.x * next.x + next.y * next.y;
+    return {
+        x: (prevSq * (curr.y - next.y) + currSq * (next.y - prev.y) + nextSq * (prev.y - curr.y)) / d,
+        y: (prevSq * (next.x - curr.x) + currSq * (prev.x - next.x) + nextSq * (curr.x - prev.x)) / d,
+    };
+}
+
+function deltaAngle(start, end, ccw) {
+    let sweep = end - start;
+    if (ccw) {
+        while (sweep <= 0) sweep += Math.PI * 2;
+        while (sweep > Math.PI * 2) sweep -= Math.PI * 2;
+    } else {
+        while (sweep >= 0) sweep -= Math.PI * 2;
+        while (sweep < -Math.PI * 2) sweep += Math.PI * 2;
+    }
+    return sweep;
+}
+
+/**
+ * Push tight bends outward until local radius >= minRadius.
+ * Handles freehand hairpins (including ~180° turns) without arc-fit math.
+ */
+export function inflateTightBends(points, minRadius) {
+    if (!points || points.length < 3 || !(minRadius > 0)) {
+        return (points || []).map(clonePoint);
+    }
+
+    let result = points.map(clonePoint);
+    for (let iter = 0; iter < INFLATE_ITERS; iter += 1) {
+        let moved = false;
+        const next = result.map(clonePoint);
+        const len = result.length;
+        for (let index = 0; index < len; index += 1) {
+            const prev = result[(index - 1 + len) % len];
+            const curr = result[index];
+            const following = result[(index + 1) % len];
+            const radius = localBendRadius(prev, curr, following);
+            if (!(radius < minRadius)) {
+                continue;
+            }
+            const center = circumcenter(prev, curr, following);
+            if (!center) {
+                continue;
+            }
+            const radial = normalizeVector(curr.x - center.x, curr.y - center.y);
+            if (Math.abs(radial.x) < 1e-9 && Math.abs(radial.y) < 1e-9) {
+                continue;
+            }
+            next[index] = add(center, scale(radial, minRadius));
+            moved = true;
+        }
+        result = next;
+        if (!moved) {
+            break;
+        }
+    }
+    return result;
 }
 
 /**
@@ -177,7 +257,6 @@ export function filletCenterline(points, filletRadius) {
                     x: corner.center.x + Math.cos(angle) * corner.radius,
                     y: corner.center.y + Math.sin(angle) * corner.radius,
                 };
-                // Arc tangent: left turn → +90° from radius, right turn → -90°.
                 const radial = normalizeVector(point.x - corner.center.x, point.y - corner.center.y);
                 const tangent =
                     corner.turnAngle >= 0
@@ -189,7 +268,6 @@ export function filletCenterline(points, filletRadius) {
             pushSample(corner.curr, edgeDir);
         }
 
-        // Straight run from this corner's exit to the next corner's entry.
         const exitTrim = corner.isCorner ? corner.trim : 0;
         const enterTrim = nextCorner.isCorner ? nextCorner.trim : 0;
         const edgeLen = distance(curr, next);
@@ -204,18 +282,6 @@ export function filletCenterline(points, filletRadius) {
     return samples;
 }
 
-function deltaAngle(start, end, ccw) {
-    let sweep = end - start;
-    if (ccw) {
-        while (sweep <= 0) sweep += Math.PI * 2;
-        while (sweep > Math.PI * 2) sweep -= Math.PI * 2;
-    } else {
-        while (sweep >= 0) sweep -= Math.PI * 2;
-        while (sweep < -Math.PI * 2) sweep += Math.PI * 2;
-    }
-    return sweep;
-}
-
 /**
  * @param {{x:number,y:number}[]} centerline closed loop sample points
  * @param {number} halfWidth half of lane width
@@ -226,23 +292,39 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
         return null;
     }
 
-    const loopCcw = signedArea(centerline) > 0;
-    // Fillet radius = halfWidth → inner side of a hard bend collapses to the
-    // fillet center; outer rides an arc at 2 * halfWidth (constant width).
-    const samples = filletCenterline(centerline, halfWidth);
+    const inflated = inflateTightBends(centerline, halfWidth);
+    const loopCcw = signedArea(inflated) > 0;
+    const samples = filletCenterline(inflated, halfWidth);
     if (samples.length < 3) {
         return null;
     }
 
     const outer = [];
     const inner = [];
-    for (const sample of samples) {
-        const tangent = sample.tangent;
-        const left = leftNormal(tangent);
+    const sampleCount = samples.length;
+    for (let index = 0; index < sampleCount; index += 1) {
+        const prev = samples[(index - 1 + sampleCount) % sampleCount];
+        const curr = samples[index];
+        const next = samples[(index + 1) % sampleCount];
+        const left = leftNormal(curr.tangent);
         const towardInner = loopCcw ? left : scale(left, -1);
         const towardOuter = scale(towardInner, -1);
-        pushUnique(inner, add(sample.point, scale(towardInner, halfWidth)));
-        pushUnique(outer, add(sample.point, scale(towardOuter, halfWidth)));
+
+        pushUnique(outer, add(curr.point, scale(towardOuter, halfWidth)));
+
+        const bendRadius = localBendRadius(prev.point, curr.point, next.point);
+        const frame = cornerFrame(prev.point, curr.point, next.point);
+        const turningInward =
+            (loopCcw && frame.turnAngle > 0) || (!loopCcw && frame.turnAngle < 0);
+
+        // If the centerline bends tighter than the lane half-width, a normal
+        // inward offset loops through itself. Snap to the bend center instead.
+        if (turningInward && bendRadius <= halfWidth * 1.05) {
+            const center = circumcenter(prev.point, curr.point, next.point);
+            pushUnique(inner, center || add(curr.point, scale(towardInner, halfWidth)));
+        } else {
+            pushUnique(inner, add(curr.point, scale(towardInner, halfWidth)));
+        }
     }
 
     if (outer.length > 1 && distance(outer[0], outer[outer.length - 1]) < MERGE_DISTANCE) {
@@ -251,6 +333,9 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
     if (inner.length > 1 && distance(inner[0], inner[inner.length - 1]) < MERGE_DISTANCE) {
         inner.pop();
     }
+
+    // Tiny collapsed apex clusters → one point.
+    collapsePointClusters(inner, halfWidth * 0.15);
 
     if (outer.length < 3 || inner.length < 3) {
         return null;
@@ -263,4 +348,59 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
     }
 
     return { outer, inner };
+}
+
+/** Merge consecutive points that sit in a tight cluster into their centroid. */
+function collapsePointClusters(points, radius) {
+    if (!points || points.length < 3 || !(radius > 0)) {
+        return;
+    }
+    let guard = 0;
+    while (guard < points.length) {
+        guard += 1;
+        let merged = false;
+        for (let index = 0; index < points.length; index += 1) {
+            const a = points[index];
+            const b = points[(index + 1) % points.length];
+            if (distance(a, b) > radius) {
+                continue;
+            }
+            // Grow cluster of consecutive close points.
+            let end = index;
+            let count = 1;
+            let sumX = a.x;
+            let sumY = a.y;
+            while (count < points.length) {
+                const nextIndex = (end + 1) % points.length;
+                if (distance(points[end], points[nextIndex]) > radius) {
+                    break;
+                }
+                end = nextIndex;
+                count += 1;
+                sumX += points[end].x;
+                sumY += points[end].y;
+                if (end === index) {
+                    break;
+                }
+            }
+            if (count < 2) {
+                continue;
+            }
+            const centroid = { x: sumX / count, y: sumY / count };
+            if (end >= index) {
+                points.splice(index, count, centroid);
+            } else {
+                // Cluster wrapped past 0.
+                const tail = points.length - index;
+                points.splice(index, tail);
+                points.splice(0, end + 1);
+                points.push(centroid);
+            }
+            merged = true;
+            break;
+        }
+        if (!merged) {
+            break;
+        }
+    }
 }
