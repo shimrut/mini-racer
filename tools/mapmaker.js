@@ -408,6 +408,7 @@ class MapmakerApp {
             tool: 'outer',
             selectedHandle: null,
             hoverHandle: null,
+            hoverSegment: null,
             checkpointIndex: 0,
             drag: null,
             dirtyTrackKeys: new Set(),
@@ -641,25 +642,16 @@ class MapmakerApp {
         });
 
         const updateSelectedCoordinate = () => {
+            const gate = this.getSelectedLaneGateRef();
+            if (gate) {
+                return;
+            }
             const point = this.getSelectedPointRef();
             if (!point) {
                 return;
             }
             const nextX = Number(this.selectedXInput.value);
             const nextY = Number(this.selectedYInput.value);
-            const handle = this.state.selectedHandle;
-            if (
-                (handle?.kind === 'startLine' || handle?.kind === 'checkpoint')
-                && Number.isFinite(nextX)
-                && Number.isFinite(nextY)
-            ) {
-                this.snapSelectedLaneGate({ x: nextX, y: nextY }, {
-                    status: handle.kind === 'checkpoint'
-                        ? 'Updated checkpoint (snapped perpendicular to walls).'
-                        : 'Updated start line (snapped perpendicular to walls).',
-                });
-                return;
-            }
             if (Number.isFinite(nextX)) {
                 point.x = nextX;
             }
@@ -679,7 +671,6 @@ class MapmakerApp {
                 this.state.selectedHandle = {
                     kind: 'checkpoint',
                     checkpointIndex: this.state.checkpointIndex,
-                    endpoint: 'p1'
                 };
             }
             this.syncSelectedInputs();
@@ -760,10 +751,9 @@ class MapmakerApp {
             this.state.selectedHandle = {
                 kind: 'checkpoint',
                 checkpointIndex: this.state.checkpointIndex,
-                endpoint: 'p1'
             };
         } else if (tool === 'startLine') {
-            this.state.selectedHandle = { kind: 'startLine', endpoint: 'p1' };
+            this.state.selectedHandle = { kind: 'startLine' };
         } else if (tool === 'startPos') {
             this.state.selectedHandle = { kind: 'startPos' };
         } else {
@@ -869,12 +859,12 @@ class MapmakerApp {
             this.state.tool = 'draw';
             this.state.selectedHandle = null;
         } else if (this.state.tool === 'startLine') {
-            this.state.selectedHandle = { kind: 'startLine', endpoint: 'p1' };
+            this.state.selectedHandle = { kind: 'startLine' };
         } else if (this.state.tool === 'startPos') {
             this.state.selectedHandle = { kind: 'startPos' };
         } else if (this.state.tool === 'checkpoints') {
             this.state.selectedHandle = this.track.checkpoints.length
-                ? { kind: 'checkpoint', checkpointIndex: 0, endpoint: 'p1' }
+                ? { kind: 'checkpoint', checkpointIndex: 0 }
                 : null;
         }
         this.state.checkpointIndex = 0;
@@ -1002,16 +992,10 @@ class MapmakerApp {
         if (handle.kind === 'polygon') {
             return this.track[handle.path][handle.index] || null;
         }
-        if (handle.kind === 'startLine') {
-            return this.track.startLine[handle.endpoint];
-        }
         if (handle.kind === 'startPos') {
             return this.track.startPos;
         }
-        if (handle.kind === 'checkpoint') {
-            const checkpoint = this.track.checkpoints[handle.checkpointIndex];
-            return checkpoint ? checkpoint[handle.endpoint] : null;
-        }
+        // Start lines and checkpoints are whole-line selections, not endpoints.
         return null;
     }
 
@@ -1027,6 +1011,16 @@ class MapmakerApp {
             return this.track.checkpoints[handle.checkpointIndex] || null;
         }
         return null;
+    }
+
+    getLaneGateMidpoint(gate) {
+        if (!gate?.p1 || !gate?.p2) {
+            return null;
+        }
+        return {
+            x: (gate.p1.x + gate.p2.x) / 2,
+            y: (gate.p1.y + gate.p2.y) / 2,
+        };
     }
 
     snapSelectedLaneGate(seedPoint, options = {}) {
@@ -1065,8 +1059,10 @@ class MapmakerApp {
     }
 
     syncSelectedInputs() {
+        const gate = this.getSelectedLaneGateRef();
         const point = this.getSelectedPointRef();
-        const hasPoint = Boolean(point);
+        const handle = this.state.selectedHandle;
+        const hasPoint = Boolean(point) && !gate;
         this.selectedXInput.disabled = !hasPoint;
         this.selectedYInput.disabled = !hasPoint;
         if (hasPoint) {
@@ -1077,8 +1073,7 @@ class MapmakerApp {
             this.selectedYInput.value = '';
         }
 
-        const handle = this.state.selectedHandle;
-        if (!handle || !point) {
+        if (!handle) {
             this.selectionLabel.textContent = 'No point selected.';
             return;
         }
@@ -1086,11 +1081,11 @@ class MapmakerApp {
         if (handle.kind === 'polygon') {
             this.selectionLabel.textContent = `${handle.path} point ${handle.index + 1}`;
         } else if (handle.kind === 'startLine') {
-            this.selectionLabel.textContent = `start line ${handle.endpoint}`;
+            this.selectionLabel.textContent = 'start line (drag line to move)';
         } else if (handle.kind === 'startPos') {
             this.selectionLabel.textContent = 'start position';
         } else if (handle.kind === 'checkpoint') {
-            this.selectionLabel.textContent = `checkpoint ${handle.checkpointIndex + 1} ${handle.endpoint}`;
+            this.selectionLabel.textContent = `checkpoint ${handle.checkpointIndex + 1} (drag line to move)`;
         }
     }
 
@@ -1126,7 +1121,7 @@ class MapmakerApp {
             return;
         }
         if (this.state.tool === 'startLine' || this.state.tool === 'checkpoints') {
-            this.canvasHint.textContent = 'Drag a handle to slide the line along the track. It snaps across the lane, stays perpendicular, and sticks out past both walls.';
+            this.canvasHint.textContent = 'Drag the line to slide it along the track. End dots show length only — dragging them still moves the whole gate.';
             return;
         }
         this.canvasHint.textContent = 'Click the track to select, then drag to edit or use the sidebar for precise values.';
@@ -1326,7 +1321,7 @@ class MapmakerApp {
         if (tool === 'startLine') {
             return [
                 { kind: 'startLine', endpoint: 'p1', point: this.track.startLine.p1 },
-                { kind: 'startLine', endpoint: 'p2', point: this.track.startLine.p2 }
+                { kind: 'startLine', endpoint: 'p2', point: this.track.startLine.p2 },
             ];
         }
         if (tool === 'startPos') {
@@ -1335,7 +1330,7 @@ class MapmakerApp {
         if (tool === 'checkpoints') {
             return this.track.checkpoints.flatMap((checkpoint, checkpointIndex) => ([
                 { kind: 'checkpoint', checkpointIndex, endpoint: 'p1', point: checkpoint.p1 },
-                { kind: 'checkpoint', checkpointIndex, endpoint: 'p2', point: checkpoint.p2 }
+                { kind: 'checkpoint', checkpointIndex, endpoint: 'p2', point: checkpoint.p2 },
             ]));
         }
         return [];
@@ -1390,12 +1385,12 @@ class MapmakerApp {
             return a.path === b.path && a.index === b.index;
         }
         if (a.kind === 'startLine') {
-            return a.endpoint === b.endpoint;
+            return true;
         }
         if (a.kind === 'startPos') {
             return true;
         }
-        return a.checkpointIndex === b.checkpointIndex && a.endpoint === b.endpoint;
+        return a.checkpointIndex === b.checkpointIndex;
     }
 
     getCanvasPoint(event) {
@@ -1432,14 +1427,20 @@ class MapmakerApp {
     }
 
     hitTestSegment(canvasPoint, viewport = this.getViewport()) {
-        const hitRadius = 9;
+        const hitRadius = 12;
         let best = null;
 
         this.getSelectableSegments().forEach((segment) => {
             const start = this.worldToScreen(segment.a, viewport);
             const end = this.worldToScreen(segment.b, viewport);
             const match = distanceToSegment(canvasPoint, start, end);
-            if (match.distance <= hitRadius && (!best || match.distance < best.distance)) {
+            const radius = (
+                segment.kind === 'startLineSegment'
+                || segment.kind === 'checkpointSegment'
+            )
+                ? 14
+                : hitRadius;
+            if (match.distance <= radius && (!best || match.distance < best.distance)) {
                 best = { segment, distance: match.distance };
             }
         });
@@ -1475,7 +1476,7 @@ class MapmakerApp {
         }
 
         if (segment.kind === 'startLineSegment') {
-            this.selectHandle({ kind: 'startLine', endpoint: nearestEndpoint });
+            this.selectHandle({ kind: 'startLine' });
             return true;
         }
 
@@ -1483,7 +1484,6 @@ class MapmakerApp {
             this.selectHandle({
                 kind: 'checkpoint',
                 checkpointIndex: segment.checkpointIndex,
-                endpoint: nearestEndpoint
             });
             return true;
         }
@@ -1622,6 +1622,23 @@ class MapmakerApp {
                 return;
             }
             this.selectSegment(segmentHit, canvasPoint, viewport);
+            if (
+                segmentHit.kind === 'startLineSegment'
+                || segmentHit.kind === 'checkpointSegment'
+            ) {
+                this.freezeViewBounds();
+                this.state.drag = {
+                    type: 'laneGate',
+                    handle: this.state.selectedHandle,
+                };
+                this.snapSelectedLaneGate(worldPoint, {
+                    status: segmentHit.kind === 'checkpointSegment'
+                        ? 'Moved checkpoint (snapped perpendicular to walls).'
+                        : 'Moved start line (snapped perpendicular to walls).',
+                    updateStatus: false,
+                });
+            }
+            this.draw();
             return;
         }
 
@@ -1691,7 +1708,27 @@ class MapmakerApp {
             return;
         }
 
+        if (this.state.drag?.type === 'laneGate') {
+            const handle = this.state.drag.handle;
+            this.state.selectedHandle = handle;
+            this.snapSelectedLaneGate(worldPoint, {
+                status: handle?.kind === 'checkpoint'
+                    ? 'Moved checkpoint (snapped perpendicular to walls).'
+                    : 'Moved start line (snapped perpendicular to walls).',
+                updateStatus: false,
+            });
+            this.draw();
+            return;
+        }
+
         this.state.hoverHandle = this.hitTest(canvasPoint, viewport);
+        const segmentHover = this.hitTestSegment(canvasPoint, viewport);
+        this.state.hoverSegment = (
+            segmentHover?.kind === 'startLineSegment'
+            || segmentHover?.kind === 'checkpointSegment'
+        )
+            ? segmentHover
+            : null;
         this.draw();
     }
 
@@ -1718,7 +1755,7 @@ class MapmakerApp {
         if (this.state.drag?.type !== 'pan') {
             this.state.skipDrawClick = false;
         }
-        if (this.state.drag?.type === 'handle') {
+        if (this.state.drag?.type === 'handle' || this.state.drag?.type === 'laneGate') {
             this.releaseViewBounds({ keepCameraSteady: true });
         }
         this.state.drag = null;
@@ -1786,15 +1823,22 @@ class MapmakerApp {
             return;
         }
 
+        const gate = this.getSelectedLaneGateRef();
         const point = this.getSelectedPointRef();
-        if (!point) {
+        if (!gate && !point) {
             return;
         }
 
         const step = event.shiftKey ? 1 : 0.25;
         let moved = false;
-        let nextX = point.x;
-        let nextY = point.y;
+        const origin = gate
+            ? this.getLaneGateMidpoint(gate)
+            : { x: point.x, y: point.y };
+        if (!origin) {
+            return;
+        }
+        let nextX = origin.x;
+        let nextY = origin.y;
         if (event.key === 'ArrowLeft') {
             nextX -= step;
             moved = true;
@@ -1812,7 +1856,7 @@ class MapmakerApp {
         if (moved) {
             event.preventDefault();
             const handle = this.state.selectedHandle;
-            if (handle?.kind === 'startLine' || handle?.kind === 'checkpoint') {
+            if (gate && (handle?.kind === 'startLine' || handle?.kind === 'checkpoint')) {
                 this.snapSelectedLaneGate({ x: nextX, y: nextY }, {
                     status: handle.kind === 'checkpoint'
                         ? 'Nudged checkpoint (snapped perpendicular to walls).'
@@ -1961,7 +2005,6 @@ class MapmakerApp {
         this.state.selectedHandle = {
             kind: 'checkpoint',
             checkpointIndex: this.state.checkpointIndex,
-            endpoint: 'p1'
         };
         this.refreshCheckpointSelect();
         this.setTool('checkpoints');
@@ -1980,7 +2023,6 @@ class MapmakerApp {
             ? {
                 kind: 'checkpoint',
                 checkpointIndex: this.state.checkpointIndex,
-                endpoint: 'p1'
             }
             : null;
         this.syncSelectedInputs();
