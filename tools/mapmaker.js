@@ -1,7 +1,7 @@
 import { CONFIG } from '../game/config.js';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
-import { buildPerpendicularLaneGate } from './mapmaker/lane-gate.js';
+import { buildPerpendicularWallSpan } from './mapmaker/cross-track-snap.js';
 import {
     formatTrackNumber as formatNumber,
     generateTrackIntegrationSnippet,
@@ -641,25 +641,30 @@ class MapmakerApp {
             }
             const nextX = Number(this.selectedXInput.value);
             const nextY = Number(this.selectedYInput.value);
-            const handle = this.state.selectedHandle;
-            if (
-                (handle?.kind === 'startLine' || handle?.kind === 'checkpoint')
-                && Number.isFinite(nextX)
-                && Number.isFinite(nextY)
-            ) {
-                this.snapSelectedLaneGate({ x: nextX, y: nextY }, {
-                    status: handle.kind === 'checkpoint'
-                        ? 'Updated checkpoint (snapped perpendicular to walls).'
-                        : 'Updated start line (snapped perpendicular to walls).',
-                });
-                return;
-            }
             if (Number.isFinite(nextX)) {
                 point.x = nextX;
             }
             if (Number.isFinite(nextY)) {
                 point.y = nextY;
             }
+
+            const crossTrackLine = this.getSelectedCrossTrackLine();
+            if (
+                crossTrackLine
+                && this.applyPerpendicularSnapToCrossTrackLine(crossTrackLine, {
+                    x: point.x,
+                    y: point.y,
+                })
+            ) {
+                this.markDirty(
+                    this.state.selectedHandle?.kind === 'startLine'
+                        ? 'Updated start line (snapped across the track).'
+                        : 'Updated checkpoint (snapped across the track).',
+                );
+                this.syncSelectedInputs();
+                return;
+            }
+
             this.markDirty('Updated point coordinates.');
             this.syncSelectedInputs();
         };
@@ -1009,7 +1014,7 @@ class MapmakerApp {
         return null;
     }
 
-    getSelectedLaneGateRef() {
+    getSelectedCrossTrackLine() {
         const handle = this.state.selectedHandle;
         if (!handle) {
             return null;
@@ -1023,29 +1028,22 @@ class MapmakerApp {
         return null;
     }
 
-    snapSelectedLaneGate(seedPoint, options = {}) {
-        if (!this.hasTrackGeometry()) {
+    applyPerpendicularSnapToCrossTrackLine(line, worldPoint) {
+        if (!line || !this.hasTrackGeometry()) {
             return false;
         }
-        const gate = this.getSelectedLaneGateRef();
-        if (!gate) {
+        const span = buildPerpendicularWallSpan(
+            worldPoint,
+            this.track.outer,
+            this.track.inner,
+        );
+        if (!span) {
             return false;
         }
-        const snapped = buildPerpendicularLaneGate(seedPoint, this.track.outer, this.track.inner);
-        if (!snapped) {
-            return false;
-        }
-        gate.p1.x = snapped.p1.x;
-        gate.p1.y = snapped.p1.y;
-        gate.p2.x = snapped.p2.x;
-        gate.p2.y = snapped.p2.y;
-        this.syncSelectedInputs();
-        if (options.markDirty !== false) {
-            const label = this.state.selectedHandle?.kind === 'checkpoint'
-                ? 'Snapped checkpoint across the lane.'
-                : 'Snapped start line across the lane.';
-            this.markDirty(options.status ?? label, options.updateStatus !== false);
-        }
+        line.p1.x = span.p1.x;
+        line.p1.y = span.p1.y;
+        line.p2.x = span.p2.x;
+        line.p2.y = span.p2.y;
         return true;
     }
 
@@ -1110,8 +1108,12 @@ class MapmakerApp {
             this.canvasHint.textContent = 'This track has no walls yet. Switch to Line Build and close the loop first.';
             return;
         }
-        if (this.state.tool === 'startLine' || this.state.tool === 'checkpoints') {
-            this.canvasHint.textContent = 'Drag a handle to slide the line along the track. It snaps perpendicular across the outer and inner walls.';
+        if (this.state.tool === 'startLine') {
+            this.canvasHint.textContent = 'Drag the start line. It snaps wall-to-wall, perpendicular to the track.';
+            return;
+        }
+        if (this.state.tool === 'checkpoints') {
+            this.canvasHint.textContent = 'Drag a checkpoint. It snaps wall-to-wall, perpendicular to the track.';
             return;
         }
         this.canvasHint.textContent = 'Click the track to select, then drag to edit or use the sidebar for precise values.';
@@ -1655,16 +1657,27 @@ class MapmakerApp {
 
         if (this.state.drag?.type === 'handle') {
             const handle = this.state.drag.handle;
-            if (handle?.kind === 'startLine' || handle?.kind === 'checkpoint') {
-                this.snapSelectedLaneGate(worldPoint, {
-                    status: handle.kind === 'checkpoint'
-                        ? 'Moved checkpoint (snapped perpendicular to walls).'
-                        : 'Moved start line (snapped perpendicular to walls).',
-                    updateStatus: false,
-                });
-                this.draw();
+            const crossTrackLine = handle?.kind === 'startLine' || handle?.kind === 'checkpoint'
+                ? (
+                    handle.kind === 'startLine'
+                        ? this.track.startLine
+                        : this.track.checkpoints[handle.checkpointIndex]
+                )
+                : null;
+            if (crossTrackLine) {
+                if (this.applyPerpendicularSnapToCrossTrackLine(crossTrackLine, worldPoint)) {
+                    this.syncSelectedInputs();
+                    this.markDirty(
+                        handle.kind === 'startLine'
+                            ? 'Moved start line (snapped across the track).'
+                            : 'Moved checkpoint (snapped across the track).',
+                        false,
+                    );
+                    this.draw();
+                }
                 return;
             }
+
             const point = this.getSelectedPointRef();
             if (point) {
                 point.x = worldPoint.x;
@@ -1778,35 +1791,38 @@ class MapmakerApp {
 
         const step = event.shiftKey ? 1 : 0.25;
         let moved = false;
-        let nextX = point.x;
-        let nextY = point.y;
         if (event.key === 'ArrowLeft') {
-            nextX -= step;
+            point.x -= step;
             moved = true;
         } else if (event.key === 'ArrowRight') {
-            nextX += step;
+            point.x += step;
             moved = true;
         } else if (event.key === 'ArrowUp') {
-            nextY -= step;
+            point.y -= step;
             moved = true;
         } else if (event.key === 'ArrowDown') {
-            nextY += step;
+            point.y += step;
             moved = true;
         }
 
         if (moved) {
             event.preventDefault();
-            const handle = this.state.selectedHandle;
-            if (handle?.kind === 'startLine' || handle?.kind === 'checkpoint') {
-                this.snapSelectedLaneGate({ x: nextX, y: nextY }, {
-                    status: handle.kind === 'checkpoint'
-                        ? 'Nudged checkpoint (snapped perpendicular to walls).'
-                        : 'Nudged start line (snapped perpendicular to walls).',
-                });
+            const crossTrackLine = this.getSelectedCrossTrackLine();
+            if (
+                crossTrackLine
+                && this.applyPerpendicularSnapToCrossTrackLine(crossTrackLine, {
+                    x: point.x,
+                    y: point.y,
+                })
+            ) {
+                this.syncSelectedInputs();
+                this.markDirty(
+                    this.state.selectedHandle?.kind === 'startLine'
+                        ? 'Nudged start line (snapped across the track).'
+                        : 'Nudged checkpoint (snapped across the track).',
+                );
                 return;
             }
-            point.x = nextX;
-            point.y = nextY;
             this.syncSelectedInputs();
             this.markDirty('Nudged selected point.');
         }
@@ -1925,22 +1941,22 @@ class MapmakerApp {
 
     addCheckpoint() {
         if (!this.hasTrackGeometry()) {
-            this.setStatus('Build outer and inner walls before adding a checkpoint.', true);
+            this.setStatus('Build walls before adding checkpoints.', true);
             return;
         }
         const bounds = this.getTrackBounds();
-        const seed = {
+        const center = {
             x: (bounds.minX + bounds.maxX) / 2,
             y: (bounds.minY + bounds.maxY) / 2,
         };
-        const snapped = buildPerpendicularLaneGate(seed, this.track.outer, this.track.inner);
-        const checkpoint = snapped || {
-            p1: { x: seed.x - 2, y: seed.y },
-            p2: { x: seed.x + 2, y: seed.y },
+        const span = buildPerpendicularWallSpan(center, this.track.outer, this.track.inner);
+        const checkpoint = span || {
+            p1: { x: center.x - 2, y: center.y },
+            p2: { x: center.x + 2, y: center.y },
         };
         this.track.checkpoints.push({
-            p1: { x: checkpoint.p1.x, y: checkpoint.p1.y },
-            p2: { x: checkpoint.p2.x, y: checkpoint.p2.y },
+            p1: clonePoint(checkpoint.p1),
+            p2: clonePoint(checkpoint.p2),
         });
         this.state.checkpointIndex = this.track.checkpoints.length - 1;
         this.state.selectedHandle = {
@@ -1950,7 +1966,11 @@ class MapmakerApp {
         };
         this.refreshCheckpointSelect();
         this.setTool('checkpoints');
-        this.markDirty('Added checkpoint (snapped perpendicular to walls).');
+        this.markDirty(
+            span
+                ? 'Added checkpoint (snapped across the track).'
+                : 'Added checkpoint.',
+        );
     }
 
     removeCheckpoint() {

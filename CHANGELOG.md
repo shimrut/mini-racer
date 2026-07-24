@@ -1,7 +1,6 @@
 # Changelog
 
-- Fixed Mapmaker start/checkpoint wall snap so gates cast straight across the lane instead of linking unrelated diagonal wall points.
-- Mapmaker start line and checkpoint edits snap perpendicular across the lane to the outer/inner walls.
+- Mapmaker start line and checkpoint edits snap wall-to-wall and stay perpendicular to the track walls.
 - Mapmaker Wall Corners uses plain labels (Sharp, A bit rounded, Rounded, Soft) instead of a raw curve-radius number.
 - Mapmaker Line Build brush is fixed at 4u; other brush sizes and presets are removed.
 - Mapmaker Save & Integrate now lets authors choose **Daily Challenge** or
