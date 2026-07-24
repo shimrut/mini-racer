@@ -24,6 +24,14 @@
       "game": {
         "entry": "game.html"
       },
+      "landing": {
+        "height": "tall",
+        "entry": "landing.html"
+      },
+      "campaign": {
+        "height": "tall",
+        "entry": "campaign.html"
+      },
       "campaign-challenge": {
         "height": "tall",
         "entry": "campaign-challenge.html"
@@ -46,6 +54,13 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "Create Mini Racer landing post",
+        "description": "Publish a hub post that links to Daily and Campaign",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/landing-create"
       },
       {
         "label": "Enable daily Mini Racer posts",

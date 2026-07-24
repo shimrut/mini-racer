@@ -20,6 +20,9 @@ function readPostTarget(root) {
     if (postData.postType === 'campaign-challenge' && postData.challengeId) {
         return { mode: 'challenge', challengeId: String(postData.challengeId) };
     }
+    if (postData.postType === 'campaign') {
+        return { mode: 'campaign', challengeId: null };
+    }
     if (postData.challenge || postData.challengeId) {
         return { mode: 'daily', challengeId: null };
     }
@@ -74,7 +77,9 @@ export function resolveGameLaunchTarget(root = globalThis) {
     if (queryMode) return { mode: queryMode, challengeId: null };
 
     const postTarget = readPostTarget(root);
-    if (postTarget?.mode === 'challenge') return postTarget;
+    if (postTarget?.mode === 'challenge' || postTarget?.mode === 'campaign') {
+        return postTarget;
+    }
 
     const storedTarget = readStoredTarget(root);
     if (storedTarget) return storedTarget;

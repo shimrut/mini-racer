@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer</title>
+    <link rel="stylesheet" href="landing.css">
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <script type="module" src="landing.js"></script>
+</head>
+
+<body>
+    <main class="landing-shell" aria-labelledby="landing-title">
+        <img class="landing-track" src="assets/landing-track.jpg" alt="" width="1200" height="630" decoding="async" fetchpriority="high">
+        <div class="landing-veil" aria-hidden="true"></div>
+
+        <header class="landing-brand">
+            <h1 id="landing-title" class="landing-title">
+                <span class="landing-title__mini">Mini</span>
+                <span class="landing-title__racer">Racer</span>
+            </h1>
+        </header>
+
+        <nav class="landing-modes" aria-label="Choose a race mode">
+            <button id="landing-daily-btn" class="landing-mode" type="button" disabled>
+                Daily
+            </button>
+            <button id="landing-campaign-btn" class="landing-mode" type="button" disabled>
+                Campaign
+            </button>
+        </nav>
+
+        <p id="landing-status" class="landing-status" role="status" aria-live="polite"></p>
+    </main>
+</body>
+
+</html>

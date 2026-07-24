@@ -44,11 +44,16 @@ import {
     deleteDailyPodiumAutopostSubscription,
     readAllDailyPodiumAutopostSubscriptions,
 } from './daily-podium-autopost-store.js';
+import {
+    ensureLandingBundleForSubreddit,
+    getLandingDestinations,
+} from './landing-service.js';
 import { resolveMenuTargetSubredditName } from './moderator-access.js';
 import { registerPlayerRoutes } from './routes/player-routes.js';
 import { registerCompetitionRoutes } from './routes/competition-routes.js';
 import { registerShareRoutes } from './routes/share-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
+import { registerLandingRoutes } from './routes/landing-routes.js';
 import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 import { registerPodiumRoutes } from './routes/podium-routes.js';
 import { registerCampaignRoutes } from './routes/campaign-routes.js';
@@ -130,11 +135,17 @@ function registerProductionRoutes(app: express.Application): void {
             confirmDailyGpShare(input, requestContext)
         ),
     });
+    registerLandingRoutes(app, {
+        readContextSubredditName,
+        getServerDailyGpChallenge,
+        getLandingDestinations,
+    });
     registerInternalRoutes(app, {
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,
         ensureDailyMiniRacerPostForSubreddit,
+        ensureLandingBundleForSubreddit,
         enableDailyAutopost,
         deleteDailyAutopostSubscription,
         ensureDailyMiniRacerPodiumPostForSubreddit,

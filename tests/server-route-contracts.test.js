@@ -4,6 +4,7 @@ import { registerPlayerRoutes } from '../src/server/routes/player-routes.ts';
 import { registerCompetitionRoutes } from '../src/server/routes/competition-routes.ts';
 import { registerShareRoutes } from '../src/server/routes/share-routes.ts';
 import { registerInternalRoutes } from '../src/server/routes/internal-routes.ts';
+import { registerLandingRoutes } from '../src/server/routes/landing-routes.ts';
 import { registerPbGhostRoutes } from '../src/server/routes/pb-ghost-routes.ts';
 
 const openServers = new Set();
@@ -664,5 +665,56 @@ describe('server route contracts', () => {
             ok: false,
             error: 'Scheduled daily post run failed',
         });
+    });
+
+    it('creates a landing hub and resolves Daily/Campaign destinations', async () => {
+        const ensureLandingBundleForSubreddit = vi.fn(async () => ({
+            created: true,
+            postUrl: 'https://reddit.com/landing',
+        }));
+        const getLandingDestinations = vi.fn(async () => ({
+            dailyPostUrl: 'https://reddit.com/daily',
+            campaignPostUrl: 'https://reddit.com/campaign',
+        }));
+        const baseUrl = await startApp((app) => {
+            registerInternalRoutes(app, {
+                resolveMenuTargetSubredditName: async () => 'MiniRacer',
+                getServerDailyGpChallenge: async () => ({ id: 'daily-gp-2026-07-16' }),
+                ensureDailyMiniRacerPostForSubreddit: vi.fn(),
+                ensureLandingBundleForSubreddit,
+                enableDailyAutopost: vi.fn(),
+                deleteDailyAutopostSubscription: vi.fn(),
+                readAllDailyAutopostSubscriptions: async () => [],
+            });
+            registerLandingRoutes(app, {
+                readContextSubredditName: () => null,
+                getServerDailyGpChallenge: async () => ({ id: 'daily-gp-2026-07-16' }),
+                getLandingDestinations,
+            });
+        });
+
+        const created = await fetch(`${baseUrl}/internal/menu/landing-create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetId: 't5_mini' }),
+        });
+        expect(await readJson(created)).toEqual({
+            showToast: {
+                text: 'Mini Racer landing post created for r/MiniRacer.',
+                appearance: 'success',
+            },
+            navigateTo: 'https://reddit.com/landing',
+        });
+        expect(ensureLandingBundleForSubreddit).toHaveBeenCalledWith(
+            'MiniRacer',
+            { id: 'daily-gp-2026-07-16' },
+        );
+
+        const destinations = await fetch(`${baseUrl}/api/landing/destinations`);
+        expect(destinations.status).toBe(400);
+        expect(await readJson(destinations)).toEqual({
+            error: 'Reddit did not provide a subreddit context for this post.',
+        });
+        expect(getLandingDestinations).not.toHaveBeenCalled();
     });
 });

@@ -72,6 +72,7 @@ Install Mini Racer in your subreddit, then use the subreddit menu:
 | Menu item | What it does |
 | --- | --- |
 | **Create Mini Racer post** | Creates a playable race post for today |
+| **Create Mini Racer landing post** | Creates a hub post with **Daily** and **Campaign** links (also creates today's Daily post and a permanent Campaign post if needed) |
 | **Enable daily Mini Racer posts** | Auto-posts a new race each day (UTC) |
 | **Disable daily Mini Racer posts** | Stops the daily auto-posts |
 | **Enable daily Mini Racer podium posts** | Auto-posts the final podium after a track expires, with hourly retries during the six-hour publication window |
@@ -80,6 +81,8 @@ Install Mini Racer in your subreddit, then use the subreddit menu:
 Tips:
 
 - Only **one** race post is used per community per day — creating again reuses that post instead of flooding the feed
+- The **landing post** is the community hub: **Daily** opens today's race post, **Campaign** opens the permanent Campaign post
+- Only **one** landing post and **one** Campaign post are kept per community — creating again reuses them
 - Every race post gets a pinned **Mini Racer score thread** for player result comments
 - Podium posts are informational, use an independent opt-in, and never create a score thread
 - Players share scores as replies in that thread, from their own accounts
