@@ -14,6 +14,7 @@ import {
     GATE_WALL_OVERHANG,
 } from './mapmaker/lane-gate.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
+import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
 import {
     formatTrackNumber as formatNumber,
     generateTrackIntegrationSnippet,
@@ -197,39 +198,6 @@ function sampleClosedLoopAtDistance(points, targetDistance) {
     };
 }
 
-function offsetLoop(points, offsetDistance) {
-    return points.map((point, index) => {
-        const prev = points[(index - 1 + points.length) % points.length];
-        const next = points[(index + 1) % points.length];
-        let prevDir = normalizeVector(point.x - prev.x, point.y - prev.y);
-        let nextDir = normalizeVector(next.x - point.x, next.y - point.y);
-        if (Math.abs(prevDir.x) < 0.000001 && Math.abs(prevDir.y) < 0.000001) {
-            prevDir = nextDir;
-        }
-        if (Math.abs(nextDir.x) < 0.000001 && Math.abs(nextDir.y) < 0.000001) {
-            nextDir = prevDir;
-        }
-
-        const prevNormal = { x: -prevDir.y, y: prevDir.x };
-        const nextNormal = { x: -nextDir.y, y: nextDir.x };
-        let bisector = normalizeVector(prevNormal.x + nextNormal.x, prevNormal.y + nextNormal.y);
-        if (Math.abs(bisector.x) < 0.000001 && Math.abs(bisector.y) < 0.000001) {
-            bisector = nextNormal;
-        }
-
-        const alignment = clamp(
-            Math.abs(bisector.x * nextNormal.x + bisector.y * nextNormal.y),
-            0.3,
-            1
-        );
-        const distanceScale = clamp(offsetDistance / alignment, -Math.abs(offsetDistance) * 3, Math.abs(offsetDistance) * 3);
-        return {
-            x: point.x + bisector.x * distanceScale,
-            y: point.y + bisector.y * distanceScale
-        };
-    });
-}
-
 function offsetTrackLayout(layout, offsetX, offsetY) {
     const movePoint = (point) => ({
         x: point.x + offsetX,
@@ -286,15 +254,11 @@ function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) 
     }
 
     const halfWidth = trackWidth / 2;
-    const candidateA = offsetLoop(centerline, halfWidth);
-    const candidateB = offsetLoop(centerline, -halfWidth);
-    const areaA = Math.abs(signedArea(candidateA));
-    const areaB = Math.abs(signedArea(candidateB));
-    if (!Number.isFinite(areaA) || !Number.isFinite(areaB) || Math.abs(areaA - areaB) < 0.001) {
+    const walls = buildRibbonWallsFromCenterline(centerline, halfWidth);
+    if (!walls) {
         return null;
     }
-    const outer = areaA >= areaB ? candidateA : candidateB;
-    const inner = areaA >= areaB ? candidateB : candidateA;
+    const { outer, inner } = walls;
     const startIndex = 0;
     const nextIndex = 1 % centerline.length;
     const startAngle = Math.atan2(
@@ -319,7 +283,33 @@ function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) 
         });
     }
 
-    const startSpan = extendGatePastWalls(outer[startIndex], inner[startIndex]);
+    // Walls are no longer index-paired; place start from the centerline.
+    const startTangent = normalizeVector(
+        centerline[nextIndex].x - centerline[startIndex].x,
+        centerline[nextIndex].y - centerline[startIndex].y
+    );
+    const startNormal = { x: -startTangent.y, y: startTangent.x };
+    const startLeft = {
+        x: centerline[startIndex].x + startNormal.x * halfWidth,
+        y: centerline[startIndex].y + startNormal.y * halfWidth
+    };
+    const startRight = {
+        x: centerline[startIndex].x - startNormal.x * halfWidth,
+        y: centerline[startIndex].y - startNormal.y * halfWidth
+    };
+    const startSpan = extendGatePastWalls(startLeft, startRight);
+    const poseSample = sampleClosedLoopAtDistance(centerline, Math.min(loopLength * 0.02, halfWidth));
+    const poseNormal = { x: -poseSample.tangent.y, y: poseSample.tangent.x };
+    const startPos = midpoint(
+        {
+            x: poseSample.point.x + poseNormal.x * halfWidth,
+            y: poseSample.point.y + poseNormal.y * halfWidth
+        },
+        {
+            x: poseSample.point.x - poseNormal.x * halfWidth,
+            y: poseSample.point.y - poseNormal.y * halfWidth
+        }
+    );
     return normalizeTrackLayout({
         outer: outer.map(clonePoint),
         inner: inner.map(clonePoint),
@@ -327,7 +317,7 @@ function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) 
             p1: clonePoint(startSpan.p1),
             p2: clonePoint(startSpan.p2)
         },
-        startPos: midpoint(outer[nextIndex], inner[nextIndex]),
+        startPos,
         startAngle,
         checkpoints,
         cornerRadius
