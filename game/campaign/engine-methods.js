@@ -19,6 +19,7 @@ import {
     submitCampaignRun,
 } from './service.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
+import { createVerificationSnapshot } from '../scoreboard/verification-queue.js';
 
 function toRaceChallenge(stage, mode = 'campaign') {
     return {
@@ -391,11 +392,38 @@ export const campaignEngineMethods = {
         const signedIn = this.campaignBootstrap?.signedIn === true;
         const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
 
+        const buildCampaignPlayerRow = () => ({
+            isCurrentPlayer: true,
+            bestTime: finalTime,
+            rank: null,
+            displayName: 'You',
+        });
+
+        const buildSubmittingSnapshot = () => ({
+            ...createVerificationSnapshot({
+                verificationState: 'pending',
+                isLoading: true,
+                submissionStage: 'submitting',
+            }),
+            currentPlayerRow: buildCampaignPlayerRow(),
+        });
+
+        const buildErrorSnapshot = (statusText) => ({
+            ...createVerificationSnapshot({
+                verificationState: 'error',
+                isLoading: false,
+                submissionStage: 'error',
+                statusText: statusText || 'Couldn\'t rank this run. Try again.',
+            }),
+            currentPlayerRow: buildCampaignPlayerRow(),
+        });
+
         const showCampaignResult = ({
             accepted,
             confirmationFailed = false,
             error = null,
             shareRequest = null,
+            scoreboardSnapshot = null,
         }) => {
             this.modal.showModal(
                 accepted
@@ -412,7 +440,11 @@ export const campaignEngineMethods = {
                     primaryStatLabel: 'Race Time',
                     lapMedal: medal,
                     trackKey: stage.trackKey,
+                    scoreboardSnapshot,
+                    scoreboardChallengeId: stage.raceId,
+                    scoreboardTrackKey: stage.trackKey,
                     showGlobalLeaderboard: false,
+                    allowLeaderboardOpen: true,
                 },
                 {
                     ...createModalActions({
@@ -440,9 +472,11 @@ export const campaignEngineMethods = {
         }
 
         if (!replay) {
+            const error = 'This run could not be verified.';
             showCampaignResult({
                 accepted: false,
-                error: 'This run could not be verified.',
+                error,
+                scoreboardSnapshot: buildErrorSnapshot(error),
             });
             return;
         }
@@ -455,6 +489,7 @@ export const campaignEngineMethods = {
                 source: 'campaign',
                 raceId: stage.raceId,
             },
+            scoreboardSnapshot: buildSubmittingSnapshot(),
         });
 
         void (async () => {
@@ -486,8 +521,32 @@ export const campaignEngineMethods = {
             }
 
             if (!accepted) {
-                showCampaignResult({ accepted: false, confirmationFailed, error });
+                showCampaignResult({
+                    accepted: false,
+                    confirmationFailed,
+                    error,
+                    scoreboardSnapshot: buildErrorSnapshot(error),
+                });
                 return;
+            }
+
+            try {
+                const snapshotResponse = await getCampaignSnapshot(stage.raceId, {
+                    limit: 50,
+                    offset: 0,
+                });
+                if (
+                    this.status === 'won'
+                    && this.activeCampaignStage?.raceId === stage.raceId
+                    && snapshotResponse.ok
+                ) {
+                    const snapshot = normalizeCampaignLeaderboardSnapshot(snapshotResponse.body);
+                    if (snapshot) {
+                        this.modal.updateModalScoreboardSnapshot?.(snapshot);
+                    }
+                }
+            } catch (snapshotError) {
+                console.warn('Campaign finish opened without a live rank snapshot:', snapshotError);
             }
 
             try {

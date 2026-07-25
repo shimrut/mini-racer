@@ -128,7 +128,9 @@ flowchart LR
   player challenges. Campaign and challenge finishes open the result sheet
   immediately (same pattern as Daily), then confirm the run in the background;
   a rejected or interrupted confirmation updates that sheet instead of showing
-  a separate saving modal. Follow-up PB ghost and lobby refreshes also stay in
+  a separate saving modal. Campaign finish also paints RANK immediately while
+  submitting, then replaces it with the stage leaderboard place after
+  confirmation. Follow-up PB ghost and lobby refreshes also stay in
   the background. Campaign client requests abort after 20 seconds so a stalled
   WebView request is terminal. Guest Campaign progress is browser-local.
   Campaign uses the same compact lobby actions and modal shells as Daily:

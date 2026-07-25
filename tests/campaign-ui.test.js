@@ -174,6 +174,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             modal: {
                 modalMsg,
                 showModal: vi.fn(),
+                updateModalScoreboardSnapshot: vi.fn(),
             },
             restartActiveRace: vi.fn(),
             showCampaignLobby: vi.fn(),
@@ -186,30 +187,55 @@ describe('Campaign lobby and shared modal adapters', () => {
                 progress: { unlockedRaceIds: ['numbered-v1-00'] },
             },
         });
+        campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
+            ok: true,
+            body: {
+                rows: [{ rank: 1, displayName: 'You', bestTimeMs: 8250, isCurrentPlayer: true }],
+                currentPlayerRow: {
+                    rank: 1,
+                    displayName: 'You',
+                    bestTimeMs: 8250,
+                    isCurrentPlayer: true,
+                },
+                totalCount: 3,
+                pageOffset: 0,
+                pageLimit: 50,
+                hasMore: false,
+                nextOffset: null,
+            },
+        });
         campaignServiceMocks.getCampaignPbGhost.mockRejectedValue(new Error('ghost offline'));
         vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         await campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
         await vi.waitFor(() => {
-            expect(context.modal.showModal).toHaveBeenLastCalledWith(
-                'Campaign race complete',
-                null,
+            expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    lapTime: 8.25,
-                    completedLaps: 1,
-                    requiredLaps: 1,
-                }),
-                expect.objectContaining({
-                    modalKind: 'win',
-                    shareRequest: {
-                        kind: 'campaign-challenge',
-                        source: 'campaign',
-                        raceId: 'numbered-v1-00',
-                    },
+                    playerRankLabel: '#1',
+                    totalCount: 3,
                 }),
             );
         });
         expect(context.status).toBe('won');
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                lapTime: 8.25,
+                scoreboardSnapshot: expect.objectContaining({
+                    isLoading: true,
+                    submissionStage: 'submitting',
+                }),
+            }),
+            expect.objectContaining({
+                modalKind: 'win',
+                shareRequest: {
+                    kind: 'campaign-challenge',
+                    source: 'campaign',
+                    raceId: 'numbered-v1-00',
+                },
+            }),
+        );
         expect(modalMsg.textContent).toBe('Number Zero · 1 lap');
     });
 
@@ -281,6 +307,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             modal: {
                 modalMsg: { style: {}, textContent: '' },
                 showModal: vi.fn(),
+                updateModalScoreboardSnapshot: vi.fn(),
             },
             restartActiveRace: vi.fn(),
             showCampaignLobby: vi.fn(),
@@ -289,6 +316,23 @@ describe('Campaign lobby and shared modal adapters', () => {
         campaignServiceMocks.submitCampaignRun.mockImplementation(() => new Promise((resolve) => {
             resolveSubmission = resolve;
         }));
+        campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
+            ok: true,
+            body: {
+                rows: [],
+                currentPlayerRow: {
+                    rank: 2,
+                    displayName: 'You',
+                    bestTimeMs: 8250,
+                    isCurrentPlayer: true,
+                },
+                totalCount: 4,
+                pageOffset: 0,
+                pageLimit: 50,
+                hasMore: false,
+                nextOffset: null,
+            },
+        });
         campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: null });
 
         const finish = campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
@@ -298,7 +342,13 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.modal.showModal).toHaveBeenCalledWith(
             'Campaign race complete',
             null,
-            expect.objectContaining({ lapTime: 8.25 }),
+            expect.objectContaining({
+                lapTime: 8.25,
+                scoreboardSnapshot: expect.objectContaining({
+                    isLoading: true,
+                    submissionStage: 'submitting',
+                }),
+            }),
             expect.objectContaining({
                 modalKind: 'win',
                 shareRequest: {
