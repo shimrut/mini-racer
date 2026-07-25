@@ -424,6 +424,15 @@ describe('medals', () => {
             expect(children[0].children[0].children.some(
                 (c) => c.textContent === 'Could not confirm.',
             )).toBe(true);
+
+            renderChallengeFinishHero(overlay, { phase: 'lost' });
+            expect(children[0].dataset.challengePhase).toBe('lost');
+            expect(children[0].children[0].children.some(
+                (c) => c.textContent === 'Challenge Lost',
+            )).toBe(true);
+            expect(children[0].children[0].children.some(
+                (c) => c.className?.includes?.('combined-medal-row'),
+            )).toBe(true);
         } finally {
             global.document = originalDocument;
         }

@@ -262,6 +262,18 @@ export function renderChallengeFinishHero(
     const centerWrap = document.createElement('div');
     centerWrap.className = 'win-combined-medal-overlay__center';
 
+    const appendPlaceholderMedal = () => {
+        const row = document.createElement('div');
+        row.className = 'combined-medal-row win-combined-medal-overlay__row';
+        const slot = document.createElement('div');
+        slot.className = 'combined-medal-row-slot';
+        slot.appendChild(createMedalIconSvg('white', {
+            className: 'medal-svg--hero',
+        }));
+        row.appendChild(slot);
+        centerWrap.appendChild(row);
+    };
+
     const label = document.createElement('p');
     label.className = 'combined-medal-challenge-label';
 
@@ -290,29 +302,21 @@ export function renderChallengeFinishHero(
         root.setAttribute('role', 'status');
         root.setAttribute('aria-label', pendingLabel);
         root.setAttribute('aria-live', 'polite');
-
-        const row = document.createElement('div');
-        row.className = 'combined-medal-row win-combined-medal-overlay__row';
-        const slot = document.createElement('div');
-        slot.className = 'combined-medal-row-slot';
-        slot.appendChild(createMedalIconSvg('white', {
-            className: 'medal-svg--hero',
-        }));
-        row.appendChild(slot);
-        centerWrap.appendChild(row);
-
+        appendPlaceholderMedal();
         label.textContent = pendingLabel;
         label.classList.add('combined-medal-challenge-label--pending');
     } else if (phase === 'lost' || phase === 'tie') {
         const outcomeLabel = phase === 'tie' ? 'Tie' : 'Challenge Lost';
         root.setAttribute('role', 'status');
         root.setAttribute('aria-label', outcomeLabel);
+        appendPlaceholderMedal();
         label.textContent = outcomeLabel;
         label.classList.add('combined-medal-challenge-label--outcome');
     } else {
         const errorLabel = error || 'This run could not be verified.';
         root.setAttribute('role', 'alert');
         root.setAttribute('aria-label', errorLabel);
+        appendPlaceholderMedal();
         label.textContent = errorLabel;
         label.classList.add('combined-medal-challenge-label--error');
     }
