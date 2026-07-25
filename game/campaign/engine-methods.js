@@ -708,13 +708,27 @@ export const campaignEngineMethods = {
             }
 
             const accepted = response.ok && response.body?.accepted === true;
+            const outcome = accepted ? response.body?.outcome : null;
+            const differenceMs = accepted ? response.body?.differenceMs : null;
+
+            // Same outcome as provisional: keep the open sheet (no medal remount).
+            if (accepted && outcome === provisionalOutcome) {
+                if (this.modal.modalMsg) {
+                    this.modal.modalMsg.style.display = '';
+                    this.modal.modalMsg.textContent = outcome === 'won'
+                        ? 'Challenge beaten'
+                        : `${Math.abs(Number(differenceMs) || 0) / 1000}s from the challenge time`;
+                }
+                return;
+            }
+
             showChallengeResult({
                 accepted,
                 confirmationFailed,
                 title: accepted ? response.body.resultLabel : null,
                 error: response.body?.error || null,
-                outcome: accepted ? response.body?.outcome : null,
-                differenceMs: accepted ? response.body?.differenceMs : null,
+                outcome,
+                differenceMs,
             });
         })();
     },

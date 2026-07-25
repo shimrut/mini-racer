@@ -1,5 +1,7 @@
 # Changelog
 
+- Challenge finish confirmation no longer remounts the sheet when the server
+  agrees with the provisional win/loss/tie (stops the challenge medal replaying).
 - Challenge finishes always show **Improve**, **Brag**, and **Home**. Brag is
   enabled only when the challenge is beaten. A win shows a display-only challenge
   medal and **Challenge beaten** (not Campaign medal tiers).

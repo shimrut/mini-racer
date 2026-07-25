@@ -131,8 +131,10 @@ flowchart LR
   pattern as Daily), then confirm in the background. Challenge finishes use one
   sheet with Improve / Brag / Home every time (Brag enabled only when beaten). A
   win shows a display-only challenge medal and “Challenge beaten”; loss/tie keep
-  an empty medal hero. Challenge finishes never write Campaign medals, progress,
-  or ranks.
+  an empty medal hero. When server confirmation matches the provisional outcome,
+  the open sheet is patched in place (no finish remount / medal replay); reject
+  or outcome mismatch still remounts. Challenge finishes never write Campaign
+  medals, progress, or ranks.
   a rejected or interrupted confirmation updates that sheet instead of showing
   a separate saving modal. Campaign finish also paints RANK immediately while
   submitting, then replaces it with the stage leaderboard place after
