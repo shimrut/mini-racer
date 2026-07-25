@@ -182,8 +182,9 @@ describe('campaign challenge service', () => {
         const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000 });
         const created = await createChallenge(service);
         const challengeId = created.body.challengeId;
+        const acceptor = { ...context, username: 'ChallengerAce' };
 
-        const win = await service.submit({ challengeId, replay: {} }, context);
+        const win = await service.submit({ challengeId, replay: {} }, acceptor);
         expect(win.body).toMatchObject({
             accepted: true,
             improved: true,
@@ -193,7 +194,7 @@ describe('campaign challenge service', () => {
         });
 
         const slowerService = makeService({ validatedTimeMs: 26_000 });
-        const loss = await slowerService.submit({ challengeId, replay: {} }, context);
+        const loss = await slowerService.submit({ challengeId, replay: {} }, acceptor);
         expect(loss.body).toMatchObject({
             improved: false,
             outcome: 'lost',
@@ -215,10 +216,34 @@ describe('campaign challenge service', () => {
         });
     });
 
+    it('rejects get and submit when the viewer created the challenge', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const challengeId = created.body.challengeId;
+
+        const ownGet = await service.get(challengeId, context);
+        expect(ownGet.status).toBe(403);
+        expect(ownGet.body).toEqual({
+            status: 'own_challenge',
+            error: "You can't accept your own challenge.",
+        });
+
+        const ownSubmit = await service.submit({ challengeId, replay: {} }, context);
+        expect(ownSubmit.status).toBe(403);
+        expect(ownSubmit.body.status).toBe('own_challenge');
+
+        const otherGet = await service.get(challengeId, { ...context, username: 'OtherRacer' });
+        expect(otherGet.status).toBe(200);
+        expect(otherGet.body.status).toBe('ready');
+    });
+
     it('keeps challenge results isolated from campaign writes and supports duel-result chaining', async () => {
         const service = makeService({ sourceKind: 'duel' });
         const created = await createChallenge(service);
-        const loaded = await service.get(created.body.challengeId, context);
+        const loaded = await service.get(
+            created.body.challengeId,
+            { ...context, username: 'OtherRacer' },
+        );
 
         expect(loaded.body.challenge).toMatchObject({
             raceId: 'numbered-v1-03',

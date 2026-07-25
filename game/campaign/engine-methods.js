@@ -307,6 +307,11 @@ export const campaignEngineMethods = {
             this.reset(false, { showStartOverlay: false });
         }
         const response = await getCampaignChallenge(challengeId);
+        if (response.body?.status === 'own_challenge') {
+            this.activeCampaignChallenge = null;
+            await this.showCampaignLobby();
+            return;
+        }
         const contextual = globalThis.devvit?.context?.postData;
         const challenge = response.body?.challenge
             || (contextual?.postType === 'campaign-challenge' ? contextual : null);

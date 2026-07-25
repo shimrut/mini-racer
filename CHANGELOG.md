@@ -1,5 +1,7 @@
 # Changelog
 
+- You can’t accept a player challenge you created: Accept shows a short message
+  and opens Campaign instead. The server also rejects self get/submit.
 - Mapmaker start-pos tool uses a location-pin icon with a small "start pos" label.
 - Mapmaker checkpoints tool uses a stopwatch icon with a small "checkpoints" label.
 - Mapmaker finish-line tool uses a flag icon with a small "finish line" label.

@@ -41,6 +41,16 @@ describe('game launch target', () => {
             .toEqual({ mode: 'challenge', challengeId: 'challenge-1' });
     });
 
+    it('lets an explicit stored campaign target override a challenge post', () => {
+        const root = createRoot({
+            postData: { postType: 'campaign-challenge', challengeId: 'challenge-1' },
+        });
+        requestGameLaunchTarget('campaign', { root });
+        expect(resolveGameLaunchTarget(root))
+            .toEqual({ mode: 'campaign', challengeId: null });
+        expect(root.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
+    });
+
     it('consumes a valid one-use launch target', () => {
         const root = createRoot();
         expect(requestGameLaunchTarget('daily', { root })).toBe(true);

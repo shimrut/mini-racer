@@ -445,6 +445,15 @@ export function createCampaignChallengeService(
         if (!record || normalizeName(record.subredditName) !== normalizeName(request.subredditName)) {
             return { status: 404, body: { status: 'challenge_unavailable', error: 'This challenge is unavailable.' } };
         }
+        if (normalizeName(request.username) === normalizeName(record.challengerUsername)) {
+            return {
+                status: 403,
+                body: {
+                    status: 'own_challenge',
+                    error: "You can't accept your own challenge.",
+                },
+            };
+        }
         const result = await readCampaignChallengeResult(record.challengeId, request.username);
         return { status: 200, body: { status: 'ready', ...publicChallengeBody(record, result) } };
     }
@@ -461,6 +470,15 @@ export function createCampaignChallengeService(
         const challenge = challengeId ? await readCampaignChallenge(challengeId) : null;
         if (!challenge || normalizeName(challenge.subredditName) !== normalizeName(request.subredditName)) {
             return { status: 404, body: { status: 'challenge_unavailable', error: 'This challenge is unavailable.' } };
+        }
+        if (normalizeName(request.username) === normalizeName(challenge.challengerUsername)) {
+            return {
+                status: 403,
+                body: {
+                    status: 'own_challenge',
+                    error: "You can't accept your own challenge.",
+                },
+            };
         }
         const verified = await dependencies.validateReplay(challenge, input.replay);
         if (

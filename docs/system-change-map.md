@@ -143,7 +143,10 @@ flowchart LR
 - `src/server/campaign-challenge-*` owns verified-result source resolution,
   frozen opponent ghosts, isolated duel results, custom-post idempotency, and
   the three-new-posts per player/subreddit/UTC-day limit. Guests cannot create
-  or accept challenges. Duel submissions never call the Campaign store.
+  or accept challenges. The challenger cannot accept or submit against their
+  own post (`own_challenge`); the in-feed Accept card shows an expired-style
+  message and opens Campaign via a stored launch target that overrides challenge
+  post data. Duel submissions never call the Campaign store.
 - `campaign-challenge.html` is the dedicated in-feed custom-post entrypoint;
   its public post data includes only the immutable race target and no ghost,
   player ID, or private persistence data.

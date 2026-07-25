@@ -5,8 +5,10 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from './game/track/presentation.js';
+import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 
 const POST_TYPE = 'campaign-challenge';
+const OWN_CHALLENGE_MESSAGE = "You can't accept your own challenge. Opening your Campaign.";
 
 function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
@@ -85,26 +87,76 @@ function renderChallengeTrack(documentRef, trackKey) {
 }
 
 export async function resolveCampaignChallengeAccess(root = globalThis) {
-    if (typeof root?.fetch !== 'function') return { signedIn: false };
+    if (typeof root?.fetch !== 'function') return { signedIn: false, ownChallenge: false };
     try {
         const response = await root.fetch('/api/campaign/challenge');
-        if (!response?.ok) return { signedIn: false };
-        const body = await response.json();
-        return { signedIn: body?.status === 'ready', body };
+        const body = await response?.json?.().catch?.(() => null) ?? null;
+        if (body?.status === 'own_challenge') {
+            return { signedIn: true, ownChallenge: true, body };
+        }
+        if (!response?.ok) return { signedIn: false, ownChallenge: false, body };
+        return { signedIn: body?.status === 'ready', ownChallenge: false, body };
     } catch {
-        return { signedIn: false };
+        return { signedIn: false, ownChallenge: false };
     }
+}
+
+export function showOwnChallengeMessage(documentRef, openCampaign = openCampaignAsRedirect) {
+    const doc = documentRef || document;
+    const existing = doc.getElementById('own-challenge-message');
+    if (existing) existing.remove();
+
+    const overlay = doc.createElement('div');
+    overlay.id = 'own-challenge-message';
+    overlay.className = 'expired-message';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+
+    const message = doc.createElement('p');
+    message.className = 'expired-message__text';
+    message.textContent = OWN_CHALLENGE_MESSAGE;
+
+    const button = doc.createElement('button');
+    button.className = 'expired-message__ok';
+    button.type = 'button';
+    button.textContent = 'OK';
+    button.addEventListener('click', async (event) => {
+        await openCampaign(event);
+    });
+
+    overlay.append(message, button);
+    doc.body.append(overlay);
+    button.focus();
+    return overlay;
 }
 
 export function bindAcceptChallenge(
     documentRef,
     openGame = openCampaignChallenge,
+    { ownChallenge = false } = {},
 ) {
     const button = documentRef?.getElementById('accept-challenge');
     if (!button || button.dataset.bound === '1') return button || null;
     button.dataset.bound = '1';
-    button.addEventListener('click', openGame);
+    button.addEventListener('click', async (event) => {
+        if (ownChallenge) {
+            event.preventDefault?.();
+            showOwnChallengeMessage(documentRef);
+            return;
+        }
+        await openGame(event);
+    });
     return button;
+}
+
+export async function openCampaignAsRedirect(event) {
+    try {
+        requestGameLaunchTarget('campaign');
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        await requestExpandedMode(event, 'game');
+    } catch (error) {
+        console.error('Failed to open Mini Racer Campaign:', error);
+    }
 }
 
 export async function openCampaignChallenge(event) {
@@ -118,9 +170,11 @@ export async function openCampaignChallenge(event) {
 
 async function boot() {
     const challenge = renderCampaignChallenge(document, readCampaignChallengePostData());
-    const button = bindAcceptChallenge(document);
     const message = document.getElementById('challenge-message');
     const access = await resolveCampaignChallengeAccess(globalThis);
+    const button = bindAcceptChallenge(document, openCampaignChallenge, {
+        ownChallenge: access.ownChallenge === true,
+    });
     if (!access.signedIn && button) {
         button.disabled = true;
         button.textContent = 'Sign in to Accept';
@@ -134,6 +188,7 @@ async function boot() {
         lapCount: challenge.lapCount,
         targetTimeMs: challenge.targetTimeMs,
         signedIn: access.signedIn,
+        ownChallenge: access.ownChallenge === true,
     });
     globalThis.advanceTime = () => {};
 }
@@ -144,3 +199,5 @@ if (typeof document !== 'undefined') {
         renderCampaignChallenge(document, readCampaignChallengePostData());
     });
 }
+
+export { OWN_CHALLENGE_MESSAGE };

@@ -69,9 +69,30 @@ export function requestGameLaunchTarget(mode, {
     }
 }
 
+function peekStoredCampaignTarget(root) {
+    const storage = root?.localStorage;
+    if (!storage) return null;
+    try {
+        const raw = storage.getItem(LAUNCH_TARGET_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        if (!Number.isFinite(parsed.expiresAt) || Date.now() > parsed.expiresAt) return null;
+        if (normalizeTarget(parsed.mode) !== 'campaign') return null;
+        storage.removeItem(LAUNCH_TARGET_KEY);
+        return { mode: 'campaign', challengeId: null };
+    } catch {
+        return null;
+    }
+}
+
 export function resolveGameLaunchTarget(root = globalThis) {
     const queryMode = readQueryTarget(root);
     if (queryMode) return { mode: queryMode, challengeId: null };
+
+    // Own-challenge Accept stores campaign; that must beat challenge post data.
+    const storedCampaign = peekStoredCampaignTarget(root);
+    if (storedCampaign) return storedCampaign;
 
     const postTarget = readPostTarget(root);
     if (postTarget?.mode === 'challenge') return postTarget;

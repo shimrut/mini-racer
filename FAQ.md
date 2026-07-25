@@ -114,6 +114,9 @@ Campaign progress, PBs, medals, or leaderboards.
 Player challenges require Reddit sign-in. Guests can view the post and
 practice Campaign locally, but cannot challenge other players.
 
+You also can’t accept a challenge you created yourself. Accepting your own
+post shows a short message and opens your Campaign instead.
+
 ### Share says the preview expired
 
 You waited too long on the confirm step (~**10 minutes**). Start **Share** again and post sooner.

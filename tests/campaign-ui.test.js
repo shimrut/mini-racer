@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const campaignServiceMocks = vi.hoisted(() => ({
     getCampaignBootstrap: vi.fn(),
+    getCampaignChallenge: vi.fn(),
     getCampaignPbGhost: vi.fn(),
     getCampaignSnapshot: vi.fn(),
     readLocalCampaignProgress: vi.fn(() => ({
@@ -22,7 +23,7 @@ const campaignServiceMocks = vi.hoisted(() => ({
 vi.mock('../game/campaign/service.js', () => ({
     createCampaignChallenge: vi.fn(),
     getCampaignBootstrap: campaignServiceMocks.getCampaignBootstrap,
-    getCampaignChallenge: vi.fn(),
+    getCampaignChallenge: campaignServiceMocks.getCampaignChallenge,
     getCampaignPbGhost: campaignServiceMocks.getCampaignPbGhost,
     getCampaignSnapshot: campaignServiceMocks.getCampaignSnapshot,
     previewCampaignChallenge: vi.fn(),
@@ -138,6 +139,7 @@ function campaignState() {
 afterEach(() => {
     vi.restoreAllMocks();
     campaignServiceMocks.getCampaignBootstrap.mockReset();
+    campaignServiceMocks.getCampaignChallenge.mockReset();
     campaignServiceMocks.getCampaignPbGhost.mockReset();
     campaignServiceMocks.getCampaignSnapshot.mockReset();
     campaignServiceMocks.readLocalCampaignProgress.mockReset();
@@ -814,6 +816,36 @@ describe('Campaign lobby and shared modal adapters', () => {
                 topRows: [expect.objectContaining({ displayName: 'Current' })],
             }),
         );
+    });
+
+    it('bounces own challenges to the Campaign lobby without showing Accept', async () => {
+        campaignServiceMocks.getCampaignChallenge.mockResolvedValue({
+            ok: false,
+            status: 403,
+            body: {
+                status: 'own_challenge',
+                error: "You can't accept your own challenge.",
+            },
+        });
+        const showCampaignLobby = vi.fn(async () => undefined);
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            activeCampaignChallenge: { challengeId: 'stale' },
+            hasAnyData: true,
+            isReturningPlayer: false,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: { showChallenge: vi.fn() },
+            reset: vi.fn(),
+            showCampaignLobby,
+        };
+
+        await campaignEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
+
+        expect(context.activeCampaignChallenge).toBeNull();
+        expect(showCampaignLobby).toHaveBeenCalledTimes(1);
+        expect(context.lobbyUi.showChallenge).not.toHaveBeenCalled();
+        expect(context.startOverlay.showStartOverlay).not.toHaveBeenCalled();
     });
 
     it('paints the Campaign lobby before bootstrap resolves', async () => {
