@@ -571,16 +571,27 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(track.textContent).toBe('');
         expect(body.dataset.lobbyMode).toBe('campaign');
 
-        lobby.showChallenge();
+        lobby.showChallenge({
+            signedIn: true,
+            available: true,
+            challengerName: 'shimroot',
+            trackName: 'Number One',
+            laps: 1,
+            targetTimeMs: 9478,
+            medal: 'gold',
+        });
         expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Challenge');
-        expect(track.hidden).toBe(true);
+        expect(track.hidden).toBe(false);
+        expect(track.textContent).toBe('u/shimroot challenges you');
+        expect(track.classList.contains('lobby-mode-track--challenge')).toBe(true);
         expect(body.dataset.lobbyMode).toBe('challenge');
 
         lobby.showHome();
         expect(subhead.hidden).toBe(true);
         expect(label.textContent).toBe('');
         expect(track.hidden).toBe(true);
+        expect(track.classList.contains('lobby-mode-track--challenge')).toBe(false);
         expect(body.dataset.lobbyMode).toBe('home');
 
         global.document = originalDocument;

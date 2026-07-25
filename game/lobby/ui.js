@@ -135,7 +135,7 @@ export class LobbyUi {
         if (mode === 'daily') {
             if (subhead) subhead.hidden = false;
             label.textContent = 'Daily';
-            this.syncDailyTrackLabel();
+            this.syncLobbySubheadDetail();
             return;
         }
         if (mode === 'campaign') {
@@ -147,7 +147,7 @@ export class LobbyUi {
         if (mode === 'challenge') {
             if (subhead) subhead.hidden = false;
             label.textContent = 'Challenge';
-            this.updateDailyTrackLabel('');
+            this.syncLobbySubheadDetail();
             return;
         }
         if (subhead) subhead.hidden = true;
@@ -157,19 +157,28 @@ export class LobbyUi {
 
     updateDailyTrackLabel(trackName = '') {
         this._dailyTrackName = typeof trackName === 'string' ? trackName.trim() : '';
-        this.syncDailyTrackLabel();
+        this.syncLobbySubheadDetail();
     }
 
-    syncDailyTrackLabel() {
+    syncLobbySubheadDetail() {
         const track = document.querySelector('[data-lobby-mode-track]');
         if (!track) return;
-        if (this.mode !== 'daily' || !this._dailyTrackName) {
-            track.hidden = true;
-            track.textContent = '';
+        if (this.mode === 'daily' && this._dailyTrackName) {
+            track.hidden = false;
+            track.textContent = this._dailyTrackName;
+            track.classList.remove('lobby-mode-track--challenge');
             return;
         }
-        track.hidden = false;
-        track.textContent = this._dailyTrackName;
+        if (this.mode === 'challenge') {
+            const opponent = this.challengeState?.opponentLabel?.trim() || '';
+            track.hidden = !opponent;
+            track.textContent = opponent;
+            track.classList.toggle('lobby-mode-track--challenge', Boolean(opponent));
+            return;
+        }
+        track.hidden = true;
+        track.textContent = '';
+        track.classList.remove('lobby-mode-track--challenge');
     }
 
     getMode() {
@@ -283,7 +292,6 @@ export class LobbyUi {
     }
 
     renderChallenge() {
-        setText(document.getElementById('challenge-opponent-name'), this.challengeState.opponentLabel);
         setText(document.getElementById('challenge-track-label'), this.challengeState.trackLabel);
         setText(document.getElementById('challenge-target-time'), this.challengeState.targetTimeLabel);
         const medal = document.getElementById('challenge-target-medal');
@@ -304,5 +312,6 @@ export class LobbyUi {
                 this.challengeState.signedIn ? 'Accept' : 'Sign in required',
             );
         }
+        if (this.mode === 'challenge') this.syncLobbySubheadDetail();
     }
 }

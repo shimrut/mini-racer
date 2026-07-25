@@ -167,6 +167,16 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     text-transform: uppercase;
 }
 
+.lobby-mode-track--challenge {
+    max-width: 22rem;
+    color: var(--text-color);
+    font-size: clamp(1.05rem, 3.8vw, 1.45rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-transform: none;
+}
+
 .main-menu {
     display: flex;
     flex-direction: column;
