@@ -190,25 +190,26 @@ describe('Campaign lobby and shared modal adapters', () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         await campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
-
+        await vi.waitFor(() => {
+            expect(context.modal.showModal).toHaveBeenLastCalledWith(
+                'Campaign race complete',
+                null,
+                expect.objectContaining({
+                    lapTime: 8.25,
+                    completedLaps: 1,
+                    requiredLaps: 1,
+                }),
+                expect.objectContaining({
+                    modalKind: 'win',
+                    shareRequest: {
+                        kind: 'campaign-challenge',
+                        source: 'campaign',
+                        raceId: 'numbered-v1-00',
+                    },
+                }),
+            );
+        });
         expect(context.status).toBe('won');
-        expect(context.modal.showModal).toHaveBeenLastCalledWith(
-            'Campaign race complete',
-            null,
-            expect.objectContaining({
-                lapTime: 8.25,
-                completedLaps: 1,
-                requiredLaps: 1,
-            }),
-            expect.objectContaining({
-                modalKind: 'win',
-                shareRequest: {
-                    kind: 'campaign-challenge',
-                    source: 'campaign',
-                    raceId: 'numbered-v1-00',
-                },
-            }),
-        );
         expect(modalMsg.textContent).toBe('Number Zero · 1 lap');
     });
 
@@ -239,22 +240,30 @@ describe('Campaign lobby and shared modal adapters', () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
         await campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
-
-        expect(context.modal.showModal).toHaveBeenLastCalledWith(
-            'Result not confirmed',
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
             null,
             expect.objectContaining({ lapTime: 8.25 }),
-            expect.objectContaining({
-                modalKind: 'rejected',
-                shareRequest: null,
-            }),
+            expect.objectContaining({ modalKind: 'win' }),
         );
+
+        await vi.waitFor(() => {
+            expect(context.modal.showModal).toHaveBeenLastCalledWith(
+                'Result not confirmed',
+                null,
+                expect.objectContaining({ lapTime: 8.25 }),
+                expect.objectContaining({
+                    modalKind: 'rejected',
+                    shareRequest: null,
+                }),
+            );
+        });
         expect(modalMsg.textContent).toBe(
             'Race finished, but the result could not be confirmed. Check Campaign progress before retrying.',
         );
     });
 
-    it('opens a saving sheet before Campaign submission settles', async () => {
+    it('opens the finish modal before Campaign submission settles', async () => {
         let resolveSubmission;
         const context = {
             activeCampaignStage: {
@@ -287,10 +296,17 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(context.modal.showModal).toHaveBeenCalledTimes(1);
         expect(context.modal.showModal).toHaveBeenCalledWith(
-            'Saving Campaign result',
-            'Confirming your finished race…',
+            'Campaign race complete',
             null,
-            { modalKind: 'pending' },
+            expect.objectContaining({ lapTime: 8.25 }),
+            expect.objectContaining({
+                modalKind: 'win',
+                shareRequest: {
+                    kind: 'campaign-challenge',
+                    source: 'campaign',
+                    raceId: 'numbered-v1-00',
+                },
+            }),
         );
 
         resolveSubmission({
@@ -301,12 +317,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
         await finish;
-        expect(context.modal.showModal).toHaveBeenLastCalledWith(
-            'Campaign race complete',
-            null,
-            expect.objectContaining({ lapTime: 8.25 }),
-            expect.objectContaining({ modalKind: 'win' }),
-        );
+        await vi.waitFor(() => {
+            expect(context.loadCampaignLobby).toHaveBeenCalledWith({ show: false });
+        });
+        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
     });
 
     it('does not strand a Campaign challenge finish when confirmation fails', async () => {
@@ -340,20 +354,22 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(context.modal.showModal).toHaveBeenNthCalledWith(
             1,
-            'Saving challenge result',
-            'Confirming your finished race…',
-            null,
-            { modalKind: 'pending' },
-        );
-        expect(context.modal.showModal).toHaveBeenLastCalledWith(
-            'Result not confirmed',
+            'Challenge complete',
             null,
             expect.objectContaining({ lapTime: 8.25 }),
-            expect.objectContaining({
-                modalKind: 'rejected',
-                shareRequest: null,
-            }),
+            expect.objectContaining({ modalKind: 'win' }),
         );
+        await vi.waitFor(() => {
+            expect(context.modal.showModal).toHaveBeenLastCalledWith(
+                'Result not confirmed',
+                null,
+                expect.objectContaining({ lapTime: 8.25 }),
+                expect.objectContaining({
+                    modalKind: 'rejected',
+                    shareRequest: null,
+                }),
+            );
+        });
         expect(modalMsg.textContent).toBe(
             'Race finished, but the challenge result could not be confirmed.',
         );

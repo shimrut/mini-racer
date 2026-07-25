@@ -389,79 +389,107 @@ export const campaignEngineMethods = {
         const replay = this.scoreboardReplay.getPayload(stage.lapCount);
         const medal = getMedalForRaceTime(stage.trackKey, finalTime, stage.lapCount);
         const signedIn = this.campaignBootstrap?.signedIn === true;
-        let accepted = !signedIn;
-        let confirmationFailed = false;
-        let error = null;
-        if (signedIn) {
-            if (!replay) {
-                error = 'This run could not be verified.';
-            } else {
-                this.modal.showModal(
-                    'Saving Campaign result',
-                    'Confirming your finished race…',
-                    null,
-                    { modalKind: 'pending' },
-                );
-                try {
-                    const response = await submitCampaignRun({
-                        raceId: stage.raceId,
-                        trackKey: stage.trackKey,
-                        replay,
-                    });
-                    accepted = response.ok && response.body?.accepted === true;
-                    error = accepted ? null : response.body?.error || 'This run could not be verified.';
-                    if (accepted && response.body?.progress) {
-                        this.campaignBootstrap.progress = response.body.progress;
-                    }
-                } catch (submitError) {
-                    confirmationFailed = true;
-                    error = 'Race finished, but the result could not be confirmed. Check Campaign progress before retrying.';
-                    console.error('Could not confirm Campaign race result:', submitError);
-                }
+        const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
+
+        const showCampaignResult = ({
+            accepted,
+            confirmationFailed = false,
+            error = null,
+            shareRequest = null,
+        }) => {
+            this.modal.showModal(
+                accepted
+                    ? 'Campaign race complete'
+                    : confirmationFailed
+                        ? 'Result not confirmed'
+                        : 'Run rejected',
+                null,
+                {
+                    lapTime: finalTime,
+                    bestTime: null,
+                    completedLaps: stage.lapCount,
+                    requiredLaps: stage.lapCount,
+                    primaryStatLabel: 'Race Time',
+                    lapMedal: medal,
+                    trackKey: stage.trackKey,
+                    showGlobalLeaderboard: false,
+                },
+                {
+                    ...createModalActions({
+                        modalKind: accepted ? 'win' : 'rejected',
+                        primaryActionLabel: 'Retry',
+                        secondaryActionLabel: 'Campaign',
+                        secondaryAction: () => this.showCampaignLobby(),
+                    }),
+                    restartAction: () => this.restartActiveRace(),
+                    settingsAction: () => this.settings.openSettings(),
+                    shareRequest,
+                },
+            );
+            if (this.modal.modalMsg) {
+                this.modal.modalMsg.style.display = '';
+                this.modal.modalMsg.textContent = error || trackLine;
             }
-        } else {
+        };
+
+        if (!signedIn) {
             const local = saveLocalCampaignFinish(stage.raceId, finalTime);
             this.campaignBootstrap.progress = local;
-        }
-        this.modal.showModal(
-            accepted
-                ? 'Campaign race complete'
-                : confirmationFailed
-                    ? 'Result not confirmed'
-                    : 'Run rejected',
-            null,
-            {
-                lapTime: finalTime,
-                bestTime: null,
-                completedLaps: stage.lapCount,
-                requiredLaps: stage.lapCount,
-                primaryStatLabel: 'Race Time',
-                lapMedal: medal,
-                trackKey: stage.trackKey,
-                showGlobalLeaderboard: false,
-            },
-            {
-                ...createModalActions({
-                    modalKind: accepted ? 'win' : 'rejected',
-                    primaryActionLabel: 'Retry',
-                    secondaryActionLabel: 'Campaign',
-                    secondaryAction: () => this.showCampaignLobby(),
-                }),
-                restartAction: () => this.restartActiveRace(),
-                settingsAction: () => this.settings.openSettings(),
-                shareRequest: accepted && signedIn
-                    ? { kind: 'campaign-challenge', source: 'campaign', raceId: stage.raceId }
-                    : null,
-            },
-        );
-        if (this.modal.modalMsg) {
-            this.modal.modalMsg.style.display = '';
-            this.modal.modalMsg.textContent = error
-                || `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
+            showCampaignResult({ accepted: true });
+            return;
         }
 
-        const refreshGhost = async () => {
-            if (!accepted || !signedIn) return;
+        if (!replay) {
+            showCampaignResult({
+                accepted: false,
+                error: 'This run could not be verified.',
+            });
+            return;
+        }
+
+        // Same pattern as Daily: open the finish sheet immediately, confirm in the background.
+        showCampaignResult({
+            accepted: true,
+            shareRequest: {
+                kind: 'campaign-challenge',
+                source: 'campaign',
+                raceId: stage.raceId,
+            },
+        });
+
+        void (async () => {
+            let accepted = false;
+            let confirmationFailed = false;
+            let error = null;
+            try {
+                const response = await submitCampaignRun({
+                    raceId: stage.raceId,
+                    trackKey: stage.trackKey,
+                    replay,
+                });
+                accepted = response.ok && response.body?.accepted === true;
+                error = accepted ? null : response.body?.error || 'This run could not be verified.';
+                if (accepted && response.body?.progress) {
+                    this.campaignBootstrap.progress = response.body.progress;
+                }
+            } catch (submitError) {
+                confirmationFailed = true;
+                error = 'Race finished, but the result could not be confirmed. Check Campaign progress before retrying.';
+                console.error('Could not confirm Campaign race result:', submitError);
+            }
+
+            if (
+                this.status !== 'won'
+                || this.activeCampaignStage?.raceId !== stage.raceId
+            ) {
+                return;
+            }
+
+            if (!accepted) {
+                showCampaignResult({ accepted: false, confirmationFailed, error });
+                return;
+            }
+
             try {
                 const ghost = await getCampaignPbGhost(stage.raceId);
                 const personalBest = ghost.ok ? ghost.body?.personalBest : null;
@@ -479,15 +507,13 @@ export const campaignEngineMethods = {
             } catch (ghostError) {
                 console.warn('Campaign result was saved, but PB ghost refresh failed:', ghostError);
             }
-        };
-        const refreshLobby = async () => {
+
             try {
                 await this.loadCampaignLobby({ show: false });
             } catch (refreshError) {
                 console.warn('Campaign result screen opened without refreshed progress:', refreshError);
             }
-        };
-        await Promise.all([refreshGhost(), refreshLobby()]);
+        })();
     },
 
     async handleCampaignChallengeWin(winData) {
@@ -497,15 +523,78 @@ export const campaignEngineMethods = {
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
-        let confirmationFailed = false;
-        let response = { ok: false, body: { error: 'This run could not be verified.' } };
-        if (replay) {
+        const medal = getMedalForRaceTime(challenge.trackKey, finalTime, challenge.lapCount);
+
+        const showChallengeResult = ({
+            accepted,
+            confirmationFailed = false,
+            title = null,
+            error = null,
+            shareRequest = null,
+            differenceMs = null,
+        }) => {
             this.modal.showModal(
-                'Saving challenge result',
-                'Confirming your finished race…',
+                accepted
+                    ? (title || 'Challenge complete')
+                    : confirmationFailed
+                        ? 'Result not confirmed'
+                        : 'Run rejected',
                 null,
-                { modalKind: 'pending' },
+                {
+                    lapTime: finalTime,
+                    bestTime: challenge.targetTimeMs / 1000,
+                    completedLaps: challenge.lapCount,
+                    requiredLaps: challenge.lapCount,
+                    primaryStatLabel: 'Race Time',
+                    lapMedal: medal,
+                    trackKey: challenge.trackKey,
+                    showGlobalLeaderboard: false,
+                },
+                {
+                    ...createModalActions({
+                        modalKind: accepted ? 'win' : 'rejected',
+                        primaryActionLabel: 'Retry',
+                        secondaryActionLabel: 'Challenge',
+                        secondaryAction: () => this.loadChallengeLobby(challenge.challengeId),
+                    }),
+                    restartAction: () => this.restartActiveRace(),
+                    settingsAction: () => this.settings.openSettings(),
+                    shareRequest,
+                },
             );
+            if (this.modal.modalMsg) {
+                this.modal.modalMsg.style.display = '';
+                this.modal.modalMsg.textContent = accepted
+                    ? `${Math.abs(Number(differenceMs) || 0) / 1000}s from the challenge time`
+                    : (error || 'This run could not be verified.');
+            }
+        };
+
+        if (!replay) {
+            showChallengeResult({
+                accepted: false,
+                error: 'This run could not be verified.',
+            });
+            return;
+        }
+
+        showChallengeResult({
+            accepted: true,
+            title: 'Challenge complete',
+            shareRequest: {
+                kind: 'campaign-challenge',
+                source: 'duel',
+                challengeId: challenge.challengeId,
+            },
+            differenceMs: null,
+        });
+        if (this.modal.modalMsg) {
+            this.modal.modalMsg.textContent = 'Confirming your finished race…';
+        }
+
+        void (async () => {
+            let confirmationFailed = false;
+            let response = { ok: false, body: { error: 'This run could not be verified.' } };
             try {
                 response = await submitCampaignChallengeRun({
                     challengeId: challenge.challengeId,
@@ -521,45 +610,30 @@ export const campaignEngineMethods = {
                 };
                 console.error('Could not confirm Campaign challenge result:', submitError);
             }
-        }
-        const accepted = response.ok && response.body?.accepted === true;
-        this.modal.showModal(
-            accepted
-                ? response.body.resultLabel
-                : confirmationFailed
-                    ? 'Result not confirmed'
-                    : 'Run rejected',
-            null,
-            {
-                lapTime: finalTime,
-                bestTime: challenge.targetTimeMs / 1000,
-                completedLaps: challenge.lapCount,
-                requiredLaps: challenge.lapCount,
-                primaryStatLabel: 'Race Time',
-                lapMedal: getMedalForRaceTime(challenge.trackKey, finalTime, challenge.lapCount),
-                trackKey: challenge.trackKey,
-                showGlobalLeaderboard: false,
-            },
-            {
-                ...createModalActions({
-                    modalKind: accepted ? 'win' : 'rejected',
-                    primaryActionLabel: 'Retry',
-                    secondaryActionLabel: 'Challenge',
-                    secondaryAction: () => this.loadChallengeLobby(challenge.challengeId),
-                }),
-                restartAction: () => this.restartActiveRace(),
-                settingsAction: () => this.settings.openSettings(),
+
+            if (
+                this.status !== 'won'
+                || this.activeCampaignChallenge?.challengeId !== challenge.challengeId
+            ) {
+                return;
+            }
+
+            const accepted = response.ok && response.body?.accepted === true;
+            showChallengeResult({
+                accepted,
+                confirmationFailed,
+                title: accepted ? response.body.resultLabel : null,
+                error: response.body?.error || null,
                 shareRequest: accepted
-                    ? { kind: 'campaign-challenge', source: 'duel', challengeId: challenge.challengeId }
+                    ? {
+                        kind: 'campaign-challenge',
+                        source: 'duel',
+                        challengeId: challenge.challengeId,
+                    }
                     : null,
-            },
-        );
-        if (this.modal.modalMsg) {
-            this.modal.modalMsg.style.display = '';
-            this.modal.modalMsg.textContent = accepted
-                ? `${Math.abs(Number(response.body?.differenceMs) || 0) / 1000}s from the challenge time`
-                : response.body?.error || 'This run could not be verified.';
-        }
+                differenceMs: accepted ? response.body?.differenceMs : null,
+            });
+        })();
     },
 
     restartActiveRace() {

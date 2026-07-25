@@ -125,16 +125,15 @@ flowchart LR
   geometry; `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
-  player challenges. Campaign finish UI is terminal-state safe: a saved run
-  still opens its result sheet when the follow-up PB ghost or lobby refresh
-  fails, while an interrupted submission response opens an explicit
-  unconfirmed-result sheet instead of leaving the stopped race on screen. A
-  saving sheet appears as soon as the finish is detected, and Campaign client
-  requests abort after 20 seconds so a stalled WebView request is terminal.
-  Guest Campaign progress is browser-local. Campaign uses the same compact
-  lobby actions and modal shells as Daily: Standings selects among unlocked
-  stage-specific leaderboards, while Tracks renders permanent stage progress
-  and starts any unlocked stage.
+  player challenges. Campaign and challenge finishes open the result sheet
+  immediately (same pattern as Daily), then confirm the run in the background;
+  a rejected or interrupted confirmation updates that sheet instead of showing
+  a separate saving modal. Follow-up PB ghost and lobby refreshes also stay in
+  the background. Campaign client requests abort after 20 seconds so a stalled
+  WebView request is terminal. Guest Campaign progress is browser-local.
+  Campaign uses the same compact lobby actions and modal shells as Daily:
+  Standings selects among unlocked stage-specific leaderboards, while Tracks
+  renders permanent stage progress and starts any unlocked stage.
 - `src/server/campaign-store.ts` owns signed-in Campaign start state,
   permanent progress, one permanent leaderboard and PB ghost hash per stage,
   replay validation, and server-derived medals. Campaign records do not share
