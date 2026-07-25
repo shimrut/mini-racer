@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker finish-line tool uses a flag icon with a small "finish line" label.
 - Mapmaker edit-layer tools sit in the canvas header next to the track name (replacing the Outer/Inner/Lines legend).
 - Removed the Mapmaker canvas car/brush scale box.
 - Mapmaker Line Build tool button shows a bottle icon with a small "line build" label under it.

@@ -30,7 +30,7 @@ const TOOL_LABELS = {
     draw: 'line build',
     outer: 'outer wall',
     inner: 'inner wall',
-    startLine: 'start line',
+    startLine: 'finish line',
     startPos: 'start position',
     checkpoints: 'checkpoints'
 };
