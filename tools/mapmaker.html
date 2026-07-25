@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.17">
+    <link rel="stylesheet" href="mapmaker.css?v=2.18">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -74,22 +74,8 @@
 
             <section class="maker-panel">
                 <div class="panel-head">
-                    <h2>Edit Layer</h2>
+                    <h2>Edit Tools</h2>
                     <button id="reframe-btn" type="button" class="ghost-btn">Reframe</button>
-                </div>
-
-                <div id="tool-buttons" class="tool-grid">
-                    <button type="button" data-tool="draw" class="tool-icon-btn" aria-label="Line Build" title="Line Build">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-                            <path fill="currentColor" d="M223.9 32l-76.2 0c-29.4 0-55.1 20.1-62.1 48.6L1.4 420.5C-6.1 450.7 16.8 480 48 480l175.9 0 0-64c0-17.7 14.3-32 32-32s32 14.3 32 32l0 64 176.1 0c31.2 0 54.1-29.3 46.6-59.5L426.5 80.6C419.4 52.1 393.8 32 364.3 32l-76.4 0 0 64c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-64zm64 192l0 64c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32s32 14.3 32 32z"/>
-                        </svg>
-                        <span class="tool-icon-label">line build</span>
-                    </button>
-                    <button type="button" data-tool="outer">Outer Wall</button>
-                    <button type="button" data-tool="inner">Inner Wall</button>
-                    <button type="button" data-tool="startLine">Start Line</button>
-                    <button type="button" data-tool="startPos">Start Pos</button>
-                    <button type="button" data-tool="checkpoints">Checkpoints</button>
                 </div>
 
                 <label class="field">
@@ -178,10 +164,31 @@
                     <p id="stage-title" class="stage-title">Classic Circuit</p>
                     <p id="stage-subtitle" class="stage-subtitle">Editing outer wall</p>
                 </div>
-                <div class="legend">
-                    <span><i class="legend-swatch legend-outer"></i>Outer</span>
-                    <span><i class="legend-swatch legend-inner"></i>Inner</span>
-                    <span><i class="legend-swatch legend-line"></i>Lines</span>
+                <div id="tool-buttons" class="tool-grid stage-tool-grid">
+                    <button type="button" data-tool="draw" class="tool-icon-btn" aria-label="Line Build" title="Line Build">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+                            <path fill="currentColor" d="M223.9 32l-76.2 0c-29.4 0-55.1 20.1-62.1 48.6L1.4 420.5C-6.1 450.7 16.8 480 48 480l175.9 0 0-64c0-17.7 14.3-32 32-32s32 14.3 32 32l0 64 176.1 0c31.2 0 54.1-29.3 46.6-59.5L426.5 80.6C419.4 52.1 393.8 32 364.3 32l-76.4 0 0 64c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-64zm64 192l0 64c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32s32 14.3 32 32z"/>
+                        </svg>
+                        <span class="tool-icon-label">line build</span>
+                    </button>
+                    <button type="button" data-tool="outer" class="tool-swatch-btn">
+                        <i class="legend-swatch legend-outer" aria-hidden="true"></i>
+                        <span class="tool-icon-label">outer</span>
+                    </button>
+                    <button type="button" data-tool="inner" class="tool-swatch-btn">
+                        <i class="legend-swatch legend-inner" aria-hidden="true"></i>
+                        <span class="tool-icon-label">inner</span>
+                    </button>
+                    <button type="button" data-tool="startLine" class="tool-swatch-btn">
+                        <i class="legend-swatch legend-line" aria-hidden="true"></i>
+                        <span class="tool-icon-label">start line</span>
+                    </button>
+                    <button type="button" data-tool="startPos" class="tool-icon-btn">
+                        <span class="tool-icon-label">start pos</span>
+                    </button>
+                    <button type="button" data-tool="checkpoints" class="tool-icon-btn">
+                        <span class="tool-icon-label">checkpoints</span>
+                    </button>
                 </div>
             </div>
 

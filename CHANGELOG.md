@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker edit-layer tools sit in the canvas header next to the track name (replacing the Outer/Inner/Lines legend).
 - Removed the Mapmaker canvas car/brush scale box.
 - Mapmaker Line Build tool button shows a bottle icon with a small "line build" label under it.
 - Mapmaker Line Build widens bends that are tighter than half the lane before building walls, so the inside corner cannot loop through itself.

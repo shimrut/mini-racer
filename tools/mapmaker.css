@@ -247,6 +247,33 @@ select:focus {
     line-height: 1.15;
 }
 
+.stage-tool-grid {
+    margin-top: 0;
+    grid-template-columns: repeat(6, minmax(4.4rem, auto));
+    gap: 0.45rem;
+    justify-content: end;
+}
+
+.stage-tool-grid .tool-icon-btn,
+.stage-tool-grid .tool-swatch-btn {
+    min-height: 3.6rem;
+    padding: 0.45rem 0.4rem;
+    border-radius: 12px;
+}
+
+.tool-swatch-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+}
+
+.stage-tool-grid .legend-swatch {
+    width: 0.7rem;
+    height: 0.7rem;
+}
+
 .chip-row {
     grid-template-columns: repeat(auto-fit, minmax(5.8rem, 1fr));
 }
@@ -403,8 +430,14 @@ kbd {
 
     .field-grid,
     .button-row,
-    .tool-grid {
+    .tool-grid:not(.stage-tool-grid) {
         grid-template-columns: 1fr;
+    }
+
+    .stage-tool-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        justify-content: stretch;
+        width: 100%;
     }
 
     .chip-row {
