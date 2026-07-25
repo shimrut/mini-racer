@@ -814,6 +814,72 @@ describe('ui leaderboard helpers', () => {
         expect(options.slice(1).every((option) => option.challengeId === null)).toBe(true);
     });
 
+    it('keeps the standings rail anchored to today when an older track is loaded', async () => {
+        const today = '2026-07-25';
+        const olderDate = '2026-07-20';
+        const originalDateNow = Date.now;
+        Date.now = () => Date.parse(`${today}T12:00:00.000Z`);
+        try {
+            const showRunsModal = vi.fn();
+            const updateModalLeaderboardDayOptions = vi.fn();
+            const todayChallenge = {
+                id: 'daily-today',
+                trackKey: 'circuit',
+                challengeDate: today,
+            };
+            const olderChallenge = {
+                id: 'daily-older',
+                trackKey: 'circuit',
+                challengeDate: olderDate,
+            };
+            const dailyChallengeUi = {
+                getSummary: vi.fn(() => ({
+                    challengeId: olderChallenge.id,
+                    trackKey: olderChallenge.trackKey,
+                    challengeDate: olderChallenge.challengeDate,
+                })),
+            };
+            const instance = new LeaderboardsUi({
+                showRunsModal,
+                dailyChallengeUi,
+                updateModalLeaderboardDayOptions,
+            });
+            vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue({
+                playerRankLabel: '#1',
+            });
+            const service = await import('../game/daily-challenge/service.js');
+            vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([
+                todayChallenge,
+                olderChallenge,
+            ]);
+            vi.spyOn(service, 'getDailyChallengePlaylist').mockResolvedValue([
+                todayChallenge,
+                olderChallenge,
+            ]);
+
+            await instance.openDailyChallengeLeaderboard('close');
+
+            const payload = showRunsModal.mock.calls[0][4];
+            expect(payload.selectedLeaderboardDayId).toBe(olderChallenge.id);
+            expect(payload.leaderboardDayOptions[0]).toMatchObject({
+                challengeId: todayChallenge.id,
+                dayLabel: 'Today',
+                challengeDate: today,
+            });
+            expect(payload.leaderboardDayOptions).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        challengeId: olderChallenge.id,
+                        challengeDate: olderDate,
+                    }),
+                ]),
+            );
+            expect(payload.leaderboardDayOptions).toHaveLength(DAILY_PLAYLIST_DAYS);
+        } finally {
+            Date.now = originalDateNow;
+        }
+    });
+
     it('updates the day rail when the playlist resolves while standings stay open', async () => {
         const today = new Date(Date.now()).toISOString().slice(0, 10);
         const showRunsModal = vi.fn();

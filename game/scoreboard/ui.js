@@ -554,8 +554,12 @@ export class LeaderboardsUi {
         const currentChallenge = initialPlaylist.find(
             (challenge) => challenge.id === summary.challengeId
         ) || fallbackChallenge;
+        const windowAnchorChallenge = resolveWindowAnchorChallenge(
+            initialPlaylist,
+            currentChallenge,
+        );
         const leaderboardDayOptions = buildLeaderboardDayOptionsForWindow({
-            anchorChallenge: currentChallenge,
+            anchorChallenge: windowAnchorChallenge,
             playlistChallenges: initialPlaylist,
         });
 
@@ -584,8 +588,12 @@ export class LeaderboardsUi {
                     playlistChallenges,
                     fallbackChallenge
                 );
+                const updatedAnchorChallenge = resolveWindowAnchorChallenge(
+                    mergedPlaylist,
+                    currentChallenge,
+                );
                 const updatedDayOptions = buildLeaderboardDayOptionsForWindow({
-                    anchorChallenge: currentChallenge,
+                    anchorChallenge: updatedAnchorChallenge,
                     playlistChallenges: mergedPlaylist,
                 });
                 this.updateModalLeaderboardDayOptions({
