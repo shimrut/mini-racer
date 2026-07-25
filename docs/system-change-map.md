@@ -147,7 +147,7 @@ flowchart LR
   its public post data includes only the immutable race target and no ghost,
   player ID, or private persistence data.
 - The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
-- Standings entry points open that selected-day modal directly. The date rail and touch swipe navigation switch available days inside it; there is no intermediate standings track-picker. The separate Tracks playlist remains the race-selection flow.
+- Standings entry points open that selected-day modal directly. The date rail and touch swipe navigation switch available days inside it; there is no intermediate standings track-picker. The separate Tracks playlist remains the race-selection flow. The date rail is non-shrinking (`flex: 0 0 auto`) with vertical overflow visible so long paginated standings lists cannot clip month labels.
 - Campaign adapts that same standings rail to unlocked stage numbers. Every
   selection requests `/api/campaign/snapshot` for exactly one `raceId`; results
   and pagination remain isolated per permanent stage. The shared Tracks modal
