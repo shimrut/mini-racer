@@ -144,6 +144,12 @@ export class LobbyUi {
             this.updateDailyTrackLabel('');
             return;
         }
+        if (mode === 'challenge') {
+            if (subhead) subhead.hidden = false;
+            label.textContent = 'Challenge';
+            this.updateDailyTrackLabel('');
+            return;
+        }
         if (subhead) subhead.hidden = true;
         label.textContent = '';
         this.updateDailyTrackLabel('');
@@ -295,7 +301,7 @@ export class LobbyUi {
             this.challengeAcceptBtn.disabled = !this.challengeState.canAccept;
             setText(
                 this.challengeAcceptBtn.querySelector('.main-menu__label'),
-                this.challengeState.signedIn ? 'Accept Challenge' : 'Sign in required',
+                this.challengeState.signedIn ? 'Accept' : 'Sign in required',
             );
         }
     }

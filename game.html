@@ -145,8 +145,13 @@
 
                     <section id="lobby-challenge-pane" class="lobby-pane lobby-pane--challenge main-menu"
                         data-lobby-pane="challenge" aria-label="Player challenge" hidden>
+                        <div class="lobby-mode-menu">
+                            <button id="lobby-challenge-back-btn" class="lobby-mode-action" type="button"
+                                data-lobby-action aria-label="Back to modes">
+                                <span class="lobby-mode-action__label">Back</span>
+                            </button>
+                        </div>
                         <div class="challenge-lobby">
-                            <span class="lobby-pane-heading__eyebrow">Player challenge</span>
                             <h2 id="challenge-opponent-name" class="challenge-lobby__opponent">A racer challenges you</h2>
                             <p id="challenge-track-label" class="challenge-lobby__track">Track unavailable</p>
                             <div class="challenge-target">
@@ -159,12 +164,10 @@
                             </p>
                         </div>
                         <div class="lobby-primary-row">
-                            <button id="lobby-challenge-back-btn" class="lobby-back-btn" type="button"
-                                data-lobby-action aria-label="Back to modes">Back</button>
                             <button id="challenge-accept-btn"
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action disabled>
-                                <span class="main-menu__label">Accept Challenge</span>
+                                <span class="main-menu__label">Accept</span>
                             </button>
                         </div>
                     </section>

@@ -114,11 +114,12 @@ flowchart LR
   queries, Daily post context, and Campaign challenge post context. The shared
   lobby keeps the original compact `#start-group` footprint with title at the
   top and one bottom-pinned action cluster (`margin-top: auto` on the active
-  pane only). Home, Daily, and Campaign list secondary actions as compact
-  right-anchored mode-action labels; Daily/Campaign keep a full-width primary
-  Race/Start button in that same cluster. Daily and Campaign mode names (and
-  Daily's track name) sit in a tight `.lobby-subhead` directly under Mini Racer
-  on every viewport. Home and player-challenge panes are unchanged.
+  pane only). Home, Daily, Campaign, and Challenge list secondary actions as
+  compact right-anchored mode-action labels; Daily/Campaign/Challenge keep a
+  full-width primary Race/Start/Accept button in that same cluster. Daily,
+  Campaign, and Challenge mode names (and Daily's track name) sit in a tight
+  `.lobby-subhead` directly under Mini Racer on every viewport. Challenge also
+  shows a compact details panel (opponent, track, time to beat) above Accept.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
   Number Zero through Nine with fixed `1,1,1,2,2,2,3,3,3,3` laps and Gold/Author
   gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable

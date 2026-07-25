@@ -438,6 +438,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             'lobby-campaign-back-btn',
             'campaign-standings-btn',
             'campaign-tracks-btn',
+            'lobby-challenge-back-btn',
         ]) {
             const buttonMarkup = html.match(
                 new RegExp(`<button id="${buttonId}"[\\s\\S]*?</button>`),
@@ -452,6 +453,13 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(html).toMatch(
             /id="campaign-primary-btn"[\s\S]*main-menu__item--primary/,
+        );
+        expect(html).toMatch(
+            /id="challenge-accept-btn"[\s\S]*main-menu__label">Accept</,
+        );
+        expect(html).not.toContain('Accept Challenge');
+        expect(html).not.toMatch(
+            /id="lobby-challenge-pane"[\s\S]*lobby-pane-heading__eyebrow/,
         );
         expect(css).toMatch(
             /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-end;/s,
@@ -562,6 +570,12 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
         expect(body.dataset.lobbyMode).toBe('campaign');
+
+        lobby.showChallenge();
+        expect(subhead.hidden).toBe(false);
+        expect(label.textContent).toBe('Challenge');
+        expect(track.hidden).toBe(true);
+        expect(body.dataset.lobbyMode).toBe('challenge');
 
         lobby.showHome();
         expect(subhead.hidden).toBe(true);

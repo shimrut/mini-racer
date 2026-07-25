@@ -194,20 +194,26 @@
 
 .challenge-lobby {
     width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.85rem 0.9rem;
+    border-radius: var(--radius-sm);
+    background: rgba(8, 12, 20, 0.72);
 }
 
 .challenge-lobby__opponent {
     max-width: 29rem;
-    margin: 0.35rem 0 0;
-    font-size: clamp(2.1rem, 8vw, 3.75rem);
+    margin: 0;
+    font-family: var(--header-font);
+    font-size: clamp(1.35rem, 5vw, 1.85rem);
     font-style: italic;
     font-weight: 900;
-    letter-spacing: -0.045em;
-    line-height: 0.95;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    text-transform: none;
 }
 
 .challenge-lobby__track {
-    margin: 0.75rem 0 1.5rem;
+    margin: 0.45rem 0 0.85rem;
     color: var(--text-dim);
     font-family: var(--mono-font);
     font-size: 0.76rem;
@@ -219,8 +225,8 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    padding-block: 1rem;
-    border-block: 1px solid var(--border-default);
+    padding-block: 0.65rem 0;
+    border-top: 1px solid var(--border-default);
 }
 
 .challenge-target__label {
@@ -233,13 +239,13 @@
 
 .challenge-target__time {
     font-family: var(--mono-font);
-    font-size: clamp(2.4rem, 10vw, 4.25rem);
+    font-size: clamp(1.75rem, 7vw, 2.5rem);
     letter-spacing: -0.06em;
     line-height: 1.05;
 }
 
 .challenge-target__medal {
-    margin-top: 0.35rem;
+    margin-top: 0.25rem;
     color: var(--warning);
     font-size: 0.68rem;
     font-weight: 900;
@@ -248,10 +254,14 @@
 }
 
 .challenge-sign-in-message {
-    margin: 1rem 0 0;
+    margin: 0.75rem 0 0;
     color: var(--warning);
     font-size: 0.78rem;
     font-weight: 700;
+}
+
+.lobby-pane--challenge .lobby-primary-row {
+    margin-top: 0.85rem;
 }
 
 @media (max-width: 430px) {

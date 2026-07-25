@@ -1,5 +1,7 @@
 # Changelog
 
+- Challenge lobby matches Daily/Campaign: Back as a mode action, “Challenge”
+  under the title, compact details panel, and a bottom **Accept** button.
 - You can’t accept a player challenge you created: Accept shows a short message
   and opens Campaign instead. The server also rejects self get/submit.
 - Mapmaker start-pos tool uses a location-pin icon with a small "start pos" label.
