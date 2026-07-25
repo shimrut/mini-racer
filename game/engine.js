@@ -266,12 +266,24 @@ export class RealTimeRacer {
       playUnlockSound: (tier) => this.medalEffectsAudio?.scheduleMedalUnlock?.(tier),
       getGarageUi: () => this.garage,
       getRedditUsername: () => this.redditUsername,
-      previewShare: (payload) => payload?.kind === "campaign-challenge"
-        ? this.previewCampaignChallenge(payload)
-        : previewDailyChallengeShare(payload),
-      confirmShare: (shareToken, request) => request?.kind === "campaign-challenge"
-        ? this.confirmCampaignChallenge(shareToken)
-        : confirmDailyChallengeShare(shareToken),
+      previewShare: (payload) => {
+        if (payload?.kind === "campaign-challenge") {
+          return this.previewCampaignChallenge(payload);
+        }
+        if (payload?.kind === "challenge-brag") {
+          return this.previewCampaignChallengeBrag(payload);
+        }
+        return previewDailyChallengeShare(payload);
+      },
+      confirmShare: (shareToken, request) => {
+        if (request?.kind === "campaign-challenge") {
+          return this.confirmCampaignChallenge(shareToken);
+        }
+        if (request?.kind === "challenge-brag") {
+          return this.confirmCampaignChallengeBrag(shareToken);
+        }
+        return confirmDailyChallengeShare(shareToken);
+      },
     });
     this.leaderboards = new LeaderboardsUi({
       showRunsModal: (...args) => this.modal.showRunsModal(...args),

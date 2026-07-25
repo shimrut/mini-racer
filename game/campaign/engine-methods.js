@@ -11,6 +11,8 @@ import {
     getCampaignPbGhost,
     getCampaignSnapshot,
     previewCampaignChallenge,
+    previewCampaignChallengeBrag,
+    confirmCampaignChallengeBrag,
     readLocalCampaignProgress,
     saveLocalCampaignFinish,
     startLocalCampaign,
@@ -587,16 +589,19 @@ export const campaignEngineMethods = {
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
-        const medal = getMedalForRaceTime(challenge.trackKey, finalTime, challenge.lapCount);
 
         const showChallengeResult = ({
             accepted,
             confirmationFailed = false,
             title = null,
             error = null,
-            shareRequest = null,
+            outcome = null,
             differenceMs = null,
         }) => {
+            const won = accepted && outcome === 'won';
+            const shareRequest = won
+                ? { kind: 'challenge-brag', challengeId: challenge.challengeId }
+                : null;
             this.modal.showModal(
                 accepted
                     ? (title || 'Challenge complete')
@@ -610,7 +615,7 @@ export const campaignEngineMethods = {
                     completedLaps: challenge.lapCount,
                     requiredLaps: challenge.lapCount,
                     primaryStatLabel: 'Race Time',
-                    lapMedal: medal,
+                    lapMedal: null,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
                 },
@@ -618,10 +623,10 @@ export const campaignEngineMethods = {
                     ...createModalActions({
                         modalKind: accepted ? 'win' : 'rejected',
                         primaryActionLabel: 'Retry',
-                        secondaryActionLabel: 'Challenge',
+                        secondaryActionLabel: 'Home',
                         secondaryAction: () => this.loadChallengeLobby(challenge.challengeId),
                     }),
-                    restartAction: () => this.restartActiveRace(),
+                    restartAction: won ? null : () => this.restartActiveRace(),
                     settingsAction: () => this.settings.openSettings(),
                     shareRequest,
                 },
@@ -645,11 +650,7 @@ export const campaignEngineMethods = {
         showChallengeResult({
             accepted: true,
             title: 'Challenge complete',
-            shareRequest: {
-                kind: 'campaign-challenge',
-                source: 'duel',
-                challengeId: challenge.challengeId,
-            },
+            outcome: null,
             differenceMs: null,
         });
         if (this.modal.modalMsg) {
@@ -688,13 +689,7 @@ export const campaignEngineMethods = {
                 confirmationFailed,
                 title: accepted ? response.body.resultLabel : null,
                 error: response.body?.error || null,
-                shareRequest: accepted
-                    ? {
-                        kind: 'campaign-challenge',
-                        source: 'duel',
-                        challengeId: challenge.challengeId,
-                    }
-                    : null,
+                outcome: accepted ? response.body?.outcome : null,
                 differenceMs: accepted ? response.body?.differenceMs : null,
             });
         })();
@@ -823,5 +818,13 @@ export const campaignEngineMethods = {
 
     confirmCampaignChallenge(token) {
         return createCampaignChallenge(token);
+    },
+
+    previewCampaignChallengeBrag(request) {
+        return previewCampaignChallengeBrag(request);
+    },
+
+    confirmCampaignChallengeBrag(token) {
+        return confirmCampaignChallengeBrag(token);
     },
 };

@@ -408,14 +408,18 @@ describe('Campaign lobby and shared modal adapters', () => {
             1,
             'Challenge complete',
             null,
-            expect.objectContaining({ lapTime: 8.25 }),
-            expect.objectContaining({ modalKind: 'win' }),
+            expect.objectContaining({ lapTime: 8.25, lapMedal: null }),
+            expect.objectContaining({
+                modalKind: 'win',
+                shareRequest: null,
+                restartAction: expect.any(Function),
+            }),
         );
         await vi.waitFor(() => {
             expect(context.modal.showModal).toHaveBeenLastCalledWith(
                 'Result not confirmed',
                 null,
-                expect.objectContaining({ lapTime: 8.25 }),
+                expect.objectContaining({ lapTime: 8.25, lapMedal: null }),
                 expect.objectContaining({
                     modalKind: 'rejected',
                     shareRequest: null,
@@ -425,6 +429,78 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(modalMsg.textContent).toBe(
             'Race finished, but the challenge result could not be confirmed.',
         );
+    });
+
+    it('shows Brag without Improve on a won challenge and Improve without Brag on a loss', async () => {
+        const modalMsg = { style: {}, textContent: '' };
+        const baseContext = {
+            activeCampaignChallenge: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+
+        const winShowModal = vi.fn();
+        campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'won',
+                resultLabel: 'Challenge Won',
+                differenceMs: -500,
+            },
+        });
+        await campaignEngineMethods.handleCampaignChallengeWin.call(
+            { ...baseContext, modal: { modalMsg, showModal: winShowModal } },
+            { lapTime: 7.5 },
+        );
+        await vi.waitFor(() => {
+            expect(winShowModal).toHaveBeenLastCalledWith(
+                'Challenge Won',
+                null,
+                expect.objectContaining({ lapMedal: null, showGlobalLeaderboard: false }),
+                expect.objectContaining({
+                    shareRequest: {
+                        kind: 'challenge-brag',
+                        challengeId: 'challenge-1',
+                    },
+                    restartAction: null,
+                }),
+            );
+        });
+
+        const lossShowModal = vi.fn();
+        campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'lost',
+                resultLabel: 'Challenge Lost',
+                differenceMs: 400,
+            },
+        });
+        await campaignEngineMethods.handleCampaignChallengeWin.call(
+            { ...baseContext, modal: { modalMsg, showModal: lossShowModal } },
+            { lapTime: 8.4 },
+        );
+        await vi.waitFor(() => {
+            expect(lossShowModal).toHaveBeenLastCalledWith(
+                'Challenge Lost',
+                null,
+                expect.objectContaining({ lapMedal: null }),
+                expect.objectContaining({
+                    shareRequest: null,
+                    restartAction: expect.any(Function),
+                }),
+            );
+        });
     });
 
     it('keeps Daily and Campaign actions as mode labels with a bottom primary', () => {

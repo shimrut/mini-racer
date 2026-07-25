@@ -215,4 +215,20 @@ export async function submitCampaignChallengeRun({ challengeId, replay }) {
     });
 }
 
+export async function previewCampaignChallengeBrag({ challengeId }) {
+    return requestJson(API_ROUTES.campaignChallengeBragPreviewUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId }),
+    });
+}
+
+export async function confirmCampaignChallengeBrag(shareToken) {
+    return requestJson(API_ROUTES.campaignChallengeBragConfirmUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareToken }),
+    });
+}
+
 export { LOCAL_PROGRESS_KEY };

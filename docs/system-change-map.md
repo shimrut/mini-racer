@@ -148,7 +148,10 @@ flowchart LR
   or accept challenges. The challenger cannot accept or submit against their
   own post (`own_challenge`); the in-feed Accept card shows an expired-style
   message and opens Campaign via a stored launch target that overrides challenge
-  post data. Duel submissions never call the Campaign store.
+  post data. Challenge finishes do not award medals, campaign progress, or
+  leaderboard ranks. A win offers Brag (comment on that challenge post via
+  `/api/campaign/challenge/brag/*`); a loss/tie offers Improve. Duel submissions
+  never call the Campaign store.
 - `campaign-challenge.html` is the dedicated in-feed custom-post entrypoint;
   its public post data includes only the immutable race target and no ghost,
   player ID, or private persistence data.

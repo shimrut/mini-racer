@@ -62,6 +62,10 @@ import {
 } from './campaign-store.js';
 import { createCampaignChallengeService } from './campaign-challenge-service.js';
 import {
+    confirmCampaignChallengeBrag,
+    previewCampaignChallengeBrag,
+} from './campaign-challenge-brag.js';
+import {
     resolveCampaignChallengeSource,
     validateCampaignChallengeReplay,
 } from './campaign-challenge-runtime.js';
@@ -109,6 +113,8 @@ function registerProductionRoutes(app: express.Application): void {
         createCampaignChallenge: campaignChallengeService.create,
         getCampaignChallenge: campaignChallengeService.get,
         submitCampaignChallenge: campaignChallengeService.submit,
+        previewCampaignChallengeBrag,
+        confirmCampaignChallengeBrag,
     });
     registerCompetitionRoutes(app, {
         getRequestUsername,
