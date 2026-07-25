@@ -54,6 +54,7 @@ export const FIRST_UNLOCK_MEDAL_HOLD_MS = 250;
  * @param {{ trackKey?: string|null, lapTimeSec?: number|null, previousPersonalBestSec?: number|null|undefined }} [context]
  */
 export function shouldCelebrateMedalTier(tier, previousBestMedalOnTrack, context = {}) {
+    if (tier === 'challenge') return true;
     if (tier === 'personal-best') {
         return shouldShowPersonalBestMedalHero(context.trackKey, context.lapTimeSec, {
             previousTrackMedal: previousBestMedalOnTrack,
@@ -236,20 +237,59 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
 
 /**
  * Win combined overlay: horizontal row of all medal tiers for this track.
+ * Challenge finishes use a single display-only challenge medal on win, or an empty hero otherwise.
  * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
- * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|null, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
+ * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|'challenge'|null, challengeFinish?: boolean, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
  */
 export function renderWinCombinedMedalOverlay(
     overlayEl,
     {
         trackKey = null,
         lapMedal = null,
+        challengeFinish = false,
         previousTrackMedal = null,
         lapCount = 1,
     } = {},
 ) {
     if (!overlayEl) return;
     overlayEl.replaceChildren();
+
+    if (lapMedal === 'challenge') {
+        const root = document.createElement('div');
+        root.className = 'win-combined-medal-overlay win-combined-medal-overlay--challenge';
+        root.setAttribute('role', 'group');
+        root.setAttribute('aria-label', 'Challenge beaten');
+
+        const centerWrap = document.createElement('div');
+        centerWrap.className = 'win-combined-medal-overlay__center';
+
+        const row = document.createElement('div');
+        row.className = 'combined-medal-row win-combined-medal-overlay__row';
+        row.setAttribute('role', 'group');
+        row.setAttribute('aria-label', 'Challenge beaten');
+
+        const slot = document.createElement('div');
+        slot.className = 'combined-medal-row-slot';
+        slot.dataset.tier = 'challenge';
+        slot.appendChild(createMedalIconSvg('challenge', {
+            className: 'medal-svg--hero medal-pile-icon--deferred',
+        }));
+        row.appendChild(slot);
+        centerWrap.appendChild(row);
+
+        const label = document.createElement('p');
+        label.className = 'combined-medal-challenge-label';
+        label.textContent = 'Challenge beaten';
+        centerWrap.appendChild(label);
+
+        root.appendChild(centerWrap);
+        overlayEl.appendChild(root);
+        return;
+    }
+
+    if (challengeFinish) {
+        return;
+    }
 
     const bestStoredMedal = maxMedalTier(
         isStandardMedalTier(previousTrackMedal) ? previousTrackMedal : null,

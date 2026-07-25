@@ -198,6 +198,7 @@ export function formatMedalLabel(medal) {
     if (medal === 'silver') return 'Silver';
     if (medal === 'bronze') return 'Bronze';
     if (medal === 'personal-best') return 'Personal best';
+    if (medal === 'challenge') return 'Challenge beaten';
     return '—';
 }
 

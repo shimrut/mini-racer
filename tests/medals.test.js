@@ -19,7 +19,8 @@ import {
     shouldShowPersonalBestMedalHero,
     planFirstUnlockMedalRevealDelays,
     FIRST_UNLOCK_MEDAL_HOLD_MS,
-    isPersonalBestTimeImprovement
+    isPersonalBestTimeImprovement,
+    isStandardMedalTier,
 } from '../game/medals/medals.js';
 
 describe('medals', () => {
@@ -348,6 +349,14 @@ describe('medals', () => {
             expect(shouldCelebrateMedalTier('personal-best', 'author', pbContext)).toBe(true);
         }
         expect(shouldCelebrateMedalTier('white', null)).toBe(false);
+        expect(shouldCelebrateMedalTier('challenge', null)).toBe(true);
+        expect(shouldCelebrateMedalTier('challenge', 'author')).toBe(true);
+    });
+
+    it('labels the challenge display medal without treating it as a Campaign tier', async () => {
+        const { formatMedalLabel } = await import('../game/medals/medal-timing.js');
+        expect(formatMedalLabel('challenge')).toBe('Challenge beaten');
+        expect(isStandardMedalTier('challenge')).toBe(false);
     });
 
     it('isPersonalBestTimeImprovement is strict on the clock', () => {

@@ -603,7 +603,7 @@ export const campaignEngineMethods = {
                     ? 'tie'
                     : 'lost';
         const provisionalTitle = provisionalOutcome === 'won'
-            ? 'Challenge Won'
+            ? 'Challenge beaten'
             : provisionalOutcome === 'tie'
                 ? 'Tie'
                 : provisionalOutcome === 'lost'
@@ -619,15 +619,13 @@ export const campaignEngineMethods = {
             differenceMs = null,
         }) => {
             const won = accepted && outcome === 'won';
-            const shareRequest = won
-                ? { kind: 'challenge-brag', challengeId: challenge.challengeId }
-                : null;
+            const finishTitle = accepted
+                ? (won ? 'Challenge beaten' : (title || 'Challenge complete'))
+                : confirmationFailed
+                    ? 'Result not confirmed'
+                    : 'Run rejected';
             this.modal.showModal(
-                accepted
-                    ? (title || 'Challenge complete')
-                    : confirmationFailed
-                        ? 'Result not confirmed'
-                        : 'Run rejected',
+                finishTitle,
                 null,
                 {
                     lapTime: finalTime,
@@ -635,7 +633,8 @@ export const campaignEngineMethods = {
                     completedLaps: challenge.lapCount,
                     requiredLaps: challenge.lapCount,
                     primaryStatLabel: 'Race Time',
-                    lapMedal: null,
+                    lapMedal: won ? 'challenge' : null,
+                    challengeFinish: accepted,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
                 },
@@ -646,15 +645,20 @@ export const campaignEngineMethods = {
                         secondaryActionLabel: 'Home',
                         secondaryAction: () => this.loadChallengeLobby(challenge.challengeId),
                     }),
-                    restartAction: won ? null : () => this.restartActiveRace(),
+                    restartAction: () => this.restartActiveRace(),
                     settingsAction: () => this.settings.openSettings(),
-                    shareRequest,
+                    shareRequest: accepted
+                        ? { kind: 'challenge-brag', challengeId: challenge.challengeId }
+                        : null,
+                    shareEnabled: won,
                 },
             );
             if (this.modal.modalMsg) {
                 this.modal.modalMsg.style.display = '';
                 this.modal.modalMsg.textContent = accepted
-                    ? `${Math.abs(Number(differenceMs) || 0) / 1000}s from the challenge time`
+                    ? (won
+                        ? 'Challenge beaten'
+                        : `${Math.abs(Number(differenceMs) || 0) / 1000}s from the challenge time`)
                     : (error || 'This run could not be verified.');
             }
         };

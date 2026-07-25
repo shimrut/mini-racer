@@ -77,6 +77,7 @@ export function createMedalEffectsAudio(externalCtx, externalOutput) {
             if (tier === 'gold') freq = 659.25; // Gold (E5)
             if (tier === 'author') freq = 880.00; // Author (A5)
             if (tier === 'personal-best') freq = 523.25; // Personal best (C5)
+            if (tier === 'challenge') freq = 698.46; // Challenge beaten (F5)
 
             const osc = ctx.createOscillator();
             osc.type = 'triangle';

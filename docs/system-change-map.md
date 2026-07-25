@@ -128,9 +128,11 @@ flowchart LR
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
   player challenges. Campaign finishes open the result sheet immediately (same
-  pattern as Daily), then confirm in the background. Challenge finishes follow
-  the same immediate sheet, without medals or rank: win → Brag/Home, loss/tie →
-  Improve/Home.
+  pattern as Daily), then confirm in the background. Challenge finishes use one
+  sheet with Improve / Brag / Home every time (Brag enabled only when beaten). A
+  win shows a display-only challenge medal and “Challenge beaten”; loss/tie keep
+  an empty medal hero. Challenge finishes never write Campaign medals, progress,
+  or ranks.
   a rejected or interrupted confirmation updates that sheet instead of showing
   a separate saving modal. Campaign finish also paints RANK immediately while
   submitting, then replaces it with the stage leaderboard place after
@@ -151,8 +153,9 @@ flowchart LR
   own post (`own_challenge`); the in-feed Accept card shows an expired-style
   message and opens Campaign via a stored launch target that overrides challenge
   post data. Challenge finishes do not award medals, campaign progress, or
-  leaderboard ranks. A win offers Brag (comment on that challenge post via
-  `/api/campaign/challenge/brag/*`); a loss/tie offers Improve. Duel submissions
+  leaderboard ranks. One finish sheet always offers Improve / Brag / Home; Brag
+  is enabled only after a beat and comments via `/api/campaign/challenge/brag/*`.
+  A win shows a display-only challenge medal. Duel submissions
   never call the Campaign store.
 - `campaign-challenge.html` is the dedicated in-feed custom-post entrypoint;
   its public post data includes only the immutable race target and no ghost,

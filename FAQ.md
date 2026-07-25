@@ -108,11 +108,10 @@ stage's leaderboard but do not unlock the next race.
 No. A player challenge is an isolated duel against a frozen verified ghost.
 Its win, tie, or loss can be shared as another challenge, but it never changes
 Campaign progress, PBs, medals, or leaderboards. Challenge finishes also do not
-show or award medals, and they never appear on Campaign or Daily standings.
-
-If you **win**, the finish screen offers **Brag** (posts a comment on that
-challenge saying you beat it) or **Home**. If you lose or tie, you get
-**Improve** or **Home**.
+award Campaign medals or ranks, and they never appear on Campaign or Daily standings.
+A win shows a display-only challenge medal and **Challenge beaten**, with finish buttons
+**Improve**, **Brag**, and **Home** (Brag posts a comment on that challenge). A loss or
+tie uses the same three buttons, but **Brag** stays disabled.
 
 ### Why can’t I accept or create a player challenge?
 

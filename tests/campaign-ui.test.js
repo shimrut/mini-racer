@@ -408,10 +408,18 @@ describe('Campaign lobby and shared modal adapters', () => {
             1,
             'Challenge Lost',
             null,
-            expect.objectContaining({ lapTime: 8.25, lapMedal: null }),
+            expect.objectContaining({
+                lapTime: 8.25,
+                lapMedal: null,
+                challengeFinish: true,
+            }),
             expect.objectContaining({
                 modalKind: 'win',
-                shareRequest: null,
+                shareRequest: {
+                    kind: 'challenge-brag',
+                    challengeId: 'challenge-1',
+                },
+                shareEnabled: false,
                 restartAction: expect.any(Function),
             }),
         );
@@ -423,6 +431,8 @@ describe('Campaign lobby and shared modal adapters', () => {
                 expect.objectContaining({
                     modalKind: 'rejected',
                     shareRequest: null,
+                    shareEnabled: false,
+                    restartAction: expect.any(Function),
                 }),
             );
         });
@@ -431,7 +441,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
-    it('shows Brag without Improve on a won challenge and Improve without Brag on a loss', async () => {
+    it('always shows Improve+Brag+Home; Brag only enabled on a win with challenge medal', async () => {
         const modalMsg = { style: {}, textContent: '' };
         const baseContext = {
             activeCampaignChallenge: {
@@ -463,31 +473,42 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(winShowModal).toHaveBeenNthCalledWith(
             1,
-            'Challenge Won',
+            'Challenge beaten',
             null,
-            expect.objectContaining({ lapMedal: null, showGlobalLeaderboard: false }),
+            expect.objectContaining({
+                lapMedal: 'challenge',
+                challengeFinish: true,
+                showGlobalLeaderboard: false,
+            }),
             expect.objectContaining({
                 shareRequest: {
                     kind: 'challenge-brag',
                     challengeId: 'challenge-1',
                 },
-                restartAction: null,
+                shareEnabled: true,
+                restartAction: expect.any(Function),
             }),
         );
         await vi.waitFor(() => {
             expect(winShowModal).toHaveBeenLastCalledWith(
-                'Challenge Won',
+                'Challenge beaten',
                 null,
-                expect.objectContaining({ lapMedal: null, showGlobalLeaderboard: false }),
+                expect.objectContaining({
+                    lapMedal: 'challenge',
+                    challengeFinish: true,
+                    showGlobalLeaderboard: false,
+                }),
                 expect.objectContaining({
                     shareRequest: {
                         kind: 'challenge-brag',
                         challengeId: 'challenge-1',
                     },
-                    restartAction: null,
+                    shareEnabled: true,
+                    restartAction: expect.any(Function),
                 }),
             );
         });
+        expect(modalMsg.textContent).toBe('Challenge beaten');
 
         const lossShowModal = vi.fn();
         campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
@@ -507,9 +528,49 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect(lossShowModal).toHaveBeenLastCalledWith(
                 'Challenge Lost',
                 null,
-                expect.objectContaining({ lapMedal: null }),
                 expect.objectContaining({
-                    shareRequest: null,
+                    lapMedal: null,
+                    challengeFinish: true,
+                }),
+                expect.objectContaining({
+                    shareRequest: {
+                        kind: 'challenge-brag',
+                        challengeId: 'challenge-1',
+                    },
+                    shareEnabled: false,
+                    restartAction: expect.any(Function),
+                }),
+            );
+        });
+
+        const tieShowModal = vi.fn();
+        campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'tie',
+                resultLabel: 'Tie',
+                differenceMs: 0,
+            },
+        });
+        await campaignEngineMethods.handleCampaignChallengeWin.call(
+            { ...baseContext, modal: { modalMsg, showModal: tieShowModal } },
+            { lapTime: 8 },
+        );
+        await vi.waitFor(() => {
+            expect(tieShowModal).toHaveBeenLastCalledWith(
+                'Tie',
+                null,
+                expect.objectContaining({
+                    lapMedal: null,
+                    challengeFinish: true,
+                }),
+                expect.objectContaining({
+                    shareRequest: {
+                        kind: 'challenge-brag',
+                        challengeId: 'challenge-1',
+                    },
+                    shareEnabled: false,
                     restartAction: expect.any(Function),
                 }),
             );

@@ -7,6 +7,7 @@ const MEDAL_ARIA = {
     silver: 'Silver medal',
     bronze: 'Bronze medal',
     'personal-best': 'Personal best medal',
+    challenge: 'Challenge beaten',
     white: 'No medal yet'
 };
 
@@ -16,7 +17,8 @@ const MEDAL_TIER_CAPTION = {
     silver: 'silver',
     gold: 'gold',
     author: 'creator',
-    'personal-best': 'pb'
+    'personal-best': 'pb',
+    challenge: 'beat'
 };
 
 const MEDAL_CENTER_X = '320';
@@ -185,7 +187,7 @@ function appendMedalTierCaption(tier, svg, emblemGradId = null) {
     appendMedalSvgText(svg, 'medal-svg__tier-caption', caption, MEDAL_CAPTION_Y, emblemGradId);
 }
 
-const MEDAL_EMBLEM_TIERS = new Set(['bronze', 'silver', 'gold', 'author', 'personal-best']);
+const MEDAL_EMBLEM_TIERS = new Set(['bronze', 'silver', 'gold', 'author', 'personal-best', 'challenge']);
 
 /**
  * @param {'author'|'gold'|'silver'|'bronze'|'personal-best'} tier
@@ -343,6 +345,21 @@ function buildMedalIcon(tier, { className = '', outline = false, centerText = nu
                 { offset: '0%', color: '#ffffff' },
                 { offset: '100%', color: '#a7f3d0' }
             ];
+        } else if (tier === 'challenge') {
+            borderStops = [
+                { offset: '0%', color: '#fda4af' },
+                { offset: '35%', color: '#e11d48' },
+                { offset: '70%', color: '#fb7185' },
+                { offset: '100%', color: '#881337' }
+            ];
+            faceStops = [
+                { offset: '0%', color: '#f43f5e' },
+                { offset: '100%', color: '#9f1239' }
+            ];
+            emblemStops = [
+                { offset: '0%', color: '#ffffff' },
+                { offset: '100%', color: '#fecdd3' }
+            ];
         }
 
         defs.appendChild(createGradient(borderGradId, 'linear', { x1: '0%', y1: '0%', x2: '100%', y2: '100%' }, borderStops));
@@ -422,7 +439,7 @@ function buildMedalIcon(tier, { className = '', outline = false, centerText = nu
 }
 
 /**
- * @param {'author'|'gold'|'silver'|'bronze'|'personal-best'|'white'|null|undefined} medal
+ * @param {'author'|'gold'|'silver'|'bronze'|'personal-best'|'challenge'|'white'|null|undefined} medal
  * @param {{ className?: string, outline?: boolean, centerText?: string|null, showEmblem?: boolean, rowPlaceholder?: boolean }} [options]
  * @returns {HTMLElement}
  */
@@ -432,7 +449,8 @@ export function createMedalIconSvg(medal, { className = '', outline = false, cen
         || medal === 'gold'
         || medal === 'silver'
         || medal === 'bronze'
-        || medal === 'personal-best';
+        || medal === 'personal-best'
+        || medal === 'challenge';
     const tier = isKnownTier ? medal : 'white';
     const options = { className, outline, centerText, showEmblem, rowPlaceholder };
     const cacheKey = getMedalTemplateCacheKey(tier, options);

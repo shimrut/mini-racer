@@ -1,7 +1,8 @@
 # Changelog
 
-- Challenge finishes no longer show medals or rank. A win offers **Brag** (comment
-  on that challenge post) or **Home**; a loss/tie offers **Improve** or **Home**.
+- Challenge finishes always show **Improve**, **Brag**, and **Home**. Brag is
+  enabled only when the challenge is beaten. A win shows a display-only challenge
+  medal and **Challenge beaten** (not Campaign medal tiers).
 - Challenge lobby matches Daily/Campaign: Back as a mode action, “Challenge”
   under the title with “u/… challenges you” on the next line, compact details
   panel, and a bottom **Accept** button.

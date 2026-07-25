@@ -97,7 +97,7 @@ describe('medal-icon', () => {
         };
 
         try {
-            for (const tier of ['bronze', 'silver', 'gold', 'author', 'personal-best']) {
+            for (const tier of ['bronze', 'silver', 'gold', 'author', 'personal-best', 'challenge']) {
                 const icon = createMedalIconSvg(tier);
                 const svg = icon.children[0];
                 const emblem = svg.children.find(c => c.className === 'medal-svg__emblem-text');
@@ -105,6 +105,13 @@ describe('medal-icon', () => {
                 expect(emblem.textContent, tier).toBe('MR');
                 expect(svg.children.find(c => c.className === 'medal-svg__label'), tier).toBeUndefined();
             }
+            const challenge = createMedalIconSvg('challenge');
+            expect(challenge.getAttribute('aria-label')).toBe('Challenge beaten');
+            expect(challenge.dataset.tier).toBe('challenge');
+            const challengeCaption = challenge.children[0].children.find(
+                (c) => c.className === 'medal-svg__tier-caption',
+            );
+            expect(challengeCaption?.textContent).toBe('beat');
         } finally {
             global.document = originalDocument;
         }

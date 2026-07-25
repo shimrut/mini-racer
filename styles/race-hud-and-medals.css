@@ -424,6 +424,20 @@
     filter: drop-shadow(0 0 12px rgba(74, 222, 128, 0.55)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
 
+.combined-hero-medal .medal-svg--hero.medal-svg--challenge {
+    filter: drop-shadow(0 0 12px rgba(251, 113, 133, 0.55)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.combined-medal-challenge-label {
+    margin: 0.65rem 0 0;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fecdd3;
+}
+
 .combined-hero-medal .medal-svg--hero.medal-svg--placeholder {
     filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
 }

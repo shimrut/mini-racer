@@ -933,13 +933,14 @@ export class ModalShell {
             time: lapData.lapTime,
             bestLap: lapData.bestTime,
             scoreboardSnapshot: lapData.scoreboardSnapshot,
-            title: 'RACE COMPLETE',
+            title: lapData.lapMedal === 'challenge' ? 'Challenge beaten' : 'RACE COMPLETE',
             statLabels: [
                 (lapData.requiredLaps ?? lapData.completedLaps ?? 1) > 1
                     ? 'RACE TIME'
                     : 'THIS LAP',
             ],
             lapMedal: lapData.lapMedal ?? null,
+            challengeFinish: Boolean(lapData.challengeFinish),
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
@@ -972,19 +973,22 @@ export class ModalShell {
             const shareKind = options.shareRequest?.kind;
             const isChallengeShare = shareKind === 'campaign-challenge';
             const isChallengeBrag = shareKind === 'challenge-brag';
+            const shareEnabled = options.shareEnabled !== false;
             const shareLabel = isChallengeBrag
                 ? 'Brag'
                 : isChallengeShare
                     ? 'Challenge'
                     : 'Share Time';
             const shareAria = isChallengeBrag
-                ? 'Brag that you beat this challenge'
+                ? (shareEnabled
+                    ? 'Brag that you beat this challenge'
+                    : 'Brag available after beating this challenge')
                 : isChallengeShare
                     ? 'Challenge other racers'
                     : 'Share time';
             this._setShareButtonLabel(this.combinedPlaylistBtn, shareLabel);
             this.combinedPlaylistBtn.setAttribute('aria-label', shareAria);
-            this.combinedPlaylistBtn.disabled = false;
+            this.combinedPlaylistBtn.disabled = Boolean(options.shareRequest) && !shareEnabled;
         }
 
         this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
@@ -992,9 +996,9 @@ export class ModalShell {
         this._bindCombinedGarageBtn(this.combinedGarageBtn);
         this._bindClickAction(
             this.combinedPlaylistBtn,
-            options.shareRequest
+            options.shareRequest && options.shareEnabled !== false
                 ? () => void this._startShare(options.shareRequest, this.combinedPlaylistBtn, this.modalCombinedView)
-                : options.playlistAction,
+                : (!options.shareRequest ? options.playlistAction : null),
         );
         this._bindClickAction(
             this.combinedRestartBtn,
