@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker Line Build tool button shows a bottle icon with a small "line build" label under it.
 - Mapmaker Line Build widens bends that are tighter than half the lane before building walls, so the inside corner cannot loop through itself.
 - Mapmaker Line Build keeps lane width through corners by filleting the centerline then offsetting walls (no miter flare).
 - Mapmaker now shows the same race-style track preview as the game (rounded walls, asphalt, curbs, checkered start/finish), with faint sharp construction lines still visible for editing.
