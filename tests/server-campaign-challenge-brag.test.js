@@ -63,6 +63,7 @@ const challenge = {
     campaignId: 'numbered-v1',
     raceId: 'numbered-v1-01',
     challengerUsername: 'RaceFan',
+    challengerAvatarUrl: null,
     trackKey: 'numberOne',
     lapCount: 1,
     targetTimeMs: 10_000,

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Racer Challenge</title>
+    <title>Mini Racer Head to Head</title>
     <link rel="stylesheet" href="campaign-challenge.css">
     <link rel="icon" href="public/favicon.ico" type="image/x-icon">
     <script type="module" src="campaign-challenge.js"></script>
@@ -21,8 +21,19 @@
         </header>
 
         <section class="challenge-copy">
-            <p class="challenge-eyebrow">Player challenge</p>
-            <h1 id="challenge-heading"><span id="challenger-name">A racer</span> challenges you</h1>
+            <p class="challenge-eyebrow">Head to Head</p>
+            <div class="challenge-duel" aria-label="Head to Head racers">
+                <div class="challenge-duel__racer">
+                    <img id="challenger-avatar" class="challenge-avatar challenge-avatar--generic" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png" alt="">
+                    <span id="challenger-name" class="challenge-duel__name">A racer</span>
+                </div>
+                <span class="challenge-duel__vs" aria-hidden="true">VS</span>
+                <div class="challenge-duel__racer">
+                    <img id="viewer-avatar" class="challenge-avatar challenge-avatar--generic" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png" alt="">
+                    <span id="viewer-name" class="challenge-duel__name">You</span>
+                </div>
+            </div>
+            <h1 id="challenge-heading">wants a Head to Head</h1>
             <p id="challenge-track-name" class="challenge-track-name">Campaign race</p>
             <div class="challenge-target" aria-label="Target time">
                 <span>Beat this time</span>
@@ -33,7 +44,7 @@
 
         <footer class="challenge-actions">
             <p id="challenge-message" role="status" aria-live="polite"></p>
-            <button id="accept-challenge" type="button">Accept Challenge</button>
+            <button id="accept-challenge" type="button">Race Head to Head</button>
         </footer>
     </main>
 </body>

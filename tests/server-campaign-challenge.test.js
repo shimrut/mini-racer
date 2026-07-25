@@ -41,6 +41,7 @@ const reddit = {
         return post;
     }),
     getPostsByUser: vi.fn(async () => ({ all: async () => [] })),
+    getSnoovatarUrl: vi.fn(async (username) => `https://i.redd.it/${username}.png`),
     submitCustomPost: vi.fn(async (input) => {
         postNumber += 1;
         const post = {
@@ -124,9 +125,10 @@ describe('campaign challenge service', () => {
         const preview = await service.preview({ bestTimeMs: 1, ghost: 'forged' }, context);
 
         expect(preview.status).toBe(200);
-        expect(preview.body.title).toBe('u/RaceFan challenges you: beat 25.640 on Number Three');
+        expect(preview.body.title).toBe('u/RaceFan wants a Head to Head: beat 25.640 on Number Three');
         expect(preview.body.preview).not.toHaveProperty('ghost');
         expect(preview.body.preview).not.toHaveProperty('sourceId');
+        expect(preview.body.preview.challengerAvatarUrl).toBe('https://i.redd.it/RaceFan.png');
 
         const created = await service.create(
             { challengeToken: preview.body.challengeToken },
@@ -139,11 +141,32 @@ describe('campaign challenge service', () => {
                 postType: 'campaign-challenge',
                 targetTimeMs: 25_640,
                 challengerUsername: 'RaceFan',
+                challengerAvatarUrl: 'https://i.redd.it/RaceFan.png',
             }),
         }));
         expect(reddit.submitCustomPost.mock.calls[0][0].postData).not.toHaveProperty('ghost');
         const stored = await readCampaignChallenge(created.body.challengeId);
         expect(stored.frozenGhost).toEqual(source().ghost);
+        expect(stored.challengerAvatarUrl).toBe('https://i.redd.it/RaceFan.png');
+    });
+
+    it('returns challenger and viewer avatars when loading a Head to Head', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            username: 'OtherRacer',
+        });
+        expect(loaded.status).toBe(200);
+        expect(loaded.body).toMatchObject({
+            status: 'ready',
+            viewerUsername: 'OtherRacer',
+            viewerAvatarUrl: 'https://i.redd.it/OtherRacer.png',
+            challenge: {
+                challengerUsername: 'RaceFan',
+                challengerAvatarUrl: 'https://i.redd.it/RaceFan.png',
+            },
+        });
     });
 
     it('requires a signed-in Reddit user and current subreddit', async () => {
@@ -225,7 +248,10 @@ describe('campaign challenge service', () => {
         expect(ownGet.status).toBe(403);
         expect(ownGet.body).toEqual({
             status: 'own_challenge',
-            error: "You can't accept your own challenge.",
+            error: "You can't accept your own Head to Head.",
+            viewerUsername: 'RaceFan',
+            viewerAvatarUrl: 'https://i.redd.it/RaceFan.png',
+            challengerAvatarUrl: 'https://i.redd.it/RaceFan.png',
         });
 
         const ownSubmit = await service.submit({ challengeId, replay: {} }, context);
@@ -256,6 +282,6 @@ describe('campaign challenge service', () => {
 describe('campaign challenge formatting', () => {
     it('formats exact verified milliseconds', () => {
         expect(formatCampaignChallengeTitle('RaceFan', 9_005, 'numberZero'))
-            .toBe('u/RaceFan challenges you: beat 9.005 on Number Zero');
+            .toBe('u/RaceFan wants a Head to Head: beat 9.005 on Number Zero');
     });
 });

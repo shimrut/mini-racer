@@ -102,19 +102,68 @@ body {
     text-transform: uppercase;
 }
 
-h1 {
-    max-width: 680px;
-    margin: 12px 0 0;
-    font-size: clamp(38px, 7vw, 82px);
-    font-weight: 900;
-    font-style: italic;
-    line-height: 0.92;
-    letter-spacing: -0.06em;
-    text-transform: uppercase;
+.challenge-duel {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 2.5vw, 22px);
+    margin: 18px 0 10px;
 }
 
-#challenger-name {
+.challenge-duel__racer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.challenge-avatar {
+    width: clamp(64px, 12vw, 96px);
+    height: clamp(64px, 12vw, 96px);
+    display: block;
+    border: 2px solid rgb(239 68 68 / 55%);
+    border-radius: 50%;
+    background: #171d27;
+    object-fit: cover;
+    box-shadow: 0 0 0 4px rgb(239 68 68 / 12%);
+}
+
+.challenge-avatar--generic {
+    padding: 12%;
+    background: color-mix(in srgb, var(--accent-color) 10%, #10151e);
+    object-fit: contain;
+}
+
+.challenge-duel__name {
+    max-width: 9rem;
+    overflow: hidden;
+    color: var(--text-color);
+    font-size: clamp(12px, 1.6vw, 15px);
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.challenge-duel__vs {
     color: var(--accent-color);
+    font-size: clamp(14px, 2vw, 18px);
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.12em;
+}
+
+h1 {
+    max-width: 680px;
+    margin: 8px 0 0;
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 900;
+    font-style: italic;
+    line-height: 0.96;
+    letter-spacing: -0.05em;
+    text-transform: uppercase;
 }
 
 .challenge-track-name {

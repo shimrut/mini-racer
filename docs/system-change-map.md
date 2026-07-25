@@ -158,9 +158,11 @@ flowchart LR
   unlocks only after a verified beat. Confirmation status is patched into the
   medal hero (Submitting/Verifying → medal or error). Duel submissions
   never call the Campaign store.
-- `campaign-challenge.html` is the dedicated in-feed custom-post entrypoint;
-  its public post data includes only the immutable race target and no ghost,
-  player ID, or private persistence data.
+- `campaign-challenge.html` is the dedicated in-feed Head to Head custom-post
+  entrypoint. Public post data includes the immutable race target plus a frozen
+  challenger Reddit avatar URL (no ghost, player ID, or private persistence).
+  The Accept card shows challenger and viewer avatars (generic Snoo while signed
+  out) and labels the mode Head to Head.
 - The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
 - Standings entry points open that selected-day modal directly. The date rail and touch swipe navigation switch available days inside it; there is no intermediate standings track-picker. The separate Tracks playlist remains the race-selection flow.
 - Campaign adapts that same standings rail to unlocked stage numbers. Every

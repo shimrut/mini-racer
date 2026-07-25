@@ -24,6 +24,7 @@ export type CampaignChallengePostData = {
     campaignId: typeof CAMPAIGN_CHALLENGE_ID;
     raceId: string;
     challengerUsername: string;
+    challengerAvatarUrl: string | null;
     trackKey: string;
     lapCount: 1 | 2 | 3;
     targetTimeMs: number;
@@ -71,6 +72,9 @@ export function toCampaignChallengePostData(
         campaignId: record.campaignId,
         raceId: record.raceId,
         challengerUsername: record.challengerUsername,
+        challengerAvatarUrl: typeof record.challengerAvatarUrl === 'string'
+            ? record.challengerAvatarUrl
+            : null,
         trackKey: record.trackKey,
         lapCount: record.lapCount,
         targetTimeMs: record.targetTimeMs,

@@ -29,6 +29,10 @@ import {
     writeCampaignChallengeResult,
 } from './campaign-challenge-store.js';
 import { releaseRedisLock } from './redis-lock.js';
+import {
+    isRedditAvatarUrl,
+    resolveRedditAvatarUrl,
+} from './daily-podium-service.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 
@@ -137,18 +141,22 @@ export function formatCampaignChallengeTitle(
     timeMs: number,
     trackKey: string,
 ): string {
-    return `u/${username} challenges you: beat ${formatCampaignChallengeTime(timeMs)} on ${getTrackName(trackKey, trackKey)}`;
+    return `u/${username} wants a Head to Head: beat ${formatCampaignChallengeTime(timeMs)} on ${getTrackName(trackKey, trackKey)}`;
 }
 
 export function formatCampaignChallengeTextFallback(postData: CampaignChallengePostData): string {
     const laps = postData.lapCount === 1 ? '1 lap' : `${postData.lapCount} laps`;
     return [
-        `# ${postData.challengerUsername} challenges you`,
+        `# ${postData.challengerUsername} wants a Head to Head`,
         '',
         `Beat **${formatCampaignChallengeTime(postData.targetTimeMs)}** on **${getTrackName(postData.trackKey, postData.trackKey)}** (${laps}).`,
         '',
-        'Open Mini Racer and accept the challenge to race the frozen verified ghost.',
+        'Open Mini Racer and accept the Head to Head to race the frozen verified ghost.',
     ].join('\n');
+}
+
+function normalizeAvatarUrl(value: unknown): string | null {
+    return isRedditAvatarUrl(value) ? value : null;
 }
 
 function parsePreview(raw: string | null): PreviewRecord | null {
@@ -169,13 +177,17 @@ function parsePreview(raw: string | null): PreviewRecord | null {
     }
 }
 
-function buildRecord(preview: PreviewRecord): CampaignChallengeRecord {
+function buildRecord(
+    preview: PreviewRecord,
+    challengerAvatarUrl: string | null = null,
+): CampaignChallengeRecord {
     return {
         postType: CAMPAIGN_CHALLENGE_POST_TYPE,
         challengeId: preview.challengeId,
         campaignId: CAMPAIGN_CHALLENGE_ID,
         raceId: preview.source.raceId,
         challengerUsername: preview.username,
+        challengerAvatarUrl: normalizeAvatarUrl(challengerAvatarUrl),
         trackKey: preview.source.trackKey,
         lapCount: preview.source.lapCount,
         targetTimeMs: preview.source.bestTimeMs,
@@ -190,6 +202,19 @@ function buildRecord(preview: PreviewRecord): CampaignChallengeRecord {
         postId: null,
         postUrl: null,
     };
+}
+
+async function resolveChallengeAvatars(
+    challengerUsername: string,
+    viewerUsername: string,
+    storedChallengerAvatarUrl: unknown = null,
+): Promise<{ challengerAvatarUrl: string | null; viewerAvatarUrl: string | null }> {
+    const stored = normalizeAvatarUrl(storedChallengerAvatarUrl);
+    const [challengerAvatarUrl, viewerAvatarUrl] = await Promise.all([
+        stored ? Promise.resolve(stored) : resolveRedditAvatarUrl(challengerUsername),
+        resolveRedditAvatarUrl(viewerUsername),
+    ]);
+    return { challengerAvatarUrl, viewerAvatarUrl };
 }
 
 async function activePost(identity: {
@@ -287,6 +312,7 @@ export function createCampaignChallengeService(
         const challengeId = createId();
         const createdAt = now().toISOString();
         const title = formatCampaignChallengeTitle(request.username, source.bestTimeMs, source.trackKey);
+        const challengerAvatarUrl = await resolveRedditAvatarUrl(request.username);
         const record: PreviewRecord = {
             username: request.username,
             subredditName: request.subredditName,
@@ -305,7 +331,7 @@ export function createCampaignChallengeService(
                 challengeToken: token,
                 username: request.username,
                 title,
-                preview: toCampaignChallengePostData(buildRecord(record)),
+                preview: toCampaignChallengePostData(buildRecord(record, challengerAvatarUrl)),
                 expiresAt: new Date(now().getTime() + PREVIEW_TTL_SECONDS * 1000).toISOString(),
             },
         };
@@ -317,7 +343,13 @@ export function createCampaignChallengeService(
     ): Promise<CampaignChallengeServiceResult> {
         const request = creationContext(context);
         if (!request) {
-            return { status: 401, body: { status: 'signed_in_required', error: 'Sign in to Reddit to create a challenge.' } };
+            return {
+                status: 401,
+                body: {
+                    status: 'signed_in_required',
+                    error: 'Sign in to Reddit to create a Head to Head.',
+                },
+            };
         }
         const token = typeof input.challengeToken === 'string' ? input.challengeToken : '';
         const tokenKey = previewKey(token);
@@ -369,7 +401,8 @@ export function createCampaignChallengeService(
 
             const recovered = await recoverPost(prepared, request.appSlug);
             if (recovered) {
-                const saved = await savePost(buildRecord(prepared), recovered);
+                const challengerAvatarUrl = await resolveRedditAvatarUrl(prepared.username);
+                const saved = await savePost(buildRecord(prepared, challengerAvatarUrl), recovered);
                 await redis.del(tokenKey);
                 return {
                     status: 200,
@@ -387,12 +420,13 @@ export function createCampaignChallengeService(
                     status: 429,
                     body: {
                         status: 'daily_limit_reached',
-                        error: 'You can create up to three new challenge posts per community each UTC day.',
+                        error: 'You can create up to three new Head to Head posts per community each UTC day.',
                     },
                 };
             }
 
-            const record = buildRecord(prepared);
+            const challengerAvatarUrl = await resolveRedditAvatarUrl(prepared.username);
+            const record = buildRecord(prepared, challengerAvatarUrl);
             const postData = toCampaignChallengePostData(record);
             const post = await reddit.submitCustomPost({
                 subredditName: request.subredditName,
@@ -446,16 +480,43 @@ export function createCampaignChallengeService(
             return { status: 404, body: { status: 'challenge_unavailable', error: 'This challenge is unavailable.' } };
         }
         if (normalizeName(request.username) === normalizeName(record.challengerUsername)) {
+            const avatars = await resolveChallengeAvatars(
+                record.challengerUsername,
+                request.username,
+                record.challengerAvatarUrl,
+            );
             return {
                 status: 403,
                 body: {
                     status: 'own_challenge',
-                    error: "You can't accept your own challenge.",
+                    error: "You can't accept your own Head to Head.",
+                    viewerUsername: request.username,
+                    viewerAvatarUrl: avatars.viewerAvatarUrl,
+                    challengerAvatarUrl: avatars.challengerAvatarUrl,
                 },
             };
         }
         const result = await readCampaignChallengeResult(record.challengeId, request.username);
-        return { status: 200, body: { status: 'ready', ...publicChallengeBody(record, result) } };
+        const avatars = await resolveChallengeAvatars(
+            record.challengerUsername,
+            request.username,
+            record.challengerAvatarUrl,
+        );
+        const challenge = {
+            ...toCampaignChallengePostData(record),
+            challengerAvatarUrl: avatars.challengerAvatarUrl,
+        };
+        return {
+            status: 200,
+            body: {
+                status: 'ready',
+                challenge,
+                opponentGhost: record.frozenGhost,
+                bestResult: result,
+                viewerUsername: request.username,
+                viewerAvatarUrl: avatars.viewerAvatarUrl,
+            },
+        };
     }
 
     async function submit(

@@ -8,11 +8,35 @@ import {
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 
 const POST_TYPE = 'campaign-challenge';
-const OWN_CHALLENGE_MESSAGE = "You can't accept your own challenge. Opening your Campaign.";
+const GENERIC_SNOO_URL = 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
+const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head. Opening your Campaign.";
 
 function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
+
+export function isRedditAvatarUrl(value) {
+    if (typeof value !== 'string') return false;
+    try {
+        const url = new URL(value);
+        const hostname = url.hostname.toLowerCase();
+        return url.protocol === 'https:' && (
+            hostname === 'redd.it'
+            || hostname.endsWith('.redd.it')
+            || hostname === 'redditmedia.com'
+            || hostname.endsWith('.redditmedia.com')
+            || hostname === 'redditstatic.com'
+            || hostname.endsWith('.redditstatic.com')
+        );
+    } catch {
+        return false;
+    }
+}
+
+export function resolveDisplayAvatarUrl(value) {
+    return isRedditAvatarUrl(value) ? value : GENERIC_SNOO_URL;
+}
+
 export function readCampaignChallengePostData(root = globalThis) {
     const value = root?.devvit?.context?.postData;
     return value && typeof value === 'object' && value.postType === POST_TYPE
@@ -30,6 +54,9 @@ export function normalizeCampaignChallengePostData(value) {
         campaignId: input.campaignId === 'numbered-v1' ? input.campaignId : '',
         raceId: cleanText(input.raceId),
         challengerUsername: cleanText(input.challengerUsername) || 'A racer',
+        challengerAvatarUrl: isRedditAvatarUrl(input.challengerAvatarUrl)
+            ? input.challengerAvatarUrl
+            : null,
         trackKey: TRACKS[cleanText(input.trackKey)] ? cleanText(input.trackKey) : '',
         lapCount,
         targetTimeMs: Number.isInteger(targetTimeMs) && targetTimeMs > 0 ? targetTimeMs : null,
@@ -42,14 +69,49 @@ export function formatCampaignChallengePreviewTime(timeMs) {
     return `${Math.floor(timeMs / 1000)}.${String(timeMs % 1000).padStart(3, '0')}`;
 }
 
+function setAvatarImage(img, avatarUrl, label) {
+    if (!img) return;
+    const resolved = resolveDisplayAvatarUrl(avatarUrl);
+    img.src = resolved;
+    img.alt = label ? `${label} avatar` : '';
+    img.classList.toggle('challenge-avatar--generic', resolved === GENERIC_SNOO_URL);
+}
+
+export function renderCampaignChallengeAvatars(documentRef, {
+    challengerUsername = 'A racer',
+    challengerAvatarUrl = null,
+    viewerUsername = 'You',
+    viewerAvatarUrl = null,
+} = {}) {
+    if (!documentRef) return;
+    const challengerName = cleanText(challengerUsername).replace(/^u\//i, '') || 'A racer';
+    const viewerName = cleanText(viewerUsername).replace(/^u\//i, '') || 'You';
+    const challengerLabel = documentRef.getElementById('challenger-name');
+    const viewerLabel = documentRef.getElementById('viewer-name');
+    if (challengerLabel) challengerLabel.textContent = challengerName;
+    if (viewerLabel) viewerLabel.textContent = viewerName;
+    setAvatarImage(
+        documentRef.getElementById('challenger-avatar'),
+        challengerAvatarUrl,
+        challengerName,
+    );
+    setAvatarImage(
+        documentRef.getElementById('viewer-avatar'),
+        viewerAvatarUrl,
+        viewerName,
+    );
+}
+
 export function renderCampaignChallenge(documentRef, rawValue) {
     const value = normalizeCampaignChallengePostData(rawValue);
     if (!documentRef) return value;
-    const challenger = documentRef.getElementById('challenger-name');
     const trackName = documentRef.getElementById('challenge-track-name');
     const target = documentRef.getElementById('challenge-target-time');
     const format = documentRef.getElementById('challenge-format');
-    if (challenger) challenger.textContent = value.challengerUsername.replace(/^u\//i, '');
+    renderCampaignChallengeAvatars(documentRef, {
+        challengerUsername: value.challengerUsername,
+        challengerAvatarUrl: value.challengerAvatarUrl,
+    });
     if (trackName) trackName.textContent = value.trackKey
         ? getTrackName(value.trackKey, value.trackKey)
         : 'Campaign race';
@@ -164,21 +226,40 @@ export async function openCampaignChallenge(event) {
         const { requestExpandedMode } = await import('@devvit/web/client');
         await requestExpandedMode(event, 'game');
     } catch (error) {
-        console.error('Failed to open Mini Racer challenge:', error);
+        console.error('Failed to open Mini Racer Head to Head:', error);
     }
+}
+
+let lastAccessAvatars = null;
+
+function applyAccessAvatars(documentRef, challenge, access) {
+    const body = access?.body && typeof access.body === 'object' ? access.body : {};
+    const challengeBody = body.challenge && typeof body.challenge === 'object'
+        ? body.challenge
+        : {};
+    lastAccessAvatars = {
+        challengerUsername: challengeBody.challengerUsername || challenge.challengerUsername,
+        challengerAvatarUrl: challengeBody.challengerAvatarUrl
+            ?? challenge.challengerAvatarUrl
+            ?? body.challengerAvatarUrl,
+        viewerUsername: body.viewerUsername || 'You',
+        viewerAvatarUrl: body.viewerAvatarUrl,
+    };
+    renderCampaignChallengeAvatars(documentRef, lastAccessAvatars);
 }
 
 async function boot() {
     const challenge = renderCampaignChallenge(document, readCampaignChallengePostData());
     const message = document.getElementById('challenge-message');
     const access = await resolveCampaignChallengeAccess(globalThis);
+    applyAccessAvatars(document, challenge, access);
     const button = bindAcceptChallenge(document, openCampaignChallenge, {
         ownChallenge: access.ownChallenge === true,
     });
     if (!access.signedIn && button) {
         button.disabled = true;
-        button.textContent = 'Sign in to Accept';
-        if (message) message.textContent = 'Reddit sign-in is required to challenge another player.';
+        button.textContent = 'Sign in to Race';
+        if (message) message.textContent = 'Reddit sign-in is required to race a Head to Head.';
     }
     globalThis.render_game_to_text = () => JSON.stringify({
         screen: 'campaign-challenge-preview',
@@ -196,8 +277,17 @@ async function boot() {
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', boot);
     globalThis.addEventListener('resize', () => {
-        renderCampaignChallenge(document, readCampaignChallengePostData());
+        const challenge = renderCampaignChallenge(document, readCampaignChallengePostData());
+        if (lastAccessAvatars) {
+            renderCampaignChallengeAvatars(document, {
+                ...lastAccessAvatars,
+                challengerUsername: lastAccessAvatars.challengerUsername
+                    || challenge.challengerUsername,
+                challengerAvatarUrl: lastAccessAvatars.challengerAvatarUrl
+                    ?? challenge.challengerAvatarUrl,
+            });
+        }
     });
 }
 
-export { OWN_CHALLENGE_MESSAGE };
+export { GENERIC_SNOO_URL, OWN_CHALLENGE_MESSAGE };

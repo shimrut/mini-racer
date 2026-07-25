@@ -24,12 +24,14 @@ describe('campaign challenge custom-post preview', () => {
         expect(normalizeCampaignChallengePostData({
             campaignId: 'numbered-v1',
             challengerUsername: 'RaceFan',
+            challengerAvatarUrl: 'https://i.redd.it/avatar.png',
             trackKey: 'numberThree',
             lapCount: 2,
             targetTimeMs: 25_640,
         })).toMatchObject({
             campaignId: 'numbered-v1',
             challengerUsername: 'RaceFan',
+            challengerAvatarUrl: 'https://i.redd.it/avatar.png',
             trackKey: 'numberThree',
             lapCount: 2,
             targetTimeMs: 25_640,
@@ -37,7 +39,12 @@ describe('campaign challenge custom-post preview', () => {
         expect(normalizeCampaignChallengePostData({
             trackKey: 'forged',
             targetTimeMs: -1,
-        })).toMatchObject({ trackKey: '', targetTimeMs: null });
+            challengerAvatarUrl: 'https://evil.com/avatar.png',
+        })).toMatchObject({
+            trackKey: '',
+            targetTimeMs: null,
+            challengerAvatarUrl: null,
+        });
     });
 
     it('renders millisecond-precise challenge times', () => {
