@@ -2469,38 +2469,6 @@ class MapmakerApp {
         this.ctx.restore();
     }
 
-    drawCarScaleLegend(viewport) {
-        const brush = this.getDrawWidth();
-        const lines = [
-            `Car ${formatNumber(CAR_WIDTH)}×${formatNumber(CAR_LENGTH)}u`,
-            `Brush ${formatNumber(brush)}u ≈ ${formatCarWidths(brush)} cars wide`,
-        ];
-        this.ctx.save();
-        this.ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
-        this.ctx.textAlign = 'left';
-        this.ctx.textBaseline = 'top';
-        const paddingX = 10;
-        const paddingY = 8;
-        const lineHeight = 14;
-        const textWidth = Math.max(...lines.map((line) => this.ctx.measureText(line).width));
-        const boxWidth = textWidth + paddingX * 2;
-        const boxHeight = paddingY * 2 + lineHeight * lines.length + 4;
-        const x = 12;
-        const y = 12;
-        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
-        this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-        this.ctx.lineWidth = 1;
-        this.ctx.beginPath();
-        this.ctx.rect(x, y, boxWidth, boxHeight);
-        this.ctx.fill();
-        this.ctx.stroke();
-        this.ctx.fillStyle = '#e2e8f0';
-        lines.forEach((line, index) => {
-            this.ctx.fillText(line, x + paddingX, y + paddingY + index * lineHeight);
-        });
-        this.ctx.restore();
-    }
-
     drawStartPosition(viewport) {
         this.drawGhostCar(this.track.startPos, this.track.startAngle || 0, viewport);
     }
@@ -2590,7 +2558,6 @@ class MapmakerApp {
             return aPriority - bPriority;
         });
         handles.forEach((handle) => this.drawHandle(handle, viewport));
-        this.drawCarScaleLegend(viewport);
     }
 
     async copyCurrentTrack() {
