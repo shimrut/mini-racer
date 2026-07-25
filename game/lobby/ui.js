@@ -45,6 +45,7 @@ export class LobbyUi {
         this.campaignState = normalizeCampaignLobbyState();
         this.challengeState = normalizeChallengeLobbyState();
         this._dailyTrackName = '';
+        this._campaignPrimaryLoading = false;
         this._menuKeyboardState = createMenuKeyboardState();
         this._bound = false;
         this._keydownHandler = (event) => this.handleKeydown(event);
@@ -76,8 +77,9 @@ export class LobbyUi {
         document.getElementById('campaign-tracks-btn')
             ?.addEventListener('click', () => this.onOpenCampaignTracks?.());
         this.campaignPrimaryBtn?.addEventListener('click', () => {
-            if (this.campaignState.complete || !this.campaignState.nextStage) return;
-            this.onStartCampaign?.(this.campaignState.nextStage);
+            if (this.campaignState.complete) return;
+            // Resolve the continue stage after bootstrap is ready — do not pass a stale stage.
+            this.onStartCampaign?.();
         });
         this.challengeAcceptBtn?.addEventListener('click', () => {
             if (!this.challengeState.canAccept) return;
@@ -241,11 +243,36 @@ export class LobbyUi {
     renderCampaign() {
         if (this.campaignPrimaryBtn) {
             this.campaignPrimaryBtn.hidden = this.campaignState.complete;
-            this.campaignPrimaryBtn.disabled = this.campaignState.complete || !this.campaignState.nextStage;
+            this.campaignPrimaryBtn.disabled = this.campaignState.complete
+                || (!this.campaignState.nextStage && !this._campaignPrimaryLoading);
             setText(
                 this.campaignPrimaryBtn.querySelector('.main-menu__label'),
-                this.campaignState.primaryLabel || '',
+                this.campaignState.primaryLabel || (this._campaignPrimaryLoading ? 'Loading' : ''),
             );
+        }
+    }
+
+    setCampaignPrimaryLoading(isLoading) {
+        this._campaignPrimaryLoading = Boolean(isLoading);
+        const btn = this.campaignPrimaryBtn;
+        if (!btn) return;
+        btn.classList.toggle('is-loading', this._campaignPrimaryLoading);
+        btn.toggleAttribute('aria-busy', this._campaignPrimaryLoading);
+        let spinner = btn.querySelector('.main-menu__spinner');
+        if (this._campaignPrimaryLoading) {
+            if (!spinner) {
+                spinner = document.createElement('span');
+                spinner.className = 'modal-rank-spinner main-menu__spinner';
+                spinner.setAttribute('aria-hidden', 'true');
+                btn.appendChild(spinner);
+            }
+            btn.disabled = false;
+            if (!this.campaignState.primaryLabel) {
+                setText(btn.querySelector('.main-menu__label'), 'Loading');
+            }
+        } else {
+            spinner?.remove();
+            this.renderCampaign();
         }
     }
 

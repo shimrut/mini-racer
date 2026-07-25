@@ -2,22 +2,34 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const campaignServiceMocks = vi.hoisted(() => ({
+    getCampaignBootstrap: vi.fn(),
     getCampaignPbGhost: vi.fn(),
     getCampaignSnapshot: vi.fn(),
+    readLocalCampaignProgress: vi.fn(() => ({
+        campaignId: 'numbered-v1',
+        startedAt: null,
+        resultsByRaceId: {},
+        unlockedRaceIds: ['numbered-v1-00'],
+        complete: false,
+        continueRaceId: 'numbered-v1-00',
+    })),
+    startServerCampaignRace: vi.fn(),
+    startLocalCampaign: vi.fn(),
     submitCampaignChallengeRun: vi.fn(),
     submitCampaignRun: vi.fn(),
 }));
 
 vi.mock('../game/campaign/service.js', () => ({
     createCampaignChallenge: vi.fn(),
-    getCampaignBootstrap: vi.fn(),
+    getCampaignBootstrap: campaignServiceMocks.getCampaignBootstrap,
     getCampaignChallenge: vi.fn(),
     getCampaignPbGhost: campaignServiceMocks.getCampaignPbGhost,
     getCampaignSnapshot: campaignServiceMocks.getCampaignSnapshot,
     previewCampaignChallenge: vi.fn(),
+    readLocalCampaignProgress: campaignServiceMocks.readLocalCampaignProgress,
     saveLocalCampaignFinish: vi.fn(),
-    startLocalCampaign: vi.fn(),
-    startServerCampaignRace: vi.fn(),
+    startLocalCampaign: campaignServiceMocks.startLocalCampaign,
+    startServerCampaignRace: campaignServiceMocks.startServerCampaignRace,
     submitCampaignChallengeRun: campaignServiceMocks.submitCampaignChallengeRun,
     submitCampaignRun: campaignServiceMocks.submitCampaignRun,
 }));
@@ -47,7 +59,7 @@ function createClassList() {
 
 function createElement(tagName = 'div') {
     const listeners = new Map();
-    return {
+    const element = {
         tagName,
         children: [],
         className: '',
@@ -69,7 +81,21 @@ function createElement(tagName = 'div') {
             this.children = children;
         },
         setAttribute: vi.fn(),
+        toggleAttribute: vi.fn(),
+        querySelector(selector) {
+            if (selector === '.main-menu__label') {
+                return this.children.find((child) => child.className === 'main-menu__label') || null;
+            }
+            if (selector === '.main-menu__spinner' || selector === '.modal-rank-spinner') {
+                return this.children.find((child) => String(child.className).includes('spinner')) || null;
+            }
+            return null;
+        },
+        remove() {
+            // no-op for detached spinner stubs
+        },
     };
+    return element;
 }
 
 function campaignState() {
@@ -111,8 +137,20 @@ function campaignState() {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    campaignServiceMocks.getCampaignBootstrap.mockReset();
     campaignServiceMocks.getCampaignPbGhost.mockReset();
     campaignServiceMocks.getCampaignSnapshot.mockReset();
+    campaignServiceMocks.readLocalCampaignProgress.mockReset();
+    campaignServiceMocks.readLocalCampaignProgress.mockReturnValue({
+        campaignId: 'numbered-v1',
+        startedAt: null,
+        resultsByRaceId: {},
+        unlockedRaceIds: ['numbered-v1-00'],
+        complete: false,
+        continueRaceId: 'numbered-v1-00',
+    });
+    campaignServiceMocks.startServerCampaignRace.mockReset();
+    campaignServiceMocks.startLocalCampaign.mockReset();
     campaignServiceMocks.submitCampaignChallengeRun.mockReset();
     campaignServiceMocks.submitCampaignRun.mockReset();
 });
@@ -570,6 +608,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             campaignLobbyState: state,
             modal,
             _campaignStandingsRequestId: 0,
+            activeRaceMode: 'campaign',
+            ensureCampaignBootstrap: vi.fn().mockResolvedValue({}),
         };
 
         expect(buildCampaignLeaderboardOptions(state).map((option) => option.challengeId))
@@ -626,6 +666,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             campaignLobbyState: campaignState(),
             modal,
             _campaignStandingsRequestId: 0,
+            activeRaceMode: 'campaign',
+            ensureCampaignBootstrap: vi.fn().mockResolvedValue({}),
         };
 
         await campaignEngineMethods.openCampaignStandings.call(context, 'numbered-v1-00');
@@ -667,6 +709,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             campaignLobbyState: campaignState(),
             modal,
             _campaignStandingsRequestId: 0,
+            activeRaceMode: 'campaign',
+            ensureCampaignBootstrap: vi.fn().mockResolvedValue({}),
         };
 
         const firstOpen = campaignEngineMethods.openCampaignStandings.call(
@@ -677,6 +721,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             context,
             'numbered-v1-01',
         );
+        await vi.waitFor(() => {
+            expect(typeof resolveFirst).toBe('function');
+            expect(typeof resolveSecond).toBe('function');
+        });
         resolveFirst({
             ok: true,
             body: {
@@ -700,5 +748,219 @@ describe('Campaign lobby and shared modal adapters', () => {
                 topRows: [expect.objectContaining({ displayName: 'Current' })],
             }),
         );
+    });
+
+    it('paints the Campaign lobby before bootstrap resolves', async () => {
+        let resolveBootstrap;
+        campaignServiceMocks.getCampaignBootstrap.mockReturnValue(new Promise((resolve) => {
+            resolveBootstrap = resolve;
+        }));
+        const lobbyUi = {
+            showCampaign: vi.fn(),
+            getMode: vi.fn(() => 'campaign'),
+            setCampaignPrimaryLoading: vi.fn(),
+        };
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            hasAnyData: true,
+            isReturningPlayer: false,
+            activeRaceMode: 'home',
+            campaignBootstrap: null,
+            campaignLobbyState: null,
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi,
+            reset: vi.fn(),
+            applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
+            paintCampaignLobby: campaignEngineMethods.paintCampaignLobby,
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+            showCampaignLobby: campaignEngineMethods.showCampaignLobby,
+        };
+
+        context.showCampaignLobby();
+
+        expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(1);
+        expect(context.activeRaceMode).toBe('campaign');
+        expect(context._campaignBootstrapReady).toBe(false);
+        expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(1);
+
+        resolveBootstrap({
+            campaignId: 'numbered-v1',
+            signedIn: true,
+            stages: [
+                {
+                    raceId: 'numbered-v1-00',
+                    stageIndex: 0,
+                    stageNumber: '00',
+                    trackKey: 'numberZero',
+                    lapCount: 1,
+                },
+                {
+                    raceId: 'numbered-v1-01',
+                    stageIndex: 1,
+                    stageNumber: '01',
+                    trackKey: 'numberOne',
+                    lapCount: 1,
+                },
+            ],
+            progress: {
+                startedAt: '2026-07-01T00:00:00.000Z',
+                resultsByRaceId: {
+                    'numbered-v1-00': {
+                        raceId: 'numbered-v1-00',
+                        bestTimeMs: 8000,
+                        medal: 'gold',
+                    },
+                },
+                unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
+                complete: false,
+            },
+        });
+        await context._campaignBootstrapPromise;
+
+        expect(context._campaignBootstrapReady).toBe(true);
+        expect(context.campaignBootstrap.signedIn).toBe(true);
+        expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(2);
+        expect(lobbyUi.showCampaign.mock.calls[1][0].primaryLabel).toBe('Continue Campaign');
+    });
+
+    it('waits for bootstrap and uses the server path when Start is pressed early', async () => {
+        let resolveBootstrap;
+        campaignServiceMocks.getCampaignBootstrap.mockReturnValue(new Promise((resolve) => {
+            resolveBootstrap = resolve;
+        }));
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({
+            ok: true,
+            body: { progress: { unlockedRaceIds: ['numbered-v1-00'] } },
+        });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+        const lobbyUi = {
+            showCampaign: vi.fn(),
+            getMode: vi.fn(() => 'campaign'),
+            setCampaignPrimaryLoading: vi.fn(),
+        };
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            hasAnyData: true,
+            isReturningPlayer: false,
+            activeRaceMode: 'campaign',
+            campaignBootstrap: {
+                campaignId: 'numbered-v1',
+                signedIn: false,
+                stages: [],
+                progress: {
+                    resultsByRaceId: {},
+                    unlockedRaceIds: ['numbered-v1-00'],
+                    complete: false,
+                },
+            },
+            campaignLobbyState: {
+                complete: false,
+                nextStage: { id: 'numbered-v1-00' },
+                stages: [{ id: 'numbered-v1-00', unlocked: true }],
+            },
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            startButtonPending: false,
+            currentTrackKey: 'numberZero',
+            pbGhost: { clearTrack: vi.fn(), prepare: vi.fn() },
+            trackPersonalBestByTrackKey: {},
+            bestLapTime: null,
+            journeys: { startAttempt: vi.fn() },
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi,
+            reset: vi.fn(),
+            loadTrack: vi.fn(),
+            applyDailyChallenge: vi.fn(),
+            startSequence: vi.fn(),
+            loadCampaignLobby: vi.fn(),
+            applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+        };
+
+        const startPromise = campaignEngineMethods.startCampaignStage.call(context);
+        expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenCalledWith(true);
+
+        resolveBootstrap({
+            campaignId: 'numbered-v1',
+            signedIn: true,
+            stages: [{
+                raceId: 'numbered-v1-00',
+                stageIndex: 0,
+                stageNumber: '00',
+                trackKey: 'numberZero',
+                lapCount: 1,
+            }],
+            progress: {
+                resultsByRaceId: {},
+                unlockedRaceIds: ['numbered-v1-00'],
+                complete: false,
+            },
+        });
+        await startPromise;
+
+        expect(campaignServiceMocks.startServerCampaignRace).toHaveBeenCalledWith('numbered-v1-00');
+        expect(campaignServiceMocks.startLocalCampaign).not.toHaveBeenCalled();
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenCalledWith(false);
+    });
+
+    it('does not repaint Campaign after leaving before bootstrap resolves', async () => {
+        let resolveBootstrap;
+        campaignServiceMocks.getCampaignBootstrap.mockReturnValue(new Promise((resolve) => {
+            resolveBootstrap = resolve;
+        }));
+        const lobbyUi = {
+            showCampaign: vi.fn(),
+            getMode: vi.fn(() => 'campaign'),
+            setCampaignPrimaryLoading: vi.fn(),
+        };
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            hasAnyData: true,
+            isReturningPlayer: false,
+            activeRaceMode: 'home',
+            campaignBootstrap: null,
+            campaignLobbyState: null,
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi,
+            reset: vi.fn(),
+            applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
+            paintCampaignLobby: campaignEngineMethods.paintCampaignLobby,
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+            showCampaignLobby: campaignEngineMethods.showCampaignLobby,
+        };
+
+        context.showCampaignLobby();
+        expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(1);
+        context.activeRaceMode = 'home';
+        lobbyUi.getMode.mockReturnValue('home');
+
+        resolveBootstrap({
+            campaignId: 'numbered-v1',
+            signedIn: false,
+            stages: [],
+            progress: {
+                resultsByRaceId: {},
+                unlockedRaceIds: ['numbered-v1-00'],
+                complete: false,
+            },
+        });
+        await context._campaignBootstrapPromise;
+
+        expect(context._campaignBootstrapReady).toBe(true);
+        expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(1);
     });
 });

@@ -152,7 +152,10 @@ flowchart LR
   selection requests `/api/campaign/snapshot` for exactly one `raceId`; results
   and pagination remain isolated per permanent stage. The shared Tracks modal
   swaps its Daily playlist renderer for Campaign progress when entered from the
-  Campaign lobby.
+  Campaign lobby. Opening Campaign paints the lobby immediately from provisional
+  or cached progress while `/api/campaign/bootstrap` refreshes in the background;
+  Start/Continue, Tracks, and Standings wait for that bootstrap when it has not
+  finished yet (Start shows a small button spinner).
 - Player standing is independent of loaded pages: every snapshot resolves `playerRank` and `currentPlayerRow`, and the standings header keeps that rank and best time visible even when the player's row is outside the loaded rank range.
 - Leaderboard rows and the pinned player time always show three decimal places, matching the verified leaderboard's stored millisecond precision. Race HUD and result timing remain unchanged.
 - On touch devices, the standings list accepts deliberate horizontal swipes as an alternative to the day rail: swipe left for an older available day and right for a newer one. The original date strip remains visible, tappable, and horizontally scrollable; swipe navigation does not replace it. Short or vertically dominant gestures, day buttons, links, and the shareable player row keep their existing tap/scroll behavior.

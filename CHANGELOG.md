@@ -59,6 +59,7 @@
 - Fixed procedural music failing to start when the Web Audio context was still suspended at race start (notably on iOS Reddit).
 - Fix standings date rail getting squeezed by long leaderboards (`flex-shrink: 0`).
 - Fix daily standings always anchoring the date rail to today; an older loaded track only changes the selected day.
+- Campaign lobby paints immediately on open and loads progress in the background; Start/Continue shows a small spinner if bootstrap is still pending.
 - Tightened Devvit Journey attempt boundaries so each explicit player intent (`initial_start`, `track_switch`, `restart`, `retry`, `improve`) maps to one start/end pair, including mid-run track switches that now replace the active Journey before the next attempt begins.
 - Mid-lap PB ghost samples now blend position and angle to each 50ms grid mark between 60Hz poses, so playback no longer sits up to one physics frame ahead when the clocks drift. Finish-sample residual lead is unchanged.
 - Checkpoint/lap ±0.01 deltas use normal green/red flash colors again; amber `is-warning` is reserved for notices like GHOST UNAVAILABLE.

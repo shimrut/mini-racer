@@ -265,7 +265,21 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     gap: 0.75rem;
     flex-direction: row;
     justify-content: center;
+    align-items: center;
+    display: inline-flex;
     filter: none;
+}
+
+.main-menu__item--primary.is-loading {
+    gap: 0.65rem;
+}
+
+.main-menu__item--primary .main-menu__spinner {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-color: rgba(255, 255, 255, 0.25);
+    border-top-color: #ffffff;
 }
 
 .main-menu__item--primary .main-menu__label {

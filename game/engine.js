@@ -109,6 +109,9 @@ export class RealTimeRacer {
     this.activeCampaignChallenge = null;
     this.campaignBootstrap = null;
     this.campaignLobbyState = null;
+    this._campaignBootstrapReady = false;
+    this._campaignBootstrapPromise = null;
+    this._campaignBootstrapRequestId = 0;
     this.launchTarget = resolveGameLaunchTarget();
     /** Last challenge raced this page session; home Start prefers this over featured daily. */
     this.lastPlayedDailyChallenge = null;
@@ -231,11 +234,11 @@ export class RealTimeRacer {
     });
     this.lobbyUi = new LobbyUi({
       onSelectDaily: () => this.showDailyLobby(),
-      onSelectCampaign: () => void this.showCampaignLobby(),
+      onSelectCampaign: () => this.showCampaignLobby(),
       onBack: () => this.showHomeLobby(),
       onStartCampaign: (stage) => void this.startCampaignStage(stage),
       onOpenCampaignStandings: () => void this.openCampaignStandings(),
-      onOpenCampaignTracks: () => this.openCampaignTracks(),
+      onOpenCampaignTracks: () => void this.openCampaignTracks(),
       onAcceptChallenge: () => void this.startCampaignChallenge(),
     });
     this.hud = new RaceHud({
@@ -408,7 +411,7 @@ export class RealTimeRacer {
       if (this.launchTarget.mode === "daily") {
         this.showDailyLobby();
       } else if (this.launchTarget.mode === "campaign") {
-        await this.showCampaignLobby();
+        this.showCampaignLobby();
       } else if (this.launchTarget.mode === "challenge") {
         await this.loadChallengeLobby(this.launchTarget.challengeId);
       } else {

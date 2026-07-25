@@ -11,13 +11,14 @@ import {
     getCampaignPbGhost,
     getCampaignSnapshot,
     previewCampaignChallenge,
+    readLocalCampaignProgress,
     saveLocalCampaignFinish,
     startLocalCampaign,
     startServerCampaignRace,
     submitCampaignChallengeRun,
     submitCampaignRun,
 } from './service.js';
-import { getCampaignStage } from './manifest.js';
+import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
 
 function toRaceChallenge(stage, mode = 'campaign') {
     return {
@@ -62,6 +63,15 @@ function decorateCampaignState(bootstrap) {
     };
 }
 
+function buildProvisionalCampaignBootstrap(previous = null) {
+    return {
+        campaignId: CAMPAIGN_ID,
+        signedIn: previous?.signedIn === true,
+        stages: CAMPAIGN_STAGES,
+        progress: previous?.progress || readLocalCampaignProgress(),
+    };
+}
+
 export function normalizeCampaignLeaderboardSnapshot(body) {
     if (!body) return null;
     const normalizeRow = (row) => row ? {
@@ -96,18 +106,66 @@ export function buildCampaignLeaderboardOptions(campaignState) {
 }
 
 export const campaignEngineMethods = {
-    async loadCampaignLobby({ show = true } = {}) {
-        const bootstrap = await getCampaignBootstrap();
+    applyCampaignLobbyBootstrap(bootstrap, { paint = false } = {}) {
         this.campaignBootstrap = bootstrap;
+        this._campaignBootstrapReady = true;
         this.campaignLobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
-        if (show) {
-            if (this.status !== 'ready' || this.currentChallengeRun) {
-                this.reset(false, { showStartOverlay: false });
-            }
-            this.activeRaceMode = 'campaign';
-            this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
+        if (
+            paint
+            && this.activeRaceMode === 'campaign'
+            && this.lobbyUi?.getMode?.() === 'campaign'
+        ) {
             this.lobbyUi.showCampaign(this.campaignLobbyState);
         }
+        return this.campaignLobbyState;
+    },
+
+    paintCampaignLobby(state, { bootstrapReady = false } = {}) {
+        if (this.status !== 'ready' || this.currentChallengeRun) {
+            this.reset(false, { showStartOverlay: false });
+        }
+        this.activeRaceMode = 'campaign';
+        this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
+        this.campaignLobbyState = normalizeCampaignLobbyState(state);
+        this.lobbyUi.showCampaign(this.campaignLobbyState);
+        this.lobbyUi.setCampaignPrimaryLoading?.(false);
+        this._campaignBootstrapReady = Boolean(bootstrapReady);
+    },
+
+    async ensureCampaignBootstrap({ forceRefresh = false } = {}) {
+        if (!forceRefresh && this._campaignBootstrapReady && this.campaignBootstrap) {
+            return this.campaignBootstrap;
+        }
+        if (!forceRefresh && this._campaignBootstrapPromise) {
+            return this._campaignBootstrapPromise;
+        }
+
+        const requestId = (this._campaignBootstrapRequestId || 0) + 1;
+        this._campaignBootstrapRequestId = requestId;
+        const promise = getCampaignBootstrap()
+            .then((bootstrap) => {
+                if (requestId !== this._campaignBootstrapRequestId) {
+                    return this.campaignBootstrap;
+                }
+                this.applyCampaignLobbyBootstrap(bootstrap, { paint: true });
+                return bootstrap;
+            })
+            .finally(() => {
+                if (this._campaignBootstrapPromise === promise) {
+                    this._campaignBootstrapPromise = null;
+                }
+            });
+        this._campaignBootstrapPromise = promise;
+        return promise;
+    },
+
+    async loadCampaignLobby({ show = true } = {}) {
+        if (show) {
+            this.showCampaignLobby();
+            await this.ensureCampaignBootstrap({ forceRefresh: true });
+            return this.campaignLobbyState;
+        }
+        await this.ensureCampaignBootstrap({ forceRefresh: true });
         return this.campaignLobbyState;
     },
 
@@ -135,24 +193,59 @@ export const campaignEngineMethods = {
         this.lobbyUi.showDaily();
     },
 
-    async showCampaignLobby() {
+    showCampaignLobby() {
         this.activeCampaignStage = null;
         this.activeCampaignChallenge = null;
-        await this.loadCampaignLobby({ show: true });
+        const hadReadyBootstrap = Boolean(
+            this._campaignBootstrapReady && this.campaignBootstrap
+        );
+        const bootstrapForPaint = hadReadyBootstrap
+            ? this.campaignBootstrap
+            : buildProvisionalCampaignBootstrap(this.campaignBootstrap);
+        if (!hadReadyBootstrap) {
+            this.campaignBootstrap = bootstrapForPaint;
+            this._campaignBootstrapReady = false;
+        }
+        this.paintCampaignLobby(
+            decorateCampaignState(bootstrapForPaint),
+            { bootstrapReady: hadReadyBootstrap },
+        );
+        void this.ensureCampaignBootstrap({ forceRefresh: true });
     },
 
-    openCampaignTracks() {
-        if (!this.campaignLobbyState) return;
+    async openCampaignTracks() {
+        await this.ensureCampaignBootstrap();
+        if (this.activeRaceMode !== 'campaign' || !this.campaignLobbyState) return;
         this.dailyChallengeUi.openCampaignProgressModal(this.campaignLobbyState, {
             onPlay: (stage) => void this.startCampaignStage(stage),
         });
     },
 
-    async startCampaignStage(stageLike) {
-        const stage = getCampaignStage(stageLike?.raceId || stageLike?.id);
-        if (!stage || this.startButtonPending) return;
+    async startCampaignStage(stageLike = null) {
+        if (this.startButtonPending) return;
         this.startButtonPending = true;
+        const needsBootstrapWait = !this._campaignBootstrapReady;
+        if (needsBootstrapWait) {
+            this.lobbyUi?.setCampaignPrimaryLoading?.(true);
+        }
         try {
+            await this.ensureCampaignBootstrap();
+            if (this.activeRaceMode !== 'campaign') return;
+
+            const requestedId = stageLike?.raceId || stageLike?.id || null;
+            const unlockedStages = Array.isArray(this.campaignLobbyState?.stages)
+                ? this.campaignLobbyState.stages.filter((stage) => stage.unlocked)
+                : [];
+            const selectedLobbyStage = requestedId
+                ? unlockedStages.find((stage) => stage.id === requestedId)
+                : null;
+            const stage = getCampaignStage(
+                selectedLobbyStage?.id
+                || this.campaignLobbyState?.nextStage?.id
+                || requestedId,
+            );
+            if (!stage) return;
+
             if (this.campaignBootstrap?.signedIn) {
                 const started = await startServerCampaignRace(stage.raceId);
                 if (!started.ok) throw new Error(started.body?.error || 'Could not start this Campaign race.');
@@ -201,6 +294,9 @@ export const campaignEngineMethods = {
             console.error('Could not start Campaign race:', error);
             await this.loadCampaignLobby({ show: true });
         } finally {
+            if (needsBootstrapWait) {
+                this.lobbyUi?.setCampaignPrimaryLoading?.(false);
+            }
             this.startButtonPending = false;
         }
     },
@@ -486,6 +582,9 @@ export const campaignEngineMethods = {
     },
 
     async openCampaignStandings(stageLike = null) {
+        await this.ensureCampaignBootstrap();
+        if (this.activeRaceMode !== 'campaign') return;
+
         const lobbyState = this.campaignLobbyState;
         const unlockedStages = Array.isArray(lobbyState?.stages)
             ? lobbyState.stages.filter((stage) => stage.unlocked)
