@@ -127,8 +127,10 @@ flowchart LR
   geometry; `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
-  player challenges. Campaign and challenge finishes open the result sheet
-  immediately (same pattern as Daily), then confirm the run in the background;
+  player challenges. Campaign finishes open the result sheet immediately (same
+  pattern as Daily), then confirm in the background. Challenge finishes follow
+  the same immediate sheet, without medals or rank: win → Brag/Home, loss/tie →
+  Improve/Home.
   a rejected or interrupted confirmation updates that sheet instead of showing
   a separate saving modal. Campaign finish also paints RANK immediately while
   submitting, then replaces it with the stage leaderboard place after
