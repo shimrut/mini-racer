@@ -589,6 +589,26 @@ export const campaignEngineMethods = {
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
+        const provisionalBestTimeMs = Number.isFinite(finalTime)
+            ? Math.round(finalTime * 1000)
+            : null;
+        const provisionalDifferenceMs = Number.isInteger(provisionalBestTimeMs)
+            ? provisionalBestTimeMs - challenge.targetTimeMs
+            : null;
+        const provisionalOutcome = provisionalDifferenceMs == null
+            ? null
+            : provisionalDifferenceMs < 0
+                ? 'won'
+                : provisionalDifferenceMs === 0
+                    ? 'tie'
+                    : 'lost';
+        const provisionalTitle = provisionalOutcome === 'won'
+            ? 'Challenge Won'
+            : provisionalOutcome === 'tie'
+                ? 'Tie'
+                : provisionalOutcome === 'lost'
+                    ? 'Challenge Lost'
+                    : 'Challenge complete';
 
         const showChallengeResult = ({
             accepted,
@@ -649,9 +669,9 @@ export const campaignEngineMethods = {
 
         showChallengeResult({
             accepted: true,
-            title: 'Challenge complete',
-            outcome: null,
-            differenceMs: null,
+            title: provisionalTitle,
+            outcome: provisionalOutcome,
+            differenceMs: provisionalDifferenceMs,
         });
         if (this.modal.modalMsg) {
             this.modal.modalMsg.textContent = 'Confirming your finished race…';

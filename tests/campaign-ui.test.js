@@ -406,7 +406,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(context.modal.showModal).toHaveBeenNthCalledWith(
             1,
-            'Challenge complete',
+            'Challenge Lost',
             null,
             expect.objectContaining({ lapTime: 8.25, lapMedal: null }),
             expect.objectContaining({
@@ -460,6 +460,19 @@ describe('Campaign lobby and shared modal adapters', () => {
         await campaignEngineMethods.handleCampaignChallengeWin.call(
             { ...baseContext, modal: { modalMsg, showModal: winShowModal } },
             { lapTime: 7.5 },
+        );
+        expect(winShowModal).toHaveBeenNthCalledWith(
+            1,
+            'Challenge Won',
+            null,
+            expect.objectContaining({ lapMedal: null, showGlobalLeaderboard: false }),
+            expect.objectContaining({
+                shareRequest: {
+                    kind: 'challenge-brag',
+                    challengeId: 'challenge-1',
+                },
+                restartAction: null,
+            }),
         );
         await vi.waitFor(() => {
             expect(winShowModal).toHaveBeenLastCalledWith(
