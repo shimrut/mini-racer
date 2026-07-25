@@ -305,12 +305,12 @@
     justify-content: space-between;
     width: 100%;
     flex-shrink: 0;
-    min-height: 2.5rem;
-    padding: 0.3rem 0.2rem 0.4rem;
+    min-height: 2rem;
+    padding: 0.2rem 0.2rem 0.35rem;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
-    margin: 0 0 0.15rem;
+    margin: -0.15rem 0 0.15rem;
     box-sizing: border-box;
 }
 
@@ -323,12 +323,10 @@
     align-items: center;
     justify-content: center;
     min-width: 2.25rem;
-    min-height: 2.5rem;
+    min-height: 2.35rem;
     flex: 0 0 auto;
-    padding: 0.28rem 0.55rem;
     border: none;
-    /* Soft radius: full-pill on near-square chips becomes a circle and clips JUL. */
-    border-radius: 0.85rem;
+    border-radius: var(--radius-full);
     background: transparent;
     color: var(--text-dim);
     font-family: var(--header-font);
@@ -337,7 +335,6 @@
     text-transform: uppercase;
     cursor: pointer;
     box-shadow: none;
-    overflow: visible;
     transition: color 0.15s ease;
 }
 
@@ -388,14 +385,11 @@
 
 .leaderboard-day-chip__month {
     display: block;
-    /* Keep source size above WebView min-font clamps, then scale visually. */
-    font-size: 0.8rem;
+    font-size: 0.52rem;
     font-weight: 700;
     letter-spacing: 0.1em;
-    line-height: 1.1;
+    line-height: 1;
     color: var(--text-muted);
-    transform: scale(0.65);
-    transform-origin: center bottom;
 }
 
 .leaderboard-day-chip.is-selected .leaderboard-day-chip__month,
