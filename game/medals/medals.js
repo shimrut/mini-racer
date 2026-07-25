@@ -236,32 +236,38 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
 }
 
 /**
- * Win combined overlay: horizontal row of all medal tiers for this track.
- * Challenge finishes use a single display-only challenge medal on win, or an empty hero otherwise.
+ * Challenge finish hero: pending placeholder, won medal, loss/tie label, or error.
  * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
- * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|'challenge'|null, challengeFinish?: boolean, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
+ * @param {{
+ *   phase?: 'pending'|'won'|'lost'|'tie'|'error',
+ *   statusText?: string|null,
+ *   error?: string|null,
+ * }} [params]
  */
-export function renderWinCombinedMedalOverlay(
+export function renderChallengeFinishHero(
     overlayEl,
     {
-        trackKey = null,
-        lapMedal = null,
-        challengeFinish = false,
-        previousTrackMedal = null,
-        lapCount = 1,
+        phase = 'pending',
+        statusText = null,
+        error = null,
     } = {},
 ) {
     if (!overlayEl) return;
     overlayEl.replaceChildren();
 
-    if (lapMedal === 'challenge') {
-        const root = document.createElement('div');
-        root.className = 'win-combined-medal-overlay win-combined-medal-overlay--challenge';
+    const root = document.createElement('div');
+    root.className = 'win-combined-medal-overlay win-combined-medal-overlay--challenge';
+    root.dataset.challengePhase = phase;
+
+    const centerWrap = document.createElement('div');
+    centerWrap.className = 'win-combined-medal-overlay__center';
+
+    const label = document.createElement('p');
+    label.className = 'combined-medal-challenge-label';
+
+    if (phase === 'won') {
         root.setAttribute('role', 'group');
         root.setAttribute('aria-label', 'Challenge beaten');
-
-        const centerWrap = document.createElement('div');
-        centerWrap.className = 'win-combined-medal-overlay__center';
 
         const row = document.createElement('div');
         row.className = 'combined-medal-row win-combined-medal-overlay__row';
@@ -277,17 +283,80 @@ export function renderWinCombinedMedalOverlay(
         row.appendChild(slot);
         centerWrap.appendChild(row);
 
-        const label = document.createElement('p');
-        label.className = 'combined-medal-challenge-label';
         label.textContent = 'Challenge beaten';
-        centerWrap.appendChild(label);
+        label.classList.add('combined-medal-challenge-label--won');
+    } else if (phase === 'pending') {
+        const pendingLabel = statusText || 'Submitting...';
+        root.setAttribute('role', 'status');
+        root.setAttribute('aria-label', pendingLabel);
+        root.setAttribute('aria-live', 'polite');
 
-        root.appendChild(centerWrap);
-        overlayEl.appendChild(root);
+        const row = document.createElement('div');
+        row.className = 'combined-medal-row win-combined-medal-overlay__row';
+        const slot = document.createElement('div');
+        slot.className = 'combined-medal-row-slot';
+        slot.appendChild(createMedalIconSvg('white', {
+            className: 'medal-svg--hero',
+        }));
+        row.appendChild(slot);
+        centerWrap.appendChild(row);
+
+        label.textContent = pendingLabel;
+        label.classList.add('combined-medal-challenge-label--pending');
+    } else if (phase === 'lost' || phase === 'tie') {
+        const outcomeLabel = phase === 'tie' ? 'Tie' : 'Challenge Lost';
+        root.setAttribute('role', 'status');
+        root.setAttribute('aria-label', outcomeLabel);
+        label.textContent = outcomeLabel;
+        label.classList.add('combined-medal-challenge-label--outcome');
+    } else {
+        const errorLabel = error || 'This run could not be verified.';
+        root.setAttribute('role', 'alert');
+        root.setAttribute('aria-label', errorLabel);
+        label.textContent = errorLabel;
+        label.classList.add('combined-medal-challenge-label--error');
+    }
+
+    centerWrap.appendChild(label);
+    root.appendChild(centerWrap);
+    overlayEl.appendChild(root);
+}
+
+/**
+ * Win combined overlay: horizontal row of all medal tiers for this track.
+ * Challenge finishes use {@link renderChallengeFinishHero} instead of the campaign stack.
+ * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
+ * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|'challenge'|null, challengeFinish?: boolean, challengeConfirmPhase?: 'pending'|'won'|'lost'|'tie'|'error'|null, challengeConfirmStatus?: string|null, challengeConfirmError?: string|null, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
+ */
+export function renderWinCombinedMedalOverlay(
+    overlayEl,
+    {
+        trackKey = null,
+        lapMedal = null,
+        challengeFinish = false,
+        challengeConfirmPhase = null,
+        challengeConfirmStatus = null,
+        challengeConfirmError = null,
+        previousTrackMedal = null,
+        lapCount = 1,
+    } = {},
+) {
+    if (!overlayEl) return;
+    overlayEl.replaceChildren();
+
+    if (challengeFinish || challengeConfirmPhase) {
+        const phase = challengeConfirmPhase
+            || (lapMedal === 'challenge' ? 'won' : 'pending');
+        renderChallengeFinishHero(overlayEl, {
+            phase,
+            statusText: challengeConfirmStatus,
+            error: challengeConfirmError,
+        });
         return;
     }
 
-    if (challengeFinish) {
+    if (lapMedal === 'challenge') {
+        renderChallengeFinishHero(overlayEl, { phase: 'won' });
         return;
     }
 

@@ -589,43 +589,20 @@ export const campaignEngineMethods = {
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
-        const provisionalBestTimeMs = Number.isFinite(finalTime)
-            ? Math.round(finalTime * 1000)
-            : null;
-        const provisionalDifferenceMs = Number.isInteger(provisionalBestTimeMs)
-            ? provisionalBestTimeMs - challenge.targetTimeMs
-            : null;
-        const provisionalOutcome = provisionalDifferenceMs == null
-            ? null
-            : provisionalDifferenceMs < 0
-                ? 'won'
-                : provisionalDifferenceMs === 0
-                    ? 'tie'
-                    : 'lost';
-        const provisionalTitle = provisionalOutcome === 'won'
-            ? 'Challenge beaten'
-            : provisionalOutcome === 'tie'
-                ? 'Tie'
-                : provisionalOutcome === 'lost'
-                    ? 'Challenge Lost'
-                    : 'Challenge complete';
+        const submittingStatus = createVerificationSnapshot({
+            verificationState: 'pending',
+            isLoading: true,
+            submissionStage: 'submitting',
+        }).statusText || 'Submitting...';
+        const verifyingStatus = createVerificationSnapshot({
+            verificationState: 'pending',
+            isLoading: true,
+            submissionStage: 'verifying',
+        }).statusText || 'Verifying...';
 
-        const showChallengeResult = ({
-            accepted,
-            confirmationFailed = false,
-            title = null,
-            error = null,
-            outcome = null,
-            differenceMs = null,
-        }) => {
-            const won = accepted && outcome === 'won';
-            const finishTitle = accepted
-                ? (won ? 'Challenge beaten' : (title || 'Challenge complete'))
-                : confirmationFailed
-                    ? 'Result not confirmed'
-                    : 'Run rejected';
+        const openPendingFinish = () => {
             this.modal.showModal(
-                finishTitle,
+                'Challenge complete',
                 null,
                 {
                     lapTime: finalTime,
@@ -633,55 +610,51 @@ export const campaignEngineMethods = {
                     completedLaps: challenge.lapCount,
                     requiredLaps: challenge.lapCount,
                     primaryStatLabel: 'Race Time',
-                    lapMedal: won ? 'challenge' : null,
-                    challengeFinish: accepted,
+                    lapMedal: null,
+                    challengeFinish: true,
+                    challengeConfirmPhase: 'pending',
+                    challengeConfirmStatus: submittingStatus,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
                 },
                 {
                     ...createModalActions({
-                        modalKind: accepted ? 'win' : 'rejected',
+                        modalKind: 'win',
                         primaryActionLabel: 'Retry',
                         secondaryActionLabel: 'Home',
                         secondaryAction: () => this.loadChallengeLobby(challenge.challengeId),
                     }),
                     restartAction: () => this.restartActiveRace(),
                     settingsAction: () => this.settings.openSettings(),
-                    shareRequest: accepted
-                        ? { kind: 'challenge-brag', challengeId: challenge.challengeId }
-                        : null,
-                    shareEnabled: won,
+                    shareRequest: { kind: 'challenge-brag', challengeId: challenge.challengeId },
+                    shareEnabled: false,
                 },
             );
-            if (this.modal.modalMsg) {
-                this.modal.modalMsg.style.display = '';
-                this.modal.modalMsg.textContent = accepted
-                    ? (won
-                        ? 'Challenge beaten'
-                        : `${Math.abs(Number(differenceMs) || 0) / 1000}s from the challenge time`)
-                    : (error || 'This run could not be verified.');
-            }
         };
 
+        const stillOnThisFinish = () => (
+            this.status === 'won'
+            && this.activeCampaignChallenge?.challengeId === challenge.challengeId
+        );
+
         if (!replay) {
-            showChallengeResult({
-                accepted: false,
+            openPendingFinish();
+            this.modal.updateChallengeFinishHero?.({
+                phase: 'error',
                 error: 'This run could not be verified.',
             });
             return;
         }
 
-        showChallengeResult({
-            accepted: true,
-            title: provisionalTitle,
-            outcome: provisionalOutcome,
-            differenceMs: provisionalDifferenceMs,
-        });
-        if (this.modal.modalMsg) {
-            this.modal.modalMsg.textContent = 'Confirming your finished race…';
-        }
+        openPendingFinish();
 
         void (async () => {
+            if (!stillOnThisFinish()) return;
+            this.modal.updateChallengeFinishHero?.({
+                phase: 'pending',
+                statusText: verifyingStatus,
+            });
+
             let confirmationFailed = false;
             let response = { ok: false, body: { error: 'This run could not be verified.' } };
             try {
@@ -700,36 +673,30 @@ export const campaignEngineMethods = {
                 console.error('Could not confirm Campaign challenge result:', submitError);
             }
 
-            if (
-                this.status !== 'won'
-                || this.activeCampaignChallenge?.challengeId !== challenge.challengeId
-            ) {
-                return;
-            }
+            if (!stillOnThisFinish()) return;
 
             const accepted = response.ok && response.body?.accepted === true;
             const outcome = accepted ? response.body?.outcome : null;
-            const differenceMs = accepted ? response.body?.differenceMs : null;
 
-            // Same outcome as provisional: keep the open sheet (no medal remount).
-            if (accepted && outcome === provisionalOutcome) {
-                if (this.modal.modalMsg) {
-                    this.modal.modalMsg.style.display = '';
-                    this.modal.modalMsg.textContent = outcome === 'won'
-                        ? 'Challenge beaten'
-                        : `${Math.abs(Number(differenceMs) || 0) / 1000}s from the challenge time`;
-                }
+            if (!accepted) {
+                this.modal.updateChallengeFinishHero?.({
+                    phase: 'error',
+                    error: confirmationFailed
+                        ? (response.body?.error || 'Race finished, but the challenge result could not be confirmed.')
+                        : (response.body?.error || 'This run could not be verified.'),
+                });
                 return;
             }
 
-            showChallengeResult({
-                accepted,
-                confirmationFailed,
-                title: accepted ? response.body.resultLabel : null,
-                error: response.body?.error || null,
-                outcome,
-                differenceMs,
-            });
+            if (outcome === 'won') {
+                this.modal.updateChallengeFinishHero?.({ phase: 'won' });
+                return;
+            }
+            if (outcome === 'tie') {
+                this.modal.updateChallengeFinishHero?.({ phase: 'tie' });
+                return;
+            }
+            this.modal.updateChallengeFinishHero?.({ phase: 'lost' });
         })();
     },
 

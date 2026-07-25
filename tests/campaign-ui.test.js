@@ -377,6 +377,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
     it('does not strand a Campaign challenge finish when confirmation fails', async () => {
         const modalMsg = { style: {}, textContent: '' };
+        const updateChallengeFinishHero = vi.fn();
         const context = {
             activeCampaignChallenge: {
                 challengeId: 'challenge-1',
@@ -389,6 +390,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             modal: {
                 modalMsg,
                 showModal: vi.fn(),
+                updateChallengeFinishHero,
             },
             restartActiveRace: vi.fn(),
             loadChallengeLobby: vi.fn(),
@@ -404,14 +406,15 @@ describe('Campaign lobby and shared modal adapters', () => {
             { lapTime: 8.25 },
         );
 
-        expect(context.modal.showModal).toHaveBeenNthCalledWith(
-            1,
-            'Challenge Lost',
+        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Challenge complete',
             null,
             expect.objectContaining({
                 lapTime: 8.25,
                 lapMedal: null,
                 challengeFinish: true,
+                challengeConfirmPhase: 'pending',
             }),
             expect.objectContaining({
                 modalKind: 'win',
@@ -424,24 +427,17 @@ describe('Campaign lobby and shared modal adapters', () => {
             }),
         );
         await vi.waitFor(() => {
-            expect(context.modal.showModal).toHaveBeenLastCalledWith(
-                'Result not confirmed',
-                null,
-                expect.objectContaining({ lapTime: 8.25, lapMedal: null }),
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    modalKind: 'rejected',
-                    shareRequest: null,
-                    shareEnabled: false,
-                    restartAction: expect.any(Function),
+                    phase: 'error',
+                    error: 'Race finished, but the challenge result could not be confirmed.',
                 }),
             );
         });
-        expect(modalMsg.textContent).toBe(
-            'Race finished, but the challenge result could not be confirmed.',
-        );
+        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
     });
 
-    it('always shows Improve+Brag+Home; Brag only enabled on a win with challenge medal', async () => {
+    it('patches medal hero in place: pending then won/lost/tie; Brag only after verified win', async () => {
         const modalMsg = { style: {}, textContent: '' };
         const baseContext = {
             activeCampaignChallenge: {
@@ -457,7 +453,23 @@ describe('Campaign lobby and shared modal adapters', () => {
             settings: { openSettings: vi.fn() },
         };
 
+        const pendingLap = expect.objectContaining({
+            lapMedal: null,
+            challengeFinish: true,
+            challengeConfirmPhase: 'pending',
+            showGlobalLeaderboard: false,
+        });
+        const pendingOptions = expect.objectContaining({
+            shareRequest: {
+                kind: 'challenge-brag',
+                challengeId: 'challenge-1',
+            },
+            shareEnabled: false,
+            restartAction: expect.any(Function),
+        });
+
         const winShowModal = vi.fn();
+        const winUpdateHero = vi.fn();
         campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
             ok: true,
             body: {
@@ -468,33 +480,33 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
         await campaignEngineMethods.handleCampaignChallengeWin.call(
-            { ...baseContext, modal: { modalMsg, showModal: winShowModal } },
+            {
+                ...baseContext,
+                modal: {
+                    modalMsg,
+                    showModal: winShowModal,
+                    updateChallengeFinishHero: winUpdateHero,
+                },
+            },
             { lapTime: 7.5 },
         );
         expect(winShowModal).toHaveBeenCalledTimes(1);
         expect(winShowModal).toHaveBeenCalledWith(
-            'Challenge beaten',
+            'Challenge complete',
             null,
-            expect.objectContaining({
-                lapMedal: 'challenge',
-                challengeFinish: true,
-                showGlobalLeaderboard: false,
-            }),
-            expect.objectContaining({
-                shareRequest: {
-                    kind: 'challenge-brag',
-                    challengeId: 'challenge-1',
-                },
-                shareEnabled: true,
-                restartAction: expect.any(Function),
-            }),
+            pendingLap,
+            pendingOptions,
         );
         await vi.waitFor(() => {
-            expect(modalMsg.textContent).toBe('Challenge beaten');
+            expect(winUpdateHero).toHaveBeenCalledWith({ phase: 'won' });
         });
+        expect(winUpdateHero).toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'pending', statusText: expect.any(String) }),
+        );
         expect(winShowModal).toHaveBeenCalledTimes(1);
 
         const lossShowModal = vi.fn();
+        const lossUpdateHero = vi.fn();
         campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
             ok: true,
             body: {
@@ -505,32 +517,30 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
         await campaignEngineMethods.handleCampaignChallengeWin.call(
-            { ...baseContext, modal: { modalMsg, showModal: lossShowModal } },
+            {
+                ...baseContext,
+                modal: {
+                    modalMsg,
+                    showModal: lossShowModal,
+                    updateChallengeFinishHero: lossUpdateHero,
+                },
+            },
             { lapTime: 8.4 },
         );
         expect(lossShowModal).toHaveBeenCalledTimes(1);
         expect(lossShowModal).toHaveBeenCalledWith(
-            'Challenge Lost',
+            'Challenge complete',
             null,
-            expect.objectContaining({
-                lapMedal: null,
-                challengeFinish: true,
-            }),
-            expect.objectContaining({
-                shareRequest: {
-                    kind: 'challenge-brag',
-                    challengeId: 'challenge-1',
-                },
-                shareEnabled: false,
-                restartAction: expect.any(Function),
-            }),
+            pendingLap,
+            pendingOptions,
         );
         await vi.waitFor(() => {
-            expect(modalMsg.textContent).toBe('0.4s from the challenge time');
+            expect(lossUpdateHero).toHaveBeenCalledWith({ phase: 'lost' });
         });
         expect(lossShowModal).toHaveBeenCalledTimes(1);
 
         const tieShowModal = vi.fn();
+        const tieUpdateHero = vi.fn();
         campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
             ok: true,
             body: {
@@ -541,28 +551,19 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
         await campaignEngineMethods.handleCampaignChallengeWin.call(
-            { ...baseContext, modal: { modalMsg, showModal: tieShowModal } },
+            {
+                ...baseContext,
+                modal: {
+                    modalMsg,
+                    showModal: tieShowModal,
+                    updateChallengeFinishHero: tieUpdateHero,
+                },
+            },
             { lapTime: 8 },
         );
         expect(tieShowModal).toHaveBeenCalledTimes(1);
-        expect(tieShowModal).toHaveBeenCalledWith(
-            'Tie',
-            null,
-            expect.objectContaining({
-                lapMedal: null,
-                challengeFinish: true,
-            }),
-            expect.objectContaining({
-                shareRequest: {
-                    kind: 'challenge-brag',
-                    challengeId: 'challenge-1',
-                },
-                shareEnabled: false,
-                restartAction: expect.any(Function),
-            }),
-        );
         await vi.waitFor(() => {
-            expect(modalMsg.textContent).toBe('0s from the challenge time');
+            expect(tieUpdateHero).toHaveBeenCalledWith({ phase: 'tie' });
         });
         expect(tieShowModal).toHaveBeenCalledTimes(1);
     });

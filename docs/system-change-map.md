@@ -129,12 +129,11 @@ flowchart LR
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
   player challenges. Campaign finishes open the result sheet immediately (same
   pattern as Daily), then confirm in the background. Challenge finishes use one
-  sheet with Improve / Brag / Home every time (Brag enabled only when beaten). A
-  win shows a display-only challenge medal and “Challenge beaten”; loss/tie keep
-  an empty medal hero. When server confirmation matches the provisional outcome,
-  the open sheet is patched in place (no finish remount / medal replay); reject
-  or outcome mismatch still remounts. Challenge finishes never write Campaign
-  medals, progress, or ranks.
+  sheet with Improve / Brag / Home every time (Brag enabled only after a verified
+  beat). Confirmation status lives in the medal hero: placeholder +
+  Submitting/Verifying, then challenge medal + “Challenge beaten” on win, outcome
+  label on loss/tie, or an error label on reject — patched in place with no finish
+  remount. Challenge finishes never write Campaign medals, progress, or ranks.
   a rejected or interrupted confirmation updates that sheet instead of showing
   a separate saving modal. Campaign finish also paints RANK immediately while
   submitting, then replaces it with the stage leaderboard place after
@@ -156,8 +155,8 @@ flowchart LR
   message and opens Campaign via a stored launch target that overrides challenge
   post data. Challenge finishes do not award medals, campaign progress, or
   leaderboard ranks. One finish sheet always offers Improve / Brag / Home; Brag
-  is enabled only after a beat and comments via `/api/campaign/challenge/brag/*`.
-  A win shows a display-only challenge medal. Duel submissions
+  unlocks only after a verified beat. Confirmation status is patched into the
+  medal hero (Submitting/Verifying → medal or error). Duel submissions
   never call the Campaign store.
 - `campaign-challenge.html` is the dedicated in-feed custom-post entrypoint;
   its public post data includes only the immutable race target and no ghost,

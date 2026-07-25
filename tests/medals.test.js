@@ -359,6 +359,76 @@ describe('medals', () => {
         expect(isStandardMedalTier('challenge')).toBe(false);
     });
 
+    it('renderChallengeFinishHero covers pending, won, and error phases', async () => {
+        const { renderChallengeFinishHero } = await import('../game/medals/medals.js');
+        const children = [];
+        const overlay = {
+            replaceChildren() {
+                children.length = 0;
+            },
+            appendChild(child) {
+                children.push(child);
+                return child;
+            },
+        };
+
+        const originalDocument = global.document;
+        global.document = {
+            createElement: (tag) => {
+                const el = {
+                    tagName: tag,
+                    className: '',
+                    classList: {
+                        classes: new Set(),
+                        add(cls) {
+                            this.classes.add(cls);
+                            el.className = Array.from(this.classes).join(' ');
+                        },
+                    },
+                    children: [],
+                    dataset: {},
+                    textContent: '',
+                    setAttribute() {},
+                    appendChild(child) {
+                        this.children.push(child);
+                        return child;
+                    },
+                };
+                el.classList.classes = new Set();
+                return el;
+            },
+            createElementNS: (_ns, tag) => global.document.createElement(tag),
+        };
+
+        try {
+            renderChallengeFinishHero(overlay, {
+                phase: 'pending',
+                statusText: 'Submitting...',
+            });
+            expect(children[0].dataset.challengePhase).toBe('pending');
+            expect(children[0].children[0].children.some(
+                (c) => c.textContent === 'Submitting...',
+            )).toBe(true);
+
+            renderChallengeFinishHero(overlay, { phase: 'won' });
+            expect(children[0].dataset.challengePhase).toBe('won');
+            expect(children[0].children[0].children.some(
+                (c) => c.textContent === 'Challenge beaten',
+            )).toBe(true);
+
+            renderChallengeFinishHero(overlay, {
+                phase: 'error',
+                error: 'Could not confirm.',
+            });
+            expect(children[0].dataset.challengePhase).toBe('error');
+            expect(children[0].children[0].children.some(
+                (c) => c.textContent === 'Could not confirm.',
+            )).toBe(true);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
     it('isPersonalBestTimeImprovement is strict on the clock', () => {
         expect(isPersonalBestTimeImprovement(3, null)).toBe(true);
         expect(isPersonalBestTimeImprovement(3, { bestTime: 4 })).toBe(true);

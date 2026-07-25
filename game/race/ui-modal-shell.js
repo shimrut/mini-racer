@@ -19,7 +19,8 @@ import {
 } from './result-flow.js';
 import {
     scheduleCombinedMedalEntranceAfterModal,
-    shouldCelebrateMedalTier
+    shouldCelebrateMedalTier,
+    renderChallengeFinishHero,
 } from '../medals/medals.js';
 import { closeModalElement, openModalElement, runModalHandoff } from '../ui/modal-handoff.js';
 import { configureReusableModal } from '../ui/reusable-modal.js';
@@ -933,7 +934,9 @@ export class ModalShell {
             time: lapData.lapTime,
             bestLap: lapData.bestTime,
             scoreboardSnapshot: lapData.scoreboardSnapshot,
-            title: lapData.lapMedal === 'challenge' ? 'Challenge beaten' : 'RACE COMPLETE',
+            title: lapData.lapMedal === 'challenge' || lapData.challengeConfirmPhase === 'won'
+                ? 'Challenge beaten'
+                : 'RACE COMPLETE',
             statLabels: [
                 (lapData.requiredLaps ?? lapData.completedLaps ?? 1) > 1
                     ? 'RACE TIME'
@@ -941,6 +944,9 @@ export class ModalShell {
             ],
             lapMedal: lapData.lapMedal ?? null,
             challengeFinish: Boolean(lapData.challengeFinish),
+            challengeConfirmPhase: lapData.challengeConfirmPhase ?? null,
+            challengeConfirmStatus: lapData.challengeConfirmStatus ?? null,
+            challengeConfirmError: lapData.challengeConfirmError ?? null,
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
@@ -950,6 +956,10 @@ export class ModalShell {
             pbCheckpointTimes: lapData.pbCheckpointTimes,
             pbFinishSec: lapData.pbFinishSec,
         });
+
+        if (lapData.challengeFinish || lapData.challengeConfirmPhase) {
+            this._challengeFinishShareRequest = options.shareRequest || null;
+        }
 
         const finishResultModal = (fn) => {
             if (!fn) return null;
@@ -1042,20 +1052,92 @@ export class ModalShell {
             if (!shouldCelebrateTier(tier)) return;
             this.playUnlockSound(tier);
         };
-        scheduleCombinedMedalEntranceAfterModal(this.modal, this.modalCombinedView, {
-            heroMedalEl,
-            stackEl: null
-        }, {
-            staggerMs: 85,
-            stackAfterHeroMs: 0,
-            shouldCelebrateTier,
-            playUnlockSound
-        });
+        // Pending challenge heroes use a static placeholder — skip entrance.
+        const challengePending = lapData.challengeConfirmPhase === 'pending'
+            || (lapData.challengeFinish && lapData.challengeConfirmPhase !== 'won'
+                && lapData.lapMedal !== 'challenge');
+        if (!challengePending) {
+            scheduleCombinedMedalEntranceAfterModal(this.modal, this.modalCombinedView, {
+                heroMedalEl,
+                stackEl: null
+            }, {
+                staggerMs: 85,
+                stackAfterHeroMs: 0,
+                shouldCelebrateTier,
+                playUnlockSound
+            });
+        }
 
         scheduleAfterModalPaint(() => {
             this.resetMenuKeyboardNav?.();
             this.activateModalFocusTrap(this.modal);
         });
+    }
+
+    /**
+     * Patch challenge finish medal hero + Brag without remounting the sheet.
+     * @param {{
+     *   phase: 'pending'|'won'|'lost'|'tie'|'error',
+     *   statusText?: string|null,
+     *   error?: string|null,
+     *   shareRequest?: { kind: string, challengeId: string }|null,
+     * }} params
+     */
+    updateChallengeFinishHero({
+        phase,
+        statusText = null,
+        error = null,
+        shareRequest = undefined,
+    } = {}) {
+        if (!this.modalCombinedView?.classList.contains('active-view')) return;
+
+        const heroMedalEl = this.modalCombinedView.querySelector('#combined-hero-medal');
+        renderChallengeFinishHero(heroMedalEl, { phase, statusText, error });
+
+        if (shareRequest !== undefined) {
+            this._challengeFinishShareRequest = shareRequest;
+        }
+        const bragRequest = this._challengeFinishShareRequest;
+        const bragEnabled = phase === 'won' && Boolean(bragRequest);
+
+        if (this.combinedPlaylistBtn && bragRequest) {
+            this.combinedPlaylistBtn.style.display = '';
+            this._setShareButtonLabel(this.combinedPlaylistBtn, 'Brag');
+            this.combinedPlaylistBtn.setAttribute(
+                'aria-label',
+                bragEnabled
+                    ? 'Brag that you beat this challenge'
+                    : 'Brag available after beating this challenge',
+            );
+            this.combinedPlaylistBtn.disabled = !bragEnabled;
+            this._bindClickAction(
+                this.combinedPlaylistBtn,
+                bragEnabled
+                    ? () => void this._startShare(
+                        bragRequest,
+                        this.combinedPlaylistBtn,
+                        this.modalCombinedView,
+                    )
+                    : null,
+            );
+        }
+
+        if (phase === 'won') {
+            const shouldCelebrateTier = (tier) => tier === 'challenge';
+            const playUnlockSound = (tier) => {
+                if (tier !== 'challenge') return;
+                this.playUnlockSound(tier);
+            };
+            scheduleCombinedMedalEntranceAfterModal(this.modal, this.modalCombinedView, {
+                heroMedalEl,
+                stackEl: null,
+            }, {
+                staggerMs: 85,
+                stackAfterHeroMs: 0,
+                shouldCelebrateTier,
+                playUnlockSound,
+            });
+        }
     }
 
     showRunsModal(lapTimesArray, bestTime, currentTime = null, returnMode = 'close', {
