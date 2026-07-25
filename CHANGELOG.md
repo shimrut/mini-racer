@@ -1,5 +1,6 @@
 # Changelog
 
+- Mapmaker checkpoints tool uses a stopwatch icon with a small "checkpoints" label.
 - Mapmaker finish-line tool uses a flag icon with a small "finish line" label.
 - Mapmaker edit-layer tools sit in the canvas header next to the track name (replacing the Outer/Inner/Lines legend).
 - Removed the Mapmaker canvas car/brush scale box.
