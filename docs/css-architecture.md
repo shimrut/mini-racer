@@ -5,6 +5,10 @@
 `styles.css` remains the single stylesheet entrypoint loaded by `game.html`. It is
 an ordered manifest whose imports are bundled into the production `game.css`.
 
+Standalone post surfaces (`preview.css`, `podium.css`, `campaign-challenge.css`)
+import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
+(`#ef4444`) tokens as the game.
+
 The split is structural. Its first priority is preserving the original cascade:
 the imported partials reproduce the previous stylesheet's rules in the same
 top-to-bottom order.
