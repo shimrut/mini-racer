@@ -57,6 +57,8 @@
 - Removed Number Eight from the Daily GP schedule (catalog, registry, definition, and share image).
 - Added Golden Marsh, Jumping Jack, and Furious Fast to the Daily GP schedule with share images and medal targets; refined Needle Chicane and Turbo Shell geometry.
 - Fixed procedural music failing to start when the Web Audio context was still suspended at race start (notably on iOS Reddit).
+- Fix standings date-rail month labels getting clipped in production WebViews by keeping month type above min-font clamps (scale visually), softening near-circular chip radii, and giving the rail a little more top room.
+- Fix standings date rail getting squeezed by long leaderboards (`flex-shrink: 0`).
 - Tightened Devvit Journey attempt boundaries so each explicit player intent (`initial_start`, `track_switch`, `restart`, `retry`, `improve`) maps to one start/end pair, including mid-run track switches that now replace the active Journey before the next attempt begins.
 - Mid-lap PB ghost samples now blend position and angle to each 50ms grid mark between 60Hz poses, so playback no longer sits up to one physics frame ahead when the clocks drift. Finish-sample residual lead is unchanged.
 - Checkpoint/lap ±0.01 deltas use normal green/red flash colors again; amber `is-warning` is reserved for notices like GHOST UNAVAILABLE.
@@ -68,7 +70,6 @@
 - Match player row height to the share column by sizing the existing `leaderboard-row__action` slot to the share button.
 - Fix standings date rail disappearing after modal refresh by rebuilding the strip when the container is cleared while the rail cache still matches.
 - Fix standings date-rail hover flicker by keeping the day strip mounted during snapshot refresh and aligning mouse/keyboard chip highlights.
-- Fix standings date month labels (e.g. JUL) getting clipped: keep the day rail from shrinking under long leaderboards, allow vertical overflow, and keep month type above WebView min-font clamps with a soft chip radius.
 - Standings date strip keeps Today as a single label and shows other days as a small month over a larger day number, using the same accent pill and focus ring treatment as garage tabs.
 - Hardened leaderboard-identity and daily-gp-model mutation tests with full name-catalog snapshots, exact constructed-name fixtures, and pinned TTL/window constant values after `ignoreStatic` exposed hybrid static survivors.
 - Added Number Zero through Number Six tracks (definitions, catalog/registry wiring, share images) and updated track runtime integrity expectations plus the full registry fingerprint.

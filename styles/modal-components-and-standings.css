@@ -304,11 +304,11 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    flex: 0 0 auto;
-    min-height: 2.9rem;
+    flex-shrink: 0;
+    min-height: 2.5rem;
     padding: 0.3rem 0.2rem 0.4rem;
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: hidden;
     scrollbar-width: none;
     margin: 0 0 0.15rem;
     box-sizing: border-box;
@@ -392,7 +392,7 @@
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.1em;
-    line-height: 1.15;
+    line-height: 1.1;
     color: var(--text-muted);
     transform: scale(0.65);
     transform-origin: center bottom;
