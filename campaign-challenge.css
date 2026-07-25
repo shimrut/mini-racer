@@ -155,22 +155,16 @@ body {
     letter-spacing: 0.12em;
 }
 
-h1 {
-    max-width: 680px;
-    margin: 8px 0 0;
+h1.challenge-track-name,
+.challenge-track-name {
+    margin: 14px 0 26px;
+    color: var(--text-color);
     font-size: clamp(28px, 5vw, 52px);
     font-weight: 900;
     font-style: italic;
     line-height: 0.96;
     letter-spacing: -0.05em;
     text-transform: uppercase;
-}
-
-.challenge-track-name {
-    margin: 14px 0 26px;
-    color: var(--text-dim);
-    font-size: clamp(17px, 2.5vw, 27px);
-    font-weight: 650;
 }
 
 .challenge-target {

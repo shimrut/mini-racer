@@ -141,17 +141,17 @@ export function formatCampaignChallengeTitle(
     timeMs: number,
     trackKey: string,
 ): string {
-    return `u/${username} wants a Head to Head: beat ${formatCampaignChallengeTime(timeMs)} on ${getTrackName(trackKey, trackKey)}`;
+    return `u/${username} · Head to Head: beat ${formatCampaignChallengeTime(timeMs)} on ${getTrackName(trackKey, trackKey)}`;
 }
 
 export function formatCampaignChallengeTextFallback(postData: CampaignChallengePostData): string {
     const laps = postData.lapCount === 1 ? '1 lap' : `${postData.lapCount} laps`;
     return [
-        `# ${postData.challengerUsername} wants a Head to Head`,
+        `# Head to Head · ${postData.challengerUsername}`,
         '',
         `Beat **${formatCampaignChallengeTime(postData.targetTimeMs)}** on **${getTrackName(postData.trackKey, postData.trackKey)}** (${laps}).`,
         '',
-        'Open Mini Racer and accept the Head to Head to race the frozen verified ghost.',
+        'Open Mini Racer and race the frozen verified ghost.',
     ].join('\n');
 }
 

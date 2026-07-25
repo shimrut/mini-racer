@@ -125,7 +125,7 @@ describe('campaign challenge service', () => {
         const preview = await service.preview({ bestTimeMs: 1, ghost: 'forged' }, context);
 
         expect(preview.status).toBe(200);
-        expect(preview.body.title).toBe('u/RaceFan wants a Head to Head: beat 25.640 on Number Three');
+        expect(preview.body.title).toBe('u/RaceFan · Head to Head: beat 25.640 on Number Three');
         expect(preview.body.preview).not.toHaveProperty('ghost');
         expect(preview.body.preview).not.toHaveProperty('sourceId');
         expect(preview.body.preview.challengerAvatarUrl).toBe('https://i.redd.it/RaceFan.png');
@@ -282,6 +282,6 @@ describe('campaign challenge service', () => {
 describe('campaign challenge formatting', () => {
     it('formats exact verified milliseconds', () => {
         expect(formatCampaignChallengeTitle('RaceFan', 9_005, 'numberZero'))
-            .toBe('u/RaceFan wants a Head to Head: beat 9.005 on Number Zero');
+            .toBe('u/RaceFan · Head to Head: beat 9.005 on Number Zero');
     });
 });
