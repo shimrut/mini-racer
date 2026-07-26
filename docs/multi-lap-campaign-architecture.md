@@ -18,6 +18,12 @@ leaderboard, and retention rules.
 - Unlock rule: Gold or Author on the immediately preceding stage.
 - Signed-in starts, progress, per-stage bests, PB ghosts, and leaderboards are
   permanent Campaign records. Guest progress is local practice data only.
+- Guest finishes store their replay alongside the local result. Signing in
+  replays each stored run through the normal validated submission, lowest stage
+  first, so the server re-derives every time and medal rather than trusting the
+  guest record. A stage the server refuses ends the claim, because every stage
+  above it is still locked. A verified server result is never replaced by a
+  slower guest one.
 - Campaign result posts freeze a verified result and ghost. Signed-in viewers
   may race that ghost even when the corresponding Campaign stage is locked;
   duel results never write Campaign progression, leaderboards, or PBs.
@@ -444,5 +450,12 @@ leaderboards.
    the first release.
 6. Decide how campaign rule changes work after launch: immutable campaign
    version (recommended) or in-place migration.
-7. Define campaign progress retention for guests and whether guest progress can
-   be claimed by a later signed-in account.
+7. ~~Define campaign progress retention for guests and whether guest progress can
+   be claimed by a later signed-in account.~~ **Resolved.** Guests stay
+   local-only while signed out; signing in claims their stored replays through
+   server validation. See the implemented contract above.
+
+The Gold-or-Author unlock gate on every stage was reviewed and confirmed
+deliberate: ten Golds are required to finish the Campaign. Medal targets still
+need playtest balancing, because a single mistuned Gold target hard-stops
+progression with no way around it.

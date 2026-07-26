@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     CAMPAIGN_REQUEST_TIMEOUT_MS,
+    clearLocalCampaignProgress,
     deriveCampaignProgress,
+    getClaimableCampaignResults,
     readLocalCampaignProgress,
     saveLocalCampaignFinish,
     startLocalCampaign,
@@ -14,6 +16,7 @@ function createRoot() {
         localStorage: {
             getItem: (key) => values.get(key) ?? null,
             setItem: (key, value) => values.set(key, String(value)),
+            removeItem: (key) => values.delete(key),
         },
     };
 }
@@ -55,10 +58,40 @@ describe('campaign client progress', () => {
     });
 
     it('keeps only the fastest local guest finish', () => {
-        const first = saveLocalCampaignFinish('numbered-v1-00', 7.1, root);
-        const slower = saveLocalCampaignFinish('numbered-v1-00', 7.5, root);
+        const first = saveLocalCampaignFinish('numbered-v1-00', 7.1, { root });
+        const slower = saveLocalCampaignFinish('numbered-v1-00', 7.5, { root });
         expect(slower.resultsByRaceId['numbered-v1-00'].bestTimeMs)
             .toBe(first.resultsByRaceId['numbered-v1-00'].bestTimeMs);
+    });
+
+    it('keeps guest replays so signing in can have them verified', () => {
+        saveLocalCampaignFinish('numbered-v1-00', 7.1, {
+            root,
+            replay: { targetLapNumber: 1, inputs: [{ frames: 3, left: true }] },
+        });
+        saveLocalCampaignFinish('numbered-v1-01', 6.4, {
+            root,
+            replay: { targetLapNumber: 1, inputs: [{ frames: 2, right: true }] },
+        });
+
+        const claimable = getClaimableCampaignResults(readLocalCampaignProgress(root));
+        expect(claimable.map((result) => result.raceId))
+            .toEqual(['numbered-v1-00', 'numbered-v1-01']);
+        expect(claimable[0].replay).toMatchObject({ targetLapNumber: 1 });
+    });
+
+    it('offers nothing to claim when a guest finish stored no replay', () => {
+        saveLocalCampaignFinish('numbered-v1-00', 7.1, { root });
+        expect(getClaimableCampaignResults(readLocalCampaignProgress(root))).toEqual([]);
+    });
+
+    it('drops claimed guest progress once it is cleared', () => {
+        saveLocalCampaignFinish('numbered-v1-00', 7.1, {
+            root,
+            replay: { targetLapNumber: 1, inputs: [] },
+        });
+        clearLocalCampaignProgress(root);
+        expect(readLocalCampaignProgress(root).resultsByRaceId).toEqual({});
     });
 
     it('aborts a Campaign request that never settles', async () => {

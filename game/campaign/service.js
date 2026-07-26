@@ -30,6 +30,9 @@ function normalizeResults(value) {
                 ? raw.medal
                 : null,
             updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
+            // Kept so a guest result can be re-validated by the server if the
+            // player signs in later. Guest medals themselves are never trusted.
+            replay: raw.replay && typeof raw.replay === 'object' ? raw.replay : null,
         };
     }
     return results;
@@ -83,7 +86,10 @@ export function startLocalCampaign(root = globalThis) {
     }, root);
 }
 
-export function saveLocalCampaignFinish(raceId, timeSec, root = globalThis) {
+export function saveLocalCampaignFinish(raceId, timeSec, {
+    replay = null,
+    root = globalThis,
+} = {}) {
     const stage = getCampaignStage(raceId);
     const bestTimeMs = Math.round(Number(timeSec) * 1000);
     if (!stage || !Number.isSafeInteger(bestTimeMs) || bestTimeMs <= 0) {
@@ -100,8 +106,30 @@ export function saveLocalCampaignFinish(raceId, timeSec, root = globalThis) {
             bestTimeMs,
             medal,
             updatedAt: new Date().toISOString(),
+            replay: replay && typeof replay === 'object' ? replay : null,
         },
     }, current.startedAt), root);
+}
+
+/**
+ * Guest results that still carry a replay, in stage order.
+ *
+ * Order matters: the server refuses a locked stage, so a claim has to walk the
+ * ladder from the bottom and let each accepted result unlock the next.
+ */
+export function getClaimableCampaignResults(progress) {
+    const results = progress?.resultsByRaceId || {};
+    return CAMPAIGN_STAGES
+        .map((stage) => results[stage.raceId])
+        .filter((result) => result?.replay && Number.isSafeInteger(result.bestTimeMs));
+}
+
+export function clearLocalCampaignProgress(root = globalThis) {
+    try {
+        root?.localStorage?.removeItem(LOCAL_PROGRESS_KEY);
+    } catch {
+        // Clearing claimed guest progress is best-effort browser state.
+    }
 }
 
 async function requestJson(url, options = {}) {

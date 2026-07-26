@@ -1,5 +1,18 @@
 # Changelog
 
+- Guest Campaign progress is no longer lost at sign-in. Guest finishes keep their
+  replay, and signing in replays them through the normal validated submission so
+  the server re-derives every time and medal. Stages claim bottom-up, a stage the
+  server refuses stops the claim, and a verified result is never traded down for
+  a guest one. Claimed stages also gain PB ghosts.
+- Campaign finishes are gated and queued like Daily: finishes that fail win
+  validation are rejected outright, runs with severe frame stalls are not ranked,
+  an overflowed replay reports **Run too long to rank**, and a confirmed run
+  survives a dropped connection through the durable verification queue.
+- A Campaign run the server refuses no longer keeps showing an earned medal,
+  since Campaign medals are the stage-unlock gate.
+- Campaign progress is stored per player instead of as a field in one
+  campaign-wide record.
 - Challenge finish shows Submitting/Verifying in the medal area, then the
   challenge medal (win), outcome label (loss/tie), or an error — without
   remounting the sheet. Brag unlocks only after a verified win.

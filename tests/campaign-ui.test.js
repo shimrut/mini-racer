@@ -15,6 +15,8 @@ const campaignServiceMocks = vi.hoisted(() => ({
         continueRaceId: 'numbered-v1-00',
     })),
     saveLocalCampaignFinish: vi.fn(),
+    clearLocalCampaignProgress: vi.fn(),
+    getClaimableCampaignResults: vi.fn(),
     startServerCampaignRace: vi.fn(),
     startLocalCampaign: vi.fn(),
     submitCampaignChallengeRun: vi.fn(),
@@ -30,6 +32,8 @@ vi.mock('../game/campaign/service.js', () => ({
     previewCampaignChallenge: vi.fn(),
     readLocalCampaignProgress: campaignServiceMocks.readLocalCampaignProgress,
     saveLocalCampaignFinish: campaignServiceMocks.saveLocalCampaignFinish,
+    clearLocalCampaignProgress: campaignServiceMocks.clearLocalCampaignProgress,
+    getClaimableCampaignResults: campaignServiceMocks.getClaimableCampaignResults,
     startLocalCampaign: campaignServiceMocks.startLocalCampaign,
     startServerCampaignRace: campaignServiceMocks.startServerCampaignRace,
     submitCampaignChallengeRun: campaignServiceMocks.submitCampaignChallengeRun,
@@ -153,6 +157,8 @@ afterEach(() => {
         continueRaceId: 'numbered-v1-00',
     });
     campaignServiceMocks.saveLocalCampaignFinish.mockReset();
+    campaignServiceMocks.clearLocalCampaignProgress.mockReset();
+    campaignServiceMocks.getClaimableCampaignResults.mockReset();
     campaignServiceMocks.startServerCampaignRace.mockReset();
     campaignServiceMocks.startLocalCampaign.mockReset();
     campaignServiceMocks.submitCampaignChallengeRun.mockReset();
@@ -203,6 +209,133 @@ describe('Campaign lobby and shared modal adapters', () => {
             ...overrides,
         };
     }
+
+    function createClaimContext() {
+        return {
+            ...campaignEngineMethods,
+            _campaignClaimAttempted: false,
+            campaignBootstrap: null,
+            activeRaceMode: 'campaign',
+            lobbyUi: { getMode: () => 'campaign', showCampaign: vi.fn() },
+        };
+    }
+
+    // Seeds the stored guest record and the ordered claim list derived from it.
+    function seedGuestProgress(...raceIds) {
+        const results = Object.fromEntries(raceIds.map((raceId, index) => [raceId, {
+            raceId,
+            bestTimeMs: 7100 - index,
+            replay: { targetLapNumber: 1, inputs: [] },
+        }]));
+        campaignServiceMocks.readLocalCampaignProgress.mockReturnValue({
+            resultsByRaceId: results,
+        });
+        campaignServiceMocks.getClaimableCampaignResults.mockReturnValue(
+            raceIds.map((raceId) => results[raceId]),
+        );
+        return results;
+    }
+
+    it('has the server verify stored guest runs when the player signs in', async () => {
+        const context = createClaimContext();
+        seedGuestProgress('numbered-v1-00', 'numbered-v1-01');
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: { accepted: true },
+        });
+
+        const claimed = await context.claimGuestCampaignProgress({
+            signedIn: true,
+            progress: { resultsByRaceId: {} },
+        });
+
+        expect(claimed).toBe(true);
+        // Claimed bottom-up: each accepted stage is what unlocks the next.
+        expect(campaignServiceMocks.submitCampaignRun.mock.calls.map(([input]) => input.raceId))
+            .toEqual(['numbered-v1-00', 'numbered-v1-01']);
+        expect(campaignServiceMocks.clearLocalCampaignProgress).toHaveBeenCalled();
+    });
+
+    it('stops claiming at the first stage the server refuses', async () => {
+        const context = createClaimContext();
+        seedGuestProgress('numbered-v1-00', 'numbered-v1-01');
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: false,
+            status: 422,
+            body: { accepted: false, error: 'Submission replay validation failed.' },
+        });
+
+        const claimed = await context.claimGuestCampaignProgress({
+            signedIn: true,
+            progress: { resultsByRaceId: {} },
+        });
+
+        expect(claimed).toBe(false);
+        expect(campaignServiceMocks.submitCampaignRun).toHaveBeenCalledTimes(1);
+        // Nothing was verified, so the guest record must survive for a retry.
+        expect(campaignServiceMocks.clearLocalCampaignProgress).not.toHaveBeenCalled();
+    });
+
+    it('never trades a verified server result down for a guest one', async () => {
+        const context = createClaimContext();
+        const slow = {
+            raceId: 'numbered-v1-00',
+            bestTimeMs: 9000,
+            replay: { targetLapNumber: 1, inputs: [] },
+        };
+        campaignServiceMocks.readLocalCampaignProgress.mockReturnValue({
+            resultsByRaceId: { 'numbered-v1-00': slow },
+        });
+        campaignServiceMocks.getClaimableCampaignResults.mockReturnValue([slow]);
+
+        const claimed = await context.claimGuestCampaignProgress({
+            signedIn: true,
+            progress: {
+                resultsByRaceId: { 'numbered-v1-00': { bestTimeMs: 7100 } },
+            },
+        });
+
+        expect(claimed).toBe(false);
+        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
+    });
+
+    it('claims nothing for a guest and never claims twice', async () => {
+        const context = createClaimContext();
+        seedGuestProgress('numbered-v1-00');
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: { accepted: true },
+        });
+
+        expect(await context.claimGuestCampaignProgress({ signedIn: false })).toBe(false);
+        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
+
+        await context.claimGuestCampaignProgress({
+            signedIn: true,
+            progress: { resultsByRaceId: {} },
+        });
+        campaignServiceMocks.submitCampaignRun.mockClear();
+        await context.claimGuestCampaignProgress({
+            signedIn: true,
+            progress: { resultsByRaceId: {} },
+        });
+        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
+    });
+
+    it('stores the replay with a guest finish so it can be claimed later', () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: { signedIn: false, progress: {} },
+        });
+        campaignServiceMocks.saveLocalCampaignFinish.mockReturnValue({ resultsByRaceId: {} });
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        expect(campaignServiceMocks.saveLocalCampaignFinish).toHaveBeenCalledWith(
+            'numbered-v1-00',
+            8.25,
+            { replay: { revision: 1, segments: [] } },
+        );
+    });
 
     it('opens the finish modal once and queues the run before submission settles', async () => {
         const context = createCampaignFinishContext();

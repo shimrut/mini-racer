@@ -5,7 +5,9 @@ import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
 import { createModalActions } from '../race/result-flow.js';
 import {
+    clearLocalCampaignProgress,
     createCampaignChallenge,
+    getClaimableCampaignResults,
     getCampaignBootstrap,
     getCampaignChallenge,
     getCampaignPbGhost,
@@ -186,11 +188,17 @@ export const campaignEngineMethods = {
         const requestId = (this._campaignBootstrapRequestId || 0) + 1;
         this._campaignBootstrapRequestId = requestId;
         const promise = getCampaignBootstrap()
-            .then((bootstrap) => {
+            .then(async (bootstrap) => {
                 if (requestId !== this._campaignBootstrapRequestId) {
                     return this.campaignBootstrap;
                 }
                 this.applyCampaignLobbyBootstrap(bootstrap, { paint: true });
+                const claimed = await this.claimGuestCampaignProgress?.(bootstrap);
+                if (claimed && requestId === this._campaignBootstrapRequestId) {
+                    const refreshed = await getCampaignBootstrap();
+                    this.applyCampaignLobbyBootstrap(refreshed, { paint: true });
+                    return refreshed;
+                }
                 return bootstrap;
             })
             .finally(() => {
@@ -200,6 +208,52 @@ export const campaignEngineMethods = {
             });
         this._campaignBootstrapPromise = promise;
         return promise;
+    },
+
+    /**
+     * Promotes guest practice results into the signed-in Campaign profile.
+     *
+     * Guest medals are computed on the client and are never trusted, so each
+     * stored replay is replayed through the normal validated submit endpoint:
+     * the server re-derives the time and medal, and anything it refuses simply
+     * does not claim. Stages are walked in order because each accepted Gold is
+     * what unlocks the next one.
+     */
+    async claimGuestCampaignProgress(bootstrap) {
+        if (bootstrap?.signedIn !== true || this._campaignClaimAttempted) return false;
+        const local = readLocalCampaignProgress();
+        const claimable = getClaimableCampaignResults(local);
+        if (!claimable.length) return false;
+        this._campaignClaimAttempted = true;
+
+        const serverResults = bootstrap.progress?.resultsByRaceId || {};
+        let claimedAny = false;
+        for (const result of claimable) {
+            const stage = getCampaignStage(result.raceId);
+            if (!stage) continue;
+            // Never trade a verified server result down for a guest one.
+            const existing = serverResults[result.raceId];
+            if (existing && Number(existing.bestTimeMs) <= result.bestTimeMs) continue;
+            try {
+                const response = await submitCampaignRun({
+                    raceId: stage.raceId,
+                    trackKey: stage.trackKey,
+                    replay: result.replay,
+                });
+                if (!(response.ok && response.body?.accepted === true)) {
+                    // A refused stage leaves everything above it locked, so
+                    // there is nothing further to claim.
+                    break;
+                }
+                claimedAny = true;
+            } catch (error) {
+                console.warn('Could not claim guest Campaign progress:', error);
+                break;
+            }
+        }
+
+        if (claimedAny) clearLocalCampaignProgress();
+        return claimedAny;
     },
 
     async loadCampaignLobby({ show = true } = {}) {
@@ -502,7 +556,9 @@ export const campaignEngineMethods = {
         }
 
         if (!signedIn) {
-            const local = saveLocalCampaignFinish(stage.raceId, finalTime);
+            // The replay rides along so signing in later can have the server
+            // verify this run instead of discarding it.
+            const local = saveLocalCampaignFinish(stage.raceId, finalTime, { replay });
             if (this.campaignBootstrap) this.campaignBootstrap.progress = local;
             this.showCampaignFinish(stage, { finalTime, medal });
             return;
