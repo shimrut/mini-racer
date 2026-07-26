@@ -49,6 +49,7 @@ describe('verification queue', () => {
 
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.useRealTimers();
         delete globalThis.window;
     });
 
@@ -65,6 +66,10 @@ describe('verification queue', () => {
     });
 
     it('derives legacy expiry from challengeDate or daily-gp challenge ids', () => {
+        // Pinned: the derived expiry below is a fixed date, so a real clock past
+        // it would prune the very entries this test asserts on.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const playlistMs = 7 * 24 * 60 * 60 * 1000;
         const bufferMs = 6 * 60 * 60 * 1000;
         const startsAt = Date.parse('2026-07-18T00:00:00.000Z');

@@ -64,6 +64,10 @@ describe('daily-challenge service wave5', () => {
     });
 
     it('normalizes devvit post-bound challenges with trimmed skin and default objective params (L125-L137, L286-L288)', async () => {
+        // Pinned: the challenge window below is fixed, so a real clock past
+        // availableUntil would drop it as expired before it can be normalized.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         globalThis.devvit = {
             context: {
                 postData: {
@@ -103,6 +107,10 @@ describe('daily-challenge service wave5', () => {
     });
 
     it('merges playlist cache entries by challenge id when caching (L405-L417)', () => {
+        // Pinned: buildChallenge defaults to a fixed availableUntil, so a real clock
+        // past it would prune the merged entries before they can be asserted on.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const first = buildChallenge({ id: 'merge-a', trackKey: 'circuit' });
         const updated = buildChallenge({
             id: 'merge-a',

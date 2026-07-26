@@ -186,10 +186,10 @@
     "bronze": 10.72
   },
   "sundayMarket": {
-    "author": 11.65,
-    "gold": 11.72,
-    "silver": 11.89,
-    "bronze": 12.02
+    "author": 9.45,
+    "gold": 9.86,
+    "silver": 10.29,
+    "bronze": 10.72
   },
   "ironHook": {
     "author": 13.80,
@@ -376,5 +376,29 @@
     "gold": 14.67,
     "silver": 16.29,
     "bronze": 19.48
+  },
+  "analogAudio": {
+    "author": 10.75,
+    "gold": 11.02,
+    "silver": 11.34,
+    "bronze": 11.79
+  },
+  "hardHitter": {
+    "author": 15.86,
+    "gold": 16.07,
+    "silver": 16.51,
+    "bronze": 16.93
+  },
+  "roadRage": {
+    "author": 12.20,
+    "gold": 12.61,
+    "silver": 12.98,
+    "bronze": 13.37
+  },
+  "yellowYard": {
+    "author": 10.45,
+    "gold": 10.87,
+    "silver": 11.39,
+    "bronze": 12.01
   }
 }

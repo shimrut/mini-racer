@@ -289,10 +289,15 @@ describe('verification-queue mutation kills', () => {
 
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.useRealTimers();
         delete globalThis.window;
     });
 
     it('derives legacy expiry only from anchored daily-gp date ids', () => {
+        // Pinned: the derived expiry below is a fixed date, so a real clock past
+        // it would prune the very entries this test asserts on.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const playlistMs = 7 * 24 * 60 * 60 * 1000;
         const bufferMs = 6 * 60 * 60 * 1000;
         const startsAt = Date.parse('2026-07-18T00:00:00.000Z');

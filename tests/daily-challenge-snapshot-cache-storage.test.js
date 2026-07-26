@@ -24,6 +24,7 @@ function createMemoryLocalStorage(initial = {}) {
 describe('daily-challenge snapshot cache storage', () => {
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.useRealTimers();
         delete globalThis.window;
         delete globalThis.fetch;
     });
@@ -89,6 +90,10 @@ describe('daily-challenge snapshot cache storage', () => {
     });
 
     it('syncs a cached snapshot player row into daily challenge storage when the playlist knows the challenge', async () => {
+        // Pinned: the challenge window below is fixed, so a real clock past
+        // availableUntil would prune it from the playlist and skip the sync.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const challenge = {
             id: 'sync-best-from-snapshot',
             trackKey: 'circuit',

@@ -67,6 +67,7 @@ function validTrace(overrides = {}) {
 describe('mutation soft spots wave 6', () => {
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.useRealTimers();
         delete globalThis.window;
     });
 
@@ -190,6 +191,10 @@ describe('mutation soft spots wave 6', () => {
         });
 
         it('derives legacy expiry from challengeDate when challengeId does not match the anchored pattern', () => {
+            // Pinned: the derived expiry below is a fixed date, so a real clock past
+            // it would prune the very entry this test asserts on.
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
             const playlistMs = 7 * 24 * 60 * 60 * 1000;
             const bufferMs = 6 * 60 * 60 * 1000;
             const startsAt = Date.parse('2026-07-18T00:00:00.000Z');

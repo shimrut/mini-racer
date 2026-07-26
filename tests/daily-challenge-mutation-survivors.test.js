@@ -443,6 +443,10 @@ describe('daily-challenge mutation survivors', () => {
     });
 
     it('caches post-bound challenges into the playlist before returning them', async () => {
+        // Pinned: buildChallenge defaults to a fixed availableUntil, so a real clock
+        // past it would prune the entry from the playlist cache before it is read back.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const postChallenge = buildChallenge({ id: 'post-bound-playlist-cache' });
         globalThis.devvit = { context: { postData: { challenge: postChallenge } } };
         window.location = {

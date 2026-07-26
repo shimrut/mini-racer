@@ -8,6 +8,7 @@ import {
     TRACK_SCHEDULE_KEYS,
 } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
+import { CONFIG } from '../game/config.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
 
 function expectFinitePoint(point) {
@@ -43,6 +44,37 @@ function pointInPolygon(point, polygon) {
 
 function toKebabCase(trackKey) {
     return trackKey.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+function distanceToPolygon(point, polygon) {
+    let nearest = Infinity;
+    for (let i = 0; i < polygon.length; i += 1) {
+        const start = polygon[i];
+        const end = polygon[(i + 1) % polygon.length];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const lenSq = dx * dx + dy * dy || 1e-9;
+        const t = Math.min(1, Math.max(0, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq));
+        const distance = Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+        if (distance < nearest) nearest = distance;
+    }
+    return nearest;
+}
+
+/**
+ * How far a car center could travel past a gate endpoint while still on the
+ * drivable surface. An endpoint buried in the inner island or beyond the outer
+ * wall is sealed (0); one sitting inside the corridor leaks by its clearance to
+ * the nearest boundary.
+ */
+function gateEndpointLeak(point, geometry) {
+    const onDrivableSurface = pointInPolygon(point, geometry.outer)
+        && !pointInPolygon(point, geometry.inner);
+    if (!onDrivableSurface) return 0;
+    return Math.min(
+        distanceToPolygon(point, geometry.outer),
+        distanceToPolygon(point, geometry.inner),
+    );
 }
 
 function hashTrackRegistry(trackRegistry) {
@@ -90,6 +122,11 @@ describe('track runtime integrity', () => {
             'numberSeven',
             'numberEight',
             'numberNine',
+            'analogAudio',
+            'hardHitter',
+            'roadRage',
+            'yellowYard',
+            'sundayMarket',
         ]);
 
         const intentionallyReviewedKeys = new Set([
@@ -108,6 +145,11 @@ describe('track runtime integrity', () => {
             'numberSeven',
             'numberEight',
             'numberNine',
+            'analogAudio',
+            'hardHitter',
+            'roadRage',
+            'yellowYard',
+            'sundayMarket',
         ]);
         const unchangedTrackRegistry = Object.fromEntries(
             Object.entries(TRACKS)
@@ -126,7 +168,7 @@ describe('track runtime integrity', () => {
             '9b58bdb2a83ae41caf4456faebfb85b9ccb70930865844df5abc183169250f6b',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '8988a16f2c42f3aa54523082c9ce435fc4790ecdf8276f2787a004fe2004b9ed',
+            '127cf0cb9c9b667d132d8701e5976c4b875b08a3fcf60f96104a3d59b395f6b6',
         );
     });
 
@@ -195,6 +237,33 @@ describe('track runtime integrity', () => {
                 expectFinitePoint(segment.end);
                 expect(Number.isFinite(segment.lenSq)).toBe(true);
                 expect(segment.lenSq).toBeGreaterThan(0);
+            });
+        });
+    });
+
+    it('keeps every lap gate sealed across the drivable corridor', () => {
+        // Lap progress is tested against the car *center* path (see
+        // game/race/simulation.js), so a gate that stops short of either wall by
+        // more than the car radius lets a player skip it and never complete a lap.
+        const carRadius = CONFIG.carRadius;
+        expect(Number.isFinite(carRadius)).toBe(true);
+
+        Object.entries(TRACKS).forEach(([trackKey, track]) => {
+            const geometry = buildTrackGeometry(track);
+            const gates = [
+                ['startLine', track.startLine],
+                ...(track.checkpoints || []).map((checkpoint, index) => [`checkpoint ${index}`, checkpoint]),
+            ];
+
+            gates.forEach(([gateName, gate]) => {
+                const leak = Math.max(
+                    gateEndpointLeak(gate.p1, geometry),
+                    gateEndpointLeak(gate.p2, geometry),
+                );
+                expect(
+                    leak,
+                    `${trackKey} ${gateName} leaves a ${leak.toFixed(3)} gap a car center (radius ${carRadius}) could drive through`,
+                ).toBeLessThanOrEqual(carRadius);
             });
         });
     });

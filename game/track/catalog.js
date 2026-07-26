@@ -61,6 +61,11 @@ export const TRACK_CATALOG = {
     numberSeven: { name: "Number Seven" },
     numberEight: { name: "Number Eight" },
     numberNine: { name: "Number Nine" },
+    analogAudio: { name: "Analog Audio" },
+    hardHitter: { name: "Hard Hitter" },
+    roadRage: { name: "Road Rage" },
+    yellowYard: { name: "Yellow Yard" },
+    sundayMarket: { name: "Sunday Market" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -116,6 +121,11 @@ export const TRACK_SCHEDULE_KEYS = [
     'needleChicane',
     'cinderSpine',
     'glassSerpent',
+    'analogAudio',
+    'hardHitter',
+    'roadRage',
+    'yellowYard',
+    'sundayMarket',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

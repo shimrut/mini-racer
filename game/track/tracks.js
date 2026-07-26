@@ -60,6 +60,11 @@ import numberSix from './definitions/number-six.js';
 import numberSeven from './definitions/number-seven.js';
 import numberEight from './definitions/number-eight.js';
 import numberNine from './definitions/number-nine.js';
+import analogAudio from './definitions/analog-audio.js';
+import hardHitter from './definitions/hard-hitter.js';
+import roadRage from './definitions/road-rage.js';
+import yellowYard from './definitions/yellow-yard.js';
+import sundayMarket from './definitions/sunday-market.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -125,6 +130,11 @@ const TRACK_GEOMETRY = {
     numberSeven,
     numberEight,
     numberNine,
+    analogAudio,
+    hardHitter,
+    roadRage,
+    yellowYard,
+    sundayMarket,
 };
 
 // Compatibility registry for existing gameplay and server consumers.
