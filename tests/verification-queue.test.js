@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+    clearCampaignVerification,
     clearDailyChallengeVerification,
     createVerificationSnapshot,
+    enqueueCampaignVerification,
     enqueueDailyChallengeVerification,
+    getCampaignVerificationEntry,
+    getDueCampaignVerifications,
+    isRetryableVerificationFailure,
+    markCampaignVerificationPending,
     getDailyChallengeVerificationEntry,
     getDailyChallengeVerificationState,
     getDueDailyChallengeVerifications,
@@ -682,6 +688,55 @@ describe('verification queue', () => {
         });
 
         expect(getDueDailyChallengeVerifications()).toEqual([]);
-        expect(readStoredQueue()).toEqual({ daily: {} });
+        expect(readStoredQueue()).toEqual({ daily: {}, campaign: {} });
+    });
+
+    it('keeps Campaign entries queued for retry and isolated from Daily', () => {
+        installLocalStorage();
+
+        expect(enqueueCampaignVerification({
+            raceId: 'numbered-v1-03',
+            trackKey: 'numberThree',
+            bestTime: 24.5,
+            lapCount: 2,
+            rulesRevision: 1,
+            replay: { targetLapNumber: 2, inputs: [] },
+        }).enqueued).toBe(true);
+
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+        expect(getDueCampaignVerifications()).toMatchObject([
+            { raceId: 'numbered-v1-03', bestTime: 24.5, lapCount: 2 },
+        ]);
+
+        // A slower rerun must never displace the queued faster time.
+        expect(enqueueCampaignVerification({
+            raceId: 'numbered-v1-03',
+            trackKey: 'numberThree',
+            bestTime: 25.9,
+            lapCount: 2,
+            rulesRevision: 1,
+            replay: { targetLapNumber: 2, inputs: [] },
+        }).enqueued).toBe(false);
+        expect(getCampaignVerificationEntry('numbered-v1-03').bestTime).toBe(24.5);
+
+        markCampaignVerificationPending('numbered-v1-03', Date.now() + 60_000, {
+            submissionStage: 'retrying',
+        });
+        expect(getDueCampaignVerifications()).toEqual([]);
+        expect(getCampaignVerificationEntry('numbered-v1-03')).toMatchObject({
+            verificationState: 'pending',
+            submissionStage: 'retrying',
+        });
+
+        clearCampaignVerification('numbered-v1-03');
+        expect(getCampaignVerificationEntry('numbered-v1-03')).toBeNull();
+    });
+
+    it('classifies transient submission failures as retryable', () => {
+        expect(isRetryableVerificationFailure(null)).toBe(true);
+        expect(isRetryableVerificationFailure({ status: 503 })).toBe(true);
+        expect(isRetryableVerificationFailure({ status: 429 })).toBe(true);
+        expect(isRetryableVerificationFailure({ status: 422 })).toBe(false);
+        expect(isRetryableVerificationFailure({ status: 403 })).toBe(false);
     });
 });

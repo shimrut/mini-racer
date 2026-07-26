@@ -2,6 +2,7 @@ import {
   clearDailyChallengeVerification,
   enqueueDailyChallengeVerification,
   getDueDailyChallengeVerifications,
+  getDueCampaignVerifications,
   getDailyChallengeVerificationEntry,
   getNextVerificationAttemptAt,
   getVerificationRetryDelayMs,
@@ -9,6 +10,7 @@ import {
   markDailyChallengeVerificationError,
   createVerificationSnapshot,
   isDailyChallengeVerificationExpired,
+  isRetryableVerificationFailure,
 } from "./verification-queue.js";
 import {
   rollbackDailyChallengeBestIfMatchesFailedSubmission,
@@ -20,12 +22,6 @@ import {
   submitDailyChallengeBestTime,
 } from "../daily-challenge/service.js";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
-
-function isRetryableVerificationFailure(result) {
-  const status = Number(result?.status);
-  if (!Number.isFinite(status)) return true;
-  return status === 408 || status === 425 || status === 429 || status >= 500;
-}
 
 function previousBestFromVerificationEntry(entry) {
   if (!Number.isFinite(entry?.previousBestTime)) return null;
@@ -103,6 +99,10 @@ export const scoreboardEngineMethods = {
       const dueDailyEntries = getDueDailyChallengeVerifications();
       for (const entry of dueDailyEntries) {
         await this.processDailyChallengeVerificationEntry(entry);
+      }
+      const dueCampaignEntries = getDueCampaignVerifications();
+      for (const entry of dueCampaignEntries) {
+        await this.processCampaignVerificationEntry(entry);
       }
     } finally {
       this.isProcessingVerificationQueue = false;

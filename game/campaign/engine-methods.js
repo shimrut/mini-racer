@@ -21,7 +21,15 @@ import {
     submitCampaignRun,
 } from './service.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
-import { createVerificationSnapshot } from '../scoreboard/verification-queue.js';
+import {
+    clearCampaignVerification,
+    createVerificationSnapshot,
+    enqueueCampaignVerification,
+    getVerificationRetryDelayMs,
+    isRetryableVerificationFailure,
+    markCampaignVerificationError,
+    markCampaignVerificationPending,
+} from '../scoreboard/verification-queue.js';
 
 function toRaceChallenge(stage, mode = 'campaign') {
     return {
@@ -106,6 +114,38 @@ export function buildCampaignLeaderboardOptions(campaignState) {
             dateLabel: stage.trackName,
             ariaLabel: `View ${stage.trackName} campaign standings`,
         }));
+}
+
+function campaignPlayerRow(bestTime) {
+    return {
+        isCurrentPlayer: true,
+        bestTime,
+        rank: null,
+        displayName: 'You',
+    };
+}
+
+function campaignPendingSnapshot(bestTime, submissionStage = 'submitting') {
+    return {
+        ...createVerificationSnapshot({
+            verificationState: 'pending',
+            isLoading: true,
+            submissionStage,
+        }),
+        currentPlayerRow: campaignPlayerRow(bestTime),
+    };
+}
+
+function campaignErrorSnapshot(bestTime, statusText) {
+    return {
+        ...createVerificationSnapshot({
+            verificationState: 'error',
+            isLoading: false,
+            submissionStage: 'error',
+            statusText: statusText || 'Couldn\'t rank this run. Try again.',
+        }),
+        currentPlayerRow: campaignPlayerRow(bestTime),
+    };
 }
 
 export const campaignEngineMethods = {
@@ -388,198 +428,282 @@ export const campaignEngineMethods = {
         this.handleDailyChallengeWin(winData);
     },
 
-    async handleCampaignWin(winData) {
+    handleInvalidCampaignWin(reason = 'Finish could not be verified.') {
+        console.warn('Campaign win validation failed:', reason);
+        const stage = this.activeCampaignStage;
+        this.status = 'ready';
+        void this.journeys?.endAttempt?.({ complete: false });
+        this.hud.setPauseVisible(false);
+        this.hud.setHudPersonalBestsOpenAllowed(true);
+        this.modal.showModal(
+            'RUN REJECTED',
+            null,
+            {
+                lapTime: this.currentTime,
+                bestTime: this.bestLapTime,
+                primaryStatLabel: 'Race Time',
+                trackKey: stage?.trackKey ?? this.currentTrackKey,
+                showGlobalLeaderboard: false,
+            },
+            {
+                ...createModalActions({
+                    modalKind: 'rejected',
+                    primaryActionLabel: 'Retry',
+                    secondaryActionLabel: 'Campaign',
+                    secondaryAction: () => this.showCampaignLobby(),
+                }),
+                restartAction: () => this.restartActiveRace(),
+                settingsAction: () => this.settings.openSettings(),
+            },
+        );
+        if (this.modal.modalMsg) {
+            this.modal.modalMsg.style.display = '';
+            this.modal.modalMsg.textContent = reason;
+        }
+    },
+
+    showCampaignFinish(stage, {
+        finalTime,
+        medal,
+        message = null,
+        shareRequest = null,
+        scoreboardSnapshot = null,
+    }) {
+        const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
+        this.modal.showModal(
+            'Campaign race complete',
+            null,
+            {
+                lapTime: finalTime,
+                bestTime: null,
+                completedLaps: stage.lapCount,
+                requiredLaps: stage.lapCount,
+                primaryStatLabel: 'Race Time',
+                lapMedal: medal,
+                trackKey: stage.trackKey,
+                scoreboardSnapshot,
+                scoreboardChallengeId: stage.raceId,
+                scoreboardTrackKey: stage.trackKey,
+                showGlobalLeaderboard: false,
+                allowLeaderboardOpen: true,
+            },
+            {
+                ...createModalActions({
+                    modalKind: 'win',
+                    primaryActionLabel: 'Retry',
+                    secondaryActionLabel: 'Campaign',
+                    secondaryAction: () => this.showCampaignLobby(),
+                }),
+                restartAction: () => this.restartActiveRace(),
+                settingsAction: () => this.settings.openSettings(),
+                shareRequest,
+            },
+        );
+        if (this.modal.modalMsg) {
+            this.modal.modalMsg.style.display = '';
+            this.modal.modalMsg.textContent = message || trackLine;
+        }
+    },
+
+    handleCampaignWin(winData) {
         const stage = this.activeCampaignStage;
         if (!stage || !this.currentChallengeRun) return;
-        this.status = 'won';
-        void this.journeys?.endAttempt?.({ complete: true });
-        const finalTime = Number(winData?.lapTime);
-        const replay = this.scoreboardReplay.getPayload(stage.lapCount);
-        const medal = getMedalForRaceTime(stage.trackKey, finalTime, stage.lapCount);
-        const signedIn = this.campaignBootstrap?.signedIn === true;
-        const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
 
-        const buildCampaignPlayerRow = () => ({
-            isCurrentPlayer: true,
-            bestTime: finalTime,
-            rank: null,
-            displayName: 'You',
-        });
-
-        const buildSubmittingSnapshot = () => ({
-            ...createVerificationSnapshot({
-                verificationState: 'pending',
-                isLoading: true,
-                submissionStage: 'submitting',
-            }),
-            currentPlayerRow: buildCampaignPlayerRow(),
-        });
-
-        const buildErrorSnapshot = (statusText) => ({
-            ...createVerificationSnapshot({
-                verificationState: 'error',
-                isLoading: false,
-                submissionStage: 'error',
-                statusText: statusText || 'Couldn\'t rank this run. Try again.',
-            }),
-            currentPlayerRow: buildCampaignPlayerRow(),
-        });
-
-        const showCampaignResult = ({
-            accepted,
-            confirmationFailed = false,
-            error = null,
-            shareRequest = null,
-            scoreboardSnapshot = null,
-        }) => {
-            this.modal.showModal(
-                accepted
-                    ? 'Campaign race complete'
-                    : confirmationFailed
-                        ? 'Result not confirmed'
-                        : 'Run rejected',
-                null,
-                {
-                    lapTime: finalTime,
-                    bestTime: null,
-                    completedLaps: stage.lapCount,
-                    requiredLaps: stage.lapCount,
-                    primaryStatLabel: 'Race Time',
-                    lapMedal: medal,
-                    trackKey: stage.trackKey,
-                    scoreboardSnapshot,
-                    scoreboardChallengeId: stage.raceId,
-                    scoreboardTrackKey: stage.trackKey,
-                    showGlobalLeaderboard: false,
-                    allowLeaderboardOpen: true,
-                },
-                {
-                    ...createModalActions({
-                        modalKind: accepted ? 'win' : 'rejected',
-                        primaryActionLabel: 'Retry',
-                        secondaryActionLabel: 'Campaign',
-                        secondaryAction: () => this.showCampaignLobby(),
-                    }),
-                    restartAction: () => this.restartActiveRace(),
-                    settingsAction: () => this.settings.openSettings(),
-                    shareRequest,
-                },
-            );
-            if (this.modal.modalMsg) {
-                this.modal.modalMsg.style.display = '';
-                this.modal.modalMsg.textContent = error || trackLine;
-            }
-        };
-
-        if (!signedIn) {
-            const local = saveLocalCampaignFinish(stage.raceId, finalTime);
-            this.campaignBootstrap.progress = local;
-            showCampaignResult({ accepted: true });
+        const invalidReason = this.getInvalidWinDataReason?.(winData) ?? null;
+        if (invalidReason) {
+            this.handleInvalidCampaignWin(invalidReason);
             return;
         }
 
-        if (!replay) {
-            const error = 'This run could not be verified.';
-            showCampaignResult({
-                accepted: false,
-                error,
-                scoreboardSnapshot: buildErrorSnapshot(error),
+        this.status = 'won';
+        void this.journeys?.endAttempt?.({ complete: true });
+        const finalTime = Number(winData?.lapTime);
+        const medal = getMedalForRaceTime(stage.trackKey, finalTime, stage.lapCount);
+        const signedIn = this.campaignBootstrap?.signedIn === true;
+        const replay = this.scoreboardReplay.getPayload(stage.lapCount);
+        const blockedReason = this.rankedSubmissionBlockedReason
+            || (replay
+                ? null
+                : this.scoreboardReplay.overflowed
+                    ? 'Run too long to rank.'
+                    : 'Submission replay was unavailable for this run.');
+
+        // A run the client cannot rank must not advance progression on either
+        // side of the sign-in line: guest unlocks read the same medal that a
+        // verified server result would have written.
+        if (blockedReason) {
+            this.showCampaignFinish(stage, {
+                finalTime,
+                medal,
+                message: blockedReason,
+                scoreboardSnapshot: campaignErrorSnapshot(finalTime, blockedReason),
             });
             return;
         }
 
-        // Same pattern as Daily: open the finish sheet immediately, confirm in the background.
-        showCampaignResult({
-            accepted: true,
+        if (!signedIn) {
+            const local = saveLocalCampaignFinish(stage.raceId, finalTime);
+            if (this.campaignBootstrap) this.campaignBootstrap.progress = local;
+            this.showCampaignFinish(stage, { finalTime, medal });
+            return;
+        }
+
+        // Same pattern as Daily: the finish sheet opens immediately and the
+        // durable queue confirms in the background, so a dropped connection
+        // retries instead of losing the run.
+        const { enqueued, entry } = enqueueCampaignVerification({
+            raceId: stage.raceId,
+            trackKey: stage.trackKey,
+            bestTime: finalTime,
+            lapCount: stage.lapCount,
+            rulesRevision: stage.rulesRevision,
+            replay,
+        });
+
+        this.showCampaignFinish(stage, {
+            finalTime,
+            medal,
             shareRequest: {
                 kind: 'campaign-challenge',
                 source: 'campaign',
                 raceId: stage.raceId,
             },
-            scoreboardSnapshot: buildSubmittingSnapshot(),
+            scoreboardSnapshot: entry
+                ? campaignPendingSnapshot(finalTime)
+                : campaignErrorSnapshot(finalTime, null),
         });
 
-        void (async () => {
-            let accepted = false;
-            let confirmationFailed = false;
-            let error = null;
-            try {
-                const response = await submitCampaignRun({
-                    raceId: stage.raceId,
+        if (!enqueued) return;
+        const processing = this.processVerificationQueue?.();
+        if (processing && typeof processing.catch === 'function') {
+            void processing.catch((error) => {
+                console.error('Error processing Campaign verification queue:', error);
+                this.scheduleVerificationQueueProcessing?.(getVerificationRetryDelayMs());
+            });
+        } else {
+            this.scheduleVerificationQueueProcessing?.(0);
+        }
+    },
+
+    updateCampaignFinishSnapshot(raceId, snapshot) {
+        if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
+            this.modal.updateModalScoreboardSnapshot?.(snapshot);
+        }
+    },
+
+    retryCampaignVerificationLater(entry, statusText = null) {
+        markCampaignVerificationPending(
+            entry.raceId,
+            Date.now() + getVerificationRetryDelayMs(),
+            { submissionStage: 'retrying', statusText },
+        );
+        this.updateCampaignFinishSnapshot(
+            entry.raceId,
+            campaignPendingSnapshot(entry.bestTime, 'retrying'),
+        );
+    },
+
+    async processCampaignVerificationEntry(entry) {
+        const raceId = entry?.raceId;
+        const stage = getCampaignStage(raceId);
+        if (!raceId || !stage || !Number.isFinite(entry?.bestTime)) {
+            if (raceId) clearCampaignVerification(raceId);
+            return;
+        }
+
+        if (!entry.replay) {
+            const error = 'Submission replay is missing. Race again to rank it.';
+            markCampaignVerificationError(raceId, error);
+            this.updateCampaignFinishSnapshot(
+                raceId,
+                campaignErrorSnapshot(entry.bestTime, error),
+            );
+            return;
+        }
+
+        markCampaignVerificationPending(raceId, Date.now(), {
+            submissionStage: 'verifying',
+        });
+        this.updateCampaignFinishSnapshot(
+            raceId,
+            campaignPendingSnapshot(entry.bestTime, 'verifying'),
+        );
+
+        let response = null;
+        try {
+            response = await submitCampaignRun({
+                raceId,
+                trackKey: stage.trackKey,
+                replay: entry.replay,
+            });
+        } catch (submitError) {
+            console.error('Could not confirm Campaign race result:', submitError);
+            this.retryCampaignVerificationLater(entry);
+            return;
+        }
+
+        if (response.ok && response.body?.accepted === true) {
+            clearCampaignVerification(raceId);
+            if (this.campaignBootstrap && response.body.progress) {
+                this.campaignBootstrap.progress = response.body.progress;
+            }
+            await this.refreshCampaignAfterAcceptedRun(stage);
+            return;
+        }
+
+        if (isRetryableVerificationFailure(response)) {
+            this.retryCampaignVerificationLater(
+                entry,
+                typeof response.body?.error === 'string' ? response.body.error : null,
+            );
+            return;
+        }
+
+        const error = response.body?.error || 'This run could not be verified.';
+        markCampaignVerificationError(raceId, error);
+        this.updateCampaignFinishSnapshot(
+            raceId,
+            campaignErrorSnapshot(entry.bestTime, error),
+        );
+    },
+
+    async refreshCampaignAfterAcceptedRun(stage) {
+        try {
+            const snapshotResponse = await getCampaignSnapshot(stage.raceId, {
+                limit: 50,
+                offset: 0,
+            });
+            if (snapshotResponse.ok) {
+                const snapshot = normalizeCampaignLeaderboardSnapshot(snapshotResponse.body);
+                if (snapshot) this.updateCampaignFinishSnapshot(stage.raceId, snapshot);
+            }
+        } catch (snapshotError) {
+            console.warn('Campaign finish opened without a live rank snapshot:', snapshotError);
+        }
+
+        try {
+            const ghost = await getCampaignPbGhost(stage.raceId);
+            const personalBest = ghost.ok ? ghost.body?.personalBest : null;
+            if (personalBest?.ghost) this.pbGhost.prepare(personalBest);
+            if (Number(personalBest?.bestTimeMs) > 0) {
+                this.trackPersonalBestByTrackKey[stage.raceId] = {
+                    challengeId: stage.raceId,
                     trackKey: stage.trackKey,
-                    replay,
-                });
-                accepted = response.ok && response.body?.accepted === true;
-                error = accepted ? null : response.body?.error || 'This run could not be verified.';
-                if (accepted && response.body?.progress) {
-                    this.campaignBootstrap.progress = response.body.progress;
-                }
-            } catch (submitError) {
-                confirmationFailed = true;
-                error = 'Race finished, but the result could not be confirmed. Check Campaign progress before retrying.';
-                console.error('Could not confirm Campaign race result:', submitError);
+                    bestTime: Number(personalBest.bestTimeMs) / 1000,
+                    checkpointTimesSec: personalBest.checkpointTimesSec ?? null,
+                    ghostAvailable: Boolean(personalBest.ghost),
+                    updatedAt: personalBest.updatedAt ?? null,
+                };
             }
+        } catch (ghostError) {
+            console.warn('Campaign result was saved, but PB ghost refresh failed:', ghostError);
+        }
 
-            if (
-                this.status !== 'won'
-                || this.activeCampaignStage?.raceId !== stage.raceId
-            ) {
-                return;
-            }
-
-            if (!accepted) {
-                showCampaignResult({
-                    accepted: false,
-                    confirmationFailed,
-                    error,
-                    scoreboardSnapshot: buildErrorSnapshot(error),
-                });
-                return;
-            }
-
-            try {
-                const snapshotResponse = await getCampaignSnapshot(stage.raceId, {
-                    limit: 50,
-                    offset: 0,
-                });
-                if (
-                    this.status === 'won'
-                    && this.activeCampaignStage?.raceId === stage.raceId
-                    && snapshotResponse.ok
-                ) {
-                    const snapshot = normalizeCampaignLeaderboardSnapshot(snapshotResponse.body);
-                    if (snapshot) {
-                        this.modal.updateModalScoreboardSnapshot?.(snapshot);
-                    }
-                }
-            } catch (snapshotError) {
-                console.warn('Campaign finish opened without a live rank snapshot:', snapshotError);
-            }
-
-            try {
-                const ghost = await getCampaignPbGhost(stage.raceId);
-                const personalBest = ghost.ok ? ghost.body?.personalBest : null;
-                if (personalBest?.ghost) this.pbGhost.prepare(personalBest);
-                if (Number(personalBest?.bestTimeMs) > 0) {
-                    this.trackPersonalBestByTrackKey[stage.raceId] = {
-                        challengeId: stage.raceId,
-                        trackKey: stage.trackKey,
-                        bestTime: Number(personalBest.bestTimeMs) / 1000,
-                        checkpointTimesSec: personalBest.checkpointTimesSec ?? null,
-                        ghostAvailable: Boolean(personalBest.ghost),
-                        updatedAt: personalBest.updatedAt ?? null,
-                    };
-                }
-            } catch (ghostError) {
-                console.warn('Campaign result was saved, but PB ghost refresh failed:', ghostError);
-            }
-
-            try {
-                await this.loadCampaignLobby({ show: false });
-            } catch (refreshError) {
-                console.warn('Campaign result screen opened without refreshed progress:', refreshError);
-            }
-        })();
+        try {
+            await this.loadCampaignLobby({ show: false });
+        } catch (refreshError) {
+            console.warn('Campaign result screen opened without refreshed progress:', refreshError);
+        }
     },
 
     async handleCampaignChallengeWin(winData) {

@@ -14,6 +14,7 @@ const campaignServiceMocks = vi.hoisted(() => ({
         complete: false,
         continueRaceId: 'numbered-v1-00',
     })),
+    saveLocalCampaignFinish: vi.fn(),
     startServerCampaignRace: vi.fn(),
     startLocalCampaign: vi.fn(),
     submitCampaignChallengeRun: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock('../game/campaign/service.js', () => ({
     getCampaignSnapshot: campaignServiceMocks.getCampaignSnapshot,
     previewCampaignChallenge: vi.fn(),
     readLocalCampaignProgress: campaignServiceMocks.readLocalCampaignProgress,
-    saveLocalCampaignFinish: vi.fn(),
+    saveLocalCampaignFinish: campaignServiceMocks.saveLocalCampaignFinish,
     startLocalCampaign: campaignServiceMocks.startLocalCampaign,
     startServerCampaignRace: campaignServiceMocks.startServerCampaignRace,
     submitCampaignChallengeRun: campaignServiceMocks.submitCampaignChallengeRun,
@@ -151,6 +152,7 @@ afterEach(() => {
         complete: false,
         continueRaceId: 'numbered-v1-00',
     });
+    campaignServiceMocks.saveLocalCampaignFinish.mockReset();
     campaignServiceMocks.startServerCampaignRace.mockReset();
     campaignServiceMocks.startLocalCampaign.mockReset();
     campaignServiceMocks.submitCampaignChallengeRun.mockReset();
@@ -158,30 +160,152 @@ afterEach(() => {
 });
 
 describe('Campaign lobby and shared modal adapters', () => {
-    it('still opens the saved result when PB ghost and lobby refreshes fail', async () => {
+    function createCampaignFinishContext(overrides = {}) {
         const modalMsg = { style: {}, textContent: '' };
-        const context = {
+        return {
+            ...campaignEngineMethods,
             activeCampaignStage: {
                 raceId: 'numbered-v1-00',
                 trackKey: 'numberZero',
                 lapCount: 1,
+                rulesRevision: 1,
             },
             currentChallengeRun: {},
+            currentTime: 8.25,
+            bestLapTime: null,
             campaignBootstrap: { signedIn: true, progress: {} },
             journeys: { endAttempt: vi.fn() },
-            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            scoreboardReplay: {
+                overflowed: false,
+                getPayload: vi.fn(() => ({ revision: 1, segments: [] })),
+            },
+            rankedSubmissionBlockedReason: null,
+            getInvalidWinDataReason: vi.fn(() => null),
             pbGhost: { prepare: vi.fn() },
             trackPersonalBestByTrackKey: {},
-            loadCampaignLobby: vi.fn().mockRejectedValue(new Error('bootstrap offline')),
+            hud: {
+                setPauseVisible: vi.fn(),
+                setHudPersonalBestsOpenAllowed: vi.fn(),
+            },
+            loadCampaignLobby: vi.fn().mockResolvedValue({}),
+            processVerificationQueue: vi.fn(),
+            scheduleVerificationQueueProcessing: vi.fn(),
             modal: {
                 modalMsg,
                 showModal: vi.fn(),
                 updateModalScoreboardSnapshot: vi.fn(),
+                matchesModalScoreboardContext: vi.fn(() => true),
             },
             restartActiveRace: vi.fn(),
             showCampaignLobby: vi.fn(),
             settings: { openSettings: vi.fn() },
+            ...overrides,
         };
+    }
+
+    it('opens the finish modal once and queues the run before submission settles', async () => {
+        const context = createCampaignFinishContext();
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        expect(context.status).toBe('won');
+        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                lapTime: 8.25,
+                scoreboardSnapshot: expect.objectContaining({
+                    isLoading: true,
+                    submissionStage: 'submitting',
+                }),
+            }),
+            expect.objectContaining({
+                modalKind: 'win',
+                shareRequest: {
+                    kind: 'campaign-challenge',
+                    source: 'campaign',
+                    raceId: 'numbered-v1-00',
+                },
+            }),
+        );
+        expect(context.modal.modalMsg.textContent).toBe('Number Zero · 1 lap');
+        // The queue owns the submission now, so the finish path never calls it directly.
+        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
+        expect(context.processVerificationQueue).toHaveBeenCalled();
+    });
+
+    it('rejects a finish that fails win validation without submitting or scoring it', () => {
+        const context = createCampaignFinishContext({
+            getInvalidWinDataReason: vi.fn(() => 'Checkpoint count did not match the loaded track.'),
+        });
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        expect(context.status).toBe('ready');
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'RUN REJECTED',
+            null,
+            expect.not.objectContaining({ lapMedal: expect.anything() }),
+            expect.objectContaining({ modalKind: 'rejected' }),
+        );
+        expect(context.modal.modalMsg.textContent).toBe(
+            'Checkpoint count did not match the loaded track.',
+        );
+        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
+        expect(context.processVerificationQueue).not.toHaveBeenCalled();
+    });
+
+    it('does not queue or score a run blocked by a timing anomaly', () => {
+        const context = createCampaignFinishContext({
+            rankedSubmissionBlockedReason:
+                'Leaderboard rank disabled because the run had severe frame stalls.',
+        });
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                scoreboardSnapshot: expect.objectContaining({
+                    verificationState: 'error',
+                    statusText: 'Leaderboard rank disabled because the run had severe frame stalls.',
+                }),
+            }),
+            expect.anything(),
+        );
+        expect(context.processVerificationQueue).not.toHaveBeenCalled();
+        expect(campaignServiceMocks.saveLocalCampaignFinish).not.toHaveBeenCalled();
+    });
+
+    it('reports an overflowed replay as too long rather than unverifiable', () => {
+        const context = createCampaignFinishContext({
+            scoreboardReplay: {
+                overflowed: true,
+                getPayload: vi.fn(() => null),
+            },
+        });
+
+        context.handleCampaignWin({ lapTime: 41.5 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                scoreboardSnapshot: expect.objectContaining({
+                    statusText: 'Run too long to rank.',
+                }),
+            }),
+            expect.anything(),
+        );
+        expect(context.modal.modalMsg.textContent).toBe('Run too long to rank.');
+        expect(context.processVerificationQueue).not.toHaveBeenCalled();
+    });
+
+    it('still shows the accepted result when PB ghost and lobby refreshes fail', async () => {
+        const context = createCampaignFinishContext();
         campaignServiceMocks.submitCampaignRun.mockResolvedValue({
             ok: true,
             body: {
@@ -207,172 +331,71 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
         campaignServiceMocks.getCampaignPbGhost.mockRejectedValue(new Error('ghost offline'));
+        context.loadCampaignLobby.mockRejectedValue(new Error('bootstrap offline'));
         vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-        await campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
-        await vi.waitFor(() => {
-            expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    playerRankLabel: '#1',
-                    totalCount: 3,
-                }),
-            );
+        await context.processCampaignVerificationEntry({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime: 8.25,
+            replay: { revision: 1, segments: [] },
         });
-        expect(context.status).toBe('won');
-        expect(context.modal.showModal).toHaveBeenCalledWith(
-            'Campaign race complete',
-            null,
-            expect.objectContaining({
-                lapTime: 8.25,
-                scoreboardSnapshot: expect.objectContaining({
-                    isLoading: true,
-                    submissionStage: 'submitting',
-                }),
-            }),
-            expect.objectContaining({
-                modalKind: 'win',
-                shareRequest: {
-                    kind: 'campaign-challenge',
-                    source: 'campaign',
-                    raceId: 'numbered-v1-00',
-                },
-            }),
+
+        expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
+            expect.objectContaining({ playerRankLabel: '#1', totalCount: 3 }),
         );
-        expect(modalMsg.textContent).toBe('Number Zero · 1 lap');
+        expect(context.campaignBootstrap.progress).toEqual({
+            unlockedRaceIds: ['numbered-v1-00'],
+        });
+        // The already-open finish sheet is patched in place, never remounted.
+        expect(context.modal.showModal).not.toHaveBeenCalled();
     });
 
-    it('shows an actionable result instead of freezing when submission confirmation fails', async () => {
-        const modalMsg = { style: {}, textContent: '' };
-        const context = {
-            activeCampaignStage: {
-                raceId: 'numbered-v1-00',
-                trackKey: 'numberZero',
-                lapCount: 1,
-            },
-            currentChallengeRun: {},
-            campaignBootstrap: { signedIn: true, progress: {} },
-            journeys: { endAttempt: vi.fn() },
-            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
-            pbGhost: { prepare: vi.fn() },
-            trackPersonalBestByTrackKey: {},
-            loadCampaignLobby: vi.fn().mockResolvedValue({}),
-            modal: {
-                modalMsg,
-                showModal: vi.fn(),
-            },
-            restartActiveRace: vi.fn(),
-            showCampaignLobby: vi.fn(),
-            settings: { openSettings: vi.fn() },
-        };
-        campaignServiceMocks.submitCampaignRun.mockRejectedValue(new Error('response interrupted'));
+    it('retries instead of stranding the run when confirmation fails', async () => {
+        const context = createCampaignFinishContext();
+        campaignServiceMocks.submitCampaignRun.mockRejectedValue(
+            new Error('response interrupted'),
+        );
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        await campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
-        expect(context.modal.showModal).toHaveBeenCalledWith(
-            'Campaign race complete',
-            null,
-            expect.objectContaining({ lapTime: 8.25 }),
-            expect.objectContaining({ modalKind: 'win' }),
-        );
-
-        await vi.waitFor(() => {
-            expect(context.modal.showModal).toHaveBeenLastCalledWith(
-                'Result not confirmed',
-                null,
-                expect.objectContaining({ lapTime: 8.25 }),
-                expect.objectContaining({
-                    modalKind: 'rejected',
-                    shareRequest: null,
-                }),
-            );
+        await context.processCampaignVerificationEntry({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime: 8.25,
+            replay: { revision: 1, segments: [] },
         });
-        expect(modalMsg.textContent).toBe(
-            'Race finished, but the result could not be confirmed. Check Campaign progress before retrying.',
+
+        expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                verificationState: 'pending',
+                submissionStage: 'retrying',
+                isLoading: true,
+            }),
         );
+        expect(context.modal.showModal).not.toHaveBeenCalled();
     });
 
-    it('opens the finish modal before Campaign submission settles', async () => {
-        let resolveSubmission;
-        const context = {
-            activeCampaignStage: {
-                raceId: 'numbered-v1-00',
-                trackKey: 'numberZero',
-                lapCount: 1,
-            },
-            currentChallengeRun: {},
-            campaignBootstrap: { signedIn: true, progress: {} },
-            journeys: { endAttempt: vi.fn() },
-            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
-            pbGhost: { prepare: vi.fn() },
-            trackPersonalBestByTrackKey: {},
-            loadCampaignLobby: vi.fn().mockResolvedValue({}),
-            modal: {
-                modalMsg: { style: {}, textContent: '' },
-                showModal: vi.fn(),
-                updateModalScoreboardSnapshot: vi.fn(),
-            },
-            restartActiveRace: vi.fn(),
-            showCampaignLobby: vi.fn(),
-            settings: { openSettings: vi.fn() },
-        };
-        campaignServiceMocks.submitCampaignRun.mockImplementation(() => new Promise((resolve) => {
-            resolveSubmission = resolve;
-        }));
-        campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
-            ok: true,
-            body: {
-                rows: [],
-                currentPlayerRow: {
-                    rank: 2,
-                    displayName: 'You',
-                    bestTimeMs: 8250,
-                    isCurrentPlayer: true,
-                },
-                totalCount: 4,
-                pageOffset: 0,
-                pageLimit: 50,
-                hasMore: false,
-                nextOffset: null,
-            },
+    it('stops retrying a run the server refuses outright', async () => {
+        const context = createCampaignFinishContext();
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: false,
+            status: 422,
+            body: { accepted: false, error: 'Campaign race was not completed.' },
         });
-        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: null });
 
-        const finish = campaignEngineMethods.handleCampaignWin.call(context, { lapTime: 8.25 });
-        await Promise.resolve();
+        await context.processCampaignVerificationEntry({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime: 8.25,
+            replay: { revision: 1, segments: [] },
+        });
 
-        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
-        expect(context.modal.showModal).toHaveBeenCalledWith(
-            'Campaign race complete',
-            null,
+        expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(
             expect.objectContaining({
-                lapTime: 8.25,
-                scoreboardSnapshot: expect.objectContaining({
-                    isLoading: true,
-                    submissionStage: 'submitting',
-                }),
-            }),
-            expect.objectContaining({
-                modalKind: 'win',
-                shareRequest: {
-                    kind: 'campaign-challenge',
-                    source: 'campaign',
-                    raceId: 'numbered-v1-00',
-                },
+                verificationState: 'error',
+                statusText: 'Campaign race was not completed.',
             }),
         );
-
-        resolveSubmission({
-            ok: true,
-            body: {
-                accepted: true,
-                progress: { unlockedRaceIds: ['numbered-v1-00'] },
-            },
-        });
-        await finish;
-        await vi.waitFor(() => {
-            expect(context.loadCampaignLobby).toHaveBeenCalledWith({ show: false });
-        });
-        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
     });
 
     it('does not strand a Campaign challenge finish when confirmation fails', async () => {
