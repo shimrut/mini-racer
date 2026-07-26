@@ -233,6 +233,17 @@ export class ModalContentUi {
     }
 }
 
+    /**
+     * Paints the combined-result hero medal. Split out of renderCombinedResults
+     * so a finish already on screen can have its medal patched once the server
+     * confirms or refuses the run.
+     */
+    renderCombinedMedalOverlay(heroMedalEl, options = {}) {
+        if (!heroMedalEl) return;
+        heroMedalEl.replaceChildren();
+        renderWinCombinedMedalOverlay(heroMedalEl, options);
+    }
+
     createModalMedalStat(medal) {
         const stat = document.createElement('span');
         stat.className = 'modal-stat-stack';
@@ -605,21 +616,18 @@ export class ModalContentUi {
         const nextMedalIconSlot = container.querySelector('#combined-next-medal-icon-slot');
         const nextMedalTimeEl = container.querySelector('#combined-next-medal-time');
 
-        if (heroMedalEl) {
-            heroMedalEl.replaceChildren();
-            renderWinCombinedMedalOverlay(heroMedalEl, {
-                trackKey,
-                lapTimeSec: time,
-                lapMedal,
-                challengeFinish,
-                challengeConfirmPhase,
-                challengeConfirmStatus,
-                challengeConfirmError,
-                previousPersonalBestSec,
-                previousTrackMedal,
-                lapCount,
-            });
-        }
+        this.renderCombinedMedalOverlay(heroMedalEl, {
+            trackKey,
+            lapTimeSec: time,
+            lapMedal,
+            challengeFinish,
+            challengeConfirmPhase,
+            challengeConfirmStatus,
+            challengeConfirmError,
+            previousPersonalBestSec,
+            previousTrackMedal,
+            lapCount,
+        });
         
         if (label2El) {
             label2El.hidden = false;

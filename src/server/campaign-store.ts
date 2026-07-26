@@ -62,7 +62,6 @@ const MAX_LIMIT = 50;
 const SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 const SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 const SUBMISSION_LOCK_TTL_MS = 30_000;
-const PROGRESS_HASH_KEY = `campaign:${CAMPAIGN_ID}:progress`;
 
 function playerIdForUsername(username: string): string {
     return `reddit:${username.toLowerCase()}`;
@@ -70,6 +69,14 @@ function playerIdForUsername(username: string): string {
 
 function playerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
+}
+
+/**
+ * Progress is per player and permanent, so it gets its own key rather than a
+ * field in one campaign-wide hash that would grow without bound.
+ */
+function progressKey(playerId: string): string {
+    return `campaign:${CAMPAIGN_ID}:progress:${playerField(playerId)}`;
 }
 
 function leaderboardKey(raceId: string): string {
@@ -201,7 +208,7 @@ function parsePbRecord(raw: string | null | undefined, raceId: string): Campaign
 }
 
 async function readProgress(playerId: string): Promise<CampaignProgress> {
-    return parseCampaignProgress(await redis.hGet(PROGRESS_HASH_KEY, playerField(playerId)));
+    return parseCampaignProgress(await redis.get(progressKey(playerId)));
 }
 
 function publicProgress(progress: CampaignProgress) {
@@ -266,9 +273,7 @@ export async function startServerCampaignRace({
     if (!progress.startedAt) {
         const nowIso = new Date().toISOString();
         startedProgress = { ...progress, startedAt: nowIso, updatedAt: nowIso };
-        await redis.hSet(PROGRESS_HASH_KEY, {
-            [playerField(identity.playerId)]: JSON.stringify(startedProgress),
-        });
+        await redis.set(progressKey(identity.playerId), JSON.stringify(startedProgress));
     }
     return { status: 200, body: { race: stage, progress: publicProgress(startedProgress) } };
 }
@@ -481,9 +486,10 @@ export async function submitServerCampaignRun({
             if (!transaction) {
                 return { status: 503, body: { accepted: false, error: 'Submission save was interrupted. Try again.' } };
             }
-            await transaction.hSet(PROGRESS_HASH_KEY, {
-                [playerField(identity.playerId)]: JSON.stringify(nextProgress),
-            });
+            await transaction.set(
+                progressKey(identity.playerId),
+                JSON.stringify(nextProgress),
+            );
             await transaction.hSet(entryHashKey(stage.raceId), {
                 [identity.playerId]: JSON.stringify(entry),
             });

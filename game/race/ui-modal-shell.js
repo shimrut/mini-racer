@@ -929,6 +929,7 @@ export class ModalShell {
         if (!this.modal || !this.modalCombinedView) return;
 
         this.cancelPendingModalClose();
+        this._combinedResultsLapData = lapData;
 
         this.content.renderCombinedResults(this.modalCombinedView, {
             time: lapData.lapTime,
@@ -1083,6 +1084,33 @@ export class ModalShell {
      *   shareRequest?: { kind: string, challengeId: string }|null,
      * }} params
      */
+    /**
+     * Repaints the hero medal on a finish that is already open. Campaign uses
+     * this to drop a medal the server refused, so the sheet never implies a
+     * stage unlock that never happened.
+     */
+    setCombinedWinMedal(lapMedal) {
+        if (!this.modalCombinedView?.classList.contains('active-view')) return;
+        const lapData = this._combinedResultsLapData;
+        if (!lapData || (lapData.lapMedal ?? null) === (lapMedal ?? null)) return;
+        lapData.lapMedal = lapMedal ?? null;
+        this.content.renderCombinedMedalOverlay(
+            this.modalCombinedView.querySelector('#combined-hero-medal'),
+            {
+                trackKey: lapData.trackKey || this.getCurrentTrackKey(),
+                lapTimeSec: lapData.lapTime,
+                lapMedal: lapData.lapMedal,
+                challengeFinish: Boolean(lapData.challengeFinish),
+                challengeConfirmPhase: lapData.challengeConfirmPhase ?? null,
+                challengeConfirmStatus: lapData.challengeConfirmStatus ?? null,
+                challengeConfirmError: lapData.challengeConfirmError ?? null,
+                previousPersonalBestSec: lapData.previousPersonalBestSec,
+                previousTrackMedal: lapData.previousTrackMedal ?? null,
+                lapCount: lapData.requiredLaps ?? lapData.completedLaps ?? 1,
+            },
+        );
+    }
+
     updateChallengeFinishHero({
         phase,
         statusText = null,

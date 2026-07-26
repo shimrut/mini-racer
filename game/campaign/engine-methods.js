@@ -212,30 +212,6 @@ export const campaignEngineMethods = {
         return this.campaignLobbyState;
     },
 
-    showHomeLobby() {
-        if (this.status !== 'ready' || this.currentChallengeRun) {
-            this.reset(false, { showStartOverlay: false });
-        }
-        this.activeRaceMode = 'home';
-        this.activeCampaignStage = null;
-        this.activeCampaignChallenge = null;
-        this.clearDailyChallengeRun();
-        this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-        this.lobbyUi.showHome();
-        this.resetCanvasPresentation();
-    },
-
-    showDailyLobby() {
-        if (this.status !== 'ready' || this.currentChallengeRun) {
-            this.reset(false, { showStartOverlay: false });
-        }
-        this.activeRaceMode = 'daily';
-        this.activeCampaignStage = null;
-        this.activeCampaignChallenge = null;
-        this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-        this.lobbyUi.showDaily();
-    },
-
     showCampaignLobby() {
         this.activeCampaignStage = null;
         this.activeCampaignChallenge = null;
@@ -410,22 +386,6 @@ export const campaignEngineMethods = {
         } finally {
             this.startButtonPending = false;
         }
-    },
-
-    handleActiveRaceLapCompleted(lapTime, details) {
-        this.handleDailyChallengeLapCompleted(lapTime, details);
-    },
-
-    handleActiveRaceWin(winData) {
-        if (this.activeRaceMode === 'campaign') {
-            void this.handleCampaignWin(winData);
-            return;
-        }
-        if (this.activeRaceMode === 'challenge') {
-            void this.handleCampaignChallengeWin(winData);
-            return;
-        }
-        this.handleDailyChallengeWin(winData);
     },
 
     handleInvalidCampaignWin(reason = 'Finish could not be verified.') {
@@ -661,6 +621,11 @@ export const campaignEngineMethods = {
 
         const error = response.body?.error || 'This run could not be verified.';
         markCampaignVerificationError(raceId, error);
+        // Campaign medals are the unlock gate, and this run earned none, so the
+        // open finish sheet must stop advertising one.
+        if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
+            this.modal.setCombinedWinMedal?.(null);
+        }
         this.updateCampaignFinishSnapshot(
             raceId,
             campaignErrorSnapshot(entry.bestTime, error),
@@ -822,25 +787,6 @@ export const campaignEngineMethods = {
             }
             this.modal.updateChallengeFinishHero?.({ phase: 'lost' });
         })();
-    },
-
-    restartActiveRace() {
-        if (this.activeRaceMode === 'daily') {
-            this.restartDailyChallenge({ reason: 'restart' });
-            return;
-        }
-        if (!this.currentChallengeRun) return;
-        void this.journeys?.endAttempt?.({ complete: false });
-        void this.journeys?.startAttempt?.({ reason: 'restart' });
-        this.reset(true, { preserveDailyChallenge: true, showStartOverlay: false });
-    },
-
-    returnToActiveLobby() {
-        if (this.activeRaceMode === 'campaign') return this.showCampaignLobby();
-        if (this.activeRaceMode === 'challenge') {
-            return this.loadChallengeLobby(this.activeCampaignChallenge?.challengeId);
-        }
-        return this.showDailyLobby();
     },
 
     async openCampaignStandings(stageLike = null) {

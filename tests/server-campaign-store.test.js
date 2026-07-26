@@ -38,6 +38,7 @@ function createTransaction() {
         multi: vi.fn(async () => {}),
         unwatch: vi.fn(async () => {}),
         del: vi.fn(async (...args) => commands.push(() => mockRedis.del(...args))),
+        set: vi.fn(async (...args) => commands.push(() => mockRedis.set(...args))),
         hSet: vi.fn(async (...args) => commands.push(() => mockRedis.hSet(...args))),
         zAdd: vi.fn(async (...args) => commands.push(() => mockRedis.zAdd(...args))),
         exec: vi.fn(async () => {
@@ -127,7 +128,25 @@ describe('Campaign server store', () => {
         });
         expect(submission).toMatchObject({ status: 401, body: { accepted: false } });
         expect(mockRedis.hSet).not.toHaveBeenCalled();
+        expect(mockRedis.set).not.toHaveBeenCalled();
         expect(mockRedis.zAdd).not.toHaveBeenCalled();
+    });
+
+    it('keeps each player progress in its own key rather than one campaign hash', async () => {
+        const { startServerCampaignRace, getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+        await startServerCampaignRace({ raceId: 'numbered-v1-00', redditUsername: 'RaceFan' });
+        await startServerCampaignRace({ raceId: 'numbered-v1-00', redditUsername: 'OtherRacer' });
+
+        const progressKeys = [...strings.keys()].filter((key) => key.includes(':progress'));
+        expect(progressKeys).toHaveLength(2);
+        expect(new Set(progressKeys).size).toBe(2);
+        // Progress must never be a field inside one shared, unbounded hash.
+        expect([...hashes.keys()].some((key) => key.endsWith(':progress'))).toBe(false);
+
+        const first = await getServerCampaignBootstrap({ redditUsername: 'RaceFan' });
+        const second = await getServerCampaignBootstrap({ redditUsername: 'OtherRacer' });
+        expect(first.body.progress.startedAt).toEqual(expect.any(String));
+        expect(second.body.progress.startedAt).toEqual(expect.any(String));
     });
 
     it('persists Campaign start once so an unfinished run resumes as Continue', async () => {

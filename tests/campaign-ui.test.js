@@ -195,6 +195,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 showModal: vi.fn(),
                 updateModalScoreboardSnapshot: vi.fn(),
                 matchesModalScoreboardContext: vi.fn(() => true),
+                setCombinedWinMedal: vi.fn(),
             },
             restartActiveRace: vi.fn(),
             showCampaignLobby: vi.fn(),
@@ -395,6 +396,29 @@ describe('Campaign lobby and shared modal adapters', () => {
                 verificationState: 'error',
                 statusText: 'Campaign race was not completed.',
             }),
+        );
+        // No progression was written, so the sheet must not still show a medal.
+        expect(context.modal.setCombinedWinMedal).toHaveBeenCalledWith(null);
+    });
+
+    it('keeps the medal while a refused run is still being retried', async () => {
+        const context = createCampaignFinishContext();
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: false,
+            status: 503,
+            body: { accepted: false, error: 'Service unavailable.' },
+        });
+
+        await context.processCampaignVerificationEntry({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime: 8.25,
+            replay: { revision: 1, segments: [] },
+        });
+
+        expect(context.modal.setCombinedWinMedal).not.toHaveBeenCalled();
+        expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(
+            expect.objectContaining({ submissionStage: 'retrying' }),
         );
     });
 

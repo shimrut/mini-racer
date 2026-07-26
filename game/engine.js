@@ -41,6 +41,7 @@ import { raceEngineMethods } from "./race/engine-methods.js";
 import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
 import { campaignEngineMethods } from "./campaign/engine-methods.js";
+import { modeRouterEngineMethods } from "./modes/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
 import { createProceduralMusic } from "./audio/procedural-music.js";
@@ -641,4 +642,6 @@ Object.assign(
   dailyChallengeEngineMethods,
   scoreboardEngineMethods,
   campaignEngineMethods,
+  // Routing dispatches across every mode above, so it is applied last.
+  modeRouterEngineMethods,
 );
