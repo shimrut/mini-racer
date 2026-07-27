@@ -47,7 +47,25 @@ describe('lobby service', () => {
         expect(state.progressLabel).toBe('1 / 3 Gold');
     });
 
-    it('removes the campaign CTA only when every stage is Gold or Author', () => {
+    it('withholds the campaign CTA until the progress it names is known', () => {
+        const pending = normalizeCampaignLobbyState({
+            resolved: false,
+            stages: [{ id: 'zero', unlocked: true }],
+        });
+
+        // Guessing here is what made the button flash Start before Continue.
+        expect(pending.resolved).toBe(false);
+        expect(pending.primaryLabel).toBeNull();
+        expect(pending.nextStage.id).toBe('zero');
+
+        const resolved = normalizeCampaignLobbyState({
+            stages: [{ id: 'zero', unlocked: true }],
+        });
+        expect(resolved.resolved).toBe(true);
+        expect(resolved.primaryLabel).toBe('Start Campaign');
+    });
+
+    it('turns the campaign CTA into Complete once every stage is Gold or Author', () => {
         const state = normalizeCampaignLobbyState({
             stages: [
                 { unlocked: true, medal: 'Gold' },
@@ -56,8 +74,10 @@ describe('lobby service', () => {
         });
 
         expect(state.complete).toBe(true);
-        expect(state.primaryLabel).toBeNull();
+        expect(state.primaryLabel).toBe('Complete');
         expect(state.progressLabel).toBe('2 / 2 Gold');
+        // Re-normalizing a painted state must not drift the label back.
+        expect(normalizeCampaignLobbyState(state).primaryLabel).toBe('Complete');
     });
 
     it('blocks guests from accepting a player challenge', () => {

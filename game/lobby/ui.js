@@ -77,7 +77,10 @@ export class LobbyUi {
         document.getElementById('campaign-tracks-btn')
             ?.addEventListener('click', () => this.onOpenCampaignTracks?.());
         this.campaignPrimaryBtn?.addEventListener('click', () => {
-            if (this.campaignState.complete) return;
+            if (this.campaignState.complete) {
+                this.onOpenCampaignTracks?.();
+                return;
+            }
             // Resolve the continue stage after bootstrap is ready — do not pass a stale stage.
             this.onStartCampaign?.();
         });
@@ -257,9 +260,12 @@ export class LobbyUi {
 
     renderCampaign() {
         if (this.campaignPrimaryBtn) {
-            this.campaignPrimaryBtn.hidden = this.campaignState.complete;
-            this.campaignPrimaryBtn.disabled = this.campaignState.complete
-                || (!this.campaignState.nextStage && !this._campaignPrimaryLoading);
+            // A finished campaign keeps the primary action: it reads Complete and
+            // opens Tracks so every stage stays one press away.
+            this.campaignPrimaryBtn.hidden = false;
+            this.campaignPrimaryBtn.disabled = !this.campaignState.complete
+                && !this.campaignState.nextStage
+                && !this._campaignPrimaryLoading;
             setText(
                 this.campaignPrimaryBtn.querySelector('.main-menu__label'),
                 this.campaignState.primaryLabel || (this._campaignPrimaryLoading ? 'Loading' : ''),

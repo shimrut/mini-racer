@@ -137,8 +137,13 @@ flowchart LR
   a rejected or interrupted confirmation updates that sheet instead of showing
   a separate saving modal. Campaign finish also paints RANK immediately while
   submitting, then replaces it with the stage leaderboard place after
-  confirmation. Follow-up PB ghost and lobby refreshes also stay in
-  the background. Campaign client requests abort after 20 seconds so a stalled
+  confirmation. Starting a signed-in Campaign stage begins the lights as soon
+  as its track is ready: race-start bookkeeping and the stage PB ghost fetch
+  run concurrently in the background, with submission re-validating the
+  unlock. The lobby keeps its primary action pending until bootstrap resolves
+  rather than briefly guessing Start or Continue; a completed Campaign keeps a
+  Complete primary action that opens Tracks. Follow-up PB ghost and lobby
+  refreshes also stay in the background. Campaign client requests abort after 20 seconds so a stalled
   WebView request is terminal. Guest Campaign progress is browser-local.
   Campaign uses the same compact lobby actions and modal shells as Daily:
   Standings selects among unlocked stage-specific leaderboards, while Tracks

@@ -1180,6 +1180,7 @@ export class ModalShell {
         selectedLeaderboardDayId = null,
         onSelectLeaderboardDay = null,
         onLoadMoreLeaderboard = null,
+        onOpenStandings = null,
         showGlobalLeaderboard = true,
         allowLeaderboardOpen = true,
         onClose = null
@@ -1227,6 +1228,7 @@ export class ModalShell {
             selectedLeaderboardDayId,
             onSelectLeaderboardDay,
             onLoadMoreLeaderboard,
+            onOpenStandings,
             showGlobalLeaderboard,
             allowLeaderboardOpen
         }, {
@@ -1801,6 +1803,13 @@ export class ModalShell {
     }
 
     showModalLeaderboardPayload() {
+        // Non-Daily finishes own their standings screen: the challenge id in the
+        // payload is only meaningful to the mode that put it there.
+        if (typeof this._modalRunsPayload?.onOpenStandings === 'function') {
+            this._modalRunsPayload.onOpenStandings();
+            return;
+        }
+
         if (this._modalRunsPayload?.scoreboardChallengeId) {
             void this.getLeaderboards()?.openDailyChallengeLeaderboardForChallenge?.({
                 id: this._modalRunsPayload.scoreboardChallengeId,

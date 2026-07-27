@@ -227,6 +227,7 @@ describe('result-flow helpers', () => {
 
         const onSelect = () => {};
         const onLoadMore = () => {};
+        const onOpenStandings = () => {};
         const primaryAction = () => {};
         expect(buildModalRunsViewOptions({
             scoreboardChallengeId: 'daily-1',
@@ -239,6 +240,7 @@ describe('result-flow helpers', () => {
             selectedLeaderboardDayId: 'a',
             onSelectLeaderboardDay: onSelect,
             onLoadMoreLeaderboard: onLoadMore,
+            onOpenStandings,
             primaryActionLabel: 'Go',
             primaryAction,
             showGlobalLeaderboard: false,
@@ -254,6 +256,7 @@ describe('result-flow helpers', () => {
             selectedLeaderboardDayId: 'a',
             onSelectLeaderboardDay: onSelect,
             onLoadMoreLeaderboard: onLoadMore,
+            onOpenStandings,
             primaryActionLabel: 'Go',
             primaryAction,
             showGlobalLeaderboard: false,
@@ -264,6 +267,7 @@ describe('result-flow helpers', () => {
             leaderboardDayOptions: 'nope',
             onSelectLeaderboardDay: 'nope',
             onLoadMoreLeaderboard: 7,
+            onOpenStandings: 'nope',
             primaryAction: 7,
             showGlobalLeaderboard: undefined,
             allowLeaderboardOpen: undefined
@@ -272,6 +276,7 @@ describe('result-flow helpers', () => {
             leaderboardDayOptions: null,
             onSelectLeaderboardDay: null,
             onLoadMoreLeaderboard: null,
+            onOpenStandings: null,
             primaryAction: null,
             showGlobalLeaderboard: true,
             allowLeaderboardOpen: true
@@ -579,6 +584,7 @@ describe('result-flow helpers', () => {
             selectedLeaderboardDayId: null,
             onSelectLeaderboardDay: null,
             onLoadMoreLeaderboard: null,
+            onOpenStandings: null,
             primaryActionLabel: null,
             primaryAction: null,
             showGlobalLeaderboard: false,
@@ -604,6 +610,7 @@ describe('result-flow helpers', () => {
             selectedLeaderboardDayId: null,
             onSelectLeaderboardDay: null,
             onLoadMoreLeaderboard: null,
+            onOpenStandings: null,
             primaryActionLabel: null,
             primaryAction: null,
             showGlobalLeaderboard: true,
@@ -629,6 +636,7 @@ describe('result-flow helpers', () => {
             selectedLeaderboardDayId: null,
             onSelectLeaderboardDay: null,
             onLoadMoreLeaderboard: null,
+            onOpenStandings: null,
             primaryActionLabel: null,
             primaryAction: null,
             showGlobalLeaderboard: true,
@@ -651,6 +659,7 @@ describe('result-flow helpers', () => {
             selectedLeaderboardDayId: null,
             onSelectLeaderboardDay: null,
             onLoadMoreLeaderboard: null,
+            onOpenStandings: null,
             primaryActionLabel: null,
             primaryAction: null,
             showGlobalLeaderboard: true,

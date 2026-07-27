@@ -722,6 +722,29 @@ describe('ui modal runs helpers', () => {
         expect(showTrackLeaderboardModal).toHaveBeenLastCalledWith('circuit', 'back');
     });
 
+    it('lets a finish supply its own standings screen instead of the Daily one', () => {
+        const openDailyChallengeLeaderboardForChallenge = vi.fn();
+        const showTrackLeaderboardModal = vi.fn();
+        const onOpenStandings = vi.fn();
+
+        showModalLeaderboardPayload.call({
+            _modalRunsPayload: {
+                scoreboardChallengeId: 'numbered-v1-03',
+                scoreboardTrackKey: 'circuit',
+                scoreboardSnapshot: { playerRankLabel: '#3' },
+                onOpenStandings,
+            },
+            getLeaderboards: () => ({
+                openDailyChallengeLeaderboardForChallenge,
+                showTrackLeaderboardModal,
+            })
+        });
+
+        expect(onOpenStandings).toHaveBeenCalledTimes(1);
+        expect(openDailyChallengeLeaderboardForChallenge).not.toHaveBeenCalled();
+        expect(showTrackLeaderboardModal).not.toHaveBeenCalled();
+    });
+
     it('keeps the player rank in the header summary and moves time under the track name', () => {
         const originalDocument = global.document;
         const header = createTestElement('header');

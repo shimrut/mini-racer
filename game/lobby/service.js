@@ -79,20 +79,27 @@ export function normalizeCampaignLobbyState(state = {}) {
     )) || stages.find((stage) => stage.unlocked) || null;
     const hasProgress = Boolean(state.startedAt)
         || stages.some((stage) => stage.bestTimeMs !== null || stage.medal);
+    // A provisional paint knows the stage list but not whose progress it is, and
+    // "Start" vs "Continue" is exactly the part it would get wrong. Leaving the
+    // label unset lets the lobby show its pending state instead of guessing.
+    const resolved = state.resolved !== false;
 
     return {
         ...state,
+        resolved,
         stages,
         complete: completed,
         goldCount,
         progressLabel: typeof state.progressLabel === 'string'
             ? state.progressLabel
             : `${goldCount} / ${stages.length} Gold`,
-        primaryLabel: completed
+        primaryLabel: !resolved
             ? null
-            : (typeof state.primaryLabel === 'string'
-                ? state.primaryLabel
-                : (hasProgress ? 'Continue Campaign' : 'Start Campaign')),
+            : (completed
+                ? 'Complete'
+                : (typeof state.primaryLabel === 'string'
+                    ? state.primaryLabel
+                    : (hasProgress ? 'Continue Campaign' : 'Start Campaign'))),
         nextStage,
     };
 }

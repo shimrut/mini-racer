@@ -161,6 +161,10 @@ export const campaignEngineMethods = {
             && this.lobbyUi?.getMode?.() === 'campaign'
         ) {
             this.lobbyUi.showCampaign(this.campaignLobbyState);
+            // A press owns the spinner until its own start finishes.
+            if (!this.startButtonPending) {
+                this.lobbyUi.setCampaignPrimaryLoading?.(false);
+            }
         }
         return this.campaignLobbyState;
     },
@@ -171,9 +175,14 @@ export const campaignEngineMethods = {
         }
         this.activeRaceMode = 'campaign';
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-        this.campaignLobbyState = normalizeCampaignLobbyState(state);
+        this.campaignLobbyState = normalizeCampaignLobbyState({
+            ...state,
+            resolved: Boolean(bootstrapReady),
+        });
         this.lobbyUi.showCampaign(this.campaignLobbyState);
-        this.lobbyUi.setCampaignPrimaryLoading?.(false);
+        // Until the server answers, the primary action is unknown rather than
+        // "Start": showing it as pending is what keeps the label from flipping.
+        this.lobbyUi.setCampaignPrimaryLoading?.(!bootstrapReady);
         this._campaignBootstrapReady = Boolean(bootstrapReady);
     },
 
@@ -297,10 +306,9 @@ export const campaignEngineMethods = {
     async startCampaignStage(stageLike = null) {
         if (this.startButtonPending) return;
         this.startButtonPending = true;
-        const needsBootstrapWait = !this._campaignBootstrapReady;
-        if (needsBootstrapWait) {
-            this.lobbyUi?.setCampaignPrimaryLoading?.(true);
-        }
+        // The whole start is a wait, not just the bootstrap leg: without this the
+        // button sits dead through a track load and reads as a freeze.
+        this.lobbyUi?.setCampaignPrimaryLoading?.(true);
         try {
             await this.ensureCampaignBootstrap();
             if (this.activeRaceMode !== 'campaign') return;
@@ -319,15 +327,24 @@ export const campaignEngineMethods = {
             );
             if (!stage) return;
 
-            if (this.campaignBootstrap?.signedIn) {
-                const started = await startServerCampaignRace(stage.raceId);
-                if (!started.ok) throw new Error(started.body?.error || 'Could not start this Campaign race.');
-                if (started.body?.progress) {
-                    this.campaignBootstrap.progress = started.body.progress;
-                }
-            } else {
-                startLocalCampaign();
-            }
+            const signedIn = this.campaignBootstrap?.signedIn === true;
+            // Same shape as Daily: nothing on the wire gates the countdown. Both
+            // requests go out now and are folded in once the lights are running,
+            // so the player waits for the track load and nothing else.
+            const startRequest = signedIn
+                ? startServerCampaignRace(stage.raceId).catch((error) => {
+                    console.warn('Could not stamp the Campaign race start:', error);
+                    return null;
+                })
+                : null;
+            const ghostRequest = signedIn
+                ? getCampaignPbGhost(stage.raceId).catch((error) => {
+                    console.warn('Campaign PB ghost was unavailable for this run:', error);
+                    return null;
+                })
+                : null;
+            if (!signedIn) startLocalCampaign();
+
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
             this.activeCampaignChallenge = null;
@@ -339,39 +356,92 @@ export const campaignEngineMethods = {
                     showStartOverlayOnReset: false,
                 });
             }
-            if (this.campaignBootstrap?.signedIn) {
-                const ghost = await getCampaignPbGhost(stage.raceId);
-                const personalBest = ghost.ok ? ghost.body?.personalBest : null;
-                if (personalBest?.ghost) this.pbGhost.prepare(personalBest);
-                this.bestLapTime = Number(personalBest?.bestTimeMs) > 0
-                    ? Number(personalBest.bestTimeMs) / 1000
-                    : null;
-                if (this.bestLapTime) {
-                    this.trackPersonalBestByTrackKey[stage.raceId] = {
-                        challengeId: stage.raceId,
-                        trackKey: stage.trackKey,
-                        bestTime: this.bestLapTime,
-                        checkpointTimesSec: personalBest?.checkpointTimesSec ?? null,
-                        ghostAvailable: Boolean(personalBest?.ghost),
-                        updatedAt: personalBest?.updatedAt ?? null,
-                    };
-                } else {
-                    delete this.trackPersonalBestByTrackKey[stage.raceId];
-                }
-            }
             this.applyDailyChallenge(toRaceChallenge(stage));
             this.activeRaceMode = 'campaign';
             void this.journeys?.startAttempt?.({ reason: 'initial_start' });
             this.startSequence();
+
+            if (startRequest) void this.confirmCampaignRaceStart(stage, startRequest);
+            if (ghostRequest) {
+                void ghostRequest.then((response) => {
+                    // A dropped request leaves whatever was already cached alone;
+                    // only an answer from the server rewrites the personal best.
+                    if (!response) return;
+                    this.applyCampaignPersonalBest(
+                        stage,
+                        response.ok ? response.body?.personalBest : null,
+                    );
+                });
+            }
         } catch (error) {
             console.error('Could not start Campaign race:', error);
             await this.loadCampaignLobby({ show: true });
         } finally {
-            if (needsBootstrapWait) {
-                this.lobbyUi?.setCampaignPrimaryLoading?.(false);
-            }
+            this.lobbyUi?.setCampaignPrimaryLoading?.(false);
             this.startButtonPending = false;
         }
+    },
+
+    /**
+     * Records the server-side race start without holding up the lights.
+     *
+     * The stamp only drives progress bookkeeping — submission re-validates the
+     * unlock on its own — so a dropped request lets the run continue and rank
+     * normally. Only an outright refusal means the stage was never raceable,
+     * and that sends the player back to a refreshed lobby.
+     */
+    async confirmCampaignRaceStart(stage, startRequest) {
+        const started = await startRequest;
+        if (!started) return;
+        if (started.ok) {
+            if (this.campaignBootstrap && started.body?.progress) {
+                this.campaignBootstrap.progress = started.body.progress;
+            }
+            return;
+        }
+        console.error(
+            'Could not start Campaign race:',
+            started.body?.error || 'Could not start this Campaign race.',
+        );
+        if (this.activeCampaignStage?.raceId !== stage.raceId) return;
+        await this.loadCampaignLobby({ show: true });
+    },
+
+    /**
+     * Folds a Campaign personal best into the run that is already counting down.
+     *
+     * The ghost only has to be prepared before GO to race against; a slower
+     * response just means this attempt runs without one.
+     */
+    applyCampaignPersonalBest(stage, personalBest) {
+        if (this.activeCampaignStage?.raceId !== stage.raceId) return;
+        const bestTimeMs = Number(personalBest?.bestTimeMs);
+        if (!(bestTimeMs > 0)) {
+            delete this.trackPersonalBestByTrackKey[stage.raceId];
+            if (this.activeDailyChallenge?.id !== stage.raceId) return;
+            this.trackPersonalBestResult = null;
+            this.bestLapTime = null;
+            this.syncChallengeHudPrimaryStats?.();
+            return;
+        }
+        if (personalBest?.ghost) this.pbGhost.prepare(personalBest);
+        const bestTime = bestTimeMs / 1000;
+        const trackPersonalBest = {
+            challengeId: stage.raceId,
+            trackKey: stage.trackKey,
+            bestTime,
+            checkpointTimesSec: personalBest?.checkpointTimesSec ?? null,
+            ghostAvailable: Boolean(personalBest?.ghost),
+            updatedAt: personalBest?.updatedAt ?? null,
+        };
+        this.trackPersonalBestByTrackKey[stage.raceId] = trackPersonalBest;
+        // applyDailyChallenge already ran off whatever was cached, so the HUD and
+        // medal baseline have to be re-derived from the fresh best.
+        if (this.activeDailyChallenge?.id !== stage.raceId) return;
+        this.trackPersonalBestResult = trackPersonalBest;
+        this.bestLapTime = bestTime;
+        this.syncTrackMedalFromChallengeBest?.(this.activeDailyChallenge, bestTime);
+        this.syncChallengeHudPrimaryStats?.();
     },
 
     async loadChallengeLobby(challengeId = null) {
@@ -500,6 +570,11 @@ export const campaignEngineMethods = {
                 scoreboardTrackKey: stage.trackKey,
                 showGlobalLeaderboard: false,
                 allowLeaderboardOpen: true,
+                // Campaign stages rank against their own board, so the rank tap
+                // must not fall through to the Daily standings.
+                onOpenStandings: () => void this.openCampaignStandings(stage.raceId, {
+                    returnMode: 'back',
+                }),
             },
             {
                 ...createModalActions({
@@ -845,7 +920,7 @@ export const campaignEngineMethods = {
         })();
     },
 
-    async openCampaignStandings(stageLike = null) {
+    async openCampaignStandings(stageLike = null, { returnMode = 'close' } = {}) {
         await this.ensureCampaignBootstrap();
         if (this.activeRaceMode !== 'campaign') return;
 
@@ -909,7 +984,7 @@ export const campaignEngineMethods = {
             leaderboardDayOptions: leaderboardOptions,
             leaderboardRailLabel: 'Campaign stages',
             selectedLeaderboardDayId: stage.raceId,
-            onSelectLeaderboardDay: (raceId) => void this.openCampaignStandings(raceId),
+            onSelectLeaderboardDay: (raceId) => void this.openCampaignStandings(raceId, { returnMode }),
             onLoadMoreLeaderboard,
             showGlobalLeaderboard: true,
             allowLeaderboardOpen: false,
@@ -917,7 +992,7 @@ export const campaignEngineMethods = {
                 this._campaignStandingsRequestId = (this._campaignStandingsRequestId || 0) + 1;
             },
         };
-        this.modal.showRunsModal(null, null, null, 'close', modalOptions);
+        this.modal.showRunsModal(null, null, null, returnMode, modalOptions);
 
         try {
             const response = await getCampaignSnapshot(stage.raceId, { limit: 50, offset: 0 });

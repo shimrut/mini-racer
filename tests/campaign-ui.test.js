@@ -369,6 +369,22 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.processVerificationQueue).toHaveBeenCalled();
     });
 
+    it('sends the finish rank tap to Campaign standings, not the Daily leaderboard', () => {
+        const context = createCampaignFinishContext({
+            openCampaignStandings: vi.fn(),
+        });
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        const lapData = context.modal.showModal.mock.calls[0][2];
+        expect(typeof lapData.onOpenStandings).toBe('function');
+        lapData.onOpenStandings();
+        expect(context.openCampaignStandings).toHaveBeenCalledWith(
+            'numbered-v1-00',
+            { returnMode: 'back' },
+        );
+    });
+
     it('rejects a finish that fails win validation without submitting or scoring it', () => {
         const context = createCampaignFinishContext({
             getInvalidWinDataReason: vi.fn(() => 'Checkpoint count did not match the loaded track.'),
@@ -941,6 +957,43 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
+    it('keeps a Complete primary that opens Tracks once every stage is Gold', () => {
+        const originalDocument = global.document;
+        const label = createElement('span');
+        label.className = 'main-menu__label';
+        const primary = createElement('button');
+        primary.children.push(label);
+        global.document = {
+            getElementById: (id) => (id === 'campaign-primary-btn' ? primary : null),
+            querySelector: () => null,
+            addEventListener: vi.fn(),
+            createElement,
+        };
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        global.requestAnimationFrame = vi.fn();
+        const onStartCampaign = vi.fn();
+        const onOpenCampaignTracks = vi.fn();
+        const lobby = new LobbyUi({ onStartCampaign, onOpenCampaignTracks });
+
+        lobby.bind();
+        lobby.showCampaign({
+            stages: [
+                { id: 'numbered-v1-00', unlocked: true, medal: 'Gold' },
+                { id: 'numbered-v1-01', unlocked: true, medal: 'Author' },
+            ],
+        });
+
+        expect(primary.hidden).toBe(false);
+        expect(primary.disabled).toBe(false);
+        expect(label.textContent).toBe('Complete');
+
+        primary.listeners.get('click')();
+        expect(onOpenCampaignTracks).toHaveBeenCalledTimes(1);
+        expect(onStartCampaign).not.toHaveBeenCalled();
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.document = originalDocument;
+    });
+
     it('renders Campaign progress inside the existing Tracks list', () => {
         const originalDocument = global.document;
         const list = createElement();
@@ -1043,6 +1096,41 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
             expect.objectContaining({ topRows: [], totalCount: 0 }),
         );
+    });
+
+    it('keeps a Back route to the finish sheet when standings open from it', async () => {
+        campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
+            ok: true,
+            body: { rows: [], currentPlayerRow: null, totalCount: 0 },
+        });
+        const modal = {
+            showRunsModal: vi.fn(),
+            isRunsViewActive: vi.fn(() => true),
+            updateModalScoreboardSnapshot: vi.fn(),
+        };
+        const context = {
+            ...campaignEngineMethods,
+            campaignLobbyState: campaignState(),
+            modal,
+            _campaignStandingsRequestId: 0,
+            activeRaceMode: 'campaign',
+            ensureCampaignBootstrap: vi.fn().mockResolvedValue({}),
+        };
+
+        await campaignEngineMethods.openCampaignStandings.call(
+            context,
+            'numbered-v1-00',
+            { returnMode: 'back' },
+        );
+
+        expect(modal.showRunsModal.mock.calls[0][3]).toBe('back');
+        // Switching stages from that screen must not lose the way back.
+        const { onSelectLeaderboardDay } = modal.showRunsModal.mock.calls[0][4];
+        onSelectLeaderboardDay('numbered-v1-01');
+        await vi.waitFor(() => {
+            expect(modal.showRunsModal).toHaveBeenCalledTimes(2);
+        });
+        expect(modal.showRunsModal.mock.calls[1][3]).toBe('back');
     });
 
     it('loads later rows from the selected stage leaderboard only', async () => {
@@ -1230,6 +1318,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.activeRaceMode).toBe('campaign');
         expect(context._campaignBootstrapReady).toBe(false);
         expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(1);
+        // The provisional paint must not name a primary action it cannot know.
+        expect(lobbyUi.showCampaign.mock.calls[0][0].primaryLabel).toBeNull();
+        expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenLastCalledWith(true);
 
         resolveBootstrap({
             campaignId: 'numbered-v1',
@@ -1269,6 +1360,38 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.campaignBootstrap.signedIn).toBe(true);
         expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(2);
         expect(lobbyUi.showCampaign.mock.calls[1][0].primaryLabel).toBe('Continue Campaign');
+        expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenLastCalledWith(false);
+    });
+
+    it('leaves the primary spinner to a start that is already running', async () => {
+        const lobbyUi = {
+            showCampaign: vi.fn(),
+            getMode: vi.fn(() => 'campaign'),
+            setCampaignPrimaryLoading: vi.fn(),
+        };
+        const context = {
+            ...campaignEngineMethods,
+            activeRaceMode: 'campaign',
+            // A press is mid-flight: it owns the spinner until its own start ends.
+            startButtonPending: true,
+            lobbyUi,
+        };
+
+        context.applyCampaignLobbyBootstrap({
+            campaignId: 'numbered-v1',
+            signedIn: true,
+            stages: [{
+                raceId: 'numbered-v1-00',
+                stageIndex: 0,
+                stageNumber: '00',
+                trackKey: 'numberZero',
+                lapCount: 1,
+            }],
+            progress: { resultsByRaceId: {}, unlockedRaceIds: ['numbered-v1-00'], complete: false },
+        }, { paint: true });
+
+        expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(1);
+        expect(lobbyUi.setCampaignPrimaryLoading).not.toHaveBeenCalled();
     });
 
     it('waits for bootstrap and uses the server path when Start is pressed early', async () => {
@@ -1328,6 +1451,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             loadCampaignLobby: vi.fn(),
             applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
             ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+            confirmCampaignRaceStart: campaignEngineMethods.confirmCampaignRaceStart,
+            applyCampaignPersonalBest: campaignEngineMethods.applyCampaignPersonalBest,
         };
 
         const startPromise = campaignEngineMethods.startCampaignStage.call(context);
@@ -1355,6 +1480,122 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(campaignServiceMocks.startLocalCampaign).not.toHaveBeenCalled();
         expect(context.startSequence).toHaveBeenCalledTimes(1);
         expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenCalledWith(false);
+        expect(context.loadCampaignLobby).not.toHaveBeenCalled();
+    });
+
+    function createStartContext(overrides = {}) {
+        return {
+            ...campaignEngineMethods,
+            status: 'ready',
+            currentChallengeRun: null,
+            activeRaceMode: 'campaign',
+            startButtonPending: false,
+            _campaignBootstrapReady: true,
+            campaignBootstrap: { signedIn: true, progress: {} },
+            campaignLobbyState: {
+                complete: false,
+                nextStage: { id: 'numbered-v1-00' },
+                stages: [{ id: 'numbered-v1-00', unlocked: true }],
+            },
+            currentTrackKey: 'numberZero',
+            pbGhost: { clearTrack: vi.fn(), prepare: vi.fn() },
+            trackPersonalBestByTrackKey: {},
+            bestLapTime: null,
+            activeDailyChallenge: null,
+            journeys: { startAttempt: vi.fn() },
+            lobbyUi: { setCampaignPrimaryLoading: vi.fn() },
+            loadTrack: vi.fn(),
+            applyDailyChallenge: vi.fn(function applyDailyChallenge(challenge) {
+                this.activeDailyChallenge = challenge;
+            }),
+            startSequence: vi.fn(),
+            syncTrackMedalFromChallengeBest: vi.fn(),
+            syncChallengeHudPrimaryStats: vi.fn(),
+            loadCampaignLobby: vi.fn().mockResolvedValue({}),
+            ...overrides,
+        };
+    }
+
+    it('starts the lights without waiting on the start stamp or the PB ghost', async () => {
+        let resolveStart;
+        let resolveGhost;
+        campaignServiceMocks.startServerCampaignRace.mockReturnValue(new Promise((resolve) => {
+            resolveStart = resolve;
+        }));
+        campaignServiceMocks.getCampaignPbGhost.mockReturnValue(new Promise((resolve) => {
+            resolveGhost = resolve;
+        }));
+        const context = createStartContext();
+
+        await context.startCampaignStage();
+
+        // Both requests are already on the wire, and neither held up the race.
+        expect(campaignServiceMocks.startServerCampaignRace).toHaveBeenCalledWith('numbered-v1-00');
+        expect(campaignServiceMocks.getCampaignPbGhost).toHaveBeenCalledWith('numbered-v1-00');
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(context.startButtonPending).toBe(false);
+
+        resolveStart({ ok: true, body: { progress: { startedAt: '2026-07-26T00:00:00.000Z' } } });
+        resolveGhost({
+            ok: true,
+            body: {
+                personalBest: {
+                    bestTimeMs: 9_400,
+                    ghost: { samples: [] },
+                    checkpointTimesSec: [4.2],
+                    updatedAt: '2026-07-26T00:00:00.000Z',
+                },
+            },
+        });
+
+        // The ghost still lands in time to race against, and the HUD catches up.
+        await vi.waitFor(() => {
+            expect(context.pbGhost.prepare).toHaveBeenCalled();
+        });
+        expect(context.bestLapTime).toBe(9.4);
+        expect(context.trackPersonalBestByTrackKey['numbered-v1-00']).toMatchObject({
+            bestTime: 9.4,
+            ghostAvailable: true,
+        });
+        expect(context.syncChallengeHudPrimaryStats).toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(context.campaignBootstrap.progress).toEqual({
+                startedAt: '2026-07-26T00:00:00.000Z',
+            });
+        });
+        expect(context.loadCampaignLobby).not.toHaveBeenCalled();
+    });
+
+    it('sends the player back to the lobby when the server refuses the stage', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({
+            ok: false,
+            status: 403,
+            body: { error: 'Campaign race is locked.' },
+        });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: {} });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const context = createStartContext();
+
+        await context.startCampaignStage();
+
+        await vi.waitFor(() => {
+            expect(context.loadCampaignLobby).toHaveBeenCalledWith({ show: true });
+        });
+    });
+
+    it('lets the run continue when the start stamp cannot be delivered', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockRejectedValue(new Error('offline'));
+        campaignServiceMocks.getCampaignPbGhost.mockRejectedValue(new Error('offline'));
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const context = createStartContext();
+
+        await context.startCampaignStage();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // Bookkeeping is not the gate — submission re-validates the unlock.
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(context.loadCampaignLobby).not.toHaveBeenCalled();
     });
 
     it('does not repaint Campaign after leaving before bootstrap resolves', async () => {

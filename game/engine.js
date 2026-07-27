@@ -630,6 +630,11 @@ export class RealTimeRacer {
       });
     window.setTimeout(() => {
       this.prefetchDailyChallengePlaylist?.();
+      // Warmed here so opening Campaign paints the real primary action instead
+      // of a pending one. Deduped, so a campaign launch target pays nothing.
+      void Promise.resolve(this.ensureCampaignBootstrap?.()).catch((error) => {
+        console.error("Error warming the Campaign lobby:", error);
+      });
     }, 0);
     this.scheduleVerificationQueueProcessing(0);
   }

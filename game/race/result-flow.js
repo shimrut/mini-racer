@@ -327,6 +327,9 @@ export function buildModalRunsPayload(source, {
         onLoadMoreLeaderboard: typeof source.onLoadMoreLeaderboard === 'function'
             ? source.onLoadMoreLeaderboard
             : null,
+        onOpenStandings: typeof source.onOpenStandings === 'function'
+            ? source.onOpenStandings
+            : null,
         primaryActionLabel: source.primaryActionLabel || null,
         primaryAction: typeof source.primaryAction === 'function' ? source.primaryAction : null,
         showGlobalLeaderboard: source.showGlobalLeaderboard !== false,
@@ -385,6 +388,9 @@ export function buildModalRunsViewOptions(payload) {
             : null,
         onLoadMoreLeaderboard: typeof payload.onLoadMoreLeaderboard === 'function'
             ? payload.onLoadMoreLeaderboard
+            : null,
+        onOpenStandings: typeof payload.onOpenStandings === 'function'
+            ? payload.onOpenStandings
             : null,
         primaryActionLabel: payload.primaryActionLabel || null,
         primaryAction: typeof payload.primaryAction === 'function' ? payload.primaryAction : null,
