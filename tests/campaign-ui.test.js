@@ -859,6 +859,24 @@ describe('Campaign lobby and shared modal adapters', () => {
             /id="lobby-campaign-pane"[\s\S]*lobby-pane-heading__title">Campaign</,
         );
 
+        const lobbyCss = readFileSync(
+            new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
+        const responsiveCss = readFileSync(
+            new URL('../styles/responsive-layout.css', import.meta.url),
+            'utf8',
+        );
+        expect(lobbyCss).toMatch(
+            /\.lobby-header\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-start;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.lobby-subhead\s*\{[^}]*margin-top:\s*0\.45rem;/s,
+        );
+        expect(responsiveCss).not.toMatch(
+            /^\s*header\s*\{/m,
+        );
+
         const originalDocument = global.document;
         const subhead = createElement('div');
         subhead.hidden = true;

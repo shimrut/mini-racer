@@ -119,8 +119,10 @@ flowchart LR
   full-width primary Race/Start/Accept button in that same cluster. Daily,
   Campaign, and Challenge mode names (and Daily's track name / Challenge's
   opponent line) sit in a tight `.lobby-subhead` directly under Mini Racer on
-  every viewport. Challenge also shows a compact details panel (track, time to
-  beat) above Accept.
+  every viewport. Desktop responsive rules must not target the generic `header`
+  element because that would override this lobby stack and separate the mode
+  label from the title. Challenge also shows a compact details panel (track,
+  time to beat) above Accept.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
   Number Zero through Nine with fixed `1,1,1,2,2,2,3,3,3,3` laps and Gold/Author
   gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable
