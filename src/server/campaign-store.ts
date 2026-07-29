@@ -29,6 +29,11 @@ import { verifyGuestPlayerToken } from './player-token.js';
 import { submitCompetitionRun } from './competition-submit.js';
 import { getPlayerTrackPbRecord } from './pb-ghost-store.js';
 import { redisCompressed } from '@devvit/redis';
+import {
+    getCarUnlockSnapshot,
+    mergeGuestCarUnlockProgress,
+    recordCompletedRace,
+} from './car-unlock-store.js';
 
 type CampaignMedal = 'bronze' | 'silver' | 'gold' | 'author';
 
@@ -141,6 +146,12 @@ async function readProgress(playerId: string): Promise<CampaignProgress> {
     return parseCampaignProgress(await redis.get(progressKey(playerId)));
 }
 
+export async function getCampaignResultsForCarUnlocks(
+    playerId: string,
+): Promise<CampaignProgress['resultsByRaceId']> {
+    return (await readProgress(playerId)).resultsByRaceId;
+}
+
 function publicProgress(progress: CampaignProgress) {
     const unlockedRaceIds = getCampaignUnlockedRaceIds(progress.resultsByRaceId);
     return {
@@ -206,10 +217,16 @@ export async function getServerCampaignBootstrap({
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
         if (guestPlayerId) {
             try {
-                await mergeGuestCampaignProgress({
-                    guestPlayerId: `guest:${guestPlayerId}`,
-                    redditPlayerId: canonicalPlayerId,
-                });
+                await Promise.all([
+                    mergeGuestCampaignProgress({
+                        guestPlayerId: `guest:${guestPlayerId}`,
+                        redditPlayerId: canonicalPlayerId,
+                    }),
+                    mergeGuestCarUnlockProgress({
+                        guestPlayerId: `guest:${guestPlayerId}`,
+                        redditPlayerId: canonicalPlayerId,
+                    }),
+                ]);
             } catch (error) {
                 // A failed claim must not cost the player their bootstrap; the
                 // guest keys survive, so the next load tries again.
@@ -222,6 +239,9 @@ export async function getServerCampaignBootstrap({
         canonicalPlayerId ? readProgress(canonicalPlayerId) : Promise.resolve(emptyProgress()),
         readCampaignStandingsByRaceId(canonicalPlayerId),
     ]);
+    const carUnlocks = canonicalPlayerId
+        ? await getCarUnlockSnapshot(canonicalPlayerId, progress.resultsByRaceId)
+        : null;
     return {
         status: 200,
         body: {
@@ -234,6 +254,7 @@ export async function getServerCampaignBootstrap({
             stages: CAMPAIGN_STAGES,
             progress: publicProgress(progress),
             standingsByRaceId,
+            carUnlocks,
         },
     };
 }
@@ -411,11 +432,18 @@ export async function submitServerCampaignRun({
         }
     }
 
+    await recordCompletedRace(canonicalPlayerId);
+    const savedProgress = await readProgress(canonicalPlayerId);
+
     return {
         status: 200,
         body: {
             ...outcome.body as Record<string, unknown>,
-            progress: publicProgress(await readProgress(canonicalPlayerId)),
+            progress: publicProgress(savedProgress),
+            carUnlocks: await getCarUnlockSnapshot(
+                canonicalPlayerId,
+                savedProgress.resultsByRaceId,
+            ),
         },
     };
 }

@@ -631,6 +631,45 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     font-size: .62rem;
 }
 
+.garage-skin-option__requirement {
+    min-height: 1.7em;
+    font-family: var(--mono-font);
+    font-size: .52rem;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: .02em;
+    color: #cbd5e1;
+}
+
+.garage-skin-option.is-locked {
+    position: relative;
+    cursor: not-allowed;
+    opacity: .72;
+}
+
+.garage-skin-option.is-locked::after {
+    content: 'LOCKED';
+    position: absolute;
+    top: .55rem;
+    right: .55rem;
+    display: grid;
+    place-items: center;
+    min-width: 2.45rem;
+    height: 1.05rem;
+    padding: 0 .35rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, .9);
+    color: #f8fafc;
+    font-family: var(--mono-font);
+    font-size: .4rem;
+    font-weight: 900;
+    letter-spacing: .05em;
+}
+
+.garage-skin-option.is-locked:hover {
+    background: transparent;
+}
+
 .garage-skin-option.is-selected .garage-skin-option__label,
 .garage-trail-option.is-selected .garage-trail-option__label {
     color: #fecaca;
@@ -782,6 +821,10 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     font-family: var(--header-font);
     font-size: .85rem;
     color: #e2e8f0;
+}
+
+#garage-modal .garage-skin-option__requirement {
+    font-size: .62rem;
 }
 
 #garage-modal .garage-skin-option.is-selected,

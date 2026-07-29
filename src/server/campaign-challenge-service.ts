@@ -28,6 +28,13 @@ import {
     writeCampaignChallengePostIdentity,
     writeCampaignChallengeResult,
 } from './campaign-challenge-store.js';
+import {
+    getCarUnlockSnapshot,
+    recordCompletedRace,
+    recordHeadToHeadPost,
+    recordHeadToHeadWin,
+} from './car-unlock-store.js';
+import { getCampaignResultsForCarUnlocks } from './campaign-store.js';
 import { releaseRedisLock } from './redis-lock.js';
 import {
     isRedditAvatarUrl,
@@ -81,6 +88,23 @@ type PreviewRecord = {
 
 function normalizeName(value: string): string {
     return value.trim().toLowerCase();
+}
+
+function playerIdForUsername(username: string): string {
+    return `reddit:${normalizeName(username)}`;
+}
+
+async function readChallengeCarUnlocks(username: string) {
+    const playerId = playerIdForUsername(username);
+    return getCarUnlockSnapshot(
+        playerId,
+        await getCampaignResultsForCarUnlocks(playerId),
+    );
+}
+
+async function recordChallengePostUnlock(username: string, trackKey: string) {
+    await recordHeadToHeadPost(playerIdForUsername(username), trackKey);
+    return readChallengeCarUnlocks(username);
 }
 
 function previewKey(token: string): string {
@@ -384,10 +408,19 @@ export function createCampaignChallengeService(
             );
             const existing = await activePost(identity);
             if (existing) {
+                const carUnlocks = await recordChallengePostUnlock(
+                    request.username,
+                    source.trackKey,
+                );
                 await redis.del(tokenKey);
                 return {
                     status: 200,
-                    body: { status: 'already_created', challengeId: existing.challengeId, postUrl: existing.postUrl },
+                    body: {
+                        status: 'already_created',
+                        challengeId: existing.challengeId,
+                        postUrl: existing.postUrl,
+                        carUnlocks,
+                    },
                 };
             }
             if (identity) {
@@ -403,10 +436,19 @@ export function createCampaignChallengeService(
             if (recovered) {
                 const challengerAvatarUrl = await resolveRedditAvatarUrl(prepared.username);
                 const saved = await savePost(buildRecord(prepared, challengerAvatarUrl), recovered);
+                const carUnlocks = await recordChallengePostUnlock(
+                    request.username,
+                    saved.trackKey,
+                );
                 await redis.del(tokenKey);
                 return {
                     status: 200,
-                    body: { status: 'already_created', challengeId: saved.challengeId, postUrl: saved.postUrl },
+                    body: {
+                        status: 'already_created',
+                        challengeId: saved.challengeId,
+                        postUrl: saved.postUrl,
+                        carUnlocks,
+                    },
                 };
             }
 
@@ -447,11 +489,20 @@ export function createCampaignChallengeService(
                 postId: post.id as `t3_${string}`,
                 postUrl: post.url,
             });
+            const carUnlocks = await recordChallengePostUnlock(
+                request.username,
+                saved.trackKey,
+            );
             reservedAt = null;
             await redis.del(tokenKey);
             return {
                 status: 200,
-                body: { status: 'created', challengeId: saved.challengeId, postUrl: saved.postUrl },
+                body: {
+                    status: 'created',
+                    challengeId: saved.challengeId,
+                    postUrl: saved.postUrl,
+                    carUnlocks,
+                },
             };
         } catch (error) {
             if (reservedAt) {
@@ -572,6 +623,11 @@ export function createCampaignChallengeService(
 
             const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
             const outcome = differenceMs < 0 ? 'won' : differenceMs === 0 ? 'tie' : 'lost';
+            const playerId = playerIdForUsername(request.username);
+            await recordCompletedRace(playerId);
+            if (outcome === 'won') {
+                await recordHeadToHeadWin(playerId, challengeId);
+            }
             return {
                 status: 200,
                 body: {
@@ -588,6 +644,7 @@ export function createCampaignChallengeService(
                     targetTimeMs: challenge.targetTimeMs,
                     differenceMs,
                     bestResult,
+                    carUnlocks: await readChallengeCarUnlocks(request.username),
                 },
             };
         } finally {

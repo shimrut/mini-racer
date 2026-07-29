@@ -43,6 +43,19 @@ Mini Racer is a **game**, so the most important launch requirements are:
   the next stage, and keep independent permanent standings and PB ghosts.
 - [ ] Campaign standings can switch between unlocked stages without combining
   their rows, and each stage continues paging its own leaderboard.
+- [ ] A newly completed verified Daily, Campaign, or Head-to-Head race unlocks
+  Crimson; an accepted Head-to-Head loss or tie still counts as completion.
+- [ ] Campaign Extra-car progress treats Author as Gold-or-better on that same
+  stage: 5/all 10 Gold-or-Author stages unlock Gold/Blaze, while 5/all 10 Author
+  stages unlock Surge/Arctic.
+- [ ] The first successful Head-to-Head post unlocks Fuchsia, five different
+  posted track keys unlock Plasma, the first verified duel win unlocks Lime,
+  and ten different won challenge IDs unlock Onyx. Reposting one track or
+  replaying one challenge cannot inflate progress.
+- [ ] Locked Garage cars are disabled with a visible requirement/progress label,
+  cannot be selected through keyboard navigation, and are rejected by the
+  preferences API. Unlocks remain after post deletion, slower retries, and
+  profile expiry; an authorized guest Crimson unlock merges at Reddit sign-in.
 - [ ] In Daily standings, select an available historical day and a non-self
   racer, confirm Race Opponent, and verify the correct day/track starts with
   that opponent's ghost, target time, and checkpoint deltas while a faster

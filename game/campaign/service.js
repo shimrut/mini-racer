@@ -199,6 +199,7 @@ function unavailableCampaignBootstrap() {
         // a player out of stages they had already opened.
         progress: deriveCampaignProgress(getPendingCampaignResults()),
         standingsByRaceId: normalizeCampaignStandings(null),
+        carUnlocks: null,
     };
 }
 
@@ -220,6 +221,7 @@ export async function getCampaignBootstrap() {
                 response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
             ),
             standingsByRaceId: normalizeCampaignStandings(response.body.standingsByRaceId),
+            carUnlocks: response.body.carUnlocks ?? null,
         };
     } catch {
         return unavailableCampaignBootstrap();

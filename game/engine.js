@@ -22,6 +22,7 @@ import { getCarRearAxleWorldPoint } from "./race/simulation.js";
 import { createCarSprite } from "./car/sprite.js";
 import { CarSpriteLoader } from "./car/sprite.js";
 import { normalizePhysicsConfig } from "./car/handling.js";
+import { setPlayerCarUnlockSnapshot } from "./car/player-car-skin.js";
 import { TrackLayerRenderer } from "./track/layer.js";
 import { RaceHud } from "./race/ui-hud.js";
 import { StartOverlay } from "./race/ui-start-overlay.js";
@@ -420,13 +421,20 @@ export class RealTimeRacer {
 
     this.setLoadingStatus(30, "Fetching Profile...");
     this.playerHistoryPromise = getPlayerProgressState()
-      .then(async ({ hasAnyData, isReturningPlayer, playerPreferences, redditUsername }) => {
+      .then(async ({
+        hasAnyData,
+        isReturningPlayer,
+        playerPreferences,
+        redditUsername,
+        carUnlocks,
+      }) => {
         this.setLoadingStatus(50, "Profile Loaded...");
         this.hasAnyData = Boolean(hasAnyData);
         this.isReturningPlayer = Boolean(isReturningPlayer);
         this.redditUsername = typeof redditUsername === "string" && redditUsername.trim()
           ? redditUsername.trim()
           : null;
+        this.applyCarUnlockSnapshot(carUnlocks);
         if (playerPreferences) {
           await this.applyPersistedPlayerPreferences(playerPreferences);
         } else {
@@ -540,6 +548,11 @@ export class RealTimeRacer {
     this.garage.syncTrailSelection();
     await this.syncCarSpriteAsset();
     this.requestRender();
+  }
+
+  applyCarUnlockSnapshot(snapshot) {
+    setPlayerCarUnlockSnapshot(snapshot);
+    this.garage?.refreshCarUnlocks?.();
   }
 
   getNow() {

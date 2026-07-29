@@ -1,4 +1,11 @@
 import { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from './sprite.js';
+import {
+    CAR_UNLOCK_REQUIREMENTS,
+    DEFAULT_CAR_UNLOCK_SNAPSHOT,
+    formatCarUnlockRequirement,
+    isCarAssetUnlocked,
+    normalizeCarUnlockSnapshot,
+} from './car-unlock-policy.js';
 
 export const PLAYER_CAR_SKIN_STORAGE_KEY = 'MiniRacerPlayerCarSkin';
 
@@ -65,7 +72,8 @@ export const PLAYER_CAR_SKINS = Object.freeze(
             label: skinLabelForAsset(assetName),
             /** @type {PlayerCarSkinSeriesId} */
             series: skinSeriesIdForAsset(assetName),
-            assetName
+            assetName,
+            unlockRequirement: CAR_UNLOCK_REQUIREMENTS[assetName] ?? null,
         })
     )
 );
@@ -90,31 +98,61 @@ function buildPlayerCarSkinSections() {
 export const PLAYER_CAR_SKIN_SECTIONS = buildPlayerCarSkinSections();
 
 const ALLOWED = new Set(PLAYER_CAR_SKINS.map((s) => s.assetName));
+let currentCarUnlockSnapshot = DEFAULT_CAR_UNLOCK_SNAPSHOT;
 
-export function readPlayerCarSkinAssetName() {
-    if (typeof window === 'undefined' || !window.localStorage) {
-        return STOCK_CAR_ASSET_NAME;
-    }
+function readStoredPlayerCarSkinAssetName() {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
     try {
         const raw = window.localStorage.getItem(PLAYER_CAR_SKIN_STORAGE_KEY);
-        if (!raw) return STOCK_CAR_ASSET_NAME;
+        if (!raw) return null;
         const parsed = JSON.parse(raw);
-        const name = typeof parsed === 'string' ? parsed.trim() : '';
-        if (name && ALLOWED.has(name)) return name;
+        return typeof parsed === 'string' && parsed.trim() ? parsed.trim() : null;
     } catch (error) {
         console.error('Error reading player car skin:', error);
+        return null;
     }
+}
+
+function writeStoredPlayerCarSkinAssetName(assetName) {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+        window.localStorage.setItem(PLAYER_CAR_SKIN_STORAGE_KEY, JSON.stringify(assetName));
+    } catch (error) {
+        console.error('Error saving player car skin:', error);
+    }
+}
+
+export function getPlayerCarUnlockSnapshot() {
+    return currentCarUnlockSnapshot;
+}
+
+export function setPlayerCarUnlockSnapshot(snapshot) {
+    currentCarUnlockSnapshot = normalizeCarUnlockSnapshot(snapshot);
+    const current = readStoredPlayerCarSkinAssetName();
+    if (current && !isCarAssetUnlocked(current, currentCarUnlockSnapshot)) {
+        writeStoredPlayerCarSkinAssetName(STOCK_CAR_ASSET_NAME);
+    }
+    return currentCarUnlockSnapshot;
+}
+
+export function isPlayerCarSkinUnlocked(assetName) {
+    return isCarAssetUnlocked(assetName, currentCarUnlockSnapshot);
+}
+
+export function getPlayerCarSkinUnlockLabel(assetName) {
+    return formatCarUnlockRequirement(assetName, currentCarUnlockSnapshot);
+}
+
+export function readPlayerCarSkinAssetName() {
+    const name = readStoredPlayerCarSkinAssetName();
+    if (name && ALLOWED.has(name) && isPlayerCarSkinUnlocked(name)) return name;
     return STOCK_CAR_ASSET_NAME;
 }
 
 export function writePlayerCarSkinAssetName(assetName) {
-    const next = ALLOWED.has(assetName) ? assetName : STOCK_CAR_ASSET_NAME;
-    if (typeof window !== 'undefined' && window.localStorage) {
-        try {
-            window.localStorage.setItem(PLAYER_CAR_SKIN_STORAGE_KEY, JSON.stringify(next));
-        } catch (error) {
-            console.error('Error saving player car skin:', error);
-        }
-    }
+    const next = ALLOWED.has(assetName) && isPlayerCarSkinUnlocked(assetName)
+        ? assetName
+        : STOCK_CAR_ASSET_NAME;
+    writeStoredPlayerCarSkinAssetName(next);
     return next;
 }

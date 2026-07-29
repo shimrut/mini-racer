@@ -253,6 +253,7 @@ export const scoreboardEngineMethods = {
     }
 
     if (result?.ok && body?.accepted && Number.isFinite(body?.bestTimeMs)) {
+      this.applyCarUnlockSnapshot?.(body.carUnlocks);
       const challenge = {
         id: entry.challengeId,
         challengeDate: entry.challengeDate,

@@ -284,6 +284,7 @@ function campaignErrorSnapshot(bestTime, statusText) {
 
 export const campaignEngineMethods = {
     applyCampaignLobbyBootstrap(bootstrap, { paint = false } = {}) {
+        this.applyCarUnlockSnapshot?.(bootstrap?.carUnlocks);
         this.campaignBootstrap = bootstrap;
         this._campaignBootstrapReady = true;
         this.campaignLobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
@@ -1005,6 +1006,7 @@ export const campaignEngineMethods = {
         }
 
         if (response.ok && response.body?.accepted === true) {
+            this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
             clearCampaignVerification(raceId);
             // Verified progress supersedes what this run opened optimistically.
             clearPendingCampaignResult(raceId);
@@ -1177,6 +1179,7 @@ export const campaignEngineMethods = {
                 });
                 return;
             }
+            this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
 
             if (outcome === 'won') {
                 this.modal.updateChallengeFinishHero?.({ phase: 'won' });
@@ -1298,8 +1301,10 @@ export const campaignEngineMethods = {
         return previewCampaignChallenge(request);
     },
 
-    confirmCampaignChallenge(token) {
-        return createCampaignChallenge(token);
+    async confirmCampaignChallenge(token) {
+        const response = await createCampaignChallenge(token);
+        if (response?.ok) this.applyCarUnlockSnapshot?.(response.body?.carUnlocks);
+        return response;
     },
 
     previewCampaignChallengeBrag(request) {

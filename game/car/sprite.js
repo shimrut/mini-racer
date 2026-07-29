@@ -1,8 +1,9 @@
 import { CONFIG } from "../config.js";
 import { GENERATED_PLAYER_SELECTABLE_CAR_ASSETS } from "./generated-player-selectable-car-assets.js";
+import { STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
 
 /** Canonical stock car art under `public/assets/cars/`. */
-export const STOCK_CAR_ASSET_NAME = "assets/cars/mr_mr_red.webp";
+export { STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
 
 /**
  * Every `public/assets/cars/mr_*.webp` the player can pick in the garage.

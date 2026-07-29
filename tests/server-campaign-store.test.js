@@ -17,6 +17,7 @@ const mockRedis = {
         return 1;
     }),
     hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
+    hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
     hMGet: vi.fn(async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null)),
     mGet: vi.fn(async (keys) => keys.map((key) => strings.get(key) ?? null)),
     hDel: vi.fn(async (key, fields) => {
@@ -30,6 +31,13 @@ const mockRedis = {
         for (const [field, value] of Object.entries(entries)) hash.set(field, value);
         hashes.set(key, hash);
         return Object.keys(entries).length;
+    }),
+    hSetNX: vi.fn(async (key, field, value) => {
+        const hash = hashes.get(key) ?? new Map();
+        if (hash.has(field)) return 0;
+        hash.set(field, value);
+        hashes.set(key, hash);
+        return 1;
     }),
     incrBy: vi.fn(async () => 1),
     expire: vi.fn(async () => true),
@@ -103,6 +111,7 @@ describe('Campaign server store', () => {
             return 1;
         });
         mockRedis.hGet.mockImplementation(async (key, field) => hashes.get(key)?.get(field) ?? null);
+        mockRedis.hGetAll.mockImplementation(async (key) => Object.fromEntries(hashes.get(key) ?? []));
         mockRedis.hMGet.mockImplementation(async (key, fields) => (
             fields.map((field) => hashes.get(key)?.get(field) ?? null)
         ));
@@ -111,6 +120,13 @@ describe('Campaign server store', () => {
             for (const [field, value] of Object.entries(entries)) hash.set(field, value);
             hashes.set(key, hash);
             return Object.keys(entries).length;
+        });
+        mockRedis.hSetNX.mockImplementation(async (key, field, value) => {
+            const hash = hashes.get(key) ?? new Map();
+            if (hash.has(field)) return 0;
+            hash.set(field, value);
+            hashes.set(key, hash);
+            return 1;
         });
         mockRedis.incrBy.mockResolvedValue(1);
         mockRedis.expire.mockResolvedValue(true);

@@ -5,8 +5,14 @@ import {
     PLAYER_CAR_SKIN_STORAGE_KEY,
     PLAYER_CAR_SKINS,
     readPlayerCarSkinAssetName,
+    setPlayerCarUnlockSnapshot,
     writePlayerCarSkinAssetName
 } from '../game/car/player-car-skin.js';
+import {
+    DEFAULT_CAR_UNLOCK_SNAPSHOT,
+    EXTRA_CAR_ASSETS,
+    buildCarUnlockSnapshot,
+} from '../game/car/car-unlock-policy.js';
 import { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from '../game/car/sprite.js';
 
 describe('player car skin', () => {
@@ -14,6 +20,7 @@ describe('player car skin', () => {
 
     beforeEach(() => {
         store.clear();
+        setPlayerCarUnlockSnapshot(DEFAULT_CAR_UNLOCK_SNAPSHOT);
         globalThis.window = {
             localStorage: {
                 getItem: (key) => (store.has(key) ? store.get(key) : null),
@@ -45,6 +52,16 @@ describe('player car skin', () => {
     it('falls back to stock for unknown stored values', () => {
         store.set(PLAYER_CAR_SKIN_STORAGE_KEY, JSON.stringify('assets/cars/nope.webp'));
         expect(readPlayerCarSkinAssetName()).toBe(STOCK_CAR_ASSET_NAME);
+    });
+
+    it('rejects a locked car locally and accepts it after the server unlock snapshot arrives', () => {
+        expect(writePlayerCarSkinAssetName(EXTRA_CAR_ASSETS.crimson)).toBe(STOCK_CAR_ASSET_NAME);
+        expect(readPlayerCarSkinAssetName()).toBe(STOCK_CAR_ASSET_NAME);
+
+        setPlayerCarUnlockSnapshot(buildCarUnlockSnapshot({ completedRace: true }));
+
+        expect(writePlayerCarSkinAssetName(EXTRA_CAR_ASSETS.crimson)).toBe(EXTRA_CAR_ASSETS.crimson);
+        expect(readPlayerCarSkinAssetName()).toBe(EXTRA_CAR_ASSETS.crimson);
     });
 
     it('includes every shipped player car WebP as a selectable skin', () => {

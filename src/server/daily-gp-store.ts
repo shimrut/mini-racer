@@ -74,6 +74,21 @@ import {
     releaseRedisLock,
     type RedisLock,
 } from './redis-lock.js';
+import {
+    getCarUnlockSnapshot,
+    mergeGuestCarUnlockProgress,
+    recordCompletedRace,
+    type CarUnlockSnapshot,
+} from './car-unlock-store.js';
+import {
+    getCampaignResultsForCarUnlocks,
+    mergeGuestCampaignProgress,
+} from './campaign-store.js';
+import {
+    STOCK_CAR_ASSET_NAME,
+    isCarAssetUnlocked,
+} from '../../game/car/car-unlock-policy.js';
+import { verifyGuestPlayerToken } from './player-token.js';
 
 // Identity, profiles and the leaderboard itself are shared across every ranked
 // mode now. Re-exported here so the paths callers and tests already import from
@@ -94,6 +109,7 @@ type PlayerBootstrapPayload = {
     isReturningPlayer: boolean;
     firstSeenAt: string | null;
     lastSeenAt: string | null;
+    carUnlocks: CarUnlockSnapshot | null;
 };
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -104,6 +120,26 @@ const DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 30_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+async function readPlayerCarUnlocks(playerId: string): Promise<CarUnlockSnapshot> {
+    return getCarUnlockSnapshot(
+        playerId,
+        await getCampaignResultsForCarUnlocks(playerId),
+    );
+}
+
+function preferencesAllowedByCarUnlocks(
+    preferences: DailyGpPlayerPreferences | null,
+    carUnlocks: CarUnlockSnapshot,
+): DailyGpPlayerPreferences | null {
+    if (!preferences) return null;
+    return {
+        ...preferences,
+        carSkin: isCarAssetUnlocked(preferences.carSkin, carUnlocks)
+            ? preferences.carSkin
+            : STOCK_CAR_ASSET_NAME,
+    };
+}
 
 function createSubmissionRateLimitKey(challengeId: string, rateLimitIdentity: string): string {
     return `dailygp:submit-rate-limit:${challengeId}:${rateLimitIdentity}`;
@@ -815,7 +851,24 @@ export async function getServerPlayerBootstrap({
             isReturningPlayer: false,
             firstSeenAt: null,
             lastSeenAt: null,
+            carUnlocks: null,
         };
+    }
+
+    if (identity.canonicalPlayerId.startsWith('reddit:')) {
+        const guestPlayerId = await verifyGuestPlayerToken(guestToken);
+        if (guestPlayerId) {
+            await Promise.all([
+                mergeGuestCampaignProgress({
+                    guestPlayerId: `guest:${guestPlayerId}`,
+                    redditPlayerId: identity.canonicalPlayerId,
+                }),
+                mergeGuestCarUnlockProgress({
+                    guestPlayerId: `guest:${guestPlayerId}`,
+                    redditPlayerId: identity.canonicalPlayerId,
+                }),
+            ]);
+        }
     }
 
     if (!profile) {
@@ -832,17 +885,33 @@ export async function getServerPlayerBootstrap({
     const isReturningPlayer = profile.hasSeenGame
         && Number.isFinite(firstSeenMs)
         && (Date.now() - firstSeenMs) > RETURNING_PLAYER_DELAY_MS;
+    const carUnlocks = await readPlayerCarUnlocks(identity.canonicalPlayerId);
+    const playerPreferences = preferencesAllowedByCarUnlocks(profile.preferences, carUnlocks);
+    if (
+        playerPreferences
+        && profile.preferences
+        && playerPreferences.carSkin !== profile.preferences.carSkin
+    ) {
+        profile = await upsertPlayerProfile({
+            playerId: identity.canonicalPlayerId,
+            redditUsername,
+            preferences: playerPreferences,
+            hasAnyData: false,
+            previousProfile: profile,
+        });
+    }
 
     return {
         playerId: identity.canonicalPlayerId,
         guestToken: identity.guestToken,
         redditUsername: safeRequestRedditUsername,
         leaderboardIdentity: profile.leaderboardIdentity,
-        playerPreferences: profile.preferences,
+        playerPreferences,
         hasAnyData: previousProfile ? (profile.hasSeenGame || profile.hasAnyData) : false,
         isReturningPlayer,
         firstSeenAt: profile.firstSeenAt,
         lastSeenAt: profile.lastSeenAt,
+        carUnlocks,
     };
 }
 
@@ -878,11 +947,13 @@ export async function updateServerPlayerPreferences({
             playerPreferences: null,
         };
     }
+    const carUnlocks = await readPlayerCarUnlocks(identity.canonicalPlayerId);
+    const allowedPreferences = preferencesAllowedByCarUnlocks(normalizedPreferences, carUnlocks);
 
     const profile = await upsertPlayerProfile({
         playerId: identity.canonicalPlayerId,
         redditUsername,
-        preferences: normalizedPreferences,
+        preferences: allowedPreferences,
         hasAnyData: false,
     });
     return {
@@ -1246,6 +1317,7 @@ export async function submitServerDailyGpRun({
         console.error('Challenge PB persistence failed after a valid Daily GP run:', trackPbPersistence!.reason);
     }
     const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
+    await recordCompletedRace(normalizedPlayerId);
     return {
         status: 200,
         body: {
@@ -1263,6 +1335,7 @@ export async function submitServerDailyGpRun({
             checkpointTimesSec: storedDailyEntry.checkpointTimesSec ?? null,
             validationMethod: storedDailyEntry.validationMethod ?? 'strict-replay',
             strictReplayFailureReason: storedDailyEntry.strictReplayFailureReason ?? null,
+            carUnlocks: await readPlayerCarUnlocks(normalizedPlayerId),
         },
     };
 }

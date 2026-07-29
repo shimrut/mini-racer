@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const strings = new Map();
+const hashes = new Map();
 const redis = {
     get: vi.fn(async (key) => strings.get(key) ?? null),
     set: vi.fn(async (key, value, options = {}) => {
@@ -14,6 +15,20 @@ const redis = {
         const next = Number(strings.get(key) || 0) + amount;
         strings.set(key, String(next));
         return next;
+    }),
+    hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
+    hSet: vi.fn(async (key, entries) => {
+        const hash = hashes.get(key) ?? new Map();
+        for (const [field, value] of Object.entries(entries)) hash.set(field, value);
+        hashes.set(key, hash);
+        return Object.keys(entries).length;
+    }),
+    hSetNX: vi.fn(async (key, field, value) => {
+        const hash = hashes.get(key) ?? new Map();
+        if (hash.has(field)) return 0;
+        hash.set(field, value);
+        hashes.set(key, hash);
+        return 1;
     }),
     watch: vi.fn(async () => {
         const commands = [];
@@ -115,6 +130,7 @@ async function createChallenge(service) {
 describe('campaign challenge service', () => {
     beforeEach(() => {
         strings.clear();
+        hashes.clear();
         activePosts.clear();
         postNumber = 0;
         vi.clearAllMocks();
@@ -182,10 +198,15 @@ describe('campaign challenge service', () => {
         const second = await createChallenge(service);
 
         expect(first.body.status).toBe('created');
-        expect(second.body).toEqual({
+        expect(second.body).toMatchObject({
             status: 'already_created',
             challengeId: first.body.challengeId,
             postUrl: first.body.postUrl,
+            carUnlocks: {
+                progress: {
+                    headToHeadTracksPosted: 1,
+                },
+            },
         });
         expect(reddit.submitCustomPost).toHaveBeenCalledTimes(1);
     });

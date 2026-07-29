@@ -1,6 +1,8 @@
 import {
     PLAYER_CAR_SKIN_SECTIONS,
     PLAYER_CAR_SKINS,
+    getPlayerCarSkinUnlockLabel,
+    isPlayerCarSkinUnlocked,
     readPlayerCarSkinAssetName,
     writePlayerCarSkinAssetName
 } from '../car/player-car-skin.js';
@@ -170,7 +172,10 @@ export class GarageUi {
                 label.className = 'garage-skin-option__label';
                 label.textContent = skin.label;
 
-                btn.append(thumb, label);
+                const requirement = document.createElement('span');
+                requirement.className = 'garage-skin-option__requirement';
+
+                btn.append(thumb, label, requirement);
                 btn.addEventListener('click', () => this.selectCarSkin(skin.assetName));
                 grid.appendChild(btn);
                 this.skinOptionButtons.set(skin.assetName, btn);
@@ -179,13 +184,36 @@ export class GarageUi {
             sectionEl.append(title, grid);
             host.appendChild(sectionEl);
         }
+        this.refreshCarUnlocks();
     }
 
     selectCarSkin(assetName) {
+        if (!isPlayerCarSkinUnlocked(assetName)) return;
         const next = writePlayerCarSkinAssetName(assetName);
         this.syncSkinSelection();
         this.onCarSkinChanged?.(next);
         this.onPlayerPreferencesChanged?.();
+    }
+
+    refreshCarUnlocks() {
+        for (const skin of PLAYER_CAR_SKINS) {
+            const btn = this.skinOptionButtons.get(skin.assetName);
+            if (!btn) continue;
+            const unlocked = isPlayerCarSkinUnlocked(skin.assetName);
+            const unlockLabel = getPlayerCarSkinUnlockLabel(skin.assetName);
+            const requirement = btn.querySelector('.garage-skin-option__requirement');
+            btn.disabled = !unlocked;
+            btn.classList.toggle('is-locked', !unlocked);
+            btn.setAttribute('aria-label', !unlocked && unlockLabel
+                ? `${skin.label}. Locked. ${unlockLabel}`
+                : skin.label);
+            if (requirement) {
+                requirement.textContent = !unlocked ? unlockLabel : '';
+                requirement.hidden = unlocked;
+            }
+        }
+        this.syncSkinSelection();
+        this.modal?.resetGarageMenuKeyboardNav?.();
     }
 
     syncSkinSelection() {

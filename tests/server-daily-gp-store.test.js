@@ -1765,7 +1765,10 @@ describe('server daily gp store submissions', () => {
                 playerPreferences: basePreferences(overrides),
             });
 
-            expect(result.playerPreferences).toMatchObject(expected);
+            expect(result.playerPreferences).toMatchObject({
+                ...expected,
+                carSkin: 'assets/cars/mr_mr_red.webp',
+            });
         });
 
         it('trims whitespace from carSkin and trailId before storing preferences', async () => {
@@ -1777,7 +1780,10 @@ describe('server daily gp store submissions', () => {
                 playerPreferences: basePreferences({ carSkin: '  car.png  ', trailId: ' gold ' }),
             });
 
-            expect(result.playerPreferences).toMatchObject({ carSkin: 'car.png', trailId: 'gold' });
+            expect(result.playerPreferences).toMatchObject({
+                carSkin: 'assets/cars/mr_mr_red.webp',
+                trailId: 'gold',
+            });
         });
 
         it('rounds crashRestartDelaySec to one decimal place', async () => {
@@ -2955,6 +2961,7 @@ describe('server daily gp store submissions', () => {
                 redditUsername: null,
                 leaderboardIdentity: 'constructed',
                 playerPreferences: null,
+                carUnlocks: null,
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
@@ -2986,6 +2993,7 @@ describe('server daily gp store submissions', () => {
                 redditUsername: null,
                 leaderboardIdentity: 'constructed',
                 playerPreferences: null,
+                carUnlocks: null,
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
@@ -3105,6 +3113,7 @@ describe('server daily gp store submissions', () => {
                 redditUsername: null,
                 leaderboardIdentity: 'constructed',
                 playerPreferences: null,
+                carUnlocks: null,
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,

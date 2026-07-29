@@ -14,6 +14,10 @@ import {
   setGuestPlayerToken,
 } from "./scoreboard/player-identity.js";
 import { isLocalEnvironment } from "./track/environment.js";
+import {
+  DEFAULT_CAR_UNLOCK_SNAPSHOT,
+  normalizeCarUnlockSnapshot,
+} from "./car/car-unlock-policy.js";
 
 async function fetchRemotePlayerProgressState() {
   const config = API_ROUTES;
@@ -59,6 +63,7 @@ async function fetchRemotePlayerProgressState() {
       payload?.playerPreferences && typeof payload.playerPreferences === "object"
         ? payload.playerPreferences
         : null,
+    carUnlocks: normalizeCarUnlockSnapshot(payload?.carUnlocks),
   };
 }
 
@@ -71,6 +76,7 @@ function getLocalPlayerProgressState() {
     leaderboardIdentity: getLeaderboardIdentityPreference(),
     leaderboardPlayerId: getOrCreatePlayerId("player bootstrap"),
     playerPreferences: null,
+    carUnlocks: DEFAULT_CAR_UNLOCK_SNAPSHOT,
   };
 }
 

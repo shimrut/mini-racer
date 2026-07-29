@@ -92,6 +92,19 @@ Ghosts are per day/track. If a download isn’t ready in time, the game starts w
 
 ## Sharing
 
+### Why is an Extra car locked in the Garage?
+
+Extra cars show their requirement and current progress in the Garage. Complete
+one verified Daily, Campaign, or Head-to-Head race for Crimson. Campaign Gold
+and Blaze count stages with either Gold or Author; Surge and Arctic specifically
+require Author. Posting the same Head-to-Head track repeatedly counts once
+toward Plasma, and replaying the same challenge cannot add extra wins toward
+Onyx.
+
+Unlocks stay unlocked. Guest race completion is carried into the Reddit account
+when that guest signs in; creating or winning Head-to-Heads requires Reddit
+sign-in.
+
 ### Why does Campaign say Start on one device and Continue on another?
 
 Signed-in Campaign progress is permanent for that Reddit account. Guest

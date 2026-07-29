@@ -20,12 +20,15 @@ Steer, finish the complete race as fast as you can, then try again.
 - Missed a day? You can replay the last **7 days** of tracks
 - Play the permanent ten-stage **Campaign**, earning Gold to unlock the next
   fixed 1-, 2-, or 3-lap race
-- Change how your car looks in the **Garage** (skins and trails — handling stays the same)
+- Change how your car looks in the **Garage** (available and achievement-unlocked
+  skins plus trails — handling stays the same)
 - **Share** a finished race or a verified daily best as a Reddit comment (you preview the text first)
 - When signed in, turn a verified Campaign or player-challenge result into a
   custom challenge post with your frozen ghost
 
-Your car look and settings are saved to your player profile. Guest data expires after 7 inactive days; signed-in data expires after 30 inactive days.
+Your selected car look and settings are saved to your player profile. Car
+unlocks are permanent. Other guest profile data expires after 7 inactive days;
+signed-in profile data expires after 30 inactive days.
 
 ## Daily tracks
 
@@ -63,7 +66,12 @@ Final podium posts (separate moderator opt-in) show the top three verified times
 
 ## Garage
 
-- **12 car skins** in Mini, Cyberpunk, and Steampunk sets
+- **22 car skins** across Extra, Mini, Cyberpunk, and Steampunk sets
+- Extra unlocks: Crimson after one verified race; Gold and Blaze after Gold or
+  Author on 5/all 10 Campaign stages; Surge and Arctic after Author on 5/all
+  10 Campaign stages; Fuchsia and Plasma after posting Head-to-Heads on 1/5
+  distinct tracks; Lime and Onyx after 1/10 Head-to-Head wins
+- Cobalt and every non-achievement car are available immediately
 - **8 trails**, including no trail
 - Looks only — the car drives the same either way
 
