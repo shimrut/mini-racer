@@ -45,6 +45,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
   their rows, and each stage continues paging its own leaderboard.
 - [ ] A newly completed verified Daily, Campaign, or Head-to-Head race unlocks
   Crimson; an accepted Head-to-Head loss or tie still counts as completion.
+  Retained accepted Daily history and any saved Campaign result from before
+  achievement tracking also backfill Crimson.
 - [ ] Campaign Extra-car progress treats Author as Gold-or-better on that same
   stage: 5/all 10 Gold-or-Author stages unlock Gold/Blaze, while 5/all 10 Author
   stages unlock Surge/Arctic.

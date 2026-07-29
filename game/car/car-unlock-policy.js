@@ -117,8 +117,12 @@ export function buildCarUnlockSnapshot({
     campaignResultsByRaceId = {},
 } = {}) {
     const campaign = countCampaignUnlockMedals(campaignResultsByRaceId);
+    const hasCampaignResult = campaignResultsByRaceId
+        && typeof campaignResultsByRaceId === 'object'
+        && Object.values(campaignResultsByRaceId)
+            .some((result) => result && typeof result === 'object');
     const progress = normalizeCarUnlockProgress({
-        completedRace: completedRace ? 1 : 0,
+        completedRace: (completedRace || hasCampaignResult) ? 1 : 0,
         ...campaign,
         headToHeadTracksPosted: new Set(postedTrackKeys).size,
         headToHeadWins: new Set(wonChallengeIds).size,

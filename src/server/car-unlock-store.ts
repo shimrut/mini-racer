@@ -93,10 +93,11 @@ export async function getCarUnlockSnapshot(
     playerId: string,
     campaignResultsByRaceId: CampaignResultMap = {},
     client: RedisClient = redis,
+    completedRaceEvidence = false,
 ): Promise<CarUnlockSnapshot> {
     const fields = await readEventFields(playerId, client);
     return buildCarUnlockSnapshot({
-        completedRace: fields[COMPLETED_RACE_FIELD] === '1',
+        completedRace: completedRaceEvidence || fields[COMPLETED_RACE_FIELD] === '1',
         postedTrackKeys: Object.keys(fields)
             .filter((field) => field.startsWith(POSTED_TRACK_PREFIX))
             .map((field) => readFieldPart(field.slice(POSTED_TRACK_PREFIX.length)))

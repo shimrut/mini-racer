@@ -51,6 +51,18 @@ describe('server car unlock store', () => {
         expect(snapshot.unlockedAssets).toContain(EXTRA_CAR_ASSETS.crimson);
     });
 
+    it('accepts retained race evidence while an old account is backfilled', async () => {
+        const snapshot = await getCarUnlockSnapshot(
+            'reddit:returning-driver',
+            {},
+            client,
+            true,
+        );
+
+        expect(snapshot.progress.completedRace).toBe(1);
+        expect(snapshot.unlockedAssets).toContain(EXTRA_CAR_ASSETS.crimson);
+    });
+
     it('deduplicates posted tracks and unlocks Plasma on the fifth unique track', async () => {
         for (let index = 0; index < 5; index += 1) {
             await recordHeadToHeadPost('reddit:driver', `track-${index}`, client);

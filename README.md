@@ -71,6 +71,8 @@ Final podium posts (separate moderator opt-in) show the top three verified times
   Author on 5/all 10 Campaign stages; Surge and Arctic after Author on 5/all
   10 Campaign stages; Fuchsia and Plasma after posting Head-to-Heads on 1/5
   distinct tracks; Lime and Onyx after 1/10 Head-to-Head wins
+- Existing accepted Daily history and saved Campaign results backfill Crimson,
+  so established racers are not treated as new when unlock tracking is added
 - Cobalt and every non-achievement car are available immediately
 - Locked cars show a white lock; its white progress arc appears only after
   progress begins. Select one to open its unlock requirement and exact progress

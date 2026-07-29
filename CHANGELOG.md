@@ -7,6 +7,9 @@
   a white progress arc appears only after progress begins. Selecting one opens
   a compact requirement panel.
   Both client and server still reject selecting them early.
+- Fixed Crimson remaining locked for existing racers when their race predated
+  the unlock event store. Retained Daily race history and any saved Campaign
+  result now backfill the permanent completed-race unlock.
 - Fixed the Mini Racer wordmark briefly disappearing when returning to Home
   because its first-launch entrance animation replayed from zero opacity.
 - Daily and Campaign now use a compact top toolbar with Back, Standings,

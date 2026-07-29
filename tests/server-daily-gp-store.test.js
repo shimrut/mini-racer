@@ -1947,6 +1947,34 @@ describe('server daily gp store submissions', () => {
             expect(storedProfile.profile.hasAnyData).toBe(true);
         });
 
+        it('backfills Crimson for a player with an accepted race predating unlock tracking', async () => {
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+                playerId: 'reddit:existing-racer',
+                leaderboardIdentity: 'reddit',
+                redditUsername: 'Existing-Racer',
+                hasSeenGame: true,
+                hasAnyData: true,
+                firstSeenAt: '2026-01-01T00:00:00.000Z',
+                lastSeenAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            }));
+
+            const payload = await getServerPlayerBootstrap({ redditUsername: 'Existing-Racer' });
+            const playerHash = createHash('sha256')
+                .update('reddit:existing-racer', 'utf8')
+                .digest('base64url');
+
+            expect(mockRedis.hSetNX).toHaveBeenCalledWith(
+                `miniracer:car-unlocks:v1:${playerHash}`,
+                'race:completed',
+                '1',
+            );
+            expect(payload.carUnlocks.progress.completedRace).toBe(1);
+            expect(payload.carUnlocks.unlockedAssets)
+                .toContain('assets/cars/mr_extra_crimson.webp');
+        });
+
         it('preserves the original firstSeenAt across profile updates', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
             mockRedis.get.mockResolvedValueOnce(JSON.stringify({

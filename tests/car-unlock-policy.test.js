@@ -39,6 +39,7 @@ describe('car unlock policy', () => {
         expect(isUnlocked(snapshot, EXTRA_CAR_ASSETS.surge)).toBe(true);
         expect(isUnlocked(snapshot, EXTRA_CAR_ASSETS.blaze)).toBe(false);
         expect(isUnlocked(snapshot, EXTRA_CAR_ASSETS.arctic)).toBe(false);
+        expect(isUnlocked(snapshot, EXTRA_CAR_ASSETS.crimson)).toBe(true);
     });
 
     it('unlocks Campaign cars at exactly 5 and 10 qualifying distinct stages', () => {

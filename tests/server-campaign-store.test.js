@@ -216,6 +216,37 @@ describe('Campaign server store', () => {
         expect(bootstrap.body.progress.startedAt).toBe(first.body.progress.startedAt);
     });
 
+    it('unlocks Crimson from retained Campaign results created before unlock tracking', async () => {
+        const playerId = 'reddit:campaign-veteran';
+        const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        strings.set(`campaign:numbered-v1:progress:${playerHash}`, JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: {
+                'numbered-v1-00': {
+                    raceId: 'numbered-v1-00',
+                    trackKey: 'numberZero',
+                    lapCount: 1,
+                    rulesRevision: 1,
+                    bestTimeMs: 1000,
+                    medal: 'author',
+                    checkpointTimesSec: null,
+                    updatedAt: '2026-07-27T10:00:00.000Z',
+                },
+            },
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        }));
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+
+        const bootstrap = await getServerCampaignBootstrap({
+            redditUsername: 'Campaign-Veteran',
+        });
+
+        expect(bootstrap.body.carUnlocks.progress.completedRace).toBe(1);
+        expect(bootstrap.body.carUnlocks.unlockedAssets)
+            .toContain('assets/cars/mr_extra_crimson.webp');
+    });
+
     it('persists the replay-derived result and unlocks the next race only from the server medal', async () => {
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: true,

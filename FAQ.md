@@ -103,6 +103,8 @@ require Author. Posting the same Head-to-Head track repeatedly counts once
 toward Plasma, and replaying the same challenge cannot add extra wins toward
 Onyx.
 
+Existing accepted Daily history and saved Campaign results also count for
+Crimson, including races completed before achievement tracking was added.
 Unlocks stay unlocked. Guest race completion is carried into the Reddit account
 when that guest signs in; creating or winning Head-to-Heads requires Reddit
 sign-in.

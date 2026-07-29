@@ -121,10 +121,15 @@ const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 30_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-async function readPlayerCarUnlocks(playerId: string): Promise<CarUnlockSnapshot> {
+async function readPlayerCarUnlocks(
+    playerId: string,
+    completedRaceEvidence = false,
+): Promise<CarUnlockSnapshot> {
     return getCarUnlockSnapshot(
         playerId,
         await getCampaignResultsForCarUnlocks(playerId),
+        redis,
+        completedRaceEvidence,
     );
 }
 
@@ -885,7 +890,19 @@ export async function getServerPlayerBootstrap({
     const isReturningPlayer = profile.hasSeenGame
         && Number.isFinite(firstSeenMs)
         && (Date.now() - firstSeenMs) > RETURNING_PLAYER_DELAY_MS;
-    const carUnlocks = await readPlayerCarUnlocks(identity.canonicalPlayerId);
+    if (profile.hasAnyData) {
+        try {
+            await recordCompletedRace(identity.canonicalPlayerId);
+        } catch (error) {
+            // Existing accepted-race history is enough to unlock Crimson for
+            // this response; a later bootstrap can retry the permanent marker.
+            console.error('Completed-race unlock backfill failed:', error);
+        }
+    }
+    const carUnlocks = await readPlayerCarUnlocks(
+        identity.canonicalPlayerId,
+        profile.hasAnyData,
+    );
     const playerPreferences = preferencesAllowedByCarUnlocks(profile.preferences, carUnlocks);
     if (
         playerPreferences
