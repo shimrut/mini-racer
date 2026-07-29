@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
+import { toDailyCompetition } from '../src/server/competition.ts';
 
 function decodeCompressedValue(value) {
     const prefix = '__gz:b64__:';
@@ -259,7 +260,7 @@ describe('PB ghost trace and storage', () => {
     it('keeps only the strictly faster per-track record', async () => {
         const first = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:racer',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -267,7 +268,7 @@ describe('PB ghost trace and storage', () => {
         });
         const slower = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:racer',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 13_000,
             checkpointTimesSec: [5, 9],
@@ -287,7 +288,7 @@ describe('PB ghost trace and storage', () => {
     it('selects a retained strict daily best and the current verified ghost under one lock', async () => {
         const retained = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:retained',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 13_000,
             checkpointTimesSec: [5, 9],
@@ -311,7 +312,7 @@ describe('PB ghost trace and storage', () => {
         redis.hashes.clear();
         const tied = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:tied',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4.1, 8.1],
@@ -334,7 +335,7 @@ describe('PB ghost trace and storage', () => {
     it('enriches an equal time-only record with the current verified ghost', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:enriched',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -343,7 +344,7 @@ describe('PB ghost trace and storage', () => {
 
         const result = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:enriched',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4.1, 8.1],
@@ -372,7 +373,7 @@ describe('PB ghost trace and storage', () => {
 
         await expect(upsertPlayerTrackPersonalBest({
             playerId: 'reddit:stale-owner',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -394,7 +395,7 @@ describe('PB ghost trace and storage', () => {
 
         await expect(upsertPlayerTrackPersonalBest({
             playerId: 'reddit:cleanup',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -409,7 +410,7 @@ describe('PB ghost trace and storage', () => {
     it('applies the fixed competition deadline to every challenge PB collection', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'guest:racer',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -437,7 +438,7 @@ describe('PB ghost trace and storage', () => {
         try {
             await upsertPlayerTrackPersonalBest({
                 playerId: 'reddit:recurring',
-                challenge: CHALLENGE,
+                competition: toDailyCompetition(CHALLENGE),
                 track: TRACK,
                 bestTimeMs: 12_000,
                 checkpointTimesSec: null,
@@ -445,7 +446,7 @@ describe('PB ghost trace and storage', () => {
             });
             await upsertPlayerTrackPersonalBest({
                 playerId: 'reddit:recurring',
-                challenge: laterChallenge,
+                competition: toDailyCompetition(laterChallenge),
                 track: TRACK,
                 bestTimeMs: 13_000,
                 checkpointTimesSec: null,
@@ -471,7 +472,7 @@ describe('PB ghost trace and storage', () => {
         try {
             await expect(upsertPlayerTrackPersonalBest({
                 playerId: 'reddit:late',
-                challenge: CHALLENGE,
+                competition: toDailyCompetition(CHALLENGE),
                 track: TRACK,
                 bestTimeMs: 12_000,
                 checkpointTimesSec: null,
@@ -486,7 +487,7 @@ describe('PB ghost trace and storage', () => {
     it('deletes a stored PB when competitive track geometry changes', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:racer',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -500,7 +501,7 @@ describe('PB ghost trace and storage', () => {
         expect(createTrackFingerprint(changedTrack)).not.toBe(createTrackFingerprint(TRACK));
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:racer',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: changedTrack,
         })).toBeNull();
         expect(redis.hDel).toHaveBeenCalledWith(
@@ -512,7 +513,7 @@ describe('PB ghost trace and storage', () => {
     it('deletes corrupt PB hash entries instead of returning them', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:corrupt',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -524,7 +525,7 @@ describe('PB ghost trace and storage', () => {
 
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:corrupt',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
         expect(redis.hDel).toHaveBeenCalledWith(collectionKey, [field]);
@@ -536,7 +537,7 @@ describe('PB ghost trace and storage', () => {
 
         await expect(upsertPlayerTrackPersonalBest({
             playerId: 'reddit:busy',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -557,7 +558,7 @@ describe('PB ghost trace and storage', () => {
 
         await expect(upsertPlayerTrackPersonalBest({
             playerId: 'reddit:empty-exec',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -568,7 +569,7 @@ describe('PB ghost trace and storage', () => {
     it('stores time-only PBs through the seed helper without a ghost trace', async () => {
         const result = await seedPlayerTrackPersonalBest({
             playerId: 'reddit:seed-only',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 11_500,
             checkpointTimesSec: [3.5, 7.5],
@@ -586,7 +587,7 @@ describe('PB ghost trace and storage', () => {
     it('stores exact lap boundaries while accepting historical and malformed records', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:lap-boundaries',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -598,7 +599,7 @@ describe('PB ghost trace and storage', () => {
 
         expect((await getPlayerTrackPbRecord({
             playerId: 'reddit:lap-boundaries',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         }))?.lapCompletionTimesSec).toEqual([12]);
 
@@ -607,7 +608,7 @@ describe('PB ghost trace and storage', () => {
         redis.hashes.get(collectionKey).set(field, JSON.stringify(payload));
         expect((await getPlayerTrackPbRecord({
             playerId: 'reddit:lap-boundaries',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         }))?.lapCompletionTimesSec).toBeNull();
 
@@ -615,7 +616,7 @@ describe('PB ghost trace and storage', () => {
         redis.hashes.get(collectionKey).set(field, JSON.stringify(payload));
         expect((await getPlayerTrackPbRecord({
             playerId: 'reddit:lap-boundaries',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         }))?.lapCompletionTimesSec).toBeNull();
     });
@@ -623,7 +624,7 @@ describe('PB ghost trace and storage', () => {
     it('drops non-finite checkpoint splits when parsing stored PB records', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:bad-checkpoints',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [1.2, 8],
@@ -638,7 +639,7 @@ describe('PB ghost trace and storage', () => {
 
         const record = await getPlayerTrackPbRecord({
             playerId: 'reddit:bad-checkpoints',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         });
 
@@ -660,7 +661,7 @@ describe('PB ghost trace and storage', () => {
 
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:invalid-schema',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
         expect(redis.hDel).toHaveBeenCalledWith(collectionKey, [field]);
@@ -669,7 +670,7 @@ describe('PB ghost trace and storage', () => {
     it('deletes stored PBs when the challenge track key no longer matches', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:track-key',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -679,7 +680,7 @@ describe('PB ghost trace and storage', () => {
         const mismatchedChallenge = { ...CHALLENGE, trackKey: 'harborParkLoop' };
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:track-key',
-            challenge: mismatchedChallenge,
+            competition: toDailyCompetition(mismatchedChallenge),
             track: TRACK,
         })).toBeNull();
         expect(redis.hDel).toHaveBeenCalled();
@@ -688,7 +689,7 @@ describe('PB ghost trace and storage', () => {
     it('drops invalid ghost traces when reading stored PB records', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:bad-ghost',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_500,
             checkpointTimesSec: [4, 8],
@@ -708,7 +709,7 @@ describe('PB ghost trace and storage', () => {
 
         const record = await getPlayerTrackPbRecord({
             playerId: 'reddit:bad-ghost',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         });
 
@@ -721,7 +722,7 @@ describe('PB ghost trace and storage', () => {
         const expectedField = createHash('sha256').update(playerId, 'utf8').digest('base64url');
         await upsertPlayerTrackPersonalBest({
             playerId,
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: null,
@@ -768,17 +769,17 @@ describe('PB ghost trace and storage', () => {
 
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:empty-key',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:bad-revision',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:no-updated-at',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
         expect(redis.hDel).toHaveBeenCalledTimes(3);
@@ -787,7 +788,7 @@ describe('PB ghost trace and storage', () => {
     it('returns the existing record without rewriting when it already wins the comparison', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:existing-winner',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],
@@ -797,7 +798,7 @@ describe('PB ghost trace and storage', () => {
 
         const result = await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:existing-winner',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_500,
             checkpointTimesSec: [5, 9],
@@ -822,7 +823,7 @@ describe('PB ghost trace and storage', () => {
 
         await expect(upsertPlayerTrackPersonalBest({
             playerId: 'reddit:cleanup-log',
-            challenge: CHALLENGE,
+            competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
             bestTimeMs: 12_000,
             checkpointTimesSec: [4, 8],

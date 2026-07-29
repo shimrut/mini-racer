@@ -1,9 +1,6 @@
 import { redisCompressed as redis } from '@devvit/redis';
 import { createHash } from 'node:crypto';
-import {
-    getDailyGpCompetitionTtlSeconds,
-    type DailyGpChallenge,
-} from './daily-gp-model.js';
+import type { Competition } from './competition.js';
 import {
     createTrackFingerprint,
     isValidPbGhostTrace,
@@ -35,18 +32,19 @@ export type PlayerTrackPbRecord = {
 
 const PB_LOCK_TTL_MS = 30_000;
 
-function getChallengeRaceIdentity(challenge: DailyGpChallenge): {
+/**
+ * A record is only interchangeable with another run of the same race, so the
+ * stored rules revision and lap count are what a reader checks before trusting
+ * one. Revision 0 predates multi-lap and is always a single lap.
+ */
+function getCompetitionRaceIdentity(competition: Competition): {
     rulesRevision: 0 | 1;
     lapCount: 1 | 2 | 3;
 } {
-    if (challenge.rulesRevision !== 1) {
+    if (competition.rulesRevision !== 1) {
         return { rulesRevision: 0, lapCount: 1 };
     }
-    const lapCount = challenge.objectiveParams?.lapCount;
-    return {
-        rulesRevision: 1,
-        lapCount: lapCount === 2 || lapCount === 3 ? lapCount : 1,
-    };
+    return { rulesRevision: 1, lapCount: competition.lapCount };
 }
 
 function playerField(playerId: string): string {
@@ -57,9 +55,9 @@ export function challengeCollectionKey(challengeId: string): string {
     return `dailygp:challenge-pbs:${challengeId}`;
 }
 
-function playerChallengeLockKey(challengeId: string, playerId: string): string {
+function playerChallengeLockKey(competitionId: string, playerId: string): string {
     const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
-    return `dailygp:challenge-pb-lock:${challengeId}:${playerHash}`;
+    return `dailygp:challenge-pb-lock:${competitionId}:${playerHash}`;
 }
 
 function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null {
@@ -110,25 +108,25 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
 
 async function readCompatibleRecord({
     playerId,
-    challenge,
+    competition,
     track,
 }: {
     playerId: string;
-    challenge: DailyGpChallenge;
+    competition: Competition;
     track: Record<string, any>;
 }): Promise<PlayerTrackPbRecord | null> {
-    const collectionKey = challengeCollectionKey(challenge.id);
+    const collectionKey = competition.pbHashKey;
     const field = playerField(playerId);
     const raw = await redis.hGet(collectionKey, field);
     const record = parseRecord(raw);
     const fingerprint = createTrackFingerprint(track);
-    const raceIdentity = getChallengeRaceIdentity(challenge);
+    const raceIdentity = getCompetitionRaceIdentity(competition);
     if (!record) {
         if (raw) await redis.hDel(collectionKey, [field]);
         return null;
     }
     if (
-        record.trackKey !== challenge.trackKey
+        record.trackKey !== competition.trackKey
         || record.trackFingerprint !== fingerprint
         || record.simulationRevision !== PB_GHOST_SIMULATION_REVISION
         || record.rulesRevision !== raceIdentity.rulesRevision
@@ -142,7 +140,7 @@ async function readCompatibleRecord({
 
 export async function getPlayerTrackPbRecord(input: {
     playerId: string;
-    challenge: DailyGpChallenge;
+    competition: Competition;
     track: Record<string, any>;
 }): Promise<PlayerTrackPbRecord | null> {
     return readCompatibleRecord(input);
@@ -150,7 +148,7 @@ export async function getPlayerTrackPbRecord(input: {
 
 export async function upsertPlayerTrackPersonalBest({
     playerId,
-    challenge,
+    competition,
     track,
     bestTimeMs,
     checkpointTimesSec,
@@ -160,7 +158,7 @@ export async function upsertPlayerTrackPersonalBest({
     updatedAt = new Date().toISOString(),
 }: {
     playerId: string;
-    challenge: DailyGpChallenge;
+    competition: Competition;
     track: Record<string, any>;
     bestTimeMs: number;
     checkpointTimesSec: number[] | null;
@@ -174,21 +172,23 @@ export async function upsertPlayerTrackPersonalBest({
     } | null;
     updatedAt?: string;
 }): Promise<{ record: PlayerTrackPbRecord; improved: boolean }> {
-    const trackKey = challenge.trackKey;
-    const ttlSeconds = getDailyGpCompetitionTtlSeconds(challenge);
-    if (ttlSeconds <= 0) {
+    const trackKey = competition.trackKey;
+    // A permanent competition has no deadline to miss. A time-boxed one still
+    // does, and writing a PB no reader would ever accept is worse than failing.
+    const ttlSeconds = competition.ttlSeconds;
+    if (ttlSeconds != null && ttlSeconds <= 0) {
         throw new Error('Personal best retention deadline has passed.');
     }
 
-    const lockKey = playerChallengeLockKey(challenge.id, playerId);
+    const lockKey = playerChallengeLockKey(competition.id, playerId);
     const lock = await acquireRedisLock(lockKey, PB_LOCK_TTL_MS, redis);
     if (!lock) {
         throw new Error('Personal best update already in progress.');
     }
     try {
-        const existing = await readCompatibleRecord({ playerId, challenge, track });
+        const existing = await readCompatibleRecord({ playerId, competition, track });
         const trackFingerprint = createTrackFingerprint(track);
-        const raceIdentity = getChallengeRaceIdentity(challenge);
+        const raceIdentity = getCompetitionRaceIdentity(competition);
         const current: PlayerTrackPbRecord = {
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
             trackKey,
@@ -243,11 +243,13 @@ export async function upsertPlayerTrackPersonalBest({
         if (!transaction) {
             throw new Error('Personal best lock ownership was lost.');
         }
-        const collectionKey = challengeCollectionKey(challenge.id);
+        const collectionKey = competition.pbHashKey;
         await transaction.hSet(collectionKey, {
             [playerField(playerId)]: encodeRedisCompressedValue(JSON.stringify(record)),
         });
-        await transaction.expire(collectionKey, ttlSeconds);
+        if (ttlSeconds != null) {
+            await transaction.expire(collectionKey, ttlSeconds);
+        }
         const transactionResults = await transaction.exec();
         if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
             throw new Error('Personal best lock ownership was lost.');

@@ -39,7 +39,29 @@ import {
 import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import type { FinalDailyGpPodium } from './daily-podium-model.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
-import { mintGuestPlayerToken, verifyGuestPlayerToken } from './player-token.js';
+import { toDailyCompetition } from './competition.js';
+import {
+    createEmptySnapshot,
+    isCompleteOpponentRecord,
+    parseStoredEntry,
+    readEntryByPlayerId,
+    readPlayerRank,
+    readRowsByRankRange,
+    readSnapshot,
+    toSnapshotRow,
+    writeEntry,
+    type SnapshotPayload,
+    type SnapshotRow,
+} from './competition-leaderboard.js';
+import {
+    claimNewGuestPlayerProfile,
+    normalizePlayerPreferences,
+    parseStoredPlayerProfile,
+    readPlayerProfile,
+    readPlayerProfileMap,
+    resolveAuthorizedPlayerIdentity,
+    upsertPlayerProfile,
+} from './competition-identity.js';
 import {
     getPlayerTrackPbRecord,
     seedPlayerTrackPersonalBest,
@@ -52,35 +74,14 @@ import {
     type RedisLock,
 } from './redis-lock.js';
 
-type SnapshotRow = {
-    rank: number;
-    rankLabel: string;
-    displayName: string;
-    bestTime: number;
-    bestTimeMs: number;
-    updatedAt: string;
-    isCurrentPlayer: boolean;
-    completedLaps: null;
-    checkpointTimesSec: number[] | null;
-    opponentRaceAvailable: boolean;
-};
-
-type SnapshotPayload = {
-    topRows: SnapshotRow[];
-    nearbyRows: SnapshotRow[];
-    currentPlayerRow: SnapshotRow | null;
-    /** Subreddit size when provided, else count of players with a posted time (at least this many). */
-    totalCount: number;
-    /** Players on the timed leaderboard (Redis z-card). */
-    leaderboardEntryCount: number;
-    objectiveType: string;
-    playerRank: number | null;
-    playerRankLabel: string | null;
-    pageOffset: number;
-    pageLimit: number;
-    hasMore: boolean;
-    nextOffset: number | null;
-};
+// Identity, profiles and the leaderboard itself are shared across every ranked
+// mode now. Re-exported here so the paths callers and tests already import from
+// keep resolving.
+export {
+    normalizePlayerPreferences,
+    parseStoredPlayerProfile,
+} from './competition-identity.js';
+export { parseStoredEntry } from './competition-leaderboard.js';
 
 type PlayerBootstrapPayload = {
     playerId: string | null;
@@ -111,21 +112,8 @@ function createSubmissionLockKey(challengeId: string, playerId: string): string 
     return `dailygp:submit-lock:${challengeId}:${playerId}`;
 }
 
-function createEmptySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
-    return {
-        topRows: [],
-        nearbyRows: [],
-        currentPlayerRow: null,
-        totalCount: 0,
-        leaderboardEntryCount: 0,
-        objectiveType: challenge.objectiveType,
-        playerRank: null,
-        playerRankLabel: null,
-        pageOffset: 0,
-        pageLimit: DAILY_GP_DEFAULT_LIMIT,
-        hasMore: false,
-        nextOffset: null,
-    };
+function createEmptyDailySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
+    return createEmptySnapshot(toDailyCompetition(challenge), DAILY_GP_DEFAULT_LIMIT);
 }
 
 function getUtcDayStart(dayIndex: number): Date {
@@ -411,406 +399,8 @@ export function normalizeOffset(offset: unknown): number {
     return Math.max(Math.trunc(Number(offset)), 0);
 }
 
-export function parseStoredEntry(
-    raw: string | null | undefined,
-    expectedTrackKey?: string,
-): DailyGpLeaderboardEntry | null {
-    if (!raw) return null;
 
-    try {
-        const parsed = JSON.parse(raw);
-        if (
-            !parsed
-            || typeof parsed !== 'object'
-            || typeof parsed.playerId !== 'string'
-            || !parsed.playerId
-            || !Number.isFinite(parsed.bestTimeMs)
-            || typeof parsed.updatedAt !== 'string'
-            || !parsed.updatedAt
-        ) {
-            return null;
-        }
 
-        const parsedTrackKey = typeof parsed.trackKey === 'string' && parsed.trackKey
-            ? parsed.trackKey
-            : null;
-        if (expectedTrackKey && parsedTrackKey && parsedTrackKey !== expectedTrackKey) {
-            return null;
-        }
-
-        const bestTimeMs = Number(parsed.bestTimeMs);
-        const checkpointTimesSec = normalizeCheckpointTimesSec(
-            bestTimeMs / 1000,
-            parsed.checkpointTimesSec,
-        );
-
-    return {
-        playerId: parsed.playerId,
-        trackKey: parsedTrackKey || expectedTrackKey || '',
-        bestTimeMs,
-        updatedAt: parsed.updatedAt,
-        completedLaps: parsed.completedLaps === 1
-            || parsed.completedLaps === 2
-            || parsed.completedLaps === 3
-            ? parsed.completedLaps
-            : null,
-        checkpointTimesSec,
-        validationMethod: parsed.validationMethod === 'strict-replay'
-            ? parsed.validationMethod
-            : undefined,
-        strictReplayFailureReason: typeof parsed.strictReplayFailureReason === 'string'
-            ? parsed.strictReplayFailureReason
-            : null,
-    };
-    } catch (_error) {
-        return null;
-    }
-}
-
-export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | null {
-    if (!value || typeof value !== 'object') {
-        return null;
-    }
-
-    const preferences = value as Record<string, unknown>;
-    const carSkin = typeof preferences.carSkin === 'string' ? preferences.carSkin.trim() : '';
-    const trailId = typeof preferences.trailId === 'string' ? preferences.trailId.trim() : '';
-    const crashRestartDelaySec = Number(preferences.crashRestartDelaySec);
-    if (
-        !carSkin
-        || carSkin.length > 160
-        || !trailId
-        || trailId.length > 32
-        || typeof preferences.musicEnabled !== 'boolean'
-        || typeof preferences.carAudioEnabled !== 'boolean'
-        || typeof preferences.crashAutoRestartEnabled !== 'boolean'
-        || (
-            preferences.pbGhostEnabled !== undefined
-            && typeof preferences.pbGhostEnabled !== 'boolean'
-        )
-        || !Number.isFinite(crashRestartDelaySec)
-        || crashRestartDelaySec < 0
-        || crashRestartDelaySec > 1
-    ) {
-        return null;
-    }
-
-    return {
-        carSkin,
-        trailId,
-        musicEnabled: preferences.musicEnabled,
-        carAudioEnabled: preferences.carAudioEnabled,
-        crashAutoRestartEnabled: preferences.crashAutoRestartEnabled,
-        crashRestartDelaySec: Math.round(crashRestartDelaySec * 10) / 10,
-        pbGhostEnabled: preferences.pbGhostEnabled !== false,
-    };
-}
-
-export function parseStoredPlayerProfile(raw: string | null | undefined): DailyGpPlayerProfile | null {
-    if (!raw) return null;
-
-    try {
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object' || typeof parsed.playerId !== 'string' || !parsed.playerId) {
-            return null;
-        }
-
-        return {
-            playerId: parsed.playerId,
-            leaderboardIdentity: normalizeLeaderboardIdentityPreference(parsed.leaderboardIdentity),
-            redditUsername: sanitizeRedditUsername(parsed.redditUsername),
-            preferences: normalizePlayerPreferences(parsed.preferences),
-            hasSeenGame: parsed.hasSeenGame !== false,
-            hasAnyData: Boolean(parsed.hasAnyData),
-            firstSeenAt: typeof parsed.firstSeenAt === 'string' && parsed.firstSeenAt
-                ? parsed.firstSeenAt
-                : new Date(0).toISOString(),
-            lastSeenAt: typeof parsed.lastSeenAt === 'string' && parsed.lastSeenAt
-                ? parsed.lastSeenAt
-                : new Date(0).toISOString(),
-            updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt
-                ? parsed.updatedAt
-                : new Date(0).toISOString(),
-        };
-    } catch (_error) {
-        return null;
-    }
-}
-
-function createRedisPlayerProfileKey(playerId: string): string {
-    const playerKey = createHash('sha256')
-        .update(playerId, 'utf8')
-        .digest('base64url');
-    return `dailygp:player-profile:${playerKey}`;
-}
-
-function createPlayerProfileExpirationDate(playerId: string): Date {
-    const ttlSeconds = playerId.startsWith('guest:')
-        ? DAILY_GP_GUEST_PROFILE_TTL_SECONDS
-        : DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS;
-    return new Date(Date.now() + ttlSeconds * 1000);
-}
-
-async function writePlayerProfile(profile: DailyGpPlayerProfile): Promise<void> {
-    await redis.set(
-        createRedisPlayerProfileKey(profile.playerId),
-        JSON.stringify(profile),
-        { expiration: createPlayerProfileExpirationDate(profile.playerId) },
-    );
-}
-
-function resolveStoredLeaderboardIdentity(
-    leaderboardIdentity: unknown,
-    previousProfile: DailyGpPlayerProfile | null,
-): 'constructed' | 'reddit' {
-    if (leaderboardIdentity === 'reddit' || leaderboardIdentity === 'constructed') {
-        return leaderboardIdentity;
-    }
-
-    return previousProfile?.leaderboardIdentity || 'constructed';
-}
-
-function normalizeGuestPlayerId(playerId: unknown): string | null {
-    return typeof playerId === 'string' && playerId.trim()
-        ? playerId.trim()
-        : null;
-}
-
-async function resolveAuthorizedPlayerIdentity({
-    playerId,
-    redditUsername,
-    guestToken,
-}: {
-    playerId?: unknown;
-    redditUsername?: unknown;
-    guestToken?: unknown;
-}): Promise<{
-    canonicalPlayerId: string | null;
-    guestPlayerId: string | null;
-    guestToken: string | null;
-}> {
-    const safeUsername = sanitizeRedditUsername(redditUsername);
-    if (safeUsername) {
-        return {
-            canonicalPlayerId: `reddit:${safeUsername.toLowerCase()}`,
-            guestPlayerId: null,
-            guestToken: null,
-        };
-    }
-
-    const normalizedGuestToken = typeof guestToken === 'string' && guestToken.trim()
-        ? guestToken.trim()
-        : null;
-    if (normalizedGuestToken) {
-        const verifiedGuestPlayerId = await verifyGuestPlayerToken(normalizedGuestToken);
-        if (!verifiedGuestPlayerId) {
-            return {
-                canonicalPlayerId: null,
-                guestPlayerId: null,
-                guestToken: null,
-            };
-        }
-
-        const normalizedGuestPlayerId = normalizeGuestPlayerId(playerId);
-        if (normalizedGuestPlayerId && normalizedGuestPlayerId !== verifiedGuestPlayerId) {
-            return {
-                canonicalPlayerId: null,
-                guestPlayerId: null,
-                guestToken: null,
-            };
-        }
-
-        return {
-            canonicalPlayerId: `guest:${verifiedGuestPlayerId}`,
-            guestPlayerId: verifiedGuestPlayerId,
-            guestToken: normalizedGuestToken,
-        };
-    }
-
-    return {
-        canonicalPlayerId: null,
-        guestPlayerId: null,
-        guestToken: null,
-    };
-}
-
-async function readPlayerProfile(playerId: string): Promise<DailyGpPlayerProfile | null> {
-    const rawProfile = await redis.get(createRedisPlayerProfileKey(playerId));
-    return parseStoredPlayerProfile(rawProfile);
-}
-
-function buildPlayerProfile({
-    playerId,
-    leaderboardIdentity,
-    redditUsername,
-    preferences,
-    hasAnyData,
-    previousProfile,
-}: {
-    playerId: string;
-    leaderboardIdentity?: unknown;
-    redditUsername?: unknown;
-    preferences?: unknown;
-    hasAnyData?: boolean;
-    previousProfile?: DailyGpPlayerProfile | null;
-}): DailyGpPlayerProfile {
-    const nowIso = new Date().toISOString();
-    return {
-        playerId,
-        leaderboardIdentity: resolveStoredLeaderboardIdentity(leaderboardIdentity, previousProfile || null),
-        redditUsername: sanitizeRedditUsername(redditUsername) || previousProfile?.redditUsername || null,
-        preferences: preferences === undefined
-            ? previousProfile?.preferences || null
-            : normalizePlayerPreferences(preferences),
-        hasSeenGame: true,
-        hasAnyData: Boolean(hasAnyData || previousProfile?.hasAnyData),
-        firstSeenAt: previousProfile?.firstSeenAt || nowIso,
-        lastSeenAt: nowIso,
-        updatedAt: nowIso,
-    };
-}
-
-async function claimNewGuestPlayerProfile({
-    playerId,
-    leaderboardIdentity,
-}: {
-    playerId?: unknown;
-    leaderboardIdentity?: unknown;
-}): Promise<{
-    canonicalPlayerId: string;
-    guestPlayerId: string;
-    guestToken: string;
-    profile: DailyGpPlayerProfile;
-} | null> {
-    const guestPlayerId = normalizeGuestPlayerId(playerId);
-    if (!guestPlayerId) {
-        return null;
-    }
-
-    const guestToken = await mintGuestPlayerToken(guestPlayerId);
-    if (!guestToken) {
-        return null;
-    }
-
-    const canonicalPlayerId = `guest:${guestPlayerId}`;
-    const profile = buildPlayerProfile({
-        playerId: canonicalPlayerId,
-        leaderboardIdentity,
-        hasAnyData: false,
-        previousProfile: null,
-    });
-    const claimed = await redis.set(
-        createRedisPlayerProfileKey(canonicalPlayerId),
-        JSON.stringify(profile),
-        { nx: true, expiration: createPlayerProfileExpirationDate(canonicalPlayerId) },
-    );
-    if (!claimed) {
-        return null;
-    }
-
-    return {
-        canonicalPlayerId,
-        guestPlayerId,
-        guestToken,
-        profile,
-    };
-}
-
-async function upsertPlayerProfile({
-    playerId,
-    leaderboardIdentity,
-    redditUsername,
-    preferences,
-    hasAnyData,
-    previousProfile,
-}: {
-    playerId: string;
-    leaderboardIdentity?: unknown;
-    redditUsername?: unknown;
-    preferences?: unknown;
-    hasAnyData?: boolean;
-    previousProfile?: DailyGpPlayerProfile | null;
-}): Promise<DailyGpPlayerProfile> {
-    const resolvedPreviousProfile = previousProfile ?? await readPlayerProfile(playerId);
-    const nextProfile = buildPlayerProfile({
-        playerId,
-        leaderboardIdentity,
-        redditUsername,
-        preferences,
-        hasAnyData,
-        previousProfile: resolvedPreviousProfile,
-    });
-
-    await writePlayerProfile(nextProfile);
-    return nextProfile;
-}
-
-async function readPlayerProfileMap(playerIds: string[]): Promise<Map<string, DailyGpPlayerProfile>> {
-    const uniquePlayerIds = [...new Set(playerIds.filter((playerId) => typeof playerId === 'string' && playerId))];
-    if (!uniquePlayerIds.length) {
-        return new Map();
-    }
-
-    const rawProfiles = await redis.mGet(uniquePlayerIds.map(createRedisPlayerProfileKey));
-    const profileMap = new Map<string, DailyGpPlayerProfile>();
-
-    uniquePlayerIds.forEach((playerId, index) => {
-        const parsed = parseStoredPlayerProfile(rawProfiles[index]);
-        if (parsed) {
-            profileMap.set(playerId, parsed);
-        }
-    });
-
-    return profileMap;
-}
-
-function toSnapshotRow(
-    entry: DailyGpLeaderboardEntry,
-    rank: number,
-    currentPlayerId: string | null,
-    profileMap: Map<string, DailyGpPlayerProfile>,
-    opponentRaceAvailable = false,
-): SnapshotRow {
-    const profile = profileMap.get(entry.playerId);
-    const isCurrentPlayer = entry.playerId === currentPlayerId;
-    return {
-        rank,
-        rankLabel: formatRankLabel(rank) || '--',
-        displayName: resolveLeaderboardDisplayName({
-            playerId: entry.playerId,
-            preference: profile?.leaderboardIdentity,
-            redditUsername: profile?.redditUsername,
-        }),
-        bestTime: entry.bestTimeMs / 1000,
-        bestTimeMs: entry.bestTimeMs,
-        updatedAt: entry.updatedAt,
-        isCurrentPlayer,
-        completedLaps: entry.completedLaps,
-        checkpointTimesSec: entry.checkpointTimesSec ?? null,
-        opponentRaceAvailable: !isCurrentPlayer && opponentRaceAvailable,
-    };
-}
-
-function isCompleteOpponentRecord(
-    entry: DailyGpLeaderboardEntry,
-    record: Awaited<ReturnType<typeof getPlayerTrackPbRecord>>,
-    challenge: DailyGpChallenge,
-): boolean {
-    const checkpointCount = (TRACKS[challenge.trackKey]?.checkpoints?.length || 0)
-        * challenge.objectiveParams.lapCount;
-    // The leaderboard entry and the PB record are written by two concurrent
-    // writes, and before they shared a timestamp they always disagreed by a few
-    // milliseconds. The run identity that matters is the time itself: an exact
-    // best-time match on both the record and its trace pins the ghost to this
-    // leaderboard row without stranding every entry set before that fix.
-    return Boolean(
-        record?.ghost
-        && record.bestTimeMs === entry.bestTimeMs
-        && record.ghost.finishTimeMs === entry.bestTimeMs
-        && Array.isArray(record.checkpointTimesSec)
-        && record.checkpointTimesSec.length === checkpointCount,
-    );
-}
 
 function formatPodiumTime(bestTimeMs: number): string {
     const totalCentiseconds = Math.max(0, Math.round(bestTimeMs / 10));
@@ -864,66 +454,6 @@ async function readFinalPodiumPositions(
     }) as FinalDailyGpPodium['positions'];
 }
 
-async function readRowsByRankRange(
-    challenge: DailyGpChallenge,
-    start: number,
-    stop: number,
-    currentPlayerId: string | null,
-): Promise<SnapshotRow[]> {
-    if (stop < start || start < 0) {
-        return [];
-    }
-
-    const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
-    const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
-    const rankedMembers = await redis.zRange(leaderboardKey, start, stop);
-    if (!rankedMembers.length) {
-        return [];
-    }
-
-    const rawEntries = await redis.hMGet(
-        entryHashKey,
-        rankedMembers.map((member) => member.member),
-    );
-    const profileMap = await readPlayerProfileMap(
-        rankedMembers.map((member) => member.member),
-    );
-
-    const rows = await Promise.all(rankedMembers
-        .map(async (member, index) => {
-            const storedEntry = parseStoredEntry(rawEntries[index], challenge.trackKey);
-            if (!storedEntry) return null;
-            const record = member.member === currentPlayerId
-                ? null
-                : await getPlayerTrackPbRecord({
-                    playerId: member.member,
-                    challenge,
-                    track: TRACKS[challenge.trackKey],
-                });
-            return toSnapshotRow(
-                storedEntry,
-                start + index + 1,
-                currentPlayerId,
-                profileMap,
-                isCompleteOpponentRecord(
-                    storedEntry,
-                    record,
-                    challenge,
-                ),
-            );
-        }));
-    return rows
-        .filter((entry): entry is SnapshotRow => Boolean(entry));
-}
-
-async function readEntryByPlayerId(
-    challengeId: string,
-    trackKey: string,
-    playerId: string,
-): Promise<DailyGpLeaderboardEntry | null> {
-    const rawEntry = await redis.hGet(createRedisChallengeEntryHashKey(challengeId), playerId);
-    return parseStoredEntry(rawEntry, trackKey);
-}
 
 async function checkSubmissionRateLimit(
     challengeId: string,
@@ -1040,8 +570,7 @@ export async function getServerDailyGpPlayerBest({
     }
 
     const entry = await readEntryByPlayerId(
-        challenge.id,
-        challenge.trackKey,
+        toDailyCompetition(challenge),
         `reddit:${username.toLowerCase()}`,
     );
     return entry ? { challenge, bestTimeMs: entry.bestTimeMs } : null;
@@ -1076,25 +605,22 @@ async function readOrSeedTrackPersonalBest({
     const track = TRACKS[challenge.trackKey];
     if (!track) return null;
 
+    const competition = toDailyCompetition(challenge);
     const existing = await getPlayerTrackPbRecord({
         playerId,
-        challenge,
+        competition,
         track,
     });
     if (existing) return existing;
 
-    const retainedEntry = await readEntryByPlayerId(
-        challenge.id,
-        challenge.trackKey,
-        playerId,
-    );
+    const retainedEntry = await readEntryByPlayerId(competition, playerId);
     if (!retainedEntry || retainedEntry.validationMethod !== 'strict-replay') {
         return null;
     }
 
     const seeded = await seedPlayerTrackPersonalBest({
         playerId,
-        challenge,
+        competition,
         track,
         bestTimeMs: retainedEntry.bestTimeMs,
         checkpointTimesSec: retainedEntry.checkpointTimesSec,
@@ -1429,20 +955,7 @@ export async function getServerDailyGpSnapshot({
         ? await getServerDailyGpPlayableChallenge(challengeId)
         : activeChallenge;
     if (!challenge) {
-        return createEmptySnapshot(activeChallenge);
-    }
-
-    const safeLimit = normalizeLimit(limit);
-    const safeOffset = normalizeOffset(offset);
-    const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
-    const leaderboardEntryCount = await redis.zCard(leaderboardKey);
-    const communityFloor = normalizeCommunityMemberTotal(communityMemberTotal);
-    const totalCount = communityFloor != null
-        ? Math.max(leaderboardEntryCount, communityFloor)
-        : leaderboardEntryCount;
-
-    if (leaderboardEntryCount === 0 && totalCount === 0) {
-        return createEmptySnapshot(challenge);
+        return createEmptyDailySnapshot(activeChallenge);
     }
 
     const identity = await resolveAuthorizedPlayerIdentity({
@@ -1459,89 +972,14 @@ export async function getServerDailyGpSnapshot({
             hasAnyData: false,
         });
     }
-    const topRows = leaderboardEntryCount
-        ? await readRowsByRankRange(
-            challenge,
-            safeOffset,
-            safeOffset + safeLimit - 1,
-            normalizedPlayerId,
-        )
-        : [];
-    const playerRankZeroBased = normalizedPlayerId && leaderboardEntryCount
-        ? await redis.zRank(leaderboardKey, normalizedPlayerId)
-        : undefined;
-    const playerRank = Number.isFinite(playerRankZeroBased)
-        ? Number(playerRankZeroBased) + 1
-        : null;
 
-    const playerInTop = normalizedPlayerId
-        ? topRows.find((row) => row.isCurrentPlayer) || null
-        : null;
-
-    if (playerInTop) {
-        return {
-            topRows,
-            nearbyRows: [],
-            currentPlayerRow: {
-                ...playerInTop,
-                isCurrentPlayer: true,
-            },
-            totalCount,
-            leaderboardEntryCount,
-            objectiveType: challenge.objectiveType,
-            playerRank,
-            playerRankLabel: formatRankLabel(playerRank),
-            pageOffset: safeOffset,
-            pageLimit: safeLimit,
-            hasMore: safeOffset + safeLimit < leaderboardEntryCount,
-            nextOffset: safeOffset + safeLimit < leaderboardEntryCount
-                ? safeOffset + safeLimit
-                : null,
-        };
-    }
-
-    let currentPlayerRow: SnapshotRow | null = null;
-    if (normalizedPlayerId && playerRank) {
-        const storedEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
-        if (storedEntry) {
-            const profileMap = await readPlayerProfileMap([normalizedPlayerId]);
-            currentPlayerRow = toSnapshotRow(storedEntry, playerRank, normalizedPlayerId, profileMap);
-            currentPlayerRow.isCurrentPlayer = true;
-        }
-    }
-
-    let nearbyRows: SnapshotRow[] = [];
-    const playerOutsidePage = Boolean(
-        playerRank
-        && (playerRank <= safeOffset || playerRank > safeOffset + safeLimit)
-    );
-    if (playerOutsidePage && leaderboardEntryCount) {
-        const nearbyStart = Math.max(0, playerRank - DAILY_GP_NEARBY_RADIUS - 1);
-        const nearbyStop = nearbyStart + (DAILY_GP_NEARBY_RADIUS * 2);
-        nearbyRows = await readRowsByRankRange(
-            challenge,
-            nearbyStart,
-            nearbyStop,
-            normalizedPlayerId,
-        );
-    }
-
-    return {
-        topRows,
-        nearbyRows,
-        currentPlayerRow,
-        totalCount,
-        leaderboardEntryCount,
-        objectiveType: challenge.objectiveType,
-        playerRank,
-        playerRankLabel: formatRankLabel(playerRank),
-        pageOffset: safeOffset,
-        pageLimit: safeLimit,
-        hasMore: safeOffset + safeLimit < leaderboardEntryCount,
-        nextOffset: safeOffset + safeLimit < leaderboardEntryCount
-            ? safeOffset + safeLimit
-            : null,
-    };
+    return readSnapshot({
+        competition: toDailyCompetition(challenge),
+        playerId: normalizedPlayerId,
+        limit: normalizeLimit(limit),
+        offset: normalizeOffset(offset),
+        communityFloor: normalizeCommunityMemberTotal(communityMemberTotal),
+    });
 }
 
 type OpponentRowSelection = {
@@ -1623,18 +1061,15 @@ export async function prepareServerDailyLeaderboardRace({
         return { status: 400, body: { error: 'Opponent selection is invalid.', reason: 'invalid_selection' } };
     }
 
-    const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
+    const competition = toDailyCompetition(challenge);
+    const leaderboardKey = competition.leaderboardKey;
     let rankedCandidates: Array<{ member: string; rank: number }> = [];
     if (selection.kind === 'row') {
         const ranked = await redis.zRange(leaderboardKey, selection.rank - 1, selection.rank - 1);
         rankedCandidates = ranked.map((row) => ({ member: row.member, rank: selection.rank }));
     } else {
         const ownRankZeroBased = await redis.zRank(leaderboardKey, identity.canonicalPlayerId);
-        const ownEntry = await readEntryByPlayerId(
-            challenge.id,
-            challenge.trackKey,
-            identity.canonicalPlayerId,
-        );
+        const ownEntry = await readEntryByPlayerId(competition, identity.canonicalPlayerId);
         const benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
         if (!Number.isFinite(benchmarkTimeMs)) {
             return { status: 409, body: { error: 'Set a time before choosing the next opponent.', reason: 'benchmark_required' } };
@@ -1656,14 +1091,10 @@ export async function prepareServerDailyLeaderboardRace({
             }
             continue;
         }
-        const entry = await readEntryByPlayerId(challenge.id, challenge.trackKey, candidate.member);
+        const entry = await readEntryByPlayerId(competition, candidate.member);
         if (!entry) continue;
         if (selection.kind === 'next-faster') {
-            const ownEntry = await readEntryByPlayerId(
-                challenge.id,
-                challenge.trackKey,
-                identity.canonicalPlayerId,
-            );
+            const ownEntry = await readEntryByPlayerId(competition, identity.canonicalPlayerId);
             const benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
             if (!benchmarkTimeMs || entry.bestTimeMs >= benchmarkTimeMs) continue;
         }
@@ -1685,10 +1116,10 @@ export async function prepareServerDailyLeaderboardRace({
         }
         const record = await getPlayerTrackPbRecord({
             playerId: candidate.member,
-            challenge,
+            competition,
             track: TRACKS[challenge.trackKey],
         });
-        if (!isCompleteOpponentRecord(entry, record, challenge)) {
+        if (!isCompleteOpponentRecord(entry, record, competition)) {
             if (selection.kind === 'row') {
                 return { status: 409, body: { error: 'That opponent ghost is unavailable.', reason: 'ghost_unavailable' } };
             }
@@ -1875,33 +1306,19 @@ export async function submitServerDailyGpRun({
         entry: DailyGpLeaderboardEntry;
     }>;
     let trackPbPersistence: PromiseSettledResult<Awaited<ReturnType<typeof upsertPlayerTrackPersonalBest>>>;
+    const competition = toDailyCompetition(challenge);
     try {
-        previousEntry = await readEntryByPlayerId(challenge.id, challenge.trackKey, normalizedPlayerId);
+        previousEntry = await readEntryByPlayerId(competition, normalizedPlayerId);
         const dailyWrite = async () => {
             if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
                 return { interrupted: false, improved: false, entry: previousEntry };
             }
 
-            const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
-            const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
             const tx = await beginOwnedRedisLockTransaction(submissionLock, redis);
             if (!tx) {
                 return { interrupted: true, improved: false, entry: previousEntry ?? nextEntry };
             }
-            await tx.hSet(
-                entryHashKey,
-                { [normalizedPlayerId]: JSON.stringify(nextEntry) },
-            );
-            await tx.zAdd(
-                leaderboardKey,
-                {
-                    member: normalizedPlayerId,
-                    score: encodeDailyGpLeaderboardScore(nextBestTimeMs),
-                },
-            );
-            const competitionTtlSeconds = getDailyGpCompetitionTtlSeconds(challenge);
-            await tx.expire(leaderboardKey, competitionTtlSeconds);
-            await tx.expire(entryHashKey, competitionTtlSeconds);
+            await writeEntry(competition, normalizedPlayerId, nextEntry, tx);
             const transactionResults = await tx.exec();
             return {
                 interrupted: !Array.isArray(transactionResults) || transactionResults.length === 0,
@@ -1920,7 +1337,7 @@ export async function submitServerDailyGpRun({
             dailyWrite(),
             upsertPlayerTrackPersonalBest({
                 playerId: normalizedPlayerId,
-                challenge,
+                competition,
                 track,
                 bestTimeMs: nextBestTimeMs,
                 checkpointTimesSec: normalizedCheckpointTimesSec,
