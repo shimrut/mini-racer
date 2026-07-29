@@ -258,8 +258,8 @@ export class TrackCarousel {
         previewLock.className = 'track-carousel__preview-lock';
         previewLock.setAttribute('aria-hidden', 'true');
         previewLock.appendChild(createLockIconSvg('track-carousel__preview-lock-icon'));
-        previewArt.append(canvas, previewLock);
-        preview.append(previewArt, medal);
+        previewArt.append(canvas);
+        preview.append(previewArt, medal, previewLock);
 
         const content = document.createElement('div');
         content.className = 'daily-playlist-hero-content';

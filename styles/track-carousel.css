@@ -358,8 +358,8 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     top: 50%;
     left: 50%;
     display: grid;
-    width: 2rem;
-    height: 2rem;
+    width: 4.5rem;
+    height: 4.5rem;
     place-items: center;
     border-radius: 999px;
     background: rgba(248, 250, 252, .06);
@@ -375,8 +375,8 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 .track-carousel__preview-lock-icon {
-    width: .72rem;
-    height: .96rem;
+    width: 1.65rem;
+    height: 2.2rem;
 }
 
 .track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-title {

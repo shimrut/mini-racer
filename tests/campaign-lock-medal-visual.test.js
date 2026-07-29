@@ -35,10 +35,11 @@ describe('Campaign locked-stage medal progress visual', () => {
             /\.track-carousel__unlock-medal \.medal-svg__center-time\s*\{[^}]*font-family:\s*var\(--mono-font\);/s,
         );
         expect(ui).toContain("createLockIconSvg('track-carousel__preview-lock-icon')");
+        expect(ui).toContain('preview.append(previewArt, medal, previewLock)');
         expect(ui).toContain('parts.previewLock.hidden = !card.locked');
         expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
         expect(css).toMatch(
-            /\.track-carousel__preview-lock\s*\{[^}]*background:\s*rgba\(248,\s*250,\s*252,\s*\.06\);[^}]*color:\s*#fff;/s,
+            /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4\.5rem;[^}]*height:\s*4\.5rem;[^}]*background:\s*rgba\(248,\s*250,\s*252,\s*\.06\);[^}]*color:\s*#fff;/s,
         );
         expect(css).not.toContain('.track-carousel__meter-fill');
     });
