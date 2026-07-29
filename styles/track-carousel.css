@@ -113,6 +113,25 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     cursor: default;
 }
 
+/* A peeking card is the shape of a track and nothing else. Fading the whole
+   card still left its medals, rank, date, laps and best time legible enough to
+   read, so three cards' worth of detail competed with the one being chosen.
+   Only the centred card states its details.
+
+   Faded rather than removed: the rail stretches every card to the same height,
+   so taking the details out of the layout would let a peeking card's track
+   drawing grow larger than the selected one's. */
+.track-carousel .daily-playlist-hero-medal,
+.track-carousel .daily-playlist-hero-content {
+    transition: opacity 0.18s ease-out;
+}
+
+.track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected) .daily-playlist-hero-medal,
+.track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected) .daily-playlist-hero-content {
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* The sheet's rows lift on hover; a peeking card is scenery, not a target. */
 .track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected):hover {
     transform: none;
