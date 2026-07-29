@@ -8,9 +8,8 @@ import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
 import {
-    clearLocalCampaignProgress,
     createCampaignChallenge,
-    getClaimableCampaignResults,
+    deriveCampaignProgress,
     getCampaignBootstrap,
     getCampaignChallenge,
     getCampaignPbGhost,
@@ -18,9 +17,6 @@ import {
     previewCampaignChallenge,
     previewCampaignChallengeBrag,
     confirmCampaignChallengeBrag,
-    readLocalCampaignProgress,
-    saveLocalCampaignFinish,
-    startLocalCampaign,
     startServerCampaignRace,
     submitCampaignChallengeRun,
     submitCampaignRun,
@@ -149,6 +145,7 @@ function decorateCampaignState(bootstrap) {
     // differently from "not loaded" on a card.
     const standingsResolved = Boolean(bootstrap?.standingsByRaceId);
     return {
+        ranked: bootstrap?.ranked === true,
         signedIn: bootstrap?.signedIn === true,
         startedAt: progress.startedAt || null,
         complete: progress.complete === true,
@@ -178,9 +175,10 @@ function decorateCampaignState(bootstrap) {
 function buildProvisionalCampaignBootstrap(previous = null) {
     return {
         campaignId: CAMPAIGN_ID,
+        ranked: previous?.ranked === true,
         signedIn: previous?.signedIn === true,
         stages: CAMPAIGN_STAGES,
-        progress: previous?.progress || readLocalCampaignProgress(),
+        progress: previous?.progress || deriveCampaignProgress(),
     };
 }
 
@@ -303,17 +301,11 @@ export const campaignEngineMethods = {
         const requestId = (this._campaignBootstrapRequestId || 0) + 1;
         this._campaignBootstrapRequestId = requestId;
         const promise = getCampaignBootstrap()
-            .then(async (bootstrap) => {
+            .then((bootstrap) => {
                 if (requestId !== this._campaignBootstrapRequestId) {
                     return this.campaignBootstrap;
                 }
                 this.applyCampaignLobbyBootstrap(bootstrap, { paint: true });
-                const claimed = await this.claimGuestCampaignProgress?.(bootstrap);
-                if (claimed && requestId === this._campaignBootstrapRequestId) {
-                    const refreshed = await getCampaignBootstrap();
-                    this.applyCampaignLobbyBootstrap(refreshed, { paint: true });
-                    return refreshed;
-                }
                 return bootstrap;
             })
             .finally(() => {
@@ -323,52 +315,6 @@ export const campaignEngineMethods = {
             });
         this._campaignBootstrapPromise = promise;
         return promise;
-    },
-
-    /**
-     * Promotes guest practice results into the signed-in Campaign profile.
-     *
-     * Guest medals are computed on the client and are never trusted, so each
-     * stored replay is replayed through the normal validated submit endpoint:
-     * the server re-derives the time and medal, and anything it refuses simply
-     * does not claim. Stages are walked in order because each accepted Gold is
-     * what unlocks the next one.
-     */
-    async claimGuestCampaignProgress(bootstrap) {
-        if (bootstrap?.signedIn !== true || this._campaignClaimAttempted) return false;
-        const local = readLocalCampaignProgress();
-        const claimable = getClaimableCampaignResults(local);
-        if (!claimable.length) return false;
-        this._campaignClaimAttempted = true;
-
-        const serverResults = bootstrap.progress?.resultsByRaceId || {};
-        let claimedAny = false;
-        for (const result of claimable) {
-            const stage = getCampaignStage(result.raceId);
-            if (!stage) continue;
-            // Never trade a verified server result down for a guest one.
-            const existing = serverResults[result.raceId];
-            if (existing && Number(existing.bestTimeMs) <= result.bestTimeMs) continue;
-            try {
-                const response = await submitCampaignRun({
-                    raceId: stage.raceId,
-                    trackKey: stage.trackKey,
-                    replay: result.replay,
-                });
-                if (!(response.ok && response.body?.accepted === true)) {
-                    // A refused stage leaves everything above it locked, so
-                    // there is nothing further to claim.
-                    break;
-                }
-                claimedAny = true;
-            } catch (error) {
-                console.warn('Could not claim guest Campaign progress:', error);
-                break;
-            }
-        }
-
-        if (claimedAny) clearLocalCampaignProgress();
-        return claimedAny;
     },
 
     async loadCampaignLobby({ show = true } = {}) {
@@ -471,31 +417,29 @@ export const campaignEngineMethods = {
             );
             if (!stage) return;
 
-            const signedIn = this.campaignBootstrap?.signedIn === true;
+            const ranked = this.campaignBootstrap?.ranked === true;
             // Same shape as Daily: nothing on the wire gates the countdown. Both
             // requests go out now and are folded in once the lights are running,
             // so the player waits for the track load and nothing else.
-            const startRequest = signedIn
+            const startRequest = ranked
                 ? startServerCampaignRace(stage.raceId).catch((error) => {
                     console.warn('Could not stamp the Campaign race start:', error);
                     return null;
                 })
                 : null;
-            const ghostRequest = signedIn
+            const ghostRequest = ranked
                 ? getCampaignPbGhost(stage.raceId).catch((error) => {
                     console.warn('Campaign PB ghost was unavailable for this run:', error);
                     return null;
                 })
                 : null;
-            if (!signedIn) startLocalCampaign();
 
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
             this.activeCampaignChallenge = null;
-            if (!signedIn) {
-                // Guest Campaign progress is local and unverified. Never let a
-                // canonical PB left in memory from another identity become its
-                // comparison baseline.
+            if (!ranked) {
+                // Nothing will be ranked, so never let a canonical PB left in
+                // memory from another identity become the comparison baseline.
                 this.applyCampaignPersonalBest(stage, null);
             }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
@@ -837,10 +781,10 @@ export const campaignEngineMethods = {
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const medal = getMedalForRaceTime(stage.trackKey, finalTime, stage.lapCount);
-        // Read before the guest path merges this finish into progress, or the
-        // run would look like it had already earned its own medal.
+        // Read before verification writes this finish into progress, or the run
+        // would look like it had already earned its own medal.
         const previousMedal = getStoredCampaignStageMedal(this.campaignBootstrap, stage.raceId);
-        const signedIn = this.campaignBootstrap?.signedIn === true;
+        const ranked = this.campaignBootstrap?.ranked === true;
         const previousVerifiedBestSec = getCampaignVerificationBestTimeSec(this, stage);
         const isCampaignBest = isNewBestResult(
             this.currentRunPolicy || { bestResultComparator: 'time' },
@@ -853,7 +797,7 @@ export const campaignEngineMethods = {
         // Match Daily's submission boundary: a valid finish still gets its
         // result sheet, opponent outcome, and retry controls, but only a strict
         // improvement enters verification. Equal and slower runs never enqueue.
-        if (signedIn && !isCampaignBest) {
+        if (ranked && !isCampaignBest) {
             this.showCampaignFinish(stage, {
                 finalTime,
                 medal,
@@ -883,9 +827,8 @@ export const campaignEngineMethods = {
                     ? 'Run too long to rank.'
                     : 'Submission replay was unavailable for this run.');
 
-        // A run the client cannot rank must not advance progression on either
-        // side of the sign-in line: guest unlocks read the same medal that a
-        // verified server result would have written.
+        // A run the client cannot rank must not advance progression: an unlock
+        // only ever follows a medal the server itself derived.
         if (blockedReason) {
             this.showCampaignFinish(stage, {
                 finalTime,
@@ -897,18 +840,18 @@ export const campaignEngineMethods = {
             return;
         }
 
-        if (!signedIn) {
-            // The replay rides along so signing in later can have the server
-            // verify this run instead of discarding it.
-            const local = saveLocalCampaignFinish(stage.raceId, finalTime, { replay });
-            if (this.campaignBootstrap) this.campaignBootstrap.progress = local;
-            this.showCampaignFinish(stage, { finalTime, medal, previousMedal });
-            this.configureLeaderboardOpponentFinish?.({
-                mode: 'campaign',
-                race: stage,
+        // Without a player identity the server has nothing to rank against, so
+        // the finish is shown but nothing is queued.
+        if (!ranked) {
+            this.showCampaignFinish(stage, {
                 finalTime,
-                comparison: this.getRaceComparisonResult?.(finalTime) ?? null,
-                guest: true,
+                medal: null,
+                previousMedal,
+                message: 'Campaign results could not be ranked.',
+                scoreboardSnapshot: campaignErrorSnapshot(
+                    finalTime,
+                    'Campaign results could not be ranked.',
+                ),
             });
             return;
         }

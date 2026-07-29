@@ -6,7 +6,7 @@ const campaignServiceMocks = vi.hoisted(() => ({
     getCampaignChallenge: vi.fn(),
     getCampaignPbGhost: vi.fn(),
     getCampaignSnapshot: vi.fn(),
-    readLocalCampaignProgress: vi.fn(() => ({
+    deriveCampaignProgress: vi.fn(() => ({
         campaignId: 'numbered-v1',
         startedAt: null,
         resultsByRaceId: {},
@@ -14,11 +14,7 @@ const campaignServiceMocks = vi.hoisted(() => ({
         complete: false,
         continueRaceId: 'numbered-v1-00',
     })),
-    saveLocalCampaignFinish: vi.fn(),
-    clearLocalCampaignProgress: vi.fn(),
-    getClaimableCampaignResults: vi.fn(),
     startServerCampaignRace: vi.fn(),
-    startLocalCampaign: vi.fn(),
     submitCampaignChallengeRun: vi.fn(),
     submitCampaignRun: vi.fn(),
 }));
@@ -30,11 +26,7 @@ vi.mock('../game/campaign/service.js', () => ({
     getCampaignPbGhost: campaignServiceMocks.getCampaignPbGhost,
     getCampaignSnapshot: campaignServiceMocks.getCampaignSnapshot,
     previewCampaignChallenge: vi.fn(),
-    readLocalCampaignProgress: campaignServiceMocks.readLocalCampaignProgress,
-    saveLocalCampaignFinish: campaignServiceMocks.saveLocalCampaignFinish,
-    clearLocalCampaignProgress: campaignServiceMocks.clearLocalCampaignProgress,
-    getClaimableCampaignResults: campaignServiceMocks.getClaimableCampaignResults,
-    startLocalCampaign: campaignServiceMocks.startLocalCampaign,
+    deriveCampaignProgress: campaignServiceMocks.deriveCampaignProgress,
     startServerCampaignRace: campaignServiceMocks.startServerCampaignRace,
     submitCampaignChallengeRun: campaignServiceMocks.submitCampaignChallengeRun,
     submitCampaignRun: campaignServiceMocks.submitCampaignRun,
@@ -181,8 +173,8 @@ afterEach(() => {
     campaignServiceMocks.getCampaignChallenge.mockReset();
     campaignServiceMocks.getCampaignPbGhost.mockReset();
     campaignServiceMocks.getCampaignSnapshot.mockReset();
-    campaignServiceMocks.readLocalCampaignProgress.mockReset();
-    campaignServiceMocks.readLocalCampaignProgress.mockReturnValue({
+    campaignServiceMocks.deriveCampaignProgress.mockReset();
+    campaignServiceMocks.deriveCampaignProgress.mockReturnValue({
         campaignId: 'numbered-v1',
         startedAt: null,
         resultsByRaceId: {},
@@ -190,11 +182,7 @@ afterEach(() => {
         complete: false,
         continueRaceId: 'numbered-v1-00',
     });
-    campaignServiceMocks.saveLocalCampaignFinish.mockReset();
-    campaignServiceMocks.clearLocalCampaignProgress.mockReset();
-    campaignServiceMocks.getClaimableCampaignResults.mockReset();
     campaignServiceMocks.startServerCampaignRace.mockReset();
-    campaignServiceMocks.startLocalCampaign.mockReset();
     campaignServiceMocks.submitCampaignChallengeRun.mockReset();
     campaignServiceMocks.submitCampaignRun.mockReset();
 });
@@ -213,7 +201,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             currentChallengeRun: {},
             currentTime: 8.25,
             bestLapTime: null,
-            campaignBootstrap: { signedIn: true, progress: {} },
+            campaignBootstrap: { ranked: true,
+            signedIn: true, progress: {} },
             journeys: { endAttempt: vi.fn() },
             scoreboardReplay: {
                 overflowed: false,
@@ -243,133 +232,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             ...overrides,
         };
     }
-
-    function createClaimContext() {
-        return {
-            ...campaignEngineMethods,
-            _campaignClaimAttempted: false,
-            campaignBootstrap: null,
-            activeRaceMode: 'campaign',
-            lobbyUi: { getMode: () => 'campaign', showCampaign: vi.fn() },
-        };
-    }
-
-    // Seeds the stored guest record and the ordered claim list derived from it.
-    function seedGuestProgress(...raceIds) {
-        const results = Object.fromEntries(raceIds.map((raceId, index) => [raceId, {
-            raceId,
-            bestTimeMs: 7100 - index,
-            replay: { targetLapNumber: 1, inputs: [] },
-        }]));
-        campaignServiceMocks.readLocalCampaignProgress.mockReturnValue({
-            resultsByRaceId: results,
-        });
-        campaignServiceMocks.getClaimableCampaignResults.mockReturnValue(
-            raceIds.map((raceId) => results[raceId]),
-        );
-        return results;
-    }
-
-    it('has the server verify stored guest runs when the player signs in', async () => {
-        const context = createClaimContext();
-        seedGuestProgress('numbered-v1-00', 'numbered-v1-01');
-        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
-            ok: true,
-            body: { accepted: true },
-        });
-
-        const claimed = await context.claimGuestCampaignProgress({
-            signedIn: true,
-            progress: { resultsByRaceId: {} },
-        });
-
-        expect(claimed).toBe(true);
-        // Claimed bottom-up: each accepted stage is what unlocks the next.
-        expect(campaignServiceMocks.submitCampaignRun.mock.calls.map(([input]) => input.raceId))
-            .toEqual(['numbered-v1-00', 'numbered-v1-01']);
-        expect(campaignServiceMocks.clearLocalCampaignProgress).toHaveBeenCalled();
-    });
-
-    it('stops claiming at the first stage the server refuses', async () => {
-        const context = createClaimContext();
-        seedGuestProgress('numbered-v1-00', 'numbered-v1-01');
-        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
-            ok: false,
-            status: 422,
-            body: { accepted: false, error: 'Submission replay validation failed.' },
-        });
-
-        const claimed = await context.claimGuestCampaignProgress({
-            signedIn: true,
-            progress: { resultsByRaceId: {} },
-        });
-
-        expect(claimed).toBe(false);
-        expect(campaignServiceMocks.submitCampaignRun).toHaveBeenCalledTimes(1);
-        // Nothing was verified, so the guest record must survive for a retry.
-        expect(campaignServiceMocks.clearLocalCampaignProgress).not.toHaveBeenCalled();
-    });
-
-    it('never trades a verified server result down for a guest one', async () => {
-        const context = createClaimContext();
-        const slow = {
-            raceId: 'numbered-v1-00',
-            bestTimeMs: 9000,
-            replay: { targetLapNumber: 1, inputs: [] },
-        };
-        campaignServiceMocks.readLocalCampaignProgress.mockReturnValue({
-            resultsByRaceId: { 'numbered-v1-00': slow },
-        });
-        campaignServiceMocks.getClaimableCampaignResults.mockReturnValue([slow]);
-
-        const claimed = await context.claimGuestCampaignProgress({
-            signedIn: true,
-            progress: {
-                resultsByRaceId: { 'numbered-v1-00': { bestTimeMs: 7100 } },
-            },
-        });
-
-        expect(claimed).toBe(false);
-        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
-    });
-
-    it('claims nothing for a guest and never claims twice', async () => {
-        const context = createClaimContext();
-        seedGuestProgress('numbered-v1-00');
-        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
-            ok: true,
-            body: { accepted: true },
-        });
-
-        expect(await context.claimGuestCampaignProgress({ signedIn: false })).toBe(false);
-        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
-
-        await context.claimGuestCampaignProgress({
-            signedIn: true,
-            progress: { resultsByRaceId: {} },
-        });
-        campaignServiceMocks.submitCampaignRun.mockClear();
-        await context.claimGuestCampaignProgress({
-            signedIn: true,
-            progress: { resultsByRaceId: {} },
-        });
-        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
-    });
-
-    it('stores the replay with a guest finish so it can be claimed later', () => {
-        const context = createCampaignFinishContext({
-            campaignBootstrap: { signedIn: false, progress: {} },
-        });
-        campaignServiceMocks.saveLocalCampaignFinish.mockReturnValue({ resultsByRaceId: {} });
-
-        context.handleCampaignWin({ lapTime: 8.25 });
-
-        expect(campaignServiceMocks.saveLocalCampaignFinish).toHaveBeenCalledWith(
-            'numbered-v1-00',
-            8.25,
-            { replay: { revision: 1, segments: [] } },
-        );
-    });
 
     it('opens the finish modal once and queues the run before submission settles', async () => {
         const context = createCampaignFinishContext();
@@ -410,7 +272,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         const configureLeaderboardOpponentFinish = vi.fn();
         const context = createCampaignFinishContext({
             campaignBootstrap: {
-                signedIn: true,
+                ranked: true,
+            signedIn: true,
                 progress: {
                     resultsByRaceId: {
                         'numbered-v1-00': {
@@ -465,7 +328,8 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('still verifies a strictly faster Campaign finish', () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: {
-                signedIn: true,
+                ranked: true,
+            signedIn: true,
                 progress: {
                     resultsByRaceId: {
                         'numbered-v1-00': {
@@ -553,7 +417,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect.anything(),
         );
         expect(context.processVerificationQueue).not.toHaveBeenCalled();
-        expect(campaignServiceMocks.saveLocalCampaignFinish).not.toHaveBeenCalled();
     });
 
     it('reports an overflowed replay as too long rather than unverifiable', () => {
@@ -583,7 +446,8 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('hands the finish sheet the medal this stage had banked before the run', () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: {
-                signedIn: true,
+                ranked: true,
+            signedIn: true,
                 progress: {
                     resultsByRaceId: {
                         'numbered-v1-00': { raceId: 'numbered-v1-00', bestTimeMs: 8000, medal: 'silver' },
@@ -602,10 +466,11 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
-    it('reads the guest stage medal before this finish is merged into progress', () => {
+    it('reads the banked stage medal before this finish is verified', () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: {
-                signedIn: false,
+                ranked: true,
+                signedIn: true,
                 progress: {
                     resultsByRaceId: {
                         'numbered-v1-00': { raceId: 'numbered-v1-00', bestTimeMs: 8300, medal: 'bronze' },
@@ -613,13 +478,8 @@ describe('Campaign lobby and shared modal adapters', () => {
                 },
             },
         });
-        // The guest path banks the finish before opening the sheet, so a late
-        // read would hand back this run's own medal and skip its celebration.
-        campaignServiceMocks.saveLocalCampaignFinish.mockReturnValue({
-            resultsByRaceId: {
-                'numbered-v1-00': { raceId: 'numbered-v1-00', bestTimeMs: 8250, medal: 'gold' },
-            },
-        });
+        // Verification writes this finish into progress, so a late read would
+        // hand back this run's own medal and skip its celebration.
 
         context.handleCampaignWin({ lapTime: 8.25 });
 
@@ -1269,6 +1129,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(body.dataset.lobbyMode).toBe('campaign');
 
         lobby.showChallenge({
+            ranked: true,
             signedIn: true,
             available: true,
             challengerName: 'shimroot',
@@ -1662,6 +1523,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         resolveBootstrap({
             campaignId: 'numbered-v1',
+            ranked: true,
             signedIn: true,
             stages: [
                 {
@@ -1717,6 +1579,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         context.applyCampaignLobbyBootstrap({
             campaignId: 'numbered-v1',
+            ranked: true,
             signedIn: true,
             stages: [{
                 raceId: 'numbered-v1-00',
@@ -1799,6 +1662,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         resolveBootstrap({
             campaignId: 'numbered-v1',
+            ranked: true,
             signedIn: true,
             stages: [{
                 raceId: 'numbered-v1-00',
@@ -1816,7 +1680,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         await startPromise;
 
         expect(campaignServiceMocks.startServerCampaignRace).toHaveBeenCalledWith('numbered-v1-00');
-        expect(campaignServiceMocks.startLocalCampaign).not.toHaveBeenCalled();
         expect(context.startSequence).toHaveBeenCalledTimes(1);
         expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenCalledWith(false);
         expect(context.loadCampaignLobby).not.toHaveBeenCalled();
@@ -1830,7 +1693,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             activeRaceMode: 'campaign',
             startButtonPending: false,
             _campaignBootstrapReady: true,
-            campaignBootstrap: { signedIn: true, progress: {} },
+            campaignBootstrap: { ranked: true,
+            signedIn: true, progress: {} },
             campaignLobbyState: {
                 complete: false,
                 nextStage: { id: 'numbered-v1-00' },

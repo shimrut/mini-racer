@@ -129,7 +129,6 @@ export const opponentRaceEngineMethods = {
         finalTime,
         comparison,
         waitForVerification = false,
-        guest = false,
     } = {}) {
         if (!comparison?.target || !comparison?.outcome) return;
 
@@ -152,10 +151,6 @@ export const opponentRaceEngineMethods = {
                 : retryOpponentPrimaryAction(this, mode),
         );
 
-        if (guest && this.modal?.modalMsg) {
-            const current = this.modal.modalMsg.textContent || '';
-            this.modal.modalMsg.textContent = `${current}${current ? ' · ' : ''}Sign in to claim your Campaign rank.`;
-        }
         if (comparison.outcome !== 'won' || waitForVerification) return;
         void this.resolveLeaderboardOpponentAdvanceAfterVerification({
             mode,

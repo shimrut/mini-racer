@@ -25,6 +25,7 @@ import {
 } from './competition-leaderboard.js';
 import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
+import { verifyGuestPlayerToken } from './player-token.js';
 import { submitCompetitionRun } from './competition-submit.js';
 import { getPlayerTrackPbRecord } from './pb-ghost-store.js';
 import { redisCompressed } from '@devvit/redis';
@@ -198,6 +199,25 @@ export async function getServerCampaignBootstrap({
 } = {}) {
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     const canonicalPlayerId = identity.canonicalPlayerId;
+
+    // Signing in is the moment a guest's ladder would otherwise be stranded, so
+    // it is claimed here, before the bootstrap reports what they own.
+    if (canonicalPlayerId?.startsWith('reddit:')) {
+        const guestPlayerId = await verifyGuestPlayerToken(guestToken);
+        if (guestPlayerId) {
+            try {
+                await mergeGuestCampaignProgress({
+                    guestPlayerId: `guest:${guestPlayerId}`,
+                    redditPlayerId: canonicalPlayerId,
+                });
+            } catch (error) {
+                // A failed claim must not cost the player their bootstrap; the
+                // guest keys survive, so the next load tries again.
+                console.error('Campaign guest progress claim failed:', error);
+            }
+        }
+    }
+
     const [progress, standingsByRaceId] = await Promise.all([
         canonicalPlayerId ? readProgress(canonicalPlayerId) : Promise.resolve(emptyProgress()),
         readCampaignStandingsByRaceId(canonicalPlayerId),
@@ -206,7 +226,11 @@ export async function getServerCampaignBootstrap({
         status: 200,
         body: {
             campaignId: CAMPAIGN_ID,
-            signedIn: Boolean(canonicalPlayerId),
+            // Whether the player is ranked is what gates racing; being signed in
+            // with Reddit is now only about how they are named and whether their
+            // progress is permanent. Guests are ranked too.
+            ranked: Boolean(canonicalPlayerId),
+            signedIn: Boolean(canonicalPlayerId?.startsWith('reddit:')),
             stages: CAMPAIGN_STAGES,
             progress: publicProgress(progress),
             standingsByRaceId,

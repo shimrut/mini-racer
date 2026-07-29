@@ -1,4 +1,3 @@
-import { getMedalForRaceTime } from '../medals/medal-timing.js';
 import {
     API_ROUTES,
     getGuestPlayerToken,
@@ -7,11 +6,9 @@ import {
 import {
     CAMPAIGN_ID,
     CAMPAIGN_STAGES,
-    getCampaignStage,
     getCampaignUnlockedRaceIds,
 } from './manifest.js';
 
-const LOCAL_PROGRESS_KEY = `MiniRacerCampaignProgress:${CAMPAIGN_ID}`;
 export const CAMPAIGN_REQUEST_TIMEOUT_MS = 20_000;
 
 function emptyResults() {
@@ -34,9 +31,6 @@ function normalizeResults(value) {
                 ? raw.medal
                 : null,
             updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
-            // Kept so a guest result can be re-validated by the server if the
-            // player signs in later. Guest medals themselves are never trusted.
-            replay: raw.replay && typeof raw.replay === 'object' ? raw.replay : null,
         };
     }
     return results;
@@ -59,81 +53,6 @@ export function deriveCampaignProgress(resultsByRaceId = {}, startedAt = null) {
         )),
         continueRaceId: continueStage?.raceId ?? null,
     };
-}
-
-export function readLocalCampaignProgress(root = globalThis) {
-    try {
-        const raw = root?.localStorage?.getItem(LOCAL_PROGRESS_KEY);
-        if (!raw) return deriveCampaignProgress();
-        const parsed = JSON.parse(raw);
-        return deriveCampaignProgress(parsed?.resultsByRaceId, parsed?.startedAt);
-    } catch {
-        return deriveCampaignProgress();
-    }
-}
-
-function writeLocalCampaignProgress(progress, root = globalThis) {
-    try {
-        root?.localStorage?.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(progress));
-    } catch {
-        // Guest Campaign progress is best-effort browser state.
-    }
-    return progress;
-}
-
-export function startLocalCampaign(root = globalThis) {
-    const current = readLocalCampaignProgress(root);
-    if (current.startedAt) return current;
-    return writeLocalCampaignProgress({
-        ...current,
-        startedAt: new Date().toISOString(),
-    }, root);
-}
-
-export function saveLocalCampaignFinish(raceId, timeSec, {
-    replay = null,
-    root = globalThis,
-} = {}) {
-    const stage = getCampaignStage(raceId);
-    const bestTimeMs = Math.round(Number(timeSec) * 1000);
-    if (!stage || !Number.isSafeInteger(bestTimeMs) || bestTimeMs <= 0) {
-        return readLocalCampaignProgress(root);
-    }
-    const current = startLocalCampaign(root);
-    const previous = current.resultsByRaceId[raceId];
-    if (previous && previous.bestTimeMs <= bestTimeMs) return current;
-    const medal = getMedalForRaceTime(stage.trackKey, bestTimeMs / 1000, stage.lapCount);
-    return writeLocalCampaignProgress(deriveCampaignProgress({
-        ...current.resultsByRaceId,
-        [raceId]: {
-            raceId,
-            bestTimeMs,
-            medal,
-            updatedAt: new Date().toISOString(),
-            replay: replay && typeof replay === 'object' ? replay : null,
-        },
-    }, current.startedAt), root);
-}
-
-/**
- * Guest results that still carry a replay, in stage order.
- *
- * Order matters: the server refuses a locked stage, so a claim has to walk the
- * ladder from the bottom and let each accepted result unlock the next.
- */
-export function getClaimableCampaignResults(progress) {
-    const results = progress?.resultsByRaceId || {};
-    return CAMPAIGN_STAGES
-        .map((stage) => results[stage.raceId])
-        .filter((result) => result?.replay && Number.isSafeInteger(result.bestTimeMs));
-}
-
-export function clearLocalCampaignProgress(root = globalThis) {
-    try {
-        root?.localStorage?.removeItem(LOCAL_PROGRESS_KEY);
-    } catch {
-        // Clearing claimed guest progress is best-effort browser state.
-    }
 }
 
 async function requestJson(url, options = {}) {
@@ -197,39 +116,40 @@ export function normalizeCampaignStandings(value) {
     return standings;
 }
 
+/**
+ * Progress is whatever the server says it is, for guests as much as for signed-in
+ * players — both are ranked server-side. An unreachable server therefore reports
+ * nothing rather than inventing a local ladder that would disagree with it.
+ */
+function unavailableCampaignBootstrap() {
+    return {
+        campaignId: CAMPAIGN_ID,
+        ranked: false,
+        signedIn: false,
+        stages: CAMPAIGN_STAGES,
+        progress: deriveCampaignProgress(),
+        standingsByRaceId: normalizeCampaignStandings(null),
+    };
+}
+
 export async function getCampaignBootstrap() {
-    if (typeof fetch !== 'function') {
-        return {
-            campaignId: CAMPAIGN_ID,
-            signedIn: false,
-            stages: CAMPAIGN_STAGES,
-            progress: readLocalCampaignProgress(),
-            standingsByRaceId: normalizeCampaignStandings(null),
-        };
-    }
+    if (typeof fetch !== 'function') return unavailableCampaignBootstrap();
     try {
         const response = await requestJson(campaignUrl(API_ROUTES.campaignBootstrapUrl).toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
         return {
             campaignId: CAMPAIGN_ID,
+            ranked: response.body.ranked === true,
             signedIn: response.body.signedIn === true,
             stages: Array.isArray(response.body.stages) ? response.body.stages : CAMPAIGN_STAGES,
-            progress: response.body.signedIn === true
-                ? deriveCampaignProgress(
-                    response.body.progress?.resultsByRaceId,
-                    response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
-                )
-                : readLocalCampaignProgress(),
+            progress: deriveCampaignProgress(
+                response.body.progress?.resultsByRaceId,
+                response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
+            ),
             standingsByRaceId: normalizeCampaignStandings(response.body.standingsByRaceId),
         };
     } catch {
-        return {
-            campaignId: CAMPAIGN_ID,
-            signedIn: false,
-            stages: CAMPAIGN_STAGES,
-            progress: readLocalCampaignProgress(),
-            standingsByRaceId: normalizeCampaignStandings(null),
-        };
+        return unavailableCampaignBootstrap();
     }
 }
 
@@ -308,5 +228,3 @@ export async function confirmCampaignChallengeBrag(shareToken) {
         body: JSON.stringify({ shareToken }),
     });
 }
-
-export { LOCAL_PROGRESS_KEY };
