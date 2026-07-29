@@ -1480,7 +1480,7 @@ export const dailyChallengeEngineMethods = {
           modalKind: "win",
           primaryActionLabel: "Retry",
           secondaryActionLabel: "Done",
-          secondaryAction: () => this.reset(false),
+          secondaryAction: () => this.returnToActiveLobby(),
         }),
         restartAction: () => this.restartDailyChallenge({ reason: "improve" }),
         settingsAction: () => this.settings.openSettings(),

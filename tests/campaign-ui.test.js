@@ -1829,6 +1829,52 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.loadCampaignLobby).not.toHaveBeenCalled();
     });
 
+    it('keeps a medal earned while the Campaign start stamp is still in flight', async () => {
+        let resolveStart;
+        campaignServiceMocks.startServerCampaignRace.mockReturnValue(new Promise((resolve) => {
+            resolveStart = resolve;
+        }));
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+        const context = createStartContext();
+
+        await context.startCampaignStage();
+        context.campaignBootstrap.progress = {
+            resultsByRaceId: {
+                'numbered-v1-00': {
+                    raceId: 'numbered-v1-00',
+                    bestTimeMs: 7_000,
+                    medal: 'author',
+                },
+            },
+            unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
+            complete: false,
+        };
+
+        resolveStart({
+            ok: true,
+            body: {
+                progress: {
+                    startedAt: '2026-07-26T00:00:00.000Z',
+                    resultsByRaceId: {},
+                    unlockedRaceIds: ['numbered-v1-00'],
+                    complete: false,
+                },
+            },
+        });
+
+        await vi.waitFor(() => {
+            expect(context.campaignBootstrap.progress.startedAt)
+                .toBe('2026-07-26T00:00:00.000Z');
+        });
+        expect(context.campaignBootstrap.progress.resultsByRaceId['numbered-v1-00'])
+            .toMatchObject({ bestTimeMs: 7_000, medal: 'author' });
+        expect(context.campaignBootstrap.progress.unlockedRaceIds)
+            .toEqual(['numbered-v1-00', 'numbered-v1-01']);
+    });
+
     it('sends the player back to the lobby when the server refuses the stage', async () => {
         campaignServiceMocks.startServerCampaignRace.mockResolvedValue({
             ok: false,

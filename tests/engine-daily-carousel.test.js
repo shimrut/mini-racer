@@ -309,6 +309,39 @@ describe('daily carousel engine wiring', () => {
         expect(engine.selectedDailyChallengeId).toBe('daily-2');
     });
 
+    it('repaints a server-confirmed medal when returning from the result sheet', () => {
+        playlistState.cached = CHALLENGES;
+        playlistState.fetched = CHALLENGES;
+        const { engine, render } = createEngine({
+            status: 'won',
+            activeRaceMode: 'daily',
+            activeDailyChallenge: CHALLENGES[0],
+            lastPlayedDailyChallenge: CHALLENGES[0],
+            currentChallengeRun: { challengeId: CHALLENGES[0].id },
+            trackPersonalBestByTrackKey: {
+                [CHALLENGES[0].id]: { bestTime: 1 },
+            },
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: { showDaily: vi.fn() },
+            reset: vi.fn(function reset() {
+                this.activeDailyChallenge = null;
+                this.currentChallengeRun = null;
+                this.status = 'ready';
+            }),
+        });
+        engine.refreshDailyCarousel =
+            dailyChallengeEngineMethods.refreshDailyCarousel.bind(engine);
+        engine.showDailyLobby = modeRouterEngineMethods.showDailyLobby.bind(engine);
+
+        modeRouterEngineMethods.returnToActiveLobby.call(engine);
+        flushLobbyPaint();
+
+        const racedCard = render.mock.calls[0][0]
+            .find((card) => card.challengeId === CHALLENGES[0].id);
+        expect(racedCard).toMatchObject({ medal: 'author' });
+        expect(racedCard.medalTiers.every((slot) => slot.filled)).toBe(true);
+    });
+
     it('restores from the completed race even if hidden scroll state changed selection', () => {
         const refreshDailyCarousel = vi.fn();
         const engine = {

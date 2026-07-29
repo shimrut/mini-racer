@@ -95,6 +95,11 @@ flowchart LR
 - Finish-screen RANK first paint and live updates share `applyCombinedRankValue` in `game/race/result-flow.js`, so loading shows Submitting/Verifying status text and failures keep RANK visible with the error. After the win modal opens, a synchronous queue sync paints Verifying when an entry still exists; if accept finishes with no standings snapshot, loading clears and RANK hides.
 - Daily leaderboard rows and PB ghosts are separate challenge-scoped records with the same fixed deadline: six hours after `availableUntil`. Entries retain the verified completed-lap count, and ghosts additionally bind rules revision and lap count. One server replay simulation validates the complete daily race and produces the canonical ghost. Both writes run concurrently; the leaderboard write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`.
 - Accepted submissions return the complete canonical `trackPersonalBest` record. The client validates and installs that record before GO without another `/api/player/pb-ghost` request. A pending faster lap makes the old prepared ghost ineligible for Improve; if the canonical result is unresolved, unavailable, or malformed at GO, the attempt starts normally without a ghost and shows `GHOST UNAVAILABLE` for two seconds after GO disappears. A late valid response is cached for the next attempt and never changes a ghost during an active run.
+- Once a finish has been confirmed, the result sheet's Done action returns
+  through the shared active-lobby router rather than merely resetting the race.
+  That route preserves the raced challenge selection and repaints the Daily
+  carousel from the installed canonical PB, so its earned medals are visible
+  without leaving Daily and entering it again.
 - Custom-post startup resolves the playable challenge before dismissing the loading screen and prepares that challenge's PB ghost as an initial race asset. A still-valid historical post therefore loads its historical track ghost, while an expired post resolves to the current featured challenge and loads today's ghost. The first `Race Now` start preserves this prepared asset instead of clearing and preparing it again; restarts continue reusing the same frozen record.
 - PB ghost playback uses the same interpolated render timestamp as the live car. It does not render directly from the 60 Hz fixed-step clock, so uneven or higher-refresh display frames cannot expose the ghost as repeated positions followed by jumps.
 - Tracks-to-race handoff hides the lobby immediately, resets the selected track without restoring the start overlay, and starts the countdown without awaiting PB ghost work. Ghost playback freezes when the countdown completes, allowing a canonical submission response received during the countdown to join that attempt without delaying GO.
@@ -145,7 +150,10 @@ flowchart LR
   unlock. The lobby keeps its primary action pending until bootstrap resolves
   rather than briefly guessing Start or Continue; a completed Campaign keeps a
   Complete primary action that opens Tracks. Follow-up PB ghost and lobby
-  refreshes also stay in the background. Campaign client requests abort after 20 seconds so a stalled
+  refreshes also stay in the background. The detached start acknowledgement
+  owns only the Campaign `startedAt` stamp; it must not replace progress results,
+  because its pre-race snapshot can arrive after a finish and erase the new
+  medal from the selector. Campaign client requests abort after 20 seconds so a stalled
   WebView request is terminal. Guest Campaign progress is browser-local.
   Campaign uses the same compact lobby actions and modal shells as Daily:
   Standings selects among unlocked stage-specific leaderboards, while Tracks

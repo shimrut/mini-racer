@@ -359,9 +359,10 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(showModal).toHaveBeenCalled();
   });
 
-  it("keeps leaderboard-open enabled for completed daily runs", () => {
+  it("keeps leaderboard-open enabled and returns completed runs through the Daily selector", () => {
     const showModal = vi.fn();
     const endAttempt = vi.fn();
+    const returnToActiveLobby = vi.fn();
 
     RealTimeRacer.prototype.handleDailyChallengeWin.call(
       {
@@ -392,6 +393,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         },
         restartDailyChallenge: vi.fn(),
         reset: vi.fn(),
+        returnToActiveLobby,
         enqueueDailyChallengeVerificationSubmission: vi.fn(),
         scoreboardReplay: { getPayload: vi.fn(() => ({ inputs: [] })) },
       },
@@ -418,6 +420,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       }),
     );
     expect(showModal.mock.calls[0][3]).not.toHaveProperty("playlistAction");
+    showModal.mock.calls[0][3].secondaryAction();
+    expect(returnToActiveLobby).toHaveBeenCalledTimes(1);
     expect(endAttempt).toHaveBeenCalledWith({ complete: true });
   });
 

@@ -551,7 +551,19 @@ export const campaignEngineMethods = {
         if (!started) return;
         if (started.ok) {
             if (this.campaignBootstrap && started.body?.progress) {
-                this.campaignBootstrap.progress = started.body.progress;
+                const startedAt = started.body.progress.startedAt;
+                // The start stamp was read before the race. Its result map can
+                // therefore be older than a medal earned while this request was
+                // in flight. Only fold in the one field this request owns.
+                if (
+                    typeof startedAt === 'string'
+                    && !this.campaignBootstrap.progress?.startedAt
+                ) {
+                    this.campaignBootstrap.progress = {
+                        ...(this.campaignBootstrap.progress || deriveCampaignProgress()),
+                        startedAt,
+                    };
+                }
             }
             return;
         }
