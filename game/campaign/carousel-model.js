@@ -32,9 +32,9 @@ function buildMetaLabel(stage, lapsLabel) {
 }
 
 /**
- * Gold gates the campaign; once it is banked Author is what is left to chase.
- * Either way the card states one target, never a table of them — this is the
- * number campaign play is actually organised around.
+ * Gold is what a stage is worth chasing to; once it is banked Author is the one
+ * medal left on the table. Either way the card states one target, never a table
+ * of them — this is the number campaign play is actually organised around.
  */
 function buildChase(stage) {
     if (!stage.unlocked) return null;

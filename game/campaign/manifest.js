@@ -1,3 +1,4 @@
+import { STANDARD_MEDAL_TIER_RANK } from '../medals/medal-timing.js';
 import {
     normalizeRaceSpec,
     RACE_MEDAL_SCALE_LINEAR_V1,
@@ -7,21 +8,33 @@ import {
 export const CAMPAIGN_ID = 'numbered-v1';
 export const CAMPAIGN_RULES_REVISION = 1;
 
+/**
+ * A stage opens on the player's medal total across the whole campaign rather
+ * than on one medal on the stage before it. A chain makes a single track the
+ * player cannot Gold a full stop; a total lets strength on one track pay for
+ * weakness on another, and gives Author a reason to exist beyond pride.
+ *
+ * From stage 03 the requirement is Silver on every previous track plus Gold on
+ * half of them — 2n + floor(n / 2). Stages 01 and 02 are set below that curve so
+ * the opening is not a wall. Every gate stays reachable without a single Author
+ * (each is under 3n, the Gold-on-everything total), and each one asks 2 or 3
+ * more than the last, so no stage can be skipped.
+ */
 const STAGE_DEFINITIONS = [
-    ['00', 'numberZero', 1, null],
-    ['01', 'numberOne', 1, 'numbered-v1-00'],
-    ['02', 'numberTwo', 1, 'numbered-v1-01'],
-    ['03', 'numberThree', 2, 'numbered-v1-02'],
-    ['04', 'numberFour', 2, 'numbered-v1-03'],
-    ['05', 'numberFive', 2, 'numbered-v1-04'],
-    ['06', 'numberSix', 3, 'numbered-v1-05'],
-    ['07', 'numberSeven', 3, 'numbered-v1-06'],
-    ['08', 'numberEight', 3, 'numbered-v1-07'],
-    ['09', 'numberNine', 3, 'numbered-v1-08'],
+    ['00', 'numberZero', 1, 0],
+    ['01', 'numberOne', 1, 1],
+    ['02', 'numberTwo', 1, 3],
+    ['03', 'numberThree', 2, 7],
+    ['04', 'numberFour', 2, 10],
+    ['05', 'numberFive', 2, 12],
+    ['06', 'numberSix', 3, 15],
+    ['07', 'numberSeven', 3, 17],
+    ['08', 'numberEight', 3, 20],
+    ['09', 'numberNine', 3, 22],
 ];
 
 export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(
-    ([stageNumber, trackKey, lapCount, prerequisiteRaceId], index) => {
+    ([stageNumber, trackKey, lapCount, requiredMedals], index) => {
         const raceSpec = normalizeRaceSpec({
             raceId: `${CAMPAIGN_ID}-${stageNumber}`,
             mode: 'campaign',
@@ -36,12 +49,8 @@ export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(
             stageIndex: index,
             stageNumber,
             ...raceSpec,
-            unlock: prerequisiteRaceId
-                ? Object.freeze({
-                    type: 'medal_on_race',
-                    raceId: prerequisiteRaceId,
-                    minimumMedal: 'gold',
-                })
+            unlock: requiredMedals > 0
+                ? Object.freeze({ type: 'medal_total', requiredMedals })
                 : Object.freeze({ type: 'start' }),
         });
     },
@@ -53,17 +62,35 @@ export function getCampaignStage(raceId) {
     return typeof raceId === 'string' ? STAGE_BY_RACE_ID.get(raceId) ?? null : null;
 }
 
-export function getCampaignUnlockedRaceIds(resultsByRaceId = {}) {
-    const unlocked = [];
+/**
+ * What one stage contributes to the total: the number of medals showing in its
+ * stack, which is what the lobby card already draws. Bronze is worth 1 and
+ * Author 4, so an Author is two Silvers ahead where a Gold is one.
+ */
+export function getCampaignStageMedalCount(medal) {
+    const rank = typeof medal === 'string' ? STANDARD_MEDAL_TIER_RANK[medal] : undefined;
+    return rank === undefined ? 0 : rank + 1;
+}
+
+/** Medals banked across every campaign stage. Nothing outside the campaign counts. */
+export function countCampaignMedals(resultsByRaceId = {}) {
+    let total = 0;
     for (const stage of CAMPAIGN_STAGES) {
-        if (stage.unlock.type === 'start') {
-            unlocked.push(stage.raceId);
-            continue;
-        }
-        const medal = resultsByRaceId?.[stage.unlock.raceId]?.medal;
-        if (medal === 'gold' || medal === 'author') unlocked.push(stage.raceId);
+        total += getCampaignStageMedalCount(resultsByRaceId?.[stage.raceId]?.medal);
     }
-    return unlocked;
+    return total;
+}
+
+/**
+ * Progress only ever keeps a better medal per stage, so the total climbs and an
+ * unlock earned here cannot lapse. The one path back is the explicit revoke of a
+ * finish the server refused, which drops the result and re-derives from scratch.
+ */
+export function getCampaignUnlockedRaceIds(resultsByRaceId = {}) {
+    const medalTotal = countCampaignMedals(resultsByRaceId);
+    return CAMPAIGN_STAGES
+        .filter((stage) => stage.unlock.type === 'start' || medalTotal >= stage.unlock.requiredMedals)
+        .map((stage) => stage.raceId);
 }
 
 export function isCampaignStageUnlocked(raceId, resultsByRaceId = {}) {

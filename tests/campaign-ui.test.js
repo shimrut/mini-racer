@@ -154,8 +154,8 @@ function campaignState() {
                 unlocked: false,
                 bestTimeLabel: 'No time',
                 medal: null,
-                unlock: { type: 'medal_on_race', raceId: 'numbered-v1-01', minimumMedal: 'gold' },
-                unlockRequirementLabel: 'Gold on Number One to unlock',
+                unlock: { type: 'medal_total', requiredMedals: 3 },
+                unlockRequirementLabel: '1/3 medals to unlock',
             },
         ],
     };

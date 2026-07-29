@@ -23,16 +23,22 @@ describe('campaign client progress', () => {
         expect(progress.continueRaceId).toBe('numbered-v1-00');
     });
 
-    it('unlocks the next stage only with Gold or Author', () => {
+    it('unlocks stages as the medal total climbs', () => {
+        // Silver is two medals: enough for the 1-medal gate, short of the 3.
         const silver = deriveCampaignProgress({
             'numbered-v1-00': { bestTimeMs: 7500, medal: 'silver' },
         });
-        expect(silver.unlockedRaceIds).toEqual(['numbered-v1-00']);
+        expect(silver.unlockedRaceIds).toEqual(['numbered-v1-00', 'numbered-v1-01']);
 
+        // The same stage improved to Gold is a third medal, and opens the next.
         const gold = deriveCampaignProgress({
             'numbered-v1-00': { bestTimeMs: 7100, medal: 'gold' },
         });
-        expect(gold.unlockedRaceIds).toEqual(['numbered-v1-00', 'numbered-v1-01']);
+        expect(gold.unlockedRaceIds).toEqual([
+            'numbered-v1-00',
+            'numbered-v1-01',
+            'numbered-v1-02',
+        ]);
     });
 
     it('aborts a Campaign request that never settles', async () => {

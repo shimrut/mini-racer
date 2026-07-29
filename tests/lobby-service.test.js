@@ -81,24 +81,27 @@ describe('lobby service', () => {
         expect(locked.needsAuthor).toBe(false);
     });
 
-    it('names the stage a locked row is waiting on', () => {
+    it('prices a locked row against the medals the player has banked', () => {
         const state = normalizeCampaignLobbyState({
             stages: [
-                { id: 'a', trackName: 'Number Five', unlocked: true, medal: 'Silver' },
+                // Author and Silver: four medals plus two.
+                { id: 'a', trackName: 'Number Five', unlocked: true, medal: 'Author' },
+                { id: 'b', trackName: 'Number Six', unlocked: true, medal: 'Silver' },
                 {
-                    id: 'b',
-                    trackName: 'Number Six',
+                    id: 'c',
+                    trackName: 'Number Seven',
                     unlocked: false,
-                    unlock: { type: 'medal_on_race', raceId: 'a', minimumMedal: 'gold' },
+                    unlock: { type: 'medal_total', requiredMedals: 10 },
                 },
-                { id: 'c', trackName: 'Number Seven', unlocked: false },
+                { id: 'd', trackName: 'Number Eight', unlocked: false },
             ],
         });
 
         expect(state.stages[0].unlockRequirementLabel).toBeNull();
-        expect(state.stages[1].unlockRequirementLabel).toBe('Gold on Number Five to unlock');
-        // No unlock metadata: the stage above it is still the honest answer.
-        expect(state.stages[2].unlockRequirementLabel).toBe('Gold on Number Six to unlock');
+        expect(state.stages[1].unlockRequirementLabel).toBeNull();
+        expect(state.stages[2].unlockRequirementLabel).toBe('6/10 medals to unlock');
+        // No unlock metadata: say it needs more without inventing a number.
+        expect(state.stages[3].unlockRequirementLabel).toBe('More medals to unlock');
     });
 
     it('flags exactly one stage as the one to race next', () => {

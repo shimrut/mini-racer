@@ -239,7 +239,8 @@ describe('Campaign server store', () => {
                 bestTimeMs: 1000,
                 trackPbPersistenceStatus: 'stored',
                 progress: {
-                    unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
+                    // One Author is four medals, which clears the 1- and 3-medal gates.
+                    unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01', 'numbered-v1-02'],
                     resultsByRaceId: {
                         'numbered-v1-00': { bestTimeMs: 1000, medal: 'author' },
                     },
@@ -759,7 +760,7 @@ describe('Campaign server store', () => {
                 status: 200,
                 body: {
                     progress: {
-                        unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
+                        unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01', 'numbered-v1-02'],
                         resultsByRaceId: {
                             'numbered-v1-00': { bestTimeMs: 1000, medal: 'author' },
                         },

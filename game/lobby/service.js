@@ -1,3 +1,4 @@
+import { getCampaignStageMedalCount } from '../campaign/manifest.js';
 import { getRaceMedalThresholds, STANDARD_MEDAL_TIER_RANK } from '../medals/medal-timing.js';
 
 const NUMBER_WORDS = [
@@ -35,15 +36,10 @@ function normalizeMedalName(medal) {
     return typeof medal === 'string' ? medal.trim().toLowerCase() : '';
 }
 
-/** Gold is the campaign gate: Author clears it too, everything below does not. */
+/** Gold is what counts a stage as cleared: Author clears it too, nothing below does. */
 export function isCampaignGoldMedal(medal) {
     const rank = STANDARD_MEDAL_TIER_RANK[normalizeMedalName(medal)];
     return rank !== undefined && rank >= STANDARD_MEDAL_TIER_RANK.gold;
-}
-
-function formatMedalRequirement(medal) {
-    const name = normalizeMedalName(medal);
-    return name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Gold';
 }
 
 function formatGoldGap(gapMs) {
@@ -71,9 +67,10 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
     const thresholds = getRaceMedalThresholds(trackKey, laps);
     const goldTargetMs = thresholds?.gold == null ? null : Math.round(thresholds.gold * 1000);
     const authorTargetMs = thresholds?.author == null ? null : Math.round(thresholds.author * 1000);
-    // Gold is what opens the next stage, so until it is earned the target — and
-    // how far off the best run is — is the only number the stage owes the player.
-    // Author takes over once Gold is banked, so a cleared stage still has a goal.
+    // Every tier is worth another medal towards the gate, so a stage always has
+    // somewhere to go. Gold is the one to name first — the curve is built around
+    // reaching it — and how far off the best run is comes with it. Author takes
+    // over once Gold is banked, still worth one more medal on the total.
     const needsGold = unlocked && goldTargetMs !== null && !isCampaignGoldMedal(medal);
     const needsAuthor = unlocked
         && !needsGold
@@ -104,7 +101,7 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
         authorTargetLabel: authorTargetMs === null ? null : formatLobbyTime(authorTargetMs),
         needsAuthor,
         authorGapLabel: needsAuthor ? gapTo(authorTargetMs) : null,
-        // Kept so a re-normalized state can still name the stage that gates this one.
+        // Kept so a re-normalized state can still state what this stage costs.
         unlock: stage.unlock ?? null,
         standingsAvailable: Boolean(stage.standingsAvailable ?? stage.unlocked),
         playerRank: Number.isInteger(stage.playerRank) && stage.playerRank > 0
@@ -119,19 +116,21 @@ export function normalizeCampaignLobbyState(state = {}) {
         ? state.stages
         : Array.from({ length: 10 }, (_, index) => ({ index, unlocked: index === 0 }));
     const normalized = sourceStages.map(normalizeCampaignStage);
-    // A locked row that only says "Locked" hides the whole rule: the player has
-    // to guess that the Silver two rows up is what is holding the campaign shut.
-    const stages = normalized.map((stage, index) => {
+    // A locked row that only says "Locked" hides the whole rule. The gate is a
+    // campaign-wide medal total now, so the row states the count and how close
+    // the player is — the one number every stage they play moves.
+    const medalTotal = normalized.reduce(
+        (total, stage) => total + getCampaignStageMedalCount(normalizeMedalName(stage.medal)),
+        0,
+    );
+    const stages = normalized.map((stage) => {
         if (stage.unlocked) return { ...stage, unlockRequirementLabel: null };
-        const prerequisite = (stage.unlock?.raceId
-            ? normalized.find((candidate) => candidate.id === stage.unlock.raceId)
-            : null) || normalized[index - 1] || null;
-        const requiredMedal = formatMedalRequirement(stage.unlock?.minimumMedal);
+        const requiredMedals = Number(stage.unlock?.requiredMedals);
         return {
             ...stage,
-            unlockRequirementLabel: prerequisite
-                ? `${requiredMedal} on ${prerequisite.trackName} to unlock`
-                : `${requiredMedal} on the stage before to unlock`,
+            unlockRequirementLabel: Number.isInteger(requiredMedals) && requiredMedals > 0
+                ? `${medalTotal}/${requiredMedals} medals to unlock`
+                : 'More medals to unlock',
         };
     });
     const completed = Boolean(state.complete)
