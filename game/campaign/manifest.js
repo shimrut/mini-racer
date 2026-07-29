@@ -17,8 +17,15 @@ export const CAMPAIGN_RULES_REVISION = 1;
  * From stage 03 the requirement is Silver on every previous track plus Gold on
  * half of them — 2n + floor(n / 2). Stages 01 and 02 are set below that curve so
  * the opening is not a wall. Every gate stays reachable without a single Author
- * (each is under 3n, the Gold-on-everything total), and each one asks 2 or 3
- * more than the last, so no stage can be skipped.
+ * (each is under 3n, the Gold-on-everything total).
+ *
+ * A total on its own cannot keep the ladder sequential: medals earned on early
+ * stages spend against every gate at once, so six Authors would open four stages
+ * the player had never driven. Pricing that out would mean asking 33 of the 36
+ * medals available by stage 09 — Author on nearly everything — so the ladder
+ * keeps a second, cheap condition instead: a medal on the stage immediately
+ * before. That caps progress at one new stage at a time, because the stage after
+ * next cannot have been medalled while it was locked.
  */
 const STAGE_DEFINITIONS = [
     ['00', 'numberZero', 1, 0],
@@ -49,8 +56,12 @@ export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(
             stageIndex: index,
             stageNumber,
             ...raceSpec,
-            unlock: requiredMedals > 0
-                ? Object.freeze({ type: 'medal_total', requiredMedals })
+            unlock: index > 0
+                ? Object.freeze({
+                    type: 'medal_total',
+                    requiredMedals,
+                    previousRaceId: `${CAMPAIGN_ID}-${STAGE_DEFINITIONS[index - 1][0]}`,
+                })
                 : Object.freeze({ type: 'start' }),
         });
     },
@@ -89,7 +100,12 @@ export function countCampaignMedals(resultsByRaceId = {}) {
 export function getCampaignUnlockedRaceIds(resultsByRaceId = {}) {
     const medalTotal = countCampaignMedals(resultsByRaceId);
     return CAMPAIGN_STAGES
-        .filter((stage) => stage.unlock.type === 'start' || medalTotal >= stage.unlock.requiredMedals)
+        .filter((stage) => stage.unlock.type === 'start' || (
+            medalTotal >= stage.unlock.requiredMedals
+            && getCampaignStageMedalCount(
+                resultsByRaceId?.[stage.unlock.previousRaceId]?.medal,
+            ) > 0
+        ))
         .map((stage) => stage.raceId);
 }
 

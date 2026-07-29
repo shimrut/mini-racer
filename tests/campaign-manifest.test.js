@@ -19,15 +19,15 @@ describe('Campaign manifest', () => {
             unlock: stage.unlock,
         }))).toEqual([
             { raceId: 'numbered-v1-00', trackKey: 'numberZero', lapCount: 1, unlock: { type: 'start' } },
-            { raceId: 'numbered-v1-01', trackKey: 'numberOne', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 1 } },
-            { raceId: 'numbered-v1-02', trackKey: 'numberTwo', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 3 } },
-            { raceId: 'numbered-v1-03', trackKey: 'numberThree', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 7 } },
-            { raceId: 'numbered-v1-04', trackKey: 'numberFour', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 10 } },
-            { raceId: 'numbered-v1-05', trackKey: 'numberFive', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 12 } },
-            { raceId: 'numbered-v1-06', trackKey: 'numberSix', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 15 } },
-            { raceId: 'numbered-v1-07', trackKey: 'numberSeven', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 17 } },
-            { raceId: 'numbered-v1-08', trackKey: 'numberEight', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 20 } },
-            { raceId: 'numbered-v1-09', trackKey: 'numberNine', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 22 } },
+            { raceId: 'numbered-v1-01', trackKey: 'numberOne', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 1, previousRaceId: 'numbered-v1-00' } },
+            { raceId: 'numbered-v1-02', trackKey: 'numberTwo', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 3, previousRaceId: 'numbered-v1-01' } },
+            { raceId: 'numbered-v1-03', trackKey: 'numberThree', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 7, previousRaceId: 'numbered-v1-02' } },
+            { raceId: 'numbered-v1-04', trackKey: 'numberFour', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 10, previousRaceId: 'numbered-v1-03' } },
+            { raceId: 'numbered-v1-05', trackKey: 'numberFive', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 12, previousRaceId: 'numbered-v1-04' } },
+            { raceId: 'numbered-v1-06', trackKey: 'numberSix', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 15, previousRaceId: 'numbered-v1-05' } },
+            { raceId: 'numbered-v1-07', trackKey: 'numberSeven', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 17, previousRaceId: 'numbered-v1-06' } },
+            { raceId: 'numbered-v1-08', trackKey: 'numberEight', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 20, previousRaceId: 'numbered-v1-07' } },
+            { raceId: 'numbered-v1-09', trackKey: 'numberNine', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 22, previousRaceId: 'numbered-v1-08' } },
         ]);
         expect(Object.isFrozen(CAMPAIGN_STAGES)).toBe(true);
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);
@@ -91,6 +91,45 @@ describe('Campaign manifest', () => {
             'numbered-v1-02',
             'numbered-v1-03',
         ]);
+    });
+
+    /**
+     * Medals spend against every gate at once, so a total on its own would let a
+     * strong early run open stages the player has never driven: six Authors is
+     * 24 medals, past the price of stages 06 through 09 together. The medal on
+     * the stage before is what holds the ladder to one rung at a time.
+     */
+    it('opens one stage at a time however strong the early runs are', () => {
+        for (const medal of ['gold', 'author']) {
+            for (let played = 1; played <= 9; played += 1) {
+                const results = {};
+                for (const stage of CAMPAIGN_STAGES.slice(0, played)) {
+                    results[stage.raceId] = { medal };
+                }
+                const unlocked = getCampaignUnlockedRaceIds(results);
+                // Everything played, plus exactly one stage past it.
+                expect(unlocked).toHaveLength(played + 1);
+                expect(unlocked.at(-1)).toBe(CAMPAIGN_STAGES[played].raceId);
+            }
+        }
+    });
+
+    it('holds a stage shut until the one before it has a medal', () => {
+        const authorsThenNothing = {
+            'numbered-v1-00': { medal: 'author' },
+            'numbered-v1-01': { medal: 'author' },
+            'numbered-v1-02': { medal: 'author' },
+            'numbered-v1-03': { medal: 'author' },
+            // Driven and banked, but too slow for even a Bronze.
+            'numbered-v1-04': { medal: null },
+        };
+        // 16 medals is well past stage 05's price of 12 — the empty stage 04 is
+        // the only thing in the way.
+        expect(countCampaignMedals(authorsThenNothing)).toBe(16);
+        expect(getCampaignUnlockedRaceIds(authorsThenNothing)).not.toContain('numbered-v1-05');
+
+        const withBronze = { ...authorsThenNothing, 'numbered-v1-04': { medal: 'bronze' } };
+        expect(getCampaignUnlockedRaceIds(withBronze)).toContain('numbered-v1-05');
     });
 
     it('lets Authors buy back the Golds the last stage would otherwise need', () => {

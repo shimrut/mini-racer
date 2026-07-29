@@ -116,22 +116,32 @@ export function normalizeCampaignLobbyState(state = {}) {
         ? state.stages
         : Array.from({ length: 10 }, (_, index) => ({ index, unlocked: index === 0 }));
     const normalized = sourceStages.map(normalizeCampaignStage);
-    // A locked row that only says "Locked" hides the whole rule. The gate is a
-    // campaign-wide medal total now, so the row states the count and how close
-    // the player is — the one number every stage they play moves.
+    // A locked row that only says "Locked" hides the whole rule. Two things gate
+    // a stage now, and the row names the one the player can go and do something
+    // about: a stage they can already race but have not medalled is a single
+    // run away, so it wins. Naming it further down the ladder would point at
+    // tracks they cannot even reach yet, five rows all reading the same, so
+    // every other locked stage quotes the total instead — that is the number
+    // that tells them how far the campaign still runs.
     const medalTotal = normalized.reduce(
         (total, stage) => total + getCampaignStageMedalCount(normalizeMedalName(stage.medal)),
         0,
     );
-    const stages = normalized.map((stage) => {
+    const stages = normalized.map((stage, index) => {
         if (stage.unlocked) return { ...stage, unlockRequirementLabel: null };
+        const previous = (stage.unlock?.previousRaceId
+            ? normalized.find((candidate) => candidate.id === stage.unlock.previousRaceId)
+            : null) || normalized[index - 1] || null;
+        const awaitingPreviousMedal = Boolean(previous?.unlocked)
+            && getCampaignStageMedalCount(normalizeMedalName(previous.medal)) === 0;
         const requiredMedals = Number(stage.unlock?.requiredMedals);
-        return {
-            ...stage,
-            unlockRequirementLabel: Number.isInteger(requiredMedals) && requiredMedals > 0
-                ? `${medalTotal}/${requiredMedals} medals to unlock`
-                : 'More medals to unlock',
-        };
+        let label = 'More medals to unlock';
+        if (awaitingPreviousMedal) {
+            label = `A medal on ${previous.trackName} to unlock`;
+        } else if (Number.isInteger(requiredMedals) && requiredMedals > 0) {
+            label = `${medalTotal}/${requiredMedals} medals to unlock`;
+        }
+        return { ...stage, unlockRequirementLabel: label };
     });
     const completed = Boolean(state.complete)
         || (stages.length > 0 && stages.every((stage) => isCampaignGoldMedal(stage.medal)));

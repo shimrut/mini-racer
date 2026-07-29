@@ -23,18 +23,26 @@ describe('campaign client progress', () => {
         expect(progress.continueRaceId).toBe('numbered-v1-00');
     });
 
-    it('unlocks stages as the medal total climbs', () => {
-        // Silver is two medals: enough for the 1-medal gate, short of the 3.
+    it('unlocks stages as the medal total climbs, one at a time', () => {
+        // Silver is two medals: enough for the 1-medal gate on stage 01.
         const silver = deriveCampaignProgress({
             'numbered-v1-00': { bestTimeMs: 7500, medal: 'silver' },
         });
         expect(silver.unlockedRaceIds).toEqual(['numbered-v1-00', 'numbered-v1-01']);
 
-        // The same stage improved to Gold is a third medal, and opens the next.
+        // Improving that same stage to Gold pays stage 02's price of 3, but
+        // stage 02 stays shut: stage 01 has not been raced yet.
         const gold = deriveCampaignProgress({
             'numbered-v1-00': { bestTimeMs: 7100, medal: 'gold' },
         });
-        expect(gold.unlockedRaceIds).toEqual([
+        expect(gold.unlockedRaceIds).toEqual(['numbered-v1-00', 'numbered-v1-01']);
+
+        // A medal on stage 01 is what opens it.
+        const both = deriveCampaignProgress({
+            'numbered-v1-00': { bestTimeMs: 7100, medal: 'gold' },
+            'numbered-v1-01': { bestTimeMs: 10_000, medal: 'bronze' },
+        });
+        expect(both.unlockedRaceIds).toEqual([
             'numbered-v1-00',
             'numbered-v1-01',
             'numbered-v1-02',

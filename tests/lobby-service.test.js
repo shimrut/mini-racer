@@ -91,7 +91,7 @@ describe('lobby service', () => {
                     id: 'c',
                     trackName: 'Number Seven',
                     unlocked: false,
-                    unlock: { type: 'medal_total', requiredMedals: 10 },
+                    unlock: { type: 'medal_total', requiredMedals: 10, previousRaceId: 'b' },
                 },
                 { id: 'd', trackName: 'Number Eight', unlocked: false },
             ],
@@ -99,9 +99,40 @@ describe('lobby service', () => {
 
         expect(state.stages[0].unlockRequirementLabel).toBeNull();
         expect(state.stages[1].unlockRequirementLabel).toBeNull();
+        // The stage before it is medalled, so the total is what is left to do.
         expect(state.stages[2].unlockRequirementLabel).toBe('6/10 medals to unlock');
-        // No unlock metadata: say it needs more without inventing a number.
+        // No unlock metadata, and the row above it is locked too: say it needs
+        // more without inventing a number or pointing at an unreachable track.
         expect(state.stages[3].unlockRequirementLabel).toBe('More medals to unlock');
+    });
+
+    it('points a locked row at the unmedalled stage in front of it', () => {
+        const state = normalizeCampaignLobbyState({
+            stages: [
+                { id: 'a', trackName: 'Number Five', unlocked: true, medal: 'Author' },
+                // Raced, banked, but nothing earned — one run from fixing.
+                { id: 'b', trackName: 'Number Six', unlocked: true, medal: null },
+                {
+                    id: 'c',
+                    trackName: 'Number Seven',
+                    unlocked: false,
+                    unlock: { type: 'medal_total', requiredMedals: 3, previousRaceId: 'b' },
+                },
+                // Two rows out: naming Number Seven would point at a track that
+                // cannot be raced yet, so this one quotes the total.
+                {
+                    id: 'd',
+                    trackName: 'Number Eight',
+                    unlocked: false,
+                    unlock: { type: 'medal_total', requiredMedals: 9, previousRaceId: 'c' },
+                },
+            ],
+        });
+
+        // Four medals already clears the price of 3, so naming the total would
+        // read as though nothing were owed.
+        expect(state.stages[2].unlockRequirementLabel).toBe('A medal on Number Six to unlock');
+        expect(state.stages[3].unlockRequirementLabel).toBe('4/9 medals to unlock');
     });
 
     it('flags exactly one stage as the one to race next', () => {
