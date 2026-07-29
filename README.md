@@ -18,8 +18,9 @@ Steer, finish the complete race as fast as you can, then try again.
 - Earn **medals** by beating the target times on each track
 - Climb that day's **leaderboard** in Standings
 - Missed a day? You can replay the last **7 days** of tracks
-- Play the permanent ten-stage **Campaign**, earning Gold to unlock the next
-  fixed 1-, 2-, or 3-lap race
+- Play the permanent ten-stage **Campaign**, banking medals to unlock each
+  fixed 1-, 2-, or 3-lap race; locked cards put the count inside a medal-shaped
+  perimeter progress indicator
 - Change how your car looks in the **Garage** (available and achievement-unlocked
   skins plus trails — handling stays the same)
 - **Share** a finished race or a verified daily best as a Reddit comment (you preview the text first)

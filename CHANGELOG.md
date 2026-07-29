@@ -1,5 +1,8 @@
 # Changelog
 
+- Replaced the Campaign locked-card MEDALS label, fraction, and bar with one
+  medal-shaped counter. The earned/required count sits inside the medal while
+  a white perimeter stroke shows unlock progress.
 - Added permanent achievement unlocks for the new Extra cars. Crimson unlocks
   after any verified race; Campaign medals unlock Gold, Blaze, Surge, and
   Arctic; unique Head-to-Head posts unlock Fuchsia and Plasma; verified duel

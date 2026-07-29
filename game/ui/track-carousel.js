@@ -26,6 +26,31 @@ function setText(element, value) {
     if (element) element.textContent = value;
 }
 
+function createUnlockMedalMeter(meter) {
+    const icon = createMedalIconSvg('silver', {
+        className: 'track-carousel__unlock-medal',
+        outline: true,
+        centerText: meter.value,
+        showEmblem: false,
+    });
+    icon.setAttribute('aria-hidden', 'true');
+    const svg = icon.querySelector?.('svg');
+    const track = svg?.querySelector?.('.medal-svg__shape');
+    if (!svg || !track) return icon;
+
+    track.classList.add('track-carousel__unlock-medal-track');
+    track.setAttribute('pathLength', '100');
+    track.removeAttribute('stroke-dasharray');
+
+    const progress = track.cloneNode(false);
+    progress.setAttribute('class', 'track-carousel__unlock-medal-progress');
+    progress.setAttribute('pathLength', '100');
+    progress.setAttribute('stroke-dasharray', '100');
+    progress.setAttribute('stroke-dashoffset', String(100 - (meter.ratio * 100)));
+    svg.insertBefore(progress, svg.querySelector('text'));
+    return icon;
+}
+
 export function findCarouselIndex(cards = [], challengeId = null) {
     if (!challengeId) return -1;
     return cards.findIndex((card) => card.challengeId === challengeId);
@@ -251,14 +276,10 @@ export class TrackCarousel {
         rankLabel.textContent = 'Rank';
         const rankValue = document.createElement('span');
         rankValue.className = 'track-carousel__rank-value';
-        // Only a locked stage fills this, so it stays out of the way until then.
-        const rankMeter = document.createElement('span');
-        rankMeter.className = 'track-carousel__meter';
-        rankMeter.hidden = true;
-        const rankMeterFill = document.createElement('span');
-        rankMeterFill.className = 'track-carousel__meter-fill';
-        rankMeter.append(rankMeterFill);
-        rank.append(rankLabel, rankValue, rankMeter);
+        const rankMedal = document.createElement('span');
+        rankMedal.className = 'track-carousel__unlock-medal-host';
+        rankMedal.hidden = true;
+        rank.append(rankLabel, rankValue, rankMedal);
         rank.addEventListener('click', (event) => {
             event.stopPropagation();
             const current = this._cards[Number(element.dataset.index)] || null;
@@ -278,8 +299,7 @@ export class TrackCarousel {
         });
 
         element._parts = {
-            canvas, eyebrow, title, meta, chase, rank, rankLabel, rankValue, rankMeter,
-            rankMeterFill, medal,
+            canvas, eyebrow, title, meta, chase, rank, rankLabel, rankValue, rankMedal, medal,
         };
         this.paintCard(element, card);
         return element;
@@ -368,11 +388,18 @@ export class TrackCarousel {
     paintRank(parts, card) {
         if (card.locked) {
             const meter = card.lockMeter || null;
-            setText(parts.rankValue, meter ? meter.value : 'Locked');
-            setText(parts.rankLabel, meter ? meter.label : 'Rank');
-            parts.rankLabel.hidden = !meter;
-            parts.rankMeter.hidden = !meter;
-            if (meter) parts.rankMeterFill.style.width = `${Math.round(meter.ratio * 100)}%`;
+            setText(parts.rankValue, meter ? '' : 'Locked');
+            setText(parts.rankLabel, 'Rank');
+            parts.rankLabel.hidden = true;
+            parts.rankValue.hidden = Boolean(meter);
+            parts.rankMedal.hidden = !meter;
+            if (meter) {
+                const key = `${meter.value}:${meter.ratio}`;
+                if (parts.rankMedal.dataset.meterKey !== key) {
+                    parts.rankMedal.dataset.meterKey = key;
+                    parts.rankMedal.replaceChildren(createUnlockMedalMeter(meter));
+                }
+            }
             parts.rank.disabled = true;
             parts.rank.classList.toggle('is-muted', !meter);
             parts.rank.setAttribute(
@@ -382,7 +409,8 @@ export class TrackCarousel {
             return;
         }
 
-        parts.rankMeter.hidden = true;
+        parts.rankMedal.hidden = true;
+        parts.rankValue.hidden = false;
         setText(parts.rankLabel, 'Rank');
         parts.rank.disabled = false;
         setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || 'Unranked'));

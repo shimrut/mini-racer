@@ -117,8 +117,10 @@ cleared site data starts locally from the beginning.
 
 ### Why is the next Campaign track locked?
 
-Earn Gold or Author on the previous stage. Silver and Bronze remain on that
-stage's leaderboard but do not unlock the next race.
+Bank the medal total shown on the locked card and earn at least one medal on
+the stage immediately before it. Better medals add more to the total.
+The locked track card shows the current/required medal count inside a medal;
+the white stroke filling its perimeter shows how close the total is.
 
 ### Can a challenge unlock a Campaign track?
 

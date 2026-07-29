@@ -39,8 +39,12 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.
-- [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3,3,3` lap sequence, Gold-gate
-  the next stage, and keep independent permanent standings and PB ghosts.
+- [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3,3,3` lap sequence, require
+  the configured medal total plus any medal on the immediately previous stage,
+  and keep independent permanent standings and PB ghosts.
+- [ ] A locked Campaign card shows its earned/required medal count inside one
+  medal shape, with a white perimeter stroke clamped to the unlock progress;
+  it does not show the old MEDALS label or horizontal bar.
 - [ ] Campaign standings can switch between unlocked stages without combining
   their rows, and each stage continues paging its own leaderboard.
 - [ ] A newly completed verified Daily, Campaign, or Head-to-Head race unlocks

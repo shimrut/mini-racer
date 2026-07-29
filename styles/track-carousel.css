@@ -276,30 +276,50 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     text-transform: uppercase;
 }
 
-/* How near the medal count is to the price, under the count itself. Only one
-   card is ever centred, so this is not a ladder to compare across cards — it is
-   the bit "10/22" is slow to say: whether the stage is close or a long way off,
-   before the numbers are read at all. */
-.track-carousel__meter {
-    width: 3.25rem;
-    height: 2px;
-    margin-top: 0.3rem;
-    overflow: hidden;
-    border-radius: var(--radius-full);
-    background: var(--border-default);
+/* Locked-stage price: the count and its progress are one neutral medal token,
+   not three detached pieces of UI. The full requirement remains on the chip's
+   accessible name. */
+.track-carousel__unlock-medal-host {
+    display: block;
+    width: 3.75rem;
+    height: 3.75rem;
+    margin-top: -0.2rem;
 }
 
-.track-carousel__meter[hidden] {
+.track-carousel__unlock-medal-host[hidden] {
     display: none;
 }
 
-.track-carousel__meter-fill {
+.track-carousel__unlock-medal {
     display: block;
-    width: 0;
+    width: 100%;
     height: 100%;
-    border-radius: inherit;
-    background: var(--text-dim);
-    transition: width var(--dur-base) var(--ease-settle);
+}
+
+.track-carousel__unlock-medal.medal-svg--outline .track-carousel__unlock-medal-track {
+    fill: rgba(148, 163, 184, 0.05);
+    stroke: rgba(148, 163, 184, 0.28);
+    stroke-width: 28;
+}
+
+.track-carousel__unlock-medal-progress {
+    fill: none;
+    stroke: var(--text-color);
+    stroke-width: 32;
+    stroke-linecap: round;
+    transition: stroke-dashoffset var(--dur-base) var(--ease-settle);
+}
+
+.track-carousel__unlock-medal .medal-svg__center-time {
+    fill: var(--text-color);
+    stroke: none;
+    filter: none;
+    font-family: var(--mono-font);
+    font-size: 112px;
+    font-style: normal;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    paint-order: normal;
 }
 
 /* A rank is a standing worth full contrast; a count of medals still owed is the
@@ -442,6 +462,10 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     }
 
     .track-carousel__rank-value {
+        transition: none;
+    }
+
+    .track-carousel__unlock-medal-progress {
         transition: none;
     }
 }
