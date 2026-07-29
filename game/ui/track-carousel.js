@@ -12,6 +12,7 @@
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { TRACKS } from '../track/tracks.js';
+import { createLockIconSvg } from './lock-icon.js';
 import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
@@ -33,6 +34,7 @@ function createUnlockMedalMeter(meter) {
         centerText: meter.value,
         showEmblem: false,
     });
+    icon.classList.toggle('is-complete', meter.ratio >= 1);
     icon.setAttribute('aria-hidden', 'true');
     const svg = icon.querySelector?.('svg');
     const track = svg?.querySelector?.('.medal-svg__shape');
@@ -243,6 +245,8 @@ export class TrackCarousel {
 
         const preview = document.createElement('div');
         preview.className = 'daily-playlist-hero-preview';
+        const previewArt = document.createElement('div');
+        previewArt.className = 'track-carousel__preview-art';
         const canvas = document.createElement('canvas');
         canvas.width = PREVIEW_WIDTH;
         canvas.height = PREVIEW_HEIGHT;
@@ -250,7 +254,12 @@ export class TrackCarousel {
         const medal = document.createElement('div');
         medal.className = 'daily-playlist-hero-medal';
         medal.setAttribute('aria-hidden', 'true');
-        preview.append(canvas, medal);
+        const previewLock = document.createElement('span');
+        previewLock.className = 'track-carousel__preview-lock';
+        previewLock.setAttribute('aria-hidden', 'true');
+        previewLock.appendChild(createLockIconSvg('track-carousel__preview-lock-icon'));
+        previewArt.append(canvas, previewLock);
+        preview.append(previewArt, medal);
 
         const content = document.createElement('div');
         content.className = 'daily-playlist-hero-content';
@@ -300,6 +309,7 @@ export class TrackCarousel {
 
         element._parts = {
             canvas, eyebrow, title, meta, chase, rank, rankLabel, rankValue, rankMedal, medal,
+            previewLock,
         };
         this.paintCard(element, card);
         return element;
@@ -318,6 +328,7 @@ export class TrackCarousel {
         // track a player is on gets it here for the same reason.
         element.classList.toggle('current', Boolean(card.isCurrent));
         element.classList.toggle('is-locked', Boolean(card.locked));
+        parts.previewLock.hidden = !card.locked;
 
         this.paintRank(parts, card);
 

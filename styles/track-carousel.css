@@ -146,6 +146,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 /* The top of the card: the track on the left, the medal ladder down the right.
    `width`/`height` are restated because the narrow-screen sheet rules pin them. */
 .track-carousel .daily-playlist-hero-preview {
+    position: relative;
     display: flex;
     flex: 1 1 auto;
     align-items: stretch;
@@ -158,6 +159,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 .track-carousel .daily-playlist-hero-preview canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+}
+
+.track-carousel__preview-art {
+    position: relative;
     flex: 1 1 auto;
     min-width: 0;
 }
@@ -304,14 +313,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 .track-carousel__unlock-medal-progress {
     fill: none;
-    stroke: var(--text-color);
+    stroke: rgba(148, 163, 184, 0.58);
     stroke-width: 32;
     stroke-linecap: round;
     transition: stroke-dashoffset var(--dur-base) var(--ease-settle);
 }
 
 .track-carousel__unlock-medal .medal-svg__center-time {
-    fill: var(--text-color);
+    fill: rgba(148, 163, 184, 0.72);
     stroke: none;
     filter: none;
     font-family: var(--mono-font);
@@ -322,6 +331,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     paint-order: normal;
 }
 
+.track-carousel__unlock-medal.is-complete .track-carousel__unlock-medal-progress {
+    stroke: var(--text-color);
+}
+
+.track-carousel__unlock-medal.is-complete .medal-svg__center-time {
+    fill: var(--text-color);
+}
+
 /* A rank is a standing worth full contrast; a count of medals still owed is the
    card telling the player it is out of reach, and reads with the dimmed title. */
 .track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__rank-value {
@@ -330,8 +347,36 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 /* A locked stage still shows its track and its gate — it just cannot be raced,
    and the art steps back so the card reads as out of reach. */
-.track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-preview {
+.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__preview-art canvas,
+.track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-medal {
     opacity: 0.35;
+}
+
+.track-carousel__preview-lock {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(248, 250, 252, .06);
+    box-shadow: inset 0 0 0 1px rgba(248, 250, 252, .04);
+    color: #fff;
+    opacity: 1;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+}
+
+.track-carousel__preview-lock[hidden] {
+    display: none;
+}
+
+.track-carousel__preview-lock-icon {
+    width: .72rem;
+    height: .96rem;
 }
 
 .track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-title {

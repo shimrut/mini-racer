@@ -11,8 +11,13 @@ describe('Garage locked-car visual contract', () => {
             new URL('../styles/lobby-and-garage.css', import.meta.url),
             'utf8',
         );
+        const lockIcon = readFileSync(
+            new URL('../game/ui/lock-icon.js', import.meta.url),
+            'utf8',
+        );
 
-        expect(ui).toContain("path.setAttribute('fill', 'currentColor')");
+        expect(ui).toContain("createLockIconSvg('garage-skin-option__lock-icon')");
+        expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
         expect(ui).toContain(
             "lockIndicator.classList.toggle('has-progress', !unlocked && ratio > 0)",
         );

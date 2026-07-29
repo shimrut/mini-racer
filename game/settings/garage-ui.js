@@ -14,12 +14,12 @@ import {
     writePlayerTrailId
 } from '../car/player-trail.js';
 import { setCarAssetImageWithFallbacks } from '../car/sprite.js';
+import { createLockIconSvg } from '../ui/lock-icon.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 const GARAGE_TABS = Object.freeze(['skin', 'trails']);
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const LOCK_ICON_PATH = 'M128 96l0 64 128 0 0-64c0-35.3-28.7-64-64-64s-64 28.7-64 64zM64 160l0-64C64 25.3 121.3-32 192-32S320 25.3 320 96l0 64c35.3 0 64 28.7 64 64l0 224c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 224c0-35.3 28.7-64 64-64z';
 
 export class GarageUi {
     constructor({
@@ -220,14 +220,7 @@ export class GarageUi {
         value.setAttribute('pathLength', '100');
         progress.append(track, value);
 
-        // Font Awesome Free v7.3.1 — https://fontawesome.com/license/free
-        const lock = document.createElementNS(SVG_NS, 'svg');
-        lock.classList.add('garage-skin-option__lock-icon');
-        lock.setAttribute('viewBox', '0 0 384 512');
-        const path = document.createElementNS(SVG_NS, 'path');
-        path.setAttribute('fill', 'currentColor');
-        path.setAttribute('d', LOCK_ICON_PATH);
-        lock.appendChild(path);
+        const lock = createLockIconSvg('garage-skin-option__lock-icon');
 
         indicator.append(progress, lock);
         return indicator;
