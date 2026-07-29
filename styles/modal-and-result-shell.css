@@ -11,7 +11,7 @@
     z-index: var(--z-modal);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .16s ease;
+    transition: opacity var(--dur-base) ease;
     will-change: opacity;
     contain: layout paint;
 }
@@ -111,7 +111,7 @@
     padding: var(--space-xl);
     margin: auto;
     transform: translateY(10px);
-    transition: transform .16s cubic-bezier(.22, 1, .36, 1), opacity .16s ease;
+    transition: transform var(--dur-base) var(--ease-settle), opacity var(--dur-base) ease;
     will-change: transform, opacity;
     contain: layout paint;
     overflow-x: hidden;

@@ -9,7 +9,7 @@
     width: 100%;
     flex: 0 0 auto;
     min-height: 0;
-    animation: lobbyPaneIn 180ms ease-out both;
+    animation: lobbyPaneIn var(--dur-base) ease-out both;
 }
 
 /* One bottom pin — same personality as main: title top, actions bottom. */
@@ -153,7 +153,7 @@ body[data-lobby-mode="campaign"] .lobby-title__racer {
 }
 
 .lobby-primary-row--race {
-    grid-template-columns: 2.75rem 50% 2.75rem;
+    grid-template-columns: 2.75rem 70% 2.75rem;
     justify-content: center;
     justify-items: center;
     column-gap: clamp(0.85rem, 3vw, 1.25rem);
@@ -186,7 +186,7 @@ body[data-lobby-mode="campaign"] .lobby-title__racer {
     background: transparent;
     border: 0;
     cursor: pointer;
-    transition: opacity 120ms ease, transform 120ms ease;
+    transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
 }
 
 .lobby-primary-utility svg {

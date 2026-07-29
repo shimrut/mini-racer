@@ -44,7 +44,7 @@
     padding: 0.65rem 0.75rem;
     background: var(--bg-surface);
     border-radius: var(--radius-sm);
-    transition: background-color .15s ease;
+    transition: background-color var(--dur-base) ease;
     border: none;
 }
 

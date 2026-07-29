@@ -917,7 +917,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(tieShowModal).toHaveBeenCalledTimes(1);
     });
 
-    it('places Back, a 50% primary, and Garage only across Start Race rows', () => {
+    it('places Back, a 70% primary, and Garage only across Start Race rows', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
 
@@ -966,7 +966,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
         );
         expect(css).toMatch(
-            /\.lobby-primary-row--race\s*\{[^}]*grid-template-columns:\s*2\.75rem\s*50%\s*2\.75rem;[^}]*justify-content:\s*center;[^}]*column-gap:\s*clamp\(0\.85rem,\s*3vw,\s*1\.25rem\);/s,
+            /\.lobby-primary-row--race\s*\{[^}]*grid-template-columns:\s*2\.75rem\s*70%\s*2\.75rem;[^}]*justify-content:\s*center;[^}]*column-gap:\s*clamp\(0\.85rem,\s*3vw,\s*1\.25rem\);/s,
         );
         expect(css).toMatch(
             /\.lobby-primary-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
@@ -985,7 +985,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(css).not.toContain('width: min(94vw, 60rem)');
         expect(css).toMatch(
-            /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn 180ms ease-out both;/s,
+            /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn var\(--dur-base\) ease-out both;/s,
         );
         expect(css).toMatch(
             /@keyframes lobbyPaneIn\s*\{[\s\S]*opacity:\s*0;[\s\S]*translate3d\(0,\s*0\.5rem,\s*0\);[\s\S]*opacity:\s*1;[\s\S]*translate3d\(0,\s*0,\s*0\);[\s\S]*\}/,

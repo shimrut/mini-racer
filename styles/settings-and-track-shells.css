@@ -96,10 +96,10 @@
     background: rgba(51, 65, 85, 0.7);
     font-family: var(--header-font);
     transition:
-        background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-        border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-        filter 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-        transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        background-color var(--dur-base) var(--ease-standard),
+        border-color var(--dur-base) var(--ease-standard),
+        filter var(--dur-base) var(--ease-standard),
+        transform var(--dur-base) var(--ease-standard);
 }
 
 #settings-modal .settings-collision-delay-stepper:hover:not(:disabled) {
@@ -144,8 +144,8 @@
     cursor: pointer;
     background: rgba(30, 41, 59, 0.8);
     transition:
-        background-color 0.15s ease,
-        transform 0.15s ease;
+        background-color var(--dur-base) ease,
+        transform var(--dur-base) ease;
 }
 
 #settings-modal .settings-collision-delay-meter__tick:hover {

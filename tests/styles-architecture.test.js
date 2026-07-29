@@ -67,6 +67,48 @@ describe('game stylesheet architecture', () => {
         expect(depth).toBe(0);
     });
 
+    it('defines the motion tokens every stylesheet transitions against', () => {
+        const styles = readCssBundle(manifestUrl);
+
+        for (const token of [
+            '--dur-fast: 120ms;',
+            '--dur-base: 160ms;',
+            '--dur-slow: 200ms;',
+            '--ease-standard: cubic-bezier(0.4, 0, 0.2, 1);',
+            '--ease-settle: cubic-bezier(0.22, 1, 0.36, 1);',
+            '--ease-glide: cubic-bezier(0.16, 1, 0.3, 1);',
+            '--ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);',
+        ]) {
+            expect(styles).toContain(token);
+        }
+    });
+
+    /**
+     * The three duration tokens are the whole micro band, so a literal under
+     * 200ms means a fourth timing has been typed in by hand and the band has
+     * started drifting again. Longer values stay literal: those are deliberate
+     * moments, not state changes, and each one owns its own number.
+     */
+    it('routes every sub-200ms duration through a token', () => {
+        const styles = readCssBundle(manifestUrl);
+        const strays = [];
+
+        for (const [, value] of styles.matchAll(
+            /\b(?:transition|animation)\s*:\s*([^;}]+)/g,
+        )) {
+            for (const segment of value.split(',')) {
+                // First time in a segment is the duration; a second one is the
+                // delay, which is free to be as short as it likes.
+                const duration = segment.match(/(\d*\.?\d+)(ms|s)\b/);
+                if (!duration) continue;
+                const ms = Number(duration[1]) * (duration[2] === 's' ? 1000 : 1);
+                if (ms <= 200) strays.push(segment.trim());
+            }
+        }
+
+        expect(strays).toEqual([]);
+    });
+
     it('keeps playlist card shadows out of the carousel rail', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*box-shadow:\s*none;/s,

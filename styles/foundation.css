@@ -46,6 +46,23 @@
     --screen-height-cap: 1000px;
     --screen-fill-height: min(100vh, var(--screen-height-cap));
 
+    /* Motion — three steps, and every UI transition picks one of them. The
+       band tops out at 200ms on purpose: these fire while the player is
+       waiting on the interface, so they cover a state change rather than
+       perform one. Anything longer is a deliberate moment (the boot curtain,
+       the medal pop, the spinner loop) and stays written out at its own site,
+       where the number is the point. */
+    --dur-fast: 120ms;
+    --dur-base: 160ms;
+    --dur-slow: 200ms;
+
+    /* Curves, by the job. `ease` stays the plain default for colour and
+       opacity; these are for anything that moves. */
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+
     /* Z-Index */
     --z-canvas: 0;
     --z-hud: 100;

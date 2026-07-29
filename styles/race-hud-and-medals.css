@@ -240,7 +240,7 @@
 }
 
 .medal-svg--medal-entrance {
-    animation: medal-entrance-pop 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: medal-entrance-pop 0.38s var(--ease-settle) both;
 }
 
 @keyframes medal-row-slot-entrance-pop {
@@ -329,9 +329,9 @@
 
 .combined-medal-row-slot .medal-svg--hero {
     transition:
-        transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
-        filter 0.22s ease,
-        opacity 0.22s ease;
+        transform var(--dur-slow) var(--ease-back),
+        filter var(--dur-slow) ease,
+        opacity var(--dur-slow) ease;
 }
 
 .medal-svg__placeholder-fill {
@@ -521,7 +521,7 @@
     height: 14px;
     background: var(--border-subtle);
     border-radius: 1px;
-    transition: background-color 0.1s ease;
+    transition: background-color var(--dur-fast) ease;
 }
 
 .speedometer-tick.active {
@@ -595,7 +595,7 @@
     border: none;
     color: var(--text-color);
     cursor: pointer;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform var(--dur-slow) var(--ease-standard);
     outline: none;
     box-shadow: none;
     z-index: var(--z-hud);

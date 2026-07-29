@@ -38,9 +38,36 @@ Some files intentionally span more than one product surface. Those boundaries
 reflect contiguous sections of the original stylesheet and avoid changing which
 equally specific rule wins.
 
+## Motion Tokens
+
+`foundation.css` owns the timing vocabulary, and every partial transitions
+against it rather than against a hand-typed number.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--dur-fast` | 120ms | Immediate feedback: hover and press colour, opacity |
+| `--dur-base` | 160ms | The default — enters, exits, content swaps |
+| `--dur-slow` | 200ms | The ceiling for anything the player waits through |
+| `--ease-standard` | `cubic-bezier(0.4, 0, 0.2, 1)` | Neutral in-and-out |
+| `--ease-settle` | `cubic-bezier(0.22, 1, 0.36, 1)` | Panels and cards arriving |
+| `--ease-glide` | `cubic-bezier(0.16, 1, 0.3, 1)` | Long decelerating entrances |
+| `--ease-back` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | Overshoot on stat and medal pops |
+
+The band stops at 200ms because these cover a state change rather than perform
+one. Durations above it are deliberate moments — the boot curtain, the medal
+entrance, the spinner and loader loops — and stay written out at their own site,
+where the number is the point. `ease` and `ease-out` remain the plain keywords
+for colour and opacity; the curve tokens are for things that move.
+
+`styles-architecture.test.js` fails on any transition or animation duration at
+or under 200ms that is not a token, so a fourth timing cannot creep back in.
+Animation *delays* are exempt.
+
 ## Change Rules
 
 - Keep `styles.css` as the only game stylesheet linked from HTML.
+- Reach for a motion token before typing a duration or curve. A new one belongs
+  in `foundation.css` with the others, not inline.
 - Add new styles to the partial that owns the product surface.
 - Keep responsive rules beside their feature when they are new and
   self-contained. Do not move an existing override between files without

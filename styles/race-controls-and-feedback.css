@@ -72,7 +72,7 @@
     touch-action: none;
     cursor: pointer;
     pointer-events: auto;
-    transition: background-color 0.15s ease;
+    transition: background-color var(--dur-base) ease;
 }
 
 .touch-btn:active,
@@ -95,7 +95,7 @@
     padding-bottom: var(--start-overlay-pad-bottom);
     z-index: var(--z-overlay);
     opacity: 0;
-    transition: opacity 0.1s ease-out;
+    transition: opacity var(--dur-fast) ease-out;
     pointer-events: none;
     overflow: hidden;
 }
@@ -156,7 +156,7 @@ body.start-selection-active #start-overlay {
     z-index: var(--z-hud);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.3s var(--ease-standard);
 }
 
 #start-lights.visible {
@@ -170,9 +170,9 @@ body.start-selection-active #start-overlay {
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.1);
     transition:
-        background-color 0.15s cubic-bezier(0.16, 1, 0.3, 1),
-        border-color 0.15s cubic-bezier(0.16, 1, 0.3, 1),
-        transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+        background-color var(--dur-base) var(--ease-glide),
+        border-color var(--dur-base) var(--ease-glide),
+        transform var(--dur-base) var(--ease-glide);
 }
 
 .light.on {
@@ -192,7 +192,7 @@ body.start-selection-active #start-overlay {
     pointer-events: none;
     z-index: var(--z-hud);
     opacity: 0;
-    transition: opacity .2s ease, transform .2s cubic-bezier(.175, .885, .32, 1.275)
+    transition: opacity var(--dur-slow) ease, transform var(--dur-slow) cubic-bezier(.175, .885, .32, 1.275)
 }
 
 #go-message.visible {
@@ -215,7 +215,7 @@ body.start-selection-active #start-overlay {
     background: rgba(2, 6, 23, 0.88);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .18s ease, transform .18s ease, background-color .18s ease;
+    transition: opacity var(--dur-base) ease, transform var(--dur-base) ease, background-color var(--dur-base) ease;
     z-index: var(--z-hud)
 }
 

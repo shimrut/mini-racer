@@ -335,7 +335,7 @@
     text-transform: uppercase;
     cursor: pointer;
     box-shadow: none;
-    transition: color 0.15s ease;
+    transition: color var(--dur-base) ease;
 }
 
 .leaderboard-day-chip:hover {
