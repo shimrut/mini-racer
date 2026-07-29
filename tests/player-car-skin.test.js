@@ -70,11 +70,12 @@ describe('player car skin', () => {
         expect(labels).toContain('Red');
         expect(labels).toContain('Blue');
         expect(labels).toContain('Cream');
-        expect(labels.some((label) => /^(Mini|Cyber|Steam)\s/.test(label))).toBe(false);
+        expect(labels).toContain('Arctic');
+        expect(labels.some((label) => /^(Mini|Cyber|Steam|Extra)\s/.test(label))).toBe(false);
     });
 
-    it('groups skins into MR, Cyberpunk, and Steampunk garage sections without gaps', () => {
-        const expectedIds = ['mini', 'cyberpunk', 'steampunk'].filter((id) =>
+    it('groups skins into Extra, MR, Cyberpunk, and Steampunk garage sections without gaps', () => {
+        const expectedIds = ['extra', 'mini', 'cyberpunk', 'steampunk'].filter((id) =>
             PLAYER_CAR_SKINS.some((s) => s.series === id)
         );
         expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id)).toEqual(expectedIds);

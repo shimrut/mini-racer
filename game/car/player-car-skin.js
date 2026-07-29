@@ -29,10 +29,13 @@ function skinLabelForAsset(assetName) {
     if (rest.toLowerCase().startsWith('steam_')) {
         return titleCaseUnderscored(rest.slice(6));
     }
+    if (rest.toLowerCase().startsWith('extra_')) {
+        return titleCaseUnderscored(rest.slice(6));
+    }
     return titleCaseUnderscored(rest);
 }
 
-/** @typedef {'mini' | 'cyberpunk' | 'steampunk'} PlayerCarSkinSeriesId */
+/** @typedef {'mini' | 'cyberpunk' | 'steampunk' | 'extra'} PlayerCarSkinSeriesId */
 
 /** @param {string} assetName */
 function skinSeriesIdForAsset(assetName) {
@@ -42,11 +45,13 @@ function skinSeriesIdForAsset(assetName) {
     if (rest.startsWith('mr_')) return 'mini';
     if (rest.startsWith('cyber_')) return 'cyberpunk';
     if (rest.startsWith('steam_')) return 'steampunk';
+    if (rest.startsWith('extra_')) return 'extra';
     return 'mini';
 }
 
 /** Garage UI section order and headings. */
 export const PLAYER_CAR_SKIN_SECTION_META = Object.freeze([
+    Object.freeze({ id: 'extra', title: 'Extra cars' }),
     Object.freeze({ id: 'mini', title: 'Mini cars' }),
     Object.freeze({ id: 'cyberpunk', title: 'Cyberpunk cars' }),
     Object.freeze({ id: 'steampunk', title: 'Steampunk cars' })
