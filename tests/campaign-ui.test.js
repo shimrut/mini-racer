@@ -1817,6 +1817,26 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
     });
 
+    it('keeps racing when the start stamp is refused for a reason that is not the stage', async () => {
+        // Unidentified, rate limited, server error: none of these say the stage
+        // is unplayable, and the player is already in the countdown.
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({
+            ok: false,
+            status: 401,
+            body: { error: 'Player identity is required for Campaign competition.' },
+        });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: {} });
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const context = createStartContext();
+
+        await context.startCampaignStage();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(context.loadCampaignLobby).not.toHaveBeenCalled();
+    });
+
     it('lets the run continue when the start stamp cannot be delivered', async () => {
         campaignServiceMocks.startServerCampaignRace.mockRejectedValue(new Error('offline'));
         campaignServiceMocks.getCampaignPbGhost.mockRejectedValue(new Error('offline'));

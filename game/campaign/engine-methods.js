@@ -490,6 +490,15 @@ export const campaignEngineMethods = {
      * normally. Only an outright refusal means the stage was never raceable,
      * and that sends the player back to a refreshed lobby.
      */
+    /**
+     * Folds the server's answer into a race that is already running.
+     *
+     * Only a refusal of this particular stage takes the player out of it: the
+     * stage is locked, or it does not exist. Anything else — unreachable, not
+     * identified, server error — says nothing about whether the stage is
+     * playable, and pulling someone out of a countdown they already started
+     * would be the worse answer. An unranked run still queues and retries.
+     */
     async confirmCampaignRaceStart(stage, startRequest) {
         const started = await startRequest;
         if (!started) return;
@@ -499,10 +508,12 @@ export const campaignEngineMethods = {
             }
             return;
         }
-        console.error(
-            'Could not start Campaign race:',
-            started.body?.error || 'Could not start this Campaign race.',
+        console.warn(
+            'Campaign race start was not stamped:',
+            started.body?.error || 'Could not stamp this Campaign race start.',
         );
+        const refusesThisStage = started.status === 403 || started.status === 404;
+        if (!refusesThisStage) return;
         if (this.activeCampaignStage?.raceId !== stage.raceId) return;
         await this.loadCampaignLobby({ show: true });
     },
