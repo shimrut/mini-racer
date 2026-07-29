@@ -33,22 +33,6 @@
     z-index: 1
 }
 
-/*
- * Daily and Campaign show every track on its own carousel card, so the live
- * track behind the lobby is the same information twice — and it competes with
- * the card the player is actually choosing from. Home has no carousel, so it
- * keeps its backdrop.
- *
- * Gated on the overlay being up: data-lobby-mode persists into the race, so
- * without that guard this would hide the game itself. Uses visibility rather
- * than opacity because resetCanvasPresentation sets opacity inline, which would
- * win over this rule.
- */
-body.start-overlay-active[data-lobby-mode="daily"] .game-layer-canvas,
-body.start-overlay-active[data-lobby-mode="campaign"] .game-layer-canvas {
-    visibility: hidden
-}
-
 button:active {
     filter: none;
 }
