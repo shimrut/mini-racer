@@ -126,7 +126,9 @@ flowchart LR
   Standings resolves the carousel's currently centred track at click time.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. Desktop responsive rules must not target the generic
-  `header` element because that would override these mode-specific stacks.
+  `header` element because that would override these mode-specific stacks. The
+  Mini Racer wordmark animates on the first Home reveal only; returning from a
+  mode restores its final visible state without replaying the hidden keyframe.
 - Daily and Campaign carousel cards show the full bronze-to-author medal ladder.
   The inline medal SVGs may shrink vertically inside the preview on Reddit's
   shorter WebView sizes; their intrinsic minimum height must not push the first

@@ -1230,6 +1230,10 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(track.hidden).toBe(true);
         expect(track.classList.contains('lobby-mode-track--challenge')).toBe(false);
         expect(body.dataset.lobbyMode).toBe('home');
+        expect(body.dataset.lobbyHomeReturned).toBe('true');
+        expect(modeCss).toMatch(
+            /body\[data-lobby-home-returned="true"\] #start-overlay\.is-ready \.lobby-title__mini,[\s\S]*animation:\s*none;/,
+        );
 
         global.document = originalDocument;
     });

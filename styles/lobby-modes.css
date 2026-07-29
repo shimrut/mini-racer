@@ -37,6 +37,14 @@
     display: none;
 }
 
+/* The wordmark entrance belongs to the first Home reveal. Returning from a
+   mode must not replay its zero-opacity keyframe after the title was hidden. */
+body[data-lobby-home-returned="true"] #start-overlay.is-ready .lobby-title__mini,
+body[data-lobby-home-returned="true"] #start-overlay.is-ready .lobby-title__racer {
+    opacity: 1;
+    animation: none;
+}
+
 /* Home and Challenge keep their established headers. Daily and Campaign use
    the available top edge for navigation and utilities instead of repeating
    the product and mode names already made clear by the selected surface. */

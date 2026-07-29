@@ -125,6 +125,7 @@ export class LobbyUi {
 
     showPane(mode) {
         if (!LOBBY_MODES.includes(mode)) return false;
+        const previousMode = this.mode;
         this.mode = mode;
         for (const candidate of LOBBY_MODES) {
             const pane = document.getElementById(`lobby-${candidate}-pane`);
@@ -134,7 +135,12 @@ export class LobbyUi {
             pane.classList.toggle('is-active', isActive);
             pane.setAttribute('aria-hidden', String(!isActive));
         }
-        if (document.body?.dataset) document.body.dataset.lobbyMode = mode;
+        if (document.body?.dataset) {
+            document.body.dataset.lobbyMode = mode;
+            if (mode === 'home' && previousMode !== 'home') {
+                document.body.dataset.lobbyHomeReturned = 'true';
+            }
+        }
         this.updateModeLabel(mode);
         this.syncModeToolbarState();
         this.overlay?.setAttribute('aria-label', this.getPaneAriaLabel(mode));

@@ -1,5 +1,7 @@
 # Changelog
 
+- Fixed the Mini Racer wordmark briefly disappearing when returning to Home
+  because its first-launch entrance animation replayed from zero opacity.
 - Daily and Campaign now use a compact top toolbar with Back, Standings,
   Garage, and Settings. Standings follows the currently centred track, and
   Start Race is again the sole full-width bottom action.
