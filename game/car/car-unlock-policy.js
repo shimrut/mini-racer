@@ -157,14 +157,25 @@ export function isCarAssetUnlocked(assetName, snapshot) {
     return normalizeCarUnlockSnapshot(snapshot).unlockedAssets.includes(assetName);
 }
 
-export function formatCarUnlockRequirement(assetName, snapshot) {
+export function getCarUnlockRequirementProgress(assetName, snapshot) {
     const requirement = CAR_UNLOCK_REQUIREMENTS[assetName];
-    if (!requirement) return '';
+    if (!requirement) return null;
     const progress = normalizeCarUnlockSnapshot(snapshot).progress;
     const current = Math.min(requirement.required, progress[requirement.progressKey] ?? 0);
-    if (current >= requirement.required) return 'Unlocked';
-    if (requirement.required === 1) return requirement.label;
-    return `${requirement.label} · ${current}/${requirement.required}`;
+    return {
+        ...requirement,
+        current,
+        ratio: requirement.required > 0 ? current / requirement.required : 1,
+        unlocked: current >= requirement.required,
+    };
+}
+
+export function formatCarUnlockRequirement(assetName, snapshot) {
+    const status = getCarUnlockRequirementProgress(assetName, snapshot);
+    if (!status) return '';
+    if (status.unlocked) return 'Unlocked';
+    if (status.required === 1) return status.label;
+    return `${status.label} · ${status.current}/${status.required}`;
 }
 
 export const DEFAULT_CAR_UNLOCK_SNAPSHOT = Object.freeze(

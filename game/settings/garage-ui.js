@@ -2,6 +2,7 @@ import {
     PLAYER_CAR_SKIN_SECTIONS,
     PLAYER_CAR_SKINS,
     getPlayerCarSkinUnlockLabel,
+    getPlayerCarSkinUnlockProgress,
     isPlayerCarSkinUnlocked,
     readPlayerCarSkinAssetName,
     writePlayerCarSkinAssetName
@@ -17,6 +18,8 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 const GARAGE_TABS = Object.freeze(['skin', 'trails']);
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const LOCK_ICON_PATH = 'M128 96l0 64 128 0 0-64c0-35.3-28.7-64-64-64s-64 28.7-64 64zM64 160l0-64C64 25.3 121.3-32 192-32S320 25.3 320 96l0 64c35.3 0 64 28.7 64 64l0 224c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 224c0-35.3 28.7-64 64-64z';
 
 export class GarageUi {
     constructor({
@@ -34,6 +37,7 @@ export class GarageUi {
         this.activeGarageTab = 'skin';
         this.skinOptionButtons = new Map();
         this.trailOptionButtons = new Map();
+        this.unlockDetailsPanel = null;
     }
 
     get panel() { return document.getElementById('garage-panel'); }
@@ -97,6 +101,7 @@ export class GarageUi {
                 this.modal?.resetGarageMenuKeyboardNav?.();
             });
         } else {
+            this.closeUnlockDetails({ restoreFocus: false });
             this.modal?.releaseModalFocusTrap?.(garageModal);
             if (this.modal?.isModalActive?.()) {
                 requestAnimationFrame(() => this.modal?.activateModalFocusTrap?.(this.modal.modal));
@@ -172,11 +177,16 @@ export class GarageUi {
                 label.className = 'garage-skin-option__label';
                 label.textContent = skin.label;
 
-                const requirement = document.createElement('span');
-                requirement.className = 'garage-skin-option__requirement';
+                const lockIndicator = this.createLockIndicator();
 
-                btn.append(thumb, label, requirement);
-                btn.addEventListener('click', () => this.selectCarSkin(skin.assetName));
+                btn.append(thumb, label, lockIndicator);
+                btn.addEventListener('click', () => {
+                    if (isPlayerCarSkinUnlocked(skin.assetName)) {
+                        this.selectCarSkin(skin.assetName);
+                    } else {
+                        this.showUnlockDetails(skin, btn);
+                    }
+                });
                 grid.appendChild(btn);
                 this.skinOptionButtons.set(skin.assetName, btn);
             }
@@ -185,6 +195,108 @@ export class GarageUi {
             host.appendChild(sectionEl);
         }
         this.refreshCarUnlocks();
+    }
+
+    createLockIndicator() {
+        const indicator = document.createElement('span');
+        indicator.className = 'garage-skin-option__lock';
+        indicator.setAttribute('aria-hidden', 'true');
+
+        const progress = document.createElementNS(SVG_NS, 'svg');
+        progress.classList.add('garage-skin-option__progress');
+        progress.setAttribute('viewBox', '0 0 44 44');
+
+        const track = document.createElementNS(SVG_NS, 'circle');
+        track.classList.add('garage-skin-option__progress-track');
+        track.setAttribute('cx', '22');
+        track.setAttribute('cy', '22');
+        track.setAttribute('r', '19');
+
+        const value = document.createElementNS(SVG_NS, 'circle');
+        value.classList.add('garage-skin-option__progress-value');
+        value.setAttribute('cx', '22');
+        value.setAttribute('cy', '22');
+        value.setAttribute('r', '19');
+        value.setAttribute('pathLength', '100');
+        progress.append(track, value);
+
+        // Font Awesome Free v7.3.1 — https://fontawesome.com/license/free
+        const lock = document.createElementNS(SVG_NS, 'svg');
+        lock.classList.add('garage-skin-option__lock-icon');
+        lock.setAttribute('viewBox', '0 0 384 512');
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('fill', 'rgb(30, 48, 80)');
+        path.setAttribute('d', LOCK_ICON_PATH);
+        lock.appendChild(path);
+
+        indicator.append(progress, lock);
+        return indicator;
+    }
+
+    showUnlockDetails(skin, restoreFocusElement = null) {
+        const status = getPlayerCarSkinUnlockProgress(skin.assetName);
+        const host = this.garageModal?.querySelector?.('.modal-view');
+        if (!status || status.unlocked || !host) return;
+        this.closeUnlockDetails({ restoreFocus: false });
+
+        const scrim = document.createElement('section');
+        scrim.className = 'result-share-panel garage-unlock-panel';
+        scrim.setAttribute('role', 'dialog');
+        scrim.setAttribute('aria-label', `${skin.label} unlock requirements`);
+        scrim.dataset.nestedModal = '';
+        scrim._restoreFocusElement = restoreFocusElement;
+
+        const card = document.createElement('div');
+        card.className = 'result-share-panel__card garage-unlock-panel__card';
+        const title = document.createElement('h3');
+        title.className = 'result-share-panel__title';
+        title.textContent = `${skin.label} locked`;
+        const statusLabel = document.createElement('p');
+        statusLabel.className = 'result-share-panel__status';
+        statusLabel.textContent = 'Unlock requirement';
+        const requirement = document.createElement('blockquote');
+        requirement.className = 'result-share-panel__copy';
+        requirement.textContent = status.label;
+        const progress = document.createElement('p');
+        progress.className = 'garage-unlock-panel__progress';
+        progress.textContent = `Progress ${status.current}/${status.required}`;
+        const actions = document.createElement('div');
+        actions.className = 'result-share-panel__actions';
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'result-share-panel__button';
+        close.dataset.nestedModalClose = '';
+        close.textContent = 'Close';
+        close.addEventListener('click', () => this.closeUnlockDetails());
+
+        actions.appendChild(close);
+        card.append(title, statusLabel, requirement, progress, actions);
+        scrim.appendChild(card);
+        host.appendChild(scrim);
+        this.unlockDetailsPanel = scrim;
+        this.modal?.resetGarageMenuKeyboardNav?.();
+    }
+
+    closeUnlockDetails({ restoreFocus = true } = {}) {
+        const panel = this.unlockDetailsPanel;
+        if (!panel) return;
+        const restoreFocusElement = panel._restoreFocusElement || null;
+        panel.remove();
+        this.unlockDetailsPanel = null;
+        if (restoreFocus && restoreFocusElement) {
+            this.modal?.resetGarageMenuKeyboardNav?.({
+                preferredElement: restoreFocusElement,
+            });
+        } else {
+            this.modal?.resetGarageMenuKeyboardNav?.();
+        }
+        if (
+            restoreFocus
+            && !this.modal?.resetGarageMenuKeyboardNav
+            && typeof restoreFocusElement?.focus === 'function'
+        ) {
+            restoreFocusElement.focus();
+        }
     }
 
     selectCarSkin(assetName) {
@@ -201,15 +313,19 @@ export class GarageUi {
             if (!btn) continue;
             const unlocked = isPlayerCarSkinUnlocked(skin.assetName);
             const unlockLabel = getPlayerCarSkinUnlockLabel(skin.assetName);
-            const requirement = btn.querySelector('.garage-skin-option__requirement');
-            btn.disabled = !unlocked;
+            const unlockProgress = getPlayerCarSkinUnlockProgress(skin.assetName);
+            const progressValue = btn.querySelector('.garage-skin-option__progress-value');
+            btn.disabled = false;
             btn.classList.toggle('is-locked', !unlocked);
+            btn.setAttribute('aria-disabled', !unlocked ? 'true' : 'false');
             btn.setAttribute('aria-label', !unlocked && unlockLabel
-                ? `${skin.label}. Locked. ${unlockLabel}`
+                ? `${skin.label}. Locked. ${unlockProgress?.current ?? 0} of ${unlockProgress?.required ?? 1}. Open unlock requirements.`
                 : skin.label);
-            if (requirement) {
-                requirement.textContent = !unlocked ? unlockLabel : '';
-                requirement.hidden = unlocked;
+            const lockIndicator = btn.querySelector('.garage-skin-option__lock');
+            if (lockIndicator) lockIndicator.hidden = unlocked;
+            if (progressValue) {
+                const ratio = Math.max(0, Math.min(1, unlockProgress?.ratio ?? 0));
+                progressValue.style.strokeDashoffset = String(100 - (ratio * 100));
             }
         }
         this.syncSkinSelection();

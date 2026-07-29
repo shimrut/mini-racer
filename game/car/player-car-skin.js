@@ -3,6 +3,7 @@ import {
     CAR_UNLOCK_REQUIREMENTS,
     DEFAULT_CAR_UNLOCK_SNAPSHOT,
     formatCarUnlockRequirement,
+    getCarUnlockRequirementProgress,
     isCarAssetUnlocked,
     normalizeCarUnlockSnapshot,
 } from './car-unlock-policy.js';
@@ -141,6 +142,10 @@ export function isPlayerCarSkinUnlocked(assetName) {
 
 export function getPlayerCarSkinUnlockLabel(assetName) {
     return formatCarUnlockRequirement(assetName, currentCarUnlockSnapshot);
+}
+
+export function getPlayerCarSkinUnlockProgress(assetName) {
+    return getCarUnlockRequirementProgress(assetName, currentCarUnlockSnapshot);
 }
 
 export function readPlayerCarSkinAssetName() {

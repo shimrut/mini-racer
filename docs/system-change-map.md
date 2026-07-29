@@ -82,7 +82,7 @@ flowchart LR
 - `game/race/ui-start-overlay.js` owns the lobby start overlay and uses the same spatial keyboard navigation while no sheet is open on top. Enter defaults to Start Race without a visible cue until a directional key is used.
 - `game/ui/menu-keyboard-nav.js` is the shared geometry-based menu navigator used by lobby, pause, finish, garage, settings, Tracks, Standings, and the share dialog. Arrow keys and WASD move to the nearest active control in the requested on-screen direction; overlapping control bounds keep wide actions reachable from narrower menu items. Standings keeps its date-rail underline and rounded-row visual language for keyboard selection instead of adding browser focus rings. Garage and Settings dismiss buttons are intentionally excluded because Escape owns dismissal, and Settings exposes the delay minus/plus buttons instead of selecting the meter display.
 - `game/race/ui-modal-content.js` builds the result modal content blocks and score displays.
-- `game/ui/reusable-modal.js` and `game/ui/modal-handoff.js` provide shared modal behavior used by settings, garage, playlist, and some results flows.
+- `game/ui/reusable-modal.js` and `game/ui/modal-handoff.js` provide shared modal behavior used by settings, garage, playlist, and some results flows. Reusable modals close an active `[data-nested-modal]` before closing their parent, which lets the Garage unlock-requirement panel share the compact result/share panel language with correct Escape behavior.
 
 ### Daily Challenge And Leaderboard Flow
 

@@ -94,9 +94,10 @@ Ghosts are per day/track. If a download isn’t ready in time, the game starts w
 
 ### Why is an Extra car locked in the Garage?
 
-Extra cars show their requirement and current progress in the Garage. Complete
-one verified Daily, Campaign, or Head-to-Head race for Crimson. Campaign Gold
-and Blaze count stages with either Gold or Author; Surge and Arctic specifically
+Locked Extra cars show a lock with a circular progress ring in the Garage.
+Select the locked car to open its requirement and exact progress. Complete one
+verified Daily, Campaign, or Head-to-Head race for Crimson. Campaign Gold and
+Blaze count stages with either Gold or Author; Surge and Arctic specifically
 require Author. Posting the same Head-to-Head track repeatedly counts once
 toward Plasma, and replaying the same challenge cannot add extra wins toward
 Onyx.

@@ -156,11 +156,19 @@ export class ModalShell {
     }
 
     getGarageMenuContainer() {
+        const unlockPanel = document.querySelector?.('#garage-modal .garage-unlock-panel');
+        if (unlockPanel) return unlockPanel;
         return document.getElementById('garage-panel')
             || document.getElementById('garage-modal');
     }
 
     getGarageMenuItems() {
+        const unlockPanel = document.querySelector?.('#garage-modal .garage-unlock-panel');
+        if (unlockPanel) {
+            return collectVisibleActionButtons(unlockPanel, 'button', {
+                requireLaidOut: false,
+            });
+        }
         const tabSkin = document.getElementById('garage-tab-skin');
         const tabTrails = document.getElementById('garage-tab-trails');
         const skinPanel = document.getElementById('garage-panel-skin');
@@ -181,13 +189,16 @@ export class ModalShell {
         );
     }
 
-    resetGarageMenuKeyboardNav({ keepCue = false } = {}) {
+    resetGarageMenuKeyboardNav({ keepCue = false, preferredElement = null } = {}) {
         const items = this.getGarageMenuItems();
         const container = this.getGarageMenuContainer();
         const firstOptionIndex = items.findIndex((item) => (
             item.classList?.contains?.('garage-skin-option')
             || item.classList?.contains?.('garage-trail-option')
         ));
+        const preferredElementIndex = preferredElement
+            ? items.indexOf(preferredElement)
+            : -1;
 
         if (keepCue && this._garageMenuKeyboardState?.keyboardNavActive) {
             const index = firstOptionIndex >= 0 ? firstOptionIndex : 0;
@@ -198,7 +209,7 @@ export class ModalShell {
         }
 
         return resetMenuKeyboardState(this._garageMenuKeyboardState, items, {
-            preferredIndex: 0,
+            preferredIndex: preferredElementIndex >= 0 ? preferredElementIndex : 0,
             container,
             focusPreferred: true,
         });
@@ -1480,7 +1491,10 @@ export class ModalShell {
             }
             if (trapRoot.id === 'garage-modal') {
                 event.preventDefault();
-                document.getElementById('garage-close-btn')?.click();
+                const unlockPanel = document.querySelector?.('#garage-modal .garage-unlock-panel');
+                const closeButton = unlockPanel?.querySelector?.('.result-share-panel__button');
+                if (closeButton) closeButton.click();
+                else document.getElementById('garage-close-btn')?.click();
                 return;
             }
             if (
@@ -1524,11 +1538,22 @@ export class ModalShell {
         }
 
         if (this._activeTrapModal?.id === 'garage-modal') {
+            const unlockPanel = document.querySelector?.('#garage-modal .garage-unlock-panel');
             if (handleMenuListKeydown(event, {
                 buttons: this.getGarageMenuItems(),
                 state: this._garageMenuKeyboardState,
                 container: this.getGarageMenuContainer(),
             })) {
+                return;
+            }
+            if (unlockPanel) {
+                if (event.key === 'Tab') {
+                    const focusables = this.getFocusables(unlockPanel);
+                    if (focusables.length > 0) {
+                        event.preventDefault();
+                        focusables[0].focus();
+                    }
+                }
                 return;
             }
         }

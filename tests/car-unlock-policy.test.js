@@ -3,6 +3,7 @@ import {
     EXTRA_CAR_ASSETS,
     buildCarUnlockSnapshot,
     countCampaignUnlockMedals,
+    getCarUnlockRequirementProgress,
 } from '../game/car/car-unlock-policy.js';
 
 function isUnlocked(snapshot, assetName) {
@@ -84,5 +85,20 @@ describe('car unlock policy', () => {
         expect(isUnlocked(firstWin, EXTRA_CAR_ASSETS.lime)).toBe(true);
         expect(isUnlocked(repeatedWin, EXTRA_CAR_ASSETS.onyx)).toBe(false);
         expect(isUnlocked(tenWins, EXTRA_CAR_ASSETS.onyx)).toBe(true);
+    });
+
+    it('reports bounded progress for the Garage lock ring and requirement modal', () => {
+        const snapshot = buildCarUnlockSnapshot({
+            postedTrackKeys: ['a', 'b', 'c'],
+        });
+
+        expect(getCarUnlockRequirementProgress(EXTRA_CAR_ASSETS.plasma, snapshot)).toMatchObject({
+            label: 'Post on 5 different tracks',
+            current: 3,
+            required: 5,
+            ratio: 0.6,
+            unlocked: false,
+        });
+        expect(getCarUnlockRequirementProgress(EXTRA_CAR_ASSETS.cobalt, snapshot)).toBeNull();
     });
 });

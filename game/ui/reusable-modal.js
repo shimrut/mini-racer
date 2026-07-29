@@ -37,11 +37,21 @@ function getTopActiveModal() {
     return activeModals.at(-1) || null;
 }
 
-function handleGlobalEscape(event) {
+export function handleGlobalEscape(event) {
     if (event.key !== 'Escape' && event.code !== 'Escape') return;
 
     const modal = getTopActiveModal();
     if (!modal) return;
+
+    const nestedClose = modal.querySelector?.(
+        '[data-nested-modal] [data-nested-modal-close]',
+    );
+    if (nestedClose) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        nestedClose.click();
+        return;
+    }
 
     const close = closeHandlers.get(modal);
     if (typeof close !== 'function') return;

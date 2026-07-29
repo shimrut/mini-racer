@@ -52,10 +52,12 @@ Mini Racer is a **game**, so the most important launch requirements are:
   posted track keys unlock Plasma, the first verified duel win unlocks Lime,
   and ten different won challenge IDs unlock Onyx. Reposting one track or
   replaying one challenge cannot inflate progress.
-- [ ] Locked Garage cars are disabled with a visible requirement/progress label,
-  cannot be selected through keyboard navigation, and are rejected by the
-  preferences API. Unlocks remain after post deletion, slower retries, and
-  profile expiry; an authorized guest Crimson unlock merges at Reddit sign-in.
+- [ ] Locked Garage cars show the supplied lock icon with a circular progress
+  ring. Pointer or keyboard activation opens the compact requirement/progress
+  panel but cannot select the car; Close and Escape dismiss only that panel and
+  restore focus to its car. The preferences API still rejects locked choices.
+  Unlocks remain after post deletion, slower retries, and profile expiry; an
+  authorized guest Crimson unlock merges at Reddit sign-in.
 - [ ] In Daily standings, select an available historical day and a non-self
   racer, confirm Race Opponent, and verify the correct day/track starts with
   that opponent's ghost, target time, and checkpoint deltas while a faster
