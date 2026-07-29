@@ -233,6 +233,30 @@ describe('Campaign lobby and shared modal adapters', () => {
         };
     }
 
+    it('still awards the medal and queues the run when the bootstrap never answered', () => {
+        // An unreachable bootstrap reports nothing rankable. That says nothing
+        // about this run: the medal comes from the track's own table, and the
+        // durable queue is what a dropped connection is for.
+        const context = createCampaignFinishContext({
+            campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
+        });
+
+        context.handleCampaignWin({ lapTime: 7.3 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                lapMedal: 'silver',
+                scoreboardSnapshot: expect.objectContaining({
+                    submissionStage: 'submitting',
+                }),
+            }),
+            expect.anything(),
+        );
+        expect(context.processVerificationQueue).toHaveBeenCalled();
+    });
+
     it('opens the finish modal once and queues the run before submission settles', async () => {
         const context = createCampaignFinishContext();
 

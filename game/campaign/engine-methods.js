@@ -405,31 +405,26 @@ export const campaignEngineMethods = {
             );
             if (!stage) return;
 
-            const ranked = this.campaignBootstrap?.ranked === true;
             // Same shape as Daily: nothing on the wire gates the countdown. Both
             // requests go out now and are folded in once the lights are running,
             // so the player waits for the track load and nothing else.
-            const startRequest = ranked
-                ? startServerCampaignRace(stage.raceId).catch((error) => {
-                    console.warn('Could not stamp the Campaign race start:', error);
-                    return null;
-                })
-                : null;
-            const ghostRequest = ranked
-                ? getCampaignPbGhost(stage.raceId).catch((error) => {
-                    console.warn('Campaign PB ghost was unavailable for this run:', error);
-                    return null;
-                })
-                : null;
+            //
+            // Sent whatever the bootstrap last reported. Both already swallow
+            // their own failures, and the ghost answer is what clears a stale
+            // personal best — skipping the request on a bootstrap that merely
+            // failed would cost the player their ghost for the run.
+            const startRequest = startServerCampaignRace(stage.raceId).catch((error) => {
+                console.warn('Could not stamp the Campaign race start:', error);
+                return null;
+            });
+            const ghostRequest = getCampaignPbGhost(stage.raceId).catch((error) => {
+                console.warn('Campaign PB ghost was unavailable for this run:', error);
+                return null;
+            });
 
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
             this.activeCampaignChallenge = null;
-            if (!ranked) {
-                // Nothing will be ranked, so never let a canonical PB left in
-                // memory from another identity become the comparison baseline.
-                this.applyCampaignPersonalBest(stage, null);
-            }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
             if (stage.trackKey !== this.currentTrackKey) {
                 await this.loadTrack(stage.trackKey, {
@@ -772,7 +767,6 @@ export const campaignEngineMethods = {
         // Read before verification writes this finish into progress, or the run
         // would look like it had already earned its own medal.
         const previousMedal = getStoredCampaignStageMedal(this.campaignBootstrap, stage.raceId);
-        const ranked = this.campaignBootstrap?.ranked === true;
         const previousVerifiedBestSec = getCampaignVerificationBestTimeSec(this, stage);
         const isCampaignBest = isNewBestResult(
             this.currentRunPolicy || { bestResultComparator: 'time' },
@@ -785,7 +779,7 @@ export const campaignEngineMethods = {
         // Match Daily's submission boundary: a valid finish still gets its
         // result sheet, opponent outcome, and retry controls, but only a strict
         // improvement enters verification. Equal and slower runs never enqueue.
-        if (ranked && !isCampaignBest) {
+        if (!isCampaignBest) {
             this.showCampaignFinish(stage, {
                 finalTime,
                 medal,
@@ -828,25 +822,15 @@ export const campaignEngineMethods = {
             return;
         }
 
-        // Without a player identity the server has nothing to rank against, so
-        // the finish is shown but nothing is queued.
-        if (!ranked) {
-            this.showCampaignFinish(stage, {
-                finalTime,
-                medal: null,
-                previousMedal,
-                message: 'Campaign results could not be ranked.',
-                scoreboardSnapshot: campaignErrorSnapshot(
-                    finalTime,
-                    'Campaign results could not be ranked.',
-                ),
-            });
-            return;
-        }
-
         // Same pattern as Daily: the finish sheet opens immediately and the
         // durable queue confirms in the background, so a dropped connection
         // retries instead of losing the run.
+        //
+        // Queued whatever the bootstrap last said about being rankable. A
+        // bootstrap that failed says nothing about this run, and a guest whose
+        // token is not minted yet will have one by the time the queue retries.
+        // Only the server gets to refuse a run, and when it does the queue
+        // reports that refusal on the sheet.
         const { enqueued, entry } = enqueueCampaignVerification({
             raceId: stage.raceId,
             trackKey: stage.trackKey,
