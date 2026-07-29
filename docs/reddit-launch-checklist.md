@@ -52,8 +52,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
   posted track keys unlock Plasma, the first verified duel win unlocks Lime,
   and ten different won challenge IDs unlock Onyx. Reposting one track or
   replaying one challenge cannot inflate progress.
-- [ ] Locked Garage cars show the supplied lock icon with a circular progress
-  ring. Pointer or keyboard activation opens the compact requirement/progress
+- [ ] Locked Garage cars show a white lock on a barely visible backing. The
+  white circular progress arc is absent at zero and appears after progress
+  begins. Pointer or keyboard activation opens the compact requirement/progress
   panel but cannot select the car; Close and Escape dismiss only that panel and
   restore focus to its car. The preferences API still rejects locked choices.
   Unlocks remain after post deletion, slower retries, and profile expiry; an

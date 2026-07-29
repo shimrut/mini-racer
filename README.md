@@ -72,8 +72,8 @@ Final podium posts (separate moderator opt-in) show the top three verified times
   10 Campaign stages; Fuchsia and Plasma after posting Head-to-Heads on 1/5
   distinct tracks; Lime and Onyx after 1/10 Head-to-Head wins
 - Cobalt and every non-achievement car are available immediately
-- Locked cars show a lock with a circular progress ring; select one to open its
-  unlock requirement and exact progress
+- Locked cars show a white lock; its white progress arc appears only after
+  progress begins. Select one to open its unlock requirement and exact progress
 - **8 trails**, including no trail
 - Looks only — the car drives the same either way
 

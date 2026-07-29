@@ -225,7 +225,7 @@ export class GarageUi {
         lock.classList.add('garage-skin-option__lock-icon');
         lock.setAttribute('viewBox', '0 0 384 512');
         const path = document.createElementNS(SVG_NS, 'path');
-        path.setAttribute('fill', 'rgb(30, 48, 80)');
+        path.setAttribute('fill', 'currentColor');
         path.setAttribute('d', LOCK_ICON_PATH);
         lock.appendChild(path);
 
@@ -322,9 +322,12 @@ export class GarageUi {
                 ? `${skin.label}. Locked. ${unlockProgress?.current ?? 0} of ${unlockProgress?.required ?? 1}. Open unlock requirements.`
                 : skin.label);
             const lockIndicator = btn.querySelector('.garage-skin-option__lock');
-            if (lockIndicator) lockIndicator.hidden = unlocked;
+            const ratio = Math.max(0, Math.min(1, unlockProgress?.ratio ?? 0));
+            if (lockIndicator) {
+                lockIndicator.hidden = unlocked;
+                lockIndicator.classList.toggle('has-progress', !unlocked && ratio > 0);
+            }
             if (progressValue) {
-                const ratio = Math.max(0, Math.min(1, unlockProgress?.ratio ?? 0));
                 progressValue.style.strokeDashoffset = String(100 - (ratio * 100));
             }
         }

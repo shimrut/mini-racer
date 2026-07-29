@@ -646,8 +646,9 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     width: 2rem;
     height: 2rem;
     border-radius: 999px;
-    background: #e2e8f0;
-    box-shadow: 0 .12rem .45rem rgba(2, 6, 23, .35);
+    background: rgba(248, 250, 252, .06);
+    box-shadow: inset 0 0 0 1px rgba(248, 250, 252, .04);
+    color: #fff;
     pointer-events: none;
 }
 
@@ -661,6 +662,12 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     width: 100%;
     height: 100%;
     transform: rotate(-90deg);
+    opacity: 0;
+    transition: opacity var(--dur-fast) ease;
+}
+
+.garage-skin-option__lock.has-progress .garage-skin-option__progress {
+    opacity: 1;
 }
 
 .garage-skin-option__progress-track,
@@ -670,11 +677,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 .garage-skin-option__progress-track {
-    stroke: rgba(30, 48, 80, .2);
+    stroke: transparent;
 }
 
 .garage-skin-option__progress-value {
-    stroke: var(--accent-color);
+    stroke: #fff;
     stroke-linecap: round;
     stroke-dasharray: 100;
     stroke-dashoffset: 100;

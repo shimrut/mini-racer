@@ -3,8 +3,9 @@
 - Added permanent achievement unlocks for the new Extra cars. Crimson unlocks
   after any verified race; Campaign medals unlock Gold, Blaze, Surge, and
   Arctic; unique Head-to-Head posts unlock Fuchsia and Plasma; verified duel
-  wins unlock Lime and Onyx. Locked cars show the supplied lock icon inside a
-  circular progress ring; selecting one opens a compact requirement panel.
+  wins unlock Lime and Onyx. Locked cars show a white lock on a subtle backing;
+  a white progress arc appears only after progress begins. Selecting one opens
+  a compact requirement panel.
   Both client and server still reject selecting them early.
 - Fixed the Mini Racer wordmark briefly disappearing when returning to Home
   because its first-launch entrance animation replayed from zero opacity.
