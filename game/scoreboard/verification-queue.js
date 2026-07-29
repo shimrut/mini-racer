@@ -190,14 +190,6 @@ function updateEntry(bucket, entryId, updater) {
   return cloneEntry(nextEntry);
 }
 
-function updateDailyEntry(challengeId, updater) {
-  return updateEntry("daily", challengeId, updater);
-}
-
-function updateCampaignEntry(raceId, updater) {
-  return updateEntry("campaign", raceId, updater);
-}
-
 export function getVerificationRetryDelayMs() {
   return DEFAULT_RETRY_DELAY_MS;
 }
@@ -212,16 +204,110 @@ export function isRetryableVerificationFailure(result) {
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
+/**
+ * Every mode queues a run the same way, so the queue is one implementation
+ * parameterised on its bucket.
+ *
+ * What stays per-mode is only which field names an entry carries: Daily keys on
+ * challengeId, Campaign on raceId. Those names are not cosmetic — entries live
+ * in localStorage that outlives a deploy, and an entry this file cannot read is
+ * deleted rather than skipped, so renaming one would silently discard real
+ * queued runs along with their replays.
+ */
+function getEntry(bucket, entryId) {
+  if (!entryId) return null;
+  return cloneEntry(readQueueState()[bucket][entryId] || null);
+}
+
+function getState(bucket, entryId) {
+  return getEntry(bucket, entryId)?.verificationState || "none";
+}
+
+function clearEntry(bucket, entryId) {
+  return updateEntry(bucket, entryId, () => null);
+}
+
+function markPending(
+  bucket,
+  entryId,
+  nextAttemptAt = Date.now(),
+  {
+    submissionStage = VERIFICATION_STAGE_PENDING,
+    statusText = null,
+    preserveUpdatedAt = false,
+  } = {},
+) {
+  return updateEntry(bucket, entryId, (previousEntry) => {
+    if (!previousEntry) return null;
+    return {
+      ...previousEntry,
+      verificationState: "pending",
+      submissionStage: normalizeVerificationStage(submissionStage, "pending"),
+      statusText: resolveVerificationStatusText(submissionStage, statusText),
+      nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
+      updatedAt: preserveUpdatedAt
+        ? previousEntry.updatedAt
+        : new Date().toISOString(),
+    };
+  });
+}
+
+function markTerminal(bucket, entryId, verificationState, stage, statusText) {
+  return updateEntry(bucket, entryId, (previousEntry) => {
+    if (!previousEntry) return null;
+    return {
+      ...previousEntry,
+      verificationState,
+      submissionStage: stage,
+      statusText: resolveVerificationStatusText(stage, statusText),
+      nextAttemptAt: null,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
+function getDue(bucket, now = Date.now()) {
+  return Object.values(readQueueState()[bucket])
+    .filter(
+      (entry) =>
+        entry?.verificationState === "pending" &&
+        normalizeNextAttemptAt(entry.nextAttemptAt) <= now,
+    )
+    .map((entry) => cloneEntry(entry));
+}
+
+function enqueue(bucket, entryId, nextEntry, isBetterThan) {
+  let didEnqueue = false;
+  const entry = updateEntry(bucket, entryId, (previousEntry) => {
+    if (!isBetterThan(nextEntry, previousEntry)) return previousEntry;
+    didEnqueue = true;
+    return nextEntry;
+  });
+  return { enqueued: didEnqueue, entry };
+}
+
+function pendingEntry(fields) {
+  return {
+    ...fields,
+    verificationState: "pending",
+    submissionStage: VERIFICATION_STAGE_SUBMITTING,
+    statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
+    nextAttemptAt: Date.now(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function isVerificationExpired(entry, now = Date.now()) {
+  const expiresAt = resolveEntryExpiry(entry);
+  return expiresAt === null || expiresAt <= now;
+}
+
 export function getDailyChallengeVerificationEntry(challengeId) {
-  if (!challengeId) return null;
-  const queueState = readQueueState();
-  return cloneEntry(queueState.daily[challengeId] || null);
+  return getEntry("daily", challengeId);
 }
 
 export function getDailyChallengeVerificationState(challengeId) {
-  return (
-    getDailyChallengeVerificationEntry(challengeId)?.verificationState || "none"
-  );
+  return getState("daily", challengeId);
 }
 
 export function enqueueDailyChallengeVerification({
@@ -255,7 +341,7 @@ export function enqueueDailyChallengeVerification({
     return { enqueued: false, entry: null };
   }
 
-  const nextEntry = {
+  return enqueue("daily", challengeId, pendingEntry({
     challengeId,
     bestTime,
     completedLaps: Number.isFinite(completedLaps)
@@ -277,136 +363,70 @@ export function enqueueDailyChallengeVerification({
     previousCheckpointTimesSec: Array.isArray(previousCheckpointTimesSec)
       ? previousCheckpointTimesSec.slice()
       : null,
-    verificationState: "pending",
-    submissionStage: VERIFICATION_STAGE_SUBMITTING,
-    statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
-    nextAttemptAt: Date.now(),
     expiresAt: new Date(resolvedExpiresAt).toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  let didEnqueue = false;
-  const entry = updateDailyEntry(challengeId, (previousEntry) => {
-    if (!isBetterDailyCandidate(nextEntry, previousEntry)) {
-      return previousEntry;
-    }
-    didEnqueue = true;
-    return nextEntry;
-  });
-  return {
-    enqueued: didEnqueue,
-    entry,
-  };
+  }), isBetterDailyCandidate);
 }
 
 export function clearDailyChallengeVerification(challengeId) {
-  return updateDailyEntry(challengeId, () => null);
+  return clearEntry("daily", challengeId);
 }
 
 export function markDailyChallengeVerificationPending(
   challengeId,
   nextAttemptAt = Date.now(),
-  {
-    submissionStage = VERIFICATION_STAGE_PENDING,
-    statusText = null,
-    preserveUpdatedAt = false,
-  } = {},
+  options = {},
 ) {
-  return updateDailyEntry(challengeId, (previousEntry) => {
-    if (!previousEntry) return null;
-    return {
-      ...previousEntry,
-      verificationState: "pending",
-      submissionStage: normalizeVerificationStage(submissionStage, "pending"),
-      statusText: resolveVerificationStatusText(submissionStage, statusText),
-      nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
-      updatedAt: preserveUpdatedAt
-        ? previousEntry.updatedAt
-        : new Date().toISOString(),
-    };
-  });
+  return markPending("daily", challengeId, nextAttemptAt, options);
 }
 
 export function markDailyChallengeVerificationRejected(challengeId) {
-  return updateDailyEntry(challengeId, (previousEntry) => {
-    if (!previousEntry) return null;
-    return {
-      ...previousEntry,
-      verificationState: "rejected",
-      submissionStage: VERIFICATION_STAGE_REJECTED,
-      statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_REJECTED],
-      nextAttemptAt: null,
-      updatedAt: new Date().toISOString(),
-    };
-  });
+  return markTerminal(
+    "daily",
+    challengeId,
+    "rejected",
+    VERIFICATION_STAGE_REJECTED,
+    null,
+  );
 }
 
 export function markDailyChallengeVerificationError(
   challengeId,
   errorMessage = null,
 ) {
-  return updateDailyEntry(challengeId, (previousEntry) => {
-    if (!previousEntry) return null;
-    return {
-      ...previousEntry,
-      verificationState: "error",
-      submissionStage: VERIFICATION_STAGE_ERROR,
-      statusText: resolveVerificationStatusText(
-        VERIFICATION_STAGE_ERROR,
-        errorMessage,
-      ),
-      nextAttemptAt: null,
-      updatedAt: new Date().toISOString(),
-    };
-  });
+  return markTerminal(
+    "daily",
+    challengeId,
+    "error",
+    VERIFICATION_STAGE_ERROR,
+    errorMessage,
+  );
 }
 
 export function getDueDailyChallengeVerifications(now = Date.now()) {
-  const queueState = readQueueState();
-  return Object.values(queueState.daily)
-    .filter(
-      (entry) =>
-        entry?.verificationState === "pending" &&
-        normalizeNextAttemptAt(entry.nextAttemptAt) <= now,
-    )
-    .map((entry) => cloneEntry(entry));
+  return getDue("daily", now);
 }
 
 export function isDailyChallengeVerificationExpired(entry, now = Date.now()) {
-  const expiresAt = resolveEntryExpiry(entry);
-  return expiresAt === null || expiresAt <= now;
-}
-
-export function getNextVerificationAttemptAt() {
-  const queueState = readQueueState();
-  const nextAttemptValues = QUEUE_BUCKETS
-    .flatMap((bucket) => Object.values(queueState[bucket]))
-    .filter(
-      (entry) =>
-        entry?.verificationState === "pending" &&
-        Number.isFinite(Number(entry.nextAttemptAt)),
-    )
-    .map((entry) => Number(entry.nextAttemptAt));
-
-  if (!nextAttemptValues.length) return null;
-  return Math.min(...nextAttemptValues);
+  return isVerificationExpired(entry, now);
 }
 
 export function getCampaignVerificationEntry(raceId) {
-  if (!raceId) return null;
-  const queueState = readQueueState();
-  return cloneEntry(queueState.campaign[raceId] || null);
+  return getEntry("campaign", raceId);
 }
 
 export function getCampaignVerificationState(raceId) {
-  return getCampaignVerificationEntry(raceId)?.verificationState || "none";
+  return getState("campaign", raceId);
 }
 
 /**
- * Queues a verified-by-the-server-later Campaign run. Unlike Daily, a slower
- * run never replaces a queued faster one, because Campaign keeps the best
- * time per race and the server rejects regressions anyway.
+ * Unlike Daily, a slower run never replaces a queued faster one, because
+ * Campaign keeps the best time per race and the server rejects regressions.
  */
+function isBetterCampaignCandidate(nextEntry, previousEntry) {
+  if (!previousEntry) return true;
+  return Number(previousEntry.bestTime) > Number(nextEntry.bestTime);
+}
+
 export function enqueueCampaignVerification({
   raceId,
   trackKey = null,
@@ -432,78 +452,66 @@ export function enqueueCampaignVerification({
     return { enqueued: false, entry: null };
   }
 
-  const nextEntry = {
+  return enqueue("campaign", raceId, pendingEntry({
     raceId,
     trackKey: typeof trackKey === "string" ? trackKey : null,
     bestTime,
     lapCount: Number.isFinite(lapCount) ? Math.max(1, Math.trunc(lapCount)) : null,
     rulesRevision: Number.isInteger(rulesRevision) ? rulesRevision : null,
     replay,
-    verificationState: "pending",
-    submissionStage: VERIFICATION_STAGE_SUBMITTING,
-    statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
-    nextAttemptAt: Date.now(),
     expiresAt: new Date(resolvedExpiresAt).toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  let didEnqueue = false;
-  const entry = updateCampaignEntry(raceId, (previousEntry) => {
-    if (previousEntry && Number(previousEntry.bestTime) <= Number(bestTime)) {
-      return previousEntry;
-    }
-    didEnqueue = true;
-    return nextEntry;
-  });
-  return { enqueued: didEnqueue, entry };
+  }), isBetterCampaignCandidate);
 }
 
 export function clearCampaignVerification(raceId) {
-  return updateCampaignEntry(raceId, () => null);
+  return clearEntry("campaign", raceId);
 }
 
 export function markCampaignVerificationPending(
   raceId,
   nextAttemptAt = Date.now(),
-  { submissionStage = VERIFICATION_STAGE_PENDING, statusText = null } = {},
+  options = {},
 ) {
-  return updateCampaignEntry(raceId, (previousEntry) => {
-    if (!previousEntry) return null;
-    return {
-      ...previousEntry,
-      verificationState: "pending",
-      submissionStage: normalizeVerificationStage(submissionStage, "pending"),
-      statusText: resolveVerificationStatusText(submissionStage, statusText),
-      nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
-    };
-  });
+  return markPending("campaign", raceId, nextAttemptAt, options);
+}
+
+export function markCampaignVerificationRejected(raceId) {
+  return markTerminal(
+    "campaign",
+    raceId,
+    "rejected",
+    VERIFICATION_STAGE_REJECTED,
+    null,
+  );
 }
 
 export function markCampaignVerificationError(raceId, errorMessage = null) {
-  return updateCampaignEntry(raceId, (previousEntry) => {
-    if (!previousEntry) return null;
-    return {
-      ...previousEntry,
-      verificationState: "error",
-      submissionStage: VERIFICATION_STAGE_ERROR,
-      statusText: resolveVerificationStatusText(
-        VERIFICATION_STAGE_ERROR,
-        errorMessage,
-      ),
-      nextAttemptAt: null,
-    };
-  });
+  return markTerminal(
+    "campaign",
+    raceId,
+    "error",
+    VERIFICATION_STAGE_ERROR,
+    errorMessage,
+  );
 }
 
 export function getDueCampaignVerifications(now = Date.now()) {
+  return getDue("campaign", now);
+}
+
+export function getNextVerificationAttemptAt() {
   const queueState = readQueueState();
-  return Object.values(queueState.campaign)
+  const nextAttemptValues = QUEUE_BUCKETS
+    .flatMap((bucket) => Object.values(queueState[bucket]))
     .filter(
       (entry) =>
         entry?.verificationState === "pending" &&
-        normalizeNextAttemptAt(entry.nextAttemptAt) <= now,
+        Number.isFinite(Number(entry.nextAttemptAt)),
     )
-    .map((entry) => cloneEntry(entry));
+    .map((entry) => Number(entry.nextAttemptAt));
+
+  if (!nextAttemptValues.length) return null;
+  return Math.min(...nextAttemptValues);
 }
 
 export function createVerificationSnapshot({
