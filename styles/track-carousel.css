@@ -276,6 +276,38 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     text-transform: uppercase;
 }
 
+/* How near the medal count is to the price, under the count itself. Only one
+   card is ever centred, so this is not a ladder to compare across cards — it is
+   the bit "10/22" is slow to say: whether the stage is close or a long way off,
+   before the numbers are read at all. */
+.track-carousel__meter {
+    width: 3.25rem;
+    height: 2px;
+    margin-top: 0.3rem;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--border-default);
+}
+
+.track-carousel__meter[hidden] {
+    display: none;
+}
+
+.track-carousel__meter-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--text-dim);
+    transition: width var(--dur-base) var(--ease-settle);
+}
+
+/* A rank is a standing worth full contrast; a count of medals still owed is the
+   card telling the player it is out of reach, and reads with the dimmed title. */
+.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__rank-value {
+    color: var(--text-dim);
+}
+
 /* A locked stage still shows its track and its gate — it just cannot be raced,
    and the art steps back so the card reads as out of reach. */
 .track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-preview {

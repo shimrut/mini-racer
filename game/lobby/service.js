@@ -128,20 +128,31 @@ export function normalizeCampaignLobbyState(state = {}) {
         0,
     );
     const stages = normalized.map((stage, index) => {
-        if (stage.unlocked) return { ...stage, unlockRequirementLabel: null };
+        if (stage.unlocked) {
+            return { ...stage, unlockRequirementLabel: null, unlockProgress: null };
+        }
         const previous = (stage.unlock?.previousRaceId
             ? normalized.find((candidate) => candidate.id === stage.unlock.previousRaceId)
             : null) || normalized[index - 1] || null;
         const awaitingPreviousMedal = Boolean(previous?.unlocked)
             && getCampaignStageMedalCount(normalizeMedalName(previous.medal)) === 0;
         const requiredMedals = Number(stage.unlock?.requiredMedals);
+        const hasPrice = Number.isInteger(requiredMedals) && requiredMedals > 0;
         let label = 'More medals to unlock';
         if (awaitingPreviousMedal) {
             label = `A medal on ${previous.trackName} to unlock`;
-        } else if (Number.isInteger(requiredMedals) && requiredMedals > 0) {
+        } else if (hasPrice) {
             label = `${medalTotal}/${requiredMedals} medals to unlock`;
         }
-        return { ...stage, unlockRequirementLabel: label };
+        return {
+            ...stage,
+            unlockRequirementLabel: label,
+            // The card shows the count where an unlocked stage shows its rank,
+            // so it needs the two numbers rather than the sentence.
+            unlockProgress: hasPrice
+                ? { medalTotal, requiredMedals, awaitingPreviousMedal }
+                : null,
+        };
     });
     const completed = Boolean(state.complete)
         || (stages.length > 0 && stages.every((stage) => isCampaignGoldMedal(stage.medal)));

@@ -75,6 +75,59 @@ describe('campaign carousel card model', () => {
         expect(cards[1].lockedLabel).toContain('to unlock');
     });
 
+    /**
+     * The count goes where an unlocked card puts its rank, so the meta line has
+     * no reason to say it a second time — the stage goes back to describing
+     * itself. The one exception is the stage waiting on the run before it: that
+     * sentence is not in the counter, so the meta line still carries it.
+     */
+    it('hands the medal count to the card and stops repeating it in the meta', () => {
+        const cards = buildCampaignCarouselCards(campaignState([
+            { unlocked: true, medal: 'gold' },
+            {
+                unlocked: false,
+                laps: 3,
+                unlock: { type: 'medal_total', requiredMedals: 12, previousRaceId: 'numbered-v1-00' },
+            },
+        ]));
+
+        expect(cards[1].lockMeter).toEqual({ label: 'Medals', value: '3/12', ratio: 0.25 });
+        expect(cards[1].metaLabel).toBe('3 Laps');
+        // The sentence stays reachable for the screen reader on the rank chip.
+        expect(cards[1].lockedLabel).toBe('3/12 medals to unlock');
+    });
+
+    it('keeps the sentence on the meta line while the run before is unmedalled', () => {
+        const cards = buildCampaignCarouselCards(campaignState([
+            { unlocked: true, medal: null },
+            {
+                unlocked: false,
+                unlock: { type: 'medal_total', requiredMedals: 12, previousRaceId: 'numbered-v1-00' },
+            },
+        ]));
+
+        expect(cards[1].metaLabel).toBe('A medal on Number 0 to unlock');
+        expect(cards[1].lockMeter).toEqual({ label: 'Medals', value: '0/12', ratio: 0 });
+    });
+
+    it('leaves an unlocked card without a meter and never overflows the bar', () => {
+        const cards = buildCampaignCarouselCards(campaignState([
+            { unlocked: true, medal: 'author' },
+            { unlocked: true, medal: 'author' },
+            {
+                unlocked: false,
+                // Already past the price, held only by the unmedalled stage 02.
+                unlock: { type: 'medal_total', requiredMedals: 3, previousRaceId: 'numbered-v1-02' },
+            },
+        ]));
+
+        expect(cards[0].lockMeter).toBeNull();
+        // Eight medals against a price of three: the bar fills, it does not spill.
+        expect(cards[2].lockMeter).toEqual({ label: 'Medals', value: '8/3', ratio: 1 });
+        // A locked stage with no price quoted has no bar to draw.
+        expect(cards[3].lockMeter).toBeNull();
+    });
+
     it('carries the banked time and medal onto the card', () => {
         const cards = buildCampaignCarouselCards(campaignState([
             { unlocked: true, bestTimeMs: 18_400, medal: 'silver', laps: 3 },

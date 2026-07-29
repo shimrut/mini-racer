@@ -22,13 +22,34 @@ function formatLapsLabel(laps) {
 
 /**
  * A locked stage states its gate instead of its lap count — the requirement is
- * the only thing a player can act on there.
+ * the only thing a player can act on there. Once the medal counter is carrying
+ * the price, though, repeating it here would print the same number twice on one
+ * card, so the meta line falls back to what the stage is.
  */
 function buildMetaLabel(stage, lapsLabel) {
-    if (!stage.unlocked) return stage.unlockRequirementLabel || 'Locked';
+    if (!stage.unlocked) {
+        if (stage.unlockProgress && !stage.unlockProgress.awaitingPreviousMedal) return lapsLabel;
+        return stage.unlockRequirementLabel || 'Locked';
+    }
     return stage.bestTimeMs === null
         ? lapsLabel
         : `${lapsLabel} · PB ${stage.bestTimeLabel}`;
+}
+
+/**
+ * What an unlocked card spends on its rank, a locked one spends on the number
+ * that actually governs it. The ratio drives a fill bar: five locked cards each
+ * a little fuller reads as a ladder in a way five bare fractions do not.
+ */
+function buildLockMeter(stage) {
+    const progress = stage.unlocked ? null : stage.unlockProgress;
+    if (!progress) return null;
+    const { medalTotal, requiredMedals } = progress;
+    return {
+        label: 'Medals',
+        value: `${medalTotal}/${requiredMedals}`,
+        ratio: Math.max(0, Math.min(1, medalTotal / requiredMedals)),
+    };
 }
 
 /**
@@ -79,6 +100,7 @@ export function buildCampaignCarouselCards(campaignState = {}) {
             rankPending: stage.standingsResolved === false,
             locked: !stage.unlocked,
             lockedLabel: stage.unlockRequirementLabel || null,
+            lockMeter: buildLockMeter(stage),
         });
     }
 

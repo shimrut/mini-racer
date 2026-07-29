@@ -251,7 +251,14 @@ export class TrackCarousel {
         rankLabel.textContent = 'Rank';
         const rankValue = document.createElement('span');
         rankValue.className = 'track-carousel__rank-value';
-        rank.append(rankLabel, rankValue);
+        // Only a locked stage fills this, so it stays out of the way until then.
+        const rankMeter = document.createElement('span');
+        rankMeter.className = 'track-carousel__meter';
+        rankMeter.hidden = true;
+        const rankMeterFill = document.createElement('span');
+        rankMeterFill.className = 'track-carousel__meter-fill';
+        rankMeter.append(rankMeterFill);
+        rank.append(rankLabel, rankValue, rankMeter);
         rank.addEventListener('click', (event) => {
             event.stopPropagation();
             const current = this._cards[Number(element.dataset.index)] || null;
@@ -270,7 +277,10 @@ export class TrackCarousel {
             if (Number.isInteger(cardIndex)) this.select(cardIndex);
         });
 
-        element._parts = { canvas, eyebrow, title, meta, chase, rank, rankLabel, rankValue, medal };
+        element._parts = {
+            canvas, eyebrow, title, meta, chase, rank, rankLabel, rankValue, rankMeter,
+            rankMeterFill, medal,
+        };
         this.paintCard(element, card);
         return element;
     }
@@ -350,13 +360,21 @@ export class TrackCarousel {
         }
     }
 
-    /** A locked track has no standings to open, so the chip states the gate. */
+    /**
+     * A locked track has no standings to open, so the chip states the gate. The
+     * medal count is the one number governing it, and it belongs in the slot the
+     * card already sizes for a number rather than in the fine print.
+     */
     paintRank(parts, card) {
         if (card.locked) {
-            setText(parts.rankValue, 'Locked');
-            parts.rankLabel.hidden = true;
+            const meter = card.lockMeter || null;
+            setText(parts.rankValue, meter ? meter.value : 'Locked');
+            setText(parts.rankLabel, meter ? meter.label : 'Rank');
+            parts.rankLabel.hidden = !meter;
+            parts.rankMeter.hidden = !meter;
+            if (meter) parts.rankMeterFill.style.width = `${Math.round(meter.ratio * 100)}%`;
             parts.rank.disabled = true;
-            parts.rank.classList.add('is-muted');
+            parts.rank.classList.toggle('is-muted', !meter);
             parts.rank.setAttribute(
                 'aria-label',
                 `${card.trackName} is locked. ${card.lockedLabel || ''}`.trim(),
@@ -364,6 +382,8 @@ export class TrackCarousel {
             return;
         }
 
+        parts.rankMeter.hidden = true;
+        setText(parts.rankLabel, 'Rank');
         parts.rank.disabled = false;
         setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || 'Unranked'));
         // "Rank Unranked" reads as a stutter; the word stands on its own.
