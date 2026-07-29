@@ -33,49 +33,79 @@
     }
 }
 
-/* Home is a title screen, so the wordmark owns it. Inside a mode the pane is
-   the content — the title steps back to a header and gives the room to it.
-   Attribute + class beats the width-scoped title sizes in responsive-layout. */
-body[data-lobby-mode="daily"] .lobby-header,
-body[data-lobby-mode="campaign"] .lobby-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    column-gap: 1rem;
-    padding-bottom: 1rem;
-}
-
-body[data-lobby-mode="daily"] .lobby-header-action,
-body[data-lobby-mode="campaign"] .lobby-header-action {
-    display: flex;
-}
-
-body[data-lobby-mode="daily"] .lobby-subhead,
-body[data-lobby-mode="campaign"] .lobby-subhead {
-    grid-column: 1 / -1;
-    width: 100%;
-    margin-top: 0.5rem;
-}
-
-body[data-lobby-mode="daily"] .lobby-back-btn,
-body[data-lobby-mode="campaign"] .lobby-back-btn {
+.lobby-mode-toolbar {
     display: none;
 }
 
+/* Home and Challenge keep their established headers. Daily and Campaign use
+   the available top edge for navigation and utilities instead of repeating
+   the product and mode names already made clear by the selected surface. */
+body[data-lobby-mode="daily"] .lobby-header,
+body[data-lobby-mode="campaign"] .lobby-header {
+    display: block;
+    padding-bottom: 0.75rem;
+}
+
 body[data-lobby-mode="daily"] .lobby-title,
-body[data-lobby-mode="campaign"] .lobby-title {
-    align-items: flex-start;
-    text-align: left;
+body[data-lobby-mode="campaign"] .lobby-title,
+body[data-lobby-mode="daily"] .lobby-subhead,
+body[data-lobby-mode="campaign"] .lobby-subhead {
+    display: none;
 }
 
-body[data-lobby-mode="daily"] .lobby-title__mini,
-body[data-lobby-mode="campaign"] .lobby-title__mini {
-    font-size: clamp(1.6rem, 7vw, 2.25rem);
+body[data-lobby-mode="daily"] .lobby-mode-toolbar,
+body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
 }
 
-body[data-lobby-mode="daily"] .lobby-title__racer,
-body[data-lobby-mode="campaign"] .lobby-title__racer {
-    font-size: clamp(2.4rem, 10.5vw, 3.5rem);
+.lobby-mode-toolbar__actions {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.15rem, 1.5vw, 0.5rem);
+}
+
+.lobby-mode-toolbar .lobby-header-action {
+    display: flex;
+}
+
+.lobby-mode-toolbar__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.6rem 0.45rem 0;
+    color: #fff;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-family: var(--header-font);
+    font-size: clamp(1rem, 4vw, 1.2rem);
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.lobby-mode-toolbar__back svg {
+    width: clamp(1.5rem, 5vw, 1.9rem);
+    height: clamp(1.5rem, 5vw, 1.9rem);
+    flex: 0 0 auto;
+    fill: currentColor;
+}
+
+.lobby-mode-toolbar__back:focus-visible,
+.lobby-mode-toolbar__back.is-menu-selected {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.lobby-mode-toolbar__back:active {
+    transform: scale(0.94);
 }
 
 .lobby-mode-menu {
@@ -153,10 +183,7 @@ body[data-lobby-mode="campaign"] .lobby-title__racer {
 }
 
 .lobby-primary-row--race {
-    grid-template-columns: 2.75rem 70% 2.75rem;
-    justify-content: center;
-    justify-items: center;
-    column-gap: clamp(0.85rem, 3vw, 1.25rem);
+    grid-template-columns: minmax(0, 1fr);
 }
 
 
@@ -167,44 +194,9 @@ body[data-lobby-mode="campaign"] .lobby-title__racer {
 }
 
 .lobby-primary-row--race .main-menu__item--primary {
-    padding-inline: 0.5rem;
-    font-size: clamp(1rem, 4.5vw, 1.25rem);
-    letter-spacing: 0.04em;
-}
-
-.lobby-primary-utility {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    min-width: 0;
-    min-height: 2.75rem;
-    padding: 0.55rem;
-    color: #fff;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
-}
-
-.lobby-primary-utility svg {
-    width: clamp(1.15rem, 4vw, 1.4rem);
-    height: clamp(1.15rem, 4vw, 1.4rem);
-    fill: currentColor;
-}
-
-.lobby-primary-utility:focus-visible,
-.lobby-primary-utility.is-menu-selected {
-    color: #fff;
-    background: transparent;
-    outline: 2px solid #fff;
-    outline-offset: 2px;
-}
-
-.lobby-primary-utility:active {
-    transform: scale(0.94);
+    padding-inline: 1.25rem;
+    font-size: 1.5rem;
+    letter-spacing: 0.05em;
 }
 
 .challenge-lobby {

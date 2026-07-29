@@ -45,6 +45,21 @@ export const modeRouterEngineMethods = {
         });
     },
 
+    openVisibleLobbyStandings(mode = this.activeRaceMode) {
+        if (mode === 'daily') {
+            const challenge = this.dailyCarousel?.getSelectedChallenge?.();
+            if (challenge) this.openDailyCarouselStandings?.(challenge);
+            return;
+        }
+        if (mode === 'campaign') {
+            const stage = this.campaignCarousel?.getSelectedChallenge?.();
+            if (stage?.unlocked === false) return;
+            if (stage) {
+                void this.openCampaignStandings?.(stage, { returnMode: 'close' });
+            }
+        }
+    },
+
     handleActiveRaceLapCompleted(lapTime, details) {
         this.handleDailyChallengeLapCompleted(lapTime, details);
     },

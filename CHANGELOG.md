@@ -1,5 +1,8 @@
 # Changelog
 
+- Daily and Campaign now use a compact top toolbar with Back, Standings,
+  Garage, and Settings. Standings follows the currently centred track, and
+  Start Race is again the sole full-width bottom action.
 - Guest Campaign progress is no longer lost at sign-in. Guest finishes keep their
   replay, and signing in replays them through the normal validated submission so
   the server re-derives every time and medal. Stages claim bottom-up, a stage the

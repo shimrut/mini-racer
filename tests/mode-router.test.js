@@ -24,6 +24,15 @@ function createEngine(overrides = {}) {
         handleDailyChallengeLapCompleted: vi.fn(),
         showCampaignLobby: vi.fn(() => 'campaign-lobby'),
         loadChallengeLobby: vi.fn(() => 'challenge-lobby'),
+        dailyCarousel: { getSelectedChallenge: vi.fn(() => ({ id: 'daily-visible' })) },
+        campaignCarousel: {
+            getSelectedChallenge: vi.fn(() => ({
+                id: 'numbered-v1-03',
+                unlocked: true,
+            })),
+        },
+        openDailyCarouselStandings: vi.fn(),
+        openCampaignStandings: vi.fn(),
         ...overrides,
     };
 }
@@ -114,5 +123,41 @@ describe('mode router', () => {
         const engine = createEngine({ activeRaceMode: 'campaign', currentChallengeRun: {} });
         engine.showDailyLobby();
         expect(engine.reset).toHaveBeenCalledWith(false, { showStartOverlay: false });
+    });
+
+    it('opens Daily standings for the currently centred challenge', () => {
+        const engine = createEngine({ activeRaceMode: 'daily' });
+        engine.openVisibleLobbyStandings('daily');
+        expect(engine.openDailyCarouselStandings).toHaveBeenCalledWith({
+            id: 'daily-visible',
+        });
+    });
+
+    it('opens Campaign standings for the currently centred unlocked stage', () => {
+        const engine = createEngine({ activeRaceMode: 'campaign' });
+        engine.openVisibleLobbyStandings('campaign');
+        expect(engine.openCampaignStandings).toHaveBeenCalledWith(
+            { id: 'numbered-v1-03', unlocked: true },
+            { returnMode: 'close' },
+        );
+    });
+
+    it('does not open standings outside Daily or Campaign, or for a locked stage', () => {
+        const home = createEngine({ activeRaceMode: 'home' });
+        home.openVisibleLobbyStandings('home');
+        expect(home.openDailyCarouselStandings).not.toHaveBeenCalled();
+        expect(home.openCampaignStandings).not.toHaveBeenCalled();
+
+        const locked = createEngine({
+            activeRaceMode: 'campaign',
+            campaignCarousel: {
+                getSelectedChallenge: vi.fn(() => ({
+                    id: 'numbered-v1-04',
+                    unlocked: false,
+                })),
+            },
+        });
+        locked.openVisibleLobbyStandings('campaign');
+        expect(locked.openCampaignStandings).not.toHaveBeenCalled();
     });
 });

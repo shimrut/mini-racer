@@ -119,15 +119,14 @@ flowchart LR
   queries, Daily post context, and Campaign challenge post context. The shared
   lobby keeps the original compact `#start-group` footprint with title at the
   top and one bottom-pinned action cluster (`margin-top: auto` on the active
-  pane only). Home, Daily, Campaign, and Challenge list secondary actions as
-  compact right-anchored mode-action labels; Daily/Campaign/Challenge keep a
-  full-width primary Race/Start/Accept button in that same cluster. Daily,
-  Campaign, and Challenge mode names (and Daily's track name / Challenge's
-  opponent line) sit in a tight `.lobby-subhead` directly under Mini Racer on
-  every viewport. Desktop responsive rules must not target the generic `header`
-  element because that would override this lobby stack and separate the mode
-  label from the title. Challenge also shows a compact details panel (track,
-  time to beat) above Accept.
+  pane only). Home keeps its Daily, Campaign, Garage, and Settings mode-action
+  list. Daily and Campaign replace the wordmark/subhead with one top toolbar:
+  labeled Back at left and Font Awesome Standings, Garage, and Settings icons
+  at right. Their only bottom action is a full-width Start Race button.
+  Standings resolves the carousel's currently centred track at click time.
+  Challenge keeps its mode subhead, opponent line, compact details panel, and
+  full-width Accept action. Desktop responsive rules must not target the generic
+  `header` element because that would override these mode-specific stacks.
 - Daily and Campaign carousel cards show the full bronze-to-author medal ladder.
   The inline medal SVGs may shrink vertically inside the preview on Reddit's
   shorter WebView sizes; their intrinsic minimum height must not push the first

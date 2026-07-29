@@ -917,32 +917,27 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(tieShowModal).toHaveBeenCalledTimes(1);
     });
 
-    it('places Back, a 70% primary, and Garage only across Start Race rows', () => {
+    it('places navigation and utilities in the header with a full-width Start Race', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
 
-        for (const mode of ['daily', 'campaign']) {
-            const backMarkup = html.match(
-                new RegExp(`<button id="lobby-${mode}-back-btn"[\\s\\S]*?</button>`),
-            )?.[0];
-            const garageMarkup = html.match(
-                new RegExp(`<button id="lobby-${mode}-garage-btn"[\\s\\S]*?</button>`),
-            )?.[0];
-            expect(backMarkup).toContain('class="lobby-primary-utility"');
-            expect(backMarkup).toContain('data-lobby-back');
-            expect(backMarkup).toContain('aria-label="Back to modes"');
-            expect(garageMarkup).toContain('class="lobby-primary-utility"');
-            expect(garageMarkup).toContain('aria-label="Garage"');
-            expect(garageMarkup).toContain('aria-controls="garage-modal"');
-            expect(garageMarkup).toContain('viewBox="0 0 576 512"');
-        }
+        const toolbarMarkup = html.match(
+            /<nav class="lobby-mode-toolbar"[\s\S]*?<\/nav>/,
+        )?.[0];
+        expect(toolbarMarkup).toContain('id="lobby-mode-back-btn"');
+        expect(toolbarMarkup).toContain('data-lobby-back');
+        expect(toolbarMarkup).toContain('<span>Back</span>');
+        expect(toolbarMarkup).toContain('id="lobby-mode-standings-btn"');
+        expect(toolbarMarkup).toContain('aria-label="Standings"');
+        expect(toolbarMarkup).toContain('id="lobby-mode-garage-btn"');
+        expect(toolbarMarkup).toContain('aria-controls="garage-modal"');
+        expect(toolbarMarkup).toContain('id="lobby-mode-settings-btn"');
+        expect(toolbarMarkup).toContain('aria-controls="settings-modal"');
 
-        expect(html).toMatch(
-            /id="lobby-daily-back-btn"[\s\S]*id="daily-challenge-start-btn"[\s\S]*id="lobby-daily-garage-btn"/,
-        );
-        expect(html).toMatch(
-            /id="lobby-campaign-back-btn"[\s\S]*id="campaign-primary-btn"[\s\S]*id="lobby-campaign-garage-btn"/,
-        );
+        expect(html).not.toContain('id="lobby-daily-back-btn"');
+        expect(html).not.toContain('id="lobby-daily-garage-btn"');
+        expect(html).not.toContain('id="lobby-campaign-back-btn"');
+        expect(html).not.toContain('id="lobby-campaign-garage-btn"');
         expect(html).toMatch(/id="challenge-accept-btn"[\s\S]*main-menu__label">Accept</);
         expect(html).not.toContain('id="lobby-challenge-back-btn"');
         expect(html).not.toContain('id="lobby-challenge-garage-btn"');
@@ -966,22 +961,17 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
         );
         expect(css).toMatch(
-            /\.lobby-primary-row--race\s*\{[^}]*grid-template-columns:\s*2\.75rem\s*70%\s*2\.75rem;[^}]*justify-content:\s*center;[^}]*column-gap:\s*clamp\(0\.85rem,\s*3vw,\s*1\.25rem\);/s,
+            /\.lobby-primary-row--race\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
         );
         expect(css).toMatch(
             /\.lobby-primary-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
         );
-        expect(css).toMatch(
-            /\.lobby-primary-utility\s*\{[^}]*width:\s*2\.75rem;[^}]*height:\s*2\.75rem;[^}]*color:\s*#fff;[^}]*background:\s*transparent;[^}]*border:\s*0;/s,
-        );
-        expect(css).toMatch(
-            /\.lobby-primary-utility svg\s*\{[^}]*width:\s*clamp\(1\.15rem,\s*4vw,\s*1\.4rem\);/s,
-        );
+        expect(css).not.toContain('.lobby-primary-utility');
         expect(css).not.toMatch(
             /\.lobby-primary-row\s*\{[^}]*margin-top:\s*auto;/s,
         );
         expect(css).toMatch(
-            /\.lobby-primary-row--race \.main-menu__item--primary\s*\{[^}]*font-size:\s*clamp\(1rem,\s*4\.5vw,\s*1\.25rem\);/s,
+            /\.lobby-primary-row--race \.main-menu__item--primary\s*\{[^}]*font-size:\s*1\.5rem;/s,
         );
         expect(css).not.toContain('width: min(94vw, 60rem)');
         expect(css).toMatch(
@@ -995,7 +985,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
-    it('preserves the Home menu and adds a separate mode-screen Settings icon', () => {
+    it('preserves the Home menu and uses Font Awesome mode-toolbar icons', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
         const lobbyCss = readFileSync(
@@ -1026,6 +1016,14 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(settingsMarkup).toContain('aria-controls="settings-modal"');
         expect(settingsMarkup).toContain('viewBox="0 0 512 512"');
         expect(settingsMarkup).not.toContain('lobby-mode-action__label');
+        const standingsMarkup = html.match(
+            /<button id="lobby-mode-standings-btn"[\s\S]*?<\/button>/,
+        )?.[0];
+        expect(standingsMarkup).toContain('viewBox="0 0 640 640"');
+        const garageMarkup = html.match(
+            /<button id="lobby-mode-garage-btn"[\s\S]*?<\/button>/,
+        )?.[0];
+        expect(garageMarkup).toContain('viewBox="0 0 576 512"');
 
         expect(css).toContain('.lobby-mode-action');
         expect(css).not.toContain('.lobby-utility-row');
@@ -1095,10 +1093,31 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
-    it('keeps Home unchanged and anchors mode-screen branding left with Settings right', () => {
+    it('routes Standings through the currently active lobby mode', () => {
+        const originalDocument = global.document;
+        const standings = createElement('button');
+        global.document = {
+            getElementById: vi.fn((id) => (
+                id === 'lobby-mode-standings-btn' ? standings : null
+            )),
+            querySelectorAll: vi.fn(() => []),
+            addEventListener: vi.fn(),
+        };
+        const onOpenStandings = vi.fn();
+        const lobby = new LobbyUi({ onOpenStandings });
+        lobby.mode = 'daily';
+
+        lobby.bind();
+        standings.listeners.get('click')();
+
+        expect(onOpenStandings).toHaveBeenCalledWith('daily');
+        global.document = originalDocument;
+    });
+
+    it('keeps Home unchanged and swaps mode-screen branding for the toolbar', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         expect(html).toMatch(
-            /class="lobby-title"[\s\S]*id="lobby-mode-settings-btn"[\s\S]*data-lobby-subhead[\s\S]*data-lobby-mode-label[\s\S]*data-lobby-mode-track/,
+            /class="lobby-title"[\s\S]*class="lobby-mode-toolbar"[\s\S]*id="lobby-mode-settings-btn"[\s\S]*data-lobby-subhead/,
         );
         expect(html).not.toMatch(
             /id="lobby-daily-pane"[\s\S]*lobby-pane-heading__title">Daily</,
@@ -1123,10 +1142,13 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-header\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-start;/s,
         );
         expect(modeCss).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/,
+            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*display:\s*block;/,
         );
         expect(modeCss).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-title,[\s\S]*align-items:\s*flex-start;[\s\S]*text-align:\s*left;/,
+            /body\[data-lobby-mode="daily"\] \.lobby-title,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-subhead[\s\S]*display:\s*none;/,
+        );
+        expect(modeCss).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-mode-toolbar,[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*space-between;/,
         );
         expect(lobbyCss).toMatch(
             /\.lobby-subhead\s*\{[^}]*margin-top:\s*0\.45rem;/s,

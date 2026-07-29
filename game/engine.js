@@ -263,6 +263,7 @@ export class RealTimeRacer {
       ),
       onSelectCampaign: () => this.showCampaignLobby(),
       onBack: () => this.showHomeLobby(),
+      onOpenStandings: (mode) => this.openVisibleLobbyStandings(mode),
       onStartCampaign: () => void this.startCampaignStage(
         this.campaignCarousel.getSelectedChallenge(),
       ),

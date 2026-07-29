@@ -46,6 +46,7 @@ export class LobbyUi {
         onCarouselNavigate = null,
         onSelectCampaign = null,
         onBack = null,
+        onOpenStandings = null,
         onStartDaily = null,
         onStartCampaign = null,
         onAcceptChallenge = null,
@@ -54,6 +55,7 @@ export class LobbyUi {
         this.onCarouselNavigate = onCarouselNavigate;
         this.onSelectCampaign = onSelectCampaign;
         this.onBack = onBack;
+        this.onOpenStandings = onOpenStandings;
         this.onStartDaily = onStartDaily;
         this.onStartCampaign = onStartCampaign;
         this.onAcceptChallenge = onAcceptChallenge;
@@ -83,6 +85,8 @@ export class LobbyUi {
         document.querySelectorAll?.('[data-lobby-back]')?.forEach((button) => {
             button.addEventListener('click', () => this.onBack?.(this.mode));
         });
+        document.getElementById('lobby-mode-standings-btn')
+            ?.addEventListener('click', () => this.onOpenStandings?.(this.mode));
         document.getElementById('lobby-back-btn')
             ?.addEventListener('click', () => this.onBack?.(this.mode));
         document.getElementById('daily-challenge-start-btn')
@@ -132,6 +136,7 @@ export class LobbyUi {
         }
         if (document.body?.dataset) document.body.dataset.lobbyMode = mode;
         this.updateModeLabel(mode);
+        this.syncModeToolbarState();
         this.overlay?.setAttribute('aria-label', this.getPaneAriaLabel(mode));
         this.resetKeyboardNav();
         requestAnimationFrame(() => this.focus());
@@ -186,6 +191,13 @@ export class LobbyUi {
 
     getMode() {
         return this.mode;
+    }
+
+    syncModeToolbarState() {
+        const standings = document.getElementById('lobby-mode-standings-btn');
+        if (!standings) return;
+        standings.disabled = this.mode === 'campaign'
+            && this._campaignSelectedStage?.unlocked === false;
     }
 
     getPaneAriaLabel(mode = this.mode) {
@@ -287,6 +299,7 @@ export class LobbyUi {
     setCampaignSelectedStage(stage = null) {
         this._campaignSelectedStage = stage;
         this.renderCampaign();
+        this.syncModeToolbarState();
     }
 
     /**
