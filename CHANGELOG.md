@@ -5,7 +5,8 @@
   a perimeter stroke shows unlock progress. Incomplete counts and progress are
   muted so they do not read as earned; reached requirements turn white. Locked
   card artwork now carries a large, centered version of the same white lock
-  badge used in the Garage.
+  badge used in the Garage, on a red backing. The shared lock viewBox includes
+  the full shackle so its top does not clip at larger sizes.
 - Added permanent achievement unlocks for the new Extra cars. Crimson unlocks
   after any verified race; Campaign medals unlock Gold, Blaze, Surge, and
   Arctic; unique Head-to-Head posts unlock Fuchsia and Plasma; verified duel

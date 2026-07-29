@@ -38,8 +38,9 @@ describe('Campaign locked-stage medal progress visual', () => {
         expect(ui).toContain('preview.append(previewArt, medal, previewLock)');
         expect(ui).toContain('parts.previewLock.hidden = !card.locked');
         expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
+        expect(lockIcon).toContain("lock.setAttribute('viewBox', '0 -32 384 544')");
         expect(css).toMatch(
-            /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4\.5rem;[^}]*height:\s*4\.5rem;[^}]*background:\s*rgba\(248,\s*250,\s*252,\s*\.06\);[^}]*color:\s*#fff;/s,
+            /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4\.5rem;[^}]*height:\s*4\.5rem;[^}]*background:\s*var\(--accent-color\);[^}]*color:\s*#fff;/s,
         );
         expect(css).not.toContain('.track-carousel__meter-fill');
     });
