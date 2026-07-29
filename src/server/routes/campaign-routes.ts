@@ -29,9 +29,12 @@ export function registerCampaignRoutes(
     app: Application,
     dependencies: CampaignRouteDependencies,
 ): void {
-    app.get('/api/campaign/bootstrap', async (_req, res) => {
+    app.get('/api/campaign/bootstrap', async (req, res) => {
         try {
+            const { playerId, guestToken } = req.query ?? {};
             send(res, await dependencies.getServerCampaignBootstrap({
+                playerId,
+                guestToken,
                 redditUsername: dependencies.getRequestUsername(),
             }));
         } catch (error) {
@@ -54,11 +57,13 @@ export function registerCampaignRoutes(
 
     app.get('/api/campaign/snapshot', async (req, res) => {
         try {
-            const { raceId, limit, offset } = req.query ?? {};
+            const { raceId, limit, offset, playerId, guestToken } = req.query ?? {};
             send(res, await dependencies.getServerCampaignSnapshot({
                 raceId,
                 limit: parseOptionalInteger(limit),
                 offset: parseOptionalInteger(offset),
+                playerId,
+                guestToken,
                 redditUsername: dependencies.getRequestUsername(),
             }));
         } catch (error) {
@@ -82,8 +87,11 @@ export function registerCampaignRoutes(
 
     app.get('/api/campaign/pb-ghost', async (req, res) => {
         try {
+            const { raceId, playerId, guestToken } = req.query ?? {};
             send(res, await dependencies.getServerCampaignPbGhost({
-                raceId: req.query?.raceId,
+                raceId,
+                playerId,
+                guestToken,
                 redditUsername: dependencies.getRequestUsername(),
             }));
         } catch (error) {

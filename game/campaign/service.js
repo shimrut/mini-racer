@@ -1,5 +1,9 @@
 import { getMedalForRaceTime } from '../medals/medal-timing.js';
-import { API_ROUTES } from '../scoreboard/api-client.js';
+import {
+    API_ROUTES,
+    getGuestPlayerToken,
+    getOrCreatePlayerId,
+} from '../scoreboard/api-client.js';
 import {
     CAMPAIGN_ID,
     CAMPAIGN_STAGES,
@@ -150,6 +154,32 @@ async function requestJson(url, options = {}) {
     }
 }
 
+/**
+ * Campaign ranks guests the same way Daily does, so every request carries the
+ * player identity. A signed-in request has its username attached server-side
+ * and ignores these.
+ */
+function withPlayerIdentity(url) {
+    url.searchParams.set('playerId', getOrCreatePlayerId('campaign'));
+    const guestToken = getGuestPlayerToken();
+    if (guestToken) url.searchParams.set('guestToken', guestToken);
+    return url;
+}
+
+function playerIdentityBody(extra = {}) {
+    return {
+        ...extra,
+        playerId: getOrCreatePlayerId('campaign'),
+        guestToken: getGuestPlayerToken(),
+    };
+}
+
+function campaignUrl(route) {
+    return withPlayerIdentity(
+        new URL(route, globalThis.location?.origin ?? 'http://localhost'),
+    );
+}
+
 /** Rank and field size per stage, as the bootstrap reports them. */
 export function normalizeCampaignStandings(value) {
     const source = value && typeof value === 'object' ? value : {};
@@ -178,7 +208,7 @@ export async function getCampaignBootstrap() {
         };
     }
     try {
-        const response = await requestJson(API_ROUTES.campaignBootstrapUrl);
+        const response = await requestJson(campaignUrl(API_ROUTES.campaignBootstrapUrl).toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
         return {
             campaignId: CAMPAIGN_ID,
@@ -207,12 +237,12 @@ export async function startServerCampaignRace(raceId) {
     return requestJson(API_ROUTES.campaignStartUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ raceId }),
+        body: JSON.stringify(playerIdentityBody({ raceId })),
     });
 }
 
 export async function getCampaignSnapshot(raceId, { limit = 50, offset = 0 } = {}) {
-    const url = new URL(API_ROUTES.campaignSnapshotUrl, globalThis.location?.origin ?? 'http://localhost');
+    const url = campaignUrl(API_ROUTES.campaignSnapshotUrl);
     url.searchParams.set('raceId', raceId);
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('offset', String(offset));
@@ -223,12 +253,12 @@ export async function submitCampaignRun({ raceId, trackKey, replay }) {
     return requestJson(API_ROUTES.campaignSubmitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ raceId, trackKey, replay }),
+        body: JSON.stringify(playerIdentityBody({ raceId, trackKey, replay })),
     });
 }
 
 export async function getCampaignPbGhost(raceId) {
-    const url = new URL(API_ROUTES.campaignPbGhostUrl, globalThis.location?.origin ?? 'http://localhost');
+    const url = campaignUrl(API_ROUTES.campaignPbGhostUrl);
     url.searchParams.set('raceId', raceId);
     return requestJson(url.toString());
 }

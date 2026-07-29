@@ -40,6 +40,7 @@ import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import type { FinalDailyGpPodium } from './daily-podium-model.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 import { toDailyCompetition } from './competition.js';
+import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import {
     createEmptySnapshot,
     isCompleteOpponentRecord,
@@ -982,59 +983,12 @@ export async function getServerDailyGpSnapshot({
     });
 }
 
-type OpponentRowSelection = {
-    kind: 'row';
-    rank: number;
-    displayName: string;
-    bestTimeMs: number;
-    updatedAt: string;
-};
-
-type NextFasterSelection = {
-    kind: 'next-faster';
-    benchmarkTimeMs?: number;
-};
-
-function normalizeOpponentSelection(value: unknown): OpponentRowSelection | NextFasterSelection | null {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-    const selection = value as Record<string, unknown>;
-    if (selection.kind === 'row') {
-        if (
-            !Number.isInteger(selection.rank)
-            || Number(selection.rank) < 1
-            || typeof selection.displayName !== 'string'
-            || !selection.displayName
-            || !Number.isSafeInteger(selection.bestTimeMs)
-            || Number(selection.bestTimeMs) <= 0
-            || typeof selection.updatedAt !== 'string'
-            || !selection.updatedAt
-        ) return null;
-        return {
-            kind: 'row',
-            rank: Number(selection.rank),
-            displayName: selection.displayName,
-            bestTimeMs: Number(selection.bestTimeMs),
-            updatedAt: selection.updatedAt,
-        };
-    }
-    if (selection.kind === 'next-faster') {
-        const benchmarkTimeMs = Number(selection.benchmarkTimeMs);
-        return {
-            kind: 'next-faster',
-            benchmarkTimeMs: Number.isSafeInteger(benchmarkTimeMs) && benchmarkTimeMs > 0
-                ? benchmarkTimeMs
-                : undefined,
-        };
-    }
-    return null;
-}
-
 export async function prepareServerDailyLeaderboardRace({
     challengeId,
     playerId,
     redditUsername,
     guestToken,
-    selection: rawSelection,
+    selection,
 }: {
     challengeId?: unknown;
     playerId?: unknown;
@@ -1053,97 +1007,14 @@ export async function prepareServerDailyLeaderboardRace({
         redditUsername,
         guestToken,
     });
-    if (!identity.canonicalPlayerId) {
-        return { status: 401, body: { error: 'Player identity is required to race an opponent.', reason: 'identity_required' } };
-    }
-    const selection = normalizeOpponentSelection(rawSelection);
-    if (!selection) {
-        return { status: 400, body: { error: 'Opponent selection is invalid.', reason: 'invalid_selection' } };
-    }
-
-    const competition = toDailyCompetition(challenge);
-    const leaderboardKey = competition.leaderboardKey;
-    let rankedCandidates: Array<{ member: string; rank: number }> = [];
-    if (selection.kind === 'row') {
-        const ranked = await redis.zRange(leaderboardKey, selection.rank - 1, selection.rank - 1);
-        rankedCandidates = ranked.map((row) => ({ member: row.member, rank: selection.rank }));
-    } else {
-        const ownRankZeroBased = await redis.zRank(leaderboardKey, identity.canonicalPlayerId);
-        const ownEntry = await readEntryByPlayerId(competition, identity.canonicalPlayerId);
-        const benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
-        if (!Number.isFinite(benchmarkTimeMs)) {
-            return { status: 409, body: { error: 'Set a time before choosing the next opponent.', reason: 'benchmark_required' } };
-        }
-        const totalCount = await redis.zCard(leaderboardKey);
-        const stop = Number.isFinite(ownRankZeroBased)
-            ? Number(ownRankZeroBased) - 1
-            : totalCount - 1;
-        const ranked = stop >= 0 ? await redis.zRange(leaderboardKey, 0, stop) : [];
-        rankedCandidates = ranked
-            .map((row, index) => ({ member: row.member, rank: index + 1 }))
-            .reverse();
-    }
-
-    for (const candidate of rankedCandidates) {
-        if (candidate.member === identity.canonicalPlayerId) {
-            if (selection.kind === 'row') {
-                return { status: 409, body: { error: 'Choose another player to race.', reason: 'self_selection' } };
-            }
-            continue;
-        }
-        const entry = await readEntryByPlayerId(competition, candidate.member);
-        if (!entry) continue;
-        if (selection.kind === 'next-faster') {
-            const ownEntry = await readEntryByPlayerId(competition, identity.canonicalPlayerId);
-            const benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
-            if (!benchmarkTimeMs || entry.bestTimeMs >= benchmarkTimeMs) continue;
-        }
-        const profileMap = await readPlayerProfileMap([candidate.member]);
-        const displayName = resolveLeaderboardDisplayName({
-            playerId: candidate.member,
-            preference: profileMap.get(candidate.member)?.leaderboardIdentity,
-            redditUsername: profileMap.get(candidate.member)?.redditUsername,
-        });
-        if (
-            selection.kind === 'row'
-            && (
-                displayName !== selection.displayName
-                || entry.bestTimeMs !== selection.bestTimeMs
-                || entry.updatedAt !== selection.updatedAt
-            )
-        ) {
-            return { status: 409, body: { error: 'Leaderboard row changed. Refresh and choose again.', reason: 'selection_changed' } };
-        }
-        const record = await getPlayerTrackPbRecord({
-            playerId: candidate.member,
-            competition,
-            track: TRACKS[challenge.trackKey],
-        });
-        if (!isCompleteOpponentRecord(entry, record, competition)) {
-            if (selection.kind === 'row') {
-                return { status: 409, body: { error: 'That opponent ghost is unavailable.', reason: 'ghost_unavailable' } };
-            }
-            continue;
-        }
-        return {
-            status: 200,
-            body: {
-                mode: 'daily',
-                race: challenge,
-                target: {
-                    rank: candidate.rank,
-                    displayName,
-                    bestTimeMs: entry.bestTimeMs,
-                    checkpointTimesSec: record!.checkpointTimesSec,
-                    lapCompletionTimesSec: record!.lapCompletionTimesSec,
-                    updatedAt: entry.updatedAt,
-                    ghost: record!.ghost,
-                },
-            },
-        };
-    }
-    return { status: 404, body: { error: 'No faster opponent ghost is available.', reason: 'no_faster_opponent' } };
+    return prepareCompetitionOpponentRace({
+        competition: toDailyCompetition(challenge),
+        playerId: identity.canonicalPlayerId,
+        race: challenge,
+        selection,
+    });
 }
+
 
 export async function submitServerDailyGpRun({
     playerId,

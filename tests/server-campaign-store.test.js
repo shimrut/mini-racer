@@ -18,6 +18,13 @@ const mockRedis = {
     }),
     hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
     hMGet: vi.fn(async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null)),
+    mGet: vi.fn(async (keys) => keys.map((key) => strings.get(key) ?? null)),
+    hDel: vi.fn(async (key, fields) => {
+        const hash = hashes.get(key);
+        if (!hash) return 0;
+        return fields.filter((field) => hash.delete(field)).length;
+    }),
+    zRem: vi.fn(async () => 1),
     hSet: vi.fn(async (key, entries) => {
         const hash = hashes.get(key) ?? new Map();
         for (const [field, value] of Object.entries(entries)) hash.set(field, value);
@@ -35,6 +42,25 @@ const mockRedis = {
 };
 const mockValidateDailyGpReplayDetailed = vi.fn();
 
+/**
+ * Display names come from the player profile now, not from a name frozen into
+ * the leaderboard row, so a board that should show a name needs a profile.
+ */
+function seedPlayerProfile(playerId, redditUsername) {
+    const playerKey = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+    strings.set(`dailygp:player-profile:${playerKey}`, JSON.stringify({
+        playerId,
+        leaderboardIdentity: 'reddit',
+        redditUsername,
+        preferences: null,
+        hasSeenGame: true,
+        hasAnyData: true,
+        firstSeenAt: '2026-01-01T00:00:00.000Z',
+        lastSeenAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    }));
+}
+
 function createTransaction() {
     const commands = [];
     return {
@@ -44,6 +70,7 @@ function createTransaction() {
         set: vi.fn(async (...args) => commands.push(() => mockRedis.set(...args))),
         hSet: vi.fn(async (...args) => commands.push(() => mockRedis.hSet(...args))),
         zAdd: vi.fn(async (...args) => commands.push(() => mockRedis.zAdd(...args))),
+        expire: vi.fn(async (...args) => commands.push(() => mockRedis.expire(...args))),
         exec: vi.fn(async () => {
             const results = [];
             for (const command of commands) results.push(await command());
@@ -113,7 +140,7 @@ describe('Campaign server store', () => {
         });
     });
 
-    it('keeps guests practice-only and performs no Campaign write', async () => {
+    it('refuses an unidentified request and performs no Campaign write', async () => {
         const { getServerCampaignBootstrap, submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
         const bootstrap = await getServerCampaignBootstrap({ redditUsername: null });
         expect(bootstrap).toMatchObject({
@@ -209,19 +236,18 @@ describe('Campaign server store', () => {
             body: {
                 accepted: true,
                 improved: true,
-                result: {
-                    bestTimeMs: 1000,
-                    medal: 'author',
-                },
+                bestTimeMs: 1000,
+                trackPbPersistenceStatus: 'stored',
                 progress: {
                     unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
+                    resultsByRaceId: {
+                        'numbered-v1-00': { bestTimeMs: 1000, medal: 'author' },
+                    },
                 },
-                ghostPersistenceStatus: 'stored',
             },
         });
         expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalledWith({
             challenge: expect.objectContaining({
-                id: 'numbered-v1-00',
                 trackKey: 'numberZero',
                 objectiveParams: { lapCount: 1 },
                 rulesRevision: 1,
@@ -285,15 +311,19 @@ describe('Campaign server store', () => {
             status: 200,
             body: {
                 accepted: true,
-                result: { medal: null, bestTimeMs: 999_000 },
-                ghostPersistenceStatus: 'stored',
+                bestTimeMs: 999_000,
+                trackPbPersistenceStatus: 'stored',
+                progress: {
+                    resultsByRaceId: {
+                        'numbered-v1-00': { medal: null, bestTimeMs: 999_000 },
+                    },
+                },
             },
         });
         expect(stored).toMatchObject({
             status: 200,
             body: {
                 personalBest: {
-                    medal: null,
                     bestTimeMs: 999_000,
                     lapCompletionTimesSec: [999],
                 },
@@ -321,7 +351,7 @@ describe('Campaign server store', () => {
             body: {
                 accepted: true,
                 improved: true,
-                ghostPersistenceStatus: 'unavailable',
+                trackPbPersistenceStatus: 'unavailable',
             },
         });
         expect(consoleError).toHaveBeenCalled();
@@ -358,9 +388,10 @@ describe('Campaign server store', () => {
         };
         const entryKey = `campaign:numbered-v1:leaderboard:${raceId}:entries`;
         const pbKey = `campaign:numbered-v1:pbs:${raceId}`;
+        seedPlayerProfile(playerId, 'Opponent');
         hashes.set(entryKey, new Map([[
             playerId,
-            JSON.stringify({ ...result, playerId, displayName: 'Opponent' }),
+            JSON.stringify({ ...result, playerId }),
         ]]));
         hashes.set(pbKey, new Map([[
             createHash('sha256').update(playerId, 'utf8').digest('base64url'),
@@ -391,7 +422,7 @@ describe('Campaign server store', () => {
         })).resolves.toMatchObject({
             status: 200,
             body: {
-                rows: [{
+                topRows: [{
                     rank: 1,
                     displayName: 'Opponent',
                     opponentRaceAvailable: true,
@@ -440,18 +471,18 @@ describe('Campaign server store', () => {
             medal: 'gold',
             checkpointTimesSec: [0.02, 0.05, 0.08],
         };
+        seedPlayerProfile(rivalId, 'Opponent');
+        seedPlayerProfile(playerId, 'RaceFan');
         const entries = new Map([
             [rivalId, JSON.stringify({
                 ...baseResult,
                 playerId: rivalId,
-                displayName: 'Opponent',
                 bestTimeMs: 100,
                 updatedAt: '2026-07-27T10:00:00.000Z',
             })],
             [playerId, JSON.stringify({
                 ...baseResult,
                 playerId,
-                displayName: 'RaceFan',
                 bestTimeMs: 140,
                 updatedAt: '2026-07-27T11:00:00.000Z',
             })],
@@ -504,7 +535,6 @@ describe('Campaign server store', () => {
         entries.set(playerId, JSON.stringify({
             ...baseResult,
             playerId,
-            displayName: 'RaceFan',
             bestTimeMs: 80,
             updatedAt: '2026-07-27T11:30:00.000Z',
         }));
@@ -541,9 +571,10 @@ describe('Campaign server store', () => {
         const pbField = createHash('sha256').update(playerId, 'utf8').digest('base64url');
         const entryKey = `campaign:numbered-v1:leaderboard:${raceId}:entries`;
         const pbKey = `campaign:numbered-v1:pbs:${raceId}`;
+        seedPlayerProfile(playerId, 'Opponent');
         hashes.set(entryKey, new Map([[
             playerId,
-            JSON.stringify({ ...result, playerId, displayName: 'Opponent' }),
+            JSON.stringify({ ...result, playerId }),
         ]]));
         hashes.set(pbKey, new Map([[
             pbField,
@@ -569,7 +600,7 @@ describe('Campaign server store', () => {
             redditUsername: 'RaceFan',
         })).resolves.toMatchObject({
             status: 200,
-            body: { rows: [{ rank: 1, opponentRaceAvailable: true }] },
+            body: { topRows: [{ rank: 1, opponentRaceAvailable: true }] },
         });
         await expect(prepareServerCampaignLeaderboardRace({
             raceId,
@@ -601,7 +632,7 @@ describe('Campaign server store', () => {
             redditUsername: 'RaceFan',
         })).resolves.toMatchObject({
             status: 200,
-            body: { rows: [{ rank: 1, opponentRaceAvailable: false }] },
+            body: { topRows: [{ rank: 1, opponentRaceAvailable: false }] },
         });
         await expect(prepareServerCampaignLeaderboardRace({
             raceId,
@@ -616,6 +647,169 @@ describe('Campaign server store', () => {
         })).resolves.toMatchObject({
             status: 409,
             body: { reason: 'ghost_unavailable' },
+        });
+    });
+
+    it('ranks a guest who carries a valid token', async () => {
+        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const guestToken = await mintGuestPlayerToken('guest-racer');
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+
+        const submission = await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            playerId: 'guest-racer',
+            guestToken,
+        });
+
+        expect(submission).toMatchObject({
+            status: 200,
+            body: { accepted: true, improved: true, bestTimeMs: 12345 },
+        });
+        expect(mockRedis.zAdd).toHaveBeenCalledWith(
+            'campaign:numbered-v1:leaderboard:numbered-v1-00',
+            { member: 'guest:guest-racer', score: 12345 },
+        );
+    });
+
+    it('keeps a guest Campaign standing bounded but well past the guest profile', async () => {
+        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const guestToken = await mintGuestPlayerToken('guest-ttl');
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+
+        await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            playerId: 'guest-ttl',
+            guestToken,
+        });
+
+        const boardExpiries = mockRedis.expire.mock.calls
+            .filter(([key]) => String(key).startsWith('campaign:') && !String(key).includes('rate-limit'))
+            .map(([, seconds]) => seconds);
+        expect(boardExpiries.length).toBeGreaterThan(0);
+        // Long enough that returning after the 7-day guest profile lapses does
+        // not cost the unlocks they earned.
+        for (const seconds of boardExpiries) {
+            expect(seconds).toBeGreaterThan(7 * 24 * 60 * 60);
+        }
+    });
+
+    it('never expires a signed-in player Campaign standing', async () => {
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            redditUsername: 'Permanent',
+        });
+
+        const campaignExpiries = mockRedis.expire.mock.calls
+            .filter(([key]) => String(key).startsWith('campaign:') && !String(key).includes('rate-limit'));
+        expect(campaignExpiries).toEqual([]);
+    });
+
+    it('moves a guest Campaign standing onto the account at sign-in, keeping the better time', async () => {
+        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const guestToken = await mintGuestPlayerToken('guest-merge');
+        const {
+            getServerCampaignBootstrap,
+            mergeGuestCampaignProgress,
+            submitServerCampaignRun,
+        } = await import('../src/server/campaign-store.ts');
+
+        // The guest earns Author on stage 00, which unlocks stage 01.
+        mockValidateDailyGpReplayDetailed.mockReturnValue({
+            ok: true,
+            run: {
+                bestTimeSec: 1,
+                bestTimeMs: 1000,
+                completedLaps: 1,
+                checkpointTimesSec: [0.4],
+                lapCompletionTimesSec: [1],
+                ghost: {
+                    schemaVersion: 2,
+                    sampleIntervalMs: 50,
+                    finishTimeMs: 1000,
+                    origin: [0, 0, 0],
+                    deltas: [1, 1, 1],
+                },
+                method: 'finish',
+            },
+        });
+        await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            playerId: 'guest-merge',
+            guestToken,
+        });
+
+        const merged = await mergeGuestCampaignProgress({
+            guestPlayerId: 'guest:guest-merge',
+            redditPlayerId: 'reddit:claimed',
+        });
+        expect(merged).toEqual({ merged: true, mergedRaceIds: ['numbered-v1-00'] });
+
+        // The account now owns the unlock the guest earned...
+        await expect(getServerCampaignBootstrap({ redditUsername: 'Claimed' }))
+            .resolves.toMatchObject({
+                status: 200,
+                body: {
+                    progress: {
+                        unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
+                        resultsByRaceId: {
+                            'numbered-v1-00': { bestTimeMs: 1000, medal: 'author' },
+                        },
+                    },
+                },
+            });
+        // ...and the guest keeps nothing, so a second call changes nothing.
+        await expect(mergeGuestCampaignProgress({
+            guestPlayerId: 'guest:guest-merge',
+            redditPlayerId: 'reddit:claimed',
+        })).resolves.toEqual({ merged: false, mergedRaceIds: [] });
+    });
+
+    it('refuses to trade a verified account time down for a slower guest one', async () => {
+        const { mergeGuestCampaignProgress, parseCampaignProgress } = await import('../src/server/campaign-store.ts');
+        const progressKeyFor = (playerId) => `campaign:numbered-v1:progress:${
+            createHash('sha256').update(playerId, 'utf8').digest('base64url')
+        }`;
+        const stageResult = (bestTimeMs, medal) => ({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            lapCount: 1,
+            rulesRevision: 1,
+            bestTimeMs,
+            medal,
+            checkpointTimesSec: null,
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        });
+        strings.set(progressKeyFor('guest:slower'), JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: { 'numbered-v1-00': stageResult(9000, 'bronze') },
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        }));
+        strings.set(progressKeyFor('reddit:faster'), JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: { 'numbered-v1-00': stageResult(1000, 'author') },
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        }));
+
+        await expect(mergeGuestCampaignProgress({
+            guestPlayerId: 'guest:slower',
+            redditPlayerId: 'reddit:faster',
+        })).resolves.toEqual({ merged: false, mergedRaceIds: [] });
+
+        const kept = parseCampaignProgress(strings.get(progressKeyFor('reddit:faster')));
+        expect(kept.resultsByRaceId['numbered-v1-00']).toMatchObject({
+            bestTimeMs: 1000,
+            medal: 'author',
         });
     });
 });
