@@ -44,6 +44,19 @@ Mini Racer is a **game**, so the most important launch requirements are:
   the next stage, and keep independent permanent standings and PB ghosts.
 - [ ] Campaign standings can switch between unlocked stages without combining
   their rows, and each stage continues paging its own leaderboard.
+- [ ] In Daily standings, select an available historical day and a non-self
+  racer, confirm Race Opponent, and verify the correct day/track starts with
+  that opponent's ghost, target time, and checkpoint deltas while a faster
+  verified finish updates the normal Daily rank.
+- [ ] In Campaign standings, select an unlocked stage and opponent, verify the
+  normal Campaign submission/progression path remains active, and confirm a
+  guest result stays local until the existing sign-in claim revalidation.
+- [ ] Opponent loss/tie retries the same frozen ghost; a win offers the nearest
+  raceable racer above the refreshed position, skipping unavailable ghosts,
+  while first place falls back to normal Beat Your PB behavior.
+- [ ] Disabling PB Ghost hides only the player's normal PB ghost. A deliberately
+  selected opponent still renders with one random shipped skin that remains
+  stable across retries and changes when a different opponent is selected.
 - [ ] Crossing the final Campaign finish line opens a saving sheet immediately;
   accepted, rejected, timed-out, and interrupted-response paths all end on an
   actionable result sheet, including when PB ghost or lobby refresh fails.

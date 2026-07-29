@@ -150,6 +150,23 @@ async function requestJson(url, options = {}) {
     }
 }
 
+/** Rank and field size per stage, as the bootstrap reports them. */
+export function normalizeCampaignStandings(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    const standings = Object.create(null);
+    for (const stage of CAMPAIGN_STAGES) {
+        const raw = source[stage.raceId];
+        if (!raw || typeof raw !== 'object') continue;
+        const rank = Number(raw.rank);
+        const totalCount = Number(raw.totalCount);
+        standings[stage.raceId] = {
+            rank: Number.isInteger(rank) && rank > 0 ? rank : null,
+            totalCount: Number.isInteger(totalCount) && totalCount > 0 ? totalCount : 0,
+        };
+    }
+    return standings;
+}
+
 export async function getCampaignBootstrap() {
     if (typeof fetch !== 'function') {
         return {
@@ -157,6 +174,7 @@ export async function getCampaignBootstrap() {
             signedIn: false,
             stages: CAMPAIGN_STAGES,
             progress: readLocalCampaignProgress(),
+            standingsByRaceId: normalizeCampaignStandings(null),
         };
     }
     try {
@@ -172,6 +190,7 @@ export async function getCampaignBootstrap() {
                     response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
                 )
                 : readLocalCampaignProgress(),
+            standingsByRaceId: normalizeCampaignStandings(response.body.standingsByRaceId),
         };
     } catch {
         return {
@@ -179,6 +198,7 @@ export async function getCampaignBootstrap() {
             signedIn: false,
             stages: CAMPAIGN_STAGES,
             progress: readLocalCampaignProgress(),
+            standingsByRaceId: normalizeCampaignStandings(null),
         };
     }
 }

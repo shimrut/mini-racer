@@ -130,17 +130,84 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     animation: slideInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
 
+.lobby-header-action {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: clamp(2.6rem, 10vw, 3rem);
+    height: clamp(2.6rem, 10vw, 3rem);
+    padding: 0.65rem;
+    color: #fff;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.lobby-header-action svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+.lobby-header-action:focus-visible,
+.lobby-header-action.is-menu-selected {
+    color: #fff;
+    background: transparent;
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.lobby-header-action:active {
+    transform: scale(0.92);
+}
+
 .lobby-subhead {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.2rem;
+    align-items: center;
+    gap: 0.6rem;
     width: 100%;
     margin-top: 0.45rem;
 }
 
 .lobby-subhead[hidden] {
     display: none !important;
+}
+
+.lobby-subhead__text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.lobby-back-btn {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #fff;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    transition: color 120ms ease, transform 120ms ease;
+}
+
+.lobby-back-btn svg {
+    width: clamp(1.75rem, 5.5vw, 2.25rem);
+    height: clamp(1.75rem, 5.5vw, 2.25rem);
+    fill: currentColor;
+}
+
+.lobby-back-btn:hover,
+.lobby-back-btn:focus-visible {
+    color: #fff;
+}
+
+.lobby-back-btn:active {
+    transform: scale(0.92);
 }
 
 .lobby-mode-label {
@@ -707,4 +774,3 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 #garage-modal .garage-trail-option.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
-

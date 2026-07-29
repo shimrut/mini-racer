@@ -253,6 +253,49 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
+    it('renders accessible Race actions only for eligible opponent rows', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM('<div id="leaderboard"></div>');
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('leaderboard');
+        const component = new ModalContentUi();
+
+        const opponent = {
+            rank: 1,
+            displayName: 'Fast Racer',
+            bestTime: 6.4,
+            opponentRaceAvailable: true,
+        };
+        component.renderScoreboardList(container, {
+            topRows: [
+                opponent,
+                { rank: 2, displayName: 'No Ghost', bestTime: 7.2, opponentRaceAvailable: false },
+                {
+                    rank: 3,
+                    displayName: 'You',
+                    bestTime: 8.1,
+                    isCurrentPlayer: true,
+                    opponentRaceAvailable: true,
+                },
+            ],
+            currentPlayerRow: { rank: 3, displayName: 'You', bestTime: 8.1, isCurrentPlayer: true },
+            totalCount: 3,
+            leaderboardEntryCount: 3,
+        }, 'campaign', 'circuit', null, { raceOpponentEnabled: true });
+
+        const rows = container.querySelectorAll('.leaderboard-row');
+        expect(rows[0].classList.contains('is-raceable')).toBe(true);
+        expect(rows[0].getAttribute('role')).toBe('button');
+        expect(rows[0].getAttribute('tabindex')).toBe('0');
+        expect(rows[0].getAttribute('aria-label')).toBe("Race Fast Racer's ghost");
+        expect(rows[0].querySelector('.leaderboard-row__race')?.textContent).toBe('Race');
+        expect(rows[0]._opponentRaceEntry).toBe(opponent);
+        expect(rows[1].classList.contains('is-raceable')).toBe(false);
+        expect(rows[2].classList.contains('is-raceable')).toBe(false);
+
+        global.document = originalDocument;
+    });
+
     it('paints combined RANK status on first open instead of dashes or a hidden column', () => {
         const originalDocument = global.document;
         const dom = new JSDOM(`

@@ -373,7 +373,9 @@ describe('server replay validator branch coverage', () => {
         expect(outcome.run.completedLaps).toBe(null);
     });
 
-    it('replays revisioned multi-lap races with cumulative checkpoint splits', () => {
+    it.each([1, 2, 3])(
+      'captures exact cumulative lap boundaries for a %i-lap verified replay',
+      (lapCount) => {
         let frame = 0;
         mockUpdateSimulation.mockImplementation((state) => {
             frame += 1;
@@ -381,10 +383,11 @@ describe('server replay validator branch coverage', () => {
             state.lapCheckpointTimesSec.push(frame);
             state.currentChallengeRun.completedLaps = frame;
             state.currentChallengeRun.lastLapAt = state.currentTime;
-            if (frame < 2) {
+            if (frame < lapCount) {
                 return {
                     crashEndedRun: false,
                     challengeLapCompleted: true,
+                    challengeElapsedTime: state.currentTime,
                     winTriggered: false,
                 };
             }
@@ -392,8 +395,9 @@ describe('server replay validator branch coverage', () => {
             return {
                 crashEndedRun: false,
                 challengeLapCompleted: true,
+                challengeElapsedTime: state.currentTime,
                 winTriggered: true,
-                winData: { lapTime: state.currentTime, completedLaps: 2 },
+                winData: { lapTime: state.currentTime, completedLaps: lapCount },
             };
         });
 
@@ -401,26 +405,29 @@ describe('server replay validator branch coverage', () => {
             challenge: {
                 ...CHALLENGE,
                 rulesRevision: 1,
-                objectiveType: 'multi_lap_total',
-                objectiveParams: { lapCount: 2 },
+                objectiveType: lapCount === 1 ? 'single_lap_fastest' : 'multi_lap_total',
+                objectiveParams: { lapCount },
             },
             track: TRACK,
             replay: {
                 rulesRevision: 1,
-                targetLapNumber: 2,
-                inputs: [{ frames: 2, left: false, right: false, relaunchDelay: false }],
+                targetLapNumber: lapCount,
+                inputs: [{ frames: lapCount, left: false, right: false, relaunchDelay: false }],
             },
         });
 
+        const boundaries = Array.from({ length: lapCount }, (_, index) => (index + 1) * 2);
         expect(outcome.ok).toBe(true);
         expect(outcome.run).toMatchObject({
-            bestTimeSec: 4,
-            completedLaps: 2,
-            checkpointTimesSec: [1, 2],
+            bestTimeSec: lapCount * 2,
+            completedLaps: lapCount,
+            checkpointTimesSec: Array.from({ length: lapCount }, (_, index) => index + 1),
+            lapCompletionTimesSec: boundaries,
         });
         expect(mockUpdateSimulation.mock.calls[0][0].currentRunPolicy).toMatchObject({
-            requiredLaps: 2,
+            requiredLaps: lapCount,
             rulesRevision: 1,
         });
-    });
+      },
+    );
 });

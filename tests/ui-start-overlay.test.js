@@ -25,8 +25,6 @@ describe('ui start overlay helpers', () => {
             textContent: '',
             querySelector: (selector) => selector === '.main-menu__label' ? labelSpan : null
         };
-        const updateDailyTrackLabel = vi.fn();
-
         global.document = {
             body: {
                 classList: {
@@ -41,10 +39,7 @@ describe('ui start overlay helpers', () => {
         const dailyChallengeUi = {
             getSummary: vi.fn(() => ({ available: true, trackName: 'Desert Sprint' }))
         };
-        const overlay = new StartOverlay({
-            dailyChallengeUi,
-            getLobbyUi: () => ({ updateDailyTrackLabel }),
-        });
+        const overlay = new StartOverlay({ dailyChallengeUi });
         Object.defineProperties(overlay, {
             startOverlay: { value: { style: { display: 'flex' } } },
             startBtn: { value: startBtn }
@@ -56,7 +51,6 @@ describe('ui start overlay helpers', () => {
         expect(startBtn.disabled).toBe(false);
         expect(labelSpan.textContent).toBe('Start Race');
         expect(labelSpan.replaceChildren).not.toHaveBeenCalled();
-        expect(updateDailyTrackLabel).toHaveBeenCalledWith('Desert Sprint');
         expect(bodyClasses.has('ftu-onboarding-active')).toBe(false);
 
         global.document = originalDocument;
@@ -104,7 +98,6 @@ describe('ui start overlay helpers', () => {
             textContent: '',
             querySelector: (selector) => selector === '.main-menu__label' ? labelSpan : null
         };
-        const updateDailyTrackLabel = vi.fn();
 
         global.document = {
             body: {
@@ -115,7 +108,6 @@ describe('ui start overlay helpers', () => {
             dailyChallengeUi: {
                 getSummary: vi.fn(() => null)
             },
-            getLobbyUi: () => ({ updateDailyTrackLabel }),
         });
         Object.defineProperties(overlay, {
             startOverlay: { value: { style: { display: 'flex' } } },
@@ -126,7 +118,6 @@ describe('ui start overlay helpers', () => {
 
         expect(startBtn.disabled).toBe(true);
         expect(labelSpan.textContent).toBe('Challenge unavailable');
-        expect(updateDailyTrackLabel).toHaveBeenCalledWith('');
 
         global.document = originalDocument;
     });

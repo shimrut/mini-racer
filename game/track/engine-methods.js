@@ -121,6 +121,7 @@ export const trackEngineMethods = {
     {
       loadPlayerProgress = true,
       preserveDailyChallengeContext = false,
+      preserveRaceComparisonTarget = false,
       showStartOverlayOnReset = true,
     } = {},
   ) {
@@ -158,6 +159,7 @@ export const trackEngineMethods = {
 
     if (!loadPlayerProgress) {
       this.reset(false, {
+        preserveRaceComparisonTarget,
         showStartOverlay: showStartOverlayOnReset,
       });
       if (
@@ -184,7 +186,7 @@ export const trackEngineMethods = {
       this.hud.setBestTime(null);
     }
 
-    this.reset();
+    this.reset(false, { preserveRaceComparisonTarget });
     if (
       document.activeElement &&
       typeof document.activeElement.blur === "function"

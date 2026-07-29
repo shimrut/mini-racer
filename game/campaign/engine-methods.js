@@ -1,9 +1,11 @@
-import { getMedalForRaceTime } from '../medals/medal-timing.js';
+import { getMedalForRaceTime, isStandardMedalTier } from '../medals/medal-timing.js';
 import { normalizeCampaignLobbyState } from '../lobby/service.js';
 import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
 import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
-import { createModalActions } from '../race/result-flow.js';
+import { TRACKS } from '../track/tracks.js';
+import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
+import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import {
     clearLocalCampaignProgress,
     createCampaignChallenge,
@@ -23,6 +25,11 @@ import {
     submitCampaignRun,
 } from './service.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
+import { buildCampaignCarouselCards } from './carousel-model.js';
+import {
+    cancelDeferredLobbyWork,
+    deferLobbyWorkUntilAfterPaint,
+} from '../lobby/deferred-work.js';
 import {
     clearCampaignVerification,
     createVerificationSnapshot,
@@ -50,16 +57,104 @@ function toRaceChallenge(stage, mode = 'campaign') {
     };
 }
 
+/**
+ * Best medal already banked for this stage, so the finish sheet can tell a first
+ * unlock from a medal the player owned before this run.
+ *
+ * Campaign medals scale with the stage lap count and belong to a stage rather
+ * than to a track, so they live in Campaign progress by raceId — the per-track
+ * lap-medal store the Daily finish reads never sees them.
+ * @returns {'author'|'gold'|'silver'|'bronze'|null}
+ */
+function getStoredCampaignStageMedal(bootstrap, raceId) {
+    const medal = bootstrap?.progress?.resultsByRaceId?.[raceId]?.medal ?? null;
+    return isStandardMedalTier(medal) ? medal : null;
+}
+
+function getCampaignVerificationBestTimeSec(engine, stage) {
+    const storedBestTimeMs = Number(
+        engine.campaignBootstrap?.progress?.resultsByRaceId?.[stage.raceId]?.bestTimeMs,
+    );
+    const cachedTrackBestSec = Number(
+        engine.trackPersonalBestByTrackKey?.[stage.raceId]?.bestTime,
+    );
+    const preparedBaselineSec = Number(
+        engine.personalBestPaceBaselineByRaceId?.[stage.raceId]?.finishTimeSec,
+    );
+    const activeBaselineSec = Number(engine.activePersonalBestPaceBaseline?.finishTimeSec);
+    const candidates = [
+        storedBestTimeMs > 0 ? storedBestTimeMs / 1000 : null,
+        cachedTrackBestSec > 0 ? cachedTrackBestSec : null,
+        preparedBaselineSec > 0 ? preparedBaselineSec : null,
+        activeBaselineSec > 0 ? activeBaselineSec : null,
+    ].filter(Number.isFinite);
+    return candidates.length ? Math.min(...candidates) : null;
+}
+
+function getExistingCampaignScoreboardSnapshot(engine, stage) {
+    const raceId = stage?.raceId;
+    if (!raceId) return null;
+
+    const standing = engine.campaignBootstrap?.standingsByRaceId?.[raceId] ?? null;
+    const lobbyStage = engine.campaignLobbyState?.stages?.find((candidate) => (
+        candidate?.id === raceId || candidate?.raceId === raceId
+    )) ?? null;
+    const result = engine.campaignBootstrap?.progress?.resultsByRaceId?.[raceId] ?? null;
+    const rankValue = Number(standing?.rank ?? lobbyStage?.playerRank);
+    const playerRank = Number.isInteger(rankValue) && rankValue > 0 ? rankValue : null;
+    const countValue = Number(
+        standing?.totalCount ?? lobbyStage?.leaderboardEntryCount,
+    );
+    const totalCount = Number.isInteger(countValue) && countValue > 0 ? countValue : 0;
+    const bestTimeMs = Number(result?.bestTimeMs ?? lobbyStage?.bestTimeMs);
+    const bestTime = bestTimeMs > 0 ? bestTimeMs / 1000 : null;
+
+    if (playerRank === null && bestTime === null && totalCount === 0) return null;
+
+    return normalizeScoreboardSnapshot({
+        currentPlayerRow: bestTime === null
+            ? null
+            : {
+                isCurrentPlayer: true,
+                displayName: 'You',
+                rank: playerRank,
+                bestTime,
+            },
+        totalCount,
+        leaderboardEntryCount: totalCount,
+        playerRank,
+        playerRankLabel: playerRank === null ? null : `#${playerRank}`,
+    });
+}
+
+/**
+ * Where Campaign should land when the player has not picked a stage themselves.
+ * A finished campaign is asking for nothing, so it lands on the last stage the
+ * player reached rather than sending them back to Stage 00.
+ */
+function getDefaultCampaignLobbyStage(lobbyState) {
+    const unlockedStages = Array.isArray(lobbyState?.stages)
+        ? lobbyState.stages.filter((stage) => stage.unlocked)
+        : [];
+    return lobbyState?.nextStage || unlockedStages.at(-1) || null;
+}
+
 function decorateCampaignState(bootstrap) {
     const progress = bootstrap?.progress || {};
     const results = progress.resultsByRaceId || {};
     const unlocked = new Set(progress.unlockedRaceIds || []);
+    const standings = bootstrap?.standingsByRaceId || {};
+    // A provisional paint has no standings yet, and "no rank" reads very
+    // differently from "not loaded" on a card.
+    const standingsResolved = Boolean(bootstrap?.standingsByRaceId);
     return {
         signedIn: bootstrap?.signedIn === true,
         startedAt: progress.startedAt || null,
         complete: progress.complete === true,
+        standingsResolved,
         stages: (bootstrap?.stages || []).map((stage) => {
             const result = results[stage.raceId] || null;
+            const standing = standings[stage.raceId] || null;
             return {
                 ...stage,
                 id: stage.raceId,
@@ -70,6 +165,9 @@ function decorateCampaignState(bootstrap) {
                 unlocked: unlocked.has(stage.raceId),
                 bestTimeMs: result?.bestTimeMs ?? null,
                 medal: result?.medal ?? null,
+                playerRank: standing?.rank ?? null,
+                leaderboardEntryCount: standing?.totalCount ?? 0,
+                standingsResolved,
                 standingsAvailable: true,
             };
         }),
@@ -161,6 +259,9 @@ export const campaignEngineMethods = {
             && this.lobbyUi?.getMode?.() === 'campaign'
         ) {
             this.lobbyUi.showCampaign(this.campaignLobbyState);
+            if (this._campaignCarouselPaintReady !== false) {
+                this.paintCampaignCarousel();
+            }
             // A press owns the spinner until its own start finishes.
             if (!this.startButtonPending) {
                 this.lobbyUi.setCampaignPrimaryLoading?.(false);
@@ -169,7 +270,10 @@ export const campaignEngineMethods = {
         return this.campaignLobbyState;
     },
 
-    paintCampaignLobby(state, { bootstrapReady = false } = {}) {
+    paintCampaignLobby(state, {
+        bootstrapReady = false,
+        paintCarousel = true,
+    } = {}) {
         if (this.status !== 'ready' || this.currentChallengeRun) {
             this.reset(false, { showStartOverlay: false });
         }
@@ -179,11 +283,12 @@ export const campaignEngineMethods = {
             ...state,
             resolved: Boolean(bootstrapReady),
         });
+        this._campaignBootstrapReady = Boolean(bootstrapReady);
         this.lobbyUi.showCampaign(this.campaignLobbyState);
+        if (paintCarousel) this.paintCampaignCarousel();
         // Until the server answers, the primary action is unknown rather than
         // "Start": showing it as pending is what keeps the label from flipping.
         this.lobbyUi.setCampaignPrimaryLoading?.(!bootstrapReady);
-        this._campaignBootstrapReady = Boolean(bootstrapReady);
     },
 
     async ensureCampaignBootstrap({ forceRefresh = false } = {}) {
@@ -276,6 +381,7 @@ export const campaignEngineMethods = {
     },
 
     showCampaignLobby() {
+        this._campaignCarouselPaintReady = false;
         this.activeCampaignStage = null;
         this.activeCampaignChallenge = null;
         const hadReadyBootstrap = Boolean(
@@ -290,21 +396,58 @@ export const campaignEngineMethods = {
         }
         this.paintCampaignLobby(
             decorateCampaignState(bootstrapForPaint),
-            { bootstrapReady: hadReadyBootstrap },
+            {
+                bootstrapReady: hadReadyBootstrap,
+                paintCarousel: false,
+            },
         );
+        if (this.campaignCarousel?.isEmpty?.()) {
+            this.campaignCarousel.renderStatus?.({ loading: true });
+        }
+        deferLobbyWorkUntilAfterPaint(this, 'campaign', () => {
+            this._campaignCarouselPaintReady = true;
+            this.paintCampaignCarousel();
+        });
         void this.ensureCampaignBootstrap({ forceRefresh: true });
     },
 
-    async openCampaignTracks() {
-        await this.ensureCampaignBootstrap();
-        if (this.activeRaceMode !== 'campaign' || !this.campaignLobbyState) return;
-        this.dailyChallengeUi.openCampaignProgressModal(this.campaignLobbyState, {
-            onPlay: (stage) => void this.startCampaignStage(stage),
+    /**
+     * The Campaign pane is the stage picker: every stage gets a card, locked
+     * ones included, so the shape of the campaign is visible from the lobby.
+     */
+    paintCampaignCarousel() {
+        if (!this.campaignCarousel) return;
+        const cards = buildCampaignCarouselCards(this.campaignLobbyState);
+        this.campaignCarousel.render(cards, {
+            selectedChallengeId: this.selectedCampaignStageId
+                || getDefaultCampaignLobbyStage(this.campaignLobbyState)?.id
+                || null,
+            loading: !this._campaignBootstrapReady,
         });
     },
 
-    async startCampaignStage(stageLike = null) {
+    handleCampaignCarouselSelect(stage) {
+        if (!stage?.id) return;
+        this.selectedCampaignStageId = stage.id;
+        this.lobbyUi?.setCampaignSelectedStage?.(stage);
+    },
+
+    /** Warm the centred track so the primary action does not pay for the build. */
+    handleCampaignCarouselSettled(card) {
+        const stage = card?.challenge;
+        if (!stage?.trackKey || card?.locked) return;
+        if (this.status === 'playing' || this.status === 'starting') return;
+        if (!this.startOverlay?.isStartOverlayVisible?.()) return;
+        this.prewarmDailyPlaylistTracks?.([{ trackKey: stage.trackKey }], {
+            requireModal: false,
+        });
+    },
+
+    async startCampaignStage(stageLike = null, {
+        preserveRaceComparisonTarget = false,
+    } = {}) {
         if (this.startButtonPending) return;
+        if (!preserveRaceComparisonTarget) this.clearRaceComparisonTarget?.();
         this.startButtonPending = true;
         // The whole start is a wait, not just the bootstrap leg: without this the
         // button sits dead through a track load and reads as a freeze.
@@ -322,7 +465,7 @@ export const campaignEngineMethods = {
                 : null;
             const stage = getCampaignStage(
                 selectedLobbyStage?.id
-                || this.campaignLobbyState?.nextStage?.id
+                || getDefaultCampaignLobbyStage(this.campaignLobbyState)?.id
                 || requestedId,
             );
             if (!stage) return;
@@ -348,11 +491,18 @@ export const campaignEngineMethods = {
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
             this.activeCampaignChallenge = null;
-            this.pbGhost.clearTrack();
+            if (!signedIn) {
+                // Guest Campaign progress is local and unverified. Never let a
+                // canonical PB left in memory from another identity become its
+                // comparison baseline.
+                this.applyCampaignPersonalBest(stage, null);
+            }
+            if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
             if (stage.trackKey !== this.currentTrackKey) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
+                    preserveRaceComparisonTarget,
                     showStartOverlayOnReset: false,
                 });
             }
@@ -380,6 +530,28 @@ export const campaignEngineMethods = {
             this.lobbyUi?.setCampaignPrimaryLoading?.(false);
             this.startButtonPending = false;
         }
+    },
+
+    async startCampaignStageAgainstOpponent(stage, target) {
+        if (!stage || !target) return false;
+        this.clearRaceComparisonTarget?.();
+        if (!this.installRaceComparisonTarget?.(
+            { ...target, mode: 'campaign' },
+            {
+                track: TRACKS[stage.trackKey],
+                lapCount: stage.lapCount,
+            },
+        )) {
+            return false;
+        }
+        await this.startCampaignStage(stage, { preserveRaceComparisonTarget: true });
+        // Same rule as Daily: a start that never reached this stage cannot
+        // leave its opponent installed for the next race.
+        if (this.activeCampaignStage?.raceId !== stage.raceId) {
+            this.clearRaceComparisonTarget?.();
+            return false;
+        }
+        return this.raceComparisonTarget !== null;
     },
 
     /**
@@ -415,9 +587,16 @@ export const campaignEngineMethods = {
      */
     applyCampaignPersonalBest(stage, personalBest) {
         if (this.activeCampaignStage?.raceId !== stage.raceId) return;
+        this.trackPersonalBestByTrackKey ??= Object.create(null);
+        this.personalBestPaceBaselineByRaceId ??= Object.create(null);
+        this.sessionBestLapSecByTrackKey ??= Object.create(null);
+        this.sessionBestCheckpointTimesByTrackKey ??= Object.create(null);
         const bestTimeMs = Number(personalBest?.bestTimeMs);
         if (!(bestTimeMs > 0)) {
             delete this.trackPersonalBestByTrackKey[stage.raceId];
+            delete this.personalBestPaceBaselineByRaceId[stage.raceId];
+            delete this.sessionBestLapSecByTrackKey[stage.raceId];
+            delete this.sessionBestCheckpointTimesByTrackKey[stage.raceId];
             if (this.activeDailyChallenge?.id !== stage.raceId) return;
             this.trackPersonalBestResult = null;
             this.bestLapTime = null;
@@ -431,10 +610,28 @@ export const campaignEngineMethods = {
             trackKey: stage.trackKey,
             bestTime,
             checkpointTimesSec: personalBest?.checkpointTimesSec ?? null,
+            lapCompletionTimesSec: personalBest?.lapCompletionTimesSec ?? null,
             ghostAvailable: Boolean(personalBest?.ghost),
             updatedAt: personalBest?.updatedAt ?? null,
         };
         this.trackPersonalBestByTrackKey[stage.raceId] = trackPersonalBest;
+        const paceBaseline = createPersonalBestPaceBaseline(
+            personalBest,
+            TRACKS[stage.trackKey],
+            stage.lapCount,
+        );
+        if (paceBaseline) {
+            this.personalBestPaceBaselineByRaceId[stage.raceId] = paceBaseline;
+            this.sessionBestLapSecByTrackKey[stage.raceId] = paceBaseline.finishTimeSec;
+            if (paceBaseline.checkpointTimesSec.length) {
+                this.sessionBestCheckpointTimesByTrackKey[stage.raceId] =
+                    paceBaseline.checkpointTimesSec.slice();
+            } else {
+                delete this.sessionBestCheckpointTimesByTrackKey[stage.raceId];
+            }
+        } else {
+            delete this.personalBestPaceBaselineByRaceId[stage.raceId];
+        }
         // applyDailyChallenge already ran off whatever was cached, so the HUD and
         // medal baseline have to be re-derived from the fresh best.
         if (this.activeDailyChallenge?.id !== stage.raceId) return;
@@ -445,6 +642,7 @@ export const campaignEngineMethods = {
     },
 
     async loadChallengeLobby(challengeId = null) {
+        cancelDeferredLobbyWork(this);
         if (this.status !== 'ready' || this.currentChallengeRun) {
             this.reset(false, { showStartOverlay: false });
         }
@@ -487,6 +685,9 @@ export const campaignEngineMethods = {
                 rulesRevision: challenge.rulesRevision,
             };
             this.activeRaceMode = 'challenge';
+            // A Challenge race owns the ghost slot, so any leaderboard
+            // opponent from a previous start has to go first.
+            this.clearRaceComparisonTarget?.();
             this.pbGhost.clearTrack();
             if (stage.trackKey !== this.currentTrackKey) {
                 await this.loadTrack(stage.trackKey, {
@@ -549,21 +750,38 @@ export const campaignEngineMethods = {
     showCampaignFinish(stage, {
         finalTime,
         medal,
+        previousMedal = null,
         message = null,
         shareRequest = null,
         scoreboardSnapshot = null,
     }) {
+        const comparison = this.getRaceComparisonResult?.(finalTime) ?? null;
+        const paceBaseline = this.getActiveRacePaceBaseline?.()
+            ?? this.activePersonalBestPaceBaseline
+            ?? null;
+        const previousPersonalBestSec = comparison
+            ? null
+            : (Number.isFinite(paceBaseline?.finishTimeSec)
+                ? paceBaseline.finishTimeSec
+                : null);
         const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
         this.modal.showModal(
             'Campaign race complete',
             null,
             {
                 lapTime: finalTime,
-                bestTime: null,
+                bestTime: previousPersonalBestSec,
+                previousPersonalBestSec,
+                deltaToPersonalBest: Number.isFinite(previousPersonalBestSec)
+                    ? finalTime - previousPersonalBestSec
+                    : null,
                 completedLaps: stage.lapCount,
                 requiredLaps: stage.lapCount,
                 primaryStatLabel: 'Race Time',
                 lapMedal: medal,
+                // Without the stage's banked medal the sheet reads every tier as
+                // a first unlock and replays the whole fanfare on every retry.
+                previousTrackMedal: previousMedal,
                 trackKey: stage.trackKey,
                 scoreboardSnapshot,
                 scoreboardChallengeId: stage.raceId,
@@ -575,6 +793,16 @@ export const campaignEngineMethods = {
                 onOpenStandings: () => void this.openCampaignStandings(stage.raceId, {
                     returnMode: 'back',
                 }),
+                raceComparisonTarget: comparison?.target ?? null,
+                comparisonOutcome: comparison?.outcome ?? null,
+                deltaToComparison: comparison?.deltaSec ?? null,
+                lapCheckpointTimes: this.getLapCheckpointTimesSec?.() ?? [],
+                pbCheckpointTimes: comparison?.target.checkpointTimesSec
+                    ?? paceBaseline?.checkpointTimesSec
+                    ?? null,
+                pbFinishSec: comparison?.target.finishTimeSec
+                    ?? paceBaseline?.finishTimeSec
+                    ?? null,
             },
             {
                 ...createModalActions({
@@ -608,7 +836,44 @@ export const campaignEngineMethods = {
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const medal = getMedalForRaceTime(stage.trackKey, finalTime, stage.lapCount);
+        // Read before the guest path merges this finish into progress, or the
+        // run would look like it had already earned its own medal.
+        const previousMedal = getStoredCampaignStageMedal(this.campaignBootstrap, stage.raceId);
         const signedIn = this.campaignBootstrap?.signedIn === true;
+        const previousVerifiedBestSec = getCampaignVerificationBestTimeSec(this, stage);
+        const isCampaignBest = isNewBestResult(
+            this.currentRunPolicy || { bestResultComparator: 'time' },
+            { bestTime: finalTime, completedLaps: stage.lapCount },
+            Number.isFinite(previousVerifiedBestSec)
+                ? { bestTime: previousVerifiedBestSec, completedLaps: stage.lapCount }
+                : null,
+        );
+
+        // Match Daily's submission boundary: a valid finish still gets its
+        // result sheet, opponent outcome, and retry controls, but only a strict
+        // improvement enters verification. Equal and slower runs never enqueue.
+        if (signedIn && !isCampaignBest) {
+            this.showCampaignFinish(stage, {
+                finalTime,
+                medal,
+                previousMedal,
+                shareRequest: {
+                    kind: 'campaign-challenge',
+                    source: 'campaign',
+                    raceId: stage.raceId,
+                },
+                scoreboardSnapshot: getExistingCampaignScoreboardSnapshot(this, stage),
+            });
+            this.configureLeaderboardOpponentFinish?.({
+                mode: 'campaign',
+                race: stage,
+                finalTime,
+                comparison: this.getRaceComparisonResult?.(finalTime) ?? null,
+                waitForVerification: false,
+            });
+            return;
+        }
+
         const replay = this.scoreboardReplay.getPayload(stage.lapCount);
         const blockedReason = this.rankedSubmissionBlockedReason
             || (replay
@@ -624,6 +889,7 @@ export const campaignEngineMethods = {
             this.showCampaignFinish(stage, {
                 finalTime,
                 medal,
+                previousMedal,
                 message: blockedReason,
                 scoreboardSnapshot: campaignErrorSnapshot(finalTime, blockedReason),
             });
@@ -635,7 +901,14 @@ export const campaignEngineMethods = {
             // verify this run instead of discarding it.
             const local = saveLocalCampaignFinish(stage.raceId, finalTime, { replay });
             if (this.campaignBootstrap) this.campaignBootstrap.progress = local;
-            this.showCampaignFinish(stage, { finalTime, medal });
+            this.showCampaignFinish(stage, { finalTime, medal, previousMedal });
+            this.configureLeaderboardOpponentFinish?.({
+                mode: 'campaign',
+                race: stage,
+                finalTime,
+                comparison: this.getRaceComparisonResult?.(finalTime) ?? null,
+                guest: true,
+            });
             return;
         }
 
@@ -654,6 +927,7 @@ export const campaignEngineMethods = {
         this.showCampaignFinish(stage, {
             finalTime,
             medal,
+            previousMedal,
             shareRequest: {
                 kind: 'campaign-challenge',
                 source: 'campaign',
@@ -662,6 +936,13 @@ export const campaignEngineMethods = {
             scoreboardSnapshot: entry
                 ? campaignPendingSnapshot(finalTime)
                 : campaignErrorSnapshot(finalTime, null),
+        });
+        this.configureLeaderboardOpponentFinish?.({
+            mode: 'campaign',
+            race: stage,
+            finalTime,
+            comparison: this.getRaceComparisonResult?.(finalTime) ?? null,
+            waitForVerification: Boolean(enqueued),
         });
 
         if (!enqueued) return;
@@ -739,6 +1020,11 @@ export const campaignEngineMethods = {
                 this.campaignBootstrap.progress = response.body.progress;
             }
             await this.refreshCampaignAfterAcceptedRun(stage);
+            void this.resolveLeaderboardOpponentAdvanceAfterVerification?.({
+                mode: 'campaign',
+                competitionId: raceId,
+                benchmarkTimeMs: Math.round(entry.bestTime * 1000),
+            });
             return;
         }
 
@@ -780,17 +1066,7 @@ export const campaignEngineMethods = {
         try {
             const ghost = await getCampaignPbGhost(stage.raceId);
             const personalBest = ghost.ok ? ghost.body?.personalBest : null;
-            if (personalBest?.ghost) this.pbGhost.prepare(personalBest);
-            if (Number(personalBest?.bestTimeMs) > 0) {
-                this.trackPersonalBestByTrackKey[stage.raceId] = {
-                    challengeId: stage.raceId,
-                    trackKey: stage.trackKey,
-                    bestTime: Number(personalBest.bestTimeMs) / 1000,
-                    checkpointTimesSec: personalBest.checkpointTimesSec ?? null,
-                    ghostAvailable: Boolean(personalBest.ghost),
-                    updatedAt: personalBest.updatedAt ?? null,
-                };
-            }
+            this.applyCampaignPersonalBest(stage, personalBest);
         } catch (ghostError) {
             console.warn('Campaign result was saved, but PB ghost refresh failed:', ghostError);
         }
@@ -928,9 +1204,7 @@ export const campaignEngineMethods = {
         const unlockedStages = Array.isArray(lobbyState?.stages)
             ? lobbyState.stages.filter((stage) => stage.unlocked)
             : [];
-        const defaultStage = lobbyState?.complete
-            ? unlockedStages.at(-1)
-            : (lobbyState?.nextStage || unlockedStages[0]);
+        const defaultStage = getDefaultCampaignLobbyStage(lobbyState);
         const requestedStageId = typeof stageLike === 'string'
             ? stageLike
             : (stageLike?.raceId || stageLike?.id || defaultStage?.id);
@@ -985,11 +1259,19 @@ export const campaignEngineMethods = {
             leaderboardRailLabel: 'Campaign stages',
             selectedLeaderboardDayId: stage.raceId,
             onSelectLeaderboardDay: (raceId) => void this.openCampaignStandings(raceId, { returnMode }),
+            onRaceOpponent: (entry) => this.prepareAndStartLeaderboardOpponent?.({
+                mode: 'campaign',
+                competitionId: stage.raceId,
+                entry,
+            }),
             onLoadMoreLeaderboard,
             showGlobalLeaderboard: true,
             allowLeaderboardOpen: false,
             onClose: () => {
                 this._campaignStandingsRequestId = (this._campaignStandingsRequestId || 0) + 1;
+                // Browsing the stage rail inside the standings moves the lobby
+                // with it, so closing lands on the stage last looked at.
+                this.campaignCarousel?.selectChallenge?.(stage.raceId);
             },
         };
         this.modal.showRunsModal(null, null, null, returnMode, modalOptions);

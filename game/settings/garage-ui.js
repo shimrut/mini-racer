@@ -59,7 +59,9 @@ export class GarageUi {
         });
         bindReusableModal(this.garageModal, () => this.setPanelVisible(false));
 
-        this.garageButton?.addEventListener('click', () => this.togglePanel());
+        this.garageToggleButtons.forEach((button) => {
+            button.addEventListener('click', () => this.togglePanel());
+        });
         this.tabSkin?.addEventListener('click', () => this.setGarageTab('skin'));
         this.tabTrails?.addEventListener('click', () => this.setGarageTab('trails'));
 

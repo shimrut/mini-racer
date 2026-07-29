@@ -82,28 +82,28 @@
 
 .leaderboard-row__action {
     flex: 0 0 auto;
-    width: 1.5rem;
+    width: 3rem;
     height: 1.5rem;
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
 }
 
-.leaderboard-row.is-shareable {
+.leaderboard-row:is(.is-shareable, .is-raceable) {
     cursor: pointer;
 }
 
-.leaderboard-row.is-shareable:hover {
+.leaderboard-row:is(.is-shareable, .is-raceable):hover {
     background: #4a1f1f;
 }
 
-.leaderboard-row.is-shareable.is-menu-selected {
+.leaderboard-row:is(.is-shareable, .is-raceable).is-menu-selected {
     outline: none !important;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
-.leaderboard-row.is-shareable:hover .combined-row-time,
-.leaderboard-row.is-shareable:hover .combined-row-name {
+.leaderboard-row:is(.is-shareable, .is-raceable):hover .combined-row-time,
+.leaderboard-row:is(.is-shareable, .is-raceable):hover .combined-row-name {
     color: var(--text-color);
 }
 
@@ -134,6 +134,22 @@
     height: 1rem;
     flex: 0 0 auto;
     pointer-events: none;
+}
+
+.leaderboard-row__race {
+    color: var(--text-dim);
+    font-family: var(--header-font);
+    font-size: 0.68rem;
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.leaderboard-row.is-raceable:hover .leaderboard-row__race {
+    color: var(--accent-bright);
 }
 
 @keyframes resultSharePanelScrimIn {
@@ -280,4 +296,15 @@
 .result-share-panel__button:disabled {
     opacity: 0.55;
     cursor: wait;
+}
+
+.leaderboard-race-panel__card {
+    max-width: 19rem;
+}
+
+.result-share-panel .leaderboard-race-panel__target {
+    font-family: var(--mono-font);
+    font-size: 1.05rem;
+    font-weight: 800;
+    text-align: center;
 }

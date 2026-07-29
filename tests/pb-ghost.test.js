@@ -132,6 +132,28 @@ describe('PB ghost playback', () => {
     expect(ghost.getPose(0.025)).toMatchObject({ x: 0.5 });
   });
 
+  it('locks an opponent ghost across late PB updates and ignores the PB setting', () => {
+    const ghost = new PbGhost({ enabled: false });
+    expect(ghost.prepareOpponent(record)).toBe(true);
+    expect(ghost.prepare({
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [900, 900, 0],
+        deltas: [100, 100, 0],
+      },
+    })).toBe(false);
+
+    expect(ghost.beginRun()).toBe(true);
+    expect(ghost.getPose(0.025)).toMatchObject({ x: 2, y: 3 });
+    ghost.setEnabled(false);
+    expect(ghost.getPose(0.025)).toMatchObject({ x: 2, y: 3 });
+    expect(ghost.clearPrepared()).toBe(false);
+    expect(ghost.clearOpponent()).toBe(true);
+    expect(ghost.getPose(0.025)).toBe(null);
+  });
+
   it('renders without mutating playback samples', () => {
     const ghost = new PbGhost();
     ghost.prepare(record);

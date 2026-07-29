@@ -350,6 +350,11 @@ export const scoreboardEngineMethods = {
         );
       }
       this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
+      void this.resolveLeaderboardOpponentAdvanceAfterVerification?.({
+        mode: "daily",
+        competitionId: entry.challengeId,
+        benchmarkTimeMs: body.bestTimeMs,
+      });
       return;
     }
 

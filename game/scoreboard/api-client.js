@@ -23,6 +23,7 @@ export const API_ROUTES = Object.freeze({
     dailySubmitUrl: `${API_BASE_URL}/daily/submit`,
     dailySharePreviewUrl: `${API_BASE_URL}/daily/share/preview`,
     dailyShareConfirmUrl: `${API_BASE_URL}/daily/share/confirm`,
+    leaderboardRacePrepareUrl: `${API_BASE_URL}/leaderboard-race/prepare`,
     campaignBootstrapUrl: `${API_BASE_URL}/campaign/bootstrap`,
     campaignStartUrl: `${API_BASE_URL}/campaign/start`,
     campaignSnapshotUrl: `${API_BASE_URL}/campaign/snapshot`,

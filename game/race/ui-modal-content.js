@@ -8,7 +8,10 @@ const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
 const LEADERBOARD_SHARE_ICON_PATH = 'M307.8 18.4c-12 5-19.8 16.6-19.8 29.6l0 80-112 0c-97.2 0-176 78.8-176 176 0 113.3 81.5 163.9 100.2 174.1 2.5 1.4 5.3 1.9 8.1 1.9 10.9 0 19.7-8.9 19.7-19.7 0-7.5-4.3-14.4-9.8-19.5-9.4-8.8-22.2-26.4-22.2-56.7 0-53 43-96 96-96l96 0 0 80c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l160-160c12.5-12.5 12.5-32.8 0-45.3l-160-160c-9.2-9.2-22.9-11.9-34.9-6.9z';
 
-function appendLeaderboardRowAction(item, { shareable = false } = {}) {
+function appendLeaderboardRowAction(item, {
+    shareable = false,
+    raceable = false,
+} = {}) {
     const action = document.createElement('span');
     action.className = 'leaderboard-row__action';
     if (shareable) {
@@ -36,6 +39,12 @@ function appendLeaderboardRowAction(item, { shareable = false } = {}) {
 
         shareBtn.append(glyph, shareLabel);
         action.appendChild(shareBtn);
+    } else if (raceable) {
+        const raceLabel = document.createElement('span');
+        raceLabel.className = 'leaderboard-row__race';
+        raceLabel.setAttribute('aria-hidden', 'true');
+        raceLabel.textContent = 'Race';
+        action.appendChild(raceLabel);
     }
     item.appendChild(action);
 }
@@ -326,7 +335,8 @@ export class ModalContentUi {
 
     renderScoreboardList(container, scoreboardSnapshot, scoreboardMode, trackKey = null, scoreboardSubhead = null, {
     showHeader = true,
-    shareBest = null
+    shareBest = null,
+    raceOpponentEnabled = false,
 } = {}) {
     if (!container) return;
     const isLoading = Boolean(scoreboardSnapshot?.isLoading);
@@ -371,6 +381,14 @@ export class ModalContentUi {
         ? Math.max(0, Math.trunc(Number(rawEntry)))
         : poolTotal;
     const openCommunitySlots = Math.max(0, poolTotal - leaderboardEntryCount);
+    const hasRowActions = Boolean(shareBest)
+        || (
+            raceOpponentEnabled
+            && (
+                topRows.some((entry) => !entry?.isCurrentPlayer && entry?.opponentRaceAvailable === true)
+                || nearbyRows.some((entry) => !entry?.isCurrentPlayer && entry?.opponentRaceAvailable === true)
+            )
+        );
 
     const trackName = getTrackName(trackKey, null);
 
@@ -448,11 +466,24 @@ export class ModalContentUi {
         const canShareRow = Boolean(shareBest)
             && entry.isCurrentPlayer
             && Number.isFinite(Number(shareBest.bestTime));
+        const canRaceRow = raceOpponentEnabled
+            && !entry.isCurrentPlayer
+            && entry.opponentRaceAvailable === true
+            && Number.isFinite(Number(entry.bestTime));
         if (canShareRow) {
             item.classList.add('is-shareable');
             item.setAttribute('role', 'button');
             item.setAttribute('tabindex', '0');
             item.setAttribute('aria-label', 'Share your best time for this day');
+        } else if (canRaceRow) {
+            const opponentName = typeof entry.displayName === 'string' && entry.displayName.trim()
+                ? entry.displayName.trim()
+                : 'Anonymous Racer';
+            item.classList.add('is-raceable');
+            item.setAttribute('role', 'button');
+            item.setAttribute('tabindex', '0');
+            item.setAttribute('aria-label', `Race ${opponentName}'s ghost`);
+            item._opponentRaceEntry = entry;
         }
 
         const runIndex = document.createElement('div');
@@ -479,8 +510,11 @@ export class ModalContentUi {
         }
         item.appendChild(runTime);
 
-        if (shareBest) {
-            appendLeaderboardRowAction(item, { shareable: canShareRow });
+        if (hasRowActions) {
+            appendLeaderboardRowAction(item, {
+                shareable: canShareRow,
+                raceable: canRaceRow,
+            });
         }
 
         list.appendChild(item);
@@ -506,7 +540,7 @@ export class ModalContentUi {
         runTime.textContent = '—';
         item.appendChild(runTime);
 
-        if (shareBest) {
+        if (hasRowActions) {
             appendLeaderboardRowAction(item);
         }
 
@@ -600,7 +634,10 @@ export class ModalContentUi {
         lapCount = 1,
         lapCheckpointTimes = null,
         pbCheckpointTimes = null,
-        pbFinishSec = null
+        pbFinishSec = null,
+        raceComparisonTarget = null,
+        comparisonOutcome = null,
+        deltaToComparison = null
     } = {}) {
         if (!container) return;
 
@@ -742,13 +779,35 @@ export class ModalContentUi {
             }
         }
         if (bestLapEl) {
-            this._applyCombinedWinPbDelta(
-                bestLapEl,
-                time,
-                previousPersonalBestSec,
-                bestLap,
-                deltaToPersonalBest,
-            );
+            if (raceComparisonTarget && comparisonOutcome) {
+                const opponentName = String(raceComparisonTarget.displayName || 'Opponent');
+                if (label2El) {
+                    label2El.textContent = Number.isFinite(raceComparisonTarget.rank)
+                        ? `VS #${raceComparisonTarget.rank} ${opponentName}`
+                        : `VS ${opponentName}`;
+                }
+                const deltaText = Number.isFinite(deltaToComparison)
+                    ? `${Math.abs(deltaToComparison).toFixed(2)}s`
+                    : '';
+                bestLapEl.textContent = comparisonOutcome === 'won'
+                    ? `WON${deltaText ? ` BY ${deltaText}` : ''}`
+                    : comparisonOutcome === 'tie'
+                        ? 'TIED'
+                        : `LOST${deltaText ? ` BY ${deltaText}` : ''}`;
+                bestLapEl.classList.remove('is-gain', 'is-loss', 'combined-stat-value--placeholder');
+                bestLapEl.classList.add(
+                    'combined-stat-value--pb-delta',
+                    comparisonOutcome === 'won' ? 'is-gain' : 'is-loss',
+                );
+            } else {
+                this._applyCombinedWinPbDelta(
+                    bestLapEl,
+                    time,
+                    previousPersonalBestSec,
+                    bestLap,
+                    deltaToPersonalBest,
+                );
+            }
             bestLapEl.classList.remove('combined-stat-value--impact');
         }
 

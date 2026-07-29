@@ -215,6 +215,7 @@ export class LeaderboardsUi {
         showRunsModal,
         dailyChallengeUi,
         onStartDailyChallenge = null,
+        onRaceOpponent = null,
         getCachedTrackCardScoreboardSnapshot = () => null,
         getScoreboardSnapshot: loadScoreboardSnapshot = getScoreboardSnapshot,
         isRunsViewActive = () => true,
@@ -224,6 +225,7 @@ export class LeaderboardsUi {
         this.showRunsModal = showRunsModal;
         this.dailyChallengeUi = dailyChallengeUi;
         this.onStartDailyChallenge = onStartDailyChallenge;
+        this.onRaceOpponent = onRaceOpponent;
         this.getCachedTrackCardScoreboardSnapshot = getCachedTrackCardScoreboardSnapshot;
         this.loadScoreboardSnapshot = loadScoreboardSnapshot;
         this.isRunsViewActive = isRunsViewActive;
@@ -232,6 +234,16 @@ export class LeaderboardsUi {
         this._requestVersion = 0;
         this._activeDailyLeaderboardRefreshSession = null;
         this._pendingDailyLeaderboardRefreshChallengeIds = new Set();
+        this._lastViewedDailyChallengeId = null;
+    }
+
+    /**
+     * The day the standings were showing when they were dismissed — day
+     * navigation moves it, so callers can land back on what the player was
+     * actually looking at rather than what they opened.
+     */
+    getLastViewedDailyChallengeId() {
+        return this._lastViewedDailyChallengeId;
     }
 
     showLeaderboardModalState(returnMode = 'close', {
@@ -246,6 +258,7 @@ export class LeaderboardsUi {
         primaryActionLabel = null,
         primaryAction = null,
         onLoadMoreLeaderboard = null,
+        onRaceOpponent = null,
         onClose = null
     } = {}) {
         const payload = {
@@ -281,6 +294,9 @@ export class LeaderboardsUi {
         }
         if (typeof onLoadMoreLeaderboard === 'function') {
             payload.onLoadMoreLeaderboard = onLoadMoreLeaderboard;
+        }
+        if (typeof onRaceOpponent === 'function') {
+            payload.onRaceOpponent = onRaceOpponent;
         }
         if (typeof onClose === 'function') {
             payload.onClose = onClose;
@@ -629,6 +645,7 @@ export class LeaderboardsUi {
 
         const refreshSession = this.resolveDailyLeaderboardRefreshSession(providedRefreshSession);
         refreshSession.selectedChallengeId = challenge.id;
+        this._lastViewedDailyChallengeId = challenge.id;
         const requestId = ++this._requestVersion;
         const historyChallenges = mergeDailyChallengeHistory(
             playlistChallenges ?? getCachedDailyChallengePlaylist(),
@@ -659,6 +676,11 @@ export class LeaderboardsUi {
                 returnMode,
                 onClose,
             ),
+            ...(typeof this.onRaceOpponent === 'function'
+                ? {
+                    onRaceOpponent: (entry) => this.onRaceOpponent(challenge, entry),
+                }
+                : {}),
         };
         const initialSnapshot = refreshSession.snapshotByChallengeId.get(challenge.id)
             || this.resolveInitialDailyChallengeSnapshot(challenge);

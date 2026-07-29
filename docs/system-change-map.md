@@ -172,6 +172,35 @@ flowchart LR
   out) and labels the mode Head to Head.
 - The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
 - Standings entry points open that selected-day modal directly. The date rail and touch swipe navigation switch available days inside it; there is no intermediate standings track-picker. The separate Tracks playlist remains the race-selection flow.
+- Daily and Campaign standings can prepare a normal competition race against a
+  selected row's verified ghost. The server re-resolves the displayed
+  rank/time/version, requires an exact compatible PB trace plus full-race
+  checkpoints, and returns only the canonical race contract and sanitized
+  comparison target—never the opponent's player ID. A row is raceable when the
+  stored PB record and its trace both carry that row's exact best time; the
+  leaderboard entry and the PB record are written by two concurrent writes and
+  their own timestamps are not comparable, so eligibility never depends on
+  them. This is not Challenge mode: the resulting replay still uses the
+  ordinary Daily or Campaign submission, PB, progression, and leaderboard path.
+- The active race comparison target is separate from the player's own PB.
+  Ordinary Start/Continue compares against the player's PB; a standings start
+  freezes the selected opponent's ghost, checkpoints, finish time, display
+  name, and one random shipped car skin across retries. PB fetches and accepted
+  submissions may refresh the player's cached PB but cannot replace that
+  opponent mid-session. Opponent ghosts are explicit and therefore render
+  independently of the PB-ghost preference.
+- The finish sheet's primary action never promises a rematch it has not
+  confirmed. A loss offers Retry against the same ghost; a win holds the
+  ordinary Improve — which restarts the competition without the beaten
+  opponent — and upgrades to Next rival only once the server has returned a
+  raceable faster rival, whose rank and name ride in the accessible name. A
+  failed lookup leaves the action alone.
+- An installed opponent survives the track load and reset a standings start
+  performs on the way to its race, because that start almost always arrives
+  from a different track than the one already loaded. `clearTrack` and
+  `clearPrepared` leave an opponent alone; only `clearRaceComparisonTarget`
+  (via `clearOpponent`) removes one, and any start that never reached its
+  requested race clears the opponent rather than leaking it into the next run.
 - Campaign adapts that same standings rail to unlocked stage numbers. Every
   selection requests `/api/campaign/snapshot` for exactly one `raceId`; results
   and pagination remain isolated per permanent stage. The shared Tracks modal
@@ -299,6 +328,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Daily challenge schedule or availability window | `game/track/catalog.js`, `src/server/daily-gp-model.ts`, `src/server/daily-gp-store.ts`, `game/daily-challenge/service.js` | `src/server/post-bound-challenge.ts`, `README.md` if player-facing behavior changes | New challenge generation walks explicit `TRACK_SCHEDULE_KEYS`; playlist availability reads persisted published history so past days do not shift |
 | Start screen or daily card copy/layout | `game/daily-challenge/ui.js`, `game/daily-challenge/labels.js`, `game.html`, `styles.css` | `game/daily-challenge/service.js` | Copy helpers are pure in `labels.js`; the UI is driven by API summary fields and modal launch actions |
 | Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/routes/competition-routes.ts`, `src/server/daily-gp-store.ts`, `src/server/community-context.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned; community size and submission rate-limit identity come from trusted server context |
+| Leaderboard opponent races | `game/scoreboard/opponent-race-service.js`, `game/scoreboard/opponent-race-engine-methods.js`, `src/server/leaderboard-race-service.ts`, `src/server/routes/leaderboard-race-routes.ts` | Daily/Campaign stores, standings UI, PB ghost, HUD, result sheet, verification queues | A selected row is only a lookup key: the server must re-resolve its current verified replay and the normal competition submission path must remain authoritative |
 | Result sharing or score-thread behavior | `game/race/ui-modal-shell.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-share.ts`, `src/server/daily-gp-post-store.ts` | `src/server/daily-post-service.ts`, `src/server/routes/share-routes.ts`, `devvit.json`, finish and standings tests | The same confirmation contract serves finish and standings; Reddit user-action permission and post/comment identity are server-enforced |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the independently expiring Reddit Redis player profile as the durable source |

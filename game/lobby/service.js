@@ -1,3 +1,5 @@
+import { getRaceMedalThresholds, STANDARD_MEDAL_TIER_RANK } from '../medals/medal-timing.js';
+
 const NUMBER_WORDS = [
     'Zero',
     'One',
@@ -29,6 +31,25 @@ export function formatLobbyTime(milliseconds) {
     return `${minutes}:${String(seconds).padStart(2, '0')}.${String(remainder).padStart(3, '0')}`;
 }
 
+function normalizeMedalName(medal) {
+    return typeof medal === 'string' ? medal.trim().toLowerCase() : '';
+}
+
+/** Gold is the campaign gate: Author clears it too, everything below does not. */
+export function isCampaignGoldMedal(medal) {
+    const rank = STANDARD_MEDAL_TIER_RANK[normalizeMedalName(medal)];
+    return rank !== undefined && rank >= STANDARD_MEDAL_TIER_RANK.gold;
+}
+
+function formatMedalRequirement(medal) {
+    const name = normalizeMedalName(medal);
+    return name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Gold';
+}
+
+function formatGoldGap(gapMs) {
+    return `+${(gapMs / 1000).toFixed(3)}`;
+}
+
 function normalizeBestTimeMs(stage) {
     const bestTimeMs = toFiniteNumber(stage?.bestTimeMs);
     if (bestTimeMs !== null && bestTimeMs >= 0) return Math.round(bestTimeMs);
@@ -41,21 +62,55 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
     const safeIndex = Number.isInteger(stage.index) ? stage.index : index;
     const defaultName = `Number ${NUMBER_WORDS[safeIndex] || safeIndex}`;
     const bestTimeMs = normalizeBestTimeMs(stage);
+    const trackKey = String(stage.trackKey ?? '');
+    const laps = Math.max(1, Math.trunc(toFiniteNumber(stage.laps) ?? DEFAULT_LAPS[safeIndex] ?? 1));
+    const unlocked = safeIndex === 0 || Boolean(stage.unlocked);
+    const medal = typeof stage.medal === 'string' && stage.medal.trim()
+        ? stage.medal.trim()
+        : null;
+    const thresholds = getRaceMedalThresholds(trackKey, laps);
+    const goldTargetMs = thresholds?.gold == null ? null : Math.round(thresholds.gold * 1000);
+    const authorTargetMs = thresholds?.author == null ? null : Math.round(thresholds.author * 1000);
+    // Gold is what opens the next stage, so until it is earned the target — and
+    // how far off the best run is — is the only number the stage owes the player.
+    // Author takes over once Gold is banked, so a cleared stage still has a goal.
+    const needsGold = unlocked && goldTargetMs !== null && !isCampaignGoldMedal(medal);
+    const needsAuthor = unlocked
+        && !needsGold
+        && authorTargetMs !== null
+        && normalizeMedalName(medal) !== 'author';
+    const gapTo = (targetMs) => (
+        targetMs !== null && bestTimeMs !== null && bestTimeMs > targetMs
+            ? formatGoldGap(bestTimeMs - targetMs)
+            : null
+    );
     return {
         id: String(stage.id ?? stage.raceId ?? `numbered-v1-${safeIndex}`),
         index: safeIndex,
         numberLabel: String(stage.numberLabel ?? String(safeIndex).padStart(2, '0')),
-        trackKey: String(stage.trackKey ?? ''),
+        trackKey,
         trackName: String(stage.trackName ?? stage.title ?? defaultName),
-        laps: Math.max(1, Math.trunc(toFiniteNumber(stage.laps) ?? DEFAULT_LAPS[safeIndex] ?? 1)),
-        unlocked: safeIndex === 0 || Boolean(stage.unlocked),
+        laps,
+        unlocked,
         selected: Boolean(stage.selected),
         bestTimeMs,
         bestTimeLabel: bestTimeMs === null ? 'No time' : formatLobbyTime(bestTimeMs),
-        medal: typeof stage.medal === 'string' && stage.medal.trim()
-            ? stage.medal.trim()
-            : null,
+        medal,
+        goldTargetMs,
+        goldTargetLabel: goldTargetMs === null ? null : formatLobbyTime(goldTargetMs),
+        needsGold,
+        goldGapLabel: needsGold ? gapTo(goldTargetMs) : null,
+        authorTargetMs,
+        authorTargetLabel: authorTargetMs === null ? null : formatLobbyTime(authorTargetMs),
+        needsAuthor,
+        authorGapLabel: needsAuthor ? gapTo(authorTargetMs) : null,
+        // Kept so a re-normalized state can still name the stage that gates this one.
+        unlock: stage.unlock ?? null,
         standingsAvailable: Boolean(stage.standingsAvailable ?? stage.unlocked),
+        playerRank: Number.isInteger(stage.playerRank) && stage.playerRank > 0
+            ? stage.playerRank
+            : null,
+        standingsResolved: stage.standingsResolved !== false,
     };
 }
 
@@ -63,25 +118,34 @@ export function normalizeCampaignLobbyState(state = {}) {
     const sourceStages = Array.isArray(state.stages) && state.stages.length
         ? state.stages
         : Array.from({ length: 10 }, (_, index) => ({ index, unlocked: index === 0 }));
-    const stages = sourceStages.map(normalizeCampaignStage);
+    const normalized = sourceStages.map(normalizeCampaignStage);
+    // A locked row that only says "Locked" hides the whole rule: the player has
+    // to guess that the Silver two rows up is what is holding the campaign shut.
+    const stages = normalized.map((stage, index) => {
+        if (stage.unlocked) return { ...stage, unlockRequirementLabel: null };
+        const prerequisite = (stage.unlock?.raceId
+            ? normalized.find((candidate) => candidate.id === stage.unlock.raceId)
+            : null) || normalized[index - 1] || null;
+        const requiredMedal = formatMedalRequirement(stage.unlock?.minimumMedal);
+        return {
+            ...stage,
+            unlockRequirementLabel: prerequisite
+                ? `${requiredMedal} on ${prerequisite.trackName} to unlock`
+                : `${requiredMedal} on the stage before to unlock`,
+        };
+    });
     const completed = Boolean(state.complete)
-        || (stages.length > 0 && stages.every((stage) => (
-            stage.medal?.toLowerCase() === 'gold'
-            || stage.medal?.toLowerCase() === 'author'
-        )));
-    const goldCount = stages.filter((stage) => (
-        stage.medal?.toLowerCase() === 'gold'
-        || stage.medal?.toLowerCase() === 'author'
-    )).length;
-    const nextStage = stages.find((stage) => stage.unlocked && !(
-        stage.medal?.toLowerCase() === 'gold'
-        || stage.medal?.toLowerCase() === 'author'
-    )) || stages.find((stage) => stage.unlocked) || null;
-    const hasProgress = Boolean(state.startedAt)
-        || stages.some((stage) => stage.bestTimeMs !== null || stage.medal);
-    // A provisional paint knows the stage list but not whose progress it is, and
-    // "Start" vs "Continue" is exactly the part it would get wrong. Leaving the
-    // label unset lets the lobby show its pending state instead of guessing.
+        || (stages.length > 0 && stages.every((stage) => isCampaignGoldMedal(stage.medal)));
+    const goldCount = stages.filter((stage) => isCampaignGoldMedal(stage.medal)).length;
+    // Strictly the stage the campaign is still asking for. Falling back to the
+    // first unlocked stage once every one of them is Gold marked Stage 00 as the
+    // live stage of a finished campaign, which is the one thing it is not.
+    const nextStage = stages.find((stage) => stage.unlocked && !isCampaignGoldMedal(stage.medal))
+        || null;
+    for (const stage of stages) stage.isNext = stage === nextStage;
+    // A provisional paint knows the stage list but not whose progress it is, so
+    // it cannot say yet whether the centred stage is playable. Leaving the label
+    // unset lets the lobby show its pending state instead of guessing.
     const resolved = state.resolved !== false;
 
     return {
@@ -93,13 +157,10 @@ export function normalizeCampaignLobbyState(state = {}) {
         progressLabel: typeof state.progressLabel === 'string'
             ? state.progressLabel
             : `${goldCount} / ${stages.length} Gold`,
-        primaryLabel: !resolved
-            ? null
-            : (completed
-                ? 'Complete'
-                : (typeof state.primaryLabel === 'string'
-                    ? state.primaryLabel
-                    : (hasProgress ? 'Continue Campaign' : 'Start Campaign'))),
+        // The button races the stage the carousel has centred, so it names that
+        // act and nothing else: campaign-level wording read as a claim about the
+        // centred stage that was wrong on every stage but one.
+        primaryLabel: resolved ? 'Start Race' : null,
         nextStage,
     };
 }

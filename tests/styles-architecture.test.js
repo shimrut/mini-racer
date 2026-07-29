@@ -4,6 +4,10 @@ import { readCssBundle } from './helpers/read-css-bundle.js';
 
 const manifestUrl = new URL('../styles.css', import.meta.url);
 const manifest = readFileSync(manifestUrl, 'utf8');
+const trackCarouselStyles = readFileSync(
+    new URL('../styles/track-carousel.css', import.meta.url),
+    'utf8',
+);
 
 const expectedImports = [
     './fonts.css',
@@ -11,6 +15,7 @@ const expectedImports = [
             './styles/race-hud-and-medals.css',
             './styles/lobby-and-garage.css',
             './styles/lobby-modes.css',
+            './styles/track-carousel.css',
             './styles/race-controls-and-feedback.css',
     './styles/modal-and-result-shell.css',
     './styles/settings-and-track-shells.css',
@@ -43,4 +48,35 @@ describe('game stylesheet architecture', () => {
         expect(styles).toContain('.result-share-panel {');
         expect(styles).not.toContain('@import');
     });
+
+    /**
+     * The bundle is concatenated, not parsed, so a stylesheet left with a
+     * dangling block still reads fine here and only fails at build time.
+     */
+    it('closes every block in every stylesheet', () => {
+        const styles = readCssBundle(manifestUrl);
+        // Braces inside strings/urls would skew the count; none are used today.
+        expect(styles).not.toMatch(/["'][^"'\n]*[{}][^"'\n]*["']/);
+
+        let depth = 0;
+        for (const character of styles) {
+            if (character === '{') depth += 1;
+            if (character === '}') depth -= 1;
+            expect(depth).toBeGreaterThanOrEqual(0);
+        }
+        expect(depth).toBe(0);
+    });
+
+    it('keeps playlist card shadows out of the carousel rail', () => {
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*box-shadow:\s*none;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-entry--hero:not\(\.is-carousel-selected\):hover\s*\{[^}]*box-shadow:\s*none;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-entry--hero\.is-carousel-selected:hover\s*\{[^}]*box-shadow:\s*none;/s,
+        );
+    });
+
 });

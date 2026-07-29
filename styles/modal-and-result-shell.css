@@ -54,33 +54,6 @@
     min-height: 0;
 }
 
-.pause-race-progress__medals {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0.18rem;
-    min-height: 1.45rem;
-    flex-wrap: wrap;
-}
-
-.pause-race-progress__medal-slot {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.3rem;
-    height: 1.3rem;
-}
-
-.pause-race-progress__medal-slot--locked {
-    opacity: 0.55;
-}
-
-.medal-svg--pause {
-    width: 1.3rem;
-    height: 1.3rem;
-    flex: 0 0 auto;
-}
-
 #modal-pause-track-preview {
     display: block;
     width: 100%;

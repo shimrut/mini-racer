@@ -31,6 +31,7 @@ type ReplayValidationResult = {
     bestTimeMs: number;
     completedLaps: number | null;
     checkpointTimesSec: number[] | null;
+    lapCompletionTimesSec: number[] | null;
     ghost: PbGhostTrace | null;
     method: 'finish';
 };
@@ -255,6 +256,7 @@ export function validateDailyGpReplayDetailed({
         position: state.pos,
         angle: state.angle,
     });
+    const lapCompletionTimesSec: number[] = [];
 
     for (const segment of segments) {
         for (let frame = 0; frame < segment.frames; frame += 1) {
@@ -294,6 +296,12 @@ export function validateDailyGpReplayDetailed({
                     failure: getStateFailureDetails('crashed', state, frameCount),
                 };
             }
+            if (
+                events.challengeLapCompleted
+                && Number.isFinite(events.challengeElapsedTime)
+            ) {
+                lapCompletionTimesSec.push(Number(events.challengeElapsedTime));
+            }
             if (events.winTriggered) {
                 const bestTimeSec = Number(events.winData?.lapTime);
                 if (!Number.isFinite(bestTimeSec)) {
@@ -312,6 +320,9 @@ export function validateDailyGpReplayDetailed({
                             : null,
                         checkpointTimesSec: Array.isArray(state.lapCheckpointTimesSec) && state.lapCheckpointTimesSec.length
                             ? state.lapCheckpointTimesSec.slice()
+                            : null,
+                        lapCompletionTimesSec: lapCompletionTimesSec.length === requiredLaps
+                            ? lapCompletionTimesSec.slice()
                             : null,
                         ghost: ghostRecorder.finish({
                             timeSec: bestTimeSec,

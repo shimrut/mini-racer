@@ -9,6 +9,59 @@ import {
 } from "../game/scoreboard/verification-queue.js";
 
 describe("RealTimeRacer daily challenge modal payload", () => {
+  it("compares intermediate laps using cumulative elapsed pace at equivalent PB boundaries", () => {
+    const showLapFlash = vi.fn();
+    const engine = {
+      currentChallengeRun: {
+        completedLaps: 0,
+        recentLaps: [],
+        bestLap: null,
+        requiredLaps: 3,
+      },
+      activeDailyChallenge: {
+        id: "campaign-stage",
+        trackKey: "circuit",
+        objectiveType: "multi_lap_total",
+        objectiveParams: { lapCount: 3 },
+      },
+      currentTrackKey: "circuit",
+      activePersonalBestPaceBaseline: {
+        finishTimeSec: 33,
+        lapCompletionTimesSec: [11, 22, 33],
+      },
+      getActiveRacePaceBaseline:
+        RealTimeRacer.prototype.getActiveRacePaceBaseline,
+      hud: { showLapFlash },
+      _resetLapTrailAfterIntermediateLap: vi.fn(),
+      updateDailyChallengeHud: vi.fn(),
+      requestRender: vi.fn(),
+    };
+
+    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 10, {
+      elapsedTimeSec: 10,
+      completedLaps: 1,
+      requiredLaps: 3,
+      isFinalLap: false,
+    });
+    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 12.5, {
+      elapsedTimeSec: 22.5,
+      completedLaps: 2,
+      requiredLaps: 3,
+      isFinalLap: false,
+    });
+
+    expect(showLapFlash).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      lapNumber: 1,
+      elapsedTimeSec: 10,
+      deltaVsBest: -1,
+    }));
+    expect(showLapFlash).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      lapNumber: 2,
+      elapsedTimeSec: 22.5,
+      deltaVsBest: 0.5,
+    }));
+  });
+
   it("keeps the challenge date in the lobby summary for post-bound standings", () => {
     const setDailyChallengeSummary = vi.fn();
     const challenge = {
@@ -806,6 +859,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.loadTrack).toHaveBeenCalledWith("blueSector", {
       loadPlayerProgress: false,
       preserveDailyChallengeContext: true,
+      preserveRaceComparisonTarget: false,
       showStartOverlayOnReset: false,
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
@@ -1536,6 +1590,36 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       .toEqual({ ghostActive: false, ghostExpected: true, noticeNeeded: true });
     // Notice is deferred until GO clears in startSequence.
     expect(showGhostUnavailableNotice).not.toHaveBeenCalled();
+  });
+
+  it("freezes the selected race PB pace baseline at GO", () => {
+    const frozen = Object.freeze({
+      finishTimeSec: 42,
+      checkpointTimesSec: Object.freeze([10, 20]),
+      lapCompletionTimesSec: Object.freeze([21, 42]),
+    });
+    const engine = {
+      activeDailyChallenge: { id: "campaign-stage", trackKey: "circuit" },
+      trackPersonalBestResult: {
+        challengeId: "campaign-stage",
+        trackKey: "circuit",
+        bestTime: 42,
+      },
+      trackPersonalBestByTrackKey: Object.create(null),
+      personalBestPaceBaselineByRaceId: { "campaign-stage": frozen },
+      pbGhost: { enabled: true, beginRun: vi.fn(() => true) },
+      hud: { showGhostUnavailableNotice: vi.fn() },
+    };
+
+    RealTimeRacer.prototype.beginPersonalBestGhostRunAtGo.call(engine);
+    engine.personalBestPaceBaselineByRaceId["campaign-stage"] = {
+      finishTimeSec: 40,
+      checkpointTimesSec: [9, 19],
+      lapCompletionTimesSec: [20, 40],
+    };
+
+    expect(engine.activePersonalBestPaceBaseline).toBe(frozen);
+    expect(engine.activePersonalBestPaceBaseline.finishTimeSec).toBe(42);
   });
 
   it.each([

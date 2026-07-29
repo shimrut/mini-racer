@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { TRACK_CATALOG, TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-backfill.ts';
+import {
+    createTrackFingerprint,
+} from '../src/server/pb-ghost-trace.ts';
 import {
     createDailyChallengeId,
     DAILY_GP_PLAYLIST_DAYS,
@@ -3570,7 +3574,7 @@ describe('server daily gp store submissions', () => {
             expect(snapshot.topRows[0].displayName).toBeTruthy();
         });
 
-        it('sets the rate-limit TTL only on the first submission attempt', async () => {
+    it('sets the rate-limit TTL only on the first submission attempt', async () => {
             const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
             const challenge = await getServerDailyGpChallenge();
             mockRedis.incrBy
@@ -3604,6 +3608,197 @@ describe('server daily gp store submissions', () => {
             mockRedis.hGet.mockResolvedValueOnce(JSON.stringify(['not-a-challenge']));
 
             await expect(getServerDailyGpChallengeById('daily-gp-2026-07-11')).resolves.toBeNull();
+        });
+    });
+
+    it('marks and prepares only an exact compatible Daily opponent ghost without exposing identity', async () => {
+        const {
+            getServerDailyGpChallenge,
+            getServerDailyGpSnapshot,
+            prepareServerDailyLeaderboardRace,
+        } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        const playerId = 'reddit:opponent';
+        const updatedAt = '2026-07-27T10:00:00.000Z';
+        const bestTimeMs = 100;
+        const checkpointCount = TRACKS[challenge.trackKey].checkpoints.length
+            * challenge.objectiveParams.lapCount;
+        const checkpointTimesSec = Array.from(
+            { length: checkpointCount },
+            (_, index) => ((index + 1) * 0.1) / (checkpointCount + 1),
+        );
+        const entry = {
+            playerId,
+            trackKey: challenge.trackKey,
+            bestTimeMs,
+            updatedAt,
+            completedLaps: challenge.objectiveParams.lapCount,
+            checkpointTimesSec,
+            validationMethod: 'strict-replay',
+        };
+        const pb = {
+            schemaVersion: 2,
+            trackKey: challenge.trackKey,
+            trackFingerprint: createTrackFingerprint(TRACKS[challenge.trackKey]),
+            simulationRevision: 1,
+            rulesRevision: challenge.rulesRevision,
+            lapCount: challenge.objectiveParams.lapCount,
+            bestTimeMs,
+            checkpointTimesSec,
+            ghost: {
+                schemaVersion: 2,
+                sampleIntervalMs: 50,
+                finishTimeMs: bestTimeMs,
+                origin: [0, 0, 0],
+                deltas: [0, 0, 0, 0, 0, 0],
+            },
+            updatedAt,
+        };
+        const pbField = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        mockRedis.zCard.mockResolvedValue(1);
+        mockRedis.zRange.mockResolvedValue([{ member: playerId, score: bestTimeMs }]);
+        mockRedis.zRank.mockResolvedValue(undefined);
+        mockRedis.hMGet.mockImplementation(async (key) => (
+            String(key).endsWith(':entries') ? [JSON.stringify(entry)] : []
+        ));
+        mockRedis.mGet.mockResolvedValue([]);
+        mockRedis.hGet.mockImplementation(async (key, field) => {
+            if (key === 'dailygp:challenges' && field === challenge.id) {
+                return JSON.stringify(challenge);
+            }
+            if (String(key).endsWith(':entries') && field === playerId) {
+                return JSON.stringify(entry);
+            }
+            if (key === `dailygp:challenge-pbs:${challenge.id}` && field === pbField) {
+                return JSON.stringify(pb);
+            }
+            return null;
+        });
+
+        const snapshot = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            redditUsername: 'RaceFan',
+        });
+        expect(snapshot.topRows).toHaveLength(1);
+        expect(snapshot.topRows[0]).toMatchObject({
+            rank: 1,
+            opponentRaceAvailable: true,
+        });
+
+        const prepared = await prepareServerDailyLeaderboardRace({
+            challengeId: challenge.id,
+            redditUsername: 'RaceFan',
+            selection: {
+                kind: 'row',
+                rank: 1,
+                displayName: snapshot.topRows[0].displayName,
+                bestTimeMs,
+                updatedAt,
+            },
+        });
+        expect(prepared).toMatchObject({
+            status: 200,
+            body: {
+                mode: 'daily',
+                race: { id: challenge.id, trackKey: challenge.trackKey },
+                target: {
+                    rank: 1,
+                    displayName: snapshot.topRows[0].displayName,
+                    bestTimeMs,
+                    checkpointTimesSec,
+                    updatedAt,
+                    ghost: { finishTimeMs: bestTimeMs },
+                },
+            },
+        });
+        expect(JSON.stringify(prepared)).not.toContain(playerId);
+    });
+
+    it('races a Daily ghost stored before the PB record shared the entry timestamp', async () => {
+        const {
+            getServerDailyGpChallenge,
+            getServerDailyGpSnapshot,
+            prepareServerDailyLeaderboardRace,
+        } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        const playerId = 'reddit:opponent';
+        const updatedAt = '2026-07-27T10:00:00.000Z';
+        const bestTimeMs = 100;
+        const checkpointCount = TRACKS[challenge.trackKey].checkpoints.length
+            * challenge.objectiveParams.lapCount;
+        const checkpointTimesSec = Array.from(
+            { length: checkpointCount },
+            (_, index) => ((index + 1) * 0.1) / (checkpointCount + 1),
+        );
+        const entry = {
+            playerId,
+            trackKey: challenge.trackKey,
+            bestTimeMs,
+            updatedAt,
+            completedLaps: challenge.objectiveParams.lapCount,
+            checkpointTimesSec,
+            validationMethod: 'strict-replay',
+        };
+        const pb = {
+            schemaVersion: 2,
+            trackKey: challenge.trackKey,
+            trackFingerprint: createTrackFingerprint(TRACKS[challenge.trackKey]),
+            simulationRevision: 1,
+            rulesRevision: challenge.rulesRevision,
+            lapCount: challenge.objectiveParams.lapCount,
+            bestTimeMs,
+            checkpointTimesSec,
+            ghost: {
+                schemaVersion: 2,
+                sampleIntervalMs: 50,
+                finishTimeMs: bestTimeMs,
+                origin: [0, 0, 0],
+                deltas: [0, 0, 0, 0, 0, 0],
+            },
+            // The submission wrote this record on its own clock, so it lands a
+            // few milliseconds after the leaderboard entry it belongs to.
+            updatedAt: '2026-07-27T09:59:59.812Z',
+        };
+        const pbField = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        mockRedis.zCard.mockResolvedValue(1);
+        mockRedis.zRange.mockResolvedValue([{ member: playerId, score: bestTimeMs }]);
+        mockRedis.zRank.mockResolvedValue(undefined);
+        mockRedis.hMGet.mockImplementation(async (key) => (
+            String(key).endsWith(':entries') ? [JSON.stringify(entry)] : []
+        ));
+        mockRedis.mGet.mockResolvedValue([]);
+        mockRedis.hGet.mockImplementation(async (key, field) => {
+            if (key === 'dailygp:challenges' && field === challenge.id) {
+                return JSON.stringify(challenge);
+            }
+            if (String(key).endsWith(':entries') && field === playerId) {
+                return JSON.stringify(entry);
+            }
+            if (key === `dailygp:challenge-pbs:${challenge.id}` && field === pbField) {
+                return JSON.stringify(pb);
+            }
+            return null;
+        });
+
+        const snapshot = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            redditUsername: 'RaceFan',
+        });
+        expect(snapshot.topRows[0]).toMatchObject({ rank: 1, opponentRaceAvailable: true });
+
+        await expect(prepareServerDailyLeaderboardRace({
+            challengeId: challenge.id,
+            redditUsername: 'RaceFan',
+            selection: {
+                kind: 'row',
+                rank: 1,
+                displayName: snapshot.topRows[0].displayName,
+                bestTimeMs,
+                updatedAt,
+            },
+        })).resolves.toMatchObject({
+            status: 200,
+            body: { target: { ghost: { finishTimeMs: bestTimeMs } } },
         });
     });
 });

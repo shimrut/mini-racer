@@ -2,7 +2,10 @@ import { CONFIG } from "../config.js";
 import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js";
 import { getScoreboardReplayMaxFrames } from "./replay.js";
 import { createModalActions } from "./result-flow.js";
-import { STOCK_CAR_ASSET_NAME } from "../car/sprite.js";
+import {
+  PLAYER_SELECTABLE_CAR_ASSETS,
+  STOCK_CAR_ASSET_NAME,
+} from "../car/sprite.js";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
 import {
   getDailyChallengeCopyLabels,
@@ -11,10 +14,84 @@ import {
   getDailyChallengeTrackName,
 } from "../daily-challenge/service.js";
 import { getTrackName } from "../track/catalog.js";
+import { createPersonalBestPaceBaseline } from "../ghost/pb-pace.js";
+import { normalizeLapCompletionTimesSec } from "../shared/lap-completion-times.js";
 
 const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;
 const SKID_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
+const COMPARISON_TIE_EPSILON_SEC = 0.005;
+
+function finitePositive(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+export function chooseOpponentCarAsset({
+  playerAssetName = STOCK_CAR_ASSET_NAME,
+  random = Math.random,
+} = {}) {
+  const alternatives = PLAYER_SELECTABLE_CAR_ASSETS.filter(
+    (assetName) => assetName !== playerAssetName,
+  );
+  const choices = alternatives.length > 0
+    ? alternatives
+    : PLAYER_SELECTABLE_CAR_ASSETS;
+  if (choices.length === 0) return STOCK_CAR_ASSET_NAME;
+  const sample = Number(random?.());
+  const index = Number.isFinite(sample)
+    ? Math.min(choices.length - 1, Math.max(0, Math.floor(sample * choices.length)))
+    : 0;
+  return choices[index] || STOCK_CAR_ASSET_NAME;
+}
+
+export function normalizeRaceComparisonTarget(rawTarget, {
+  playerAssetName = STOCK_CAR_ASSET_NAME,
+  random = Math.random,
+  lapCount = 1,
+} = {}) {
+  if (!rawTarget || typeof rawTarget !== "object") return null;
+  const finishTimeSec = finitePositive(
+    rawTarget.finishTimeSec
+      ?? rawTarget.bestTime
+      ?? (finitePositive(rawTarget.finishTimeMs ?? rawTarget.bestTimeMs) ?? 0) / 1000,
+  );
+  if (!finishTimeSec) return null;
+  const displayName = typeof rawTarget.displayName === "string"
+    ? rawTarget.displayName.trim().slice(0, 64)
+    : "";
+  if (!displayName) return null;
+  const checkpointTimesSec = Array.isArray(rawTarget.checkpointTimesSec)
+    ? rawTarget.checkpointTimesSec.map(Number)
+    : [];
+  if (
+    checkpointTimesSec.some((time) => !Number.isFinite(time) || time <= 0 || time >= finishTimeSec)
+    || checkpointTimesSec.some((time, index) => index > 0 && time <= checkpointTimesSec[index - 1])
+  ) {
+    return null;
+  }
+  const lapCompletionTimesSec = normalizeLapCompletionTimesSec(
+    finishTimeSec,
+    rawTarget.lapCompletionTimesSec,
+    lapCount,
+  ) ?? [];
+  const carAssetName = chooseOpponentCarAsset({ playerAssetName, random });
+  return Object.freeze({
+    kind: "leaderboard-opponent",
+    displayName,
+    finishTimeSec,
+    checkpointTimesSec: Object.freeze(checkpointTimesSec),
+    lapCompletionTimesSec: Object.freeze(lapCompletionTimesSec),
+    rank: Number.isInteger(Number(rawTarget.rank)) && Number(rawTarget.rank) > 0
+      ? Number(rawTarget.rank)
+      : null,
+    competitionId: typeof rawTarget.competitionId === "string"
+      ? rawTarget.competitionId
+      : null,
+    mode: rawTarget.mode === "campaign" ? "campaign" : "daily",
+    carAssetName,
+  });
+}
 
 function lerpAngle(a, b, t) {
   let delta = b - a;
@@ -85,6 +162,83 @@ function getSkidMarkPathCache(engine, skidMarks, frameSkip, gs, startIdx) {
 }
 
 export const raceEngineMethods = {
+  installRaceComparisonTarget(rawTarget, {
+    random = Math.random,
+    track = this.currentTrack,
+    lapCount = this.currentRunPolicy?.requiredLaps || 1,
+  } = {}) {
+    const paceBaseline = createPersonalBestPaceBaseline(rawTarget, track, lapCount);
+    const target = normalizeRaceComparisonTarget({
+      ...rawTarget,
+      lapCompletionTimesSec: paceBaseline?.lapCompletionTimesSec
+        ?? rawTarget?.lapCompletionTimesSec,
+    }, {
+      playerAssetName: this.getSelectedCarAssetName?.() || STOCK_CAR_ASSET_NAME,
+      random,
+      lapCount,
+    });
+    const ghostRecord = {
+      bestTimeMs: Math.round((target?.finishTimeSec || 0) * 1000),
+      ghost: rawTarget?.ghost ?? rawTarget?.opponentGhost ?? rawTarget?.frozenGhost,
+      samples: rawTarget?.samples,
+    };
+    if (!target || this.pbGhost?.prepareOpponent?.(ghostRecord) !== true) {
+      return null;
+    }
+
+    this.raceComparisonTarget = target;
+    this.opponentCarSprite = this.opponentCarSprite || this.carSprite;
+    const installLoadedSprite = (image) => {
+      if (this.raceComparisonTarget !== target) return;
+      this.opponentCarSprite = image;
+      this.requestRender?.();
+    };
+    const installPlayerSpriteFallback = () => {
+      if (this.raceComparisonTarget !== target) return;
+      this.opponentCarSprite = this.carSprite;
+      this.requestRender?.();
+    };
+    this.opponentCarSpriteLoader?.load?.(target.carAssetName, {
+      onLoaded: installLoadedSprite,
+      onError: () => {
+        if (this.raceComparisonTarget !== target) return;
+        if (target.carAssetName === STOCK_CAR_ASSET_NAME) {
+          installPlayerSpriteFallback();
+          return;
+        }
+        this.opponentCarSpriteLoader?.load?.(STOCK_CAR_ASSET_NAME, {
+          onLoaded: installLoadedSprite,
+          onError: installPlayerSpriteFallback,
+        });
+      },
+    });
+    return target;
+  },
+
+  clearRaceComparisonTarget() {
+    const previous = this.raceComparisonTarget;
+    this.raceComparisonTarget = null;
+    this.pbGhost?.clearOpponent?.();
+    this.opponentCarSprite = this.carSprite;
+    return previous;
+  },
+
+  getRaceComparisonResult(finalTime) {
+    const target = this.raceComparisonTarget;
+    if (!target || !Number.isFinite(Number(finalTime))) return null;
+    const deltaSec = Number(finalTime) - target.finishTimeSec;
+    const outcome = Math.abs(deltaSec) <= COMPARISON_TIE_EPSILON_SEC
+      ? "tie"
+      : deltaSec < 0
+        ? "won"
+        : "lost";
+    return Object.freeze({ outcome, deltaSec, target });
+  },
+
+  getActiveRacePaceBaseline() {
+    return this.raceComparisonTarget || this.activePersonalBestPaceBaseline || null;
+  },
+
   clearTimers() {
     this.activeTimers.forEach((id) => {
       clearTimeout(id);
@@ -111,6 +265,7 @@ export const raceEngineMethods = {
     if (this.status !== "ready") return;
 
     this.status = "starting";
+    this.activePersonalBestPaceBaseline = null;
     this.carEffectsAudio?.prepareOnUserGesture?.();
     this.medalEffectsAudio?.prepareOnUserGesture?.();
     this.proceduralMusic?.prepareOnUserGesture?.();
@@ -282,14 +437,14 @@ export const raceEngineMethods = {
       this.currentTrack?.checkpoints?.length || 0,
     );
 
-    const trackKey =
-      typeof this.activeDailyChallenge?.trackKey === "string"
-        ? this.activeDailyChallenge.trackKey
-        : this.currentTrackKey;
-    const pbTimes =
-      trackKey && this.sessionBestCheckpointTimesByTrackKey
-        ? this.sessionBestCheckpointTimesByTrackKey[trackKey]
-        : null;
+    const raceKey = this.activeDailyChallenge?.id || this.currentTrackKey;
+    const pbTimes = this.raceComparisonTarget?.checkpointTimesSec
+      ?? this.getActiveRacePaceBaseline?.()?.checkpointTimesSec
+      ?? (
+        raceKey && this.sessionBestCheckpointTimesByTrackKey
+          ? this.sessionBestCheckpointTimesByTrackKey[raceKey]
+          : null
+      );
     const pbSec = Array.isArray(pbTimes) ? pbTimes[index] : undefined;
     const deltaVsBest = Number.isFinite(pbSec)
       ? splitTimeSec - pbSec
@@ -529,6 +684,7 @@ export const raceEngineMethods = {
     autoStart = false,
     {
       preserveDailyChallenge = false,
+      preserveRaceComparisonTarget = preserveDailyChallenge,
       showStartOverlay = !autoStart,
     } = {},
   ) {
@@ -553,6 +709,7 @@ export const raceEngineMethods = {
     this.cachedSpeed = 0;
     this.angularVelocity = 0;
     this.lapCheckpointTimesSec = [];
+    this.activePersonalBestPaceBaseline = null;
     this.clearSteeringInput();
     this.relaunchDelayRemaining = 0;
     this.wallImpactCooldownRemaining = 0;
@@ -570,6 +727,9 @@ export const raceEngineMethods = {
     this.runHistory.clear();
     this.runHistoryTimer = 0;
     this.particles = [];
+    if (!preserveRaceComparisonTarget) {
+      this.clearRaceComparisonTarget?.();
+    }
     if (dailyChallengeToRestore) {
       this.currentChallengeRun = null;
       this.dailyChallengeBestResult = null;
@@ -796,7 +956,9 @@ export const raceEngineMethods = {
     this.pbGhost?.render?.(ctx, {
       raceTimeSec: ghostRaceTimeSec,
       gridSize: gs,
-      carSprite: this.carSprite,
+      carSprite: this.raceComparisonTarget
+        ? (this.opponentCarSprite || this.carSprite)
+        : this.carSprite,
       drawWidth,
       drawHeight,
     });

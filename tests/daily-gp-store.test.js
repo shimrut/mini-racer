@@ -510,11 +510,13 @@ describe("daily-gp-store submission hardening", () => {
       trackKey: challenge.trackKey,
       bestTimeMs: 4321,
       checkpointTimesSec: [1.2, 2.4],
+      lapCompletionTimesSec: null,
       ghostAvailable: false,
     });
     expect(full.personalBest).toMatchObject({
       bestTimeMs: 4321,
       checkpointTimesSec: [1.2, 2.4],
+      lapCompletionTimesSec: null,
       ghost: null,
     });
   });

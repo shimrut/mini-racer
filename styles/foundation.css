@@ -65,6 +65,15 @@ a:focus-visible {
     outline: none !important;
 }
 
+/* The webview paints its own grey box over a tapped control, which reads as a
+   flicker on every press. The steering pad already opted out; everything the
+   player taps needs the same. */
+button,
+a,
+[role="button"] {
+    -webkit-tap-highlight-color: transparent;
+}
+
 [hidden] {
     display: none !important;
 }

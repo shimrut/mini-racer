@@ -338,6 +338,9 @@ export function buildModalRunsPayload(source, {
     if (typeof source.leaderboardRailLabel === 'string' && source.leaderboardRailLabel) {
         normalized.leaderboardRailLabel = source.leaderboardRailLabel;
     }
+    if (typeof source.onRaceOpponent === 'function') {
+        normalized.onRaceOpponent = source.onRaceOpponent;
+    }
 
     if (!updates || typeof updates !== 'object') {
         return normalized;
@@ -399,6 +402,9 @@ export function buildModalRunsViewOptions(payload) {
     };
     if (typeof payload.leaderboardRailLabel === 'string' && payload.leaderboardRailLabel) {
         options.leaderboardRailLabel = payload.leaderboardRailLabel;
+    }
+    if (typeof payload.onRaceOpponent === 'function') {
+        options.onRaceOpponent = payload.onRaceOpponent;
     }
     return options;
 }

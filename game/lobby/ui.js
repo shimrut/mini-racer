@@ -2,6 +2,7 @@ import {
     collectVisibleActionButtons,
     createMenuKeyboardState,
     dismissMenuKeyboardCue,
+    getMenuNavDirection,
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
@@ -25,27 +26,25 @@ function setText(element, value) {
 export class LobbyUi {
     constructor({
         onSelectDaily = null,
+        onCarouselNavigate = null,
         onSelectCampaign = null,
         onBack = null,
         onStartDaily = null,
         onStartCampaign = null,
-        onOpenCampaignStandings = null,
-        onOpenCampaignTracks = null,
         onAcceptChallenge = null,
     } = {}) {
         this.onSelectDaily = onSelectDaily;
+        this.onCarouselNavigate = onCarouselNavigate;
         this.onSelectCampaign = onSelectCampaign;
         this.onBack = onBack;
         this.onStartDaily = onStartDaily;
         this.onStartCampaign = onStartCampaign;
-        this.onOpenCampaignStandings = onOpenCampaignStandings;
-        this.onOpenCampaignTracks = onOpenCampaignTracks;
         this.onAcceptChallenge = onAcceptChallenge;
         this.mode = 'home';
         this.campaignState = normalizeCampaignLobbyState();
         this.challengeState = normalizeChallengeLobbyState();
-        this._dailyTrackName = '';
         this._campaignPrimaryLoading = false;
+        this._campaignSelectedStage = null;
         this._menuKeyboardState = createMenuKeyboardState();
         this._bound = false;
         this._keydownHandler = (event) => this.handleKeydown(event);
@@ -64,24 +63,15 @@ export class LobbyUi {
             ?.addEventListener('click', () => this.onSelectDaily?.());
         document.getElementById('lobby-home-campaign-btn')
             ?.addEventListener('click', () => this.onSelectCampaign?.());
-        document.getElementById('lobby-daily-back-btn')
-            ?.addEventListener('click', () => this.onBack?.('daily'));
-        document.getElementById('lobby-campaign-back-btn')
-            ?.addEventListener('click', () => this.onBack?.('campaign'));
-        document.getElementById('lobby-challenge-back-btn')
-            ?.addEventListener('click', () => this.onBack?.('challenge'));
+        document.querySelectorAll?.('[data-lobby-back]')?.forEach((button) => {
+            button.addEventListener('click', () => this.onBack?.(this.mode));
+        });
+        document.getElementById('lobby-back-btn')
+            ?.addEventListener('click', () => this.onBack?.(this.mode));
         document.getElementById('daily-challenge-start-btn')
             ?.addEventListener('click', () => this.onStartDaily?.());
-        document.getElementById('campaign-standings-btn')
-            ?.addEventListener('click', () => this.onOpenCampaignStandings?.());
-        document.getElementById('campaign-tracks-btn')
-            ?.addEventListener('click', () => this.onOpenCampaignTracks?.());
         this.campaignPrimaryBtn?.addEventListener('click', () => {
-            if (this.campaignState.complete) {
-                this.onOpenCampaignTracks?.();
-                return;
-            }
-            // Resolve the continue stage after bootstrap is ready — do not pass a stale stage.
+            // Resolve the stage after bootstrap is ready — do not pass a stale one.
             this.onStartCampaign?.();
         });
         this.challengeAcceptBtn?.addEventListener('click', () => {
@@ -144,7 +134,7 @@ export class LobbyUi {
         if (mode === 'campaign') {
             if (subhead) subhead.hidden = false;
             label.textContent = 'Campaign';
-            this.updateDailyTrackLabel('');
+            this.syncLobbySubheadDetail();
             return;
         }
         if (mode === 'challenge') {
@@ -155,23 +145,16 @@ export class LobbyUi {
         }
         if (subhead) subhead.hidden = true;
         label.textContent = '';
-        this.updateDailyTrackLabel('');
-    }
-
-    updateDailyTrackLabel(trackName = '') {
-        this._dailyTrackName = typeof trackName === 'string' ? trackName.trim() : '';
         this.syncLobbySubheadDetail();
     }
 
+    /**
+     * Only Challenge has a detail line left: it names the opponent, which is
+     * nowhere else on the screen. Daily's track name is on the carousel card.
+     */
     syncLobbySubheadDetail() {
         const track = document.querySelector('[data-lobby-mode-track]');
         if (!track) return;
-        if (this.mode === 'daily' && this._dailyTrackName) {
-            track.hidden = false;
-            track.textContent = this._dailyTrackName;
-            track.classList.remove('lobby-mode-track--challenge');
-            return;
-        }
         if (this.mode === 'challenge') {
             const opponent = this.challengeState?.opponentLabel?.trim() || '';
             track.hidden = !opponent;
@@ -198,7 +181,13 @@ export class LobbyUi {
     }
 
     getVisibleActions() {
-        return collectVisibleActionButtons(this.activePane, '[data-lobby-action]');
+        return [
+            ...collectVisibleActionButtons(this.activePane, '[data-lobby-action]'),
+            ...collectVisibleActionButtons(
+                document.querySelector?.('.lobby-header'),
+                '[data-lobby-action]',
+            ),
+        ];
     }
 
     getPreferredIndex(buttons = this.getVisibleActions()) {
@@ -242,11 +231,30 @@ export class LobbyUi {
             this.onBack?.(this.mode);
             return;
         }
+        // The picker panes own the horizontal axis: A/D and the arrows drive the
+        // track carousel, so they must not be spent on spatial menu navigation.
+        if (this.handleCarouselKeydown(event)) return;
         handleMenuListKeydown(event, {
             buttons: this.getVisibleActions(),
             state: this._menuKeyboardState,
             container: this.activePane,
         });
+    }
+
+    handleCarouselKeydown(event) {
+        if (this.mode !== 'daily' && this.mode !== 'campaign') return false;
+        if (!this.onCarouselNavigate) return false;
+        if (event.ctrlKey || event.metaKey || event.altKey) return false;
+        const tag = event.target?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return false;
+
+        const direction = getMenuNavDirection(event.key);
+        if (direction !== 'left' && direction !== 'right') return false;
+        if (!this.onCarouselNavigate(this.mode, direction)) return false;
+
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        return true;
     }
 
     handlePointerMove(event) {
@@ -258,19 +266,38 @@ export class LobbyUi {
         });
     }
 
+    /** The carousel drives the primary action, so it has to say which stage. */
+    setCampaignSelectedStage(stage = null) {
+        this._campaignSelectedStage = stage;
+        this.renderCampaign();
+    }
+
+    /**
+     * The button races whatever the carousel has centred, so it says only
+     * whether that stage can be raced — never where the campaign as a whole is.
+     */
+    getCampaignPrimaryLabel() {
+        const stage = this._campaignSelectedStage;
+        if (stage) return stage.unlocked ? 'Start Race' : 'Locked';
+        return this.campaignState.primaryLabel
+            || (this._campaignPrimaryLoading ? 'Loading' : '');
+    }
+
     renderCampaign() {
-        if (this.campaignPrimaryBtn) {
-            // A finished campaign keeps the primary action: it reads Complete and
-            // opens Tracks so every stage stays one press away.
-            this.campaignPrimaryBtn.hidden = false;
-            this.campaignPrimaryBtn.disabled = !this.campaignState.complete
-                && !this.campaignState.nextStage
-                && !this._campaignPrimaryLoading;
-            setText(
-                this.campaignPrimaryBtn.querySelector('.main-menu__label'),
-                this.campaignState.primaryLabel || (this._campaignPrimaryLoading ? 'Loading' : ''),
-            );
-        }
+        if (!this.campaignPrimaryBtn) return;
+        const stage = this._campaignSelectedStage;
+        this.campaignPrimaryBtn.hidden = false;
+        this.campaignPrimaryBtn.disabled = this._campaignPrimaryLoading
+            ? false
+            : (stage
+                ? !stage.unlocked
+                // No selection yet, so the button can only go on whether the
+                // campaign has anything raceable in it at all.
+                : !this.campaignState.stages?.some((entry) => entry.unlocked));
+        setText(
+            this.campaignPrimaryBtn.querySelector('.main-menu__label'),
+            this.getCampaignPrimaryLabel(),
+        );
     }
 
     setCampaignPrimaryLoading(isLoading) {

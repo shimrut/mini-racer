@@ -6,6 +6,7 @@ import {
 } from "./storage.js";
 import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js";
 import { normalizePbGhostRecord } from "../ghost/pb-ghost.js";
+import { createPersonalBestPaceBaseline } from "../ghost/pb-pace.js";
 import {
   buildLapRecord,
   createModalActions,
@@ -23,6 +24,7 @@ import {
 import {
   getActiveDailyChallenge,
   cacheDailyChallengePlaylist,
+  DAILY_PLAYLIST_DAYS,
   getCachedDailyChallengePlaylist,
   getMissingDailyChallengeSnapshotIds,
   getCachedDailyChallengeSnapshot,
@@ -32,6 +34,7 @@ import {
   isDailyChallengeStoredResultForChallenge,
   prefetchDailyChallengeSnapshots,
 } from "./service.js";
+import { buildDailyCarouselCards } from "./carousel-model.js";
 import { createVerificationSnapshot, getDailyChallengeVerificationEntry, getVerificationSnapshotFromQueueEntry } from "../scoreboard/verification-queue.js";
 import { getMedalForRaceTime } from "../medals/medal-timing.js";
 import {
@@ -66,6 +69,9 @@ function normalizeTrackPersonalBest(record, trackKey = null, challengeId = null)
     checkpointTimesSec: Array.isArray(record.checkpointTimesSec)
       ? record.checkpointTimesSec.slice()
       : null,
+    lapCompletionTimesSec: Array.isArray(record.lapCompletionTimesSec)
+      ? record.lapCompletionTimesSec.slice()
+      : null,
     ghostAvailable: Boolean(record.ghostAvailable || record.ghost),
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : null,
   };
@@ -78,6 +84,13 @@ function isValidCanonicalTrackPersonalBest(record, trackKey) {
     return false;
   }
   if (record.checkpointTimesSec !== null && !Array.isArray(record.checkpointTimesSec)) {
+    return false;
+  }
+  if (
+    record.lapCompletionTimesSec !== undefined
+    && record.lapCompletionTimesSec !== null
+    && !Array.isArray(record.lapCompletionTimesSec)
+  ) {
     return false;
   }
   if (typeof record.updatedAt !== "string" || !record.updatedAt) return false;
@@ -172,6 +185,22 @@ function applyTrackPersonalBest(engine, challenge, record, { prepareGhost = fals
   } else {
     delete engine.trackPersonalBestByTrackKey[challenge.id];
   }
+  if (!engine.personalBestPaceBaselineByRaceId) {
+    engine.personalBestPaceBaselineByRaceId = Object.create(null);
+  }
+  const paceBaseline = personalBest
+    ? createPersonalBestPaceBaseline({
+        ...record,
+        bestTimeMs: Math.round(personalBest.bestTime * 1000),
+        checkpointTimesSec: personalBest.checkpointTimesSec,
+        lapCompletionTimesSec: personalBest.lapCompletionTimesSec,
+      }, TRACKS[challenge.trackKey], getDailyChallengeRequiredLaps(challenge))
+    : null;
+  if (paceBaseline) {
+    engine.personalBestPaceBaselineByRaceId[challenge.id] = paceBaseline;
+  } else {
+    delete engine.personalBestPaceBaselineByRaceId[challenge.id];
+  }
 
   const selectedChallengeId = engine.activeDailyChallenge?.id
     || engine.currentDailyChallenge?.id
@@ -194,7 +223,7 @@ function applyTrackPersonalBest(engine, challenge, record, { prepareGhost = fals
     }
   }
 
-  if (prepareGhost) {
+  if (prepareGhost && !engine.raceComparisonTarget) {
     if (personalBest?.ghostAvailable) engine.pbGhost?.prepare?.(record);
     else engine.pbGhost?.clearTrack?.();
   }
@@ -290,7 +319,9 @@ export const dailyChallengeEngineMethods = {
       return null;
     }
     const personalBest = applyTrackPersonalBest(this, challenge, record, { prepareGhost: true });
-    this.preparedPbGhostChallengeId = challenge.id;
+    if (!this.raceComparisonTarget) {
+      this.preparedPbGhostChallengeId = challenge.id;
+    }
     return personalBest;
   },
 
@@ -378,7 +409,7 @@ export const dailyChallengeEngineMethods = {
     const personalBest = applyTrackPersonalBest(this, challenge, record, {
       prepareGhost: ownsSelection,
     });
-    if (ownsSelection) {
+    if (ownsSelection && !this.raceComparisonTarget) {
       this.preparedPbGhostChallengeId = challenge.id;
     }
     return personalBest;
@@ -387,6 +418,9 @@ export const dailyChallengeEngineMethods = {
   beginPersonalBestGhostRunAtGo() {
     const challenge = this.activeDailyChallenge;
     const ghostActive = this.pbGhost?.beginRun?.() === true;
+    this.activePersonalBestPaceBaseline = this.raceComparisonTarget
+      ? null
+      : (this.personalBestPaceBaselineByRaceId?.[challenge?.id] ?? null);
     const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
     const ghostExpected = this.pbGhost?.enabled === true
       && Number.isFinite(trackPersonalBest?.bestTime);
@@ -470,22 +504,27 @@ export const dailyChallengeEngineMethods = {
     setTimeout(startPrewarm, 200);
   },
 
-  prewarmDailyPlaylistTracks(challenges = []) {
+  prewarmDailyPlaylistTracks(challenges = [], { requireModal = true } = {}) {
     const prewarmId = (this._dailyPlaylistTrackPrewarmId || 0) + 1;
     this._dailyPlaylistTrackPrewarmId = prewarmId;
     const queue = (Array.isArray(challenges) ? challenges : [])
       .filter((challenge) => challenge?.trackKey && TRACKS[challenge.trackKey]);
+    // The lobby carousel prewarms without a modal on screen; the tracks modal
+    // still stops the moment it closes.
+    const isSurfaceOpen = () => (
+      !requireModal || this.dailyChallengeUi.isPlaylistModalOpen?.()
+    );
 
     const prewarmNext = async () => {
       if (this._dailyPlaylistTrackPrewarmId !== prewarmId) return;
-      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+      if (!isSurfaceOpen()) return;
       if (this.status === "playing" || this.status === "starting") return;
       const challenge = queue.shift();
       if (!challenge) return;
 
       await this.waitForTrackPrewarmIdle();
       if (this._dailyPlaylistTrackPrewarmId !== prewarmId) return;
-      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+      if (!isSurfaceOpen()) return;
       if (this.status === "playing" || this.status === "starting") return;
 
       const track = TRACKS[challenge.trackKey];
@@ -554,7 +593,12 @@ export const dailyChallengeEngineMethods = {
       useTimer: true,
       visible: true,
     });
-    this.hud.setBestTime(this.bestLapTime, { persistToTrackCard: false });
+    const comparisonTarget = this.raceComparisonTarget;
+    if (comparisonTarget) {
+      this.hud.setComparisonTarget?.(comparisonTarget);
+    } else {
+      this.hud.setBestTime(this.bestLapTime, { persistToTrackCard: false });
+    }
   },
 
   getDailyChallengeProgressText() {
@@ -793,6 +837,7 @@ export const dailyChallengeEngineMethods = {
     this.activeDailyChallenge = null;
     this.dailyChallengeBestResult = null;
     this.trackPersonalBestResult = null;
+    this.activePersonalBestPaceBaseline = null;
     this.pbGhost?.clearTrack?.();
     this.preparedPbGhostChallengeId = null;
     claimPbGhostSelection(this, null);
@@ -814,6 +859,9 @@ export const dailyChallengeEngineMethods = {
   },
 
   async handleStartDailyChallenge(challengeOverride = null, options = {}) {
+    if (!options.preserveRaceComparisonTarget) {
+      this.clearRaceComparisonTarget?.();
+    }
     const sessionChallenge = isDailyChallengeStillPlayable(this.lastPlayedDailyChallenge)
       ? this.lastPlayedDailyChallenge
       : null;
@@ -851,39 +899,46 @@ export const dailyChallengeEngineMethods = {
     try {
       if (replacesCurrentRun && challenge.trackKey === this.currentTrackKey) {
         this.reset(false, {
+          ...(options.preserveRaceComparisonTarget === true
+            ? { preserveRaceComparisonTarget: true }
+            : {}),
           showStartOverlay: false,
         });
       }
       this.lastPlayedDailyChallenge = challenge;
+      this.selectedDailyChallengeId = challenge.id;
       this.activeDailyChallenge = challenge;
       if (challenge.trackKey && challenge.trackKey !== this.currentTrackKey) {
         await this.loadTrack(challenge.trackKey, {
           loadPlayerProgress: false,
           preserveDailyChallengeContext: true,
+          preserveRaceComparisonTarget: options.preserveRaceComparisonTarget === true,
           showStartOverlayOnReset: false,
         });
       }
 
-      const hasPreparedGhostAsset =
-        this.preparedPbGhostChallengeId === challenge.id;
-      const hasPendingGhostCandidate =
-        getPendingPbGhostCandidates(this).has(challenge.id);
-      const hasUnavailableGhost =
-        this.unavailablePbGhostChallengeIds?.has(challenge.id) === true;
-      if (
-        !hasPreparedGhostAsset
-        && !hasPendingGhostCandidate
-        && !hasUnavailableGhost
-        && typeof this.prepareTrackPersonalBestGhost === "function"
-      ) {
-        this.pbGhost?.clearTrack?.();
-        this.preparedPbGhostChallengeId = null;
-        void this.prepareTrackPersonalBestGhost(challenge).catch((error) => {
-          console.error("Error loading personal best ghost:", error);
-        });
-      } else if (hasPendingGhostCandidate || hasUnavailableGhost) {
-        this.pbGhost?.clearPrepared?.();
-        this.preparedPbGhostChallengeId = null;
+      if (!this.raceComparisonTarget) {
+        const hasPreparedGhostAsset =
+          this.preparedPbGhostChallengeId === challenge.id;
+        const hasPendingGhostCandidate =
+          getPendingPbGhostCandidates(this).has(challenge.id);
+        const hasUnavailableGhost =
+          this.unavailablePbGhostChallengeIds?.has(challenge.id) === true;
+        if (
+          !hasPreparedGhostAsset
+          && !hasPendingGhostCandidate
+          && !hasUnavailableGhost
+          && typeof this.prepareTrackPersonalBestGhost === "function"
+        ) {
+          this.pbGhost?.clearTrack?.();
+          this.preparedPbGhostChallengeId = null;
+          void this.prepareTrackPersonalBestGhost(challenge).catch((error) => {
+            console.error("Error loading personal best ghost:", error);
+          });
+        } else if (hasPendingGhostCandidate || hasUnavailableGhost) {
+          this.pbGhost?.clearPrepared?.();
+          this.preparedPbGhostChallengeId = null;
+        }
       }
       this.applyDailyChallenge(challenge);
       void this.journeys?.startAttempt?.({
@@ -969,6 +1024,119 @@ export const dailyChallengeEngineMethods = {
     }
   },
 
+  /**
+   * The Daily pane's carousel *is* the track picker, so it paints from whatever
+   * is already cached and then repaints as the playlist, personal bests and
+   * per-day snapshots land. A render token drops late work once the player has
+   * moved on.
+   */
+  async refreshDailyCarousel({ selectChallengeId = null } = {}) {
+    const carousel = this.dailyCarousel;
+    if (!carousel) return;
+
+    const token = (this._dailyCarouselRenderToken || 0) + 1;
+    this._dailyCarouselRenderToken = token;
+    const isStale = () => this._dailyCarouselRenderToken !== token;
+    const preferredId = selectChallengeId
+      || this.selectedDailyChallengeId
+      || this.currentDailyChallenge?.id
+      || null;
+
+    let challenges = this.currentDailyChallenge
+      ? cacheDailyChallengePlaylist([this.currentDailyChallenge])
+      : getCachedDailyChallengePlaylist();
+    this.paintDailyCarousel(challenges, {
+      selectedChallengeId: preferredId,
+      loading: true,
+    });
+
+    if (challenges.length < DAILY_PLAYLIST_DAYS) {
+      try {
+        const fetched = await getDailyChallengePlaylist();
+        if (isStale()) return;
+        if (fetched.length) {
+          challenges = fetched;
+          this.paintDailyCarousel(challenges, { selectedChallengeId: preferredId });
+        }
+      } catch (error) {
+        console.error("Error loading daily challenge playlist:", error);
+      }
+      if (isStale()) return;
+    }
+
+    // Nothing below changes the run of days, only what each card can say about
+    // it, so the selection is left alone from here on.
+    try {
+      await this.refreshTrackPersonalBestSummaries(challenges);
+      if (isStale()) return;
+      this.paintDailyCarousel(challenges);
+    } catch (error) {
+      console.error("Error loading playlist personal bests:", error);
+    }
+
+    const missingSnapshotIds = getMissingDailyChallengeSnapshotIds(
+      challenges.map((challenge) => challenge?.id).filter(Boolean),
+    );
+    for (const challengeId of missingSnapshotIds) {
+      try {
+        await getDailyChallengeSnapshot({ challengeId });
+      } catch (error) {
+        console.error("Error loading daily challenge snapshot:", error);
+      }
+      if (isStale()) return;
+      this.paintDailyCarousel(challenges);
+    }
+  },
+
+  paintDailyCarousel(challenges = [], {
+    selectedChallengeId = this.selectedDailyChallengeId,
+    loading = false,
+  } = {}) {
+    if (!this.dailyCarousel) return;
+    const cards = buildDailyCarouselCards(
+      decorateChallengesWithTrackPersonalBests(this, challenges),
+      { getSnapshot: (challengeId) => getCachedDailyChallengeSnapshot(challengeId) },
+    );
+    this.dailyCarousel.render(cards, { selectedChallengeId, loading });
+  },
+
+  handleDailyCarouselSelect(challenge) {
+    if (!challenge?.id) return;
+    this.selectedDailyChallengeId = challenge.id;
+    this.setDailyChallengeLobbySummary(challenge);
+  },
+
+  /** Warm the centred track so Start does not pay for the build. */
+  handleDailyCarouselSettled(card) {
+    const challenge = card?.challenge;
+    if (!challenge?.trackKey || !TRACKS[challenge.trackKey]) return;
+    if (this.status === "playing" || this.status === "starting") return;
+    if (!this.startOverlay?.isStartOverlayVisible?.()) return;
+    this.prewarmDailyPlaylistTracks([challenge], { requireModal: false });
+  },
+
+  openDailyCarouselStandings(challenge) {
+    if (!challenge?.id) return;
+    void this.leaderboards?.openDailyChallengeLeaderboardForChallenge?.(
+      challenge,
+      "close",
+      {
+        // Closing the standings lands on whichever day was last on screen, so
+        // browsing back through the week is not undone by dismissing it.
+        onClose: () => {
+          const viewedId = this.leaderboards?.getLastViewedDailyChallengeId?.()
+            || challenge.id;
+          this.selectDailyCarouselChallenge(viewedId);
+        },
+      },
+    );
+  },
+
+  selectDailyCarouselChallenge(challengeId) {
+    if (!challengeId) return false;
+    return Boolean(this.dailyCarousel?.selectChallenge?.(challengeId));
+  },
+
   prefetchDailyChallengePlaylist() {
     getDailyChallengePlaylist()
       .then((challenges) => prefetchDailyChallengeSnapshots(
@@ -994,11 +1162,18 @@ export const dailyChallengeEngineMethods = {
     const lapNumber = Number.isInteger(completedLaps)
       ? completedLaps
       : this.currentChallengeRun.completedLaps || 0;
-    const lapRecord = buildLapRecord(
-      lapNumber,
-      lapTime,
-      this.currentChallengeRun.bestLap?.time ?? null,
-    );
+    const raceElapsedTime = Number.isFinite(elapsedTimeSec)
+      ? elapsedTimeSec
+      : this.currentTime;
+    const paceBaseline = this.getActiveRacePaceBaseline?.()
+      ?? this.raceComparisonTarget
+      ?? this.activePersonalBestPaceBaseline
+      ?? null;
+    const pbLapBoundarySec = paceBaseline?.lapCompletionTimesSec?.[lapNumber - 1];
+    const lapRecord = buildLapRecord(lapNumber, lapTime, null);
+    lapRecord.deltaVsBest = Number.isFinite(pbLapBoundarySec)
+      ? raceElapsedTime - pbLapBoundarySec
+      : null;
 
     pushRecentLap(this.currentChallengeRun.recentLaps, lapRecord);
 
@@ -1019,9 +1194,6 @@ export const dailyChallengeEngineMethods = {
       typeof this.activeDailyChallenge?.trackKey === "string"
         ? this.activeDailyChallenge.trackKey
         : this.currentTrackKey;
-    const raceElapsedTime = Number.isFinite(elapsedTimeSec)
-      ? elapsedTimeSec
-      : this.currentTime;
     const progressMedal = tk
       ? getMedalForRaceTime(tk, raceElapsedTime, lapNumber)
       : null;
@@ -1139,8 +1311,13 @@ export const dailyChallengeEngineMethods = {
       raceCacheKey && Number.isFinite(this.sessionBestLapSecByTrackKey?.[raceCacheKey])
         ? this.sessionBestLapSecByTrackKey[raceCacheKey]
         : null;
+    const frozenPaceBaseline = this.raceComparisonTarget
+      ? null
+      : (this.activePersonalBestPaceBaseline ?? null);
     const storedTrackBestSec =
-      previousTrackBest != null && Number.isFinite(Number(previousTrackBest.bestTime))
+      Number.isFinite(frozenPaceBaseline?.finishTimeSec)
+        ? frozenPaceBaseline.finishTimeSec
+        : previousTrackBest != null && Number.isFinite(Number(previousTrackBest.bestTime))
         ? Number(previousTrackBest.bestTime)
         : null;
     const previousPersonalBestSec = storedTrackBestSec != null
@@ -1169,7 +1346,7 @@ export const dailyChallengeEngineMethods = {
     const lapCheckpointTimes = this.getLapCheckpointTimesSec?.() ?? [];
     const storedPbCheckpointTimes = normalizeCheckpointTimesSec(
       storedTrackBestSec ?? finalTime,
-      previousTrackBest?.checkpointTimesSec,
+      frozenPaceBaseline?.checkpointTimesSec ?? previousTrackBest?.checkpointTimesSec,
     );
     const priorPbCheckpointTimes =
       storedPbCheckpointTimes
@@ -1177,7 +1354,9 @@ export const dailyChallengeEngineMethods = {
         ? this.sessionBestCheckpointTimesByTrackKey[raceCacheKey] ?? null
         : null);
     const priorPbFinishSec =
-      raceCacheKey && this.sessionBestLapSecByTrackKey
+      Number.isFinite(frozenPaceBaseline?.finishTimeSec)
+        ? frozenPaceBaseline.finishTimeSec
+        : raceCacheKey && this.sessionBestLapSecByTrackKey
         ? this.sessionBestLapSecByTrackKey[raceCacheKey] ?? null
         : null;
     const runSubmissionBlockedReason = this.rankedSubmissionBlockedReason || null;
@@ -1259,6 +1438,11 @@ export const dailyChallengeEngineMethods = {
           },
         };
 
+    const comparison = this.getRaceComparisonResult?.(finalTime) ?? null;
+    const comparisonCheckpointTimes = comparison?.target.checkpointTimesSec
+      ?? priorPbCheckpointTimes;
+    const comparisonFinishSec = comparison?.target.finishTimeSec
+      ?? priorPbFinishSec;
     const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(challenge.id);
     this.modal.showModal(
       "Daily challenge complete",
@@ -1285,8 +1469,11 @@ export const dailyChallengeEngineMethods = {
         previousPersonalBestSec,
         trackKey: challenge.trackKey,
         lapCheckpointTimes,
-        pbCheckpointTimes: priorPbCheckpointTimes,
-        pbFinishSec: priorPbFinishSec,
+        pbCheckpointTimes: comparisonCheckpointTimes,
+        pbFinishSec: comparisonFinishSec,
+        raceComparisonTarget: comparison?.target ?? null,
+        comparisonOutcome: comparison?.outcome ?? null,
+        deltaToComparison: comparison?.deltaSec ?? null,
       },
       {
         ...createModalActions({
@@ -1308,6 +1495,14 @@ export const dailyChallengeEngineMethods = {
       this.modal.modalMsg.style.display = "";
       this.modal.modalMsg.textContent = `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
     }
+
+    this.configureLeaderboardOpponentFinish?.({
+      mode: "daily",
+      race: challenge,
+      finalTime,
+      comparison,
+      waitForVerification: Boolean(isDailyBest && didEnqueue && !submissionError),
+    });
 
     if (isDailyBest && didEnqueue && !submissionError) {
       const verificationEntry = getDailyChallengeVerificationEntry(challenge.id);
@@ -1338,5 +1533,31 @@ export const dailyChallengeEngineMethods = {
     void this.journeys?.endAttempt?.({ complete: false });
     void this.journeys?.startAttempt?.({ reason });
     this.reset(true, { preserveDailyChallenge: true });
+  },
+
+  async startDailyChallengeAgainstOpponent(challenge, target) {
+    if (!challenge || !target) return false;
+    this.clearRaceComparisonTarget?.();
+    if (!this.installRaceComparisonTarget?.(
+      { ...target, mode: "daily" },
+      {
+        track: TRACKS[challenge.trackKey],
+        lapCount: getDailyChallengeRequiredLaps(challenge),
+      },
+    )) {
+      return false;
+    }
+    await this.handleStartDailyChallenge(challenge, {
+      preserveRaceComparisonTarget: true,
+      startSource: "leaderboard_opponent",
+    });
+    // A start that never reached this challenge — a press already in flight, or
+    // a day that expired and rolled forward — must not leave the opponent
+    // installed for whatever the player races next.
+    if (this.activeDailyChallenge?.id !== challenge.id) {
+      this.clearRaceComparisonTarget?.();
+      return false;
+    }
+    return this.raceComparisonTarget !== null;
   },
 };

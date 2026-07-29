@@ -62,6 +62,7 @@ type SnapshotRow = {
     isCurrentPlayer: boolean;
     completedLaps: null;
     checkpointTimesSec: number[] | null;
+    opponentRaceAvailable: boolean;
 };
 
 type SnapshotPayload = {
@@ -768,8 +769,10 @@ function toSnapshotRow(
     rank: number,
     currentPlayerId: string | null,
     profileMap: Map<string, DailyGpPlayerProfile>,
+    opponentRaceAvailable = false,
 ): SnapshotRow {
     const profile = profileMap.get(entry.playerId);
+    const isCurrentPlayer = entry.playerId === currentPlayerId;
     return {
         rank,
         rankLabel: formatRankLabel(rank) || '--',
@@ -781,10 +784,32 @@ function toSnapshotRow(
         bestTime: entry.bestTimeMs / 1000,
         bestTimeMs: entry.bestTimeMs,
         updatedAt: entry.updatedAt,
-        isCurrentPlayer: entry.playerId === currentPlayerId,
+        isCurrentPlayer,
         completedLaps: entry.completedLaps,
         checkpointTimesSec: entry.checkpointTimesSec ?? null,
+        opponentRaceAvailable: !isCurrentPlayer && opponentRaceAvailable,
     };
+}
+
+function isCompleteOpponentRecord(
+    entry: DailyGpLeaderboardEntry,
+    record: Awaited<ReturnType<typeof getPlayerTrackPbRecord>>,
+    challenge: DailyGpChallenge,
+): boolean {
+    const checkpointCount = (TRACKS[challenge.trackKey]?.checkpoints?.length || 0)
+        * challenge.objectiveParams.lapCount;
+    // The leaderboard entry and the PB record are written by two concurrent
+    // writes, and before they shared a timestamp they always disagreed by a few
+    // milliseconds. The run identity that matters is the time itself: an exact
+    // best-time match on both the record and its trace pins the ghost to this
+    // leaderboard row without stranding every entry set before that fix.
+    return Boolean(
+        record?.ghost
+        && record.bestTimeMs === entry.bestTimeMs
+        && record.ghost.finishTimeMs === entry.bestTimeMs
+        && Array.isArray(record.checkpointTimesSec)
+        && record.checkpointTimesSec.length === checkpointCount,
+    );
 }
 
 function formatPodiumTime(bestTimeMs: number): string {
@@ -840,8 +865,7 @@ async function readFinalPodiumPositions(
 }
 
 async function readRowsByRankRange(
-    challengeId: string,
-    trackKey: string,
+    challenge: DailyGpChallenge,
     start: number,
     stop: number,
     currentPlayerId: string | null,
@@ -850,8 +874,8 @@ async function readRowsByRankRange(
         return [];
     }
 
-    const leaderboardKey = createRedisChallengeLeaderboardKey(challengeId);
-    const entryHashKey = createRedisChallengeEntryHashKey(challengeId);
+    const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
+    const entryHashKey = createRedisChallengeEntryHashKey(challenge.id);
     const rankedMembers = await redis.zRange(leaderboardKey, start, stop);
     if (!rankedMembers.length) {
         return [];
@@ -865,12 +889,30 @@ async function readRowsByRankRange(
         rankedMembers.map((member) => member.member),
     );
 
-    return rankedMembers
-        .map((member, index) => {
-            const storedEntry = parseStoredEntry(rawEntries[index], trackKey);
+    const rows = await Promise.all(rankedMembers
+        .map(async (member, index) => {
+            const storedEntry = parseStoredEntry(rawEntries[index], challenge.trackKey);
             if (!storedEntry) return null;
-            return toSnapshotRow(storedEntry, start + index + 1, currentPlayerId, profileMap);
-        })
+            const record = member.member === currentPlayerId
+                ? null
+                : await getPlayerTrackPbRecord({
+                    playerId: member.member,
+                    challenge,
+                    track: TRACKS[challenge.trackKey],
+                });
+            return toSnapshotRow(
+                storedEntry,
+                start + index + 1,
+                currentPlayerId,
+                profileMap,
+                isCompleteOpponentRecord(
+                    storedEntry,
+                    record,
+                    challenge,
+                ),
+            );
+        }));
+    return rows
         .filter((entry): entry is SnapshotRow => Boolean(entry));
 }
 
@@ -1077,6 +1119,7 @@ export async function getServerPlayerTrackPbSummaries({
         trackKey: string;
         bestTimeMs: number;
         checkpointTimesSec: number[] | null;
+        lapCompletionTimesSec: number[] | null;
         ghostAvailable: boolean;
     } | null>;
 }> {
@@ -1100,6 +1143,7 @@ export async function getServerPlayerTrackPbSummaries({
         trackKey: string;
         bestTimeMs: number;
         checkpointTimesSec: number[] | null;
+        lapCompletionTimesSec: number[] | null;
         ghostAvailable: boolean;
     } | null> = {};
 
@@ -1118,6 +1162,7 @@ export async function getServerPlayerTrackPbSummaries({
                 trackKey: record.trackKey,
                 bestTimeMs: record.bestTimeMs,
                 checkpointTimesSec: record.checkpointTimesSec,
+                lapCompletionTimesSec: record.lapCompletionTimesSec,
                 ghostAvailable: Boolean(record.ghost),
             }
             : null;
@@ -1146,6 +1191,7 @@ export async function getServerPlayerPbGhost({
     personalBest: {
         bestTimeMs: number;
         checkpointTimesSec: number[] | null;
+        lapCompletionTimesSec: number[] | null;
         updatedAt: string;
         ghost: import('./pb-ghost-trace.js').PbGhostTrace | null;
     } | null;
@@ -1187,6 +1233,7 @@ export async function getServerPlayerPbGhost({
             ? {
                 bestTimeMs: record.bestTimeMs,
                 checkpointTimesSec: record.checkpointTimesSec,
+                lapCompletionTimesSec: record.lapCompletionTimesSec,
                 updatedAt: record.updatedAt,
                 ghost: record.ghost,
             }
@@ -1414,8 +1461,7 @@ export async function getServerDailyGpSnapshot({
     }
     const topRows = leaderboardEntryCount
         ? await readRowsByRankRange(
-            challenge.id,
-            challenge.trackKey,
+            challenge,
             safeOffset,
             safeOffset + safeLimit - 1,
             normalizedPlayerId,
@@ -1473,8 +1519,7 @@ export async function getServerDailyGpSnapshot({
         const nearbyStart = Math.max(0, playerRank - DAILY_GP_NEARBY_RADIUS - 1);
         const nearbyStop = nearbyStart + (DAILY_GP_NEARBY_RADIUS * 2);
         nearbyRows = await readRowsByRankRange(
-            challenge.id,
-            challenge.trackKey,
+            challenge,
             nearbyStart,
             nearbyStop,
             normalizedPlayerId,
@@ -1497,6 +1542,176 @@ export async function getServerDailyGpSnapshot({
             ? safeOffset + safeLimit
             : null,
     };
+}
+
+type OpponentRowSelection = {
+    kind: 'row';
+    rank: number;
+    displayName: string;
+    bestTimeMs: number;
+    updatedAt: string;
+};
+
+type NextFasterSelection = {
+    kind: 'next-faster';
+    benchmarkTimeMs?: number;
+};
+
+function normalizeOpponentSelection(value: unknown): OpponentRowSelection | NextFasterSelection | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const selection = value as Record<string, unknown>;
+    if (selection.kind === 'row') {
+        if (
+            !Number.isInteger(selection.rank)
+            || Number(selection.rank) < 1
+            || typeof selection.displayName !== 'string'
+            || !selection.displayName
+            || !Number.isSafeInteger(selection.bestTimeMs)
+            || Number(selection.bestTimeMs) <= 0
+            || typeof selection.updatedAt !== 'string'
+            || !selection.updatedAt
+        ) return null;
+        return {
+            kind: 'row',
+            rank: Number(selection.rank),
+            displayName: selection.displayName,
+            bestTimeMs: Number(selection.bestTimeMs),
+            updatedAt: selection.updatedAt,
+        };
+    }
+    if (selection.kind === 'next-faster') {
+        const benchmarkTimeMs = Number(selection.benchmarkTimeMs);
+        return {
+            kind: 'next-faster',
+            benchmarkTimeMs: Number.isSafeInteger(benchmarkTimeMs) && benchmarkTimeMs > 0
+                ? benchmarkTimeMs
+                : undefined,
+        };
+    }
+    return null;
+}
+
+export async function prepareServerDailyLeaderboardRace({
+    challengeId,
+    playerId,
+    redditUsername,
+    guestToken,
+    selection: rawSelection,
+}: {
+    challengeId?: unknown;
+    playerId?: unknown;
+    redditUsername?: unknown;
+    guestToken?: unknown;
+    selection?: unknown;
+}) {
+    const challenge = await getServerDailyGpPlayableChallenge(
+        typeof challengeId === 'string' ? challengeId : null,
+    );
+    if (!challenge) {
+        return { status: 410, body: { error: 'Daily race is no longer available.', reason: 'competition_unavailable' } };
+    }
+    const identity = await resolveAuthorizedPlayerIdentity({
+        playerId,
+        redditUsername,
+        guestToken,
+    });
+    if (!identity.canonicalPlayerId) {
+        return { status: 401, body: { error: 'Player identity is required to race an opponent.', reason: 'identity_required' } };
+    }
+    const selection = normalizeOpponentSelection(rawSelection);
+    if (!selection) {
+        return { status: 400, body: { error: 'Opponent selection is invalid.', reason: 'invalid_selection' } };
+    }
+
+    const leaderboardKey = createRedisChallengeLeaderboardKey(challenge.id);
+    let rankedCandidates: Array<{ member: string; rank: number }> = [];
+    if (selection.kind === 'row') {
+        const ranked = await redis.zRange(leaderboardKey, selection.rank - 1, selection.rank - 1);
+        rankedCandidates = ranked.map((row) => ({ member: row.member, rank: selection.rank }));
+    } else {
+        const ownRankZeroBased = await redis.zRank(leaderboardKey, identity.canonicalPlayerId);
+        const ownEntry = await readEntryByPlayerId(
+            challenge.id,
+            challenge.trackKey,
+            identity.canonicalPlayerId,
+        );
+        const benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
+        if (!Number.isFinite(benchmarkTimeMs)) {
+            return { status: 409, body: { error: 'Set a time before choosing the next opponent.', reason: 'benchmark_required' } };
+        }
+        const totalCount = await redis.zCard(leaderboardKey);
+        const stop = Number.isFinite(ownRankZeroBased)
+            ? Number(ownRankZeroBased) - 1
+            : totalCount - 1;
+        const ranked = stop >= 0 ? await redis.zRange(leaderboardKey, 0, stop) : [];
+        rankedCandidates = ranked
+            .map((row, index) => ({ member: row.member, rank: index + 1 }))
+            .reverse();
+    }
+
+    for (const candidate of rankedCandidates) {
+        if (candidate.member === identity.canonicalPlayerId) {
+            if (selection.kind === 'row') {
+                return { status: 409, body: { error: 'Choose another player to race.', reason: 'self_selection' } };
+            }
+            continue;
+        }
+        const entry = await readEntryByPlayerId(challenge.id, challenge.trackKey, candidate.member);
+        if (!entry) continue;
+        if (selection.kind === 'next-faster') {
+            const ownEntry = await readEntryByPlayerId(
+                challenge.id,
+                challenge.trackKey,
+                identity.canonicalPlayerId,
+            );
+            const benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
+            if (!benchmarkTimeMs || entry.bestTimeMs >= benchmarkTimeMs) continue;
+        }
+        const profileMap = await readPlayerProfileMap([candidate.member]);
+        const displayName = resolveLeaderboardDisplayName({
+            playerId: candidate.member,
+            preference: profileMap.get(candidate.member)?.leaderboardIdentity,
+            redditUsername: profileMap.get(candidate.member)?.redditUsername,
+        });
+        if (
+            selection.kind === 'row'
+            && (
+                displayName !== selection.displayName
+                || entry.bestTimeMs !== selection.bestTimeMs
+                || entry.updatedAt !== selection.updatedAt
+            )
+        ) {
+            return { status: 409, body: { error: 'Leaderboard row changed. Refresh and choose again.', reason: 'selection_changed' } };
+        }
+        const record = await getPlayerTrackPbRecord({
+            playerId: candidate.member,
+            challenge,
+            track: TRACKS[challenge.trackKey],
+        });
+        if (!isCompleteOpponentRecord(entry, record, challenge)) {
+            if (selection.kind === 'row') {
+                return { status: 409, body: { error: 'That opponent ghost is unavailable.', reason: 'ghost_unavailable' } };
+            }
+            continue;
+        }
+        return {
+            status: 200,
+            body: {
+                mode: 'daily',
+                race: challenge,
+                target: {
+                    rank: candidate.rank,
+                    displayName,
+                    bestTimeMs: entry.bestTimeMs,
+                    checkpointTimesSec: record!.checkpointTimesSec,
+                    lapCompletionTimesSec: record!.lapCompletionTimesSec,
+                    updatedAt: entry.updatedAt,
+                    ghost: record!.ghost,
+                },
+            },
+        };
+    }
+    return { status: 404, body: { error: 'No faster opponent ghost is available.', reason: 'no_faster_opponent' } };
 }
 
 export async function submitServerDailyGpRun({
@@ -1709,7 +1924,9 @@ export async function submitServerDailyGpRun({
                 track,
                 bestTimeMs: nextBestTimeMs,
                 checkpointTimesSec: normalizedCheckpointTimesSec,
+                lapCompletionTimesSec: strictReplayOutcome.run.lapCompletionTimesSec,
                 ghost: strictReplayOutcome.run.ghost ?? null,
+                updatedAt: nextEntry.updatedAt,
                 retainedPersonalBest,
             }),
         ]);

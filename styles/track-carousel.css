@@ -1,0 +1,375 @@
+/* Lobby track carousel — shared by Daily and Campaign.
+ *
+ * The cards are the tracks sheet's hero rows — colour, type, radius, medal and
+ * shadow all come from `.daily-playlist-entry--hero`. Everything here is the
+ * rail that scrolls them and the stacked layout the taller lobby card wants.
+ */
+
+/* The rail runs edge to edge, so in these modes the shell stops being the width
+   limit and hands that job to its children — otherwise the shell clips the
+   slivers. The shell width is stated once, here, because both the header column
+   and the card width below are derived from it. */
+body[data-lobby-mode="daily"],
+body[data-lobby-mode="campaign"] {
+    --track-shell-width: min(30rem, calc(100vw - 2rem));
+}
+
+body[data-lobby-mode="daily"] #start-group,
+body[data-lobby-mode="campaign"] #start-group {
+    width: 100vw;
+    max-width: 100vw;
+    padding-inline: 0;
+    /* A reserved gutter would shrink the shell out from under the maths below. */
+    scrollbar-gutter: auto;
+}
+
+body[data-lobby-mode="daily"] .lobby-header,
+body[data-lobby-mode="daily"] .lobby-panes,
+body[data-lobby-mode="campaign"] .lobby-header,
+body[data-lobby-mode="campaign"] .lobby-panes {
+    width: var(--track-shell-width);
+    margin-inline: auto;
+}
+
+/* These panes are pickers, not menus: they claim the room above the actions
+   instead of hugging the bottom like the other panes. */
+#lobby-daily-pane.lobby-pane,
+#lobby-campaign-pane.lobby-pane {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 0;
+    margin-top: 0;
+}
+
+.track-carousel {
+    /* Matches .lobby-primary-row: 95% of the pane, which is the shell less the
+       menu's padding. Derived, so the card cannot drift wider than the buttons. */
+    --track-card-width: calc(0.95 * (var(--track-shell-width) - 0.8rem));
+    position: relative;
+    /* Wider than the shell column it sits in, so the neighbouring days run off
+       the real screen edges. The menu aligns its children right, so this has to
+       centre itself to overflow evenly on both sides. */
+    align-self: center;
+    width: min(100vw, 44rem);
+    /* Takes the room the pane has and shrinks into whatever is left on a short
+       screen; the actions stay pinned where every other pane puts them. */
+    flex: 0 1 auto;
+    height: 32rem;
+    min-height: 15rem;
+    margin-block: auto 1rem;
+}
+
+.track-carousel__viewport {
+    display: flex;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    /* #game-container turns off touch gestures for steering; the rail needs
+       horizontal panning back or a swipe does nothing on touch. */
+    touch-action: pan-x;
+}
+
+.track-carousel__viewport::-webkit-scrollbar {
+    display: none;
+}
+
+.track-carousel__rail {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    box-sizing: border-box;
+    gap: 0.5rem;
+    /* JS replaces the fallback with measured pixels once the pane is visible.
+       Embedded WebViews disagree on percentage padding inside intrinsic flex
+       rails; explicit edge space lets the first and last cards truly centre. */
+    padding-inline: var(
+        --track-carousel-edge-space,
+        calc((min(100vw, 44rem) - var(--track-card-width)) / 2)
+    );
+    padding-block: 0.2rem;
+}
+
+/* The sheet lays a track out as a wide row; the lobby has height and not much
+   width, so the same parts stack instead. */
+.track-carousel .daily-playlist-entry--hero {
+    flex: 0 0 var(--track-card-width);
+    flex-direction: column;
+    min-height: 0;
+    scroll-snap-align: center;
+    /* The sheet's card shadow overlaps through the narrow rail gaps and is
+       clipped by the viewport into one translucent rail-sized slab. */
+    box-shadow: none;
+    opacity: 0.4;
+    transition: opacity 0.18s ease-out, border-color 0.18s ease-out;
+}
+
+.track-carousel .daily-playlist-entry--hero.is-carousel-selected {
+    opacity: 1;
+    cursor: default;
+}
+
+/* The sheet's rows lift on hover; a peeking card is scenery, not a target. */
+.track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected):hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.track-carousel .daily-playlist-entry--hero.is-carousel-selected:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* The top of the card: the track on the left, the medal ladder down the right.
+   `width`/`height` are restated because the narrow-screen sheet rules pin them. */
+.track-carousel .daily-playlist-hero-preview {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: stretch;
+    gap: 0.5rem;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 6.5rem;
+    padding: 0.5rem 0.6rem 0.5rem 0;
+}
+
+.track-carousel .daily-playlist-hero-preview canvas {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.track-carousel .daily-playlist-hero-content {
+    flex: 0 0 auto;
+    align-items: flex-end;
+    padding: 0.85rem 1rem 0.95rem;
+}
+
+.track-carousel .daily-playlist-hero-info {
+    align-items: flex-start;
+    gap: 0.3rem;
+}
+
+/* Bronze at the top through author: the ladder, and how far up it you are. */
+.track-carousel .daily-playlist-hero-medal {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: auto;
+    height: auto;
+}
+
+.track-carousel__medal {
+    width: 1.7rem;
+    height: 1.7rem;
+    opacity: 0.4;
+}
+
+.track-carousel__medal.is-earned {
+    opacity: 1;
+}
+
+/* The lobby speaks in caps — the title is the one part of the sheet's card that
+   does not, and it reads as a stray next to TODAY / 3 LAPS / START RACE. */
+.track-carousel .daily-playlist-hero-title {
+    text-transform: uppercase;
+}
+
+.track-carousel__meta {
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Bottom-right of the details row: the rank, labelled by its own eyebrow. */
+.track-carousel__rank {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.track-carousel__rank:disabled {
+    cursor: default;
+}
+
+.track-carousel__rank-label {
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.track-carousel__rank-value {
+    color: var(--text-color);
+    font-family: var(--mono-font);
+    font-size: 1.15rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+}
+
+.track-carousel__rank:hover:not(:disabled) .track-carousel__rank-value {
+    color: var(--accent-bright);
+}
+
+/* Loading or never raced: the value is a word, not a number, so it steps down. */
+.track-carousel__rank.is-muted .track-carousel__rank-value {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* A locked stage still shows its track and its gate — it just cannot be raced,
+   and the art steps back so the card reads as out of reach. */
+.track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-preview {
+    opacity: 0.35;
+}
+
+.track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-title {
+    color: var(--text-dim);
+}
+
+.track-carousel__nav {
+    position: absolute;
+    /* Centred with auto margins rather than a transform: the global
+       `button:active { transform: none }` would drop the button out from under
+       the pointer on press, so the click never lands. */
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-block: auto;
+    padding: 0;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-full);
+    background: rgba(15, 23, 42, 0.82);
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.track-carousel__nav svg {
+    width: 0.6rem;
+    height: 1rem;
+    fill: currentColor;
+}
+
+.track-carousel__nav--prev {
+    left: 0.3rem;
+}
+
+.track-carousel__nav--next {
+    right: 0.3rem;
+}
+
+.track-carousel__nav:hover:not(:disabled) {
+    border-color: var(--border-strong);
+}
+
+.track-carousel__nav:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
+.track-carousel__status {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+@media (max-width: 430px) {
+    .track-carousel__medal {
+        width: 1.45rem;
+        height: 1.45rem;
+    }
+}
+
+/* Last resort. Below this the card cannot hold the art and the text both, and
+   the day, name and rank are the parts a player cannot do without. */
+@media (max-height: 480px) {
+    .track-carousel {
+        /* Sized by content: it must neither stretch (overflows the shell) nor
+           shrink (clips the rank chip). */
+        flex: 0 0 auto;
+        height: auto;
+        min-height: 0;
+        margin-block: auto 0.75rem;
+    }
+
+    .track-carousel .daily-playlist-hero-preview {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .track-carousel .daily-playlist-entry--hero {
+        transition: none;
+    }
+
+    .track-carousel__viewport {
+        scroll-behavior: auto;
+    }
+}
+
+/* The single number the track still owes — Gold, then Author once it is banked. */
+.track-carousel__chase {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-family: var(--mono-font);
+}
+
+.track-carousel__chase[hidden] {
+    display: none !important;
+}
+
+.track-carousel__chase-label {
+    color: var(--text-dim);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.track-carousel__chase-value {
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.track-carousel__chase[data-tier="gold"] .track-carousel__chase-value {
+    color: #e8b84a;
+}
+
+.track-carousel__chase[data-tier="author"] .track-carousel__chase-value {
+    color: #c4b5fd;
+}
+
+.track-carousel__chase-gap {
+    color: var(--accent-bright);
+    font-size: 0.68rem;
+    font-weight: 700;
+}

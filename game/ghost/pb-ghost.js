@@ -158,33 +158,70 @@ export class PbGhost {
     this.preparedRecord = null;
     this.activeRecord = null;
     this.activeEnabled = false;
+    this.preparedSource = null;
+    this.activeSource = null;
   }
 
   setEnabled(enabled) {
     this.enabled = Boolean(enabled);
-    if (!this.enabled) this.activeEnabled = false;
+    if (!this.enabled && this.activeSource !== 'opponent') {
+      this.activeEnabled = false;
+    }
     return this.enabled;
   }
 
   prepare(record) {
+    if (this.preparedSource === 'opponent') return false;
     this.preparedRecord = normalizePbGhostRecord(record);
+    this.preparedSource = this.preparedRecord ? 'personal-best' : null;
+    return this.preparedRecord !== null;
+  }
+
+  prepareOpponent(record) {
+    this.preparedRecord = normalizePbGhostRecord(record);
+    this.preparedSource = this.preparedRecord ? 'opponent' : null;
     return this.preparedRecord !== null;
   }
 
   beginRun() {
     this.activeRecord = this.preparedRecord;
-    this.activeEnabled = this.enabled && this.activeRecord !== null;
+    this.activeSource = this.preparedSource;
+    this.activeEnabled = this.activeRecord !== null
+      && (this.enabled || this.activeSource === 'opponent');
     return this.activeEnabled;
   }
 
   clearPrepared() {
+    if (this.preparedSource === 'opponent') return false;
     this.preparedRecord = null;
+    this.preparedSource = null;
+    return true;
+  }
+
+  clearOpponent() {
+    const hadOpponent = this.preparedSource === 'opponent'
+      || this.activeSource === 'opponent';
+    if (!hadOpponent) return false;
+    this.preparedRecord = null;
+    this.activeRecord = null;
+    this.preparedSource = null;
+    this.activeSource = null;
+    this.activeEnabled = false;
+    return true;
   }
 
   clearTrack() {
+    // An installed opponent outlives track loads and run resets: only
+    // clearOpponent (via clearRaceComparisonTarget) may drop it.
+    if (this.preparedSource === 'opponent' || this.activeSource === 'opponent') {
+      return false;
+    }
     this.preparedRecord = null;
     this.activeRecord = null;
+    this.preparedSource = null;
+    this.activeSource = null;
     this.activeEnabled = false;
+    return true;
   }
 
   getPose(raceTimeSec) {

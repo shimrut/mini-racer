@@ -294,6 +294,25 @@ export class RaceHud {
     this.updateHudStatsButtonState();
 }
 
+    setComparisonTarget(target) {
+    const finishTimeSec = Number(target?.finishTimeSec);
+    const displayName = typeof target?.displayName === 'string'
+        ? target.displayName.trim()
+        : '';
+    if (!(finishTimeSec > 0) || !displayName) {
+        this.setBestTime(null, { persistToTrackCard: false });
+        return;
+    }
+    this.setHudBestMetric({
+        label: `VS ${displayName}`,
+        value: finishTimeSec.toFixed(2),
+        visible: true,
+    });
+    this.syncBestTimeMedalBadge(null, null);
+    this._hasPersonalBests = false;
+    this.updateHudStatsButtonState();
+}
+
     setHudPersonalBestsOpenAllowed(isAllowed) {
     this._hudPersonalBestsAllowed = Boolean(isAllowed);
     this.updateHudStatsButtonState();

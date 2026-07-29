@@ -17,6 +17,7 @@ import {
     releaseRedisLock,
 } from './redis-lock.js';
 import { encodeRedisCompressedValue } from './redis-compressed-value.js';
+import { normalizeLapCompletionTimesSec } from '../../game/shared/lap-completion-times.js';
 
 export type PlayerTrackPbRecord = {
     schemaVersion: typeof PB_GHOST_SCHEMA_VERSION;
@@ -27,6 +28,7 @@ export type PlayerTrackPbRecord = {
     lapCount: 1 | 2 | 3;
     bestTimeMs: number;
     checkpointTimesSec: number[] | null;
+    lapCompletionTimesSec: number[] | null;
     ghost: PbGhostTrace | null;
     updatedAt: string;
 };
@@ -93,6 +95,11 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
             checkpointTimesSec: Array.isArray(value.checkpointTimesSec)
                 ? value.checkpointTimesSec.map(Number).filter(Number.isFinite)
                 : null,
+            lapCompletionTimesSec: normalizeLapCompletionTimesSec(
+                Number(value.bestTimeMs) / 1000,
+                value.lapCompletionTimesSec,
+                lapCount,
+            ),
             ghost,
             updatedAt: value.updatedAt,
         };
@@ -147,6 +154,7 @@ export async function upsertPlayerTrackPersonalBest({
     track,
     bestTimeMs,
     checkpointTimesSec,
+    lapCompletionTimesSec = null,
     ghost,
     retainedPersonalBest = null,
     updatedAt = new Date().toISOString(),
@@ -156,10 +164,12 @@ export async function upsertPlayerTrackPersonalBest({
     track: Record<string, any>;
     bestTimeMs: number;
     checkpointTimesSec: number[] | null;
+    lapCompletionTimesSec?: number[] | null;
     ghost: PbGhostTrace | null;
     retainedPersonalBest?: {
         bestTimeMs: number;
         checkpointTimesSec: number[] | null;
+        lapCompletionTimesSec?: number[] | null;
         updatedAt: string;
     } | null;
     updatedAt?: string;
@@ -187,6 +197,11 @@ export async function upsertPlayerTrackPersonalBest({
             ...raceIdentity,
             bestTimeMs: Math.round(bestTimeMs),
             checkpointTimesSec,
+            lapCompletionTimesSec: normalizeLapCompletionTimesSec(
+                bestTimeMs / 1000,
+                lapCompletionTimesSec,
+                raceIdentity.lapCount,
+            ),
             ghost,
             updatedAt,
         };
@@ -199,6 +214,11 @@ export async function upsertPlayerTrackPersonalBest({
                 ...raceIdentity,
                 bestTimeMs: Math.round(retainedPersonalBest.bestTimeMs),
                 checkpointTimesSec: retainedPersonalBest.checkpointTimesSec,
+                lapCompletionTimesSec: normalizeLapCompletionTimesSec(
+                    retainedPersonalBest.bestTimeMs / 1000,
+                    retainedPersonalBest.lapCompletionTimesSec,
+                    raceIdentity.lapCount,
+                ),
                 ghost: null,
                 updatedAt: retainedPersonalBest.updatedAt,
             } satisfies PlayerTrackPbRecord

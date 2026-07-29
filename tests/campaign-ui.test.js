@@ -47,6 +47,7 @@ import {
 } from '../game/campaign/engine-methods.js';
 import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 import { LobbyUi } from '../game/lobby/ui.js';
+import { GarageUi } from '../game/settings/garage-ui.js';
 
 function createClassList() {
     const values = new Set();
@@ -104,6 +105,26 @@ function createElement(tagName = 'div') {
     return element;
 }
 
+function campaignDocument(list) {
+    return {
+        getElementById: (id) => (id === 'daily-playlist-list' ? list : null),
+        createElement,
+        createElementNS: (_namespace, tagName) => createElement(tagName),
+    };
+}
+
+function findByClass(parent, className) {
+    return parent?.children?.find((child) => String(child.className).split(' ').includes(className));
+}
+
+function textOf(parent, className) {
+    return findByClass(parent, className)?.textContent;
+}
+
+function heroBody(board) {
+    return findByClass(findByClass(board, 'campaign-hero'), 'campaign-hero__body');
+}
+
 function campaignState() {
     return {
         progressLabel: '1 / 3 Gold',
@@ -112,36 +133,49 @@ function campaignState() {
         stages: [
             {
                 id: 'numbered-v1-00',
+                index: 0,
                 numberLabel: '00',
                 trackName: 'Number Zero',
                 laps: 1,
                 unlocked: true,
                 bestTimeLabel: '0:06.200',
                 medal: 'Gold',
+                needsAuthor: true,
+                authorTargetLabel: '0:06.100',
+                authorGapLabel: '+0.100',
             },
             {
                 id: 'numbered-v1-01',
+                index: 1,
                 numberLabel: '01',
                 trackName: 'Number One',
                 laps: 1,
                 unlocked: true,
-                bestTimeLabel: 'No time',
-                medal: null,
+                bestTimeLabel: '0:09.800',
+                medal: 'Silver',
+                isNext: true,
+                needsGold: true,
+                goldTargetLabel: '0:09.520',
+                goldGapLabel: '+0.280',
             },
             {
                 id: 'numbered-v1-02',
+                index: 2,
                 numberLabel: '02',
                 trackName: 'Number Two',
                 laps: 1,
                 unlocked: false,
                 bestTimeLabel: 'No time',
                 medal: null,
+                unlock: { type: 'medal_on_race', raceId: 'numbered-v1-01', minimumMedal: 'gold' },
+                unlockRequirementLabel: 'Gold on Number One to unlock',
             },
         ],
     };
 }
 
 afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     campaignServiceMocks.getCampaignBootstrap.mockReset();
     campaignServiceMocks.getCampaignChallenge.mockReset();
@@ -369,6 +403,98 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.processVerificationQueue).toHaveBeenCalled();
     });
 
+    it.each([
+        ['equal', 8],
+        ['slower', 8.25],
+    ])('does not verify an %s Campaign finish', (_case, finalTime) => {
+        const configureLeaderboardOpponentFinish = vi.fn();
+        const context = createCampaignFinishContext({
+            campaignBootstrap: {
+                signedIn: true,
+                progress: {
+                    resultsByRaceId: {
+                        'numbered-v1-00': {
+                            raceId: 'numbered-v1-00',
+                            bestTimeMs: 8000,
+                            medal: 'gold',
+                        },
+                    },
+                },
+                standingsByRaceId: {
+                    'numbered-v1-00': {
+                        rank: 12,
+                        totalCount: 84,
+                    },
+                },
+            },
+            configureLeaderboardOpponentFinish,
+        });
+
+        context.handleCampaignWin({ lapTime: finalTime });
+
+        expect(context.scoreboardReplay.getPayload).not.toHaveBeenCalled();
+        expect(context.processVerificationQueue).not.toHaveBeenCalled();
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                lapTime: finalTime,
+                scoreboardSnapshot: expect.objectContaining({
+                    playerRank: 12,
+                    playerRankLabel: '#12',
+                    totalCount: 84,
+                    currentPlayerRow: expect.objectContaining({
+                        rank: 12,
+                        bestTime: 8,
+                    }),
+                }),
+            }),
+            expect.objectContaining({
+                shareRequest: {
+                    kind: 'campaign-challenge',
+                    source: 'campaign',
+                    raceId: 'numbered-v1-00',
+                },
+            }),
+        );
+        expect(configureLeaderboardOpponentFinish).toHaveBeenCalledWith(
+            expect.objectContaining({ waitForVerification: false }),
+        );
+    });
+
+    it('still verifies a strictly faster Campaign finish', () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: {
+                signedIn: true,
+                progress: {
+                    resultsByRaceId: {
+                        'numbered-v1-00': {
+                            raceId: 'numbered-v1-00',
+                            bestTimeMs: 8000,
+                            medal: 'gold',
+                        },
+                    },
+                },
+            },
+        });
+
+        context.handleCampaignWin({ lapTime: 7.999 });
+
+        expect(context.scoreboardReplay.getPayload).toHaveBeenCalledWith(1);
+        expect(context.processVerificationQueue).toHaveBeenCalledTimes(1);
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                lapTime: 7.999,
+                scoreboardSnapshot: expect.objectContaining({
+                    submissionStage: 'submitting',
+                }),
+            }),
+            expect.anything(),
+        );
+    });
+
     it('sends the finish rank tap to Campaign standings, not the Daily leaderboard', () => {
         const context = createCampaignFinishContext({
             openCampaignStandings: vi.fn(),
@@ -452,6 +578,116 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(context.modal.modalMsg.textContent).toBe('Run too long to rank.');
         expect(context.processVerificationQueue).not.toHaveBeenCalled();
+    });
+
+    it('hands the finish sheet the medal this stage had banked before the run', () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: {
+                signedIn: true,
+                progress: {
+                    resultsByRaceId: {
+                        'numbered-v1-00': { raceId: 'numbered-v1-00', bestTimeMs: 8000, medal: 'silver' },
+                    },
+                },
+            },
+        });
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({ previousTrackMedal: 'silver' }),
+            expect.anything(),
+        );
+    });
+
+    it('reads the guest stage medal before this finish is merged into progress', () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: {
+                signedIn: false,
+                progress: {
+                    resultsByRaceId: {
+                        'numbered-v1-00': { raceId: 'numbered-v1-00', bestTimeMs: 8300, medal: 'bronze' },
+                    },
+                },
+            },
+        });
+        // The guest path banks the finish before opening the sheet, so a late
+        // read would hand back this run's own medal and skip its celebration.
+        campaignServiceMocks.saveLocalCampaignFinish.mockReturnValue({
+            resultsByRaceId: {
+                'numbered-v1-00': { raceId: 'numbered-v1-00', bestTimeMs: 8250, medal: 'gold' },
+            },
+        });
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({ previousTrackMedal: 'bronze' }),
+            expect.anything(),
+        );
+    });
+
+    it('leaves the previous medal empty on a stage with nothing banked yet', () => {
+        const context = createCampaignFinishContext();
+
+        context.handleCampaignWin({ lapTime: 8.25 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({ previousTrackMedal: null }),
+            expect.anything(),
+        );
+    });
+
+    it('keeps medal-free Campaign PB pace frozen through finish and late refreshes', () => {
+        const context = createCampaignFinishContext({
+            activeDailyChallenge: { id: 'numbered-v1-00', trackKey: 'numberZero' },
+            getLapCheckpointTimesSec: vi.fn(() => [3.9, 7.8]),
+            getActiveRacePaceBaseline() {
+                return this.activePersonalBestPaceBaseline;
+            },
+        });
+        const stage = context.activeCampaignStage;
+
+        context.applyCampaignPersonalBest(stage, {
+            bestTimeMs: 8_000,
+            medal: null,
+            checkpointTimesSec: [4, 7.9],
+            lapCompletionTimesSec: [8],
+            ghost: null,
+        });
+        context.activePersonalBestPaceBaseline =
+            context.personalBestPaceBaselineByRaceId[stage.raceId];
+
+        // A verification/PB refresh after GO may prepare the next retry, but it
+        // cannot rewrite the comparison already frozen for this run.
+        context.applyCampaignPersonalBest(stage, {
+            bestTimeMs: 7_500,
+            medal: null,
+            checkpointTimesSec: [3.7, 7.4],
+            lapCompletionTimesSec: [7.5],
+            ghost: null,
+        });
+        context.showCampaignFinish(stage, {
+            finalTime: 8.25,
+            medal: null,
+        });
+
+        expect(context.modal.showModal.mock.calls[0][2]).toMatchObject({
+            bestTime: 8,
+            previousPersonalBestSec: 8,
+            deltaToPersonalBest: 0.25,
+            lapCheckpointTimes: [3.9, 7.8],
+            pbCheckpointTimes: [4, 7.9],
+            pbFinishSec: 8,
+        });
+        expect(context.personalBestPaceBaselineByRaceId[stage.raceId].finishTimeSec)
+            .toBe(7.5);
     });
 
     it('still shows the accepted result when PB ghost and lobby refreshes fail', async () => {
@@ -764,36 +1000,38 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(tieShowModal).toHaveBeenCalledTimes(1);
     });
 
-    it('keeps Daily and Campaign actions as mode labels with a bottom primary', () => {
+    it('places Back, a 50% primary, and Garage only across Start Race rows', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
 
-        for (const buttonId of [
-            'lobby-daily-back-btn',
-            'daily-challenge-rank-btn',
-            'daily-challenge-playlist-btn',
-            'lobby-campaign-back-btn',
-            'campaign-standings-btn',
-            'campaign-tracks-btn',
-            'lobby-challenge-back-btn',
-        ]) {
-            const buttonMarkup = html.match(
-                new RegExp(`<button id="${buttonId}"[\\s\\S]*?</button>`),
+        for (const mode of ['daily', 'campaign']) {
+            const backMarkup = html.match(
+                new RegExp(`<button id="lobby-${mode}-back-btn"[\\s\\S]*?</button>`),
             )?.[0];
-            expect(buttonMarkup).toContain('class="lobby-mode-action"');
-            expect(buttonMarkup).toContain('lobby-mode-action__label');
-            expect(buttonMarkup).not.toContain('class="main-menu__icon"');
+            const garageMarkup = html.match(
+                new RegExp(`<button id="lobby-${mode}-garage-btn"[\\s\\S]*?</button>`),
+            )?.[0];
+            expect(backMarkup).toContain('class="lobby-primary-utility"');
+            expect(backMarkup).toContain('data-lobby-back');
+            expect(backMarkup).toContain('aria-label="Back to modes"');
+            expect(garageMarkup).toContain('class="lobby-primary-utility"');
+            expect(garageMarkup).toContain('aria-label="Garage"');
+            expect(garageMarkup).toContain('aria-controls="garage-modal"');
+            expect(garageMarkup).toContain('viewBox="0 0 576 512"');
         }
 
         expect(html).toMatch(
-            /id="daily-challenge-start-btn"[\s\S]*main-menu__item--primary/,
+            /id="lobby-daily-back-btn"[\s\S]*id="daily-challenge-start-btn"[\s\S]*id="lobby-daily-garage-btn"/,
         );
         expect(html).toMatch(
-            /id="campaign-primary-btn"[\s\S]*main-menu__item--primary/,
+            /id="lobby-campaign-back-btn"[\s\S]*id="campaign-primary-btn"[\s\S]*id="lobby-campaign-garage-btn"/,
         );
-        expect(html).toMatch(
-            /id="challenge-accept-btn"[\s\S]*main-menu__label">Accept</,
-        );
+        expect(html).toMatch(/id="challenge-accept-btn"[\s\S]*main-menu__label">Accept</);
+        expect(html).not.toContain('id="lobby-challenge-back-btn"');
+        expect(html).not.toContain('id="lobby-challenge-garage-btn"');
+        const headerBack = html.match(/<button id="lobby-back-btn"[\s\S]*?<\/button>/)?.[0];
+        expect(headerBack).toContain('class="lobby-back-btn"');
+        expect(headerBack).toContain('aria-label="Back to modes"');
         expect(html).not.toContain('Accept Challenge');
         expect(html).not.toMatch(
             /id="lobby-challenge-pane"[\s\S]*lobby-pane-heading__eyebrow/,
@@ -810,18 +1048,43 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).toMatch(
             /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
         );
+        expect(css).toMatch(
+            /\.lobby-primary-row--race\s*\{[^}]*grid-template-columns:\s*2\.75rem\s*50%\s*2\.75rem;[^}]*justify-content:\s*center;[^}]*column-gap:\s*clamp\(0\.85rem,\s*3vw,\s*1\.25rem\);/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-primary-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-primary-utility\s*\{[^}]*width:\s*2\.75rem;[^}]*height:\s*2\.75rem;[^}]*color:\s*#fff;[^}]*background:\s*transparent;[^}]*border:\s*0;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-primary-utility svg\s*\{[^}]*width:\s*clamp\(1\.15rem,\s*4vw,\s*1\.4rem\);/s,
+        );
         expect(css).not.toMatch(
             /\.lobby-primary-row\s*\{[^}]*margin-top:\s*auto;/s,
         );
         expect(css).toMatch(
-            /\.lobby-pane--campaign \.main-menu__item--primary\s*\{[^}]*font-size:\s*clamp\(1\.25rem,\s*5\.5vw,\s*1\.5rem\);/s,
+            /\.lobby-primary-row--race \.main-menu__item--primary\s*\{[^}]*font-size:\s*clamp\(1rem,\s*4\.5vw,\s*1\.25rem\);/s,
         );
         expect(css).not.toContain('width: min(94vw, 60rem)');
+        expect(css).toMatch(
+            /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn 180ms ease-out both;/s,
+        );
+        expect(css).toMatch(
+            /@keyframes lobbyPaneIn\s*\{[\s\S]*opacity:\s*0;[\s\S]*translate3d\(0,\s*0\.5rem,\s*0\);[\s\S]*opacity:\s*1;[\s\S]*translate3d\(0,\s*0,\s*0\);[\s\S]*\}/,
+        );
+        expect(css).toMatch(
+            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.lobby-pane\s*\{[^}]*animation:\s*none;/,
+        );
     });
 
-    it('renders Home Garage and Settings as lobby mode actions', () => {
+    it('preserves the Home menu and adds a separate mode-screen Settings icon', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
+        const lobbyCss = readFileSync(
+            new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
 
         for (const buttonId of [
             'lobby-home-daily-btn',
@@ -838,19 +1101,87 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect(buttonMarkup).not.toContain('class="main-menu__icon"');
         }
 
+        const settingsMarkup = html.match(
+            /<button id="lobby-mode-settings-btn"[\s\S]*?<\/button>/,
+        )?.[0];
+        expect(settingsMarkup).toContain('class="lobby-header-action"');
+        expect(settingsMarkup).toContain('aria-label="Settings"');
+        expect(settingsMarkup).toContain('aria-controls="settings-modal"');
+        expect(settingsMarkup).toContain('viewBox="0 0 512 512"');
+        expect(settingsMarkup).not.toContain('lobby-mode-action__label');
+
         expect(css).toContain('.lobby-mode-action');
         expect(css).not.toContain('.lobby-utility-row');
-        expect(css).not.toContain('.lobby-utility-btn');
         expect(css).not.toContain('lobby-mode-action::after');
+        expect(lobbyCss).toContain('.lobby-header-action');
+        expect(lobbyCss).toMatch(
+            /\.lobby-header-action\s*\{[^}]*display:\s*none;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.lobby-header-action\s*\{[^}]*color:\s*#fff;[^}]*background:\s*transparent;[^}]*border:\s*0;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.lobby-back-btn\s*\{[^}]*color:\s*#fff;[^}]*background:\s*none;[^}]*border:\s*0;/s,
+        );
         expect(css).not.toMatch(
             /\.lobby-mode-action\s*\{[^}]*border-bottom:/s,
         );
     });
 
-    it('places Daily and Campaign labels under the Mini Racer title', () => {
+    it('binds every lobby Garage entry point to the shared Garage modal', () => {
+        const buttons = [
+            createElement('button'),
+            createElement('button'),
+            createElement('button'),
+        ];
+        const togglePanel = vi.fn();
+
+        GarageUi.prototype.bind.call({
+            buildSkinGrid: vi.fn(),
+            buildTrailGrid: vi.fn(),
+            syncSkinSelection: vi.fn(),
+            syncTrailSelection: vi.fn(),
+            setGarageTab: vi.fn(),
+            garageModal: null,
+            garageToggleButtons: buttons,
+            togglePanel,
+            tabSkin: null,
+            tabTrails: null,
+            prefetchCarSpriteAsset: null,
+        });
+
+        for (const button of buttons) {
+            button.listeners.get('click')();
+        }
+        expect(togglePanel).toHaveBeenCalledTimes(buttons.length);
+    });
+
+    it('routes each pane Back icon through the active lobby mode', () => {
+        const originalDocument = global.document;
+        const backButtons = [
+            createElement('button'),
+            createElement('button'),
+        ];
+        global.document = {
+            getElementById: vi.fn(() => null),
+            querySelectorAll: vi.fn(() => backButtons),
+            addEventListener: vi.fn(),
+        };
+        const onBack = vi.fn();
+        const lobby = new LobbyUi({ onBack });
+        lobby.mode = 'campaign';
+
+        lobby.bind();
+        backButtons[1].listeners.get('click')();
+
+        expect(onBack).toHaveBeenCalledWith('campaign');
+        global.document = originalDocument;
+    });
+
+    it('keeps Home unchanged and anchors mode-screen branding left with Settings right', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         expect(html).toMatch(
-            /class="lobby-title"[\s\S]*data-lobby-subhead[\s\S]*data-lobby-mode-label[\s\S]*data-lobby-mode-track/,
+            /class="lobby-title"[\s\S]*id="lobby-mode-settings-btn"[\s\S]*data-lobby-subhead[\s\S]*data-lobby-mode-label[\s\S]*data-lobby-mode-track/,
         );
         expect(html).not.toMatch(
             /id="lobby-daily-pane"[\s\S]*lobby-pane-heading__title">Daily</,
@@ -863,12 +1194,22 @@ describe('Campaign lobby and shared modal adapters', () => {
             new URL('../styles/lobby-and-garage.css', import.meta.url),
             'utf8',
         );
+        const modeCss = readFileSync(
+            new URL('../styles/lobby-modes.css', import.meta.url),
+            'utf8',
+        );
         const responsiveCss = readFileSync(
             new URL('../styles/responsive-layout.css', import.meta.url),
             'utf8',
         );
         expect(lobbyCss).toMatch(
-            /\.lobby-header\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-start;/s,
+            /\.lobby-header\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-start;/s,
+        );
+        expect(modeCss).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/,
+        );
+        expect(modeCss).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-title,[\s\S]*align-items:\s*flex-start;[\s\S]*text-align:\s*left;/,
         );
         expect(lobbyCss).toMatch(
             /\.lobby-subhead\s*\{[^}]*margin-top:\s*0\.45rem;/s,
@@ -911,12 +1252,13 @@ describe('Campaign lobby and shared modal adapters', () => {
         lobby.focus = vi.fn();
         vi.stubGlobal('requestAnimationFrame', (cb) => cb());
 
-        lobby.updateDailyTrackLabel('Desert Sprint');
+        // Daily's track name lives on the carousel card, so the subhead is the
+        // mode name and nothing else.
         lobby.showDaily();
         expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Daily');
-        expect(track.hidden).toBe(false);
-        expect(track.textContent).toBe('Desert Sprint');
+        expect(track.hidden).toBe(true);
+        expect(track.textContent).toBe('');
         expect(body.dataset.lobbyMode).toBe('daily');
 
         lobby.showCampaign();
@@ -952,30 +1294,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
-    it('wires the compact Campaign Standings and Tracks actions', () => {
-        const originalDocument = global.document;
-        const buttons = {
-            'campaign-standings-btn': createElement('button'),
-            'campaign-tracks-btn': createElement('button'),
-        };
-        global.document = {
-            getElementById: (id) => buttons[id] || null,
-            addEventListener: vi.fn(),
-        };
-        const onOpenCampaignStandings = vi.fn();
-        const onOpenCampaignTracks = vi.fn();
-        const lobby = new LobbyUi({ onOpenCampaignStandings, onOpenCampaignTracks });
 
-        lobby.bind();
-        buttons['campaign-standings-btn'].listeners.get('click')();
-        buttons['campaign-tracks-btn'].listeners.get('click')();
-
-        expect(onOpenCampaignStandings).toHaveBeenCalledTimes(1);
-        expect(onOpenCampaignTracks).toHaveBeenCalledTimes(1);
-        global.document = originalDocument;
-    });
-
-    it('keeps a Complete primary that opens Tracks once every stage is Gold', () => {
+    it('races whichever stage the carousel has centred', () => {
         const originalDocument = global.document;
         const label = createElement('span');
         label.className = 'main-menu__label';
@@ -990,48 +1310,36 @@ describe('Campaign lobby and shared modal adapters', () => {
         const originalRequestAnimationFrame = global.requestAnimationFrame;
         global.requestAnimationFrame = vi.fn();
         const onStartCampaign = vi.fn();
-        const onOpenCampaignTracks = vi.fn();
-        const lobby = new LobbyUi({ onStartCampaign, onOpenCampaignTracks });
+        const lobby = new LobbyUi({ onStartCampaign });
 
         lobby.bind();
         lobby.showCampaign({
             stages: [
-                { id: 'numbered-v1-00', unlocked: true, medal: 'Gold' },
-                { id: 'numbered-v1-01', unlocked: true, medal: 'Author' },
+                { id: 'numbered-v1-00', unlocked: true, medal: null },
+                { id: 'numbered-v1-01', unlocked: true, medal: null },
+                { id: 'numbered-v1-02', unlocked: false, medal: null },
             ],
         });
 
-        expect(primary.hidden).toBe(false);
+        // Every unlocked stage reads the same: the button races what is centred.
+        lobby.setCampaignSelectedStage({ id: 'numbered-v1-00', unlocked: true });
+        expect(label.textContent).toBe('Start Race');
         expect(primary.disabled).toBe(false);
-        expect(label.textContent).toBe('Complete');
 
+        lobby.setCampaignSelectedStage({ id: 'numbered-v1-01', unlocked: true });
+        expect(label.textContent).toBe('Start Race');
+        expect(primary.disabled).toBe(false);
+
+        // A locked stage cannot be started.
+        lobby.setCampaignSelectedStage({ id: 'numbered-v1-02', unlocked: false });
+        expect(label.textContent).toBe('Locked');
+        expect(primary.disabled).toBe(true);
+
+        lobby.setCampaignSelectedStage({ id: 'numbered-v1-01', unlocked: true });
         primary.listeners.get('click')();
-        expect(onOpenCampaignTracks).toHaveBeenCalledTimes(1);
-        expect(onStartCampaign).not.toHaveBeenCalled();
+        expect(onStartCampaign).toHaveBeenCalledTimes(1);
+
         global.requestAnimationFrame = originalRequestAnimationFrame;
-        global.document = originalDocument;
-    });
-
-    it('renders Campaign progress inside the existing Tracks list', () => {
-        const originalDocument = global.document;
-        const list = createElement();
-        global.document = {
-            getElementById: (id) => id === 'daily-playlist-list' ? list : null,
-            createElement,
-        };
-        const onPlay = vi.fn();
-        const ui = new DailyChallengeUi();
-        vi.spyOn(ui, 'closePlaylistModal').mockImplementation(() => {});
-
-        ui.renderCampaignProgress(campaignState(), { onPlay });
-
-        expect(list.classList.contains('daily-playlist-list--campaign')).toBe(true);
-        expect(list.children).toHaveLength(3);
-        expect(list.children[0].dataset.stageId).toBe('numbered-v1-00');
-        expect(list.children[2].disabled).toBe(true);
-        list.children[1].listeners.get('click')();
-        expect(ui.closePlaylistModal).toHaveBeenCalledTimes(1);
-        expect(onPlay).toHaveBeenCalledWith(expect.objectContaining({ id: 'numbered-v1-01' }));
         global.document = originalDocument;
     });
 
@@ -1301,6 +1609,11 @@ describe('Campaign lobby and shared modal adapters', () => {
     });
 
     it('paints the Campaign lobby before bootstrap resolves', async () => {
+        const frameCallbacks = [];
+        vi.stubGlobal('requestAnimationFrame', vi.fn((callback) => {
+            frameCallbacks.push(callback);
+            return frameCallbacks.length;
+        }));
         let resolveBootstrap;
         campaignServiceMocks.getCampaignBootstrap.mockReturnValue(new Promise((resolve) => {
             resolveBootstrap = resolve;
@@ -1326,6 +1639,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             reset: vi.fn(),
             applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
             paintCampaignLobby: campaignEngineMethods.paintCampaignLobby,
+            paintCampaignCarousel: vi.fn(),
             ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
             showCampaignLobby: campaignEngineMethods.showCampaignLobby,
         };
@@ -1336,9 +1650,15 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.activeRaceMode).toBe('campaign');
         expect(context._campaignBootstrapReady).toBe(false);
         expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(1);
+        expect(context.paintCampaignCarousel).not.toHaveBeenCalled();
         // The provisional paint must not name a primary action it cannot know.
         expect(lobbyUi.showCampaign.mock.calls[0][0].primaryLabel).toBeNull();
         expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenLastCalledWith(true);
+
+        frameCallbacks.shift()(0);
+        expect(context.paintCampaignCarousel).not.toHaveBeenCalled();
+        frameCallbacks.shift()(16);
+        expect(context.paintCampaignCarousel).toHaveBeenCalledTimes(1);
 
         resolveBootstrap({
             campaignId: 'numbered-v1',
@@ -1377,7 +1697,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context._campaignBootstrapReady).toBe(true);
         expect(context.campaignBootstrap.signedIn).toBe(true);
         expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(2);
-        expect(lobbyUi.showCampaign.mock.calls[1][0].primaryLabel).toBe('Continue Campaign');
+        expect(lobbyUi.showCampaign.mock.calls[1][0].primaryLabel).toBe('Start Race');
         expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenLastCalledWith(false);
     });
 
@@ -1468,6 +1788,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             startSequence: vi.fn(),
             loadCampaignLobby: vi.fn(),
             applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
+            paintCampaignCarousel: vi.fn(),
             ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
             confirmCampaignRaceStart: campaignEngineMethods.confirmCampaignRaceStart,
             applyCampaignPersonalBest: campaignEngineMethods.applyCampaignPersonalBest,
@@ -1642,6 +1963,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             reset: vi.fn(),
             applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
             paintCampaignLobby: campaignEngineMethods.paintCampaignLobby,
+            paintCampaignCarousel: vi.fn(),
             ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
             showCampaignLobby: campaignEngineMethods.showCampaignLobby,
         };

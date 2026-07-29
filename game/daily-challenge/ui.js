@@ -30,14 +30,6 @@ function scheduleAfterModalPaint(callback) {
     });
 }
 
-function appendCampaignStageText(parent, className, value) {
-    const span = document.createElement('span');
-    span.className = className;
-    span.textContent = value;
-    parent.appendChild(span);
-    return span;
-}
-
 export class DailyChallengeUi {
     constructor({
         previewQualityLevel = 0,
@@ -60,8 +52,6 @@ export class DailyChallengeUi {
     get dailyChallengeModifiers() { return document.getElementById('daily-challenge-modifiers'); }
     get dailyChallengeBestLabel() { return document.getElementById('daily-challenge-best-label'); }
     get dailyChallengeBest() { return document.getElementById('daily-challenge-best'); }
-    get dailyChallengeRankBtn() { return document.getElementById('daily-challenge-rank-btn'); }
-    get dailyChallengeRankStatus() { return document.getElementById('daily-challenge-rank-status'); }
     get dailyChallengeReset() { return document.getElementById('daily-challenge-reset'); }
     get dailyChallengeStartBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get dailyChallengePlaylistModal() { return document.getElementById('daily-playlist-modal'); }
@@ -75,14 +65,7 @@ export class DailyChallengeUi {
 
     focus() {
         const start = this.dailyChallengeStartBtn;
-        if (start && !start.disabled) {
-            start.focus();
-            return;
-        }
-        const rank = this.dailyChallengeRankBtn;
-        if (rank && !rank.disabled) {
-            rank.focus();
-        }
+        if (start && !start.disabled) start.focus();
     }
     setDailyChallengeSummary(summary) {
         if (!summary || typeof summary !== 'object') {
@@ -168,27 +151,6 @@ export class DailyChallengeUi {
         if (this.dailyChallengeCarImage) {
             setCarAssetImageWithFallbacks(this.dailyChallengeCarImage, STOCK_CAR_ASSET_NAME);
         }
-        if (this.dailyChallengeRankBtn) {
-            this.dailyChallengeRankBtn.disabled = false;
-            delete this.dailyChallengeRankBtn.dataset.rank;
-            this.dailyChallengeRankBtn.setAttribute(
-                'aria-label',
-                'Open standings for all tracks.'
-            );
-            this.dailyChallengeRankBtn.classList.toggle(
-                'main-menu__item--status-error',
-                this._dailyChallengeSummary?.scoreboardSnapshot?.verificationState === 'error'
-                    || this._dailyChallengeSummary?.scoreboardSnapshot?.verificationState === 'rejected'
-            );
-            if (this.dailyChallengeRankStatus) {
-                this.dailyChallengeRankStatus.textContent = '';
-                this.dailyChallengeRankStatus.hidden = true;
-                this.dailyChallengeRankStatus.classList.remove(
-                    'main-menu__detail--loading',
-                    'main-menu__detail--error'
-                );
-            }
-        }
         if (this.dailyChallengeStartBtn) {
             this.dailyChallengeStartBtn.disabled = !hasChallenge || Boolean(this._dailyChallengeSummary?.loading);
         }
@@ -259,18 +221,6 @@ export class DailyChallengeUi {
         this.openTracksModal();
     }
 
-    openCampaignProgressModal(campaignState, actions = null) {
-        const modal = this.dailyChallengePlaylistModal;
-        if (!modal) return;
-        configureReusableModal(modal, {
-            title: 'Tracks',
-            subtitle: campaignState?.progressLabel || '',
-            closeLabel: 'Back',
-        });
-        this.renderCampaignProgress(campaignState, actions);
-        this.openTracksModal();
-    }
-
     openTracksModal() {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
@@ -312,7 +262,6 @@ export class DailyChallengeUi {
     renderPlaylist(challenges = [], actions = null) {
         const list = this.dailyChallengePlaylistList;
         if (!list) return;
-        list.classList.remove('daily-playlist-list--campaign');
         list.replaceChildren();
         const onPlay = typeof actions === 'function'
             ? actions
@@ -403,70 +352,6 @@ export class DailyChallengeUi {
             content.append(info, medal);
             row.append(preview, content);
 
-            list.appendChild(row);
-        }
-    }
-
-    renderCampaignProgress(campaignState = {}, actions = null) {
-        const list = this.dailyChallengePlaylistList;
-        if (!list) return;
-        list.classList.add('daily-playlist-list--campaign');
-        list.replaceChildren();
-
-        const stages = Array.isArray(campaignState?.stages) ? campaignState.stages : [];
-        const onPlay = typeof actions === 'function' ? actions : actions?.onPlay;
-
-        if (!stages.length) {
-            const empty = document.createElement('div');
-            empty.className = 'daily-playlist-empty';
-            empty.textContent = 'No campaign tracks available';
-            list.appendChild(empty);
-            return;
-        }
-
-        if (campaignState.complete) {
-            const complete = document.createElement('p');
-            complete.className = 'campaign-progress-complete';
-            complete.textContent = 'Campaign Complete';
-            list.appendChild(complete);
-        }
-
-        for (const stage of stages) {
-            const row = document.createElement('button');
-            row.type = 'button';
-            row.className = `daily-playlist-entry--hero campaign-progress-entry${stage.unlocked ? '' : ' is-locked'}`;
-            row.dataset.stageId = stage.id;
-            row.disabled = !stage.unlocked;
-            row.setAttribute(
-                'aria-label',
-                `${stage.trackName}, ${stage.laps} ${stage.laps === 1 ? 'lap' : 'laps'}, ${stage.unlocked ? stage.bestTimeLabel : 'locked'}`,
-            );
-            row.addEventListener('click', () => {
-                if (!stage.unlocked) return;
-                this.closePlaylistModal();
-                onPlay?.(stage);
-            });
-
-            appendCampaignStageText(row, 'campaign-stage__number', stage.numberLabel);
-            appendCampaignStageText(row, 'campaign-stage__name', stage.trackName);
-            appendCampaignStageText(
-                row,
-                'campaign-stage__laps',
-                `${stage.laps} ${stage.laps === 1 ? 'lap' : 'laps'}`,
-            );
-            appendCampaignStageText(
-                row,
-                'campaign-stage__best',
-                stage.unlocked ? stage.bestTimeLabel : 'Locked',
-            );
-            if (stage.medal) {
-                const safeMedalClass = stage.medal.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                appendCampaignStageText(
-                    row,
-                    `campaign-stage__medal campaign-stage__medal--${safeMedalClass}`,
-                    stage.medal,
-                );
-            }
             list.appendChild(row);
         }
     }

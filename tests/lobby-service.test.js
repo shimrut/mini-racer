@@ -32,7 +32,92 @@ describe('lobby service', () => {
         });
     });
 
-    it('selects Continue and the first unlocked stage without Gold', () => {
+    it('turns a stage short of Gold into the time it still needs', () => {
+        // numberFive: gold 15.28s a lap, so a two-lap stage wants 0:30.560.
+        const stage = normalizeCampaignStage({
+            trackKey: 'numberFive',
+            laps: 2,
+            unlocked: true,
+            bestTimeMs: 30831,
+            medal: 'Silver',
+        }, 5);
+
+        expect(stage.goldTargetMs).toBe(30560);
+        expect(stage.goldTargetLabel).toBe('0:30.560');
+        expect(stage.needsGold).toBe(true);
+        expect(stage.goldGapLabel).toBe('+0.271');
+    });
+
+    it('drops the Gold goal once the stage is cleared, locked, or untimed', () => {
+        const cleared = normalizeCampaignStage({
+            trackKey: 'numberFive', laps: 2, unlocked: true, bestTimeMs: 30100, medal: 'Gold',
+        }, 5);
+        const author = normalizeCampaignStage({
+            trackKey: 'numberZero', laps: 1, unlocked: true, bestTimeMs: 6879, medal: 'Author',
+        }, 0);
+        const locked = normalizeCampaignStage({
+            trackKey: 'numberSix', laps: 3, unlocked: false,
+        }, 6);
+        const untimed = normalizeCampaignStage({
+            trackKey: 'numberOne', laps: 1, unlocked: true,
+        }, 1);
+
+        expect(cleared.needsGold).toBe(false);
+        expect(author.needsGold).toBe(false);
+        expect(locked.needsGold).toBe(false);
+        // No run yet: the target still stands, there is just no gap to quote.
+        expect(untimed.needsGold).toBe(true);
+        expect(untimed.goldTargetLabel).toBe('0:09.520');
+        expect(untimed.goldGapLabel).toBeNull();
+
+        // Gold banked is not the end of the stage: Author becomes the target.
+        expect(cleared).toMatchObject({
+            needsAuthor: true,
+            authorTargetLabel: '0:30.100',
+            authorGapLabel: null,
+        });
+        // Author earned, and locked stages, have nothing left to chase.
+        expect(author.needsAuthor).toBe(false);
+        expect(locked.needsAuthor).toBe(false);
+    });
+
+    it('names the stage a locked row is waiting on', () => {
+        const state = normalizeCampaignLobbyState({
+            stages: [
+                { id: 'a', trackName: 'Number Five', unlocked: true, medal: 'Silver' },
+                {
+                    id: 'b',
+                    trackName: 'Number Six',
+                    unlocked: false,
+                    unlock: { type: 'medal_on_race', raceId: 'a', minimumMedal: 'gold' },
+                },
+                { id: 'c', trackName: 'Number Seven', unlocked: false },
+            ],
+        });
+
+        expect(state.stages[0].unlockRequirementLabel).toBeNull();
+        expect(state.stages[1].unlockRequirementLabel).toBe('Gold on Number Five to unlock');
+        // No unlock metadata: the stage above it is still the honest answer.
+        expect(state.stages[2].unlockRequirementLabel).toBe('Gold on Number Six to unlock');
+    });
+
+    it('flags exactly one stage as the one to race next', () => {
+        const state = normalizeCampaignLobbyState({
+            stages: [
+                { id: 'zero', unlocked: true, medal: 'Gold' },
+                { id: 'one', unlocked: true, medal: 'Silver' },
+                { id: 'two', unlocked: false },
+            ],
+        });
+
+        expect(state.stages.filter((stage) => stage.isNext)).toHaveLength(1);
+        expect(state.stages[1].isNext).toBe(true);
+        expect(state.nextStage.id).toBe('one');
+        // Re-normalizing a painted state must not leave two stages claiming it.
+        expect(normalizeCampaignLobbyState(state).stages.filter((s) => s.isNext)).toHaveLength(1);
+    });
+
+    it('selects the first unlocked stage without Gold', () => {
         const state = normalizeCampaignLobbyState({
             stages: [
                 { id: 'zero', unlocked: true, bestTimeMs: 24000, medal: 'Gold' },
@@ -42,18 +127,18 @@ describe('lobby service', () => {
         });
 
         expect(state.complete).toBe(false);
-        expect(state.primaryLabel).toBe('Continue Campaign');
+        expect(state.primaryLabel).toBe('Start Race');
         expect(state.nextStage.id).toBe('one');
         expect(state.progressLabel).toBe('1 / 3 Gold');
     });
 
-    it('withholds the campaign CTA until the progress it names is known', () => {
+    it('withholds the campaign CTA until the unlock state it reports is known', () => {
         const pending = normalizeCampaignLobbyState({
             resolved: false,
             stages: [{ id: 'zero', unlocked: true }],
         });
 
-        // Guessing here is what made the button flash Start before Continue.
+        // Guessing here is what made the button flash before the real state.
         expect(pending.resolved).toBe(false);
         expect(pending.primaryLabel).toBeNull();
         expect(pending.nextStage.id).toBe('zero');
@@ -62,10 +147,10 @@ describe('lobby service', () => {
             stages: [{ id: 'zero', unlocked: true }],
         });
         expect(resolved.resolved).toBe(true);
-        expect(resolved.primaryLabel).toBe('Start Campaign');
+        expect(resolved.primaryLabel).toBe('Start Race');
     });
 
-    it('turns the campaign CTA into Complete once every stage is Gold or Author', () => {
+    it('keeps the campaign CTA on Start Race once every stage is Gold or Author', () => {
         const state = normalizeCampaignLobbyState({
             stages: [
                 { unlocked: true, medal: 'Gold' },
@@ -74,10 +159,14 @@ describe('lobby service', () => {
         });
 
         expect(state.complete).toBe(true);
-        expect(state.primaryLabel).toBe('Complete');
+        // A finished campaign is asking for nothing, so no stage may claim to be
+        // the live one — that is what made Stage 00 look re-activated.
+        expect(state.nextStage).toBeNull();
+        expect(state.stages.some((stage) => stage.isNext)).toBe(false);
+        // Finishing the campaign does not stop any of its stages being raceable.
+        expect(state.primaryLabel).toBe('Start Race');
         expect(state.progressLabel).toBe('2 / 2 Gold');
-        // Re-normalizing a painted state must not drift the label back.
-        expect(normalizeCampaignLobbyState(state).primaryLabel).toBe('Complete');
+        expect(normalizeCampaignLobbyState(state).primaryLabel).toBe('Start Race');
     });
 
     it('blocks guests from accepting a player challenge', () => {

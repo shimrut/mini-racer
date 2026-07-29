@@ -53,6 +53,7 @@ import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 import { registerPodiumRoutes } from './routes/podium-routes.js';
 import { registerCampaignRoutes } from './routes/campaign-routes.js';
 import { registerCampaignChallengeRoutes } from './routes/campaign-challenge-routes.js';
+import { registerLeaderboardRaceRoutes } from './routes/leaderboard-race-routes.js';
 import {
     getServerCampaignBootstrap,
     getServerCampaignPbGhost,
@@ -70,6 +71,7 @@ import {
     validateCampaignChallengeReplay,
 } from './campaign-challenge-runtime.js';
 import { resolveLegacyDailyGpPodiumAvatars } from './daily-podium-avatar-backfill.js';
+import { prepareServerLeaderboardRace } from './leaderboard-race-service.js';
 
 const campaignChallengeService = createCampaignChallengeService({
     resolveSource: resolveCampaignChallengeSource,
@@ -115,6 +117,11 @@ function registerProductionRoutes(app: express.Application): void {
         submitCampaignChallenge: campaignChallengeService.submit,
         previewCampaignChallengeBrag,
         confirmCampaignChallengeBrag,
+    });
+    registerLeaderboardRaceRoutes(app, {
+        getRequestUsername,
+        getRequestRateLimitIdentity,
+        prepareServerLeaderboardRace: (input) => prepareServerLeaderboardRace(input),
     });
     registerCompetitionRoutes(app, {
         getRequestUsername,

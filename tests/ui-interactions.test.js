@@ -50,28 +50,22 @@ describe('ui interaction helpers', () => {
         global.window = originalWindow;
     });
 
-    it('wires the bottom bar leaderboard and placeholder actions', () => {
+    it('closes an open modal when the garage action is used', () => {
         const garageBtn = createEventTarget();
-        const leaderboardBtn = createEventTarget();
         const closeModal = vi.fn();
-        const openDailyChallengeLeaderboard = vi.fn();
         const ctx = {
             menuGarageBtn: garageBtn,
-            dailyChallengeRankBtn: leaderboardBtn,
             modal: {
                 isModalActive: vi.fn(() => true),
                 closeModal
-            },
-            leaderboards: { openDailyChallengeLeaderboard }
+            }
         };
 
         InteractionsUi.prototype.bindPrimaryActions.call(ctx);
 
         garageBtn.listeners.get('click')();
-        leaderboardBtn.listeners.get('click')();
 
         expect(closeModal).toHaveBeenCalledTimes(1);
-        expect(openDailyChallengeLeaderboard).toHaveBeenCalledTimes(1);
     });
 
 

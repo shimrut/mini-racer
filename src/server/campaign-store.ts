@@ -11,6 +11,7 @@ import { getMedalForRaceTime } from '../../game/medals/medal-timing.js';
 import { sanitizeRedditUsername } from '../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
+import { normalizeLapCompletionTimesSec } from '../../game/shared/lap-completion-times.js';
 import {
     createTrackFingerprint,
     isValidPbGhostTrace,
@@ -54,6 +55,7 @@ type CampaignPbRecord = CampaignBestResult & {
     schemaVersion: typeof PB_GHOST_SCHEMA_VERSION;
     simulationRevision: typeof PB_GHOST_SIMULATION_REVISION;
     trackFingerprint: string;
+    lapCompletionTimesSec: number[] | null;
     ghost: PbGhostTrace | null;
 };
 
@@ -200,11 +202,42 @@ function parsePbRecord(raw: string | null | undefined, raceId: string): Campaign
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
             simulationRevision: PB_GHOST_SIMULATION_REVISION,
             trackFingerprint: value.trackFingerprint,
+            lapCompletionTimesSec: normalizeLapCompletionTimesSec(
+                result.bestTimeMs / 1000,
+                value.lapCompletionTimesSec,
+                result.lapCount,
+            ),
             ghost: isValidPbGhostTrace(value.ghost) ? value.ghost : null,
         };
     } catch (_error) {
         return null;
     }
+}
+
+function isCompleteCampaignOpponentRecord(
+    entry: CampaignLeaderboardEntry,
+    record: CampaignPbRecord | null,
+): boolean {
+    const stage = getCampaignStage(entry.raceId);
+    const checkpointCount = stage
+        ? (TRACKS[stage.trackKey]?.checkpoints?.length || 0) * stage.lapCount
+        : 0;
+    // Matches Daily: the exact best time on both the record and its trace is
+    // what ties this ghost to the leaderboard row, not a stored timestamp.
+    return Boolean(
+        record?.ghost
+        && record.bestTimeMs === entry.bestTimeMs
+        && record.ghost.finishTimeMs === entry.bestTimeMs
+        && Array.isArray(record.checkpointTimesSec)
+        && record.checkpointTimesSec.length === checkpointCount,
+    );
+}
+
+async function readCampaignPbRecord(raceId: string, playerId: string): Promise<CampaignPbRecord | null> {
+    return parsePbRecord(
+        await redisCompressed.hGet(pbHashKey(raceId), playerField(playerId)),
+        raceId,
+    );
 }
 
 async function readProgress(playerId: string): Promise<CampaignProgress> {
@@ -240,9 +273,30 @@ function unauthorized() {
     };
 }
 
+/**
+ * Where the player sits on every stage's board, in one pass. The lobby shows a
+ * rank per stage, and a zRank each is far cheaper than a snapshot request per
+ * stage from the client.
+ */
+async function readCampaignStandingsByRaceId(playerId: string | null) {
+    const entries = await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
+        const key = leaderboardKey(stage.raceId);
+        const [totalCount, rankZeroBased] = await Promise.all([
+            redis.zCard(key),
+            playerId ? redis.zRank(key, playerId) : Promise.resolve(undefined),
+        ]);
+        const rank = Number.isFinite(rankZeroBased) ? Number(rankZeroBased) + 1 : null;
+        return [stage.raceId, { rank, totalCount: totalCount || 0 }] as const;
+    }));
+    return Object.fromEntries(entries);
+}
+
 export async function getServerCampaignBootstrap({ redditUsername }: { redditUsername?: unknown } = {}) {
     const identity = signedInIdentity(redditUsername);
-    const progress = identity ? await readProgress(identity.playerId) : emptyProgress();
+    const [progress, standingsByRaceId] = await Promise.all([
+        identity ? readProgress(identity.playerId) : Promise.resolve(emptyProgress()),
+        readCampaignStandingsByRaceId(identity?.playerId ?? null),
+    ]);
     return {
         status: 200,
         body: {
@@ -250,6 +304,7 @@ export async function getServerCampaignBootstrap({ redditUsername }: { redditUse
             signedIn: Boolean(identity),
             stages: CAMPAIGN_STAGES,
             progress: publicProgress(progress),
+            standingsByRaceId,
         },
     };
 }
@@ -311,17 +366,23 @@ export async function getServerCampaignSnapshot({
     const rawEntries = ranked.length
         ? await redis.hMGet(entryHashKey(stage.raceId), ranked.map((row) => row.member))
         : [];
-    const rows = ranked.flatMap((rankedRow, index) => {
+    const rows = (await Promise.all(ranked.map(async (rankedRow, index) => {
         const entry = parseLeaderboardEntry(rawEntries[index], stage.raceId);
-        return entry ? [{
+        if (!entry) return null;
+        const isCurrentPlayer = entry.playerId === identity?.playerId;
+        const pb = isCurrentPlayer
+            ? null
+            : await readCampaignPbRecord(stage.raceId, entry.playerId);
+        return {
             rank: safeOffset + index + 1,
             displayName: entry.displayName,
             bestTimeMs: entry.bestTimeMs,
             medal: entry.medal,
             updatedAt: entry.updatedAt,
-            isCurrentPlayer: entry.playerId === identity?.playerId,
-        }] : [];
-    });
+            isCurrentPlayer,
+            opponentRaceAvailable: !isCurrentPlayer && isCompleteCampaignOpponentRecord(entry, pb),
+        };
+    }))).filter((row): row is NonNullable<typeof row> => Boolean(row));
     const playerRankZeroBased = identity
         ? await redis.zRank(leaderboardKey(stage.raceId), identity.playerId)
         : undefined;
@@ -344,6 +405,7 @@ export async function getServerCampaignSnapshot({
                 medal: playerEntry.medal,
                 updatedAt: playerEntry.updatedAt,
                 isCurrentPlayer: true,
+                opponentRaceAvailable: false,
             } : null,
             totalCount,
             pageOffset: safeOffset,
@@ -352,6 +414,156 @@ export async function getServerCampaignSnapshot({
             nextOffset: safeOffset + safeLimit < totalCount ? safeOffset + safeLimit : null,
         },
     };
+}
+
+type CampaignOpponentSelection = {
+    kind: 'row';
+    rank: number;
+    displayName: string;
+    bestTimeMs: number;
+    updatedAt: string;
+} | {
+    kind: 'next-faster';
+    benchmarkTimeMs?: number;
+};
+
+function normalizeCampaignOpponentSelection(value: unknown): CampaignOpponentSelection | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const selection = value as Record<string, unknown>;
+    if (selection.kind === 'row') {
+        if (
+            !Number.isInteger(selection.rank)
+            || Number(selection.rank) < 1
+            || typeof selection.displayName !== 'string'
+            || !selection.displayName
+            || !Number.isSafeInteger(selection.bestTimeMs)
+            || Number(selection.bestTimeMs) <= 0
+            || typeof selection.updatedAt !== 'string'
+            || !selection.updatedAt
+        ) return null;
+        return {
+            kind: 'row',
+            rank: Number(selection.rank),
+            displayName: selection.displayName,
+            bestTimeMs: Number(selection.bestTimeMs),
+            updatedAt: selection.updatedAt,
+        };
+    }
+    if (selection.kind === 'next-faster') {
+        const benchmarkTimeMs = Number(selection.benchmarkTimeMs);
+        return {
+            kind: 'next-faster',
+            benchmarkTimeMs: Number.isSafeInteger(benchmarkTimeMs) && benchmarkTimeMs > 0
+                ? benchmarkTimeMs
+                : undefined,
+        };
+    }
+    return null;
+}
+
+export async function prepareServerCampaignLeaderboardRace({
+    raceId,
+    redditUsername,
+    selection: rawSelection,
+}: {
+    raceId?: unknown;
+    redditUsername?: unknown;
+    selection?: unknown;
+}) {
+    const stage = getCampaignStage(raceId);
+    if (!stage) return { status: 404, body: { error: 'Campaign race not found.', reason: 'race_not_found' } };
+    const identity = signedInIdentity(redditUsername);
+    if (identity) {
+        const progress = await readProgress(identity.playerId);
+        if (!isCampaignStageUnlocked(stage.raceId, progress.resultsByRaceId)) {
+            return { status: 403, body: { error: 'Campaign race is locked.', reason: 'race_locked' } };
+        }
+    }
+    const selection = normalizeCampaignOpponentSelection(rawSelection);
+    if (!selection) {
+        return { status: 400, body: { error: 'Opponent selection is invalid.', reason: 'invalid_selection' } };
+    }
+
+    const key = leaderboardKey(stage.raceId);
+    let rankedCandidates: Array<{ member: string; rank: number }> = [];
+    let benchmarkTimeMs: number | undefined;
+    if (selection.kind === 'row') {
+        const ranked = await redis.zRange(key, selection.rank - 1, selection.rank - 1);
+        rankedCandidates = ranked.map((row) => ({ member: row.member, rank: selection.rank }));
+    } else {
+        const ownRankZeroBased = identity
+            ? await redis.zRank(key, identity.playerId)
+            : undefined;
+        const ownEntry = identity
+            ? parseLeaderboardEntry(
+                await redis.hGet(entryHashKey(stage.raceId), identity.playerId),
+                stage.raceId,
+            )
+            : null;
+        benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
+        if (!Number.isFinite(benchmarkTimeMs)) {
+            return { status: 409, body: { error: 'Set a time before choosing the next opponent.', reason: 'benchmark_required' } };
+        }
+        const totalCount = await redis.zCard(key);
+        const stop = Number.isFinite(ownRankZeroBased)
+            ? Number(ownRankZeroBased) - 1
+            : totalCount - 1;
+        const ranked = stop >= 0 ? await redis.zRange(key, 0, stop) : [];
+        rankedCandidates = ranked
+            .map((row, index) => ({ member: row.member, rank: index + 1 }))
+            .reverse();
+    }
+
+    for (const candidate of rankedCandidates) {
+        if (candidate.member === identity?.playerId) {
+            if (selection.kind === 'row') {
+                return { status: 409, body: { error: 'Choose another player to race.', reason: 'self_selection' } };
+            }
+            continue;
+        }
+        const entry = parseLeaderboardEntry(
+            await redis.hGet(entryHashKey(stage.raceId), candidate.member),
+            stage.raceId,
+        );
+        if (!entry) continue;
+        if (selection.kind === 'next-faster' && (!benchmarkTimeMs || entry.bestTimeMs >= benchmarkTimeMs)) {
+            continue;
+        }
+        if (
+            selection.kind === 'row'
+            && (
+                entry.displayName !== selection.displayName
+                || entry.bestTimeMs !== selection.bestTimeMs
+                || entry.updatedAt !== selection.updatedAt
+            )
+        ) {
+            return { status: 409, body: { error: 'Leaderboard row changed. Refresh and choose again.', reason: 'selection_changed' } };
+        }
+        const record = await readCampaignPbRecord(stage.raceId, candidate.member);
+        if (!isCompleteCampaignOpponentRecord(entry, record)) {
+            if (selection.kind === 'row') {
+                return { status: 409, body: { error: 'That opponent ghost is unavailable.', reason: 'ghost_unavailable' } };
+            }
+            continue;
+        }
+        return {
+            status: 200,
+            body: {
+                mode: 'campaign',
+                race: stage,
+                target: {
+                    rank: candidate.rank,
+                    displayName: entry.displayName,
+                    bestTimeMs: entry.bestTimeMs,
+                    checkpointTimesSec: record!.checkpointTimesSec,
+                    lapCompletionTimesSec: record!.lapCompletionTimesSec,
+                    updatedAt: entry.updatedAt,
+                    ghost: record!.ghost,
+                },
+            },
+        };
+    }
+    return { status: 404, body: { error: 'No faster opponent ghost is available.', reason: 'no_faster_opponent' } };
 }
 
 async function checkRateLimit(raceId: string, playerId: string) {
@@ -510,6 +722,11 @@ export async function submitServerCampaignRun({
                     schemaVersion: PB_GHOST_SCHEMA_VERSION,
                     simulationRevision: PB_GHOST_SIMULATION_REVISION,
                     trackFingerprint: createTrackFingerprint(track),
+                    lapCompletionTimesSec: normalizeLapCompletionTimesSec(
+                        validation.run.bestTimeSec,
+                        validation.run.lapCompletionTimesSec,
+                        stage.lapCount,
+                    ),
                     ghost: validation.run.ghost ?? null,
                 };
                 await redisCompressed.hSet(pbHashKey(stage.raceId), {

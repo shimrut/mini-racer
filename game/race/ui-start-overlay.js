@@ -16,10 +16,8 @@ const BLOCKING_OVERLAY_IDS = [
 export class StartOverlay {
     constructor({
         dailyChallengeUi,
-        getLobbyUi = null,
     } = {}) {
         this.dailyChallengeUi = dailyChallengeUi;
-        this.getLobbyUi = typeof getLobbyUi === 'function' ? getLobbyUi : null;
         this._startOverlayHasAnyData = false;
         this._startOverlayIsReturningPlayer = false;
         this._isReady = false;
@@ -154,10 +152,6 @@ export class StartOverlay {
         if (startBtn) {
             startBtn.style.display = "inline-flex";
             startBtn.disabled = !hasChallenge;
-
-            const summary = hasChallenge ? this.dailyChallengeUi?.getSummary?.() : null;
-            const trackName = typeof summary?.trackName === 'string' ? summary.trackName.trim() : '';
-            this.getLobbyUi?.()?.updateDailyTrackLabel?.(trackName);
 
             const labelSpan = startBtn.querySelector(".main-menu__label");
             if (labelSpan) {

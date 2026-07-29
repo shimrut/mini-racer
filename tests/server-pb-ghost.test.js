@@ -578,8 +578,46 @@ describe('PB ghost trace and storage', () => {
         expect(result.record).toMatchObject({
             bestTimeMs: 11_500,
             checkpointTimesSec: [3.5, 7.5],
+            lapCompletionTimesSec: null,
             ghost: null,
         });
+    });
+
+    it('stores exact lap boundaries while accepting historical and malformed records', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:lap-boundaries',
+            challenge: CHALLENGE,
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            lapCompletionTimesSec: [12],
+            ghost: GHOST,
+        });
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const field = [...redis.hashes.get(collectionKey).keys()][0];
+
+        expect((await getPlayerTrackPbRecord({
+            playerId: 'reddit:lap-boundaries',
+            challenge: CHALLENGE,
+            track: TRACK,
+        }))?.lapCompletionTimesSec).toEqual([12]);
+
+        const payload = JSON.parse(decodeCompressedValue(redis.hashes.get(collectionKey).get(field)));
+        delete payload.lapCompletionTimesSec;
+        redis.hashes.get(collectionKey).set(field, JSON.stringify(payload));
+        expect((await getPlayerTrackPbRecord({
+            playerId: 'reddit:lap-boundaries',
+            challenge: CHALLENGE,
+            track: TRACK,
+        }))?.lapCompletionTimesSec).toBeNull();
+
+        payload.lapCompletionTimesSec = [11.5];
+        redis.hashes.get(collectionKey).set(field, JSON.stringify(payload));
+        expect((await getPlayerTrackPbRecord({
+            playerId: 'reddit:lap-boundaries',
+            challenge: CHALLENGE,
+            track: TRACK,
+        }))?.lapCompletionTimesSec).toBeNull();
     });
 
     it('drops non-finite checkpoint splits when parsing stored PB records', async () => {

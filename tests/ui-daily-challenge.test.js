@@ -2,55 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 
 describe('ui daily challenge helpers', () => {
-    it('sets leaderboard menu aria-label without rank details', () => {
-        const originalDocument = global.document;
-        const dailyChallengeRankBtn = {
-            disabled: false,
-            dataset: { rank: '3' },
-            classList: {
-                toggle: vi.fn()
-            },
-            setAttribute: vi.fn()
-        };
-        const dailyChallengeRankStatus = {
-            textContent: '',
-            hidden: true,
-            classList: {
-                toggle: vi.fn(),
-                remove: vi.fn()
-            }
-        };
-        global.document = {
-            getElementById: (id) => ({
-                'daily-challenge-rank-btn': dailyChallengeRankBtn,
-                'daily-challenge-rank-status': dailyChallengeRankStatus
-            }[id] || null),
-            querySelector: vi.fn(() => null),
-            createElement: vi.fn(() => ({
-                className: '',
-                textContent: '',
-                dataset: {},
-                setAttribute: vi.fn()
-            }))
-        };
-
-        const component = new DailyChallengeUi();
-        component.setDailyChallengeSummary({
-            available: true,
-            trackName: 'Desert Sprint',
-            scoreboardSnapshot: { rank: 3, playerRankLabel: '#3' }
-        });
-
-        expect(dailyChallengeRankBtn.dataset.rank).toBeUndefined();
-        expect(dailyChallengeRankBtn.setAttribute).toHaveBeenCalledWith(
-            'aria-label',
-            'Open standings for all tracks.'
-        );
-        expect(dailyChallengeRankStatus.hidden).toBe(true);
-
-        global.document = originalDocument;
-    });
-
     it('overlays pending verification onto the current summary', () => {
         const originalDocument = global.document;
         const originalWindow = global.window;
@@ -194,74 +145,6 @@ describe('ui daily challenge helpers', () => {
         global.window = originalWindow;
     });
 
-    it('shows visible rank-button status copy for submission errors', () => {
-        const originalDocument = global.document;
-        const rankBtn = {
-            disabled: false,
-            dataset: {},
-            classList: {
-                toggle: vi.fn()
-            },
-            setAttribute: vi.fn()
-        };
-        const rankStatus = {
-            textContent: '',
-            hidden: true,
-            classList: {
-                toggle: vi.fn(),
-                remove: vi.fn()
-            }
-        };
-        global.document = {
-            getElementById: (id) => ({
-                'daily-challenge-title': { textContent: '' },
-                'daily-challenge-track': { textContent: '', style: {} },
-                'daily-challenge-objective': { textContent: '', style: {} },
-                'daily-challenge-modifiers': { replaceChildren() {}, appendChild() {}, style: {} },
-                'daily-challenge-best-label': { textContent: '' },
-                'daily-challenge-best': { textContent: '' },
-                'daily-challenge-rank-btn': rankBtn,
-                'daily-challenge-rank-status': rankStatus,
-                'daily-challenge-start-btn': { disabled: false },
-                'daily-challenge-reset': { textContent: '' },
-                'daily-challenge-car-name': { textContent: '' },
-                'daily-challenge-car-label': { textContent: '' },
-                'daily-challenge-car-image': { src: '' }
-            }[id] || null),
-            querySelector: vi.fn(() => null),
-            createElement: vi.fn(() => ({
-                className: '',
-                textContent: '',
-                dataset: {},
-                setAttribute: vi.fn()
-            }))
-        };
-
-        const component = new DailyChallengeUi();
-        vi.spyOn(component, 'updateDailyChallengeCountdown').mockImplementation(() => {});
-        vi.spyOn(component, 'renderTrackPreview').mockImplementation(() => {});
-        component.setDailyChallengeSummary({
-            available: true,
-            trackName: 'Desert Sprint',
-            objectiveLabel: '1 lap',
-            modifierBadges: ['Verified runs'],
-            scoreboardSnapshot: {
-                verificationState: 'error',
-                submissionStage: 'error',
-                statusText: 'Daily challenge is no longer playable.'
-            }
-        });
-
-        expect(rankStatus.hidden).toBe(true);
-        expect(rankStatus.textContent).toBe('');
-        expect(rankBtn.setAttribute).toHaveBeenCalledWith(
-            'aria-label',
-            'Open standings for all tracks.'
-        );
-
-        global.document = originalDocument;
-    });
-
     it('shows best-race wording for multi-lap summaries', () => {
         const originalDocument = global.document;
         const nodes = {
@@ -280,15 +163,6 @@ describe('ui daily challenge helpers', () => {
             },
             'daily-challenge-best-label': { textContent: '' },
             'daily-challenge-best': { textContent: '' },
-            'daily-challenge-rank-btn': {
-                disabled: false,
-                dataset: {},
-                classList: {
-                    toggle: vi.fn()
-                },
-                setAttribute: vi.fn(),
-                querySelector: vi.fn(() => null)
-            },
             'daily-challenge-start-btn': { disabled: false },
             'daily-challenge-reset': { textContent: '' },
             'daily-challenge-car-name': { textContent: '' },

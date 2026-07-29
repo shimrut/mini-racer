@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
 import { ModalShell } from '../game/race/ui-modal-shell.js';
 import { TRACK_MODE_DAILY_GP } from '../game/config.js';
 
@@ -17,6 +18,8 @@ const {
     bindLeaderboardPagination,
     bindLeaderboardDaySwipe,
     _wireLeaderboardRowShare,
+    _wireLeaderboardOpponentRace,
+    _showLeaderboardOpponentConfirmation,
     _leaderboardShareBestOption,
 } = ModalShell.prototype;
 
@@ -966,6 +969,96 @@ describe('ui modal runs helpers', () => {
         shareBtn.disabled = true;
         row.onclick();
         expect(startShare).toHaveBeenCalledTimes(1);
+    });
+
+    it('wires eligible opponent rows for pointer and keyboard activation', () => {
+        const entry = {
+            rank: 2,
+            displayName: 'Rival',
+            bestTime: 9.1,
+            opponentRaceAvailable: true,
+        };
+        const row = createTestElement('div');
+        row._opponentRaceEntry = entry;
+        const modalLapTimes = createTestElement('div');
+        modalLapTimes.querySelectorAll = vi.fn((selector) => (
+            selector === '.leaderboard-row.is-raceable' ? [row] : []
+        ));
+        const showConfirmation = vi.fn();
+        const ctx = {
+            modalLapTimes,
+            _onRaceOpponent: vi.fn(),
+            _showLeaderboardOpponentConfirmation: showConfirmation,
+        };
+
+        _wireLeaderboardOpponentRace.call(ctx);
+        row.onclick();
+        expect(showConfirmation).toHaveBeenCalledWith(entry, row);
+
+        const preventDefault = vi.fn();
+        row.onkeydown({ key: 'Enter', preventDefault });
+        expect(preventDefault).toHaveBeenCalledTimes(1);
+        expect(showConfirmation).toHaveBeenCalledTimes(2);
+    });
+
+    it('confirms an opponent with rank, time, and Campaign stage context', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="modal">
+                <div id="modal-runs-view" class="active-view">
+                    <div id="modal-lap-times"></div>
+                </div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const shell = new ModalShell({
+            content: {
+                formatLeaderboardTime: (time) => `00:0${time.toFixed(3)}`,
+            },
+        });
+        const entry = {
+            rank: 2,
+            displayName: 'Rival',
+            bestTime: 9.1,
+            opponentRaceAvailable: true,
+        };
+        const onRaceOpponent = vi.fn();
+        const triggerRow = dom.window.document.createElement('div');
+        triggerRow.tabIndex = 0;
+        dom.window.document.getElementById('modal-lap-times').appendChild(triggerRow);
+        shell._onRaceOpponent = onRaceOpponent;
+        shell._modalRunsPayload = {
+            scoreboardMode: 'campaign',
+            scoreboardTrackKey: 'circuit',
+            selectedLeaderboardDayId: 'numbered-v1-02',
+            leaderboardDayOptions: [{
+                challengeId: 'numbered-v1-02',
+                monthLabel: 'Stage',
+                dayNumberLabel: '3',
+            }],
+        };
+
+        _showLeaderboardOpponentConfirmation.call(shell, entry, triggerRow);
+
+        const panel = dom.window.document.querySelector('.leaderboard-race-panel');
+        expect(panel?.getAttribute('role')).toBe('dialog');
+        expect(panel?.textContent).toContain('Race Rival?');
+        expect(panel?.textContent).toContain('Classic Circuit · Stage 3');
+        expect(panel?.textContent).toContain('#2 · 00:09.100');
+        expect(dom.window.document.activeElement?.textContent).toBe('Race Ghost');
+
+        const buttons = panel.querySelectorAll('button');
+        buttons[0].click();
+        expect(dom.window.document.querySelector('.leaderboard-race-panel')).toBe(null);
+        expect(dom.window.document.activeElement).toBe(triggerRow);
+        expect(onRaceOpponent).not.toHaveBeenCalled();
+
+        _showLeaderboardOpponentConfirmation.call(shell, entry, triggerRow);
+        dom.window.document.querySelectorAll('.leaderboard-race-panel button')[1].click();
+        expect(onRaceOpponent).toHaveBeenCalledWith(entry);
+        expect(dom.window.document.querySelector('.leaderboard-race-panel')).toBe(null);
+
+        global.document = originalDocument;
     });
 
     it('matches modal scoreboard contexts for track and challenge payloads', () => {

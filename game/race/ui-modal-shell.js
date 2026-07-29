@@ -5,11 +5,6 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from '../track/presentation.js';
-import { createMedalIconSvg } from '../medals/medal-icon.js';
-import {
-    getMedalRowSlots,
-} from '../medals/medal-timing.js';
-import { readTrackLastLapMedal } from '../medals/last-lap-medal-storage.js';
 import {
     buildModalRunsPayload,
     buildModalStatsPlan,
@@ -57,7 +52,7 @@ function getSingleTouchPoint(touches) {
 
 function isLeaderboardSwipeControl(target) {
     return Boolean(target?.closest?.(
-        '.leaderboard-day-rail, button, a, input, select, textarea, [role="button"], .leaderboard-row.is-shareable'
+        '.leaderboard-day-rail, button, a, input, select, textarea, [role="button"], .leaderboard-row.is-shareable, .leaderboard-row.is-raceable'
     ));
 }
 
@@ -118,6 +113,7 @@ export class ModalShell {
         this._modalPrimaryAction = null;
         this._modalSecondaryAction = null;
         this._modalRunsPayload = null;
+        this._onRaceOpponent = null;
         this._runsViewMode = 'close';
         this._runsCloseAction = null;
         this._savedModalState = null;
@@ -269,7 +265,9 @@ export class ModalShell {
     getStandingsMenuItems() {
         return filterVisibleMenuItems([
             ...Array.from(this.modalRunsView?.querySelectorAll?.('.leaderboard-day-chip') || []),
-            ...Array.from(this.modalRunsView?.querySelectorAll?.('.leaderboard-row.is-shareable') || []),
+            ...Array.from(this.modalRunsView?.querySelectorAll?.(
+                '.leaderboard-row.is-shareable, .leaderboard-row.is-raceable'
+            ) || []),
         ], { requireLaidOut: false });
     }
 
@@ -446,7 +444,6 @@ export class ModalShell {
         const wrap = document.getElementById('modal-pause-track-preview-wrap');
         const canvas = document.getElementById('modal-pause-track-preview');
         const nameEl = document.getElementById('modal-pause-track-name');
-        const raceStatsEl = document.getElementById('modal-pause-race-stats');
         if (wrap) {
             wrap.hidden = true;
             wrap.setAttribute('aria-hidden', 'true');
@@ -454,56 +451,11 @@ export class ModalShell {
         if (nameEl) {
             nameEl.textContent = '';
         }
-        if (raceStatsEl) {
-            raceStatsEl.replaceChildren();
-            raceStatsEl.hidden = true;
-            raceStatsEl.setAttribute('aria-hidden', 'true');
-        }
         if (canvas) {
             const ctx = canvas.getContext('2d');
             ctx?.clearRect(0, 0, canvas.width, canvas.height);
             canvas.setAttribute('aria-label', 'Track layout');
         }
-    }
-
-    _renderPauseTrackProgress(container, payload) {
-        if (!container) return;
-
-        container.replaceChildren();
-        const trackKey = typeof payload?.trackKey === 'string' ? payload.trackKey : null;
-        if (!trackKey) {
-            container.hidden = true;
-            container.setAttribute('aria-hidden', 'true');
-            return;
-        }
-
-        const medals = document.createElement('div');
-        medals.className = 'pause-race-progress__medals';
-        medals.setAttribute('aria-label', 'Track medals');
-
-        const bestStoredMedal = readTrackLastLapMedal(trackKey);
-        const medalSlots = getMedalRowSlots(trackKey, bestStoredMedal);
-        if (medalSlots.length) {
-            for (const { tier, filled } of medalSlots) {
-                const slot = document.createElement('span');
-                slot.className = 'pause-race-progress__medal-slot';
-                if (!filled) slot.classList.add('pause-race-progress__medal-slot--locked');
-                slot.appendChild(createMedalIconSvg(tier, {
-                    className: 'medal-svg--pause',
-                    outline: !filled,
-                    showEmblem: filled,
-                    rowPlaceholder: !filled,
-                }));
-                medals.appendChild(slot);
-            }
-        } else {
-            medals.appendChild(createMedalIconSvg('white', { className: 'medal-svg--pause medal-svg--row-placeholder' }));
-        }
-
-        container.append(medals);
-        container.hidden = false;
-        container.setAttribute('aria-hidden', 'false');
-        container.setAttribute('aria-label', 'Unlocked medals for this track');
     }
 
     _syncPauseTrackPreview(payload) {
@@ -528,11 +480,6 @@ export class ModalShell {
         if (nameEl) {
             nameEl.textContent = labelName;
         }
-
-        this._renderPauseTrackProgress(
-            document.getElementById('modal-pause-race-stats'),
-            payload,
-        );
 
         if (!wrap || !canvas) return;
 
@@ -619,9 +566,25 @@ export class ModalShell {
         else if (button) button.textContent = label;
     }
 
+    setCombinedPrimaryAction({
+        label = 'Improve',
+        ariaLabel = label,
+        action = null,
+        disabled = false,
+    } = {}) {
+        const button = this.combinedRestartBtn;
+        if (!button || !this.modalCombinedView?.classList.contains('active-view')) return false;
+        this._setShareButtonLabel(button, label);
+        button.setAttribute('aria-label', ariaLabel);
+        button.disabled = Boolean(disabled);
+        this._bindClickAction(button, action);
+        return true;
+    }
+
     _closeSharePanel({ restoreScroll = true } = {}) {
         const panel = this.modal?.querySelector?.('.result-share-panel');
         const scrollTop = Number(panel?.dataset?.savedScrollTop);
+        const restoreFocusElement = panel?._restoreFocusElement || null;
         resetMenuKeyboardState(this._shareMenuKeyboardState, this.getSharePanelButtons(), {
             container: this.getSharePanelActionsContainer(),
             focusPreferred: false,
@@ -629,6 +592,9 @@ export class ModalShell {
         panel?.remove();
         if (restoreScroll && Number.isFinite(scrollTop) && this.modalLapTimes) {
             this.modalLapTimes.scrollTop = scrollTop;
+        }
+        if (restoreScroll && typeof restoreFocusElement?.focus === 'function') {
+            restoreFocusElement.focus();
         }
     }
 
@@ -956,6 +922,9 @@ export class ModalShell {
             lapCheckpointTimes: lapData.lapCheckpointTimes,
             pbCheckpointTimes: lapData.pbCheckpointTimes,
             pbFinishSec: lapData.pbFinishSec,
+            raceComparisonTarget: lapData.raceComparisonTarget,
+            comparisonOutcome: lapData.comparisonOutcome,
+            deltaToComparison: lapData.deltaToComparison,
         });
 
         if (lapData.challengeFinish || lapData.challengeConfirmPhase) {
@@ -1181,6 +1150,7 @@ export class ModalShell {
         onSelectLeaderboardDay = null,
         onLoadMoreLeaderboard = null,
         onOpenStandings = null,
+        onRaceOpponent = null,
         showGlobalLeaderboard = true,
         allowLeaderboardOpen = true,
         onClose = null
@@ -1229,11 +1199,15 @@ export class ModalShell {
             onSelectLeaderboardDay,
             onLoadMoreLeaderboard,
             onOpenStandings,
+            onRaceOpponent,
             showGlobalLeaderboard,
             allowLeaderboardOpen
         }, {
             currentTrackKey: this.getCurrentTrackKey()
         });
+        this._onRaceOpponent = typeof onRaceOpponent === 'function'
+            ? onRaceOpponent
+            : null;
         this._runsViewMode = returnMode === 'back' ? 'back' : 'close';
         this._runsCloseAction = typeof onClose === 'function' ? onClose : null;
         this.configureRunsModalHeader?.();
@@ -1246,12 +1220,17 @@ export class ModalShell {
                 this._modalRunsPayload.scoreboardMode,
                 this._modalRunsPayload.scoreboardTrackKey,
                 this._modalRunsPayload.scoreboardSubhead,
-                { showHeader: hasPersonalBestList, shareBest }
+                {
+                    showHeader: hasPersonalBestList,
+                    shareBest,
+                    raceOpponentEnabled: typeof this._onRaceOpponent === 'function',
+                }
             );
         }
         this.bindLeaderboardPagination?.();
         this.bindLeaderboardDaySwipe?.();
         this._wireLeaderboardRowShare?.();
+        this._wireLeaderboardOpponentRace?.();
 
         if (this.backToMainBtn) {
             this.backToMainBtn.setAttribute('aria-label', 'Back');
@@ -1299,6 +1278,7 @@ export class ModalShell {
             this._modalPrimaryAction = this.getDefaultPrimaryAction();
             this._modalSecondaryAction = null;
             this._modalRunsPayload = null;
+            this._onRaceOpponent = null;
             this._runsReturnView = null;
             this._runsCloseAction = null;
             this._savedModalState = null;
@@ -1708,11 +1688,16 @@ export class ModalShell {
                     this._modalRunsPayload.scoreboardMode,
                     this._modalRunsPayload.scoreboardTrackKey,
                     this._modalRunsPayload.scoreboardSubhead,
-                    { showHeader: hasPersonalBestList, shareBest }
+                    {
+                        showHeader: hasPersonalBestList,
+                        shareBest,
+                        raceOpponentEnabled: typeof this._onRaceOpponent === 'function',
+                    }
                 );
             }
             this.bindLeaderboardPagination?.();
             this._wireLeaderboardRowShare?.();
+            this._wireLeaderboardOpponentRace?.();
             this.modalLapTimes.scrollTop = scrollTop;
             return;
         }
@@ -1784,7 +1769,10 @@ export class ModalShell {
                 this._modalRunsPayload.bestTime,
                 this._modalRunsPayload.currentTime,
                 this._runsViewMode,
-                buildModalRunsViewOptions(this._modalRunsPayload)
+                {
+                    ...buildModalRunsViewOptions(this._modalRunsPayload),
+                    onRaceOpponent: this._onRaceOpponent,
+                }
             );
             return;
         }
@@ -1835,7 +1823,10 @@ export class ModalShell {
             this._modalRunsPayload.bestTime,
             this._modalRunsPayload.currentTime,
             'back',
-            buildModalRunsViewOptions(this._modalRunsPayload)
+            {
+                ...buildModalRunsViewOptions(this._modalRunsPayload),
+                onRaceOpponent: this._onRaceOpponent,
+            }
         );
     }
 
@@ -2082,6 +2073,123 @@ export class ModalShell {
                 trigger();
             }
         };
+    }
+
+    _showLeaderboardOpponentConfirmation(entry, triggerRow) {
+        if (!entry || typeof this._onRaceOpponent !== 'function' || !this.modalRunsView) return;
+
+        this._closeSharePanel?.({ restoreScroll: false });
+        const scrim = document.createElement('section');
+        scrim.className = 'result-share-panel leaderboard-race-panel';
+        scrim.setAttribute('role', 'dialog');
+        scrim.setAttribute('aria-modal', 'true');
+        scrim.setAttribute('aria-label', 'Confirm ghost opponent');
+        scrim.dataset.savedScrollTop = String(this.modalLapTimes?.scrollTop || 0);
+        scrim._restoreFocusElement = triggerRow;
+
+        const panel = document.createElement('div');
+        panel.className = 'result-share-panel__card leaderboard-race-panel__card';
+
+        const opponentName = typeof entry.displayName === 'string' && entry.displayName.trim()
+            ? entry.displayName.trim()
+            : 'Anonymous Racer';
+        const title = document.createElement('h3');
+        title.className = 'result-share-panel__title';
+        title.textContent = `Race ${opponentName}?`;
+
+        const payload = this._modalRunsPayload;
+        const trackName = payload?.scoreboardTrackKey && TRACKS[payload.scoreboardTrackKey]
+            ? TRACKS[payload.scoreboardTrackKey].name
+            : (payload?.scoreboardTitle || 'This track');
+        const selectedContext = payload?.leaderboardDayOptions?.find?.(
+            (option) => option?.challengeId === payload?.selectedLeaderboardDayId
+        );
+        const selectedLabel = payload?.scoreboardMode === 'campaign'
+            ? [selectedContext?.monthLabel, selectedContext?.dayNumberLabel].filter(Boolean).join(' ')
+            : selectedContext?.dateLabel;
+        const context = document.createElement('p');
+        context.className = 'result-share-panel__status';
+        context.textContent = [trackName, selectedLabel || payload?.scoreboardSubhead]
+            .filter(Boolean)
+            .join(' · ');
+
+        const target = document.createElement('p');
+        target.className = 'result-share-panel__copy leaderboard-race-panel__target';
+        const rank = Number.isFinite(Number(entry.rank))
+            ? `#${Math.trunc(Number(entry.rank))}`
+            : (entry.rankLabel || 'Unranked');
+        target.textContent = `${rank} · ${this.content.formatLeaderboardTime(Number(entry.bestTime))}`;
+
+        const actions = document.createElement('div');
+        actions.className = 'result-share-panel__actions';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'result-share-panel__button';
+        cancel.textContent = 'Cancel';
+        cancel.onclick = () => this._closeSharePanel();
+
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = 'result-share-panel__button result-share-panel__button--primary';
+        confirm.textContent = 'Race Ghost';
+        confirm.onclick = () => {
+            const onRaceOpponent = this._onRaceOpponent;
+            confirm.disabled = true;
+            cancel.disabled = true;
+            confirm.textContent = 'Preparing…';
+            context.textContent = 'Loading the verified ghost and split times…';
+            const handleResult = (result) => {
+                if (result?.ok === false) {
+                    throw new Error(result.body?.error || 'This ghost is no longer available.');
+                }
+                this._closeSharePanel({ restoreScroll: false });
+            };
+            const handleError = (error) => {
+                confirm.disabled = false;
+                cancel.disabled = false;
+                confirm.textContent = 'Race Ghost';
+                context.textContent = error?.message || 'This ghost could not be prepared.';
+                context.classList.add('is-error');
+            };
+            try {
+                const result = onRaceOpponent?.(entry);
+                if (result && typeof result.then === 'function') {
+                    void result.then(handleResult).catch(handleError);
+                } else {
+                    handleResult(result);
+                }
+            } catch (error) {
+                handleError(error);
+            }
+        };
+
+        actions.append(cancel, confirm);
+        panel.append(title, context, target, actions);
+        scrim.appendChild(panel);
+        this.modalRunsView.appendChild(scrim);
+        this.clearFinishMenuKeyboardCue();
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [cancel, confirm], {
+            preferredIndex: 1,
+            container: actions,
+            focusPreferred: true,
+        });
+    }
+
+    _wireLeaderboardOpponentRace() {
+        if (typeof this._onRaceOpponent !== 'function') return;
+        const rows = this.modalLapTimes?.querySelectorAll?.('.leaderboard-row.is-raceable') || [];
+        rows.forEach((row) => {
+            const entry = row._opponentRaceEntry;
+            if (!entry) return;
+            const trigger = () => this._showLeaderboardOpponentConfirmation(entry, row);
+            row.onclick = trigger;
+            row.onkeydown = (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    trigger();
+                }
+            };
+        });
     }
 
     _leaderboardShareBestOption() {

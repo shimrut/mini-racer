@@ -69,6 +69,9 @@ export class SettingsUi {
 
     get settingsModal() { return document.getElementById('settings-modal'); }
     get settingsBtn() { return document.getElementById('menu-btn-settings'); }
+    get settingsToggleButtons() {
+        return document.querySelectorAll?.('[aria-controls="settings-modal"]') || [];
+    }
     get settingsView() { return document.getElementById('modal-settings-view'); }
     get settingsBackBtn() { return document.getElementById('settings-back-btn'); }
     get redditIdentitySwitch() { return document.getElementById('settings-reddit-identity-switch'); }
@@ -173,11 +176,11 @@ export class SettingsUi {
         });
         bindReusableModal(this.settingsModal, () => this.closeSettings());
 
-        if (this.settingsBtn) {
-            this.settingsBtn.addEventListener('click', () => {
+        this.settingsToggleButtons.forEach((button) => {
+            button.addEventListener('click', () => {
                 this.openSettings();
             });
-        }
+        });
         if (this.redditIdentitySwitch) {
             this.redditIdentitySwitch.addEventListener('change', async () => {
                 const next = this.redditIdentitySwitch.checked

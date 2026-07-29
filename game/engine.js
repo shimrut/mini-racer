@@ -26,6 +26,7 @@ import { TrackLayerRenderer } from "./track/layer.js";
 import { RaceHud } from "./race/ui-hud.js";
 import { StartOverlay } from "./race/ui-start-overlay.js";
 import { DailyChallengeUi } from "./daily-challenge/ui.js";
+import { TrackCarousel } from "./ui/track-carousel.js";
 import { ModalContentUi } from "./race/ui-modal-content.js";
 import { ModalShell } from "./race/ui-modal-shell.js";
 import { LoadingScreen } from "./ui/loader.js";
@@ -40,6 +41,7 @@ import { trackEngineMethods } from "./track/engine-methods.js";
 import { raceEngineMethods } from "./race/engine-methods.js";
 import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
+import { opponentRaceEngineMethods } from "./scoreboard/opponent-race-engine-methods.js";
 import { campaignEngineMethods } from "./campaign/engine-methods.js";
 import { modeRouterEngineMethods } from "./modes/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
@@ -83,6 +85,9 @@ export class RealTimeRacer {
     this.carSpriteDrawHeight = 32;
     this.carSpriteLoader = new CarSpriteLoader();
     this.carAssetPromise = this.syncCarSpriteAsset();
+    this.opponentCarSprite = createCarSprite();
+    this.opponentCarSpriteLoader = new CarSpriteLoader();
+    this.raceComparisonTarget = null;
 
     this.currentTrack = TRACKS[DEFAULT_TRACK_KEY];
     this.currentTrackKey = DEFAULT_TRACK_KEY;
@@ -126,6 +131,8 @@ export class RealTimeRacer {
     this.dailyChallengeBestResult = null;
     this.trackPersonalBestResult = null;
     this.trackPersonalBestByTrackKey = Object.create(null);
+    this.personalBestPaceBaselineByRaceId = Object.create(null);
+    this.activePersonalBestPaceBaseline = null;
     this.pbGhost = new PbGhost({ enabled: getPbGhostEnabled() });
     this.pbGhostService = new PbGhostService();
     this.journeys = new JourneyService();
@@ -231,15 +238,34 @@ export class RealTimeRacer {
     });
     this.startOverlay = new StartOverlay({
       dailyChallengeUi: this.dailyChallengeUi,
-      getLobbyUi: () => this.lobbyUi,
+    });
+    this.selectedDailyChallengeId = null;
+    this.dailyCarousel = new TrackCarousel({
+      idPrefix: "daily-carousel",
+      onSelect: (challenge) => this.handleDailyCarouselSelect(challenge),
+      onOpenLeaderboard: (challenge) => this.openDailyCarouselStandings(challenge),
+      onSettle: (card) => this.handleDailyCarouselSettled(card),
+    });
+    this.campaignCarousel = new TrackCarousel({
+      idPrefix: "campaign-carousel",
+      onSelect: (stage) => this.handleCampaignCarouselSelect(stage),
+      onOpenLeaderboard: (stage) => void this.openCampaignStandings(stage, {
+        returnMode: "close",
+      }),
+      onSettle: (card) => this.handleCampaignCarouselSettled(card),
     });
     this.lobbyUi = new LobbyUi({
       onSelectDaily: () => this.showDailyLobby(),
+      onCarouselNavigate: (mode, direction) => (
+        mode === "campaign"
+          ? this.campaignCarousel.handleNavDirection(direction)
+          : this.dailyCarousel.handleNavDirection(direction)
+      ),
       onSelectCampaign: () => this.showCampaignLobby(),
       onBack: () => this.showHomeLobby(),
-      onStartCampaign: (stage) => void this.startCampaignStage(stage),
-      onOpenCampaignStandings: () => void this.openCampaignStandings(),
-      onOpenCampaignTracks: () => void this.openCampaignTracks(),
+      onStartCampaign: () => void this.startCampaignStage(
+        this.campaignCarousel.getSelectedChallenge(),
+      ),
       onAcceptChallenge: () => void this.startCampaignChallenge(),
     });
     this.hud = new RaceHud({
@@ -292,6 +318,11 @@ export class RealTimeRacer {
       onStartDailyChallenge: (challenge, options = {}) => {
         void this.handleStartDailyChallenge(challenge, options);
       },
+      onRaceOpponent: (challenge, entry) => this.prepareAndStartLeaderboardOpponent({
+        mode: "daily",
+        competitionId: challenge?.id,
+        entry,
+      }),
       isRunsViewActive: () => this.modal.isRunsViewActive?.(),
       updateModalScoreboardSnapshot: (snapshot) => this.modal.updateModalScoreboardSnapshot?.(snapshot),
       updateModalLeaderboardDayOptions: (options) => this.modal.updateModalLeaderboardDayOptions?.(options),
@@ -369,16 +400,19 @@ export class RealTimeRacer {
       modal: this.modal,
       startOverlay: this.startOverlay,
       leaderboards: this.leaderboards,
-      onStartDailyChallenge: () => this.handleStartDailyChallenge(null, {
-        startSource: "main_menu",
-      }),
-      onOpenDailyPlaylist: () => this.openDailyChallengePlaylist(),
+      // Start races whatever the carousel has centred, not just today's track.
+      onStartDailyChallenge: () => this.handleStartDailyChallenge(
+        this.dailyCarousel.getSelectedChallenge(),
+        { startSource: "main_menu" },
+      ),
       onPauseRun: () => this.pauseActiveRun(),
     });
     this.interactions.bindModalViewToggles();
     this.interactions.bindModalActionRowPointerFocus();
     this.interactions.bindPrimaryActions();
     this.dailyChallengeUi.bindPlaylistModal();
+    this.dailyCarousel.bind();
+    this.campaignCarousel.bind();
     this.lobbyUi.bind();
     this.garage.bind();
     this.hud.setPauseVisible(false);
@@ -584,6 +618,14 @@ export class RealTimeRacer {
         : null,
       campaignRaceId: this.activeCampaignStage?.raceId || null,
       playerChallengeId: this.activeCampaignChallenge?.challengeId || null,
+      raceComparison: this.raceComparisonTarget
+        ? {
+            displayName: this.raceComparisonTarget.displayName,
+            finishTimeSec: this.raceComparisonTarget.finishTimeSec,
+            rank: this.raceComparisonTarget.rank,
+            carAssetName: this.raceComparisonTarget.carAssetName,
+          }
+        : null,
       startLine: this.currentTrack.startLine,
       routeTracePoints: this.routeTrace.length,
       liveParticles: this.particles.length,
@@ -646,6 +688,7 @@ Object.assign(
   raceEngineMethods,
   dailyChallengeEngineMethods,
   scoreboardEngineMethods,
+  opponentRaceEngineMethods,
   campaignEngineMethods,
   // Routing dispatches across every mode above, so it is applied last.
   modeRouterEngineMethods,
