@@ -21,16 +21,18 @@ top-to-bottom order.
 | 2 | `styles/foundation.css` | Tokens, reset, body, focus and global states |
 | 3 | `styles/race-hud-and-medals.css` | HUD, speed display and shared medal system |
 | 4 | `styles/lobby-and-garage.css` | Game canvas, start menu and initial garage rules |
-| 5 | `styles/race-controls-and-feedback.css` | Touch controls, countdown and lap feedback |
-| 6 | `styles/modal-and-result-shell.css` | Modal foundation, pause and initial result rules |
-| 7 | `styles/settings-and-track-shells.css` | Settings and track-list modal foundations |
-| 8 | `styles/modal-components-and-standings.css` | Reusable sheets, modal components and standings foundation |
-| 9 | `styles/responsive-layout.css` | Existing cross-product responsive overrides |
-| 10 | `styles/results.css` | Main finish-result presentation |
-| 11 | `styles/loading.css` | Startup loading screen |
-| 12 | `styles/result-details.css` | Result details overlay and compact result layout |
-| 13 | `styles/tracks-and-small-screens.css` | Track cards and later small-screen sheet overrides |
-| 14 | `styles/standings-and-sharing.css` | Standings header, shareable rows and share panel |
+| 5 | `styles/lobby-modes.css` | Home, Daily, Campaign and Challenge lobby composition |
+| 6 | `styles/track-carousel.css` | Shared Daily/Campaign selector rail, cards and medal ladder |
+| 7 | `styles/race-controls-and-feedback.css` | Touch controls, countdown and lap feedback |
+| 8 | `styles/modal-and-result-shell.css` | Modal foundation, pause and initial result rules |
+| 9 | `styles/settings-and-track-shells.css` | Settings and track-list modal foundations |
+| 10 | `styles/modal-components-and-standings.css` | Reusable sheets, modal components and standings foundation |
+| 11 | `styles/responsive-layout.css` | Existing cross-product responsive overrides |
+| 12 | `styles/results.css` | Main finish-result presentation |
+| 13 | `styles/loading.css` | Startup loading screen |
+| 14 | `styles/result-details.css` | Result details overlay and compact result layout |
+| 15 | `styles/tracks-and-small-screens.css` | Track cards and later small-screen sheet overrides |
+| 16 | `styles/standings-and-sharing.css` | Standings header, shareable rows and share panel |
 
 Some files intentionally span more than one product surface. Those boundaries
 reflect contiguous sections of the original stylesheet and avoid changing which

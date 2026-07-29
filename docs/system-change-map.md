@@ -128,6 +128,10 @@ flowchart LR
   element because that would override this lobby stack and separate the mode
   label from the title. Challenge also shows a compact details panel (track,
   time to beat) above Accept.
+- Daily and Campaign carousel cards show the full bronze-to-author medal ladder.
+  The inline medal SVGs may shrink vertically inside the preview on Reddit's
+  shorter WebView sizes; their intrinsic minimum height must not push the first
+  or last medal outside the clipped card.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
   Number Zero through Nine with fixed `1,1,1,2,2,2,3,3,3,3` laps and Gold/Author
   gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable

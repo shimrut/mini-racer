@@ -183,11 +183,21 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     gap: 0.4rem;
     width: auto;
     height: auto;
+    margin-right: 1.5rem;
 }
 
 .track-carousel__medal {
-    width: 1.7rem;
-    height: 1.7rem;
+    /* Shared medals are non-shrinking. The carousel overrides that contract so
+       all four square icons can scale together inside a short Reddit WebView
+       preview without clipping bronze or author. */
+    flex: 0 1 4rem;
+    min-height: 0;
+    min-width: 0;
+    width: auto;
+    height: auto;
+    max-width: 4rem;
+    max-height: 4rem;
+    aspect-ratio: 1;
     opacity: 0.4;
 }
 
@@ -319,13 +329,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     align-items: center;
     justify-content: center;
     margin: 0;
-}
-
-@media (max-width: 430px) {
-    .track-carousel__medal {
-        width: 1.45rem;
-        height: 1.45rem;
-    }
 }
 
 /* Last resort. Below this the card cannot hold the art and the text both, and

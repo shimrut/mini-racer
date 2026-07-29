@@ -79,4 +79,11 @@ describe('game stylesheet architecture', () => {
         );
     });
 
+    it('keeps carousel medals square and shrinkable inside short Reddit viewports', () => {
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__medal\s*\{[^}]*flex:\s*0 1 4rem;[^}]*min-height:\s*0;[^}]*min-width:\s*0;[^}]*max-width:\s*4rem;[^}]*max-height:\s*4rem;[^}]*aspect-ratio:\s*1;/s,
+        );
+        expect(trackCarouselStyles.match(/\.track-carousel__medal\s*\{/g)).toHaveLength(1);
+    });
+
 });
