@@ -147,6 +147,7 @@ export class TrackCarousel {
         } else {
             this._elements = cards.map((card, index) => this.buildCard(card, index));
             rail.replaceChildren(...this._elements);
+            this.playRailEntrance(rail);
         }
 
         const requestedIndex = findCarouselIndex(cards, selectedChallengeId);
@@ -169,6 +170,25 @@ export class TrackCarousel {
             requestAnimationFrame(() => this.fitPreviews());
         }
         if (changed || !sameRun) this.emitSelection();
+    }
+
+    /**
+     * The rail is only rebuilt when the run of tracks changes, which in
+     * practice is the frame the tracks finish loading and replace "Loading
+     * tracks". The class carries the entrance; it comes back off so that
+     * re-showing the lobby after a race does not replay it on top of the
+     * pane's own entrance.
+     */
+    playRailEntrance(rail) {
+        if (!rail?.classList) return;
+        rail.classList.remove('is-entering');
+        void rail.offsetWidth;
+        rail.classList.add('is-entering');
+        rail.addEventListener?.(
+            'animationend',
+            () => rail.classList.remove('is-entering'),
+            { once: true },
+        );
     }
 
     renderStatus({ loading = false } = {}) {

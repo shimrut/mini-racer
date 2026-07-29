@@ -94,7 +94,7 @@ describe('game stylesheet architecture', () => {
         const strays = [];
 
         for (const [, value] of styles.matchAll(
-            /\b(?:transition|animation)\s*:\s*([^;}]+)/g,
+            /\b(?:transition|animation)(?:-duration)?\s*:\s*([^;}]+)/g,
         )) {
             for (const segment of value.split(',')) {
                 // First time in a segment is the duration; a second one is the

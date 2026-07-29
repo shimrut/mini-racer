@@ -1261,6 +1261,54 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
+    /**
+     * The label fades when the campaign answers, but the button re-renders on
+     * every carousel step. Replaying the fade on a word that did not change
+     * would flicker it while the player is only browsing stages.
+     */
+    it('replays the primary label fade only when the word actually changes', () => {
+        const originalDocument = global.document;
+        const label = createElement('span');
+        label.className = 'main-menu__label';
+        const primary = createElement('button');
+        primary.children.push(label);
+        global.document = {
+            getElementById: (id) => (id === 'campaign-primary-btn' ? primary : null),
+            querySelector: () => null,
+            addEventListener: vi.fn(),
+            createElement,
+        };
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        global.requestAnimationFrame = vi.fn();
+        const lobby = new LobbyUi({});
+
+        lobby.bind();
+        lobby.showCampaign({
+            stages: [
+                { id: 'numbered-v1-00', unlocked: true, medal: null },
+                { id: 'numbered-v1-01', unlocked: true, medal: null },
+            ],
+        });
+
+        lobby.setCampaignSelectedStage({ id: 'numbered-v1-00', unlocked: true });
+        expect(label.textContent).toBe('Start Race');
+        expect(label.classList.contains('is-swapping')).toBe(true);
+
+        // Stepping between two unlocked stages reads the same both times.
+        label.classList.remove('is-swapping');
+        lobby.setCampaignSelectedStage({ id: 'numbered-v1-01', unlocked: true });
+        expect(label.textContent).toBe('Start Race');
+        expect(label.classList.contains('is-swapping')).toBe(false);
+
+        // Reaching a locked stage does change the word.
+        lobby.setCampaignSelectedStage({ id: 'numbered-v1-02', unlocked: false });
+        expect(label.textContent).toBe('Locked');
+        expect(label.classList.contains('is-swapping')).toBe(true);
+
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.document = originalDocument;
+    });
+
     it('passes the per-stage standings payload through unchanged', () => {
         expect(normalizeCampaignLeaderboardSnapshot({
             topRows: [{

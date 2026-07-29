@@ -478,7 +478,70 @@
 .leaderboard-loading-state {
     display: inline-flex;
     align-items: center;
-    gap: .65rem
+    gap: .65rem;
+    animation: leaderboardLoadingIn var(--dur-base) ease-out backwards;
+}
+
+@keyframes leaderboardLoadingIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/*
+ * Standings replace the spinner wholesale, so the rows land as one block on
+ * top of where the loading line was. Dealing them out instead gives the eye an
+ * order to read them in.
+ *
+ * `backwards` is what holds a row invisible through its delay; `forwards`
+ * would leave every row pinned to the keyframe's end transform afterwards.
+ */
+/* The rank gap is dealt with the rows around it: left out, it would be the one
+   static thing sitting in the middle of the run. */
+.leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row) {
+    animation: leaderboardRowIn var(--dur-base) var(--ease-settle) backwards;
+}
+
+/* The deal stops at five. Past that the tail is longer than the read, and the
+   list should already be there by the time the eye arrives. */
+.leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row):nth-child(2) {
+    animation-delay: 20ms;
+}
+
+.leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row):nth-child(3) {
+    animation-delay: 40ms;
+}
+
+.leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row):nth-child(4) {
+    animation-delay: 60ms;
+}
+
+.leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row):nth-child(n+5) {
+    animation-delay: 80ms;
+}
+
+@keyframes leaderboardRowIn {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 0.35rem, 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .leaderboard-loading-state,
+    .leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row) {
+        animation: none;
+    }
 }
 
 .modal-view {

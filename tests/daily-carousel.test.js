@@ -314,6 +314,39 @@ describe('TrackCarousel selection', () => {
         expect(carousel.getSelectedChallenge()).toBe(null);
         expect(carousel.handleNavDirection('right')).toBe(false);
     });
+
+    /**
+     * The entrance covers tracks replacing "Loading tracks". A rank or medal
+     * arriving later patches the cards in place, and replaying the animation
+     * there would shudder the rail while the player is only browsing.
+     */
+    it('flags the rail entrance on a rebuild and drops it when the run is unchanged', () => {
+        const carousel = new TrackCarousel();
+        const classes = new Set();
+        let animationEnd = null;
+        const rail = {
+            classList: {
+                add: (name) => classes.add(name),
+                remove: (name) => classes.delete(name),
+                contains: (name) => classes.has(name),
+            },
+            addEventListener: (name, handler) => {
+                if (name === 'animationend') animationEnd = handler;
+            },
+        };
+
+        carousel.playRailEntrance(rail);
+        expect(classes.has('is-entering')).toBe(true);
+
+        animationEnd();
+        expect(classes.has('is-entering')).toBe(false);
+    });
+
+    it('leaves the rail alone when there is no element to animate', () => {
+        const carousel = new TrackCarousel();
+        expect(() => carousel.playRailEntrance(null)).not.toThrow();
+        expect(() => carousel.playRailEntrance({})).not.toThrow();
+    });
 });
 
 describe('lobby keyboard handoff to the carousels', () => {

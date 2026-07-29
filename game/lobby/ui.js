@@ -23,6 +23,23 @@ function setText(element, value) {
     if (element) element.textContent = value;
 }
 
+/**
+ * The primary label is the one word that answers the campaign request, so it
+ * fades rather than cutting. Only a real change is worth animating: the button
+ * re-renders on every carousel step, and replaying the fade on identical text
+ * would flicker the label while the player is only browsing stages.
+ *
+ * Restarting a running animation needs the class gone for a frame, which is
+ * what reading the layout below forces.
+ */
+function setSwappingText(element, value) {
+    if (!element || element.textContent === value) return;
+    element.textContent = value;
+    element.classList.remove('is-swapping');
+    void element.offsetWidth;
+    element.classList.add('is-swapping');
+}
+
 export class LobbyUi {
     constructor({
         onSelectDaily = null,
@@ -294,7 +311,7 @@ export class LobbyUi {
                 // No selection yet, so the button can only go on whether the
                 // campaign has anything raceable in it at all.
                 : !this.campaignState.stages?.some((entry) => entry.unlocked));
-        setText(
+        setSwappingText(
             this.campaignPrimaryBtn.querySelector('.main-menu__label'),
             this.getCampaignPrimaryLabel(),
         );
@@ -316,7 +333,7 @@ export class LobbyUi {
             }
             btn.disabled = false;
             if (!this.campaignState.primaryLabel) {
-                setText(btn.querySelector('.main-menu__label'), 'Loading');
+                setSwappingText(btn.querySelector('.main-menu__label'), 'Loading');
             }
         } else {
             spinner?.remove();

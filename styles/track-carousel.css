@@ -253,6 +253,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     font-weight: 900;
     letter-spacing: -0.02em;
     line-height: 1.05;
+    /* The standings land well after the card does, and `is-muted` drops four
+       properties at once when they do — the placeholder dots grow into a rank
+       in a single frame. Riding them across covers the whole arrival. */
+    transition:
+        color var(--dur-base) ease,
+        font-size var(--dur-base) var(--ease-settle),
+        font-weight var(--dur-base) ease,
+        letter-spacing var(--dur-base) ease;
 }
 
 .track-carousel__rank:hover:not(:disabled) .track-carousel__rank-value {
@@ -329,6 +337,45 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     align-items: center;
     justify-content: center;
     margin: 0;
+    /* `hidden` is display:none globally, so there is nothing to transition
+       against — the entrance has to be a keyframe, which replays on its own
+       every time the element comes back into rendering. */
+    animation: trackCarouselStatusIn var(--dur-base) ease-out both;
+}
+
+@keyframes trackCarouselStatusIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/*
+ * Set only while the rail is actually rebuilt, which is the moment the tracks
+ * finish loading. A late rank or medal patches the existing cards instead, so
+ * browsing the rail never replays this.
+ *
+ * Carried by the rail rather than the cards: a peeking card sits at opacity
+ * 0.4 and the centred one at 1, so fading each card to 1 would flash the
+ * neighbours bright before dropping them back.
+ */
+.track-carousel__rail.is-entering {
+    animation: trackCarouselCardIn var(--dur-base) var(--ease-settle) both;
+}
+
+@keyframes trackCarouselCardIn {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 0.4rem, 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
 }
 
 /* Last resort. Below this the card cannot hold the art and the text both, and
@@ -355,6 +402,15 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
     .track-carousel__viewport {
         scroll-behavior: auto;
+    }
+
+    .track-carousel__status,
+    .track-carousel__rail.is-entering {
+        animation: none;
+    }
+
+    .track-carousel__rank-value {
+        transition: none;
     }
 }
 
