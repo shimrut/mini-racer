@@ -1,7 +1,21 @@
 export const RACE_SCORING_TOTAL_TIME = 'total_time';
 export const RACE_MEDAL_SCALE_LINEAR_V1 = 'linear_v1';
 
+export const RACE_OBJECTIVE_SINGLE_LAP = 'single_lap_fastest';
+export const RACE_OBJECTIVE_MULTI_LAP = 'multi_lap_total';
+
 const SUPPORTED_MODES = new Set(['daily', 'campaign', 'challenge']);
+
+/**
+ * The objective a lap count implies. Only the lap count drives scoring — the
+ * objective type is the label the run policy and the leaderboard report — so
+ * the two must never be chosen independently.
+ */
+export function objectiveTypeForLapCount(lapCount) {
+    return Number(lapCount) === 1
+        ? RACE_OBJECTIVE_SINGLE_LAP
+        : RACE_OBJECTIVE_MULTI_LAP;
+}
 
 export function normalizeRaceSpec(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -32,5 +46,6 @@ export function normalizeRaceSpec(value) {
         scoring: RACE_SCORING_TOTAL_TIME,
         medalScale: RACE_MEDAL_SCALE_LINEAR_V1,
         rulesRevision,
+        objectiveType: objectiveTypeForLapCount(lapCount),
     });
 }

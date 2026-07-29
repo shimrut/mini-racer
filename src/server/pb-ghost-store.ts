@@ -53,7 +53,7 @@ function playerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
 }
 
-function challengeCollectionKey(challengeId: string): string {
+export function challengeCollectionKey(challengeId: string): string {
     return `dailygp:challenge-pbs:${challengeId}`;
 }
 

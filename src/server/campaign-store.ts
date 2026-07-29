@@ -8,6 +8,7 @@ import {
     isCampaignStageUnlocked,
 } from '../../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../../game/medals/medal-timing.js';
+import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 import { sanitizeRedditUsername } from '../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
@@ -623,7 +624,7 @@ export async function submitServerCampaignRun({
         availableUntil: '9999-12-31T23:59:59.999Z',
         status: 'active' as const,
         rulesRevision: stage.rulesRevision as 1,
-        objectiveType: stage.lapCount === 1 ? 'single_lap_fastest' as const : 'multi_lap_total' as const,
+        objectiveType: objectiveTypeForLapCount(stage.lapCount) as 'single_lap_fastest' | 'multi_lap_total',
         objectiveParams: { lapCount: stage.lapCount },
         skin: 'default' as const,
     };

@@ -1,5 +1,6 @@
 import { CAMPAIGN_ID, getCampaignStage } from '../../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../../game/medals/medal-timing.js';
+import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import { getServerCampaignChallengeSource } from './campaign-store.js';
 import {
@@ -71,9 +72,8 @@ export function validateCampaignChallengeReplay(
             availableUntil: '9999-12-31T23:59:59.999Z',
             status: 'active' as const,
             rulesRevision: challenge.rulesRevision as 1,
-            objectiveType: challenge.lapCount === 1
-                ? 'single_lap_fastest' as const
-                : 'multi_lap_total' as const,
+            objectiveType: objectiveTypeForLapCount(challenge.lapCount) as
+                'single_lap_fastest' | 'multi_lap_total',
             objectiveParams: { lapCount: challenge.lapCount },
             skin: 'default' as const,
         },

@@ -42,6 +42,7 @@ export {
     getStrictDailyChallengeLapCount,
     isDailyChallengeLapCount,
 } from './labels.js';
+import { objectiveTypeForLapCount } from '../race/race-spec.js';
 
 const MIN_DAILY_TIME = 2.0;
 const MAX_DAILY_TIME = 60 * 60;
@@ -123,7 +124,7 @@ function getMockDailyChallenge() {
         id: 'mock-daily-challenge-local',
         trackKey,
         rulesRevision: 1,
-        objectiveType: lapCount === 1 ? 'single_lap_fastest' : 'multi_lap_total',
+        objectiveType: objectiveTypeForLapCount(lapCount),
         startsAt: new Date(now).toISOString(),
         endsAt: new Date(now + DAY_MS).toISOString(),
         availableUntil: new Date(now + DAILY_PLAYLIST_DAYS * DAY_MS).toISOString(),

@@ -6,6 +6,7 @@ import { getTrackName } from '../track/catalog.js';
 import { TRACKS } from '../track/tracks.js';
 import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
+import { objectiveTypeForLapCount } from '../race/race-spec.js';
 import {
     clearLocalCampaignProgress,
     createCampaignChallenge,
@@ -50,7 +51,7 @@ function toRaceChallenge(stage, mode = 'campaign') {
         availableUntil: '9999-12-31T23:59:59.999Z',
         status: 'active',
         rulesRevision: stage.rulesRevision,
-        objectiveType: stage.lapCount === 1 ? 'single_lap_fastest' : 'multi_lap_total',
+        objectiveType: objectiveTypeForLapCount(stage.lapCount),
         objectiveParams: { lapCount: stage.lapCount },
         skin: 'default',
         mode,

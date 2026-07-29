@@ -1,4 +1,5 @@
 import { getAuthorMedalSeconds } from '../../game/medals/medal-timing.js';
+import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
@@ -219,7 +220,7 @@ export function buildDailyGpChallengeForDayIndexWithTrack(
         availableUntil: availableUntil.toISOString(),
         status: 'active',
         rulesRevision: DAILY_GP_RULES_REVISION,
-        objectiveType: lapCount === 1 ? DEFAULT_OBJECTIVE_TYPE : 'multi_lap_total',
+        objectiveType: objectiveTypeForLapCount(lapCount),
         objectiveParams: { lapCount },
         skin: 'default',
     };
