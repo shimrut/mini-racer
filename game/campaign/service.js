@@ -11,6 +11,73 @@ import {
 
 export const CAMPAIGN_REQUEST_TIMEOUT_MS = 20_000;
 
+const PENDING_RESULTS_KEY = `MiniRacerCampaignPending:${CAMPAIGN_ID}`;
+
+/**
+ * Finishes that have not come back from the server yet.
+ *
+ * The medal is one shared function of a time, so the client can work out what a
+ * run earned the moment it ends and open the next stage straight away, the same
+ * way Daily banks a best time before it is confirmed. These entries are held
+ * only until the server answers for that race: an accepted run replaces them
+ * with verified progress, a refused one drops them.
+ *
+ * They are not a second source of truth. Ranking, and the gate on entering a
+ * stage, are enforced server-side on every submission regardless of what is
+ * stored here.
+ */
+function readPendingResults(root = globalThis) {
+    try {
+        const raw = root?.localStorage?.getItem(PENDING_RESULTS_KEY);
+        return raw ? normalizeResults(JSON.parse(raw)) : emptyResults();
+    } catch {
+        return emptyResults();
+    }
+}
+
+function writePendingResults(results, root = globalThis) {
+    try {
+        root?.localStorage?.setItem(PENDING_RESULTS_KEY, JSON.stringify(results));
+    } catch {
+        // An unconfirmed finish is best-effort browser state.
+    }
+}
+
+export function recordPendingCampaignResult(raceId, { bestTimeMs, medal }, root = globalThis) {
+    const results = readPendingResults(root);
+    const previous = results[raceId];
+    if (previous && Number(previous.bestTimeMs) <= Number(bestTimeMs)) return results;
+    const next = {
+        ...results,
+        [raceId]: { raceId, bestTimeMs, medal, updatedAt: new Date().toISOString() },
+    };
+    writePendingResults(next, root);
+    return next;
+}
+
+export function clearPendingCampaignResult(raceId, root = globalThis) {
+    const results = readPendingResults(root);
+    if (!results[raceId]) return results;
+    const { [raceId]: _settled, ...rest } = results;
+    writePendingResults(rest, root);
+    return rest;
+}
+
+export function getPendingCampaignResults(root = globalThis) {
+    return readPendingResults(root);
+}
+
+/** Verified progress wins wherever it exists; a pending finish only fills gaps. */
+export function mergePendingCampaignResults(serverResults, pendingResults) {
+    const merged = { ...normalizeResults(serverResults) };
+    for (const [raceId, pending] of Object.entries(normalizeResults(pendingResults))) {
+        const verified = merged[raceId];
+        if (verified && Number(verified.bestTimeMs) <= Number(pending.bestTimeMs)) continue;
+        merged[raceId] = pending;
+    }
+    return merged;
+}
+
 function emptyResults() {
     return Object.create(null);
 }
@@ -127,7 +194,10 @@ function unavailableCampaignBootstrap() {
         ranked: false,
         signedIn: false,
         stages: CAMPAIGN_STAGES,
-        progress: deriveCampaignProgress(),
+        // An unreachable server has not revoked anything, so a finish waiting to
+        // be confirmed still counts. Without this, one failed request would shut
+        // a player out of stages they had already opened.
+        progress: deriveCampaignProgress(getPendingCampaignResults()),
         standingsByRaceId: normalizeCampaignStandings(null),
     };
 }
@@ -143,7 +213,10 @@ export async function getCampaignBootstrap() {
             signedIn: response.body.signedIn === true,
             stages: Array.isArray(response.body.stages) ? response.body.stages : CAMPAIGN_STAGES,
             progress: deriveCampaignProgress(
-                response.body.progress?.resultsByRaceId,
+                mergePendingCampaignResults(
+                    response.body.progress?.resultsByRaceId,
+                    getPendingCampaignResults(),
+                ),
                 response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
             ),
             standingsByRaceId: normalizeCampaignStandings(response.body.standingsByRaceId),

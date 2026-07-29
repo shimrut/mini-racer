@@ -6,27 +6,22 @@ const campaignServiceMocks = vi.hoisted(() => ({
     getCampaignChallenge: vi.fn(),
     getCampaignPbGhost: vi.fn(),
     getCampaignSnapshot: vi.fn(),
-    deriveCampaignProgress: vi.fn(() => ({
-        campaignId: 'numbered-v1',
-        startedAt: null,
-        resultsByRaceId: {},
-        unlockedRaceIds: ['numbered-v1-00'],
-        complete: false,
-        continueRaceId: 'numbered-v1-00',
-    })),
     startServerCampaignRace: vi.fn(),
     submitCampaignChallengeRun: vi.fn(),
     submitCampaignRun: vi.fn(),
 }));
 
-vi.mock('../game/campaign/service.js', () => ({
+// Only the calls that go to the server are faked. Everything else — deriving
+// progress, holding an unconfirmed finish — is the real implementation, so a
+// new export here cannot silently go missing from the mock.
+vi.mock('../game/campaign/service.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     createCampaignChallenge: vi.fn(),
+    previewCampaignChallenge: vi.fn(),
     getCampaignBootstrap: campaignServiceMocks.getCampaignBootstrap,
     getCampaignChallenge: campaignServiceMocks.getCampaignChallenge,
     getCampaignPbGhost: campaignServiceMocks.getCampaignPbGhost,
     getCampaignSnapshot: campaignServiceMocks.getCampaignSnapshot,
-    previewCampaignChallenge: vi.fn(),
-    deriveCampaignProgress: campaignServiceMocks.deriveCampaignProgress,
     startServerCampaignRace: campaignServiceMocks.startServerCampaignRace,
     submitCampaignChallengeRun: campaignServiceMocks.submitCampaignChallengeRun,
     submitCampaignRun: campaignServiceMocks.submitCampaignRun,
@@ -173,15 +168,6 @@ afterEach(() => {
     campaignServiceMocks.getCampaignChallenge.mockReset();
     campaignServiceMocks.getCampaignPbGhost.mockReset();
     campaignServiceMocks.getCampaignSnapshot.mockReset();
-    campaignServiceMocks.deriveCampaignProgress.mockReset();
-    campaignServiceMocks.deriveCampaignProgress.mockReturnValue({
-        campaignId: 'numbered-v1',
-        startedAt: null,
-        resultsByRaceId: {},
-        unlockedRaceIds: ['numbered-v1-00'],
-        complete: false,
-        continueRaceId: 'numbered-v1-00',
-    });
     campaignServiceMocks.startServerCampaignRace.mockReset();
     campaignServiceMocks.submitCampaignChallengeRun.mockReset();
     campaignServiceMocks.submitCampaignRun.mockReset();
@@ -255,6 +241,49 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect.anything(),
         );
         expect(context.processVerificationQueue).toHaveBeenCalled();
+    });
+
+    it('opens the next stage on the finish rather than a round trip later', () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
+            applyCampaignLobbyBootstrap: vi.fn(),
+        });
+
+        // Author on stage 00 is what gates stage 01.
+        context.handleCampaignWin({ lapTime: 7.0 });
+
+        const progress = context.campaignBootstrap.progress;
+        expect(progress.resultsByRaceId['numbered-v1-00']).toMatchObject({
+            medal: 'author',
+            bestTimeMs: 7000,
+        });
+        expect(progress.unlockedRaceIds).toContain('numbered-v1-01');
+    });
+
+    it('closes the stage again when the server refuses the run that opened it', async () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
+            applyCampaignLobbyBootstrap: vi.fn(),
+            updateCampaignFinishSnapshot: vi.fn(),
+        });
+        context.handleCampaignWin({ lapTime: 7.0 });
+        expect(context.campaignBootstrap.progress.unlockedRaceIds)
+            .toContain('numbered-v1-01');
+
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: false,
+            status: 422,
+            body: { error: 'Submission replay validation failed.' },
+        });
+        await context.processCampaignVerificationEntry({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime: 7.0,
+            replay: { revision: 1, segments: [] },
+        });
+
+        expect(context.campaignBootstrap.progress.unlockedRaceIds)
+            .not.toContain('numbered-v1-01');
     });
 
     it('opens the finish modal once and queues the run before submission settles', async () => {

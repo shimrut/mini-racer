@@ -8,8 +8,12 @@ import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
 import {
+    clearPendingCampaignResult,
     createCampaignChallenge,
     deriveCampaignProgress,
+    getPendingCampaignResults,
+    mergePendingCampaignResults,
+    recordPendingCampaignResult,
     getCampaignBootstrap,
     getCampaignChallenge,
     getCampaignPbGhost,
@@ -170,6 +174,49 @@ function decorateCampaignState(bootstrap) {
             };
         }),
     };
+}
+
+/**
+ * Opens the next stage on the strength of the run that just ended, before the
+ * server has confirmed it. The medal is a shared function of the time, so the
+ * client already knows what was earned; waiting on a round trip only delays the
+ * unlock, and on a dropped connection it never arrives at all.
+ *
+ * Verified progress replaces this as soon as it lands, and a refused run has it
+ * revoked. The server gate on entering and submitting to a stage is unchanged.
+ */
+function applyPendingCampaignResult(engine, stage, finalTime, medal) {
+    if (!engine.campaignBootstrap) return;
+    const bestTimeMs = Math.round(Number(finalTime) * 1000);
+    if (!Number.isSafeInteger(bestTimeMs) || bestTimeMs <= 0) return;
+    const merged = mergePendingCampaignResults(
+        engine.campaignBootstrap.progress?.resultsByRaceId,
+        recordPendingCampaignResult(stage.raceId, { bestTimeMs, medal }),
+    );
+    engine.campaignBootstrap.progress = deriveCampaignProgress(
+        merged,
+        engine.campaignBootstrap.progress?.startedAt ?? null,
+    );
+    engine.applyCampaignLobbyBootstrap?.(engine.campaignBootstrap);
+}
+
+/**
+ * Takes back an unlock the server refused. Only the entry this run put there is
+ * dropped: a verified result for the same stage outranks it and stays.
+ */
+function revokePendingCampaignResult(engine, raceId, bestTime) {
+    clearPendingCampaignResult(raceId);
+    const progress = engine.campaignBootstrap?.progress;
+    if (!progress?.resultsByRaceId) return;
+    const existing = progress.resultsByRaceId[raceId];
+    const bestTimeMs = Math.round(Number(bestTime) * 1000);
+    if (!existing || Number(existing.bestTimeMs) !== bestTimeMs) return;
+    const { [raceId]: _refused, ...rest } = progress.resultsByRaceId;
+    engine.campaignBootstrap.progress = deriveCampaignProgress(
+        rest,
+        progress.startedAt ?? null,
+    );
+    engine.applyCampaignLobbyBootstrap?.(engine.campaignBootstrap);
 }
 
 function buildProvisionalCampaignBootstrap(previous = null) {
@@ -833,6 +880,10 @@ export const campaignEngineMethods = {
             return;
         }
 
+        // The medal is already known, so the stage it opens is opened now
+        // rather than a round trip later.
+        applyPendingCampaignResult(this, stage, finalTime, medal);
+
         // Same pattern as Daily: the finish sheet opens immediately and the
         // durable queue confirms in the background, so a dropped connection
         // retries instead of losing the run.
@@ -943,6 +994,8 @@ export const campaignEngineMethods = {
 
         if (response.ok && response.body?.accepted === true) {
             clearCampaignVerification(raceId);
+            // Verified progress supersedes what this run opened optimistically.
+            clearPendingCampaignResult(raceId);
             if (this.campaignBootstrap && response.body.progress) {
                 this.campaignBootstrap.progress = response.body.progress;
             }
@@ -965,8 +1018,10 @@ export const campaignEngineMethods = {
 
         const error = response.body?.error || 'This run could not be verified.';
         markCampaignVerificationError(raceId, error);
-        // Campaign medals are the unlock gate, and this run earned none, so the
-        // open finish sheet must stop advertising one.
+        // Campaign medals are the unlock gate, and the server refused this run,
+        // so the stage it opened closes again and the sheet stops advertising a
+        // medal it did not earn.
+        revokePendingCampaignResult(this, raceId, entry.bestTime);
         if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
             this.modal.setCombinedWinMedal?.(null);
         }
