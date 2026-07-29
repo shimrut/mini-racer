@@ -182,24 +182,12 @@ function buildProvisionalCampaignBootstrap(previous = null) {
     };
 }
 
+/**
+ * Campaign standings arrive in the shared snapshot shape now, so there is
+ * nothing left to adapt — only the null guard the call sites rely on.
+ */
 export function normalizeCampaignLeaderboardSnapshot(body) {
-    if (!body) return null;
-    const normalizeRow = (row) => row ? {
-        ...row,
-        bestTime: Number(row.bestTimeMs) / 1000,
-    } : null;
-    const currentPlayerRow = normalizeRow(body.currentPlayerRow);
-    const playerRank = Number.isFinite(Number(currentPlayerRow?.rank))
-        ? Number(currentPlayerRow.rank)
-        : null;
-    return normalizeScoreboardSnapshot({
-        ...body,
-        topRows: Array.isArray(body.rows) ? body.rows.map(normalizeRow) : [],
-        currentPlayerRow,
-        leaderboardEntryCount: body.totalCount,
-        playerRank,
-        playerRankLabel: playerRank ? `#${playerRank}` : null,
-    });
+    return body ? normalizeScoreboardSnapshot(body) : null;
 }
 
 export function buildCampaignLeaderboardOptions(campaignState) {

@@ -562,14 +562,18 @@ describe('Campaign lobby and shared modal adapters', () => {
         campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
             ok: true,
             body: {
-                rows: [{ rank: 1, displayName: 'You', bestTimeMs: 8250, isCurrentPlayer: true }],
+                topRows: [{ rank: 1, displayName: 'You', bestTimeMs: 8250, bestTime: 8.25, isCurrentPlayer: true }],
                 currentPlayerRow: {
                     rank: 1,
                     displayName: 'You',
                     bestTimeMs: 8250,
+                    bestTime: 8.25,
                     isCurrentPlayer: true,
                 },
                 totalCount: 3,
+                leaderboardEntryCount: 3,
+                playerRank: 1,
+                playerRankLabel: '#1',
                 pageOffset: 0,
                 pageLimit: 50,
                 hasMore: false,
@@ -1204,9 +1208,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
-    it('maps per-stage API rows into the shared standings contract', () => {
+    it('passes the per-stage standings payload through unchanged', () => {
         expect(normalizeCampaignLeaderboardSnapshot({
-            rows: [{
+            topRows: [{
                 rank: 1,
                 displayName: 'Racer',
                 bestTimeMs: 12_345,
@@ -1219,6 +1223,9 @@ describe('Campaign lobby and shared modal adapters', () => {
                 isCurrentPlayer: true,
             },
             totalCount: 1,
+            leaderboardEntryCount: 1,
+            playerRank: 1,
+            playerRankLabel: '#1',
             pageOffset: 0,
             pageLimit: 50,
             hasMore: false,
@@ -1243,7 +1250,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
             ok: true,
             body: {
-                rows: [],
+                topRows: [],
                 currentPlayerRow: null,
                 totalCount: 0,
                 pageOffset: 0,
@@ -1325,7 +1332,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             .mockResolvedValueOnce({
                 ok: true,
                 body: {
-                    rows: [{ rank: 1, displayName: 'Leader', bestTimeMs: 12_000 }],
+                    topRows: [{ rank: 1, displayName: 'Leader', bestTimeMs: 12_000, bestTime: 12 }],
                     currentPlayerRow: null,
                     totalCount: 51,
                     pageOffset: 0,
@@ -1337,7 +1344,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             .mockResolvedValueOnce({
                 ok: true,
                 body: {
-                    rows: [{ rank: 51, displayName: 'Racer', bestTimeMs: 15_000 }],
+                    topRows: [{ rank: 51, displayName: 'Racer', bestTimeMs: 15_000, bestTime: 15 }],
                     currentPlayerRow: null,
                     totalCount: 51,
                     pageOffset: 50,
@@ -1417,7 +1424,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         resolveFirst({
             ok: true,
             body: {
-                rows: [{ rank: 1, displayName: 'Stale', bestTimeMs: 10_000 }],
+                topRows: [{ rank: 1, displayName: 'Stale', bestTimeMs: 10_000, bestTime: 10 }],
                 totalCount: 1,
             },
         });
@@ -1427,7 +1434,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         resolveSecond({
             ok: true,
             body: {
-                rows: [{ rank: 1, displayName: 'Current', bestTimeMs: 11_000 }],
+                topRows: [{ rank: 1, displayName: 'Current', bestTimeMs: 11_000, bestTime: 11 }],
                 totalCount: 1,
             },
         });
