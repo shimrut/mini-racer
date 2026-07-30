@@ -36,10 +36,11 @@ Mini Racer is a **game**, so the most important launch requirements are:
   and Standings, Garage, and Settings icons at top right. The selected track is
   a borderless full-surface schematic, neighboring tracks peek at both screen
   edges, and a tiny version of the currently selected Garage car replaces the
-  generic direction triangle at the start line. Changing the Garage skin
-  repaints this marker in both modes. A centered Start Race pill is the only
-  bottom action. Back returns to Home, and Standings opens on the track
-  currently centred in the carousel.
+  generic direction triangle at the start line. Its size relative to the track
+  matches the in-race car-to-track proportion on both compact and tall tracks;
+  changing the Garage skin repaints this marker in both modes. A centered Start
+  Race pill is the only bottom action. Back returns to Home, and Standings
+  opens on the track currently centred in the carousel.
 - [ ] At the first and last Daily/Campaign entries, the selected track still
   centers in the Reddit WebView. Swiping or tapping an edge track updates the
   selected title, Standings target, and Start Race target together.

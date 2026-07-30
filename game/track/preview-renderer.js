@@ -100,6 +100,7 @@ function getTrackBoundsLayout(trackGeometry, width, height, topInset = 0, bottom
     const offsetY = topInset + padding + (usableHeight - (maxY - minY) * scale) / 2;
 
     return {
+        scale,
         mapPoint: (point) => ({
             x: offsetX + (point.x - minX) * scale,
             y: offsetY + (point.y - minY) * scale
@@ -245,17 +246,34 @@ function drawSchematicCarTrail(ctx, position, angle, scale = 1) {
     ctx.restore();
 }
 
-function drawSchematicCarImage(ctx, image, position, angle, scale = 1) {
+function drawSchematicCarImage(
+    ctx,
+    image,
+    position,
+    angle,
+    markerScale = 1,
+    trackScale = null,
+    carWorldSize = null
+) {
     if (!image) return;
-    const size = 36 * scale;
+    const fallbackSize = 36 * markerScale;
+    const hasWorldSize = Number.isFinite(trackScale)
+        && trackScale > 0
+        && Number.isFinite(carWorldSize?.width)
+        && carWorldSize.width > 0
+        && Number.isFinite(carWorldSize?.height)
+        && carWorldSize.height > 0;
+    const width = hasWorldSize ? carWorldSize.width * trackScale : fallbackSize;
+    const height = hasWorldSize ? carWorldSize.height * trackScale : fallbackSize;
+    const shadowScale = Math.min(width, height) / 36;
     ctx.save();
     ctx.translate(position.x, position.y);
     ctx.rotate(angle);
     ctx.shadowColor = 'rgba(2, 6, 23, 0.7)';
-    ctx.shadowBlur = 5 * scale;
-    ctx.shadowOffsetX = 1.5 * scale;
-    ctx.shadowOffsetY = 2 * scale;
-    ctx.drawImage(image, -size / 2, -size / 2, size, size);
+    ctx.shadowBlur = 5 * shadowScale;
+    ctx.shadowOffsetX = 1.5 * shadowScale;
+    ctx.shadowOffsetY = 2 * shadowScale;
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
     ctx.restore();
 }
 
@@ -305,6 +323,8 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     showCarTrail = false,
     moveCarPastStartLine = false,
     carImage = null,
+    carWorldSize = null,
+    trackScale = null,
     hideStartArrow = false
 }) {
     const outer = trackGeometry.outer;
@@ -367,7 +387,15 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
                 drawSchematicCarTrail(ctx, markerPosition, startAngle, arrowScale);
             }
             if (carImage) {
-                drawSchematicCarImage(ctx, carImage, markerPosition, startAngle, arrowScale);
+                drawSchematicCarImage(
+                    ctx,
+                    carImage,
+                    markerPosition,
+                    startAngle,
+                    arrowScale,
+                    trackScale,
+                    carWorldSize
+                );
             } else if (!hideStartArrow) {
                 drawSchematicStartArrow(ctx, markerPosition, startAngle, arrowScale);
             }
@@ -419,6 +447,8 @@ export function renderTrackPreviewCanvas(canvas, payload) {
             showCarTrail: payload.showSchematicCarTrail === true,
             moveCarPastStartLine: payload.moveSchematicCarPastStartLine === true,
             carImage: payload.schematicCarImage || null,
+            carWorldSize: payload.schematicCarWorldSize || null,
+            trackScale: boundsLayout.scale,
             hideStartArrow: payload.hideSchematicStartArrow === true
         });
         return;

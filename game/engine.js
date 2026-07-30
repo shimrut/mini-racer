@@ -250,6 +250,14 @@ export class RealTimeRacer {
         this.carSpriteAssetKey ? this.carSprite : null
       ),
       getPreviewCarAssetKey: () => this.carSpriteAssetKey || "loading",
+      getPreviewCarWorldSize: () => ({
+        width: (
+          this.carSpriteDrawWidth * (CONFIG.carSpriteRenderScale ?? 1)
+        ) / CONFIG.gridSize,
+        height: (
+          this.carSpriteDrawHeight * (CONFIG.carSpriteRenderScale ?? 1)
+        ) / CONFIG.gridSize,
+      }),
     });
     this.campaignCarousel = new TrackCarousel({
       idPrefix: "campaign-carousel",
@@ -262,6 +270,14 @@ export class RealTimeRacer {
         this.carSpriteAssetKey ? this.carSprite : null
       ),
       getPreviewCarAssetKey: () => this.carSpriteAssetKey || "loading",
+      getPreviewCarWorldSize: () => ({
+        width: (
+          this.carSpriteDrawWidth * (CONFIG.carSpriteRenderScale ?? 1)
+        ) / CONFIG.gridSize,
+        height: (
+          this.carSpriteDrawHeight * (CONFIG.carSpriteRenderScale ?? 1)
+        ) / CONFIG.gridSize,
+      }),
     });
     this.lobbyUi = new LobbyUi({
       onSelectDaily: () => this.showDailyLobby(),

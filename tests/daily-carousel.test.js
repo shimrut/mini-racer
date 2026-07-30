@@ -521,11 +521,13 @@ describe('TrackCarousel selection', () => {
         let selectedCar = {
             assetKey: 'assets/cars/red.webp',
             image: firstCar,
+            worldSize: { width: 1.3, height: 1.3 },
         };
         const carousel = new TrackCarousel({
             previewCacheNamespace: 'garage-car-preview-test',
             getPreviewCarImage: () => selectedCar.image,
             getPreviewCarAssetKey: () => selectedCar.assetKey,
+            getPreviewCarWorldSize: () => selectedCar.worldSize,
         });
         const card = { trackKey: 'circuit', skin: 'default' };
 
@@ -536,13 +538,14 @@ describe('TrackCarousel selection', () => {
                 firstCar,
                 expect.any(Number),
                 expect.any(Number),
-                expect.any(Number),
-                expect.any(Number),
+                expect.closeTo(12.12, 1),
+                expect.closeTo(12.12, 1),
             );
 
             selectedCar = {
                 assetKey: 'assets/cars/blue.webp',
                 image: secondCar,
+                worldSize: { width: 1.3, height: 1.3 },
             };
             carousel.renderPreview(canvas, card);
 
@@ -552,8 +555,8 @@ describe('TrackCarousel selection', () => {
                 secondCar,
                 expect.any(Number),
                 expect.any(Number),
-                expect.any(Number),
-                expect.any(Number),
+                expect.closeTo(12.12, 1),
+                expect.closeTo(12.12, 1),
             );
         } finally {
             globalThis.Path2D = OriginalPath2D;

@@ -199,6 +199,7 @@ describe('track preview rendering', () => {
             transparentBackground: true,
             previewRenderMode: 'schematic',
             schematicCarImage: carImage,
+            schematicCarWorldSize: { width: 1.3, height: 1.3 },
             hideSchematicStartArrow: true
         });
 
@@ -207,6 +208,8 @@ describe('track preview rendering', () => {
         expect(ctx.rotate).toHaveBeenCalledWith(0.75);
         expect(ctx.drawImage).toHaveBeenCalledOnce();
         expect(ctx.drawImage.mock.calls[0][0]).toBe(carImage);
+        expect(ctx.drawImage.mock.calls[0][3]).toBeCloseTo(27.3);
+        expect(ctx.drawImage.mock.calls[0][4]).toBeCloseTo(27.3);
         expect(ctx.__fillStyles).not.toContain('#dc5a5a');
         global.Path2D = OriginalPath2D;
     });

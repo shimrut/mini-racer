@@ -67,6 +67,7 @@ export class TrackCarousel {
         onSettle = null,
         getPreviewCarImage = null,
         getPreviewCarAssetKey = null,
+        getPreviewCarWorldSize = null,
     } = {}) {
         this.idPrefix = idPrefix;
         this.previewCacheNamespace = previewCacheNamespace;
@@ -75,6 +76,7 @@ export class TrackCarousel {
         this.onSettle = onSettle;
         this.getPreviewCarImage = getPreviewCarImage;
         this.getPreviewCarAssetKey = getPreviewCarAssetKey;
+        this.getPreviewCarWorldSize = getPreviewCarWorldSize;
         this._cards = [];
         this._elements = [];
         this._selectedIndex = -1;
@@ -483,10 +485,15 @@ export class TrackCarousel {
         if (!canvas || !track) return;
         const previewCarImage = this.getPreviewCarImage?.() || null;
         const previewCarAssetKey = this.getPreviewCarAssetKey?.() || 'fallback';
+        const previewCarWorldSize = this.getPreviewCarWorldSize?.() || null;
+        const previewCarSizeKey = previewCarWorldSize
+            ? `${previewCarWorldSize.width}x${previewCarWorldSize.height}`
+            : 'default-size';
         const previewKey = [
             card.trackKey,
             card.skin || 'default',
             previewCarAssetKey,
+            previewCarSizeKey,
             `${canvas.width}x${canvas.height}`,
         ].join(':');
         if (!force && canvas.dataset.previewKey === previewKey) return;
@@ -498,6 +505,7 @@ export class TrackCarousel {
                 card.trackKey,
                 card.skin || 'default',
                 previewCarAssetKey,
+                previewCarSizeKey,
             ].join(':'),
             trackGeometry: { outer: track.outer, inner: track.inner },
             presentation: resolveTrackPresentation(card.trackKey, {
@@ -512,6 +520,7 @@ export class TrackCarousel {
             transparentBackground: true,
             previewRenderMode: 'schematic',
             schematicCarImage: previewCarImage,
+            schematicCarWorldSize: previewCarWorldSize,
             hideSchematicStartArrow: Boolean(previewCarImage),
         });
     }
