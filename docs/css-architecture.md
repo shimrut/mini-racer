@@ -48,8 +48,14 @@ maintaining mode-specific card layouts:
   circuit schematic, and player scoreline.
 - `game/ui/track-carousel.js` generates the shared DOM. Daily and Campaign model
   builders supply different data without duplicating markup.
-- `#start-group` remains the only width and height owner. The carousel reads its
-  measured width and must not restate it with `100vw` or a second max width.
+- `#start-group` remains the only width owner. The carousel reads its measured
+  width and must not restate it with `100vw` or a second max width.
+- The visible WebView is the height owner. `game/ui/visible-viewport.js`
+  publishes `window.visualViewport.height` as `--app-visible-height` (falling
+  back to `innerHeight` and then CSS viewport units), `html` and `body` use that
+  value, and `#start-group` flexes inside the overlay's actual content box.
+  Daily/Campaign panes and the carousel clip their own paint so a transient
+  native-browser resize cannot draw poster content beneath Start Race.
 - Cards, rail, and preview stay transparent and shadowless. The selected
   schematic is the visual anchor; neighboring schematics crop at the edges.
 - The existing tokens remain the complete visual system: racing palette,
@@ -100,6 +106,9 @@ for its single handoff rather than added to the general motion band.
 ## Change Rules
 
 - Keep `styles.css` as the only game stylesheet linked from HTML.
+- Do not size a full-screen child independently from `dvh`; route usable
+  embedded-browser height through `--app-visible-height` and let descendants
+  flex from their containing block.
 - Reach for a motion token before typing a duration or curve. A new one belongs
   in `foundation.css` with the others, not inline.
 - Add new styles to the partial that owns the product surface.

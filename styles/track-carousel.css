@@ -60,6 +60,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     margin-top: 0;
     padding: 0;
     gap: 0;
+    overflow: hidden;
 }
 
 /* Start Race is the one band that never yields.
@@ -87,6 +88,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     width: 100%;
     min-height: 0;
     margin: 0;
+    overflow: hidden;
 }
 
 .track-carousel__viewport {

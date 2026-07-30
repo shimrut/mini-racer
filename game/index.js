@@ -1,4 +1,5 @@
 import { RealTimeRacer } from './engine.js';
+import { setupVisibleViewportHeight } from './ui/visible-viewport.js';
 
 function setupMobileViewportGuards() {
     const hasTouchInput = window.matchMedia('(pointer: coarse)').matches
@@ -52,6 +53,7 @@ function setupMobileViewportGuards() {
     document.addEventListener('dblclick', preventDefault, { passive: false });
 }
 
+setupVisibleViewportHeight();
 setupMobileViewportGuards();
 new RealTimeRacer();
 // Local-only debug/test hooks are exposed on window.__RACER_DEBUG__ and the

@@ -8,6 +8,14 @@ const trackCarouselStyles = readFileSync(
     new URL('../styles/track-carousel.css', import.meta.url),
     'utf8',
 );
+const foundationStyles = readFileSync(
+    new URL('../styles/foundation.css', import.meta.url),
+    'utf8',
+);
+const raceControlStyles = readFileSync(
+    new URL('../styles/race-controls-and-feedback.css', import.meta.url),
+    'utf8',
+);
 
 const expectedImports = [
     './fonts.css',
@@ -154,6 +162,32 @@ describe('game stylesheet architecture', () => {
     });
 
     it('makes it structurally impossible for the card to reach Start Race', () => {
+        // The runtime publishes the actually visible WebView height here. The
+        // shell and capped full-screen panels share it instead of independently
+        // trusting viewport units that Reddit's native chrome can obscure.
+        expect(foundationStyles).toMatch(
+            /--app-visible-height:\s*100vh;[\s\S]*--screen-fill-height:\s*min\(var\(--app-visible-height\), var\(--screen-height-cap\)\);/,
+        );
+        expect(foundationStyles).toMatch(
+            /html,\s*body\s*\{[^}]*height:\s*var\(--app-visible-height\);[^}]*min-height:\s*0;/s,
+        );
+        expect(foundationStyles).not.toContain('min-height: -webkit-fill-available');
+        // The overlay's content box is now the sole height owner. A second
+        // screen-fill subtraction on the group recreates the WebView mismatch.
+        expect(raceControlStyles).toMatch(
+            /#start-group\s*\{[^}]*flex:\s*1 1 auto;[^}]*min-height:\s*0;/s,
+        );
+        expect(raceControlStyles).not.toMatch(
+            /#start-group\s*\{[^}]*(?:height|max-height):[^}]*--screen-fill-height/s,
+        );
+        // If a browser ever reports another impossible intermediate size, the
+        // poster is clipped inside its lane; it cannot paint under the CTA.
+        expect(trackCarouselStyles).toMatch(
+            /#lobby-daily-pane\.lobby-pane,[\s\S]*#lobby-campaign-pane\.lobby-pane\s*\{[^}]*overflow:\s*hidden;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel\s*\{[^}]*overflow:\s*hidden;/s,
+        );
         // The whole point of the grid. The billing and the scoreline are `auto`
         // rows that hold their content; the drawing is the only row that can be
         // taken, and `minmax(0, 1fr)` lets it be taken all the way to nothing.

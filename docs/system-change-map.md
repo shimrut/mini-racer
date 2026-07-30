@@ -47,6 +47,11 @@ flowchart LR
 
 - `game.html` provides the full DOM contract: canvases, HUD, overlays, settings modal, garage modal, results modal, and playlist modal.
 - `game/index.js` boots the app and instantiates `RealTimeRacer`.
+- `game/ui/visible-viewport.js` converts the embedded browser's
+  `window.visualViewport.height` into the shared `--app-visible-height`
+  layout metric, with `innerHeight` and CSS viewport-unit fallbacks. This keeps
+  the full-screen shell inside the actually visible Reddit WebView even when
+  native app chrome does not reduce `dvh`.
 - `game/engine.js` is the top-level orchestrator. It creates the feature modules, owns current run state, and wires together UI, simulation, track rendering, audio, storage, and network flows.
 - The static track and the moving car use separate canvas layers. Devvit's Android client keeps the track layer on the main thread because its embedded WebView can expose the worker APIs without reliably presenting that canvas; iOS and web clients retain the worker renderer when supported.
 
@@ -119,7 +124,9 @@ flowchart LR
   queries, Daily post context, and Campaign challenge post context. The shared
   lobby keeps the original compact `#start-group` footprint with title at the
   top and one bottom-pinned action cluster (`margin-top: auto` on the active
-  pane only). Home keeps its Daily, Campaign, Garage, and Settings mode-action
+  pane only). The shared shell takes height from the measured visible WebView;
+  its poster lane is paint-contained above the non-shrinking Start Race row.
+  Home keeps its Daily, Campaign, Garage, and Settings mode-action
   list. Daily and Campaign fill the selector area inside the shared lobby shell
   with one race-programme poster: run/date and lap count above the circuit,
   personal best/rank and the medal ladder below it, and one Start Race action

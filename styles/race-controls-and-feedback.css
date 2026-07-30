@@ -123,13 +123,13 @@ body.start-selection-active #start-overlay {
 
 #start-group {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     align-items: stretch;
     position: relative;
     width: min(30rem, calc(100vw - 2rem));
     max-width: 100%;
-    height: calc(var(--screen-fill-height) - var(--start-overlay-pad-top) - var(--start-overlay-pad-bottom));
-    max-height: calc(var(--screen-fill-height) - var(--start-overlay-pad-top) - var(--start-overlay-pad-bottom));
+    min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-gutter: stable;

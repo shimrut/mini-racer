@@ -42,9 +42,13 @@
     /* Sizing */
     --modal-floating-back-height: 2.55rem;
     --modal-floating-back-offset: 0.85rem;
-    /* Full-screen panels: viewport height, capped (adjust cap in one place). */
+    /* The runtime replaces this with visualViewport.height. Reddit's embedded
+       browser can leave CSS viewport units taller than the area its native UI
+       actually exposes, so full-screen UI must share one measured height. */
+    --app-visible-height: 100vh;
+    /* Full-screen panels: visible app height, capped (adjust cap in one place). */
     --screen-height-cap: 1000px;
-    --screen-fill-height: min(100vh, var(--screen-height-cap));
+    --screen-fill-height: min(var(--app-visible-height), var(--screen-height-cap));
 
     /* Motion — three steps, and every UI transition picks one of them. The
        band tops out at 200ms on purpose: these fire while the player is
@@ -72,9 +76,9 @@
     --z-modal: 2000
 }
 
-@supports (height: 100dvh) {
+@supports (height: 100svh) {
     :root {
-        --screen-fill-height: min(100dvh, var(--screen-height-cap));
+        --app-visible-height: min(100svh, 100dvh);
     }
 }
 
@@ -97,6 +101,12 @@ a,
     display: none !important;
 }
 
+html,
+body {
+    height: var(--app-visible-height);
+    min-height: 0;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -108,9 +118,6 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: 100vh;
-    height: 100dvh;
-    min-height: -webkit-fill-available;
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none
