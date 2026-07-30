@@ -180,6 +180,12 @@ describe('daily-challenge service wave6', () => {
     });
 
     it('sorts playlist entries by newest startsAt then id (L333-L336)', () => {
+        // Pinned like the merge test above: these fixtures are only in the
+        // cache while their `availableUntil` is in the future, so on the real
+        // clock the test starts failing the day it passes.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-26T00:00:00.000Z'));
+
         const merged = cacheDailyChallengePlaylist([
             buildChallenge({
                 id: 'older-wave6-sort',
@@ -199,6 +205,8 @@ describe('daily-challenge service wave6', () => {
         expect(newerIndex).toBeGreaterThanOrEqual(0);
         expect(olderIndex).toBeGreaterThanOrEqual(0);
         expect(newerIndex).toBeLessThan(olderIndex);
+
+        vi.useRealTimers();
     });
 
     it('returns featured status while endsAt is still in the future (L701-L705)', () => {
@@ -289,6 +297,12 @@ describe('daily-challenge service wave6', () => {
     });
 
     it('persists cached playlist entries to localStorage (L366-L368)', () => {
+        // An entry is only written while it is still available, so the clock
+        // has to be pinned behind `availableUntil` rather than left to run
+        // past it.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-26T00:00:00.000Z'));
+
         cacheDailyChallengePlaylist([
             buildChallenge({
                 id: 'persisted-wave6',
@@ -300,6 +314,8 @@ describe('daily-challenge service wave6', () => {
         const parsed = JSON.parse(raw);
 
         expect(parsed.challenges.find((entry) => entry.id === 'persisted-wave6')).toBeDefined();
+
+        vi.useRealTimers();
     });
 
     it('keeps the slower local best when the cached snapshot is slower (L583-L590)', () => {

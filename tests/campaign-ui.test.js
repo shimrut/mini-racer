@@ -233,7 +233,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             'Campaign race complete',
             null,
             expect.objectContaining({
-                lapMedal: 'silver',
+                // Number Zero's own table decides the tier, so this moves
+                // whenever `medal-times.json` does: 7.3s is inside the 7.58
+                // gold target.
+                lapMedal: 'gold',
                 scoreboardSnapshot: expect.objectContaining({
                     submissionStage: 'submitting',
                 }),
