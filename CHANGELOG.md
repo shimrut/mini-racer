@@ -1,5 +1,8 @@
 # Changelog
 
+- Daily and Campaign track schematics now place the player's selected Garage
+  car at the start line instead of showing a generic red direction triangle.
+  Changing car skins refreshes both selector surfaces immediately.
 - Reworked the Daily and Campaign selector as one full-screen race surface.
   Track cards and inner preview panels no longer sit above the background; the
   selected schematic becomes the dominant artwork, neighboring tracks crop in

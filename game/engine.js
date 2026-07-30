@@ -246,6 +246,10 @@ export class RealTimeRacer {
       onSelect: (challenge) => this.handleDailyCarouselSelect(challenge),
       onOpenLeaderboard: (challenge) => this.openDailyCarouselStandings(challenge),
       onSettle: (card) => this.handleDailyCarouselSettled(card),
+      getPreviewCarImage: () => (
+        this.carSpriteAssetKey ? this.carSprite : null
+      ),
+      getPreviewCarAssetKey: () => this.carSpriteAssetKey || "loading",
     });
     this.campaignCarousel = new TrackCarousel({
       idPrefix: "campaign-carousel",
@@ -254,6 +258,10 @@ export class RealTimeRacer {
         returnMode: "close",
       }),
       onSettle: (card) => this.handleCampaignCarouselSettled(card),
+      getPreviewCarImage: () => (
+        this.carSpriteAssetKey ? this.carSprite : null
+      ),
+      getPreviewCarAssetKey: () => this.carSpriteAssetKey || "loading",
     });
     this.lobbyUi = new LobbyUi({
       onSelectDaily: () => this.showDailyLobby(),

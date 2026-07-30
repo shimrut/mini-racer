@@ -443,6 +443,128 @@ describe('TrackCarousel selection', () => {
         expect(() => carousel.playRailEntrance({})).not.toThrow();
     });
 
+    it('repaints every existing preview without rebuilding or moving the selection', () => {
+        const carousel = new TrackCarousel();
+        const firstCanvas = {};
+        const secondCanvas = {};
+        carousel._cards = [
+            { challengeId: 'c0' },
+            { challengeId: 'c1' },
+        ];
+        carousel._elements = [
+            { dataset: { index: '0' }, _parts: { canvas: firstCanvas } },
+            { dataset: { index: '1' }, _parts: { canvas: secondCanvas } },
+        ];
+        carousel._selectedIndex = 1;
+        carousel.renderPreview = vi.fn();
+
+        carousel.refreshPreviews();
+
+        expect(carousel.renderPreview).toHaveBeenCalledTimes(2);
+        expect(carousel.renderPreview).toHaveBeenNthCalledWith(
+            1,
+            firstCanvas,
+            carousel._cards[0],
+            { force: true },
+        );
+        expect(carousel.renderPreview).toHaveBeenNthCalledWith(
+            2,
+            secondCanvas,
+            carousel._cards[1],
+            { force: true },
+        );
+        expect(carousel.getSelectedChallengeId()).toBe('c1');
+    });
+
+    it('invalidates a schematic preview when the selected Garage car changes', () => {
+        const OriginalPath2D = globalThis.Path2D;
+        const originalDocument = globalThis.document;
+        globalThis.Path2D = class Path2DMock {
+            addPath() {}
+            moveTo() {}
+            lineTo() {}
+            quadraticCurveTo() {}
+            closePath() {}
+        };
+        const createContext = () => new Proxy({
+            clearRect: vi.fn(),
+            drawImage: vi.fn(),
+            createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+            createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+        }, {
+            get(target, property) {
+                if (!(property in target)) target[property] = vi.fn();
+                return target[property];
+            },
+        });
+        const offscreenContexts = [];
+        globalThis.document = {
+            createElement: vi.fn(() => {
+                const context = createContext();
+                offscreenContexts.push(context);
+                return {
+                    width: 0,
+                    height: 0,
+                    getContext: () => context,
+                };
+            }),
+        };
+        const mainContext = createContext();
+        const canvas = {
+            width: 320,
+            height: 200,
+            dataset: {},
+            getContext: () => mainContext,
+        };
+        const firstCar = { id: 'red-car' };
+        const secondCar = { id: 'blue-car' };
+        let selectedCar = {
+            assetKey: 'assets/cars/red.webp',
+            image: firstCar,
+        };
+        const carousel = new TrackCarousel({
+            previewCacheNamespace: 'garage-car-preview-test',
+            getPreviewCarImage: () => selectedCar.image,
+            getPreviewCarAssetKey: () => selectedCar.assetKey,
+        });
+        const card = { trackKey: 'circuit', skin: 'default' };
+
+        try {
+            carousel.renderPreview(canvas, card);
+            expect(canvas.dataset.previewKey).toContain(selectedCar.assetKey);
+            expect(offscreenContexts[0].drawImage).toHaveBeenCalledWith(
+                firstCar,
+                expect.any(Number),
+                expect.any(Number),
+                expect.any(Number),
+                expect.any(Number),
+            );
+
+            selectedCar = {
+                assetKey: 'assets/cars/blue.webp',
+                image: secondCar,
+            };
+            carousel.renderPreview(canvas, card);
+
+            expect(globalThis.document.createElement).toHaveBeenCalledTimes(2);
+            expect(canvas.dataset.previewKey).toContain(selectedCar.assetKey);
+            expect(offscreenContexts[1].drawImage).toHaveBeenCalledWith(
+                secondCar,
+                expect.any(Number),
+                expect.any(Number),
+                expect.any(Number),
+                expect.any(Number),
+            );
+        } finally {
+            globalThis.Path2D = OriginalPath2D;
+            if (originalDocument === undefined) {
+                delete globalThis.document;
+            } else {
+                globalThis.document = originalDocument;
+            }
+        }
+    });
+
     /**
      * The end cards' outer room has to be a child of the rail, not the rail's
      * own padding: WebKit does not count a scroll container's trailing padding,

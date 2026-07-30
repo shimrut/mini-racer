@@ -123,8 +123,12 @@ flowchart LR
   list. Daily and Campaign expand only their selector surface to the full
   viewport: the selected track schematic is the background artwork, neighboring
   tracks crop in at the screen edges, and no card or inner preview panel is
-  visible. The existing Back, Standings, Garage, and Settings toolbar stays
-  above that surface, while one centered Start Race action anchors the bottom.
+  visible. Each schematic places the player's currently selected Garage car at
+  the start pose instead of the generic direction triangle; the shared loaded
+  sprite and its asset key invalidate both Daily and Campaign preview caches
+  when the selection changes. The existing Back, Standings, Garage, and
+  Settings toolbar stays above that surface, while one centered Start Race
+  action anchors the bottom.
   Standings resolves the carousel's currently centred track at click time.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. Desktop responsive rules must not target the generic
@@ -268,7 +272,7 @@ flowchart LR
 | Track system | `game/track/catalog.js`, `game/track/definitions/*`, `game/track/tracks.js`, `game/track/geometry.js`, `game/track/runtime.js`, `game/track/assets.js`, `game/track/engine-methods.js` | Lightweight metadata and schedule order, per-track geometry, collision, cached canvases, presentation | `game/config.js`, `game/track/presentation.js` |
 | Race/physics | `game/race/simulation.js`, `game/race/engine-methods.js`, `game/car/handling.js` | Driving feel, wall scrapes, optional collision auto-restart, finish logic, replay capture | Track runtime, config, HUD, modal flow |
 | Personal-best ghost | `game/ghost/pb-ghost.js`, `game/ghost/pb-ghost-service.js`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | Challenge PB state, verified trace generation, playback, selected-car rendering | Replay validator, player identity, Redis, settings |
-| Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/car-unlock-policy.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js`, `src/server/car-unlock-store.ts` | Car art, asset loading, permanent achievement unlocks, garage selection, trail style | `public/assets/cars/*`, generated asset list, Campaign results, verified race/challenge events, Redis |
+| Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/car-unlock-policy.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js`, `src/server/car-unlock-store.ts` | Car art, asset loading, permanent achievement unlocks, garage selection, trail style, and the selected-car marker in Daily/Campaign lobby previews | `public/assets/cars/*`, generated asset list, Campaign results, verified race/challenge events, shared track carousel, Redis |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/labels.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
 | Campaign and challenges | `game/campaign/*`, `game/lobby/*`, `game/modes/launch-target.js`, `src/server/campaign-*`, `campaign-challenge.html` | Permanent staged progression, Campaign standings/PBs, isolated verified player duels and custom posts | Shared simulation/replay/medal rules, Redis, Reddit post context |
 | Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow, share entry point | API routes, daily challenge storage, server APIs |

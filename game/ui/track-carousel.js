@@ -65,12 +65,16 @@ export class TrackCarousel {
         onSelect = null,
         onOpenLeaderboard = null,
         onSettle = null,
+        getPreviewCarImage = null,
+        getPreviewCarAssetKey = null,
     } = {}) {
         this.idPrefix = idPrefix;
         this.previewCacheNamespace = previewCacheNamespace;
         this.onSelect = onSelect;
         this.onOpenLeaderboard = onOpenLeaderboard;
         this.onSettle = onSettle;
+        this.getPreviewCarImage = getPreviewCarImage;
+        this.getPreviewCarAssetKey = getPreviewCarAssetKey;
         this._cards = [];
         this._elements = [];
         this._selectedIndex = -1;
@@ -466,15 +470,35 @@ export class TrackCarousel {
         }
     }
 
+    refreshPreviews() {
+        for (const element of this._elements) {
+            const canvas = element?._parts?.canvas;
+            const card = this._cards[Number(element?.dataset?.index)];
+            if (canvas && card) this.renderPreview(canvas, card, { force: true });
+        }
+    }
+
     renderPreview(canvas, card, { force = false } = {}) {
         const track = TRACKS[card.trackKey];
         if (!canvas || !track) return;
-        const previewKey = `${card.trackKey}:${card.skin || 'default'}:${canvas.width}x${canvas.height}`;
+        const previewCarImage = this.getPreviewCarImage?.() || null;
+        const previewCarAssetKey = this.getPreviewCarAssetKey?.() || 'fallback';
+        const previewKey = [
+            card.trackKey,
+            card.skin || 'default',
+            previewCarAssetKey,
+            `${canvas.width}x${canvas.height}`,
+        ].join(':');
         if (!force && canvas.dataset.previewKey === previewKey) return;
         canvas.dataset.previewKey = previewKey;
 
         renderCachedTrackPreviewCanvas(canvas, {
-            cacheKey: `${this.previewCacheNamespace}:${card.trackKey}:${card.skin || 'default'}`,
+            cacheKey: [
+                this.previewCacheNamespace,
+                card.trackKey,
+                card.skin || 'default',
+                previewCarAssetKey,
+            ].join(':'),
             trackGeometry: { outer: track.outer, inner: track.inner },
             presentation: resolveTrackPresentation(card.trackKey, {
                 surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
@@ -487,6 +511,8 @@ export class TrackCarousel {
             startAngle: track.startAngle,
             transparentBackground: true,
             previewRenderMode: 'schematic',
+            schematicCarImage: previewCarImage,
+            hideSchematicStartArrow: Boolean(previewCarImage),
         });
     }
 

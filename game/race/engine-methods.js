@@ -480,11 +480,15 @@ export const raceEngineMethods = {
           this.carSprite = image;
           this.carSpriteDrawWidth = 52;
           this.carSpriteDrawHeight = 52;
+          this.dailyCarousel?.refreshPreviews?.();
+          this.campaignCarousel?.refreshPreviews?.();
           this.requestRender();
           resolve(image);
         },
         onError: (name) => {
           console.warn(`Unable to load ${name}; using fallback car sprite.`);
+          this.dailyCarousel?.refreshPreviews?.();
+          this.campaignCarousel?.refreshPreviews?.();
           resolve(this.carSprite);
         },
       });

@@ -156,4 +156,58 @@ describe('track preview rendering', () => {
         expect(ctx.lineWidth).toBeGreaterThanOrEqual(1.5);
         global.Path2D = OriginalPath2D;
     });
+
+    it('replaces the lobby arrow with the selected car at the exact start pose', () => {
+        const OriginalPath2D = global.Path2D;
+        global.Path2D = class Path2DMock {
+            addPath() {}
+            moveTo() {}
+            lineTo() {}
+            quadraticCurveTo() {}
+            closePath() {}
+        };
+        const ctx = createPreviewContext();
+        const carImage = { width: 500, height: 500 };
+        const canvas = {
+            width: 320,
+            height: 200,
+            getContext: vi.fn(() => ctx)
+        };
+
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: {
+                outer: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 8 },
+                    { x: 0, y: 8 }
+                ],
+                inner: [
+                    { x: 3, y: 3 },
+                    { x: 7, y: 3 },
+                    { x: 7, y: 5 },
+                    { x: 3, y: 5 }
+                ]
+            },
+            presentation: {},
+            startLine: {
+                p1: { x: 1, y: 1 },
+                p2: { x: 1, y: 3 }
+            },
+            startPos: { x: 0.5, y: 2 },
+            startAngle: 0.75,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            schematicCarImage: carImage,
+            hideSchematicStartArrow: true
+        });
+
+        expect(ctx.translate).toHaveBeenCalledOnce();
+        expect(ctx.rotate).toHaveBeenCalledOnce();
+        expect(ctx.rotate).toHaveBeenCalledWith(0.75);
+        expect(ctx.drawImage).toHaveBeenCalledOnce();
+        expect(ctx.drawImage.mock.calls[0][0]).toBe(carImage);
+        expect(ctx.__fillStyles).not.toContain('#dc5a5a');
+        global.Path2D = OriginalPath2D;
+    });
 });
