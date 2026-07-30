@@ -128,9 +128,10 @@ flowchart LR
   sprite and its asset key invalidate both Daily and Campaign preview caches
   when the selection changes. Its preview size uses the race renderer's live
   draw width/height divided by `CONFIG.gridSize`, then multiplies that world
-  size by the schematic's track map scale. This keeps the car-to-track
-  proportion identical to gameplay across different tracks and DPRs while
-  leaving the deliberately larger standalone post-preview car unchanged. The
+  size by the schematic's track map scale and a lobby-only `2x` presentation
+  multiplier. This keeps the marker consistently twice the gameplay
+  car-to-track proportion across different tracks and DPRs while leaving the
+  deliberately larger standalone post-preview car unchanged. The
   existing Back, Standings, Garage, and Settings toolbar stays above that
   surface, while one centered Start Race action anchors the bottom.
   Standings resolves the carousel's currently centred track at click time.

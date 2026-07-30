@@ -538,8 +538,8 @@ describe('TrackCarousel selection', () => {
                 firstCar,
                 expect.any(Number),
                 expect.any(Number),
-                expect.closeTo(12.12, 1),
-                expect.closeTo(12.12, 1),
+                expect.closeTo(24.24, 1),
+                expect.closeTo(24.24, 1),
             );
 
             selectedCar = {
@@ -555,8 +555,8 @@ describe('TrackCarousel selection', () => {
                 secondCar,
                 expect.any(Number),
                 expect.any(Number),
-                expect.closeTo(12.12, 1),
-                expect.closeTo(12.12, 1),
+                expect.closeTo(24.24, 1),
+                expect.closeTo(24.24, 1),
             );
         } finally {
             globalThis.Path2D = OriginalPath2D;

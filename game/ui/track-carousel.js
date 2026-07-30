@@ -20,6 +20,7 @@ import {
 
 const PREVIEW_WIDTH = 320;
 const PREVIEW_HEIGHT = 176;
+const PREVIEW_CAR_SCALE = 2;
 const SCROLL_SETTLE_MS = 90;
 const PROGRAMMATIC_SCROLL_TIMEOUT_MS = 1200;
 
@@ -485,7 +486,13 @@ export class TrackCarousel {
         if (!canvas || !track) return;
         const previewCarImage = this.getPreviewCarImage?.() || null;
         const previewCarAssetKey = this.getPreviewCarAssetKey?.() || 'fallback';
-        const previewCarWorldSize = this.getPreviewCarWorldSize?.() || null;
+        const raceCarWorldSize = this.getPreviewCarWorldSize?.() || null;
+        const previewCarWorldSize = raceCarWorldSize
+            ? {
+                width: raceCarWorldSize.width * PREVIEW_CAR_SCALE,
+                height: raceCarWorldSize.height * PREVIEW_CAR_SCALE,
+            }
+            : null;
         const previewCarSizeKey = previewCarWorldSize
             ? `${previewCarWorldSize.width}x${previewCarWorldSize.height}`
             : 'default-size';
