@@ -313,18 +313,18 @@ describe('result-flow helpers', () => {
             valueClass: ''
         });
 
-        expect(buildModalDeltaDisplay({ deltaToBest: 0.004 })).toEqual({
-            text: '0.00s',
+        expect(buildModalDeltaDisplay({ deltaToBest: 0.0004 })).toEqual({
+            text: '0.000s',
             valueClass: ''
         });
 
         expect(buildModalDeltaDisplay({ deltaToBest: 1.25 })).toEqual({
-            text: '+1.25s',
+            text: '+1.250s',
             valueClass: 'modal-stat-value--delta-positive'
         });
 
         expect(buildModalDeltaDisplay({ deltaToBest: -0.62 })).toEqual({
-            text: '-0.62s',
+            text: '-0.620s',
             valueClass: 'modal-stat-value--delta-negative'
         });
 
@@ -765,20 +765,20 @@ describe('result-flow helpers', () => {
             secondaryAction: secondary
         });
 
-        expect(buildModalDeltaDisplay({ deltaToBest: 0.005 })).toEqual({
-            text: '0.00s',
+        expect(buildModalDeltaDisplay({ deltaToBest: 0.0005 })).toEqual({
+            text: '0.000s',
             valueClass: ''
         });
-        expect(buildModalDeltaDisplay({ deltaToBest: 0.006 })).toEqual({
-            text: '+0.01s',
+        expect(buildModalDeltaDisplay({ deltaToBest: 0.0006 })).toEqual({
+            text: '+0.001s',
             valueClass: 'modal-stat-value--delta-positive'
         });
-        expect(buildModalDeltaDisplay({ deltaToBest: -0.005 })).toEqual({
-            text: '0.00s',
+        expect(buildModalDeltaDisplay({ deltaToBest: -0.0005 })).toEqual({
+            text: '0.000s',
             valueClass: ''
         });
-        expect(buildModalDeltaDisplay({ deltaToBest: -0.006 })).toEqual({
-            text: '-0.01s',
+        expect(buildModalDeltaDisplay({ deltaToBest: -0.0006 })).toEqual({
+            text: '-0.001s',
             valueClass: 'modal-stat-value--delta-negative'
         });
     });

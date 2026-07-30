@@ -4,12 +4,12 @@ import { formatSplitTimeDeltaSec } from '../game/race/lap-speed.js';
 describe('split time helpers', () => {
     it('formats checkpoint split deltas (lower is better)', () => {
         expect(formatSplitTimeDeltaSec(-0.12)).toEqual({
-            text: '-0.12',
+            text: '-0.120',
             isGain: true,
             isLoss: false,
         });
         expect(formatSplitTimeDeltaSec(0.25)).toEqual({
-            text: '+0.25',
+            text: '+0.250',
             isGain: false,
             isLoss: true,
         });

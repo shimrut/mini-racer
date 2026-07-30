@@ -37,7 +37,7 @@ function getDailyPostTitleFormat(): string {
 function formatSeconds(value: unknown): string {
     const seconds = Number(value);
     return Number.isFinite(seconds) && seconds > 0
-        ? `${seconds.toFixed(2)}s`
+        ? `${seconds.toFixed(3)}s`
         : '--';
 }
 

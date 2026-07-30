@@ -432,11 +432,11 @@ export function normalizeOffset(offset: unknown): number {
 
 
 function formatPodiumTime(bestTimeMs: number): string {
-    const totalCentiseconds = Math.max(0, Math.round(bestTimeMs / 10));
-    const minutes = Math.floor(totalCentiseconds / 6_000);
-    const seconds = Math.floor((totalCentiseconds % 6_000) / 100);
-    const centiseconds = totalCentiseconds % 100;
-    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`;
+    const totalMilliseconds = Math.max(0, Math.round(bestTimeMs));
+    const minutes = Math.floor(totalMilliseconds / 60_000);
+    const seconds = Math.floor((totalMilliseconds % 60_000) / 1000);
+    const milliseconds = totalMilliseconds % 1000;
+    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
 }
 
 async function readFinalPodiumPositions(

@@ -1135,7 +1135,7 @@ describe('ui modal runs helpers', () => {
             currentTime: 22.18,
             lapTimesArray: [22.18, 22.4]
         });
-        expect(primaryValue.textContent).toBe('22.18s');
+        expect(primaryValue.textContent).toBe('22.180s');
         expect(modalLapTimes.replaceChildren).toHaveBeenCalledTimes(1);
         expect(renderLapTimesList).toHaveBeenCalledWith(
             modalLapTimes,

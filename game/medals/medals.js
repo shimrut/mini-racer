@@ -205,7 +205,7 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
 
         const centerText =
             !filled && thresholdSec != null && Number.isFinite(thresholdSec)
-                ? `${thresholdSec.toFixed(2)}s`
+                ? `${thresholdSec.toFixed(3)}s`
                 : null;
 
         const icon = createMedalIconSvg(tier, {

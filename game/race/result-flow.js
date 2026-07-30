@@ -58,20 +58,20 @@ export function buildModalDeltaDisplay({
     emptyValueClass = ''
 } = {}) {
     if (deltaToBest !== null && deltaToBest !== undefined) {
-        if (deltaToBest > 0.005) {
+        if (deltaToBest > 0.0005) {
             return {
-                text: `+${deltaToBest.toFixed(2)}s`,
+                text: `+${deltaToBest.toFixed(3)}s`,
                 valueClass: 'modal-stat-value--delta-positive'
             };
         }
-        if (deltaToBest < -0.005) {
+        if (deltaToBest < -0.0005) {
             return {
-                text: `${deltaToBest.toFixed(2)}s`,
+                text: `${deltaToBest.toFixed(3)}s`,
                 valueClass: 'modal-stat-value--delta-negative'
             };
         }
         return {
-            text: '0.00s',
+            text: '0.000s',
             valueClass: ''
         };
     }

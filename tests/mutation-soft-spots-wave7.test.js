@@ -449,19 +449,19 @@ describe('wave7 share normalize helpers — direct coercion', () => {
 
     it('formatDailyGpShareComment uses medal copy and lap-time formatting', () => {
         expect(formatDailyGpShareComment(42380, null, 'Circuit')).toBe(
-            'I set a 42.38 lap in Circuit. 🏁',
+            'I set a 42.380 lap in Circuit. 🏁',
         );
         expect(formatDailyGpShareComment(5000, 'gold', '')).toBe(
-            'I earned the Gold medal 🥇 with a 05.00 lap in Mini Racer.',
+            'I earned the Gold medal 🥇 with a 05.000 lap in Mini Racer.',
         );
         expect(formatDailyGpShareComment(989, 'silver', 'Desert')).toBe(
-            'I earned the Silver medal 🥈 with a 00.99 lap in Desert.',
+            'I earned the Silver medal 🥈 with a 00.989 lap in Desert.',
         );
         expect(formatDailyGpShareComment(10050, 'bronze', 'Track')).toBe(
-            'I earned the Bronze medal 🥉 with a 10.05 lap in Track.',
+            'I earned the Bronze medal 🥉 with a 10.050 lap in Track.',
         );
         expect(formatDailyGpShareComment(10040, 'author', 'Track')).toBe(
-            'I earned the Author medal 🏆 with a 10.04 lap in Track.',
+            'I earned the Author medal 🏆 with a 10.040 lap in Track.',
         );
     });
 });

@@ -102,10 +102,10 @@ function createShareLockKey(record: SharePreviewRecord): string {
 }
 
 function formatLapTime(bestTimeMs: number): string {
-    const totalCentiseconds = Math.round(bestTimeMs / 10);
-    const seconds = Math.floor(totalCentiseconds / 100);
-    const centiseconds = totalCentiseconds % 100;
-    return `${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`;
+    const totalMilliseconds = Math.round(bestTimeMs);
+    const seconds = Math.floor(totalMilliseconds / 1000);
+    const milliseconds = totalMilliseconds % 1000;
+    return `${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
 }
 
 export function formatDailyGpShareComment(

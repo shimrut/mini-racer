@@ -184,7 +184,7 @@ describe('leaderboard race comparison target', () => {
 
     expect(setHudBestMetric).toHaveBeenCalledWith({
       label: 'VS Rival',
-      value: '12.35',
+      value: '12.345',
       visible: true,
     });
     expect(hud._hasPersonalBests).toBe(false);

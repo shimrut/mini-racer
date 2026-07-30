@@ -7,6 +7,9 @@ import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
 
 const LEADERBOARD_SHARE_ICON_PATH = 'M307.8 18.4c-12 5-19.8 16.6-19.8 29.6l0 80-112 0c-97.2 0-176 78.8-176 176 0 113.3 81.5 163.9 100.2 174.1 2.5 1.4 5.3 1.9 8.1 1.9 10.9 0 19.7-8.9 19.7-19.7 0-7.5-4.3-14.4-9.8-19.5-9.4-8.8-22.2-26.4-22.2-56.7 0-53 43-96 96-96l96 0 0 80c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l160-160c12.5-12.5 12.5-32.8 0-45.3l-160-160c-9.2-9.2-22.9-11.9-34.9-6.9z';
+// Font Awesome Free v7.3.1 stopwatch icon.
+// https://fontawesome.com/license/free
+const LEADERBOARD_RACE_ICON_PATH = 'M168.5 0c-13.3 0-24 10.7-24 24s10.7 24 24 24l32 0 0 25.3c-108 11.9-192 103.5-192 214.7 0 119.3 96.7 216 216 216s216-96.7 216-216c0-39.8-10.8-77.1-29.6-109.2l28.2-28.2c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-23.4 23.4c-32.9-30.2-75.2-50.3-122-55.5l0-25.3 32 0c13.3 0 24-10.7 24-24s-10.7-24-24-24l-112 0zm80 184l0 104c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-104c0-13.3 10.7-24 24-24s24 10.7 24 24z';
 
 function appendLeaderboardRowAction(item, {
     shareable = false,
@@ -40,11 +43,16 @@ function appendLeaderboardRowAction(item, {
         shareBtn.append(glyph, shareLabel);
         action.appendChild(shareBtn);
     } else if (raceable) {
-        const raceLabel = document.createElement('span');
-        raceLabel.className = 'leaderboard-row__race';
-        raceLabel.setAttribute('aria-hidden', 'true');
-        raceLabel.textContent = 'Race';
-        action.appendChild(raceLabel);
+        const raceIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        raceIcon.classList.add('leaderboard-row__race', 'leaderboard-row__race-icon');
+        raceIcon.setAttribute('viewBox', '0 0 448 512');
+        raceIcon.setAttribute('fill', 'currentColor');
+        raceIcon.setAttribute('aria-hidden', 'true');
+        raceIcon.setAttribute('focusable', 'false');
+        const raceIconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        raceIconPath.setAttribute('d', LEADERBOARD_RACE_ICON_PATH);
+        raceIcon.appendChild(raceIconPath);
+        action.appendChild(raceIcon);
     }
     item.appendChild(action);
 }
@@ -395,10 +403,10 @@ export class ModalContentUi {
     if (!this.modalStatsRow) return;
     const lapText = lapTime === null || lapTime === undefined
         ? '--'
-        : `${lapTime.toFixed(2)}s`;
+        : `${lapTime.toFixed(3)}s`;
     const bestText = bestTime === null || bestTime === undefined
         ? '--'
-        : `${bestTime.toFixed(2)}s`;
+        : `${bestTime.toFixed(3)}s`;
     const deltaDisplay = buildModalDeltaDisplay({
         deltaToBest,
         emptyText: '--'
@@ -415,7 +423,7 @@ export class ModalContentUi {
     this.modalStatsRow.replaceChildren();
 
     const lapText = lapTime !== null && lapTime !== undefined
-        ? `${lapTime.toFixed(2)}s`
+        ? `${lapTime.toFixed(3)}s`
         : '--';
     const deltaDisplay = buildModalDeltaDisplay({
         deltaToBest,
@@ -838,7 +846,7 @@ export class ModalContentUi {
         });
         if (timeEl) {
             timeEl.innerHTML = Number.isFinite(time)
-                ? `<span class="time-num">${time.toFixed(2)}</span><span class="time-unit">s</span>`
+                ? `<span class="time-num">${time.toFixed(3)}</span><span class="time-unit">s</span>`
                 : '--';
             timeEl.classList.remove('combined-stat-value--impact');
 
@@ -900,7 +908,7 @@ export class ModalContentUi {
                                 addSplitRow(
                                     `CP ${index + 1}`,
                                     Number.isFinite(splitSec)
-                                        ? `${splitSec.toFixed(2)}s`
+                                        ? `${splitSec.toFixed(3)}s`
                                         : '--',
                                     deltaSec,
                                 );
@@ -913,7 +921,7 @@ export class ModalContentUi {
                                         : null;
                                 addSplitRow(
                                     'FINISH',
-                                    `${time.toFixed(2)}s`,
+                                    `${time.toFixed(3)}s`,
                                     deltaFinish,
                                 );
                             }
@@ -945,7 +953,7 @@ export class ModalContentUi {
                         : `VS ${opponentName}`;
                 }
                 const deltaText = Number.isFinite(deltaToComparison)
-                    ? `${Math.abs(deltaToComparison).toFixed(2)}s`
+                    ? `${Math.abs(deltaToComparison).toFixed(3)}s`
                     : '';
                 bestLapEl.textContent = comparisonOutcome === 'won'
                     ? `WON${deltaText ? ` BY ${deltaText}` : ''}`
@@ -983,7 +991,7 @@ export class ModalContentUi {
         if (!Number.isFinite(seconds)) return '--';
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toFixed(2).padStart(5, '0')}`;
+        return `${mins.toString().padStart(2, '0')}:${secs.toFixed(3).padStart(6, '0')}`;
     }
 
     formatLeaderboardTime(seconds) {

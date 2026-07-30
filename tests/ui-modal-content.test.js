@@ -65,7 +65,7 @@ describe('ui modal content helpers', () => {
 
         component._applyCombinedWinPbDelta(deltaEl, 48.12, 49.0, null, -0.88);
 
-        expect(deltaEl.textContent).toBe('-0.88s');
+        expect(deltaEl.textContent).toBe('-0.880s');
         expect(deltaEl.classList.contains('is-gain')).toBe(true);
         expect(deltaEl.classList.contains('is-loss')).toBe(false);
     });
@@ -84,7 +84,7 @@ describe('ui modal content helpers', () => {
 
         component._applyCombinedWinPbDelta(deltaEl, 6.55, 6.43, null, 0.12);
 
-        expect(deltaEl.textContent).toBe('+0.12s');
+        expect(deltaEl.textContent).toBe('+0.120s');
         expect(deltaEl.classList.contains('is-gain')).toBe(false);
         expect(deltaEl.classList.contains('is-loss')).toBe(true);
     });
@@ -138,7 +138,7 @@ describe('ui modal content helpers', () => {
         const component = new ModalContentUi();
 
         expect(component.formatLeaderboardTime(62.34567)).toBe('01:02.346');
-        expect(component.formatTime(62.34567)).toBe('01:02.35');
+        expect(component.formatTime(62.34567)).toBe('01:02.346');
     });
 
     it('does not create a phantom current player row when rank is missing', () => {
@@ -288,7 +288,11 @@ describe('ui modal content helpers', () => {
         expect(rows[0].getAttribute('role')).toBe('button');
         expect(rows[0].getAttribute('tabindex')).toBe('0');
         expect(rows[0].getAttribute('aria-label')).toBe("Race Fast Racer's ghost");
-        expect(rows[0].querySelector('.leaderboard-row__race')?.textContent).toBe('Race');
+        const raceIcon = rows[0].querySelector('.leaderboard-row__race-icon');
+        expect(raceIcon?.getAttribute('viewBox')).toBe('0 0 448 512');
+        expect(raceIcon?.getAttribute('fill')).toBe('currentColor');
+        expect(raceIcon?.querySelector('path')?.getAttribute('d')).toContain('M168.5 0');
+        expect(raceIcon?.textContent).toBe('');
         expect(rows[0]._opponentRaceEntry).toBe(opponent);
         expect(rows[1].classList.contains('is-raceable')).toBe(false);
         expect(rows[2].classList.contains('is-raceable')).toBe(false);

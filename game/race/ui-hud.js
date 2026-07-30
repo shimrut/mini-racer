@@ -2,7 +2,7 @@ import { TRACK_MODE_DAILY_GP } from '../config.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { isStandardMedalTier } from '../medals/medal-timing.js';
 
-/** Speed readout: cap DOM writes (lap timer updates every frame when centiseconds change). */
+/** Speed readout: cap DOM writes (lap timer updates every frame when milliseconds change). */
 const HUD_SPEED_MIN_MS = 1000 / 15;
 
 export class RaceHud {
@@ -15,7 +15,7 @@ export class RaceHud {
         this.getCurrentTrackKey = getCurrentTrackKey;
         this.persistTrackPersonalBest = persistTrackPersonalBest;
         this._hudPrimaryMetricMode = 'time';
-        this._lastTimeText = '0.00';
+        this._lastTimeText = '0.000';
         this._lastSpeedText = '0';
         this._lastHudSpeedWrite = undefined;
         this._hasPersonalBests = false;
@@ -151,7 +151,7 @@ export class RaceHud {
 
     syncHud({ time, speed, force = false }) {
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
-    const timeText = time.toFixed(2);
+    const timeText = time.toFixed(3);
     const speedText = Math.round(speed * 20).toString();
     const useLapTimer = this._hudPrimaryMetricMode === 'time';
 
@@ -206,18 +206,18 @@ export class RaceHud {
 
     resetHud() {
     if (this.timeLabel) this.timeLabel.textContent = 'LAP';
-    if (this.timeVal) this.timeVal.textContent = '0.00';
+    if (this.timeVal) this.timeVal.textContent = '0.000';
     if (this.speedVal) this.speedVal.textContent = '0';
     if (this.mobileSpeedVal) this.mobileSpeedVal.textContent = '0';
     this._lastActiveSpeedTicks = -1;
     this.updateSpeedTicks(0);
     this._hudPrimaryMetricMode = 'time';
-    this._lastTimeText = '0.00';
+    this._lastTimeText = '0.000';
     this._lastSpeedText = '0';
     this._lastHudSpeedWrite = undefined;
 }
 
-    setHudPrimaryMetric({ label = 'LAP', value = '0.00', useTimer = true, visible = true } = {}) {
+    setHudPrimaryMetric({ label = 'LAP', value = '0.000', useTimer = true, visible = true } = {}) {
     if (!this.timeDisplay || !this.timeVal) return;
 
     this.setHudLapTimeVisible(visible);
@@ -279,7 +279,7 @@ export class RaceHud {
     if (bestLapTime !== null && bestLapTime !== undefined) {
         this.setHudBestMetric({
             label: 'BEST',
-            value: bestLapTime.toFixed(2),
+            value: bestLapTime.toFixed(3),
             visible: true
         });
         this.syncBestTimeMedalBadge(trackKey, bestLapTime);
@@ -305,7 +305,7 @@ export class RaceHud {
     }
     this.setHudBestMetric({
         label: `VS ${displayName}`,
-        value: finishTimeSec.toFixed(2),
+        value: finishTimeSec.toFixed(3),
         visible: true,
     });
     this.syncBestTimeMedalBadge(null, null);
@@ -418,7 +418,7 @@ export class RaceHud {
         }
 
         this.lapFlashLabel.textContent = label;
-        this.lapFlashTime.textContent = `${timeSec.toFixed(2)}s`;
+        this.lapFlashTime.textContent = `${timeSec.toFixed(3)}s`;
         this.lapFlash.classList.remove('is-gain', 'is-loss', 'is-warning');
 
         if (isNewBest) {
@@ -428,13 +428,13 @@ export class RaceHud {
         } else if (deltaVsBest === null || deltaVsBest === undefined) {
             this.lapFlashDelta.textContent = '';
             this.lapFlashDelta.hidden = true;
-        } else if (deltaVsBest < -0.005) {
+        } else if (deltaVsBest < -0.0005) {
             this.lapFlashDelta.hidden = false;
-            this.lapFlashDelta.textContent = `${deltaVsBest.toFixed(2)}s`;
+            this.lapFlashDelta.textContent = `${deltaVsBest.toFixed(3)}s`;
             this.lapFlash.classList.add('is-gain');
-        } else if (deltaVsBest > 0.005) {
+        } else if (deltaVsBest > 0.0005) {
             this.lapFlashDelta.hidden = false;
-            this.lapFlashDelta.textContent = `+${deltaVsBest.toFixed(2)}s`;
+            this.lapFlashDelta.textContent = `+${deltaVsBest.toFixed(3)}s`;
             this.lapFlash.classList.add('is-loss');
         } else {
             this.lapFlashDelta.hidden = false;

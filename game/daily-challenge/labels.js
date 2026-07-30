@@ -71,11 +71,11 @@ export function formatDailyChallengeResultLabel(challenge, result) {
         return '--';
     }
     const bestTime = Number.isFinite(result?.bestTime) ? Number(result.bestTime) : null;
-    return bestTime !== null ? `${bestTime.toFixed(2)}s` : '--';
+    return bestTime !== null ? `${bestTime.toFixed(3)}s` : '--';
 }
 
 export function formatDailyChallengeBestLabel(objectiveType, bestTime, completedLaps = null) {
-    return Number.isFinite(bestTime) ? `${Number(bestTime).toFixed(2)}s` : '--';
+    return Number.isFinite(bestTime) ? `${Number(bestTime).toFixed(3)}s` : '--';
 }
 
 export function formatDailyChallengeStatusDate(isoString) {

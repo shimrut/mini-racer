@@ -131,37 +131,37 @@ describe('daily GP result sharing', () => {
 
     it('formats the agreed medal and no-medal comment copy', () => {
         expect(formatDailyGpShareComment(42380, 'gold', 'Classic Circuit')).toBe(
-            'I earned the Gold medal 🥇 with a 42.38 lap in Classic Circuit.',
+            'I earned the Gold medal 🥇 with a 42.380 lap in Classic Circuit.',
         );
         expect(formatDailyGpShareComment(42380, 'silver', 'Classic Circuit')).toBe(
-            'I earned the Silver medal 🥈 with a 42.38 lap in Classic Circuit.',
+            'I earned the Silver medal 🥈 with a 42.380 lap in Classic Circuit.',
         );
         expect(formatDailyGpShareComment(42380, 'bronze', 'Classic Circuit')).toBe(
-            'I earned the Bronze medal 🥉 with a 42.38 lap in Classic Circuit.',
+            'I earned the Bronze medal 🥉 with a 42.380 lap in Classic Circuit.',
         );
         expect(formatDailyGpShareComment(52410, null, 'Classic Circuit')).toBe(
-            'I set a 52.41 lap in Classic Circuit. 🏁',
+            'I set a 52.410 lap in Classic Circuit. 🏁',
         );
         expect(formatDailyGpShareComment(42380, 'author')).toBe(
-            'I earned the Author medal 🏆 with a 42.38 lap in Mini Racer.',
+            'I earned the Author medal 🏆 with a 42.380 lap in Mini Racer.',
         );
         expect(formatDailyGpShareComment(990, null)).toBe(
-            'I set a 00.99 lap in Mini Racer. 🏁',
+            'I set a 00.990 lap in Mini Racer. 🏁',
         );
         expect(formatDailyGpShareComment(42385, 'gold', 'X')).toBe(
-            'I earned the Gold medal 🥇 with a 42.39 lap in X.',
+            'I earned the Gold medal 🥇 with a 42.385 lap in X.',
         );
         expect(formatDailyGpShareComment(42380, 'gold', '')).toBe(
-            'I earned the Gold medal 🥇 with a 42.38 lap in Mini Racer.',
+            'I earned the Gold medal 🥇 with a 42.380 lap in Mini Racer.',
         );
     });
 
     it('describes multi-lap results as complete races', () => {
         expect(formatDailyGpShareComment(24630, 'gold', 'Circuit', 2)).toBe(
-            'I earned the Gold medal 🥇 with a 24.63 2-lap race in Circuit.',
+            'I earned the Gold medal 🥇 with a 24.630 2-lap race in Circuit.',
         );
         expect(formatDailyGpShareComment(30100, null, 'Circuit', 3)).toBe(
-            'I set a 30.10 3-lap race in Circuit. 🏁',
+            'I set a 30.100 3-lap race in Circuit. 🏁',
         );
     });
 
@@ -267,7 +267,7 @@ describe('daily GP result sharing', () => {
         expect(anchor.distinguish).toHaveBeenCalledWith(true);
         expect(reddit.submitComment).toHaveBeenNthCalledWith(2, {
             id: anchor.id,
-            text: expect.stringContaining('42.38'),
+            text: expect.stringContaining('42.380'),
             runAs: 'USER',
         });
 
@@ -1280,18 +1280,18 @@ describe('daily GP result sharing', () => {
         });
     });
 
-    it('formats centisecond boundaries without rounding up to the next displayed tenth', () => {
+    it('preserves exact millisecond boundaries in shared times', () => {
         expect(formatDailyGpShareComment(42384, null, 'Track')).toBe(
-            'I set a 42.38 lap in Track. 🏁',
+            'I set a 42.384 lap in Track. 🏁',
         );
         expect(formatDailyGpShareComment(42386, 'gold', 'Track')).toBe(
-            'I earned the Gold medal 🥇 with a 42.39 lap in Track.',
+            'I earned the Gold medal 🥇 with a 42.386 lap in Track.',
         );
         expect(formatDailyGpShareComment(1000, null, 'Track')).toBe(
-            'I set a 01.00 lap in Track. 🏁',
+            'I set a 01.000 lap in Track. 🏁',
         );
         expect(formatDailyGpShareComment(99990, 'silver', 'Track')).toBe(
-            'I earned the Silver medal 🥈 with a 99.99 lap in Track.',
+            'I earned the Silver medal 🥈 with a 99.990 lap in Track.',
         );
     });
 

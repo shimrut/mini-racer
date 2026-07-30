@@ -155,8 +155,8 @@ describe('daily-challenge service wave3', () => {
         expect(formatDailyChallengeResultLabel(challenge, { bestTime: 'bad' })).toBe('--');
     });
 
-    it('formats finite best-time labels with two decimal places (L663-L664)', () => {
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.876)).toBe('9.88s');
+    it('formats finite best-time labels with three decimal places (L663-L664)', () => {
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.876)).toBe('9.876s');
         expect(formatDailyChallengeBestLabel('single_lap_fastest', null)).toBe('--');
     });
 

@@ -81,7 +81,7 @@ export function buildDailyCarouselCards(challenges = [], {
         const lapsLabel = formatDailyCarouselLapsLabel(requiredLaps);
         // No unit: the card's meta line is uppercased, and "18.00S" reads as a
         // typo. Matches how the campaign card states a best.
-        const bestLabel = hasBestTime ? bestTime.toFixed(2) : null;
+        const bestLabel = hasBestTime ? bestTime.toFixed(3) : null;
 
         cards.push({
             challengeId: challenge.id,

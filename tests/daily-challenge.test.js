@@ -125,11 +125,11 @@ describe('daily-challenge service', () => {
                 { objectiveType: 'single_lap_fastest' },
                 { bestTime: 19.5 }
             )
-        ).toBe('19.50s');
+        ).toBe('19.500s');
     });
 
     it('formatDailyChallengeBestLabel formats daily challenge best values for ui surfaces', () => {
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 19.5)).toBe('19.50s');
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', 19.5)).toBe('19.500s');
     });
 
     it('formatDailyChallengePlaylistAvailabilityLabel only flags urgent or expired tracks', () => {
@@ -1064,9 +1064,9 @@ describe('daily-challenge service', () => {
         expect(formatDailyChallengeResultLabel(
             { objectiveType: 'single_lap_fastest' },
             { bestTime: 12.345 },
-        )).toBe('12.35s');
+        )).toBe('12.345s');
         expect(formatDailyChallengeBestLabel('single_lap_fastest', Number.NaN)).toBe('--');
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.1)).toBe('9.10s');
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.1)).toBe('9.100s');
     });
 
     it('treats a missing window.location as having no mock params instead of throwing', async () => {

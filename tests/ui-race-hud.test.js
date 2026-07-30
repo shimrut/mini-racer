@@ -72,10 +72,10 @@ describe('ui race hud helpers', () => {
         const hud = new RaceHud(context);
         hud.syncHud({ time: 12.345, speed: 3.2, force: true });
 
-        expect(timeVal.textContent).toBe('12.35');
+        expect(timeVal.textContent).toBe('12.345');
         expect(speedVal.textContent).toBe('64');
         expect(mobileSpeedVal.textContent).toBe('64');
-        expect(hud._lastTimeText).toBe('12.35');
+        expect(hud._lastTimeText).toBe('12.345');
         expect(hud._lastSpeedText).toBe('64');
     });
 
@@ -112,7 +112,7 @@ describe('ui race hud helpers', () => {
         });
         expect(hud.setHudBestMetric).toHaveBeenCalledWith({
             label: 'BEST',
-            value: '48.35',
+            value: '48.350',
             visible: true
         });
         expect(hud._hasPersonalBests).toBe(true);
@@ -156,7 +156,7 @@ describe('ui race hud helpers', () => {
         });
 
         expect(lapFlashLabel.textContent).toBe('Lap 3 Best');
-        expect(lapFlashTime.textContent).toBe('27.43s');
+        expect(lapFlashTime.textContent).toBe('27.431s');
         expect(lapFlashDelta.hidden).toBe(false);
         expect(lapFlashDelta.textContent).toBe('New PB');
         expect(lapFlash.classList.add).toHaveBeenCalledWith('visible');
@@ -194,7 +194,7 @@ describe('ui race hud helpers', () => {
         });
 
         expect(lapFlashDelta.hidden).toBe(false);
-        expect(lapFlashDelta.textContent).toBe('+0.31s');
+        expect(lapFlashDelta.textContent).toBe('+0.310s');
         expect(lapFlash.classList.add).toHaveBeenCalledWith('is-loss');
     });
 
@@ -230,7 +230,7 @@ describe('ui race hud helpers', () => {
         });
 
         expect(lapFlashLabel.textContent).toBe('Lap 1 / 3');
-        expect(lapFlashTime.textContent).toBe('9.50s');
+        expect(lapFlashTime.textContent).toBe('9.500s');
         expect(lapFlashMedal.hidden).toBe(false);
         expect(lapFlashMedal.appendChild).toHaveBeenCalledWith(expect.objectContaining({
             medal: 'gold',
@@ -301,7 +301,7 @@ describe('ui race hud helpers', () => {
             splitTimeSec: 4.2,
             deltaVsBest: -0.01
         });
-        expect(gain.lapFlashDelta.textContent).toBe('-0.01s');
+        expect(gain.lapFlashDelta.textContent).toBe('-0.010s');
         expect(gain.lapFlash.classList.add).toHaveBeenCalledWith('is-gain');
         expect(gain.lapFlash.classList.add).not.toHaveBeenCalledWith('is-warning');
 
@@ -312,7 +312,7 @@ describe('ui race hud helpers', () => {
             splitTimeSec: 4.2,
             deltaVsBest: 0.01
         });
-        expect(loss.lapFlashDelta.textContent).toBe('+0.01s');
+        expect(loss.lapFlashDelta.textContent).toBe('+0.010s');
         expect(loss.lapFlash.classList.add).toHaveBeenCalledWith('is-loss');
         expect(loss.lapFlash.classList.add).not.toHaveBeenCalledWith('is-warning');
     });

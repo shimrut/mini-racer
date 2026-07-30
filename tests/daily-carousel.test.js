@@ -101,8 +101,8 @@ describe('daily carousel card model', () => {
 
         expect(multiLap.laps).toBe(3);
         expect(multiLap.lapsLabel).toBe('3 Laps');
-        expect(multiLap.bestLabel).toBe('42.50');
-        expect(multiLap.metaLabel).toBe('3 Laps · PB 42.50');
+        expect(multiLap.bestLabel).toBe('42.500');
+        expect(multiLap.metaLabel).toBe('3 Laps · PB 42.500');
         expect(noBest.lapsLabel).toBe('1 Lap');
         expect(noBest.bestLabel).toBe(null);
         expect(noBest.medal).toBe(null);

@@ -132,15 +132,14 @@
 }
 
 .leaderboard-row__race {
-    color: var(--text-dim);
-    font-family: var(--header-font);
-    font-size: 0.68rem;
-    font-style: italic;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    line-height: 1;
-    text-transform: uppercase;
+    color: rgb(30, 48, 80);
     pointer-events: none;
+}
+
+.leaderboard-row__race-icon {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
 }
 
 .leaderboard-row.is-raceable:hover .leaderboard-row__race {

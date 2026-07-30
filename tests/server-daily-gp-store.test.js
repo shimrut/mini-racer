@@ -942,12 +942,12 @@ describe('server daily gp store submissions', () => {
                 rank: 1,
                 displayName: 'RaceFan',
                 identityType: 'reddit',
-                formattedTime: '0:12.34',
+                formattedTime: '0:12.340',
             },
             expect.objectContaining({
                 rank: 2,
                 identityType: 'private',
-                formattedTime: '0:13.56',
+                formattedTime: '0:13.560',
             }),
             {
                 rank: 3,
@@ -3210,7 +3210,7 @@ describe('server daily gp store submissions', () => {
 
             const podium = await getServerFinalDailyGpPodium(new Date('2026-07-17T00:01:00.000Z'));
 
-            expect(podium.positions[0].formattedTime).toBe('1:30.00');
+            expect(podium.positions[0].formattedTime).toBe('1:30.000');
         });
 
         it('fills empty podium slots when the stored entry player id does not match the ranked member', async () => {

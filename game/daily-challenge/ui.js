@@ -132,7 +132,7 @@ export class DailyChallengeUi {
         if (this.dailyChallengeBest) {
             const bestTime = this._dailyChallengeSummary?.bestTime;
             this.dailyChallengeBest.textContent = this._dailyChallengeSummary?.bestLabel
-                || (Number.isFinite(bestTime) ? `${bestTime.toFixed(2)}s` : '--');
+                || (Number.isFinite(bestTime) ? `${bestTime.toFixed(3)}s` : '--');
         }
         if (this.dailyChallengeBestLabel) {
             this.dailyChallengeBestLabel.textContent = copyLabels.bestSummaryLabel;

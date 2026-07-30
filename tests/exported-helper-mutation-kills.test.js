@@ -240,7 +240,7 @@ describe('exported daily-challenge helpers — mutation kills', () => {
     it('formatDailyChallengeResultLabel returns dashes for missing or non-finite results', () => {
         expect(formatDailyChallengeResultLabel({ trackKey: DEFAULT_TRACK_KEY }, null)).toBe('--');
         expect(formatDailyChallengeResultLabel({ trackKey: DEFAULT_TRACK_KEY }, { bestTime: 'x' })).toBe('--');
-        expect(formatDailyChallengeResultLabel({ trackKey: DEFAULT_TRACK_KEY }, { bestTime: 12.345 })).toBe('12.35s');
+        expect(formatDailyChallengeResultLabel({ trackKey: DEFAULT_TRACK_KEY }, { bestTime: 12.345 })).toBe('12.345s');
     });
 
     it('getDailyChallengeCardStatus switches between featured, available, and expired labels', () => {

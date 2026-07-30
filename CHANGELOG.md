@@ -1,5 +1,10 @@
 # Changelog
 
+- Replaced the leaderboard's text-only **Race** affordance with a stopwatch
+  icon while preserving the full accessible opponent-race label.
+- Standardized every player-visible race time to three decimal places across
+  the HUD, result sheets, split and delta displays, medal targets, selectors,
+  Reddit result comments, post copy, and final podiums.
 - Daily and Campaign now ease their full-screen selector away over 100ms when
   Start Race is pressed, then begin the countdown once track preparation is
   ready.

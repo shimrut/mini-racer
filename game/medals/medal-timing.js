@@ -293,7 +293,7 @@ export function isPersonalBestTimeImprovement(finishTimeSec, previousBest) {
 export function formatMedalTargetsLine(trackKey) {
     const t = getTrackMedalThresholds(trackKey);
     if (!t) return null;
-    const fmt = (s) => `${Number(s).toFixed(2)}s`;
+    const fmt = (s) => `${Number(s).toFixed(3)}s`;
     const authorSec = getAuthorMedalSeconds(trackKey);
     const authorPart = authorSec != null ? `Author ≤ ${fmt(authorSec)} · ` : '';
     return `${authorPart}Gold ≤ ${fmt(t.gold)} · Silver ≤ ${fmt(t.silver)} · Bronze ≤ ${fmt(t.bronze)}`;

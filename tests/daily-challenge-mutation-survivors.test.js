@@ -701,8 +701,8 @@ describe('daily-challenge mutation survivors', () => {
 
     it('formats valid result labels and best-time labels while rejecting invalid numbers', () => {
         const challenge = buildChallenge();
-        expect(formatDailyChallengeResultLabel(challenge, { bestTime: 12.4 })).toBe('12.40s');
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.876)).toBe('9.88s');
+        expect(formatDailyChallengeResultLabel(challenge, { bestTime: 12.4 })).toBe('12.400s');
+        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.876)).toBe('9.876s');
         expect(formatDailyChallengeBestLabel('single_lap_fastest', Number.NaN)).toBe('--');
     });
 

@@ -41,9 +41,9 @@ describe('reddit post title formatting', () => {
             '',
             "## Today's medal times",
             '',
-            '- Gold: 8.75s',
-            '- Silver: 8.91s',
-            '- Bronze: 9.09s',
+            '- Gold: 8.750s',
+            '- Silver: 8.910s',
+            '- Bronze: 9.090s',
             '',
             'Open this post on Reddit and select **Race Now** to play.',
             '',
@@ -71,7 +71,7 @@ describe('reddit post title formatting', () => {
         process.env.MINI_RACER_DAILY_POST_TITLE_FORMAT = '{trackName} · PB {personalBestTime} · {medalTimes}';
 
         expect(formatDailyMiniRacerPostTitle(challenge, { personalBestSec: 8.4 })).toBe(
-            'Mistwood Serpent · PB 8.40s · Author 8.45s · Gold 8.75s · Silver 8.91s · Bronze 9.09s',
+            'Mistwood Serpent · PB 8.400s · Author 8.450s · Gold 8.750s · Silver 8.910s · Bronze 9.090s',
         );
     });
 

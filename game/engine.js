@@ -639,7 +639,7 @@ export class RealTimeRacer {
         wallContactActive: Boolean(this.wallContactActive),
         wallContactReleaseSec: Number((Number(this.wallContactReleaseRemaining) || 0).toFixed(3)),
       },
-      lapTime: Number(this.currentTime.toFixed(2)),
+      lapTime: Number(this.currentTime.toFixed(3)),
       challenge: this.currentChallengeRun
         ? {
             completedLaps: this.currentChallengeRun.completedLaps || 0,

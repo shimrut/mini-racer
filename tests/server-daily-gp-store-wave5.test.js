@@ -143,7 +143,7 @@ describe('server daily gp store wave5', () => {
 
         const podium = await getServerFinalDailyGpPodium(new Date('2026-07-17T00:01:00.000Z'));
 
-        expect(podium.positions[0].formattedTime).toBe('2:05.99');
+        expect(podium.positions[0].formattedTime).toBe('2:05.990');
         expect(podium.positions[1].formattedTime).toBeNull();
     });
 

@@ -1794,7 +1794,7 @@ export class ModalShell {
         if (bestTime !== undefined) {
             const primaryValue = this.modalStatsRow?.querySelector('.modal-stat-stack:not([data-modal-rank-stat]) .modal-stat-value');
             if (primaryValue && Number.isFinite(bestTime)) {
-                primaryValue.textContent = `${bestTime.toFixed(2)}s`;
+                primaryValue.textContent = `${bestTime.toFixed(3)}s`;
             }
         }
 

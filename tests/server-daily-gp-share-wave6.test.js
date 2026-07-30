@@ -137,16 +137,16 @@ describe('daily GP share wave6', () => {
 
     it('formats author and gold medal share comments with padded lap times (L115-L125)', () => {
         expect(formatDailyGpShareComment(9050, 'author', 'Circuit')).toBe(
-            'I earned the Author medal 🏆 with a 09.05 lap in Circuit.',
+            'I earned the Author medal 🏆 with a 09.050 lap in Circuit.',
         );
         expect(formatDailyGpShareComment(5990, 'gold', 'Desert Bridge')).toBe(
-            'I earned the Gold medal 🥇 with a 05.99 lap in Desert Bridge.',
+            'I earned the Gold medal 🥇 with a 05.990 lap in Desert Bridge.',
         );
     });
 
     it('uses the default track label when trackName is omitted (L114)', () => {
         expect(formatDailyGpShareComment(15000, null)).toBe(
-            'I set a 15.00 lap in Mini Racer. 🏁',
+            'I set a 15.000 lap in Mini Racer. 🏁',
         );
     });
 

@@ -12,13 +12,13 @@ describe('result-flow wave 2', () => {
         vi.restoreAllMocks();
     });
 
-    it('treats tiny positive deltas as zero', () => {
-        expect(buildModalDeltaDisplay({ deltaToBest: 0.004 })).toEqual({
-            text: '0.00s',
+    it('treats sub-millisecond positive deltas as zero', () => {
+        expect(buildModalDeltaDisplay({ deltaToBest: 0.0004 })).toEqual({
+            text: '0.000s',
             valueClass: '',
         });
-        expect(buildModalDeltaDisplay({ deltaToBest: 0.006 })).toEqual({
-            text: '+0.01s',
+        expect(buildModalDeltaDisplay({ deltaToBest: 0.0006 })).toEqual({
+            text: '+0.001s',
             valueClass: 'modal-stat-value--delta-positive',
         });
     });

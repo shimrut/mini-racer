@@ -48,7 +48,7 @@ describe('ui daily challenge helpers', () => {
             rankLabel: '#12',
             scoreboardSnapshot: { playerRankLabel: '#12' },
             verifiedBestTime: 15,
-            verifiedBestLabel: '15.00s',
+            verifiedBestLabel: '15.000s',
             verifiedRankLabel: '#12',
             verifiedScoreboardSnapshot: { playerRankLabel: '#12' }
         };
@@ -59,7 +59,7 @@ describe('ui daily challenge helpers', () => {
         expect(component.setDailyChallengeSummary).toHaveBeenCalledWith(expect.objectContaining({
             challengeId: 'challenge-1',
             bestTime: 12.34,
-            bestLabel: '12.34s',
+            bestLabel: '12.340s',
             rankLabel: '#12',
             scoreboardSnapshot: expect.objectContaining({
                 verificationState: 'pending',
@@ -120,7 +120,7 @@ describe('ui daily challenge helpers', () => {
             rankLabel: '#12',
             scoreboardSnapshot: { playerRankLabel: '#12' },
             verifiedBestTime: 15,
-            verifiedBestLabel: '15.00s',
+            verifiedBestLabel: '15.000s',
             verifiedRankLabel: '#12',
             verifiedScoreboardSnapshot: { playerRankLabel: '#12' }
         };
@@ -131,7 +131,7 @@ describe('ui daily challenge helpers', () => {
         expect(component.setDailyChallengeSummary).toHaveBeenCalledWith(expect.objectContaining({
             challengeId: 'challenge-error',
             bestTime: 11.9,
-            bestLabel: '11.90s',
+            bestLabel: '11.900s',
             scoreboardSnapshot: expect.objectContaining({
                 verificationState: 'error',
                 submissionStage: 'error',

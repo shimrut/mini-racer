@@ -73,7 +73,7 @@ describe('result-flow mutation kills', () => {
             valueClass: '',
         });
         expect(buildModalDeltaDisplay({ deltaToBest: 0 })).toEqual({
-            text: '0.00s',
+            text: '0.000s',
             valueClass: '',
         });
     });
