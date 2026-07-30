@@ -1,7 +1,9 @@
 # Changelog
 
 - Replaced the leaderboard's text-only **Race** affordance with a stopwatch
-  icon while preserving the full accessible opponent-race label.
+  icon while preserving the full accessible opponent-race label. The shared
+  action column now hugs the icon controls instead of reserving the old text
+  label width.
 - Standardized every player-visible race time to three decimal places across
   the HUD, result sheets, split and delta displays, medal targets, selectors,
   Reddit result comments, post copy, and final podiums.

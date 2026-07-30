@@ -242,7 +242,8 @@ flowchart LR
 - All player-visible race times use three decimal places, matching the verified
   millisecond precision across the HUD, results, splits, deltas, selectors,
   leaderboard, Reddit result copy, and podiums. Raceable opponent rows use a
-  stopwatch glyph while the row keeps its full accessible action label.
+  stopwatch glyph in the same compact action column as Share while the row
+  keeps its full accessible action label.
 - On touch devices, the standings list accepts deliberate horizontal swipes as an alternative to the day rail: swipe left for an older available day and right for a newer one. The original date strip remains visible, tappable, and horizontally scrollable; swipe navigation does not replace it. Short or vertically dominant gestures, day buttons, links, and the shareable player row keep their existing tap/scroll behavior.
 
 ### Server And Shared Validation

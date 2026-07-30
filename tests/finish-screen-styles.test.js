@@ -12,4 +12,13 @@ describe('finish screen styles', () => {
             /#modal\.modal--win #combined-restart-btn\s*,\s*\.combined-action-btn/,
         );
     });
+
+    it('keeps leaderboard action slots tight to their icon buttons', () => {
+        expect(styles).toMatch(
+            /\.leaderboard-row__action\s*\{[^}]*width:\s*1\.5rem;[^}]*justify-content:\s*flex-end;/s,
+        );
+        expect(styles).not.toMatch(
+            /\.leaderboard-row__action\s*\{[^}]*width:\s*3rem;/s,
+        );
+    });
 });
