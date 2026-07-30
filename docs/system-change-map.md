@@ -134,6 +134,11 @@ flowchart LR
   deliberately larger standalone post-preview car unchanged. The
   existing Back, Standings, Garage, and Settings toolbar stays above that
   surface, while one centered Start Race action anchors the bottom.
+  Pressing Start Race in either selector eases the full lobby surface to the
+  track over 100ms while any required track preparation continues behind it;
+  the countdown begins once both the fade and preparation are complete.
+  Intermediate track resets preserve the fading surface, and its actions and
+  keyboard navigation stay inactive during the handoff.
   Standings resolves the carousel's currently centred track at click time.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. Desktop responsive rules must not target the generic

@@ -452,6 +452,8 @@ export const campaignEngineMethods = {
                 || requestedId,
             );
             if (!stage) return;
+            const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
+            if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
 
             // Same shape as Daily: nothing on the wire gates the countdown. Both
             // requests go out now and are folded in once the lights are running,
@@ -485,6 +487,7 @@ export const campaignEngineMethods = {
             this.applyDailyChallenge(toRaceChallenge(stage));
             this.activeRaceMode = 'campaign';
             void this.journeys?.startAttempt?.({ reason: 'initial_start' });
+            await raceStartTransition;
             this.startSequence();
 
             if (startRequest) void this.confirmCampaignRaceStart(stage, startRequest);

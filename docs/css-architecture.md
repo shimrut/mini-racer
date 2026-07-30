@@ -48,6 +48,7 @@ against it rather than against a hand-typed number.
 | `--dur-fast` | 120ms | Immediate feedback: hover and press colour, opacity |
 | `--dur-base` | 160ms | The default — enters, exits, content swaps |
 | `--dur-slow` | 200ms | The ceiling for anything the player waits through |
+| `--dur-race-start-exit` | 100ms | Exact Daily/Campaign Start Race screen fade |
 | `--ease-standard` | `cubic-bezier(0.4, 0, 0.2, 1)` | Neutral in-and-out |
 | `--ease-settle` | `cubic-bezier(0.22, 1, 0.36, 1)` | Panels and cards arriving |
 | `--ease-glide` | `cubic-bezier(0.16, 1, 0.3, 1)` | Long decelerating entrances |
@@ -60,8 +61,9 @@ where the number is the point. `ease` and `ease-out` remain the plain keywords
 for colour and opacity; the curve tokens are for things that move.
 
 `styles-architecture.test.js` fails on any transition or animation duration at
-or under 200ms that is not a token, so a fourth timing cannot creep back in.
-Animation *delays* are exempt.
+or under 200ms that is not a token, so new timings cannot creep back in.
+Animation *delays* are exempt. The 100ms race-start exit is deliberately named
+for its single handoff rather than added to the general motion band.
 
 ## Change Rules
 

@@ -743,6 +743,43 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.startSequence).toHaveBeenCalled();
   });
 
+  it("waits for the Daily lobby exit before starting the countdown", async () => {
+    const challenge = {
+      id: "daily-transition",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    let finishTransition;
+    const raceStartTransition = new Promise((resolve) => {
+      finishTransition = resolve;
+    });
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: challenge,
+      activeDailyChallenge: null,
+      currentTrackKey: challenge.trackKey,
+      startOverlay: {
+        beginRaceStartTransition: vi.fn(() => raceStartTransition),
+      },
+      resetCanvasPresentation: vi.fn(),
+      applyDailyChallenge: vi.fn(),
+      startSequence: vi.fn(),
+      journeys: { startAttempt: vi.fn() },
+    };
+
+    const start = RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
+    await Promise.resolve();
+
+    expect(engine.startOverlay.beginRaceStartTransition).toHaveBeenCalledTimes(1);
+    expect(engine.startSequence).not.toHaveBeenCalled();
+
+    finishTransition();
+    await start;
+
+    expect(engine.startSequence).toHaveBeenCalledTimes(1);
+  });
+
   it("does not enqueue verification when the active track does not match the challenge", () => {
     const engine = {
       currentTrackKey: "blueSector",

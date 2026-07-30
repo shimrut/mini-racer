@@ -1114,6 +1114,26 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
+    it('blocks lobby keyboard input while the race-start exit is running', () => {
+        const overlay = {
+            style: { display: 'flex' },
+            classList: { contains: vi.fn((name) => name === 'is-race-start-exiting') },
+        };
+        const lobbyUi = new LobbyUi({ onBack: vi.fn() });
+        Object.defineProperty(lobbyUi, 'overlay', { value: overlay });
+        lobbyUi.mode = 'daily';
+        const event = {
+            key: 'Escape',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        };
+
+        lobbyUi.handleKeydown(event);
+
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(lobbyUi.onBack).not.toHaveBeenCalled();
+    });
+
     it('keeps Home unchanged and swaps mode-screen branding for the toolbar', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         expect(html).toMatch(
@@ -1901,6 +1921,35 @@ describe('Campaign lobby and shared modal adapters', () => {
             });
         });
         expect(context.loadCampaignLobby).not.toHaveBeenCalled();
+    });
+
+    it('waits for the Campaign lobby exit before starting the countdown', async () => {
+        let finishTransition;
+        const raceStartTransition = new Promise((resolve) => {
+            finishTransition = resolve;
+        });
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+        const context = createStartContext({
+            startOverlay: {
+                beginRaceStartTransition: vi.fn(() => raceStartTransition),
+            },
+        });
+
+        const start = context.startCampaignStage();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(context.startOverlay.beginRaceStartTransition).toHaveBeenCalledTimes(1);
+        expect(context.startSequence).not.toHaveBeenCalled();
+
+        finishTransition();
+        await start;
+
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
     });
 
     it('keeps a medal earned while the Campaign start stamp is still in flight', async () => {

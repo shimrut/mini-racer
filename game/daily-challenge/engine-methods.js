@@ -891,7 +891,8 @@ export const dailyChallengeEngineMethods = {
     }
 
     this.resetCanvasPresentation();
-    this.startOverlay?.hideStartOverlay?.();
+    const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
+    if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
     claimPbGhostSelection(this, challenge.id);
     this.startButtonPending = true;
     const replaceActiveJourney = replacesCurrentRun
@@ -945,6 +946,7 @@ export const dailyChallengeEngineMethods = {
         reason: resolveJourneyStartReason({ replacesCurrentRun }),
         replaceActive: replaceActiveJourney,
       });
+      await raceStartTransition;
       this.startSequence();
     } finally {
       this.startButtonPending = false;

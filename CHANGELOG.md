@@ -1,5 +1,8 @@
 # Changelog
 
+- Daily and Campaign now ease their full-screen selector away over 100ms when
+  Start Race is pressed, then begin the countdown once track preparation is
+  ready.
 - Daily and Campaign track schematics now place the player's selected Garage
   car at the start line instead of showing a generic red direction triangle.
   Changing car skins refreshes both selector surfaces immediately, and the

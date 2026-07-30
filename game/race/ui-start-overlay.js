@@ -12,6 +12,7 @@ const BLOCKING_OVERLAY_IDS = [
     'garage-modal',
     'daily-playlist-modal',
 ];
+const RACE_START_EXIT_MS = 100;
 
 export class StartOverlay {
     constructor({
@@ -22,6 +23,8 @@ export class StartOverlay {
         this._startOverlayIsReturningPlayer = false;
         this._isReady = false;
         this._isInteractive = false;
+        this._raceStartTransitionGeneration = 0;
+        this._raceStartTransitionPending = false;
         this._menuKeyboardState = createMenuKeyboardState();
         this._menuKeydownHandler = null;
         this._menuPointerMoveHandler = null;
@@ -58,6 +61,7 @@ export class StartOverlay {
     }
 
     isLobbyKeyboardNavBlocked() {
+        if (this._raceStartTransitionPending) return true;
         for (const id of BLOCKING_OVERLAY_IDS) {
             const el = document.getElementById(id);
             if (el?.classList?.contains('active')) return true;
@@ -123,7 +127,12 @@ export class StartOverlay {
     showStartOverlay(hasAnyData, isReturningPlayer = false) {
         const overlay = this.startOverlay;
         const group = this.startGroup;
-        if (overlay) overlay.style.display = "flex";
+        this._raceStartTransitionGeneration += 1;
+        this._raceStartTransitionPending = false;
+        if (overlay) {
+            overlay.classList?.remove?.('is-race-start-exiting');
+            overlay.style.display = "flex";
+        }
         if (group) group.style.display = "flex";
         this.setStartOverlayActive(true);
         this.updateStartOverlayMode(hasAnyData, isReturningPlayer);
@@ -131,12 +140,45 @@ export class StartOverlay {
         requestAnimationFrame(() => this.focusPrimaryAction());
     }
 
-    hideStartOverlay() {
+    beginRaceStartTransition() {
         const overlay = this.startOverlay;
-        if (overlay) overlay.style.display = "none";
+        if (!overlay || overlay.style.display === "none") {
+            return Promise.resolve();
+        }
+
+        const generation = this._raceStartTransitionGeneration + 1;
+        this._raceStartTransitionGeneration = generation;
+        this._raceStartTransitionPending = true;
+        overlay.classList?.add?.('is-race-start-exiting');
+        const reduceMotion = globalThis.matchMedia
+            ?.('(prefers-reduced-motion: reduce)')
+            ?.matches === true;
+        if (reduceMotion) {
+            this._raceStartTransitionPending = false;
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                if (this._raceStartTransitionGeneration === generation) {
+                    this._raceStartTransitionPending = false;
+                }
+                resolve();
+            }, RACE_START_EXIT_MS);
+        });
+    }
+
+    hideStartOverlay() {
+        if (this._raceStartTransitionPending) return false;
+        const overlay = this.startOverlay;
+        if (overlay) {
+            overlay.style.display = "none";
+            overlay.classList?.remove?.('is-race-start-exiting');
+        }
         this.setStartOverlayActive(false);
         this.setStartSelectionMode(false);
         this.resetLobbyMenuKeyboardNav();
+        return true;
     }
 
     updateStartOverlayMode(

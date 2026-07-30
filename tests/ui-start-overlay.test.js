@@ -148,4 +148,71 @@ describe('ui start overlay helpers', () => {
         global.document = originalDocument;
     });
 
+    it('eases the visible lobby away for exactly 100ms before race handoff', async () => {
+        const originalDocument = global.document;
+        const originalMatchMedia = global.matchMedia;
+        const classes = new Set(['is-ready']);
+        const overlayNode = {
+            style: { display: 'flex' },
+            classList: {
+                add: (className) => classes.add(className),
+                remove: (className) => classes.delete(className),
+            },
+        };
+        global.document = {
+            body: { classList: { toggle: vi.fn() } },
+            getElementById: (id) => id === 'start-overlay' ? overlayNode : null,
+        };
+        global.matchMedia = vi.fn(() => ({ matches: false }));
+        vi.useFakeTimers();
+
+        try {
+            const startOverlay = new StartOverlay();
+            let finished = false;
+            const transition = startOverlay.beginRaceStartTransition()
+                .then(() => { finished = true; });
+
+            expect(classes.has('is-race-start-exiting')).toBe(true);
+            expect(startOverlay.hideStartOverlay()).toBe(false);
+            expect(overlayNode.style.display).toBe('flex');
+            await vi.advanceTimersByTimeAsync(99);
+            expect(finished).toBe(false);
+            await vi.advanceTimersByTimeAsync(1);
+            await transition;
+            expect(finished).toBe(true);
+            expect(startOverlay.hideStartOverlay()).toBe(true);
+            expect(overlayNode.style.display).toBe('none');
+            expect(classes.has('is-race-start-exiting')).toBe(false);
+        } finally {
+            vi.useRealTimers();
+            global.matchMedia = originalMatchMedia;
+            global.document = originalDocument;
+        }
+    });
+
+    it('skips the race-start wait when reduced motion is requested', async () => {
+        const originalDocument = global.document;
+        const originalMatchMedia = global.matchMedia;
+        const overlayNode = {
+            style: { display: 'flex' },
+            classList: { add: vi.fn(), remove: vi.fn() },
+        };
+        global.document = {
+            body: { classList: { toggle: vi.fn() } },
+            getElementById: (id) => id === 'start-overlay' ? overlayNode : null,
+        };
+        global.matchMedia = vi.fn(() => ({ matches: true }));
+
+        try {
+            const startOverlay = new StartOverlay();
+            await startOverlay.beginRaceStartTransition();
+
+            expect(startOverlay.hideStartOverlay()).toBe(true);
+            expect(overlayNode.style.display).toBe('none');
+        } finally {
+            global.matchMedia = originalMatchMedia;
+            global.document = originalDocument;
+        }
+    });
+
 });

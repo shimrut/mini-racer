@@ -253,6 +253,9 @@ export class LobbyUi {
     }
 
     isKeyboardNavBlocked() {
+        if (this.overlay?.classList?.contains?.('is-race-start-exiting')) {
+            return true;
+        }
         return BLOCKING_OVERLAY_IDS.some((id) => (
             document.getElementById(id)?.classList?.contains('active')
         ));

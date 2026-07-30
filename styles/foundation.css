@@ -55,6 +55,8 @@
     --dur-fast: 120ms;
     --dur-base: 160ms;
     --dur-slow: 200ms;
+    /* Exact Start Race handoff requested for the full-screen selectors. */
+    --dur-race-start-exit: 100ms;
 
     /* Curves, by the job. `ease` stays the plain default for colour and
        opacity; these are for anything that moves. */

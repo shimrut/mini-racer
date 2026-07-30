@@ -105,8 +105,20 @@
     pointer-events: auto;
 }
 
+#start-overlay.is-ready.is-race-start-exiting {
+    opacity: 0;
+    pointer-events: none;
+    transition-duration: var(--dur-race-start-exit);
+}
+
 body.start-selection-active #start-overlay {
     background: rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #start-overlay.is-ready.is-race-start-exiting {
+        transition: none;
+    }
 }
 
 #start-group {

@@ -74,6 +74,7 @@ describe('game stylesheet architecture', () => {
             '--dur-fast: 120ms;',
             '--dur-base: 160ms;',
             '--dur-slow: 200ms;',
+            '--dur-race-start-exit: 100ms;',
             '--ease-standard: cubic-bezier(0.4, 0, 0.2, 1);',
             '--ease-settle: cubic-bezier(0.22, 1, 0.36, 1);',
             '--ease-glide: cubic-bezier(0.16, 1, 0.3, 1);',
@@ -133,6 +134,12 @@ describe('game stylesheet architecture', () => {
         );
         expect(trackCarouselStyles).toMatch(
             /#lobby-daily-pane \.lobby-primary-row--race,[\s\S]*#lobby-campaign-pane \.lobby-primary-row--race\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*3;[^}]*width:\s*min\(84vw,\s*30rem\);/s,
+        );
+    });
+
+    it('eases the shared Daily and Campaign lobby away over the exact race-start duration', () => {
+        expect(readCssBundle(manifestUrl)).toMatch(
+            /#start-overlay\.is-ready\.is-race-start-exiting\s*\{[^}]*opacity:\s*0;[^}]*pointer-events:\s*none;[^}]*transition-duration:\s*var\(--dur-race-start-exit\);/s,
         );
     });
 
