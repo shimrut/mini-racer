@@ -109,23 +109,42 @@ describe('game stylesheet architecture', () => {
         expect(strays).toEqual([]);
     });
 
-    it('keeps playlist card shadows out of the carousel rail', () => {
+    it('keeps playlist card shadows off every card the rail is not centring', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*box-shadow:\s*none;/s,
         );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel \.daily-playlist-entry--hero:not\(\.is-carousel-selected\):hover\s*\{[^}]*box-shadow:\s*none;/s,
         );
+    });
+
+    it('keeps the centred card lifted, and inside the rail padding that clears it', () => {
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-entry--hero\.is-carousel-selected:hover\s*\{[^}]*box-shadow:\s*none;/s,
+            /\.track-carousel \.daily-playlist-entry--hero\.is-carousel-selected\s*\{[^}]*box-shadow:[^;]+;/s,
+        );
+        // The viewport clips vertically, so the shadow only survives if the rail
+        // reserves room above and below the cards for it.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__rail\s*\{[^}]*padding-block:\s*0\.55rem;/s,
         );
     });
 
     it('keeps carousel medals square and shrinkable inside short Reddit viewports', () => {
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel__medal\s*\{[^}]*flex:\s*0 1 4rem;[^}]*min-height:\s*0;[^}]*min-width:\s*0;[^}]*max-width:\s*4rem;[^}]*max-height:\s*4rem;[^}]*aspect-ratio:\s*1;/s,
+            /\.track-carousel__medal\s*\{[^}]*flex:\s*0 1 1\.7rem;[^}]*min-height:\s*0;[^}]*min-width:\s*0;[^}]*max-width:\s*1\.7rem;[^}]*max-height:\s*1\.7rem;[^}]*aspect-ratio:\s*1;/s,
         );
         expect(trackCarouselStyles.match(/\.track-carousel__medal\s*\{/g)).toHaveLength(1);
+    });
+
+    it('leaves the track drawing the whole plate to itself', () => {
+        const ui = readFileSync(
+            new URL('../game/ui/track-carousel.js', import.meta.url),
+            'utf8',
+        );
+        // The medal ladder reads left to right under the plate; anything else in
+        // the preview box takes width from the one drawing that names the track.
+        expect(ui).toContain('preview.append(previewArt, previewLock)');
+        expect(ui).toContain('head.append(eyebrow, medal)');
     });
 
 });

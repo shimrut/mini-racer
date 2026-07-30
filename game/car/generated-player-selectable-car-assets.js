@@ -15,6 +15,7 @@ export const GENERATED_PLAYER_SELECTABLE_CAR_ASSETS = Object.freeze([
   "assets/cars/mr_extra_fuchsia.webp",
   "assets/cars/mr_extra_gold.webp",
   "assets/cars/mr_extra_lime.webp",
+  "assets/cars/mr_extra_newred.webp",
   "assets/cars/mr_extra_onyx.webp",
   "assets/cars/mr_extra_plasma.webp",
   "assets/cars/mr_extra_surge.webp",

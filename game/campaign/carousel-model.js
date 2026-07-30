@@ -52,22 +52,6 @@ function buildLockMeter(stage) {
     };
 }
 
-/**
- * Gold is what a stage is worth chasing to; once it is banked Author is the one
- * medal left on the table. Either way the card states one target, never a table
- * of them — this is the number campaign play is actually organised around.
- */
-function buildChase(stage) {
-    if (!stage.unlocked) return null;
-    if (stage.needsGold && stage.goldTargetLabel) {
-        return { tier: 'gold', label: 'Gold', value: stage.goldTargetLabel, gap: stage.goldGapLabel };
-    }
-    if (stage.needsAuthor && stage.authorTargetLabel) {
-        return { tier: 'author', label: 'Author', value: stage.authorTargetLabel, gap: stage.authorGapLabel };
-    }
-    return null;
-}
-
 export function buildCampaignCarouselCards(campaignState = {}) {
     const stages = Array.isArray(campaignState?.stages) ? campaignState.stages : [];
     const cards = [];
@@ -75,10 +59,8 @@ export function buildCampaignCarouselCards(campaignState = {}) {
     for (const stage of stages) {
         if (!stage?.id || !stage.trackKey || !TRACKS[stage.trackKey]) continue;
         const lapsLabel = formatLapsLabel(stage.laps);
-        const chase = buildChase(stage);
 
         cards.push({
-            chase,
             challengeId: stage.id,
             challenge: stage,
             trackKey: stage.trackKey,

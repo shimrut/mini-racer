@@ -32,8 +32,12 @@ describe('lobby service', () => {
         });
     });
 
-    it('turns a stage short of Gold into the time it still needs', () => {
-        // numberFive: gold 15.28s a lap, so a two-lap stage wants 0:30.560.
+    /**
+     * A normalized stage carried a Gold and an Author target, a flag for each,
+     * and the gap to both — all of it to feed one row on the card that no longer
+     * exists. What a stage still owes is the medal stack, which needs none of it.
+     */
+    it('carries no medal target times on a stage', () => {
         const stage = normalizeCampaignStage({
             trackKey: 'numberFive',
             laps: 2,
@@ -42,43 +46,13 @@ describe('lobby service', () => {
             medal: 'Silver',
         }, 5);
 
-        expect(stage.goldTargetMs).toBe(30560);
-        expect(stage.goldTargetLabel).toBe('0:30.560');
-        expect(stage.needsGold).toBe(true);
-        expect(stage.goldGapLabel).toBe('+0.271');
-    });
-
-    it('drops the Gold goal once the stage is cleared, locked, or untimed', () => {
-        const cleared = normalizeCampaignStage({
-            trackKey: 'numberFive', laps: 2, unlocked: true, bestTimeMs: 30100, medal: 'Gold',
-        }, 5);
-        const author = normalizeCampaignStage({
-            trackKey: 'numberZero', laps: 1, unlocked: true, bestTimeMs: 6879, medal: 'Author',
-        }, 0);
-        const locked = normalizeCampaignStage({
-            trackKey: 'numberSix', laps: 3, unlocked: false,
-        }, 6);
-        const untimed = normalizeCampaignStage({
-            trackKey: 'numberOne', laps: 1, unlocked: true,
-        }, 1);
-
-        expect(cleared.needsGold).toBe(false);
-        expect(author.needsGold).toBe(false);
-        expect(locked.needsGold).toBe(false);
-        // No run yet: the target still stands, there is just no gap to quote.
-        expect(untimed.needsGold).toBe(true);
-        expect(untimed.goldTargetLabel).toBe('0:09.520');
-        expect(untimed.goldGapLabel).toBeNull();
-
-        // Gold banked is not the end of the stage: Author becomes the target.
-        expect(cleared).toMatchObject({
-            needsAuthor: true,
-            authorTargetLabel: '0:30.100',
-            authorGapLabel: null,
-        });
-        // Author earned, and locked stages, have nothing left to chase.
-        expect(author.needsAuthor).toBe(false);
-        expect(locked.needsAuthor).toBe(false);
+        expect(stage).toMatchObject({ medal: 'Silver', bestTimeLabel: '0:30.831' });
+        for (const key of [
+            'goldTargetMs', 'goldTargetLabel', 'needsGold', 'goldGapLabel',
+            'authorTargetMs', 'authorTargetLabel', 'needsAuthor', 'authorGapLabel',
+        ]) {
+            expect(stage).not.toHaveProperty(key);
+        }
     });
 
     it('prices a locked row against the medals the player has banked', () => {

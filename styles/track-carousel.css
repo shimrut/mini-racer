@@ -54,9 +54,12 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     align-self: center;
     width: min(100vw, 44rem);
     /* Takes the room the pane has and shrinks into whatever is left on a short
-       screen; the actions stay pinned where every other pane puts them. */
+       screen; the actions stay pinned where every other pane puts them.
+       Tied to the card's own width rather than to the pane: track drawings are
+       landscape, so a card that simply ate the pane's height letterboxed the
+       one thing on it worth looking at. */
     flex: 0 1 auto;
-    height: 32rem;
+    height: min(32rem, calc(var(--track-card-width) * 1.18));
     min-height: 15rem;
     margin-block: auto 1rem;
 }
@@ -83,79 +86,125 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     align-items: stretch;
     height: 100%;
     box-sizing: border-box;
-    gap: 0.5rem;
-    /* JS replaces the fallback with measured pixels once the pane is visible.
-       Embedded WebViews disagree on percentage padding inside intrinsic flex
-       rails; explicit edge space lets the first and last cards truly centre. */
-    padding-inline: var(
+    gap: 0.75rem;
+    /* Room for the centred card's drop shadow; the viewport clips vertically. */
+    padding-block: 0.55rem;
+}
+
+/* The room the end cards need on their outer side to reach the middle. Carried
+   by real flex items rather than the rail's `padding-inline`: WebKit drops a
+   scroll container's trailing padding, so in the Reddit app the rail ran out of
+   scroll before the last card was centred and it sat stuck off to one side.
+   JS replaces the fallback with measured pixels once the pane is visible. */
+.track-carousel__edge {
+    flex: 0 0 var(
         --track-carousel-edge-space,
         calc((min(100vw, 44rem) - var(--track-card-width)) / 2)
     );
-    padding-block: 0.2rem;
+}
+
+/* Rounding on a fractional card width can still leave the last card a pixel or
+   two short of centre; JS measures what the rail can actually reach and tops up
+   the difference here. */
+.track-carousel__edge--tail {
+    flex-basis: calc(
+        var(
+            --track-carousel-edge-space,
+            calc((min(100vw, 44rem) - var(--track-card-width)) / 2)
+        )
+        + var(--track-carousel-tail-shortfall, 0px)
+    );
 }
 
 /* The sheet lays a track out as a wide row; the lobby has height and not much
-   width, so the same parts stack instead. */
+   width, so the same parts stack instead: a lit plate carrying the track, and
+   the card's own ground below it carrying what the track is.
+   The card frames the plate rather than being one flat slab — the padding here
+   is that frame, and the raked gradient gives it a top edge to catch light. */
 .track-carousel .daily-playlist-entry--hero {
     flex: 0 0 var(--track-card-width);
     flex-direction: column;
     min-height: 0;
+    padding: 0.45rem 0.45rem 0.15rem;
+    border-color: rgba(148, 178, 255, 0.14);
+    background: linear-gradient(163deg, #1a2440 0%, #111b2f 46%, #0b1322 100%);
     scroll-snap-align: center;
     /* The sheet's card shadow overlaps through the narrow rail gaps and is
-       clipped by the viewport into one translucent rail-sized slab. */
+       clipped by the viewport into one translucent rail-sized slab. Only the
+       centred card carries one, tight enough to stay inside the rail padding. */
     box-shadow: none;
-    opacity: 0.4;
-    transition: opacity var(--dur-base) ease-out, border-color var(--dur-base) ease-out;
+    /* Peeking cards are scenery: set back, not just faded. Both track how close
+       the card is to the middle rather than whether it holds it, so a swipe
+       brings a card forward continuously instead of switching it on when it
+       crosses the centre. The transform is visual only — centring measures
+       offsetWidth, which it does not touch. */
+    opacity: calc(0.42 + (0.58 * var(--card-proximity, 0)));
+    transform: scale(calc(0.93 + (0.07 * var(--card-proximity, 0))));
+    transition: border-color var(--dur-base) ease-out;
 }
 
 .track-carousel .daily-playlist-entry--hero.is-carousel-selected {
-    opacity: 1;
+    border-color: rgba(148, 178, 255, 0.2);
+    box-shadow:
+        0 1px 0 rgba(190, 210, 255, 0.07) inset,
+        0 10px 26px -14px rgba(0, 0, 0, 0.9);
     cursor: default;
 }
 
 /* A peeking card is the shape of a track and nothing else. Fading the whole
    card still left its medals, rank, date, laps and best time legible enough to
    read, so three cards' worth of detail competed with the one being chosen.
-   Only the centred card states its details.
+   Only the card at the centre states its details.
+
+   On a steeper ramp than the card itself: the details hold at nothing until the
+   card is most of the way in, then come up over the last of the travel. A
+   linear fade would have two cards half-stating themselves for most of a swipe,
+   which is the crowding this rule exists to prevent.
 
    Faded rather than removed: the rail stretches every card to the same height,
    so taking the details out of the layout would let a peeking card's track
    drawing grow larger than the selected one's. */
-.track-carousel .daily-playlist-hero-medal,
 .track-carousel .daily-playlist-hero-content {
-    transition: opacity var(--dur-base) ease-out;
+    opacity: clamp(0, calc((var(--card-proximity, 0) - 0.55) * 3.2), 1);
 }
 
-.track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected) .daily-playlist-hero-medal,
 .track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected) .daily-playlist-hero-content {
-    opacity: 0;
     pointer-events: none;
 }
 
-/* The sheet's rows lift on hover; a peeking card is scenery, not a target. */
+/* The sheet's rows lift on hover; a card in the rail is placed by the scroll
+   position, so it restates that rather than letting the lift move it. */
+.track-carousel .daily-playlist-entry--hero:hover {
+    transform: scale(calc(0.93 + (0.07 * var(--card-proximity, 0))));
+}
+
 .track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected):hover {
-    transform: none;
     box-shadow: none;
 }
 
-.track-carousel .daily-playlist-entry--hero.is-carousel-selected:hover {
-    transform: none;
-    box-shadow: none;
-}
-
-/* The top of the card: the track on the left, the medal ladder down the right.
+/* The top of the card is a lit plate and the track drawing fills it. The medal
+   ladder used to run down the right of this box and took a third of the width
+   from the one drawing that tells a player which track this is.
    `width`/`height` are restated because the narrow-screen sheet rules pin them. */
 .track-carousel .daily-playlist-hero-preview {
     position: relative;
     display: flex;
     flex: 1 1 auto;
     align-items: stretch;
-    gap: 0.5rem;
     width: auto;
     height: auto;
     min-width: 0;
     min-height: 6.5rem;
-    padding: 0.5rem 0.6rem 0.5rem 0;
+    padding: 0.6rem;
+    overflow: hidden;
+    border-radius: calc(var(--radius-lg) - 0.4rem);
+    /* A schematic drawn in flat greys needs something to sit on: the spotlight
+       is off-centre and cool, so the plate reads as lit rather than as a panel
+       with a gradient on it. */
+    background:
+        radial-gradient(118% 84% at 46% 30%, rgba(86, 116, 178, 0.34) 0%, rgba(13, 21, 38, 0) 68%),
+        linear-gradient(180deg, #101a2e 0%, #0a1120 100%);
+    box-shadow: inset 0 0 0 1px rgba(148, 178, 255, 0.08);
 }
 
 .track-carousel .daily-playlist-hero-preview canvas {
@@ -171,43 +220,64 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     min-width: 0;
 }
 
+/* Below the plate, on the card's own ground: which track in the run this is and
+   how far up its ladder the player is, then what it is and where they stand. */
 .track-carousel .daily-playlist-hero-content {
+    display: flex;
     flex: 0 0 auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.7rem 0.55rem 0.55rem;
+}
+
+.track-carousel__card-head,
+.track-carousel__card-foot {
+    display: flex;
     align-items: flex-end;
-    padding: 0.85rem 1rem 0.95rem;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.track-carousel__card-head {
+    align-items: center;
 }
 
 .track-carousel .daily-playlist-hero-info {
     align-items: flex-start;
     gap: 0.3rem;
+    /* The rank keeps its column; a long track name wraps rather than pushes. */
+    flex: 1 1 auto;
 }
 
-/* Bronze at the top through author: the ladder, and how far up it you are. */
+/* Bronze through author, read left to right: a row of pips is the ladder and
+   how far up it you are, in the room a single line of type takes. Four badges
+   stacked down the card's right edge said the same thing three times louder
+   than the track name they sat beside. */
 .track-carousel .daily-playlist-hero-medal {
     display: flex;
     flex: 0 0 auto;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
+    justify-content: flex-end;
+    gap: 0.28rem;
     width: auto;
     height: auto;
-    margin-right: 1.5rem;
 }
 
 .track-carousel__medal {
     /* Shared medals are non-shrinking. The carousel overrides that contract so
        all four square icons can scale together inside a short Reddit WebView
        preview without clipping bronze or author. */
-    flex: 0 1 4rem;
+    flex: 0 1 1.7rem;
     min-height: 0;
     min-width: 0;
     width: auto;
     height: auto;
-    max-width: 4rem;
-    max-height: 4rem;
+    max-width: 1.7rem;
+    max-height: 1.7rem;
     aspect-ratio: 1;
-    opacity: 0.4;
+    opacity: 0.28;
 }
 
 .track-carousel__medal.is-earned {
@@ -217,7 +287,9 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 /* The lobby speaks in caps — the title is the one part of the sheet's card that
    does not, and it reads as a stray next to TODAY / 3 LAPS / START RACE. */
 .track-carousel .daily-playlist-hero-title {
+    font-size: 1.4rem;
     text-transform: uppercase;
+    text-wrap: balance;
 }
 
 .track-carousel__meta {
@@ -258,7 +330,8 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 .track-carousel__rank-value {
     color: var(--text-color);
     font-family: var(--mono-font);
-    font-size: 1.15rem;
+    font-size: 1.3rem;
+    font-variant-numeric: tabular-nums;
     font-weight: 900;
     letter-spacing: -0.02em;
     line-height: 1.05;
@@ -290,9 +363,9 @@ body[data-lobby-mode="campaign"] .lobby-panes {
    accessible name. */
 .track-carousel__unlock-medal-host {
     display: block;
-    width: 3.75rem;
-    height: 3.75rem;
-    margin-top: -0.2rem;
+    width: 3.25rem;
+    height: 3.25rem;
+    margin-block: -0.35rem;
 }
 
 .track-carousel__unlock-medal-host[hidden] {
@@ -346,12 +419,17 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 /* A locked stage still shows its track and its gate — it just cannot be raced,
-   and the art steps back so the card reads as out of reach. */
-.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__preview-art canvas,
-.track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-medal {
+   and the art steps back so the card reads as out of reach. The medal row is
+   left alone: every pip on it is already unearned, and dimming a dim thing
+   twice took the ladder ahead down to nothing. */
+.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__preview-art canvas {
     opacity: 0.35;
 }
 
+/* Steel, not accent: red is what the lobby uses for the track you can race and
+   the button that starts it, so spending it on the one card you cannot race
+   read as a call to action. The puck keeps its size — it is still the first
+   thing the card says. */
 .track-carousel__preview-lock {
     position: absolute;
     z-index: 1;
@@ -362,9 +440,11 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     height: 4.5rem;
     place-items: center;
     border-radius: 999px;
-    background: var(--accent-color);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
-    color: #fff;
+    background: rgba(15, 23, 42, 0.92);
+    box-shadow:
+        inset 0 0 0 1px rgba(148, 163, 184, 0.28),
+        0 8px 20px -10px rgba(0, 0, 0, 0.9);
+    color: var(--text-dim);
     opacity: 1;
     pointer-events: none;
     transform: translate(-50%, -50%);
@@ -493,8 +573,12 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .track-carousel .daily-playlist-entry--hero {
+    /* The fade still tracks the swipe — it is the player's own gesture, not
+       something the interface is performing — but nothing scales. */
+    .track-carousel .daily-playlist-entry--hero,
+    .track-carousel .daily-playlist-entry--hero:hover {
         transition: none;
+        transform: none;
     }
 
     .track-carousel__viewport {
@@ -513,42 +597,4 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     .track-carousel__unlock-medal-progress {
         transition: none;
     }
-}
-
-/* The single number the track still owes — Gold, then Author once it is banked. */
-.track-carousel__chase {
-    display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    font-family: var(--mono-font);
-}
-
-.track-carousel__chase[hidden] {
-    display: none !important;
-}
-
-.track-carousel__chase-label {
-    color: var(--text-dim);
-    font-size: 0.58rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-}
-
-.track-carousel__chase-value {
-    font-size: 0.86rem;
-    font-weight: 700;
-}
-
-.track-carousel__chase[data-tier="gold"] .track-carousel__chase-value {
-    color: #e8b84a;
-}
-
-.track-carousel__chase[data-tier="author"] .track-carousel__chase-value {
-    color: #c4b5fd;
-}
-
-.track-carousel__chase-gap {
-    color: var(--accent-bright);
-    font-size: 0.68rem;
-    font-weight: 700;
 }

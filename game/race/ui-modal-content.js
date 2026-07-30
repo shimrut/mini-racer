@@ -49,6 +49,222 @@ function appendLeaderboardRowAction(item, {
     item.appendChild(action);
 }
 
+const LEADERBOARD_ROW_ACTION_SHARE = 'share';
+const LEADERBOARD_ROW_ACTION_RACE = 'race';
+const LEADERBOARD_ROW_ACTION_NONE = 'none';
+
+/**
+ * Rows are keyed by the slot they stand in, not by who is standing in it. A
+ * refresh that swaps the name at rank 3 should rewrite that row's text rather
+ * than deal a fresh list, because every new element replays the entrance
+ * animation and a standings screen re-publishes several times per open.
+ *
+ * Ties and rows with no usable rank fall back to a positional suffix so two
+ * specs can never claim the same key.
+ */
+function buildLeaderboardRowKey(prefix, rank, usedKeys) {
+    const base = `${prefix}:${rank ?? ''}`;
+    let key = base;
+    let suffix = 2;
+    while (usedKeys.has(key)) {
+        key = `${base}#${suffix}`;
+        suffix += 1;
+    }
+    usedKeys.add(key);
+    return key;
+}
+
+function setLeaderboardText(element, text) {
+    if (element.textContent === text) return;
+    element.textContent = text;
+}
+
+function ensureLeaderboardRowCell(item, className, tagName) {
+    const existing = item.querySelector(`.${className}`);
+    if (existing) return existing;
+
+    const cell = document.createElement(tagName);
+    cell.className = className;
+    item.appendChild(cell);
+    return cell;
+}
+
+/**
+ * The action slot is rebuilt only when it changes shape — a share button and a
+ * race label share no structure, and there is nothing to patch between them.
+ */
+function syncLeaderboardRowAction(item, actionState) {
+    const existing = item.querySelector('.leaderboard-row__action');
+    if (!actionState) {
+        existing?.remove();
+        return;
+    }
+    if (existing?.dataset.actionState === actionState) return;
+
+    existing?.remove();
+    appendLeaderboardRowAction(item, {
+        shareable: actionState === LEADERBOARD_ROW_ACTION_SHARE,
+        raceable: actionState === LEADERBOARD_ROW_ACTION_RACE,
+    });
+    const action = item.querySelector('.leaderboard-row__action');
+    if (action) {
+        action.dataset.actionState = actionState;
+    }
+}
+
+function applyLeaderboardRowSpec(item, spec) {
+    if (item.className !== spec.rowClass) {
+        item.className = spec.rowClass;
+    }
+
+    if (spec.role) {
+        item.setAttribute('role', spec.role);
+    } else {
+        item.removeAttribute('role');
+    }
+
+    if (spec.ariaHidden) {
+        item.setAttribute('aria-hidden', 'true');
+    } else {
+        item.removeAttribute('aria-hidden');
+    }
+
+    if (spec.ariaLive) {
+        item.setAttribute('aria-live', spec.ariaLive);
+    } else {
+        item.removeAttribute('aria-live');
+    }
+
+    if (spec.interactive) {
+        item.setAttribute('tabindex', '0');
+        item.setAttribute('aria-label', spec.ariaLabel);
+    } else {
+        item.removeAttribute('tabindex');
+        item.removeAttribute('aria-label');
+        // A row that has stopped being shareable or raceable must not keep the
+        // handler the previous render wired onto it.
+        item.onclick = null;
+        item.onkeydown = null;
+    }
+
+    if (spec.opponentEntry) {
+        item._opponentRaceEntry = spec.opponentEntry;
+    } else {
+        delete item._opponentRaceEntry;
+    }
+
+    if (!spec.hasCells) {
+        setLeaderboardText(item, spec.text || '');
+        return;
+    }
+
+    const rankCell = ensureLeaderboardRowCell(item, 'combined-row-rank', 'div');
+    if (spec.hasRankData) {
+        rankCell.dataset.rank = spec.rank;
+    } else {
+        delete rankCell.dataset.rank;
+    }
+    setLeaderboardText(rankCell, spec.rankText);
+    setLeaderboardText(ensureLeaderboardRowCell(item, 'combined-row-name', 'span'), spec.nameText);
+    setLeaderboardText(ensureLeaderboardRowCell(item, 'combined-row-time', 'span'), spec.timeText);
+
+    syncLeaderboardRowAction(item, spec.actionState);
+}
+
+/**
+ * Keyed reconcile against what is already on screen: rows that keep their slot
+ * are patched where they stand, so only genuinely new rows are created and
+ * only they play the entrance. Rows that move are re-inserted, which does
+ * replay it — the right read for a row that changed position.
+ *
+ * Rows leaving the list are dropped up front rather than swept at the end, so
+ * a row disappearing from the middle does not count as a move for everything
+ * below it and set the rest of the list re-dealing.
+ */
+function syncLeaderboardRows(list, rowSpecs) {
+    const kindByKey = new Map(rowSpecs.map((spec) => [spec.key, spec.kind]));
+    const existingByKey = new Map();
+    for (const child of Array.from(list.children)) {
+        const key = child.dataset?.rowKey;
+        if (key && kindByKey.get(key) === child.dataset.rowKind && !existingByKey.has(key)) {
+            existingByKey.set(key, child);
+        } else {
+            child.remove();
+        }
+    }
+
+    let cursor = list.firstChild;
+
+    for (const spec of rowSpecs) {
+        let item = existingByKey.get(spec.key);
+
+        if (item && item === cursor) {
+            cursor = cursor.nextSibling;
+        } else {
+            if (!item) {
+                item = document.createElement('div');
+                item.dataset.rowKey = spec.key;
+                item.dataset.rowKind = spec.kind;
+            }
+            list.insertBefore(item, cursor);
+        }
+
+        applyLeaderboardRowSpec(item, spec);
+    }
+}
+
+function syncLeaderboardHeaderRow(section, subheadText) {
+    const existing = section.querySelector('.leaderboard-header-row');
+    if (subheadText === null) {
+        existing?.remove();
+        return;
+    }
+    if (existing) {
+        setLeaderboardText(existing.querySelector('.leaderboard-subhead'), subheadText);
+        return;
+    }
+
+    const headerRow = document.createElement('div');
+    headerRow.className = 'runs-header-row leaderboard-header-row';
+
+    const headerStack = document.createElement('div');
+    headerStack.className = 'leaderboard-header-stack';
+
+    const trackLine = document.createElement('span');
+    trackLine.className = 'leaderboard-hero-track';
+    trackLine.textContent = 'Leaderboard';
+    headerStack.appendChild(trackLine);
+
+    const subhead = document.createElement('span');
+    subhead.className = 'leaderboard-subhead';
+    subhead.textContent = subheadText;
+    headerStack.appendChild(subhead);
+
+    headerRow.appendChild(headerStack);
+    section.insertBefore(headerRow, section.firstChild);
+}
+
+function syncLeaderboardEmptyState(section, { isLoading, text }) {
+    section.querySelector('.leaderboard-list')?.remove();
+
+    const existing = section.querySelector('.combined-empty-msg');
+    const emptyState = existing || document.createElement('div');
+    emptyState.className = `combined-empty-msg${isLoading ? ' leaderboard-loading-state' : ''}`;
+    emptyState.replaceChildren();
+    if (isLoading) {
+        const spinner = document.createElement('span');
+        spinner.className = 'modal-rank-spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        emptyState.appendChild(spinner);
+        emptyState.appendChild(document.createTextNode(text));
+    } else {
+        emptyState.textContent = text;
+    }
+    if (!existing) {
+        section.appendChild(emptyState);
+    }
+}
+
 function getFinitePositiveRank(value) {
     const rank = Number(value);
     return Number.isFinite(rank) && rank > 0
@@ -392,8 +608,12 @@ export class ModalContentUi {
 
     const trackName = getTrackName(trackKey, null);
 
-    const section = document.createElement('section');
-    const leaderboardOnly = container.childElementCount === 0;
+    // Reuse the standings already on screen when there is one. A refresh
+    // publishes the same rows a second time, and rebuilding them would replay
+    // every row's entrance animation over a list the player is already reading.
+    const existingSection = container.querySelector('.leaderboard-section');
+    const section = existingSection || document.createElement('section');
+    const leaderboardOnly = container.childElementCount - (existingSection ? 1 : 0) === 0;
     section.className = `leaderboard-section${leaderboardOnly ? ' leaderboard-section--solo' : ''}`;
     section.setAttribute('role', 'region');
     section.setAttribute(
@@ -401,68 +621,27 @@ export class ModalContentUi {
         trackName ? `Leaderboard for ${trackName}` : 'Global leaderboard'
     );
 
-    if (showHeader) {
-        const headerRow = document.createElement('div');
-        headerRow.className = 'runs-header-row leaderboard-header-row';
-
-        const headerStack = document.createElement('div');
-        headerStack.className = 'leaderboard-header-stack';
-
-        const trackLine = document.createElement('span');
-        trackLine.className = 'leaderboard-hero-track';
-        trackLine.textContent = 'Leaderboard';
-        headerStack.appendChild(trackLine);
-
-        const subhead = document.createElement('span');
-        subhead.className = 'leaderboard-subhead';
-        subhead.textContent = trackName || 'This track';
-        headerStack.appendChild(subhead);
-        headerRow.appendChild(headerStack);
-        section.appendChild(headerRow);
-    }
+    syncLeaderboardHeaderRow(section, showHeader ? (trackName || 'This track') : null);
 
     const hasScoredRow = topRows.length > 0
         || nearbyRows.length > 0
         || (currentPlayerRow && (Number.isFinite(currentPlayerRow.rank) || currentPlayerRow.rankLabel));
 
-    if (!hasScoredRow && !poolTotal) {
-        const emptyState = document.createElement('div');
-        emptyState.className = 'combined-empty-msg';
-        if (isLoading) {
-            emptyState.classList.add('leaderboard-loading-state');
-            const spinner = document.createElement('span');
-            spinner.className = 'modal-rank-spinner';
-            spinner.setAttribute('aria-hidden', 'true');
-            emptyState.appendChild(spinner);
-            emptyState.appendChild(document.createTextNode('Loading leaderboard...'));
-        } else {
-            emptyState.textContent = 'No scores recorded yet.';
-        }
-        section.appendChild(emptyState);
-        container.appendChild(section);
+    if (!hasScoredRow && (!poolTotal || isLoading)) {
+        syncLeaderboardEmptyState(section, {
+            isLoading,
+            text: isLoading ? 'Loading leaderboard...' : 'No scores recorded yet.',
+        });
+        if (!existingSection) container.appendChild(section);
         return;
     }
 
-    if (!hasScoredRow && isLoading) {
-        const emptyState = document.createElement('div');
-        emptyState.className = 'combined-empty-msg leaderboard-loading-state';
-        const spinner = document.createElement('span');
-        spinner.className = 'modal-rank-spinner';
-        spinner.setAttribute('aria-hidden', 'true');
-        emptyState.appendChild(spinner);
-        emptyState.appendChild(document.createTextNode('Loading leaderboard...'));
-        section.appendChild(emptyState);
-        container.appendChild(section);
-        return;
-    }
+    section.querySelector('.combined-empty-msg')?.remove();
 
-    const list = document.createElement('div');
-    list.className = 'lap-times-list leaderboard-list';
+    const rowSpecs = [];
+    const usedKeys = new Set();
 
-    const appendScoreboardRow = (entry) => {
-        const item = document.createElement('div');
-        item.className = `combined-row leaderboard-row${entry.isCurrentPlayer ? ' is-player current' : ''}`;
-
+    const pushScoreboardRowSpec = (entry) => {
         const canShareRow = Boolean(shareBest)
             && entry.isCurrentPlayer
             && Number.isFinite(Number(shareBest.bestTime));
@@ -470,140 +649,140 @@ export class ModalContentUi {
             && !entry.isCurrentPlayer
             && entry.opponentRaceAvailable === true
             && Number.isFinite(Number(entry.bestTime));
-        if (canShareRow) {
-            item.classList.add('is-shareable');
-            item.setAttribute('role', 'button');
-            item.setAttribute('tabindex', '0');
-            item.setAttribute('aria-label', 'Share your best time for this day');
-        } else if (canRaceRow) {
-            const opponentName = typeof entry.displayName === 'string' && entry.displayName.trim()
-                ? entry.displayName.trim()
-                : 'Anonymous Racer';
-            item.classList.add('is-raceable');
-            item.setAttribute('role', 'button');
-            item.setAttribute('tabindex', '0');
-            item.setAttribute('aria-label', `Race ${opponentName}'s ghost`);
-            item._opponentRaceEntry = entry;
-        }
-
-        const runIndex = document.createElement('div');
-        runIndex.className = 'combined-row-rank';
-        runIndex.dataset.rank = entry.rank;
-        runIndex.textContent = Number.isFinite(entry.rank)
-            ? entry.rank
-            : (entry.rankLabel || '—');
-        item.appendChild(runIndex);
-
-        const rowLabel = document.createElement('span');
-        rowLabel.className = 'combined-row-name';
-        rowLabel.textContent = typeof entry.displayName === 'string' && entry.displayName.trim()
-            ? entry.displayName
+        const opponentName = typeof entry.displayName === 'string' && entry.displayName.trim()
+            ? entry.displayName.trim()
             : 'Anonymous Racer';
-        item.appendChild(rowLabel);
 
-        const runTime = document.createElement('span');
-        runTime.className = 'combined-row-time';
-        if (entry.bestTime != null && Number.isFinite(entry.bestTime)) {
-            runTime.textContent = this.formatLeaderboardTime(entry.bestTime);
-        } else {
-            runTime.textContent = '--';
-        }
-        item.appendChild(runTime);
+        let rowClass = `combined-row leaderboard-row${entry.isCurrentPlayer ? ' is-player current' : ''}`;
+        if (canShareRow) rowClass += ' is-shareable';
+        else if (canRaceRow) rowClass += ' is-raceable';
 
-        if (hasRowActions) {
-            appendLeaderboardRowAction(item, {
-                shareable: canShareRow,
-                raceable: canRaceRow,
-            });
-        }
-
-        list.appendChild(item);
+        rowSpecs.push({
+            key: buildLeaderboardRowKey(
+                'score',
+                Number.isFinite(entry.rank) ? entry.rank : entry.rankLabel,
+                usedKeys,
+            ),
+            kind: 'score',
+            hasCells: true,
+            rowClass,
+            role: canShareRow || canRaceRow ? 'button' : null,
+            interactive: canShareRow || canRaceRow,
+            ariaLabel: canShareRow
+                ? 'Share your best time for this day'
+                : `Race ${opponentName}'s ghost`,
+            opponentEntry: canRaceRow ? entry : null,
+            hasRankData: true,
+            rank: entry.rank,
+            rankText: String(Number.isFinite(entry.rank)
+                ? entry.rank
+                : (entry.rankLabel || '—')),
+            nameText: typeof entry.displayName === 'string' && entry.displayName.trim()
+                ? entry.displayName
+                : 'Anonymous Racer',
+            timeText: entry.bestTime != null && Number.isFinite(entry.bestTime)
+                ? this.formatLeaderboardTime(entry.bestTime)
+                : '--',
+            actionState: hasRowActions
+                ? (canShareRow
+                    ? LEADERBOARD_ROW_ACTION_SHARE
+                    : (canRaceRow ? LEADERBOARD_ROW_ACTION_RACE : LEADERBOARD_ROW_ACTION_NONE))
+                : null,
+        });
     };
 
-    const appendCommunityOpenRow = (rank) => {
-        const item = document.createElement('div');
-        item.className = 'combined-row leaderboard-row combined-row--community-open';
-
-        const runIndex = document.createElement('div');
-        runIndex.className = 'combined-row-rank';
-        runIndex.dataset.rank = String(rank);
-        runIndex.textContent = String(rank);
-        item.appendChild(runIndex);
-
-        const rowLabel = document.createElement('span');
-        rowLabel.className = 'combined-row-name';
-        rowLabel.textContent = 'No time yet';
-        item.appendChild(rowLabel);
-
-        const runTime = document.createElement('span');
-        runTime.className = 'combined-row-time';
-        runTime.textContent = '—';
-        item.appendChild(runTime);
-
-        if (hasRowActions) {
-            appendLeaderboardRowAction(item);
-        }
-
-        list.appendChild(item);
+    const pushCommunityOpenRowSpec = (rank) => {
+        rowSpecs.push({
+            key: buildLeaderboardRowKey('open', rank, usedKeys),
+            kind: 'community-open',
+            hasCells: true,
+            rowClass: 'combined-row leaderboard-row combined-row--community-open',
+            role: null,
+            interactive: false,
+            opponentEntry: null,
+            hasRankData: true,
+            rank: String(rank),
+            rankText: String(rank),
+            nameText: 'No time yet',
+            timeText: '—',
+            actionState: hasRowActions ? LEADERBOARD_ROW_ACTION_NONE : null,
+        });
     };
 
-    topRows.forEach((entry) => appendScoreboardRow(entry));
+    topRows.forEach((entry) => pushScoreboardRowSpec(entry));
 
     if (!isPaginated && nearbyRows.length) {
         if (topRows.length > 0 && nearbyRows[0]?.rank > (topRows[topRows.length - 1]?.rank || 0) + 1) {
-            const gapRow = document.createElement('div');
-            gapRow.className = 'leaderboard-gap-row';
-            gapRow.setAttribute('aria-hidden', 'true');
-            gapRow.textContent = '· · ·';
-            list.appendChild(gapRow);
+            rowSpecs.push({
+                key: buildLeaderboardRowKey('gap', null, usedKeys),
+                kind: 'gap',
+                hasCells: false,
+                rowClass: 'leaderboard-gap-row',
+                role: null,
+                interactive: false,
+                ariaHidden: true,
+                opponentEntry: null,
+                text: '· · ·',
+            });
         }
-        nearbyRows.forEach((entry) => appendScoreboardRow(entry));
+        nearbyRows.forEach((entry) => pushScoreboardRowSpec(entry));
     } else if (!isPaginated && (
         currentPlayerRow
         && (Number.isFinite(currentPlayerRow.rank) || currentPlayerRow.rankLabel)
         && !topRows.some((entry) => entry.isCurrentPlayer)
     )) {
-        appendScoreboardRow(currentPlayerRow);
+        pushScoreboardRowSpec(currentPlayerRow);
     }
 
     if (openCommunitySlots > 0 && !hasMore) {
         const firstRank = leaderboardEntryCount + 1;
         let shown = 0;
         for (let rank = firstRank; rank <= poolTotal && shown < MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS; rank += 1) {
-            appendCommunityOpenRow(rank);
+            pushCommunityOpenRowSpec(rank);
             shown += 1;
         }
         const remaining = openCommunitySlots - shown;
         if (remaining > 0) {
-            const summary = document.createElement('div');
-            summary.className = 'combined-row leaderboard-row combined-row--community-open combined-row--community-summary';
-            summary.setAttribute('role', 'note');
-            const runIndex = document.createElement('div');
-            runIndex.className = 'combined-row-rank';
-            runIndex.textContent = '…';
-            summary.appendChild(runIndex);
-            const rowLabel = document.createElement('span');
-            rowLabel.className = 'combined-row-name';
-            rowLabel.textContent = `${remaining} more in this community — no time yet`;
-            summary.appendChild(rowLabel);
-            const runTime = document.createElement('span');
-            runTime.className = 'combined-row-time';
-            runTime.textContent = '';
-            summary.appendChild(runTime);
-            list.appendChild(summary);
+            rowSpecs.push({
+                key: buildLeaderboardRowKey('community-summary', null, usedKeys),
+                kind: 'community-summary',
+                hasCells: true,
+                rowClass: 'combined-row leaderboard-row combined-row--community-open combined-row--community-summary',
+                role: 'note',
+                interactive: false,
+                opponentEntry: null,
+                hasRankData: false,
+                rankText: '…',
+                nameText: `${remaining} more in this community — no time yet`,
+                timeText: '',
+                actionState: null,
+            });
         }
     }
 
     if (hasMore) {
-        const paginationState = document.createElement('div');
-        paginationState.className = 'leaderboard-pagination-state';
-        paginationState.setAttribute('role', 'status');
-        paginationState.setAttribute('aria-live', 'polite');
-        list.appendChild(paginationState);
+        rowSpecs.push({
+            key: buildLeaderboardRowKey('pagination', null, usedKeys),
+            kind: 'pagination',
+            hasCells: false,
+            rowClass: 'leaderboard-pagination-state',
+            role: 'status',
+            interactive: false,
+            ariaLive: 'polite',
+            opponentEntry: null,
+            text: '',
+        });
     }
 
-    section.appendChild(list);
-    container.appendChild(section);
+    let list = section.querySelector('.leaderboard-list');
+    if (!list) {
+        list = document.createElement('div');
+        list.className = 'lap-times-list leaderboard-list';
+        section.appendChild(list);
+    }
+    syncLeaderboardRows(list, rowSpecs);
+
+    if (!existingSection) container.appendChild(section);
 }
 
     centerLeaderboardCurrentRow() {

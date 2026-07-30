@@ -147,21 +147,37 @@ function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320
     const gap = 10;
     const prevBtn = { disabled: false, hidden: false };
     const nextBtn = { disabled: false, hidden: false };
-    const viewport = { clientWidth: viewportWidth, scrollLeft: 0 };
-    const rail = { style: { setProperty: vi.fn() } };
+    // Wide enough that the last card can reach the centre, which is what the
+    // rail is laid out to allow; tests that care force it short themselves.
+    const railWidth = 80 + (count * cardWidth) + ((count - 1) * gap);
+    const viewport = { clientWidth: viewportWidth, scrollLeft: 0, scrollWidth: railWidth };
+    const railStyleValues = new Map();
+    const rail = {
+        style: {
+            setProperty: vi.fn((name, value) => railStyleValues.set(name, value)),
+            getPropertyValue: vi.fn((name) => railStyleValues.get(name) || ''),
+        },
+    };
 
     carousel._cards = Array.from({ length: count }, (_, index) => ({
         challengeId: `c${index}`,
         challenge: { id: `c${index}` },
         trackName: `Track ${index}`,
     }));
-    carousel._elements = carousel._cards.map((_, index) => ({
-        offsetLeft: 40 + index * (cardWidth + gap),
-        offsetWidth: cardWidth,
-        classList: { toggle: vi.fn() },
-        setAttribute: vi.fn(),
-        _parts: { rank: { tabIndex: 0 } },
-    }));
+    carousel._elements = carousel._cards.map((_, index) => {
+        const custom = new Map();
+        return {
+            offsetLeft: 40 + index * (cardWidth + gap),
+            offsetWidth: cardWidth,
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+            style: {
+                setProperty: (name, value) => custom.set(name, value),
+                getPropertyValue: (name) => custom.get(name) || '',
+            },
+            _parts: { rank: { tabIndex: 0 } },
+        };
+    });
     carousel._selectedIndex = 0;
 
     Object.defineProperty(carousel, 'viewport', { get: () => viewport });
@@ -299,6 +315,85 @@ describe('TrackCarousel selection', () => {
         );
     });
 
+    /**
+     * WebKit drops a scroll container's trailing padding, so the Reddit app ran
+     * out of scroll before the last card was centred. Whatever the rail can
+     * actually be scrolled to is the last word, so the shortfall is measured and
+     * made up rather than assumed away.
+     */
+    it('tops the tail up by however far the rail falls short of centring the last card', () => {
+        const { carousel, viewport, rail } = createStubbedCarousel(5, {
+            cardWidth: 240,
+            viewportWidth: 320,
+        });
+        const last = carousel._elements[4];
+        const needed = last.offsetLeft + (last.offsetWidth / 2) - (viewport.clientWidth / 2);
+        // An engine that gives the rail's trailing space no room at all.
+        viewport.scrollWidth = needed + viewport.clientWidth - 40;
+
+        carousel.syncEdgeSpacing(last);
+
+        expect(rail.style.setProperty).toHaveBeenCalledWith(
+            '--track-carousel-tail-shortfall',
+            '40px',
+        );
+    });
+
+    it('leaves the tail alone on an engine that already lays the rail out long enough', () => {
+        const { carousel, rail } = createStubbedCarousel(5, {
+            cardWidth: 240,
+            viewportWidth: 320,
+        });
+
+        carousel.syncEdgeSpacing(carousel._elements[4]);
+
+        expect(rail.style.setProperty).not.toHaveBeenCalledWith(
+            '--track-carousel-tail-shortfall',
+            expect.anything(),
+        );
+    });
+
+    /**
+     * The details used to hang off `is-carousel-selected`, which flips the
+     * instant a card takes the centre — so mid-swipe a card's whole caption
+     * appeared in one step while the finger was still moving.
+     */
+    it('publishes how close each card is to the centre, not just which one holds it', () => {
+        const { carousel, viewport, cardWidth, gap } = createStubbedCarousel(5, {
+            cardWidth: 240,
+            viewportWidth: 320,
+        });
+        const proximityOf = (index) => Number(
+            carousel._elements[index].style.getPropertyValue('--card-proximity'),
+        );
+
+        const centred = carousel._elements[1];
+        const centredScroll = centred.offsetLeft + (cardWidth / 2) - (viewport.clientWidth / 2);
+        carousel._selectedIndex = 1;
+        viewport.scrollLeft = centredScroll;
+        carousel.updateProximity();
+        expect(proximityOf(1)).toBe(1);
+        expect(proximityOf(2)).toBe(0);
+
+        // Halfway between the two cards: neither is centred, and both say so.
+        viewport.scrollLeft = centredScroll + ((cardWidth + gap) / 2);
+        carousel.updateProximity();
+        expect(proximityOf(1)).toBeGreaterThan(0);
+        expect(proximityOf(1)).toBeLessThan(1);
+        expect(proximityOf(2)).toBeCloseTo(proximityOf(1), 2);
+    });
+
+    it('keeps a card visible before the pane has any geometry to measure', () => {
+        const { carousel, viewport } = createStubbedCarousel(3);
+        viewport.clientWidth = 0;
+        carousel._selectedIndex = 2;
+
+        carousel.updateProximity();
+
+        expect(carousel._elements[2].style.getPropertyValue('--card-proximity')).toBe('1.000');
+        expect(carousel._elements[0].style.getPropertyValue('--card-proximity')).toBe('0.000');
+    });
+
     it('jumps to a challenge by id and reports when it is not on the rail', () => {
         const { carousel } = createStubbedCarousel(4);
 
@@ -346,6 +441,39 @@ describe('TrackCarousel selection', () => {
         const carousel = new TrackCarousel();
         expect(() => carousel.playRailEntrance(null)).not.toThrow();
         expect(() => carousel.playRailEntrance({})).not.toThrow();
+    });
+
+    /**
+     * The end cards' outer room has to be a child of the rail, not the rail's
+     * own padding: WebKit does not count a scroll container's trailing padding,
+     * so in the Reddit app the last card could never reach the middle.
+     */
+    it('brackets the cards with real spacers so both ends can reach the centre', () => {
+        const attributes = new WeakMap();
+        globalThis.document = {
+            createElement: () => {
+                const node = { className: '' };
+                attributes.set(node, new Map());
+                node.setAttribute = (name, value) => attributes.get(node).set(name, value);
+                node.getAttribute = (name) => attributes.get(node).get(name) ?? null;
+                return node;
+            },
+        };
+
+        try {
+            const carousel = new TrackCarousel();
+            const lead = carousel.edgeSpacer('lead');
+            const tail = carousel.edgeSpacer('tail');
+
+            expect(lead.className).toContain('track-carousel__edge--lead');
+            expect(tail.className).toContain('track-carousel__edge--tail');
+            expect(lead.getAttribute('aria-hidden')).toBe('true');
+            // Reused across rebuilds rather than rebuilt with the cards.
+            expect(carousel.edgeSpacer('lead')).toBe(lead);
+            expect(lead).not.toBe(tail);
+        } finally {
+            delete globalThis.document;
+        }
     });
 });
 

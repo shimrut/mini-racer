@@ -533,23 +533,15 @@ export class LeaderboardsUi {
         };
     }
 
-    publishDailyChallengeLeaderboardSnapshot(
-        scoreboardSnapshot,
-        returnMode,
-        sharedOptions,
-        challenge,
-        onClose,
-    ) {
-        if (this.isRunsViewActive()) {
-            this.showLeaderboardModalState(returnMode, {
-                ...sharedOptions,
-                scoreboardChallengeId: challenge.id,
-                scoreboardSnapshot,
-                onClose
-            });
-            return;
-        }
-
+    /**
+     * A snapshot landing is a content change, not a new screen. Re-running the
+     * whole modal show would tear the standings down and build them again, and
+     * every rebuilt row replays its entrance — the flash the player sees when
+     * the fetch answers. It would also reinstall the day options this open
+     * closed over, undoing any fresher rail the playlist fetch has published
+     * since.
+     */
+    publishDailyChallengeLeaderboardSnapshot(scoreboardSnapshot) {
         this.updateModalScoreboardSnapshot(scoreboardSnapshot);
     }
 
@@ -747,13 +739,7 @@ export class LeaderboardsUi {
 
             const resolvedSnapshot = scoreboardSnapshot ?? null;
             currentSnapshot = resolvedSnapshot;
-            this.publishDailyChallengeLeaderboardSnapshot(
-                resolvedSnapshot,
-                returnMode,
-                sharedOptions,
-                challenge,
-                onClose,
-            );
+            this.publishDailyChallengeLeaderboardSnapshot(resolvedSnapshot);
         } catch (error) {
             console.error('Error refreshing daily challenge leaderboard:', error);
             if (requestId !== this._requestVersion) return;
@@ -765,13 +751,7 @@ export class LeaderboardsUi {
             }
 
             currentSnapshot = null;
-            this.publishDailyChallengeLeaderboardSnapshot(
-                null,
-                returnMode,
-                sharedOptions,
-                challenge,
-                onClose,
-            );
+            this.publishDailyChallengeLeaderboardSnapshot(null);
         }
     }
 
@@ -830,15 +810,7 @@ export class LeaderboardsUi {
             if (requestId !== this._requestVersion) return;
             currentSnapshot = freshSnapshot;
 
-            if (this.isRunsViewActive()) {
-                this.showLeaderboardModalState(returnMode, {
-                    scoreboardSnapshot: freshSnapshot,
-                    scoreboardTrackKey: trackKey,
-                    onLoadMoreLeaderboard: loadMoreLeaderboard,
-                });
-            } else {
-                this.updateModalScoreboardSnapshot(freshSnapshot);
-            }
+            this.updateModalScoreboardSnapshot(freshSnapshot);
         } catch (error) {
             console.error('Error loading track leaderboard:', error);
             if (requestId !== this._requestVersion) return;
@@ -848,14 +820,7 @@ export class LeaderboardsUi {
                 return;
             }
 
-            if (this.isRunsViewActive()) {
-                this.showLeaderboardModalState(returnMode, {
-                    scoreboardSnapshot: null,
-                    scoreboardTrackKey: trackKey
-                });
-            } else {
-                this.updateModalScoreboardSnapshot(null);
-            }
+            this.updateModalScoreboardSnapshot(null);
         }
     }
 }

@@ -77,6 +77,7 @@ describe('ui leaderboard helpers', () => {
         const scoreboardSnapshot = { playerRankLabel: '#5' };
         const showRunsModal = vi.fn();
         const updateModalLeaderboardDayOptions = vi.fn();
+        const updateModalScoreboardSnapshot = vi.fn();
         const fallbackChallenge = {
             id: 'daily-1',
             trackKey: 'circuit',
@@ -94,6 +95,7 @@ describe('ui leaderboard helpers', () => {
             showRunsModal,
             dailyChallengeUi,
             updateModalLeaderboardDayOptions,
+            updateModalScoreboardSnapshot,
         });
         vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockImplementation(async () => scoreboardSnapshot);
         const service = await import('../game/daily-challenge/service.js');
@@ -122,11 +124,11 @@ describe('ui leaderboard helpers', () => {
             'daily-1',
             { forceRefresh: false, limit: 50, offset: 0 }
         );
-        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', expect.objectContaining({
-            scoreboardChallengeId: 'daily-1',
-            scoreboardSnapshot,
-            leaderboardDayOptions: expectedDayOptions,
-        }));
+        // The fetched snapshot patches the standings already on screen rather
+        // than re-showing the modal, so the rows are not rebuilt underneath the
+        // player and the day rail keeps whatever the playlist last published.
+        expect(showRunsModal).toHaveBeenCalledTimes(1);
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(scoreboardSnapshot);
     });
 
     it('shows the track name in the standings header instead of the challenge date', async () => {
@@ -167,9 +169,11 @@ describe('ui leaderboard helpers', () => {
         const cachedSnapshot = { playerRankLabel: '#2' };
         const freshSnapshot = { playerRankLabel: '#3' };
         const showRunsModal = vi.fn();
+        const updateModalScoreboardSnapshot = vi.fn();
         const loadScoreboardSnapshot = vi.fn(async () => freshSnapshot);
         const instance = new LeaderboardsUi({
             showRunsModal,
+            updateModalScoreboardSnapshot,
             getCachedTrackCardScoreboardSnapshot: vi.fn(() => cachedSnapshot),
             getScoreboardSnapshot: loadScoreboardSnapshot
         });
@@ -187,12 +191,8 @@ describe('ui leaderboard helpers', () => {
             limit: 50,
             offset: 0,
         });
-        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'close', {
-            scoreboardSnapshot: freshSnapshot,
-            onLoadMoreLeaderboard: expect.any(Function),
-            scoreboardMode: TRACK_MODE_DAILY_GP,
-            scoreboardTrackKey: 'circuit'
-        });
+        expect(showRunsModal).toHaveBeenCalledTimes(1);
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(freshSnapshot);
     });
 
     it('loads and appends the next standings page from the continuation offset', async () => {
@@ -244,10 +244,12 @@ describe('ui leaderboard helpers', () => {
         const providedSnapshot = { playerRankLabel: '#4', topRows: [{ playerId: 'p1', bestTime: 18.2 }] };
         const freshSnapshot = { playerRankLabel: '#5', topRows: [{ playerId: 'p2', bestTime: 17.9 }] };
         const showRunsModal = vi.fn();
+        const updateModalScoreboardSnapshot = vi.fn();
         const loadScoreboardSnapshot = vi.fn(async () => freshSnapshot);
         const getCachedTrackCardScoreboardSnapshot = vi.fn();
         const instance = new LeaderboardsUi({
             showRunsModal,
+            updateModalScoreboardSnapshot,
             getCachedTrackCardScoreboardSnapshot,
             getScoreboardSnapshot: loadScoreboardSnapshot
         });
@@ -268,20 +270,21 @@ describe('ui leaderboard helpers', () => {
             limit: 50,
             offset: 0,
         });
-        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', {
-            scoreboardSnapshot: freshSnapshot,
-            onLoadMoreLeaderboard: expect.any(Function),
-            scoreboardMode: TRACK_MODE_DAILY_GP,
-            scoreboardTrackKey: 'circuit'
-        });
+        expect(showRunsModal).toHaveBeenCalledTimes(1);
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(freshSnapshot);
     });
 
     it('shows a provided daily snapshot immediately, then refreshes it', async () => {
         const playedSnapshot = { playerRankLabel: '#3' };
         const freshSnapshot = { playerRankLabel: '#2' };
         const showRunsModal = vi.fn();
+        const updateModalScoreboardSnapshot = vi.fn();
         const dailyChallengeUi = { getSummary: vi.fn(() => null) };
-        const instance = new LeaderboardsUi({ showRunsModal, dailyChallengeUi });
+        const instance = new LeaderboardsUi({
+            showRunsModal,
+            updateModalScoreboardSnapshot,
+            dailyChallengeUi,
+        });
         const requestSnapshot = vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot')
             .mockResolvedValue(freshSnapshot);
 
@@ -307,10 +310,8 @@ describe('ui leaderboard helpers', () => {
             limit: 50,
             offset: 0,
         });
-        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'back', expect.objectContaining({
-            scoreboardChallengeId: 'daily-2',
-            scoreboardSnapshot: freshSnapshot,
-        }));
+        expect(showRunsModal).toHaveBeenCalledTimes(1);
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(freshSnapshot);
     });
 
     it('uses the initially loaded day snapshots without refreshing on day changes', async () => {
@@ -769,9 +770,11 @@ describe('ui leaderboard helpers', () => {
 
     it('falls back to an empty track leaderboard state when the fetch fails', async () => {
         const showRunsModal = vi.fn();
+        const updateModalScoreboardSnapshot = vi.fn();
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const instance = new LeaderboardsUi({
             showRunsModal,
+            updateModalScoreboardSnapshot,
             getCachedTrackCardScoreboardSnapshot: vi.fn(() => null),
             getScoreboardSnapshot: vi.fn(() => Promise.reject(new Error('boom')))
         });
@@ -784,11 +787,8 @@ describe('ui leaderboard helpers', () => {
             scoreboardMode: TRACK_MODE_DAILY_GP,
             scoreboardTrackKey: 'circuit'
         });
-        expect(showRunsModal).toHaveBeenNthCalledWith(2, null, null, null, 'close', {
-            scoreboardSnapshot: null,
-            scoreboardMode: TRACK_MODE_DAILY_GP,
-            scoreboardTrackKey: 'circuit'
-        });
+        expect(showRunsModal).toHaveBeenCalledTimes(1);
+        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(null);
 
         consoleError.mockRestore();
     });
@@ -939,7 +939,12 @@ describe('ui leaderboard helpers', () => {
                 challengeDate: today,
             })),
         };
-        const instance = new LeaderboardsUi({ showRunsModal, dailyChallengeUi });
+        const updateModalScoreboardSnapshot = vi.fn();
+        const instance = new LeaderboardsUi({
+            showRunsModal,
+            updateModalScoreboardSnapshot,
+            dailyChallengeUi,
+        });
         vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue(null);
         const service = await import('../game/daily-challenge/service.js');
         vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([]);
@@ -947,15 +952,11 @@ describe('ui leaderboard helpers', () => {
 
         await instance.openDailyChallengeLeaderboard('close');
 
-        expect(showRunsModal).toHaveBeenLastCalledWith(
-            null,
-            null,
-            null,
-            'close',
-            expect.objectContaining({
-                scoreboardChallengeId: 'daily-1',
-                scoreboardSnapshot: null,
-            }),
-        );
+        expect(showRunsModal).toHaveBeenCalledTimes(1);
+        expect(showRunsModal.mock.calls[0][4]).toEqual(expect.objectContaining({
+            scoreboardChallengeId: 'daily-1',
+            scoreboardSnapshot: { isLoading: true },
+        }));
+        expect(updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(null);
     });
 });

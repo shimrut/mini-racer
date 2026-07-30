@@ -1701,11 +1701,17 @@ export class ModalShell {
 
         if (this.modalRunsView?.classList.contains('active-view') && this.modalLapTimes) {
             const scrollTop = this.modalLapTimes.scrollTop;
+            // A snapshot that puts rows on screen for the first time — the
+            // usual cold open, spinner then standings — still owes the player
+            // the scroll to their own row. A refresh over existing rows does
+            // not: they are already reading them.
+            const hadRows = Boolean(this.modalLapTimes.querySelector('.leaderboard-row'));
             const hasPersonalBestList = Array.isArray(this._modalRunsPayload.lapTimesArray);
-            this.modalLapTimes.querySelector('.leaderboard-section')?.remove();
             this.renderLeaderboardDayRail();
             this.renderLeaderboardHeaderSummary();
             if (this._modalRunsPayload.showGlobalLeaderboard) {
+                // Patches the standings in place: the renderer reuses the rows
+                // already on screen so a refresh does not re-deal the list.
                 const shareBest = this._leaderboardShareBestOption();
                 this.content.renderScoreboardList(
                     this.modalLapTimes,
@@ -1719,11 +1725,17 @@ export class ModalShell {
                         raceOpponentEnabled: typeof this._onRaceOpponent === 'function',
                     }
                 );
+            } else {
+                this.modalLapTimes.querySelector('.leaderboard-section')?.remove();
             }
             this.bindLeaderboardPagination?.();
             this._wireLeaderboardRowShare?.();
             this._wireLeaderboardOpponentRace?.();
-            this.modalLapTimes.scrollTop = scrollTop;
+            if (hadRows) {
+                this.modalLapTimes.scrollTop = scrollTop;
+            } else {
+                this.content.centerLeaderboardCurrentRow?.();
+            }
             return;
         }
 

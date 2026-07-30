@@ -1,5 +1,5 @@
 import { getCampaignStageMedalCount } from '../campaign/manifest.js';
-import { getRaceMedalThresholds, STANDARD_MEDAL_TIER_RANK } from '../medals/medal-timing.js';
+import { STANDARD_MEDAL_TIER_RANK } from '../medals/medal-timing.js';
 
 const NUMBER_WORDS = [
     'Zero',
@@ -42,10 +42,6 @@ export function isCampaignGoldMedal(medal) {
     return rank !== undefined && rank >= STANDARD_MEDAL_TIER_RANK.gold;
 }
 
-function formatGoldGap(gapMs) {
-    return `+${(gapMs / 1000).toFixed(3)}`;
-}
-
 function normalizeBestTimeMs(stage) {
     const bestTimeMs = toFiniteNumber(stage?.bestTimeMs);
     if (bestTimeMs !== null && bestTimeMs >= 0) return Math.round(bestTimeMs);
@@ -64,23 +60,6 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
     const medal = typeof stage.medal === 'string' && stage.medal.trim()
         ? stage.medal.trim()
         : null;
-    const thresholds = getRaceMedalThresholds(trackKey, laps);
-    const goldTargetMs = thresholds?.gold == null ? null : Math.round(thresholds.gold * 1000);
-    const authorTargetMs = thresholds?.author == null ? null : Math.round(thresholds.author * 1000);
-    // Every tier is worth another medal towards the gate, so a stage always has
-    // somewhere to go. Gold is the one to name first — the curve is built around
-    // reaching it — and how far off the best run is comes with it. Author takes
-    // over once Gold is banked, still worth one more medal on the total.
-    const needsGold = unlocked && goldTargetMs !== null && !isCampaignGoldMedal(medal);
-    const needsAuthor = unlocked
-        && !needsGold
-        && authorTargetMs !== null
-        && normalizeMedalName(medal) !== 'author';
-    const gapTo = (targetMs) => (
-        targetMs !== null && bestTimeMs !== null && bestTimeMs > targetMs
-            ? formatGoldGap(bestTimeMs - targetMs)
-            : null
-    );
     return {
         id: String(stage.id ?? stage.raceId ?? `numbered-v1-${safeIndex}`),
         index: safeIndex,
@@ -93,14 +72,6 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
         bestTimeMs,
         bestTimeLabel: bestTimeMs === null ? 'No time' : formatLobbyTime(bestTimeMs),
         medal,
-        goldTargetMs,
-        goldTargetLabel: goldTargetMs === null ? null : formatLobbyTime(goldTargetMs),
-        needsGold,
-        goldGapLabel: needsGold ? gapTo(goldTargetMs) : null,
-        authorTargetMs,
-        authorTargetLabel: authorTargetMs === null ? null : formatLobbyTime(authorTargetMs),
-        needsAuthor,
-        authorGapLabel: needsAuthor ? gapTo(authorTargetMs) : null,
         // Kept so a re-normalized state can still state what this stage costs.
         unlock: stage.unlock ?? null,
         standingsAvailable: Boolean(stage.standingsAvailable ?? stage.unlocked),

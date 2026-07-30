@@ -290,35 +290,22 @@ describe('campaign carousel engine wiring', () => {
     });
 });
 
-describe('campaign card chase target', () => {
-    it('chases Gold until it is banked, then Author', () => {
-        // circuit thresholds drive needsGold/needsAuthor via the lobby normalizer.
-        const [needsGold] = buildCampaignCarouselCards(campaignState([
+describe('campaign card medal targets', () => {
+    /**
+     * The card used to print the time the stage still owed. The medal stack is
+     * already on it, tier by tier, filled to whatever has been earned — the row
+     * restated that in numbers nobody had asked for.
+     */
+    it('leaves the target times off the card entirely', () => {
+        const cards = buildCampaignCarouselCards(campaignState([
             { unlocked: true, bestTimeMs: 60_000, medal: 'bronze' },
-        ]));
-        expect(needsGold.chase?.tier).toBe('gold');
-        expect(needsGold.chase?.label).toBe('Gold');
-        expect(needsGold.chase?.value).toBeTruthy();
-        // Behind the target, so the card also says by how much.
-        expect(needsGold.chase?.gap).toMatch(/^\+/);
-
-        const [needsAuthor] = buildCampaignCarouselCards(campaignState([
             { unlocked: true, bestTimeMs: 20_000, medal: 'gold' },
         ]));
-        expect(needsAuthor.chase?.tier).toBe('author');
-        expect(needsAuthor.chase?.label).toBe('Author');
-    });
 
-    it('has nothing left to chase once Author is banked', () => {
-        const [done] = buildCampaignCarouselCards(campaignState([
-            { unlocked: true, bestTimeMs: 1_000, medal: 'author' },
-        ]));
-        expect(done.chase).toBe(null);
-    });
-
-    it('never puts a target on a locked stage', () => {
-        const cards = buildCampaignCarouselCards(campaignState());
-        expect(cards[1].locked).toBe(true);
-        expect(cards[1].chase).toBe(null);
+        for (const card of cards) expect(card.chase).toBeUndefined();
+        // The stack is what says where the stage stands.
+        expect(cards[0].medalTiers.map(({ tier, filled }) => [tier, filled])).toEqual([
+            ['bronze', true], ['silver', false], ['gold', false], ['author', false],
+        ]);
     });
 });

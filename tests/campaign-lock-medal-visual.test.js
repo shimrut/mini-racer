@@ -35,12 +35,17 @@ describe('Campaign locked-stage medal progress visual', () => {
             /\.track-carousel__unlock-medal \.medal-svg__center-time\s*\{[^}]*font-family:\s*var\(--mono-font\);/s,
         );
         expect(ui).toContain("createLockIconSvg('track-carousel__preview-lock-icon')");
-        expect(ui).toContain('preview.append(previewArt, medal, previewLock)');
+        expect(ui).toContain('preview.append(previewArt, previewLock)');
         expect(ui).toContain('parts.previewLock.hidden = !card.locked');
         expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
         expect(lockIcon).toContain("lock.setAttribute('viewBox', '0 -32 384 544')");
+        // Steel, at the size the puck was tuned to: the accent is what the lobby
+        // spends on the track you can race and the button that starts it.
         expect(css).toMatch(
-            /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4\.5rem;[^}]*height:\s*4\.5rem;[^}]*background:\s*var\(--accent-color\);[^}]*color:\s*#fff;/s,
+            /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4\.5rem;[^}]*height:\s*4\.5rem;[^}]*background:\s*rgba\(15,\s*23,\s*42,\s*0\.92\);[^}]*color:\s*var\(--text-dim\);/s,
+        );
+        expect(css).not.toMatch(
+            /\.track-carousel__preview-lock\s*\{[^}]*background:\s*var\(--accent-color\)/s,
         );
         expect(css).not.toContain('.track-carousel__meter-fill');
     });
