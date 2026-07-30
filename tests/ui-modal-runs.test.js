@@ -1263,40 +1263,4 @@ describe('ui modal runs helpers', () => {
         expect(openGarageModal).toHaveBeenCalledTimes(1);
     });
 
-    it('binds the pause modal garage button', () => {
-        const bindCombinedGarageBtn = vi.fn();
-        const originalRequestAnimationFrame = global.requestAnimationFrame;
-        global.requestAnimationFrame = (callback) => {
-            callback();
-            return 1;
-        };
-        const context = {
-            modal: { classList: createClassList() },
-            modalPauseView: { classList: createClassList() },
-            modalMainView: { classList: createClassList() },
-            modalRunsView: { classList: createClassList() },
-            modalCombinedView: { classList: createClassList() },
-            pauseGarageBtn: { id: 'pause-garage-btn' },
-            modalMenuBtn: null,
-            pauseSettingsBtn: null,
-            pausePlaylistBtn: null,
-            modalRestartBtn: null,
-            modalResumeBtn: null,
-            cancelPendingModalClose: vi.fn(),
-            _bindClickAction: vi.fn(),
-            _bindCombinedGarageBtn: bindCombinedGarageBtn,
-            _syncGarageButtonToPanelState: vi.fn(),
-            _setActiveView: setActiveView,
-            activateModalFocusTrap: vi.fn(),
-            _syncPauseTrackPreview: vi.fn(),
-        };
-
-        try {
-            ModalShell.prototype.showPauseResults.call(context, {}, {});
-
-            expect(bindCombinedGarageBtn).toHaveBeenCalledWith(context.pauseGarageBtn);
-        } finally {
-            global.requestAnimationFrame = originalRequestAnimationFrame;
-        }
-    });
 });

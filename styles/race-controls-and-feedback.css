@@ -138,23 +138,6 @@ body.start-selection-active #start-overlay {
     gap: 1rem;
 }
 
-.daily-challenge-chip {
-    display: inline-flex;
-    align-items: center;
-    min-height: 1.55rem;
-    padding: .32rem .58rem;
-    border-radius: var(--radius-full);
-    font-family: var(--mono-font);
-    font-size: .7rem;
-    font-weight: 800;
-    letter-spacing: .08em;
-    line-height: 1;
-    text-transform: uppercase;
-    color: #e2e8f0b8;
-    background: #94a3b81f;
-    border: 1px solid rgba(226, 232, 240, .12)
-}
-
 #start-lights {
     position: absolute;
     top: 25%;

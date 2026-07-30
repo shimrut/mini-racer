@@ -1,13 +1,7 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js';
-import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { TRACKS } from '../track/tracks.js';
 import {
-    resolveTrackPresentation,
-    TRACK_PRESENTATION_SURFACES,
-} from '../track/presentation.js';
-import {
     buildModalRunsPayload,
-    buildModalStatsPlan,
     buildModalRunsViewOptions,
     applyCombinedRankValue,
     buildScoreboardRankDisplay
@@ -120,7 +114,6 @@ export class ModalShell {
         this._focusBeforeModal = null;
         this._activeTrapModal = null;
         this._modalTrapKeydown = null;
-        this._lastPauseTrackPreviewKey = '';
         this._leaderboardScrollHandler = null;
         this._leaderboardPageLoading = false;
         this._leaderboardSwipeStart = null;
@@ -427,7 +420,7 @@ export class ModalShell {
 
     _syncGarageButtonToPanelState() {
         const garageOpen = Boolean(this.getGarageUi?.()?.isGarageOpen?.());
-        const buttons = [this.combinedGarageBtn, this.pauseGarageBtn].filter(Boolean);
+        const buttons = [this.combinedGarageBtn].filter(Boolean);
         if (!buttons.length) return;
         for (const btn of buttons) {
             btn.classList.toggle('combined-action-btn--active', garageOpen);
@@ -450,28 +443,17 @@ export class ModalShell {
         };
     }
 
+    /* The pause modal states which track is being raced. It used to draw the
+       schematic beside the name; the canvas and its wrapper are long gone from
+       the markup, so what is left is the name. */
     _hidePauseTrackPreview() {
-        this._lastPauseTrackPreviewKey = '';
-        const wrap = document.getElementById('modal-pause-track-preview-wrap');
-        const canvas = document.getElementById('modal-pause-track-preview');
         const nameEl = document.getElementById('modal-pause-track-name');
-        if (wrap) {
-            wrap.hidden = true;
-            wrap.setAttribute('aria-hidden', 'true');
-        }
         if (nameEl) {
             nameEl.textContent = '';
-        }
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx?.clearRect(0, 0, canvas.width, canvas.height);
-            canvas.setAttribute('aria-label', 'Track layout');
         }
     }
 
     _syncPauseTrackPreview(payload) {
-        const wrap = document.getElementById('modal-pause-track-preview-wrap');
-        const canvas = document.getElementById('modal-pause-track-preview');
         const nameEl = document.getElementById('modal-pause-track-name');
 
         if (!payload?.trackKey) {
@@ -491,48 +473,12 @@ export class ModalShell {
         if (nameEl) {
             nameEl.textContent = labelName;
         }
-
-        if (!wrap || !canvas) return;
-
-        const presentation = payload.skin
-            ? resolveTrackPresentation(payload.trackKey, {
-                surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
-                event: {
-                    key: 'daily-challenge',
-                    trackKey: payload.trackKey,
-                    skin: payload.skin,
-                },
-            })
-            : resolveTrackPresentation(payload.trackKey, {
-                surface: TRACK_PRESENTATION_SURFACES.RACE,
-            });
-
-        wrap.hidden = false;
-        wrap.setAttribute('aria-hidden', 'false');
-
-        canvas.setAttribute('aria-label', `Track layout: ${labelName}`);
-
-        const previewKey = `${payload.trackKey}:${payload.skin || 'default'}:${canvas.width}x${canvas.height}`;
-        if (this._lastPauseTrackPreviewKey === previewKey) return;
-        this._lastPauseTrackPreviewKey = previewKey;
-
-        renderCachedTrackPreviewCanvas(canvas, {
-            cacheKey: `pause:${payload.trackKey}:${payload.skin || 'default'}`,
-            trackGeometry: { outer: track.outer, inner: track.inner },
-            presentation,
-            startLine: track.startLine,
-            startPos: track.startPos,
-            startAngle: track.startAngle,
-            transparentBackground: true,
-            previewRenderMode: 'schematic',
-        });
     }
 
     get modal() { return document.getElementById('modal'); }
     get modalTitle() { return document.getElementById('modal-title'); }
     get modalMsg() { return document.getElementById('modal-msg'); }
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
-    get modalStatsRow() { return document.getElementById('modal-stats-row'); }
     get backToMainBtn() { return document.getElementById('back-to-main-btn'); }
     get modalMainView() { return document.getElementById('modal-main-view'); }
     get modalPrimaryBtn() { return document.getElementById('modal-primary-btn'); }
@@ -544,9 +490,6 @@ export class ModalShell {
     get modalMenuBtn() { return document.getElementById('modal-menu-btn'); }
     get modalCombinedView() { return document.getElementById('modal-combined-view'); }
     get modalPauseView() { return document.getElementById('modal-pause-view'); }
-    get pauseSettingsBtn() { return document.getElementById('pause-settings-btn'); }
-    get pauseGarageBtn() { return document.getElementById('pause-garage-btn'); }
-    get pausePlaylistBtn() { return document.getElementById('modal-pause-playlist-btn'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
     get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
     get combinedGarageBtn() { return document.getElementById('combined-garage-btn'); }
@@ -787,48 +730,13 @@ export class ModalShell {
         this._modalRunsPayload = buildModalRunsPayload(lapData, {
             currentTrackKey: this.getCurrentTrackKey()
         });
-        const usesCombinedResults = modalKind === 'win';
         if (lapData) {
             if (this.modalMsg) this.modalMsg.style.display = 'none';
-            if (this.modalStatsRow && usesCombinedResults) {
-                this.modalStatsRow.replaceChildren();
-                this.modalStatsRow.style.display = 'none';
-            } else if (this.modalStatsRow) {
-                const statsPlan = buildModalStatsPlan(lapData);
-                if (statsPlan) {
-                    if (statsPlan.kind === 'pause-progress') {
-                        this.content.setPauseProgressStats(...statsPlan.args);
-                    } else if (statsPlan.kind === 'left-right') {
-                        this.content.setModalStatLeftRight(...statsPlan.args);
-                    } else if (statsPlan.kind === 'hide') {
-                        this.modalStatsRow.replaceChildren();
-                    } else if (statsPlan.kind === 'win') {
-                        this.content.setWinStats(...statsPlan.args, {
-                            showDelta: statsPlan.showDelta !== false,
-                            lapMedal: statsPlan.lapMedal ?? null
-                        });
-                    }
-
-                    if (statsPlan.rankSnapshot) {
-                        this.modalStatsRow.appendChild(
-                            this.createRankModalStat(statsPlan.rankSnapshot)
-                        );
-                    }
-
-                    if (statsPlan.hasRuns === null) {
-                        delete this.modalStatsRow.dataset.hasRuns;
-                    } else {
-                        this.modalStatsRow.dataset.hasRuns = statsPlan.hasRuns;
-                    }
-                    this.modalStatsRow.style.display = statsPlan.display;
-                }
-            }
         } else {
             if (this.modalMsg) {
                 this.modalMsg.style.display = '';
                 this.modalMsg.textContent = msg || '';
             }
-            if (this.modalStatsRow) this.modalStatsRow.style.display = 'none';
         }
 
         if (lapData?.listData !== undefined && this.modalLapTimes) {
@@ -859,9 +767,6 @@ export class ModalShell {
 
         this.cancelPendingModalClose();
         this._bindClickAction(this.modalMenuBtn, options.secondaryAction);
-        this._bindClickAction(this.pauseSettingsBtn, options.settingsAction);
-        this._bindCombinedGarageBtn(this.pauseGarageBtn);
-        this._bindClickAction(this.pausePlaylistBtn, options.playlistAction);
         this._bindClickAction(this.modalRestartBtn, options.restartAction);
         this._bindClickAction(this.modalResumeBtn, options.primaryAction);
         this._syncGarageButtonToPanelState();

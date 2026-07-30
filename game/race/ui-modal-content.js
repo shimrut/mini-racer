@@ -1,6 +1,5 @@
 import { getTrackName } from '../track/catalog.js';
 import { applyCombinedRankValue, buildModalDeltaDisplay } from '../race/result-flow.js';
-import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
@@ -361,90 +360,7 @@ export function mountCombinedPopoverOverlay(container, { title, overlayClass = '
 export class ModalContentUi {
     constructor() {}
 
-    get modalStatsRow() { return document.getElementById('modal-stats-row'); }
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
-    setModalStatLeftRight(lapText, deltaText, bestText, { leftLabel = 'Lap', rightLabel = 'Best' } = {}) {
-    if (!this.modalStatsRow) return;
-    this.modalStatsRow.replaceChildren();
-
-    const left = document.createElement('span');
-    left.className = 'modal-stat-left';
-    const lapLabel = document.createElement('span');
-    lapLabel.className = 'modal-stat-label';
-    lapLabel.textContent = leftLabel;
-    left.appendChild(lapLabel);
-    const lapVal = document.createElement('span');
-    lapVal.className = 'modal-stat-value';
-    lapVal.textContent = lapText;
-    if (deltaText) {
-        const deltaSpan = document.createElement('span');
-        deltaSpan.className = 'modal-stat-delta';
-        deltaSpan.textContent = deltaText;
-        lapVal.appendChild(document.createTextNode(' '));
-        lapVal.appendChild(deltaSpan);
-    }
-    left.appendChild(lapVal);
-    this.modalStatsRow.appendChild(left);
-
-    const right = document.createElement('span');
-    right.className = 'modal-stat-right';
-    const bestLabel = document.createElement('span');
-    bestLabel.className = 'modal-stat-label';
-    bestLabel.textContent = rightLabel;
-    right.appendChild(bestLabel);
-    const bestVal = document.createElement('span');
-    bestVal.className = 'modal-stat-value modal-stat-value--best';
-    bestVal.textContent = bestText;
-    right.appendChild(bestVal);
-    this.modalStatsRow.appendChild(right);
-}
-
-    setPauseProgressStats(lapTime, deltaToBest, bestTime, primaryLabel = 'Lap Time') {
-    if (!this.modalStatsRow) return;
-    const lapText = lapTime === null || lapTime === undefined
-        ? '--'
-        : `${lapTime.toFixed(3)}s`;
-    const bestText = bestTime === null || bestTime === undefined
-        ? '--'
-        : `${bestTime.toFixed(3)}s`;
-    const deltaDisplay = buildModalDeltaDisplay({
-        deltaToBest,
-        emptyText: '--'
-    });
-
-    this.setModalStatLeftRight(lapText, deltaDisplay.text, bestText, {
-        leftLabel: primaryLabel,
-        rightLabel: 'Best'
-    });
-}
-
-    setWinStats(lapTime, deltaToBest, primaryLabel = 'Lap Time', { showDelta = true, lapMedal = null } = {}) {
-    if (!this.modalStatsRow) return;
-    this.modalStatsRow.replaceChildren();
-
-    const lapText = lapTime !== null && lapTime !== undefined
-        ? `${lapTime.toFixed(3)}s`
-        : '--';
-    const deltaDisplay = buildModalDeltaDisplay({
-        deltaToBest,
-        emptyText: 'New PB',
-        emptyValueClass: 'modal-stat-value--delta-negative'
-    });
-
-    this.modalStatsRow.appendChild(this.createModalStat(primaryLabel, lapText));
-    if (!showDelta) {
-        if (lapMedal) {
-            this.modalStatsRow.appendChild(this.createModalMedalStat(lapMedal));
-        }
-        return;
-    }
-
-    this.modalStatsRow.appendChild(this.createModalStat('Delta', deltaDisplay.text, deltaDisplay.valueClass));
-    if (lapMedal) {
-        this.modalStatsRow.appendChild(this.createModalMedalStat(lapMedal));
-    }
-}
-
     /**
      * Paints the combined-result hero medal. Split out of renderCombinedResults
      * so a finish already on screen can have its medal patched once the server
@@ -454,19 +370,6 @@ export class ModalContentUi {
         if (!heroMedalEl) return;
         heroMedalEl.replaceChildren();
         renderWinCombinedMedalOverlay(heroMedalEl, options);
-    }
-
-    createModalMedalStat(medal) {
-        const stat = document.createElement('span');
-        stat.className = 'modal-stat-stack';
-        const label = document.createElement('span');
-        label.className = 'modal-stat-label';
-        label.textContent = 'Medal';
-        const value = document.createElement('span');
-        value.className = 'modal-stat-value modal-stat-value--compact modal-stat-medal-value';
-        value.appendChild(createMedalIconSvg(medal, { className: 'medal-svg--modal' }));
-        stat.append(label, value);
-        return stat;
     }
 
     createModalStat(labelText, valueText, valueClass = '', onClick = null) {
@@ -813,7 +716,6 @@ export class ModalContentUi {
         const rankTotalEl = container.querySelector('#combined-rank-total');
         const timeEl = container.querySelector('#combined-time');
         const bestLapEl = container.querySelector('#combined-best-lap');
-        const label1El = container.querySelector('#combined-stat-label-1');
         const label2El = container.querySelector('#combined-stat-label-2');
         const nextMedalStatEl = container.querySelector('#combined-next-medal-stat');
         const nextMedalIconSlot = container.querySelector('#combined-next-medal-icon-slot');

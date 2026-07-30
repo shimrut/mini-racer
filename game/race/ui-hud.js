@@ -36,7 +36,6 @@ export class RaceHud {
             mobileSpeedBar: document.getElementById('mobile-speed-bar'),
             bestTimeDisplay: document.getElementById('best-time-display'),
             bestTimeVal: document.getElementById('best-time-val'),
-            bestTimeLabel: document.getElementById('best-time-label'),
             bestTimeMedal: document.getElementById('best-time-medal'),
             desktopSpeedometer: document.getElementById('desktop-speedometer'),
             mobileSpeedometer: document.getElementById('mobile-speedometer'),
@@ -79,7 +78,6 @@ export class RaceHud {
     get timeLabel() { return this.elements.timeLabel; }
     get bestTimeDisplay() { return this.elements.bestTimeDisplay; }
     get bestTimeVal() { return this.elements.bestTimeVal; }
-    get bestTimeLabel() { return this.elements.bestTimeLabel; }
     get bestTimeMedal() { return this.elements.bestTimeMedal; }
     get desktopSpeedometer() { return this.elements.desktopSpeedometer; }
     get mobileSpeedometer() { return this.elements.mobileSpeedometer; }
@@ -240,13 +238,11 @@ export class RaceHud {
     if (!this.bestTimeDisplay || !this.bestTimeVal) return;
 
     if (visible) {
-        if (this.bestTimeLabel) this.bestTimeLabel.textContent = label;
         this.bestTimeVal.textContent = value;
         if (this.bestTimeDisplay) this.bestTimeDisplay.style.display = 'flex';
         return;
     }
 
-    if (this.bestTimeLabel) this.bestTimeLabel.textContent = 'BEST';
     this.bestTimeVal.textContent = '--';
     this.bestTimeDisplay.style.display = 'none';
 }

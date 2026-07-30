@@ -79,16 +79,13 @@ export class SettingsUi {
     get identityDesc() { return document.getElementById('settings-identity-desc'); }
     get carAudioSwitch() { return document.getElementById('settings-car-audio-switch'); }
     get carAudioHeading() { return document.getElementById('settings-car-audio-heading'); }
-    get carAudioDesc() { return document.getElementById('settings-car-audio-desc'); }
     get collisionAutoRestartSwitch() { return document.getElementById('settings-collision-auto-restart-switch'); }
     get collisionAutoRestartHeading() { return document.getElementById('settings-collision-auto-restart-heading'); }
-    get collisionAutoRestartDesc() { return document.getElementById('settings-collision-auto-restart-desc'); }
     get collisionRestartDelayMeter() { return document.getElementById('settings-collision-restart-delay-meter'); }
     get collisionRestartDelayMinus() { return document.getElementById('settings-collision-restart-delay-minus'); }
     get collisionRestartDelayPlus() { return document.getElementById('settings-collision-restart-delay-plus'); }
     get collisionRestartDelayValue() { return document.getElementById('settings-collision-restart-delay-value'); }
     get collisionRestartDelayHeading() { return document.getElementById('settings-collision-restart-delay-heading'); }
-    get collisionRestartDelayDesc() { return document.getElementById('settings-collision-restart-delay-desc'); }
     get musicSwitch() { return document.getElementById('settings-music-switch'); }
     get musicHeading() { return document.getElementById('settings-music-heading'); }
     get pbGhostSwitch() { return document.getElementById('settings-pb-ghost-switch'); }

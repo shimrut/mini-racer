@@ -1,7 +1,6 @@
 import {
     formatDailyChallengeBestLabel,
     getDailyChallengeCardStatus,
-    getDailyChallengeCopyLabels,
     getDailyChallengeRequiredLaps,
 } from './labels.js';
 import {
@@ -15,10 +14,6 @@ import {
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { TRACKS } from '../track/tracks.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../track/presentation.js';
-import {
-    setCarAssetImageWithFallbacks,
-    STOCK_CAR_ASSET_NAME
-} from '../car/sprite.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
@@ -42,24 +37,12 @@ export class DailyChallengeUi {
         this.onSummaryUpdated = onSummaryUpdated;
         this.getModalShell = getModalShell;
         this._dailyChallengeSummary = null;
-        this._dailyChallengeCountdownInterval = null;
-        this._dailyPreviewKey = '';
     }
 
-    get dailyChallengeTitle() { return document.getElementById('daily-challenge-title'); }
-    get dailyChallengeTrack() { return document.getElementById('daily-challenge-track'); }
-    get dailyChallengeObjective() { return document.getElementById('daily-challenge-objective'); }
-    get dailyChallengeModifiers() { return document.getElementById('daily-challenge-modifiers'); }
-    get dailyChallengeBestLabel() { return document.getElementById('daily-challenge-best-label'); }
-    get dailyChallengeBest() { return document.getElementById('daily-challenge-best'); }
-    get dailyChallengeReset() { return document.getElementById('daily-challenge-reset'); }
     get dailyChallengeStartBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get dailyChallengePlaylistModal() { return document.getElementById('daily-playlist-modal'); }
     get dailyChallengePlaylistList() { return document.getElementById('daily-playlist-list'); }
     get dailyChallengePlaylistCloseBtn() { return document.getElementById('daily-playlist-close-btn'); }
-    get dailyChallengeCarName() { return document.getElementById('daily-challenge-car-name'); }
-    get dailyChallengeCarLabel() { return document.getElementById('daily-challenge-car-label'); }
-    get dailyChallengeCarImage() { return document.getElementById('daily-challenge-car-image'); }
     get dailyChallengeHudInline() { return document.getElementById('daily-challenge-hud-inline'); }
     get hudLapCluster() { return document.querySelector('.hud-lap-cluster'); }
 
@@ -93,120 +76,11 @@ export class DailyChallengeUi {
         }
 
         const hasChallenge = Boolean(this._dailyChallengeSummary?.available);
-        const copyLabels = getDailyChallengeCopyLabels({
-            objectiveType: this._dailyChallengeSummary?.objectiveType
-        });
-        if (this.dailyChallengeTitle) {
-            this.dailyChallengeTitle.textContent = hasChallenge
-                ? (this._dailyChallengeSummary?.trackName || this._dailyChallengeSummary?.title || 'Daily challenge')
-                : 'RACE';
-        }
-        if (this.dailyChallengeTrack) {
-            this.dailyChallengeTrack.textContent = hasChallenge
-                ? "Beat today's challenge and climb the leaderboard."
-                : 'Check back at the next UTC reset.';
-            this.dailyChallengeTrack.style.display = 'block';
-        }
-        if (this.dailyChallengeObjective) {
-            this.dailyChallengeObjective.textContent = hasChallenge
-                ? (this._dailyChallengeSummary?.objectiveLabel || '1 lap')
-                : 'Challenge unavailable';
-            this.dailyChallengeObjective.style.display = 'block';
-        }
-        if (this.dailyChallengeModifiers) {
-            this.dailyChallengeModifiers.replaceChildren();
-            const badgeTexts = hasChallenge
-                ? (Array.isArray(this._dailyChallengeSummary.modifierBadges)
-                    && this._dailyChallengeSummary.modifierBadges.length
-                        ? this._dailyChallengeSummary.modifierBadges
-                        : ['Verified runs', 'UTC reset'])
-                : [];
-            for (const text of badgeTexts) {
-                const span = document.createElement('span');
-                span.className = 'daily-challenge-chip';
-                span.textContent = text;
-                this.dailyChallengeModifiers.appendChild(span);
-            }
-            this.dailyChallengeModifiers.style.display = hasChallenge && badgeTexts.length ? 'flex' : 'none';
-        }
-        if (this.dailyChallengeBest) {
-            const bestTime = this._dailyChallengeSummary?.bestTime;
-            this.dailyChallengeBest.textContent = this._dailyChallengeSummary?.bestLabel
-                || (Number.isFinite(bestTime) ? `${bestTime.toFixed(3)}s` : '--');
-        }
-        if (this.dailyChallengeBestLabel) {
-            this.dailyChallengeBestLabel.textContent = copyLabels.bestSummaryLabel;
-        }
-        if (this.dailyChallengeCarName) {
-            this.dailyChallengeCarName.textContent = hasChallenge
-                ? (this._dailyChallengeSummary?.objectiveLabel || 'Daily challenge')
-                : '--';
-        }
-        if (this.dailyChallengeCarLabel) {
-            const carLabel = hasChallenge
-                ? 'Challenge'
-                : '--';
-            this.dailyChallengeCarLabel.textContent = carLabel !== '--' ? `${carLabel.toUpperCase()} CAR` : 'CAR';
-        }
-        if (this.dailyChallengeCarImage) {
-            setCarAssetImageWithFallbacks(this.dailyChallengeCarImage, STOCK_CAR_ASSET_NAME);
-        }
         if (this.dailyChallengeStartBtn) {
             this.dailyChallengeStartBtn.disabled = !hasChallenge || Boolean(this._dailyChallengeSummary?.loading);
         }
 
-        this.updateDailyChallengeCountdown();
         this.onSummaryUpdated?.(this._dailyChallengeSummary);
-        this.renderTrackPreview();
-
-        if (this._dailyChallengeCountdownInterval !== null) {
-            clearInterval(this._dailyChallengeCountdownInterval);
-            this._dailyChallengeCountdownInterval = null;
-        }
-        if (hasChallenge && this._dailyChallengeSummary?.endsAt) {
-            this._dailyChallengeCountdownInterval = window.setInterval(
-                () => this.updateDailyChallengeCountdown(),
-                1000
-            );
-        }
-    }
-
-    renderTrackPreview() {
-        const canvas = document.getElementById('daily-challenge-track-preview');
-        if (!canvas) return;
-
-        const summary = this._dailyChallengeSummary;
-        if (!summary?.available || !summary?.trackKey) {
-            this._dailyPreviewKey = '';
-            const ctx = canvas.getContext('2d');
-            ctx?.clearRect(0, 0, canvas.width, canvas.height);
-            return;
-        }
-
-        const track = TRACKS[summary.trackKey];
-        if (!track) return;
-
-        const presentation = resolveTrackPresentation(summary.trackKey, {
-            surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
-            event: summary.skin ? { key: 'daily-challenge', trackKey: summary.trackKey, skin: summary.skin } : null
-        });
-        const previewKey = `${summary.trackKey}:${summary.skin || 'default'}:${canvas.width}x${canvas.height}`;
-        if (this._dailyPreviewKey === previewKey) return;
-        this._dailyPreviewKey = previewKey;
-
-        renderCachedTrackPreviewCanvas(canvas, {
-            cacheKey: `daily-card:${summary.trackKey}:${summary.skin || 'default'}`,
-            trackGeometry: {
-                outer: track.outer,
-                inner: track.inner
-            },
-            presentation,
-            startLine: track.startLine,
-            startPos: track.startPos,
-            startAngle: track.startAngle,
-            transparentBackground: true,
-            previewRenderMode: 'schematic'
-        });
     }
 
     openPlaylistModal(challenges = [], actions = null) {
@@ -424,29 +298,6 @@ export class DailyChallengeUi {
         }
 
         this.setDailyChallengeSummary(nextSummary);
-    }
-
-    updateDailyChallengeCountdown() {
-        if (!this.dailyChallengeReset) return;
-
-        if (!this._dailyChallengeSummary?.available || !this._dailyChallengeSummary?.endsAt) {
-            this.dailyChallengeReset.textContent = '--';
-            return;
-        }
-
-        const remainingMs = Date.parse(this._dailyChallengeSummary.endsAt) - Date.now();
-        if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
-            this.dailyChallengeReset.textContent = 'soon';
-            return;
-        }
-
-        const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const parts = [];
-        if (hours > 0) parts.push(`${hours}h`);
-        parts.push(`${minutes}m`);
-        this.dailyChallengeReset.textContent = parts.join(' ');
     }
 
     setDailyChallengeHud(state = null) {

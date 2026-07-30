@@ -54,13 +54,6 @@
     min-height: 0;
 }
 
-#modal-pause-track-preview {
-    display: block;
-    width: 100%;
-    height: auto;
-    vertical-align: middle;
-}
-
 @media (prefers-reduced-transparency: reduce) {
     #modal.modal--pause:not(.modal--win),
     #modal.modal--win {

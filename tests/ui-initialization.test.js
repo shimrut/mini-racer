@@ -73,7 +73,5 @@ describe('GameUi initialization helpers', () => {
         expect(ui.previewFrameSkip).toBe(1);
         expect(ui.onSummaryUpdated).toBe(onSummaryUpdated);
         expect(ui._dailyChallengeSummary).toBe(null);
-        expect(ui._dailyChallengeCountdownInterval).toBe(null);
-        expect(ui._dailyPreviewKey).toBe('');
     });
 });

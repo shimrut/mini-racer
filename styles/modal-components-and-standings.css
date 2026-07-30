@@ -574,18 +574,6 @@
 
 }
 
-.modal-stat-left {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start
-}
-
-.modal-stat-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end
-}
-
 .modal-stat-label {
     font-family: var(--mono-font);
     font-size: .65rem;
@@ -605,16 +593,6 @@
     line-height: 1
 }
 
-.modal-stat-value--best {
-    color: var(--success)
-}
-
-.modal-stat-delta {
-    color: var(--accent-color);
-    font-size: .75em;
-    font-weight: 700
-}
-
 .modal--pause .modal-card {
     max-width: min(92vw, 26rem);
     display: flex;
@@ -626,16 +604,6 @@
     display: flex;
     flex-direction: column;
     align-items: stretch
-}
-
-.modal--pause .modal-stats-row,
-.modal--win .modal-stats-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .75rem;
-    align-items: start;
-    margin: 0;
-    padding: 1rem 0
 }
 
 .modal-stat-stack {

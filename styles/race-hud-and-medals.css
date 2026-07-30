@@ -197,17 +197,6 @@
     stroke: rgba(148, 163, 184, 0.55);
 }
 
-.medal-svg--modal {
-    width: 2.25rem;
-    height: 2.25rem;
-}
-
-.modal-stat-medal-value {
-    display: flex;
-    justify-content: flex-end;
-    line-height: 0;
-}
-
 .medal-svg--combined {
     width: 1.75rem;
     height: 1.75rem;
