@@ -49,13 +49,18 @@ body[data-lobby-mode="campaign"] #start-overlay {
 }
 
 /* These panes are pickers, not menus: the poster claims the run from the
-   toolbar down to Start Race rather than hugging one end. */
+   toolbar down to Start Race rather than hugging one end.
+
+   The two rows are one layout contract. Start Race is not sticky, fixed or
+   layered over the poster; it owns the second grid row, and the carousel can
+   only use the first. This avoids WebKit's short-lived flex overflow during a
+   native viewport resize and makes overlap structurally impossible. */
 #lobby-daily-pane.lobby-pane,
 #lobby-campaign-pane.lobby-pane {
-    display: flex;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: stretch;
     flex: 1 1 auto;
-    flex-direction: column;
-    justify-content: flex-start;
     min-height: 0;
     margin-top: 0;
     padding: 0;
@@ -63,22 +68,13 @@ body[data-lobby-mode="campaign"] #start-overlay {
     overflow: hidden;
 }
 
-/* Start Race is the one band that never yields.
- *
- * It is a flex item beside the poster, so by default a short window shrinks it
- * along with everything else — and the button inside cannot shrink past its own
- * padding and type, so it spills back over the figures line and paints on top
- * of it. The poster is what gives way instead; it has a drawing that can be
- * drawn smaller, and the button does not.
- *
- * The row is layout only: how the button is drawn stays with the shared lobby
- * styles. `z-index` keeps it above the poster if anything ever does overflow,
- * and the safe-area padding keeps it clear of a home indicator. */
+/* Start Race is the one band that never yields. The grid above gives the
+ * poster whatever is left after this row takes its intrinsic height. The row
+ * itself remains layout-only: button appearance stays with the shared lobby
+ * styles, and there is no z-index because no overlap is permitted. */
 #lobby-daily-pane .lobby-primary-row--race,
 #lobby-campaign-pane .lobby-primary-row--race {
-    position: relative;
-    z-index: 3;
-    flex: 0 0 auto;
+    min-height: 0;
     padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
 }
 

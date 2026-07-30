@@ -53,9 +53,16 @@ maintaining mode-specific card layouts:
 - The visible WebView is the height owner. `game/ui/visible-viewport.js`
   publishes `window.visualViewport.height` as `--app-visible-height` (falling
   back to `innerHeight` and then CSS viewport units), `html` and `body` use that
-  value, and `#start-group` flexes inside the overlay's actual content box.
-  Daily/Campaign panes and the carousel clip their own paint so a transient
-  native-browser resize cannot draw poster content beneath Start Race.
+  value, and `#start-group` flexes inside the overlay's actual content box. The
+  iOS Reddit app can still place native controls over the WebView without
+  changing those browser metrics, so Daily and Campaign reserve a fixed `5rem`
+  native-control clearance below the complete race programme. Nothing renders
+  inside that deliberate empty band.
+- Each Daily/Campaign pane is a two-row grid: the carousel gets
+  `minmax(0, 1fr)` and Start Race gets its own intrinsic row. Neither is
+  positioned, sticky, or layered. The pane, carousel, and mode-specific shell
+  clip their own paint so transient WebKit resize states cannot draw poster
+  content beneath the action or into the native-control clearance.
 - Cards, rail, and preview stay transparent and shadowless. The selected
   schematic is the visual anchor; neighboring schematics crop at the edges.
 - The existing tokens remain the complete visual system: racing palette,
@@ -134,5 +141,6 @@ For structural or cross-file changes:
    sizes.
 5. For Daily/Campaign poster work, include 375 × 596, 390 × 844, 844 × 390,
    723 × 592, and 1463 × 725; verify no document scroll, no scoreline/CTA
-   overlap, selected-card recentering after resize, and synchronized
-   Start/Standings lock state.
+   overlap, at least `5rem` of reported-viewport clearance below the complete
+   action row on Reddit-sized mobile viewports, selected-card recentering after
+   resize, and synchronized Start/Standings lock state.

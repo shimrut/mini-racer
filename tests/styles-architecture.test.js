@@ -180,10 +180,27 @@ describe('game stylesheet architecture', () => {
         expect(raceControlStyles).not.toMatch(
             /#start-group\s*\{[^}]*(?:height|max-height):[^}]*--screen-fill-height/s,
         );
+        // Reddit's iOS native controls may cover the bottom of an expanded
+        // WebView without changing any browser viewport metric. Daily and
+        // Campaign reserve that unobservable native-control band instead of
+        // placing the primary action at the reported bottom edge.
+        const lobbyModeStyles = readFileSync(
+            new URL('../styles/lobby-modes.css', import.meta.url),
+            'utf8',
+        );
+        expect(lobbyModeStyles).toMatch(
+            /body\[data-lobby-mode="daily"\] #start-overlay,[\s\S]*body\[data-lobby-mode="campaign"\] #start-overlay\s*\{[^}]*--reddit-native-bottom-clearance:\s*5rem;[^}]*--start-overlay-pad-bottom:\s*calc\(/s,
+        );
+        expect(lobbyModeStyles).toMatch(
+            /body\[data-lobby-mode="daily"\] #start-group,[\s\S]*body\[data-lobby-mode="campaign"\] #start-group\s*\{[^}]*overflow-y:\s*hidden;/s,
+        );
         // If a browser ever reports another impossible intermediate size, the
         // poster is clipped inside its lane; it cannot paint under the CTA.
         expect(trackCarouselStyles).toMatch(
             /#lobby-daily-pane\.lobby-pane,[\s\S]*#lobby-campaign-pane\.lobby-pane\s*\{[^}]*overflow:\s*hidden;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /#lobby-daily-pane\.lobby-pane,[\s\S]*#lobby-campaign-pane\.lobby-pane\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*minmax\(0, 1fr\) auto;[^}]*align-items:\s*stretch;/s,
         );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel\s*\{[^}]*overflow:\s*hidden;/s,
@@ -277,15 +294,15 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).not.toMatch(/\.lobby-header\s*\{/);
         expect(trackCarouselStyles).not.toMatch(/\.main-menu__item/);
 
-        // The action row is the one exception, and only for where it sits: it
-        // has to refuse to shrink, or a short window squeezes the row until the
-        // button spills back over the figures line and paints on top of it.
-        // Nothing about how the button looks belongs here.
+        // The action row is the one exception, and only for safe-area spacing.
+        // Its intrinsic grid row cannot shrink or cover the poster, and nothing
+        // about how the button looks belongs here.
         const actionRow = trackCarouselStyles.match(
             /#lobby-daily-pane \.lobby-primary-row--race,[\s\S]*?\{([^}]*)\}/,
         )?.[1];
         expect(actionRow).toBeTruthy();
-        expect(actionRow).toMatch(/flex:\s*0 0 auto;/);
+        expect(actionRow).toMatch(/min-height:\s*0;/);
+        expect(actionRow).not.toMatch(/(?:position|z-index)\s*:/);
         expect(actionRow).not.toMatch(
             /(?:^|[\s;])(?:background|border|border-radius|box-shadow|color|font|font-size|font-weight|letter-spacing|text-transform)\s*:/m,
         );
