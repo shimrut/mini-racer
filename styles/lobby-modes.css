@@ -70,31 +70,6 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     width: 100%;
 }
 
-/* Reddit's iOS app can paint native controls over the bottom of an expanded
-   WebView without reducing `visualViewport.height` or exposing that overlap
-   through `safe-area-inset-bottom`. Daily and Campaign therefore live in an
-   upper "safe deck": the whole race programme, including Start Race, finishes
-   a fixed control-bar clearance above the reported bottom edge.
-
-   This is deliberately empty space, not a second footer. Nothing is positioned
-   in it and nothing may use it as overflow room. Home and Challenge keep their
-   existing full-height composition because their actions can scroll. */
-body[data-lobby-mode="daily"] #start-overlay,
-body[data-lobby-mode="campaign"] #start-overlay {
-    --reddit-native-bottom-clearance: 5rem;
-    --start-overlay-pad-bottom: calc(
-        max(var(--space-xl), env(safe-area-inset-bottom))
-        + var(--reddit-native-bottom-clearance)
-    );
-    justify-content: flex-start;
-}
-
-body[data-lobby-mode="daily"] #start-group,
-body[data-lobby-mode="campaign"] #start-group {
-    overflow-y: hidden;
-    scrollbar-gutter: auto;
-}
-
 .lobby-mode-toolbar__actions {
     display: flex;
     align-items: center;

@@ -125,11 +125,11 @@ flowchart LR
   lobby keeps the original compact `#start-group` footprint with title at the
   top and one bottom-pinned action cluster (`margin-top: auto` on the active
   pane only). The shared shell takes height from the measured visible WebView.
-  Daily and Campaign additionally leave a fixed `5rem` empty band above the
-  reported bottom edge because Reddit's iOS native controls can cover the
-  WebView without changing browser viewport metrics. Inside that safe deck, a
-  two-row grid contains the poster above a separate Start Race row; neither
-  layer is positioned over the other.
+  Reddit's expanded-post header and footer remain outside that WebView, so
+  Daily and Campaign add no guessed native-chrome spacer. A two-row grid keeps
+  the poster above a separate bottom Start Race row; neither layer is positioned
+  over the other. The poster reserves its Best / Rank / medals scoreline as a
+  fixed row and yields schematic height first.
   Home keeps its Daily, Campaign, Garage, and Settings mode-action
   list. Daily and Campaign fill the selector area inside the shared lobby shell
   with one race-programme poster: run/date and lap count above the circuit,

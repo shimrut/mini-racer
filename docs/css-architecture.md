@@ -53,16 +53,18 @@ maintaining mode-specific card layouts:
 - The visible WebView is the height owner. `game/ui/visible-viewport.js`
   publishes `window.visualViewport.height` as `--app-visible-height` (falling
   back to `innerHeight` and then CSS viewport units), `html` and `body` use that
-  value, and `#start-group` flexes inside the overlay's actual content box. The
-  iOS Reddit app can still place native controls over the WebView without
-  changing those browser metrics, so Daily and Campaign reserve a fixed `5rem`
-  native-control clearance below the complete race programme. Nothing renders
-  inside that deliberate empty band.
+  value, and `#start-group` flexes inside the overlay's actual content box.
+  Reddit's expanded-post header and footer are native siblings outside that
+  measured WebView, so the app must not guess their height with an internal
+  spacer. The existing overlay padding and reported safe-area inset are the only
+  bottom clearance.
 - Each Daily/Campaign pane is a two-row grid: the carousel gets
   `minmax(0, 1fr)` and Start Race gets its own intrinsic row. Neither is
   positioned, sticky, or layered. The pane, carousel, and mode-specific shell
   clip their own paint so transient WebKit resize states cannot draw poster
-  content beneath the action or into the native-control clearance.
+  content beneath the action. Inside each poster, the scoreline owns a fixed
+  `2.6rem` row; only the schematic row may shrink. Best, Rank, and the medal
+  ladder remain present at short-height breakpoints rather than being discarded.
 - Cards, rail, and preview stay transparent and shadowless. The selected
   schematic is the visual anchor; neighboring schematics crop at the edges.
 - The existing tokens remain the complete visual system: racing palette,

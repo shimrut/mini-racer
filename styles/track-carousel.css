@@ -18,11 +18,10 @@
  * same as on Home; nothing here restates them.
  *
  * The card is a three-row grid, and that is what keeps the scoreline off Start
- * Race. The billing and the scoreline are content-height rows that never
- * shrink; the drawing is `minmax(0, 1fr)` and gives up everything down to
- * nothing. A short window takes the drawing away, in that order, and can never
- * reach the type — laying the three out as flex items instead let the figures
- * line be pushed past the bottom of the card and under the button.
+ * Race. The billing is content-height and the scoreline owns an explicit fixed
+ * row; the drawing is `minmax(0, 1fr)` and gives up everything down to nothing.
+ * A short window takes the drawing away first and can never reach the figures
+ * or the action below them.
  */
 
 /* Home lets the live track-of-the-day render show through a light scrim, and
@@ -83,6 +82,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     flex: 1 1 auto;
     width: 100%;
     min-height: 0;
+    max-height: 100%;
     margin: 0;
     overflow: hidden;
 }
@@ -90,6 +90,8 @@ body[data-lobby-mode="campaign"] #start-overlay {
 .track-carousel__viewport {
     display: flex;
     height: 100%;
+    min-height: 0;
+    max-height: 100%;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
@@ -108,6 +110,8 @@ body[data-lobby-mode="campaign"] #start-overlay {
     display: flex;
     align-items: stretch;
     height: 100%;
+    min-height: 0;
+    max-height: 100%;
     box-sizing: border-box;
     gap: var(--poster-gap);
     padding-block: 0;
@@ -169,14 +173,12 @@ body[data-lobby-mode="campaign"] #start-overlay {
         var(--poster-column)
     );
     position: relative;
-    /* Three rows: billing, drawing, scoreline. The type rows are `auto` and
-       hold their content; the drawing is the only one that can be taken, and
-       `minmax(0, 1fr)` lets it be taken all the way down to nothing. `overflow:
-       hidden` is the backstop for the window too short even for the two type
-       rows — the card loses the bottom of its own scoreline rather than
-       printing it over Start Race. */
+    /* Three rows: billing, drawing, scoreline. The scoreline owns an exact row;
+       the drawing is the only one that can be taken, and `minmax(0, 1fr)` lets
+       it be taken all the way down to nothing. `overflow: hidden` contains the
+       preview during WebKit's intermediate resize frames. */
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) 2.6rem;
     /* The air the drawing sits in. Carried by the grid rather than by padding
        on the two type bands, because the drawing is measured against the row it
        is given and a band's padding is not part of that row — the schematic
@@ -384,7 +386,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     min-width: 0;
     min-height: 0;
     margin-inline: auto;
-    overflow: visible;
+    overflow: hidden;
     border-radius: 0;
     background: transparent;
     box-shadow: none;
@@ -401,6 +403,8 @@ body[data-lobby-mode="campaign"] #start-overlay {
     position: relative;
     flex: 1 1 auto;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
     transform: scale(calc(0.95 + (0.05 * var(--card-proximity, 0))));
     transition: transform var(--dur-base) var(--ease-settle);
 }
@@ -801,12 +805,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     .track-carousel__card-foot {
         height: 1.9rem;
         padding-top: 0.4rem;
-    }
-
-    /* The ladder is the first thing off a landscape phone: it is the one
-       reading on the scoreline that says nothing about the track in hand. */
-    .track-carousel .daily-playlist-hero-medal {
-        display: none;
     }
 
     .track-carousel__unlock-medal-host {

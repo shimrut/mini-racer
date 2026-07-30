@@ -180,19 +180,16 @@ describe('game stylesheet architecture', () => {
         expect(raceControlStyles).not.toMatch(
             /#start-group\s*\{[^}]*(?:height|max-height):[^}]*--screen-fill-height/s,
         );
-        // Reddit's iOS native controls may cover the bottom of an expanded
-        // WebView without changing any browser viewport metric. Daily and
-        // Campaign reserve that unobservable native-control band instead of
-        // placing the primary action at the reported bottom edge.
+        // Reddit's native header and footer sit outside the expanded WebView.
+        // Do not guess at their height inside the app: doing so lifts Start Race
+        // and takes the scoreline's space on the actual iOS surface.
         const lobbyModeStyles = readFileSync(
             new URL('../styles/lobby-modes.css', import.meta.url),
             'utf8',
         );
-        expect(lobbyModeStyles).toMatch(
-            /body\[data-lobby-mode="daily"\] #start-overlay,[\s\S]*body\[data-lobby-mode="campaign"\] #start-overlay\s*\{[^}]*--reddit-native-bottom-clearance:\s*5rem;[^}]*--start-overlay-pad-bottom:\s*calc\(/s,
-        );
-        expect(lobbyModeStyles).toMatch(
-            /body\[data-lobby-mode="daily"\] #start-group,[\s\S]*body\[data-lobby-mode="campaign"\] #start-group\s*\{[^}]*overflow-y:\s*hidden;/s,
+        expect(lobbyModeStyles).not.toContain('--reddit-native-bottom-clearance');
+        expect(lobbyModeStyles).not.toMatch(
+            /body\[data-lobby-mode="(?:daily|campaign)"\] #start-overlay\s*\{[^}]*--start-overlay-pad-bottom:/s,
         );
         // If a browser ever reports another impossible intermediate size, the
         // poster is clipped inside its lane; it cannot paint under the CTA.
@@ -205,14 +202,11 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel\s*\{[^}]*overflow:\s*hidden;/s,
         );
-        // The whole point of the grid. The billing and the scoreline are `auto`
-        // rows that hold their content; the drawing is the only row that can be
-        // taken, and `minmax(0, 1fr)` lets it be taken all the way to nothing.
-        // Laid out as flex items instead — which is what this was — the figures
-        // line could be pushed past the bottom of the card and printed under the
-        // button, because a flex item's overflow does not stop at its box.
+        // The scoreline owns a fixed row, the drawing is the only row that can
+        // be taken, and `minmax(0, 1fr)` lets it be taken all the way to
+        // nothing. WebKit cannot resolve the figures as overflow below the card.
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;/s,
+            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) 2\.6rem;/s,
         );
         // The backstop for the window too short even for the two type rows: the
         // card loses the bottom of its own scoreline rather than painting it
@@ -345,7 +339,7 @@ describe('game stylesheet architecture', () => {
         expect(lobbyModeStyles).toMatch(
             /\.lobby-mode-toolbar \.lobby-header-action\s*\{[^}]*min-width:\s*2\.75rem;[^}]*min-height:\s*2\.75rem;/s,
         );
-        expect(trackCarouselStyles).toMatch(
+        expect(trackCarouselStyles).not.toMatch(
             /@media \(max-height:\s*500px\)\s*\{[\s\S]*\.track-carousel \.daily-playlist-hero-medal\s*\{[^}]*display:\s*none;/s,
         );
     });
