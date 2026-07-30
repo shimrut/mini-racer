@@ -35,8 +35,14 @@ describe('Campaign locked-stage medal progress visual', () => {
             /\.track-carousel__unlock-medal \.medal-svg__center-time\s*\{[^}]*font-family:\s*var\(--mono-font\);/s,
         );
         expect(ui).toContain("createLockIconSvg('track-carousel__preview-lock-icon')");
-        expect(ui).toContain('preview.append(previewArt, previewLock)');
-        expect(ui).toContain('parts.previewLock.hidden = !card.locked');
+        // The puck and the requirement are one gate on the plate, shown and
+        // hidden together. The wording sits here rather than on the scoreline
+        // because the plate is the band that can wrap or be clipped without
+        // moving anything else — on the scoreline the same sentence ran to a
+        // second line and pushed itself down onto Start Race.
+        expect(ui).toContain('gate.append(previewLock, gateNote)');
+        expect(ui).toContain('preview.append(previewArt, gate)');
+        expect(ui).toContain('parts.gate.hidden = !locked');
         expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
         expect(lockIcon).toContain("lock.setAttribute('viewBox', '0 -32 384 544')");
         // Steel, at the size the puck was tuned to: the accent is what the lobby

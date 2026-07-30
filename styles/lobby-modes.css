@@ -78,6 +78,8 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
 
 .lobby-mode-toolbar .lobby-header-action {
     display: flex;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
 }
 
 .lobby-mode-toolbar__back {

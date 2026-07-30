@@ -1,79 +1,90 @@
 /* Lobby track carousel — shared by Daily and Campaign.
  *
- * The selector is the mode's full visual surface. Track rows retain the shared
- * playlist DOM and behavior, but lose their sheet-card chrome here so the
- * schematic, title and neighboring peeks read as one continuous race poster.
+ * Every card is an entry in a race programme, bracketed by two hairlines:
+ *
+ *     ▪ STAGE 03 ─────────────────── 3 LAPS   the billing
+ *     NUMBER THREE                            the circuit
+ *              ⌒⌒⌒                            the field
+ *     ─────────────────────────────────────
+ *     BEST 12.345  RANK P12        ◆ ◆ ◇ ◇    the scoreline
+ *
+ * Both rules carry a reading at each end, so the top band says what the run is
+ * and how long it is, and the bottom band says what the player has done on it
+ * and how far up its ladder that puts them. Track rows keep the shared playlist
+ * DOM, but lose their sheet-card chrome so the schematic and its type read as
+ * one printed surface.
+ *
+ * The lobby shell owns the width, the safe areas and the responsive steps, the
+ * same as on Home; nothing here restates them.
+ *
+ * The card is a three-row grid, and that is what keeps the scoreline off Start
+ * Race. The billing and the scoreline are content-height rows that never
+ * shrink; the drawing is `minmax(0, 1fr)` and gives up everything down to
+ * nothing. A short window takes the drawing away, in that order, and can never
+ * reach the type — laying the three out as flex items instead let the figures
+ * line be pushed past the bottom of the card and under the button.
  */
 
-/* The rail runs edge to edge, so in these modes the shell stops being the width
-   limit and hands that job to its children — otherwise the shell clips the
-   slivers. The shell width is stated once, here, because both the header column
-   and the card width below are derived from it. */
-body[data-lobby-mode="daily"],
-body[data-lobby-mode="campaign"] {
-    --track-shell-width: min(30rem, calc(100vw - 2rem));
-}
-
+/* Home lets the live track-of-the-day render show through a light scrim, and
+   these modes keep that — an opaque fill here erases the one thing on screen
+   that is actually moving.
+ *
+ * The vignette runs the other way round from Home's, though: darkest in the
+ * middle, lightest at the edges. The schematic's road is the same mid-slate as
+ * the road in the render behind it, so a scrim that thinned towards the centre
+ * put the drawing on top of the one part of the background it could not be told
+ * apart from. Motion now survives only in the margins, where nothing is read. */
 body[data-lobby-mode="daily"] #start-overlay,
 body[data-lobby-mode="campaign"] #start-overlay {
-    --start-overlay-pad-top: 0px;
-    --start-overlay-pad-bottom: 0px;
     background:
-        radial-gradient(80% 58% at 50% 52%, rgba(37, 55, 84, 0.34), transparent 72%),
-        #0b1426;
-    backdrop-filter: none;
+        radial-gradient(
+            78% 55% at 50% 46%,
+            rgba(2, 6, 23, 0.94),
+            rgba(2, 6, 23, 0.8) 55%,
+            rgba(2, 6, 23, 0.55) 100%
+        ),
+        rgba(2, 6, 23, 0.34);
+    backdrop-filter: blur(8px) saturate(0.8);
+    -webkit-backdrop-filter: blur(8px) saturate(0.8);
 }
 
-body[data-lobby-mode="daily"] #start-group,
-body[data-lobby-mode="campaign"] #start-group {
-    width: 100vw;
-    max-width: 100vw;
-    height: var(--screen-fill-height);
-    max-height: var(--screen-fill-height);
-    padding-inline: 0;
-    gap: 0;
-    overflow: hidden;
-    /* A reserved gutter would shrink the shell out from under the maths below. */
-    scrollbar-gutter: auto;
-}
-
-body[data-lobby-mode="daily"] .lobby-header,
-body[data-lobby-mode="campaign"] .lobby-header {
-    position: relative;
-    z-index: 3;
-    width: var(--track-shell-width);
-    padding-top: max(0.75rem, env(safe-area-inset-top));
-    margin-inline: auto;
-}
-
-body[data-lobby-mode="daily"] .lobby-panes,
-body[data-lobby-mode="campaign"] .lobby-panes {
-    width: var(--track-shell-width);
-    margin-inline: auto;
-}
-
-/* These panes are pickers, not menus: they claim the room above the actions
-   instead of hugging the bottom like the other panes. */
+/* These panes are pickers, not menus: the poster claims the run from the
+   toolbar down to Start Race rather than hugging one end. */
 #lobby-daily-pane.lobby-pane,
 #lobby-campaign-pane.lobby-pane {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: flex-start;
     min-height: 0;
     margin-top: 0;
     padding: 0;
     gap: 0;
 }
 
-.track-carousel {
-    /* Narrower than the viewport by design: the neighboring schematics crop in
-       at the real screen edges, while the selected surface remains dominant. */
-    --track-card-width: min(72vw, 36rem);
+/* Start Race is the one band that never yields.
+ *
+ * It is a flex item beside the poster, so by default a short window shrinks it
+ * along with everything else — and the button inside cannot shrink past its own
+ * padding and type, so it spills back over the figures line and paints on top
+ * of it. The poster is what gives way instead; it has a drawing that can be
+ * drawn smaller, and the button does not.
+ *
+ * The row is layout only: how the button is drawn stays with the shared lobby
+ * styles. `z-index` keeps it above the poster if anything ever does overflow,
+ * and the safe-area padding keeps it clear of a home indicator. */
+#lobby-daily-pane .lobby-primary-row--race,
+#lobby-campaign-pane .lobby-primary-row--race {
     position: relative;
-    align-self: center;
+    z-index: 3;
+    flex: 0 0 auto;
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}
+
+.track-carousel {
+    position: relative;
     flex: 1 1 auto;
-    width: 100vw;
+    width: 100%;
     min-height: 0;
     margin: 0;
 }
@@ -100,7 +111,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     align-items: stretch;
     height: 100%;
     box-sizing: border-box;
-    gap: clamp(0.5rem, 2vw, 1rem);
+    gap: var(--poster-gap);
     padding-block: 0;
 }
 
@@ -110,10 +121,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
    scroll before the last card was centred and it sat stuck off to one side.
    JS replaces the fallback with measured pixels once the pane is visible. */
 .track-carousel__edge {
-    flex: 0 0 var(
-        --track-carousel-edge-space,
-        calc((100vw - var(--track-card-width)) / 2)
-    );
+    flex: 0 0 var(--track-carousel-edge-space, 0px);
 }
 
 /* Rounding on a fractional card width can still leave the last card a pixel or
@@ -121,28 +129,71 @@ body[data-lobby-mode="campaign"] .lobby-panes {
    the difference here. */
 .track-carousel__edge--tail {
     flex-basis: calc(
-        var(
-            --track-carousel-edge-space,
-            calc((100vw - var(--track-card-width)) / 2)
-        )
+        var(--track-carousel-edge-space, 0px)
         + var(--track-carousel-tail-shortfall, 0px)
     );
 }
 
-/* Shared playlist rows become borderless slices of one continuous surface. */
+/* How much of the run either side of the poster stays on screen.
+ *
+ * The shell clips, so the peek is paid for out of the poster's own measure
+ * rather than by spilling past the shell's edge: the sliver is the inset, and
+ * the gap is the air between one poster and the next.
+ *
+ * A sliver, not a third of the measure. At 14% a side the peek took 113 of the
+ * 345 points the shell has on a phone, and the scoreline that was left could
+ * not hold two readings and the ladder on one line — which is what pushed the
+ * ladder up into the billing and the gate note onto a second line. Both were
+ * the peek's bill, not their own. The run is still visible either side, and the
+ * two chevrons say it again. */
+.track-carousel {
+    --poster-gap: clamp(0.5rem, 2.2vw, 0.85rem);
+    --poster-peek: calc(
+        var(--poster-gap)
+        + clamp(0.85rem, 0.062 * var(--track-carousel-card-width, 20rem), 2.1rem)
+    );
+}
+
+/* `--track-carousel-card-width` is the lobby shell's own measure, read off the
+   viewport by the carousel and published on the rail. Everything on the poster
+   is set from it, so this screen stays inside the width Home uses and inherits
+   every responsive step the shell already defines. */
 .track-carousel .daily-playlist-entry--hero {
+    --poster-column: calc(
+        var(--track-carousel-card-width, 20rem) - (2 * var(--poster-peek))
+    );
+    /* The frame the drawing is set in: the shell's measure, closed in to the
+       width the drawing wants whenever it is limited by height rather than
+       width (`--plate-frame-width`, measured by the carousel). */
+    --plate-frame: clamp(
+        min(var(--poster-column), 15rem),
+        var(--plate-frame-width, var(--poster-column)),
+        var(--poster-column)
+    );
     position: relative;
-    flex: 0 0 var(--track-card-width);
-    flex-direction: column;
+    /* Three rows: billing, drawing, scoreline. The type rows are `auto` and
+       hold their content; the drawing is the only one that can be taken, and
+       `minmax(0, 1fr)` lets it be taken all the way down to nothing. `overflow:
+       hidden` is the backstop for the window too short even for the two type
+       rows — the card loses the bottom of its own scoreline rather than
+       printing it over Start Race. */
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    /* The air the drawing sits in. Carried by the grid rather than by padding
+       on the two type bands, because the drawing is measured against the row it
+       is given and a band's padding is not part of that row — the schematic
+       grew into it and came to rest against both rules. */
+    row-gap: clamp(0.55rem, 2.2vh, 1.35rem);
+    flex: 0 0 var(--poster-column);
     min-height: 0;
-    padding: 0;
-    overflow: visible;
+    padding: clamp(0.35rem, 1.5vh, 1rem) 0;
+    overflow: hidden;
     border: 0;
     border-radius: 0;
     background: transparent;
     scroll-snap-align: center;
     box-shadow: none;
-    opacity: calc(0.48 + (0.52 * var(--card-proximity, 0)));
+    opacity: calc(0.42 + (0.58 * var(--card-proximity, 0)));
     transform: none;
 }
 
@@ -151,33 +202,27 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     cursor: default;
 }
 
-/* A peeking card is the shape of a track and nothing else. Fading the whole
-   card still left its medals, rank, date, laps and best time legible enough to
-   read, so three cards' worth of detail competed with the one being chosen.
-   Only the card at the centre states its details.
+/* A card that is not the one being chosen states nothing. Fading the whole card
+   still left its medals, rank, date, laps and best time legible enough to read,
+   so a second card's detail competed with the one in hand.
 
    On a steeper ramp than the card itself: the details hold at nothing until the
-   card is most of the way in, then come up over the last of the travel. A
-   linear fade would have two cards half-stating themselves for most of a swipe,
-   which is the crowding this rule exists to prevent.
+   card is most of the way in, then come up over the last of the travel.
 
-   Faded rather than removed: the rail stretches every card to the same height,
-   so taking the details out of the layout would let a peeking card's track
-   drawing grow larger than the selected one's. */
-.track-carousel .daily-playlist-hero-content {
+   Faded rather than removed: every card's bands are the same height, so taking
+   the details out of the layout would let a passing card's drawing grow larger
+   than the selected one's. */
+.track-carousel__card-head,
+.track-carousel__card-foot {
     opacity: clamp(0, calc((var(--card-proximity, 0) - 0.55) * 3.2), 1);
 }
 
-.track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected) .daily-playlist-hero-content {
+/* Nothing in the head is pressable, and a swipe that starts on the track name
+   has to move the rail rather than select the name. Only the foot takes input,
+   and only on the card that is actually selectable. */
+.track-carousel__card-head,
+.track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected) .track-carousel__card-foot {
     pointer-events: none;
-}
-
-/* The later shared sheet partial bottom-pins hero content. This selector is
-   intentionally more specific: on the full-surface mode poster the context and
-   title belong together at the top, above the background schematic. */
-#lobby-daily-pane .track-carousel .daily-playlist-hero-content,
-#lobby-campaign-pane .track-carousel .daily-playlist-hero-content {
-    justify-content: flex-start;
 }
 
 /* The sheet's rows lift on hover; a card in the rail is placed by the scroll
@@ -190,17 +235,157 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     box-shadow: none;
 }
 
-/* The schematic is the background artwork, not a panel inside the surface. */
-.track-carousel .daily-playlist-hero-preview {
-    position: absolute;
-    inset: clamp(7.4rem, 19vh, 10.5rem) 0 clamp(0.75rem, 3vh, 2rem);
+/* The masthead: what run this is, then what circuit it is, both set from the
+   left edge. Centred type in a stack was the single thing that made this screen
+   read as a card floating on a page rather than as a printed bill. */
+.track-carousel__card-head {
     display: flex;
-    align-items: stretch;
-    width: auto;
-    height: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: clamp(0.3rem, 1.2vh, 0.6rem);
+    width: 100%;
     min-width: 0;
     min-height: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-align: left;
+    user-select: none;
+}
+
+/* The billing: which run this is at one end of a hairline, how long it is at
+   the other. The rule is what turns two captions into a printed line — without
+   it the format reading floats out on the right with nothing holding it to the
+   run, and the whole band reads as a header row rather than as part of the
+   card. It is also the reason the ladder does not belong up here: the line is
+   already spoken for at both ends. */
+.track-carousel__billing {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.5rem, 2.5vw, 0.85rem);
+    width: 100%;
+    min-width: 0;
+}
+
+.track-carousel__billing-rule {
+    flex: 1 1 auto;
+    min-width: 0.75rem;
+    height: 1px;
+    background: var(--border-default);
+}
+
+/* How long the run is — the one thing about a track that is fixed before the
+   player has done anything on it, which is why it belongs on the billing and
+   not on the scoreline with the figures the player earned. */
+.track-carousel__format {
+    flex: 0 0 auto;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* The date or stage number is a caption over the name, not a chip off to one
+   side. A fixed line box keeps it the same height whether or not this is the
+   track in play, so the schematic below is the same size on every card. */
+.track-carousel .daily-playlist-hero-day {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    min-height: 1.1rem;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    line-height: 1;
+}
+
+/* The track in play is marked the way a timing screen marks the live session —
+   a lit square against the label. The shared sheet gives it a filled rounded
+   chip, which on this surface was a second red pill competing with Start Race
+   for the one accent on screen. */
+.track-carousel .daily-playlist-entry--hero.current .daily-playlist-hero-day {
     padding: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--accent-color);
+}
+
+.track-carousel .daily-playlist-entry--hero.current .daily-playlist-hero-day::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    margin-right: 0.55rem;
+    background: var(--accent-color);
+}
+
+/* The lobby speaks in caps — the title is the one part of the sheet's card that
+   does not, and it reads as a stray next to TODAY / LAPS / START RACE.
+   Two lines' worth of room is always reserved: names run from NUMBER FIVE to
+   HARBOR PRINCIPALITY, and sizing the band to each one would resize the
+   schematic under it as the rail moves. */
+/* Hung from the rule above rather than stacked under it: two lines' worth of
+   room is always reserved, and on the many names that take one the slack falls
+   as leading below the billing instead of as a gap between the name and its
+   drawing. The name reads as the caption to the schematic, which is what it is. */
+.track-carousel .daily-playlist-hero-title {
+    display: grid;
+    align-content: end;
+    width: 100%;
+    min-height: calc(2em * 0.86);
+    /* Sized against four limits, smallest wins:
+       - the shell, at the scale a bill sets its headline;
+       - the height, because the reserved two lines are charged against the same
+         height the schematic is drawn in, and a short landscape window should
+         get a smaller name rather than a postage-stamp track;
+       - the name itself. `0.7em` per character is this italic black face at its
+         widest (measured: H, O and R run ~0.77, I and L ~0.63), so the first
+         term keeps the longest word on one line and the second keeps the whole
+         name inside two. */
+    font-size: min(
+        clamp(1.5rem, 8.5vw, 3rem),
+        8vh,
+        calc(var(--poster-column) / (var(--title-longest-word, 8) * 0.7)),
+        calc(var(--poster-column) / (var(--title-length, 14) * 0.36))
+    );
+    line-height: 0.86;
+    letter-spacing: -0.02em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+/* The plate: the drawing's own box, and the field of the poster.
+ *
+ * It takes the height the type bands leave, but never more than the drawing can
+ * use — `--track-plate-aspect` is the track's own bounding box, published per
+ * card by the carousel — so a wide circuit is drawn wide and a tall one tall,
+ * instead of both being letterboxed into the same rectangle. */
+.track-carousel .daily-playlist-hero-preview {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    /* The drawing's row is taller than the drawing whenever the circuit is
+       squarer than the column; centring it in the row is what keeps the figure
+       floating between the two rules instead of hanging off the name. */
+    align-self: center;
+    box-sizing: border-box;
+    height: 100%;
+    /* The height the drawing wants at the full width of the shell, plus the
+       margin the schematic renderer keeps inside its own canvas — without that
+       allowance the plate is a few pixels short, the drawing becomes
+       height-limited, and it never grows to the width the frame promises. */
+    max-height: calc(
+        (var(--poster-column) / var(--track-plate-aspect, 1.4)) + 1.75rem
+    );
+    width: var(--plate-frame);
+    min-width: 0;
+    min-height: 0;
+    margin-inline: auto;
     overflow: visible;
     border-radius: 0;
     background: transparent;
@@ -218,113 +403,95 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     position: relative;
     flex: 1 1 auto;
     min-width: 0;
-    transform: scale(calc(0.88 + (0.12 * var(--card-proximity, 0))));
+    transform: scale(calc(0.95 + (0.05 * var(--card-proximity, 0))));
     transition: transform var(--dur-base) var(--ease-settle);
 }
 
-/* Context sits directly on the surface above the schematic. */
-.track-carousel .daily-playlist-hero-content {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.35rem;
-    padding: clamp(0.35rem, 1.5vh, 0.8rem) clamp(0.25rem, 2vw, 1rem) 0;
-    pointer-events: none;
-}
-
-.track-carousel__card-head,
+/* The scoreline: what the player has done on this track from the left edge, how
+   far up its ladder that puts them from the right, over the card's second rule.
+ *
+ * Exactly one line, on every card and in every state. The height is fixed, not
+ * a floor — every card's drawing is then the same size as its neighbour's, so
+ * the schematic does not resize as the rail moves. `nowrap` and the clip are
+ * what hold the promise: a reading long enough to want a second line is cut
+ * instead, because nothing on this band may grow the band. The gated stage that
+ * used to state its requirement here in words — the one card that took two
+ * lines — states it on the plate now, where there is room to wrap. */
 .track-carousel__card-foot {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    width: 100%;
-    min-width: 0;
-}
-
-.track-carousel__card-head {
-    flex-direction: row-reverse;
     justify-content: space-between;
-}
-
-.track-carousel .daily-playlist-hero-info {
-    align-items: center;
-    gap: 0.25rem;
-    flex: 0 1 auto;
-    text-align: center;
-}
-
-.track-carousel__card-foot {
-    flex-direction: column;
-}
-
-/* Bronze through author, read left to right: a row of pips is the ladder and
-   how far up it you are, in the room a single line of type takes. Four badges
-   stacked down the card's right edge said the same thing three times louder
-   than the track name they sat beside. */
-.track-carousel .daily-playlist-hero-medal {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.28rem;
-    width: auto;
-    height: auto;
-}
-
-.track-carousel__medal {
-    /* Shared medals are non-shrinking. The carousel overrides that contract so
-       all four square icons can scale together inside a short Reddit WebView
-       preview without clipping bronze or author. */
-    flex: 0 1 1.7rem;
-    min-height: 0;
+    gap: clamp(0.6rem, 3vw, 1.25rem);
+    width: 100%;
     min-width: 0;
-    width: auto;
-    height: auto;
-    max-width: 1.7rem;
-    max-height: 1.7rem;
-    aspect-ratio: 1;
-    opacity: 0.28;
-}
-
-.track-carousel__medal.is-earned {
-    opacity: 1;
-}
-
-/* The lobby speaks in caps — the title is the one part of the sheet's card that
-   does not, and it reads as a stray next to TODAY / 3 LAPS / START RACE. */
-.track-carousel .daily-playlist-hero-title {
-    max-width: 100%;
-    font-size: clamp(1.75rem, 7.5vw, 3.2rem);
-    line-height: 0.95;
-    text-align: center;
-    text-transform: uppercase;
-    text-wrap: balance;
+    height: 2.6rem;
+    box-sizing: border-box;
+    padding-top: clamp(0.45rem, 1.6vh, 0.9rem);
+    border-top: 1px solid var(--border-subtle);
+    overflow: hidden;
+    text-align: left;
+    white-space: nowrap;
+    user-select: none;
 }
 
 .track-carousel__meta {
-    color: var(--text-dim);
+    display: flex;
+    flex: 0 1 auto;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: clamp(0.7rem, 3.5vw, 1.3rem);
+    min-width: 0;
+    overflow: hidden;
     font-family: var(--mono-font);
-    font-size: 0.62rem;
-    letter-spacing: 0.06em;
+    font-size: clamp(0.68rem, 2.5vw, 0.76rem);
     text-transform: uppercase;
 }
 
-/* Bottom-right of the details row: the rank, labelled by its own eyebrow. */
-.track-carousel__rank {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.35rem;
+/* Label then figure, the way a timing screen sets a reading: the label dim and
+   tracked out, the figure bright and tabular, the pair held together by space
+   rather than punctuation. */
+.track-carousel__spec {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
     padding: 0;
     border: 0;
     background: none;
+    /* `font` and `text-transform` are not inherited by a button, and the rank
+       is one — without this it sets itself in the UA's own face and case while
+       the readings beside it stay on the line. */
+    font-family: inherit;
+    font-size: inherit;
+    text-transform: inherit;
+}
+
+.track-carousel__spec[hidden] {
+    display: none;
+}
+
+.track-carousel__spec-label {
+    color: var(--text-dim);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+}
+
+.track-carousel__spec-value {
+    color: var(--text-color);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+/* Never raced here: the reading states the absence rather than standing empty. */
+.track-carousel__spec.is-muted .track-carousel__spec-value {
+    color: var(--text-dim);
+}
+
+/* The line's one pressable reading, drawn exactly like the two beside it — a
+   chip or a border here would break the line into a control and two captions. */
+.track-carousel__rank {
     cursor: pointer;
     pointer-events: auto;
 }
@@ -333,55 +500,69 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     cursor: default;
 }
 
-.track-carousel__rank-label {
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.58rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
-.track-carousel__rank-value {
-    color: var(--text-color);
-    font-family: var(--mono-font);
-    font-size: 0.78rem;
-    font-variant-numeric: tabular-nums;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-    /* The standings land well after the card does, and `is-muted` drops four
-       properties at once when they do — the placeholder dots grow into a rank
-       in a single frame. Riding them across covers the whole arrival. */
+.track-carousel__rank .track-carousel__spec-value {
+    /* The standings land well after the card does, and `is-muted` drops colour
+       and weight together when they do. Riding them across covers the arrival. */
     transition:
         color var(--dur-base) ease,
-        font-size var(--dur-base) var(--ease-settle),
-        font-weight var(--dur-base) ease,
-        letter-spacing var(--dur-base) ease;
+        font-weight var(--dur-base) ease;
 }
 
-.track-carousel__rank:hover:not(:disabled) .track-carousel__rank-value {
+.track-carousel__rank:hover:not(:disabled) .track-carousel__spec-value,
+.track-carousel__rank:focus-visible .track-carousel__spec-value {
     color: var(--accent-bright);
 }
 
-/* Loading or never raced: the value is a word, not a number, so it steps down. */
-.track-carousel__rank.is-muted .track-carousel__rank-value {
-    color: var(--text-dim);
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+/* Bronze through author, read left to right: a row of pips is the ladder and
+   how far up it you are, in the room a single line of type takes. Four badges
+   stacked down the card's right edge said the same thing three times louder
+   than the track name they sat beside.
+ *
+ * The right end of the scoreline, which is the end that answers "how far up".
+ * It rode on the billing for one revision, next to the run — where it had
+ * nothing to do with either reading on that line, and where four dim outlines
+ * floating beside the date read as an unfinished control. */
+.track-carousel .daily-playlist-hero-medal {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.28rem;
+    width: auto;
+    height: auto;
+    margin: 0;
 }
 
-/* Locked-stage price: the count and its progress are one neutral medal token,
-   not three detached pieces of UI. The full requirement remains on the chip's
-   accessible name. */
+.track-carousel__medal {
+    /* Shared medals are non-shrinking. The carousel overrides that contract so
+       all four square icons can scale together inside a short Reddit WebView
+       preview without clipping bronze or author. */
+    flex: 0 1 1.45rem;
+    min-height: 0;
+    min-width: 0;
+    width: auto;
+    height: auto;
+    max-width: 1.45rem;
+    max-height: 1.45rem;
+    aspect-ratio: 1;
+    opacity: 0.3;
+}
+
+.track-carousel__medal.is-earned {
+    opacity: 1;
+}
+
+/* Locked-stage price: the count and its progress are one neutral medal token in
+   the place the ladder would hold, not three detached pieces of UI. The full
+   requirement remains on the token's accessible name. */
+/* Sized to the scoreline's content box, like the pips it stands in for — the
+   band's height is fixed, so a token taller than it is a token with its bottom
+   cut off. */
 .track-carousel__unlock-medal-host {
     display: block;
-    width: 2.75rem;
-    height: 2.75rem;
-    margin-block: -0.2rem;
+    flex: 0 0 auto;
+    width: 1.7rem;
+    height: 1.7rem;
 }
 
 .track-carousel__unlock-medal-host[hidden] {
@@ -428,51 +609,78 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     fill: var(--text-color);
 }
 
-/* A rank is a standing worth full contrast; a count of medals still owed is the
-   card telling the player it is out of reach, and reads with the dimmed title. */
-.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__rank-value {
-    color: var(--text-dim);
-}
-
 /* A locked stage still shows its track and its gate — it just cannot be raced,
-   and the art steps back so the card reads as out of reach. The medal row is
-   left alone: every pip on it is already unearned, and dimming a dim thing
-   twice took the ladder ahead down to nothing. */
+   and the art steps back so the card reads as out of reach. */
 .track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__preview-art canvas {
     opacity: 0.35;
 }
 
-/* Steel, not accent: red is what the lobby uses for the track you can race and
-   the button that starts it, so spending it on the one card you cannot race
-   read as a call to action. The puck keeps its size — it is still the first
-   thing the card says. */
-.track-carousel__preview-lock {
+/* The gate: the puck, and under it the price in words.
+ *
+ * The wording lives on the plate because the plate is the one band on the card
+ * that can give room away — it can wrap to two lines, or be clipped on a short
+ * window, and nothing else moves. On the scoreline it could do neither: that
+ * band is one line by contract, and a requirement that ran to two was exactly
+ * what used to push type down onto Start Race. */
+.track-carousel__gate {
     position: absolute;
     z-index: 1;
-    top: 50%;
-    left: 50%;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    padding-inline: 0.5rem;
+    /* Clipped to the plate. Centred content overflows its box in both
+       directions once it stops fitting, and the top of the drawing's row is the
+       track name and the bottom is the scoreline's rule — the gate may lose its
+       own bottom line, but it may not print over either of them. */
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.track-carousel__gate[hidden] {
+    display: none;
+}
+
+/* Steel, not accent: red is what the lobby uses for the track you can race and
+   the button that starts it, so spending it on the one card you cannot race
+   read as a call to action. */
+.track-carousel__preview-lock {
     display: grid;
+    flex: 0 0 auto;
     width: 4.5rem;
     height: 4.5rem;
     place-items: center;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: rgba(15, 23, 42, 0.92);
     box-shadow:
         inset 0 0 0 1px rgba(148, 163, 184, 0.28),
         0 8px 20px -10px rgba(0, 0, 0, 0.9);
     color: var(--text-dim);
     opacity: 1;
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-}
-
-.track-carousel__preview-lock[hidden] {
-    display: none;
 }
 
 .track-carousel__preview-lock-icon {
     width: 1.65rem;
     height: 2.2rem;
+}
+
+/* What opens it, in the fewest words the requirement can be put in. Set in the
+   utility face like every other reading on the card, and dim, because it is the
+   one line here the player cannot act on yet. */
+.track-carousel__gate-note {
+    max-width: 100%;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    line-height: 1.45;
+    text-align: center;
+    text-transform: uppercase;
+    text-wrap: balance;
 }
 
 .track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-title {
@@ -489,15 +697,16 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2.75rem;
+    height: 2.75rem;
     margin-block: auto;
     padding: 0;
     border: 0;
     border-radius: var(--radius-full);
     background: transparent;
-    color: var(--text-color);
+    color: var(--text-muted);
     cursor: pointer;
+    transition: color var(--dur-base) ease;
 }
 
 .track-carousel__nav svg {
@@ -507,19 +716,20 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 .track-carousel__nav--prev {
-    left: max(0.3rem, env(safe-area-inset-left));
+    left: 0;
 }
 
 .track-carousel__nav--next {
-    right: max(0.3rem, env(safe-area-inset-right));
+    right: 0;
 }
 
-.track-carousel__nav:hover:not(:disabled) {
-    color: var(--accent-bright);
+.track-carousel__nav:hover:not(:disabled),
+.track-carousel__nav:focus-visible {
+    color: var(--text-color);
 }
 
 .track-carousel__nav:disabled {
-    opacity: 0.25;
+    opacity: 0.2;
     cursor: default;
 }
 
@@ -534,14 +744,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
        against — the entrance has to be a keyframe, which replays on its own
        every time the element comes back into rendering. */
     animation: trackCarouselStatusIn var(--dur-base) ease-out both;
-}
-
-#lobby-daily-pane .lobby-primary-row--race,
-#lobby-campaign-pane .lobby-primary-row--race {
-    position: relative;
-    z-index: 3;
-    width: min(84vw, 30rem);
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 @keyframes trackCarouselStatusIn {
@@ -559,8 +761,8 @@ body[data-lobby-mode="campaign"] .lobby-panes {
  * finish loading. A late rank or medal patches the existing cards instead, so
  * browsing the rail never replays this.
  *
- * Carried by the rail rather than the cards: a peeking card sits at opacity
- * 0.4 and the centred one at 1, so fading each card to 1 would flash the
+ * Carried by the rail rather than the cards: a passing card sits at low opacity
+ * and the centred one at 1, so fading each card to 1 would flash the
  * neighbours bright before dropping them back.
  */
 .track-carousel__rail.is-entering {
@@ -580,23 +782,44 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 /* Short landscape keeps the track visible; secondary context yields first. */
-@media (max-height: 480px) {
-    .track-carousel {
-        flex: 1 1 auto;
-        min-height: 0;
-    }
-
-    .track-carousel .daily-playlist-hero-preview {
-        inset: 3.5rem 0 0;
-    }
-
+@media (max-height: 500px) {
+    /* One line, and the reserve goes back to the track: a landscape phone has
+       barely enough height for the drawing as it is. Block rather than the grid
+       above, so a name too long for the card ellipsises instead of wrapping. */
     .track-carousel .daily-playlist-hero-title {
-        font-size: clamp(1.35rem, 5vw, 2rem);
+        display: block;
+        min-height: 0;
+        font-size: clamp(1.2rem, 4.6vw, 2rem);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
-    .track-carousel .daily-playlist-hero-medal,
-    .track-carousel__meta,
-    .track-carousel__rank {
+    .track-carousel__card-head {
+        gap: 0.2rem;
+        padding-bottom: 0.4rem;
+    }
+
+    .track-carousel__card-foot {
+        height: 1.9rem;
+        padding-top: 0.4rem;
+    }
+
+    /* The ladder is the first thing off a landscape phone: it is the one
+       reading on the scoreline that says nothing about the track in hand. */
+    .track-carousel .daily-playlist-hero-medal {
+        display: none;
+    }
+
+    .track-carousel__unlock-medal-host {
+        width: 1.4rem;
+        height: 1.4rem;
+    }
+
+    /* The puck goes and the requirement stays. A landscape phone has room for
+       one of them, and only one of them tells the player what to go and do —
+       the dimmed drawing and the LOCKED button already say the other. */
+    .track-carousel__preview-lock {
         display: none;
     }
 }
@@ -623,7 +846,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
         animation: none;
     }
 
-    .track-carousel__rank-value {
+    .track-carousel__rank .track-carousel__spec-value {
         transition: none;
     }
 

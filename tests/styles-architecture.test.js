@@ -110,31 +110,154 @@ describe('game stylesheet architecture', () => {
         expect(strays).toEqual([]);
     });
 
-    it('turns the Daily and Campaign selector into a full-surface poster', () => {
+    it('sets the Daily and Campaign selector as a programme entry between two rules', () => {
+        // Translucent, not opaque: the live track-of-the-day render behind the
+        // overlay is the lobby's moving background in every mode.
         expect(trackCarouselStyles).toMatch(
-            /body\[data-lobby-mode="daily"\] #start-overlay,[\s\S]*body\[data-lobby-mode="campaign"\] #start-overlay\s*\{[^}]*--start-overlay-pad-top:\s*0px;[^}]*--start-overlay-pad-bottom:\s*0px;[^}]*backdrop-filter:\s*none;/s,
+            /body\[data-lobby-mode="daily"\] #start-overlay,[\s\S]*body\[data-lobby-mode="campaign"\] #start-overlay\s*\{[^}]*backdrop-filter:\s*blur\(/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel\s*\{[^}]*--track-card-width:\s*min\(72vw,\s*36rem\);[^}]*width:\s*100vw;/s,
+            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
+        );
+        // Ranged left, both bands, which is what makes this a printed bill
+        // rather than a card floating on a page. A centred stack here is the
+        // single change that undoes the whole direction.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__card-head\s*\{[^}]*align-items:\s*flex-start;[^}]*text-align:\s*left;/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
+            /\.track-carousel \.daily-playlist-hero-title\s*\{[^}]*text-align:\s*left;/s,
         );
+        // The billing is a hairline with a reading at each end. Without the rule
+        // the format floats out on the right with nothing holding it to the run,
+        // and the band reads as a header row rather than as part of the card.
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-hero-preview\s*\{[^}]*position:\s*absolute;[^}]*padding:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
+            /\.track-carousel__billing-rule\s*\{[^}]*flex:\s*1 1 auto;[^}]*height:\s*1px;[^}]*background:\s*var\(--border-default\);/s,
         );
+        // The schematic is capped at the height the drawing can use, so a wide
+        // circuit is drawn wide and a tall one tall rather than both being
+        // letterboxed into the same rectangle.
         expect(trackCarouselStyles).toMatch(
-            /#lobby-daily-pane \.track-carousel \.daily-playlist-hero-content,[\s\S]*#lobby-campaign-pane \.track-carousel \.daily-playlist-hero-content\s*\{[^}]*justify-content:\s*flex-start;/s,
+            /\.track-carousel \.daily-playlist-hero-preview\s*\{[^}]*align-self:\s*center;[^}]*max-height:\s*calc\(\s*\(var\(--poster-column\) \/ var\(--track-plate-aspect, 1\.4\)\)[^}]*width:\s*var\(--plate-frame\);/s,
+        );
+        // The scoreline closes the entry over the second rule: the figures from
+        // the left edge, the ladder they add up to from the right.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__card-foot\s*\{[^}]*justify-content:\s*space-between;[^}]*border-top:\s*1px solid var\(--border-subtle\);/s,
+        );
+        // Two lines are always reserved for the name, and it is sized so the
+        // longest word fits one of them. Hung from the rule above rather than
+        // stacked under it, so a one-line name sits on its drawing.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-hero-title\s*\{[^}]*align-content:\s*end;[^}]*min-height:\s*calc\(2em \* 0\.86\);[^}]*var\(--title-longest-word, 8\)/s,
         );
     });
 
-    it('keeps the toolbar and Start Race above the full-surface selector', () => {
+    it('makes it structurally impossible for the card to reach Start Race', () => {
+        // The whole point of the grid. The billing and the scoreline are `auto`
+        // rows that hold their content; the drawing is the only row that can be
+        // taken, and `minmax(0, 1fr)` lets it be taken all the way to nothing.
+        // Laid out as flex items instead — which is what this was — the figures
+        // line could be pushed past the bottom of the card and printed under the
+        // button, because a flex item's overflow does not stop at its box.
         expect(trackCarouselStyles).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-header\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*3;/s,
+            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;/s,
+        );
+        // The backstop for the window too short even for the two type rows: the
+        // card loses the bottom of its own scoreline rather than painting it
+        // over Start Race.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*overflow:\s*hidden;/s,
+        );
+        // One line, on every card and in every state — a fixed height, not a
+        // floor, so no reading on this band can ever grow the band. The gated
+        // stage that used to state its requirement here in words is the card
+        // that broke the promise, and it states it on the plate now.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__card-foot\s*\{[^}]*height:\s*2\.6rem;[^}]*overflow:\s*hidden;[^}]*white-space:\s*nowrap;/s,
+        );
+        expect(trackCarouselStyles).not.toMatch(
+            /\.track-carousel__card-foot\s*\{[^}]*min-height:/s,
+        );
+        // Centred content overflows its box in both directions once it stops
+        // fitting, and above the gate is the track name while below it is the
+        // scoreline's rule.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__gate\s*\{[^}]*overflow:\s*hidden;/s,
+        );
+    });
+
+    it('keeps the selector inside the lobby shell instead of restating its width', () => {
+        // The shell owns the width, the safe areas and every responsive step,
+        // the same as on Home. This surface reads that measure off the viewport
+        // (`--track-carousel-card-width`, published by the carousel) rather than
+        // repeating it — a second copy here goes stale the moment
+        // responsive-layout.css moves a breakpoint, and a full-bleed override
+        // makes these two screens a different width from the rest of the lobby.
+        expect(trackCarouselStyles).not.toMatch(/#start-group\s*\{/);
+        // Type and gaps may scale with the viewport the way the rest of the
+        // lobby's do; what may not is any box on this surface sizing itself off
+        // the viewport instead of off the shell.
+        expect(trackCarouselStyles).not.toMatch(
+            /(?:^|[\s;{])(?:width|min-width|max-width|flex|flex-basis|inline-size):[^;}]*\dvw/m,
+        );
+        // The poster is the shell's measure less the room the run either side
+        // peeks through — paid for out of the card, never by spilling past the
+        // shell, which clips.
+        expect(trackCarouselStyles).toMatch(
+            /--poster-column:\s*calc\(\s*var\(--track-carousel-card-width, [^)]+\) - \(2 \* var\(--poster-peek\)\)\s*\);/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /#lobby-daily-pane \.lobby-primary-row--race,[\s\S]*#lobby-campaign-pane \.lobby-primary-row--race\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*3;[^}]*width:\s*min\(84vw,\s*30rem\);/s,
+            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*flex:\s*0 0 var\(--poster-column\);/s,
         );
+
+        const ui = readFileSync(
+            new URL('../game/ui/track-carousel.js', import.meta.url),
+            'utf8',
+        );
+        // A percentage cannot do this job: the rail is an intrinsically sized
+        // flex container, so `100%` on a card resolves against the rail's own
+        // content width and the card grows to whatever it happened to measure.
+        expect(ui).toMatch(/syncCardWidth\(\)\s*\{[\s\S]*--track-carousel-card-width/);
+        expect(ui).toMatch(/render\([\s\S]*this\.syncCardWidth\(\);/);
+    });
+
+    it('sizes the plate frame from the track the card is showing', () => {
+        const ui = readFileSync(
+            new URL('../game/ui/track-carousel.js', import.meta.url),
+            'utf8',
+        );
+        // CSS can cap the plate against the column, but only a measurement can
+        // close the frame in on a drawing that ran out of height first.
+        expect(ui).toContain('--track-plate-aspect');
+        expect(ui).toContain('--plate-frame-width');
+        expect(ui).toContain('--title-longest-word');
+        expect(ui).toMatch(/fitPreviews\(\)\s*\{\s*this\.fitPlateFrames\(\);/);
+    });
+
+    it('leaves the toolbar and Start Race to the styles the rest of the lobby uses', () => {
+        // Both are shared lobby furniture. This surface changed how a track card
+        // is composed, not how the lobby lays out its header or draws its
+        // primary button — restyling them here is how Daily and Campaign drift
+        // away from Home.
+        expect(trackCarouselStyles).not.toMatch(/\.lobby-header\s*\{/);
+        expect(trackCarouselStyles).not.toMatch(/\.main-menu__item/);
+
+        // The action row is the one exception, and only for where it sits: it
+        // has to refuse to shrink, or a short window squeezes the row until the
+        // button spills back over the figures line and paints on top of it.
+        // Nothing about how the button looks belongs here.
+        const actionRow = trackCarouselStyles.match(
+            /#lobby-daily-pane \.lobby-primary-row--race,[\s\S]*?\{([^}]*)\}/,
+        )?.[1];
+        expect(actionRow).toBeTruthy();
+        expect(actionRow).toMatch(/flex:\s*0 0 auto;/);
+        expect(actionRow).not.toMatch(
+            /(?:^|[\s;])(?:background|border|border-radius|box-shadow|color|font|font-size|font-weight|letter-spacing|text-transform)\s*:/m,
+        );
+        expect(
+            trackCarouselStyles.match(/\.lobby-primary-row/g),
+        ).toHaveLength(2);
     });
 
     it('eases the shared Daily and Campaign lobby away over the exact race-start duration', () => {
@@ -145,20 +268,62 @@ describe('game stylesheet architecture', () => {
 
     it('keeps carousel medals square and shrinkable inside short Reddit viewports', () => {
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel__medal\s*\{[^}]*flex:\s*0 1 1\.7rem;[^}]*min-height:\s*0;[^}]*min-width:\s*0;[^}]*max-width:\s*1\.7rem;[^}]*max-height:\s*1\.7rem;[^}]*aspect-ratio:\s*1;/s,
+            /\.track-carousel__medal\s*\{[^}]*flex:\s*0 1 1\.45rem;[^}]*min-height:\s*0;[^}]*min-width:\s*0;[^}]*max-width:\s*1\.45rem;[^}]*max-height:\s*1\.45rem;[^}]*aspect-ratio:\s*1;/s,
         );
         expect(trackCarouselStyles.match(/\.track-carousel__medal\s*\{/g)).toHaveLength(1);
     });
 
-    it('leaves the track drawing the whole plate to itself', () => {
+    it('keeps poster context readable and controls comfortably tappable', () => {
+        const lobbyModeStyles = readFileSync(
+            new URL('../styles/lobby-modes.css', import.meta.url),
+            'utf8',
+        );
+
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__format\s*\{[^}]*color:\s*var\(--text-dim\);[^}]*font-size:\s*0\.68rem;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__spec-label\s*\{[^}]*color:\s*var\(--text-dim\);/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__spec\.is-muted \.track-carousel__spec-value\s*\{[^}]*color:\s*var\(--text-dim\);/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__nav\s*\{[\s\S]*?width:\s*2\.75rem;[\s\S]*?height:\s*2\.75rem;/s,
+        );
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-mode-toolbar \.lobby-header-action\s*\{[^}]*min-width:\s*2\.75rem;[^}]*min-height:\s*2\.75rem;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /@media \(max-height:\s*500px\)\s*\{[\s\S]*\.track-carousel \.daily-playlist-hero-medal\s*\{[^}]*display:\s*none;/s,
+        );
+    });
+
+    it('gives each band of the card one thing to say', () => {
         const ui = readFileSync(
             new URL('../game/ui/track-carousel.js', import.meta.url),
             'utf8',
         );
-        // The medal ladder reads left to right under the plate; anything else in
-        // the preview box takes width from the one drawing that names the track.
-        expect(ui).toContain('preview.append(previewArt, previewLock)');
-        expect(ui).toContain('head.append(eyebrow, medal)');
+        // Three bands: what the run is, the drawing of it, how the player stands
+        // on it. Nothing crosses between them, so they never contend for the
+        // same pixels and a short window can take the drawing on its own.
+        expect(ui).toContain('element.append(head, preview, foot)');
+        // The billing is a hairline with a reading at each end — the run at one,
+        // how long it is at the other. Moving the lap count up here is what left
+        // the scoreline below room for the ladder.
+        expect(ui).toContain('billing.append(eyebrow, billingRule, format)');
+        expect(ui).toContain('head.append(billing, title)');
+        // The plate carries the drawing and, on a stage out of reach, the gate.
+        // The requirement runs to a sentence, and the plate is the one band that
+        // can wrap or be clipped without moving anything else — which is exactly
+        // what it could not do on the scoreline.
+        expect(ui).toContain('preview.append(previewArt, gate)');
+        expect(ui).toContain('gate.append(previewLock, gateNote)');
+        // The scoreline: the player's own figures from the left, the ladder they
+        // add up to from the right. The ladder rode on the billing for one
+        // revision, where it had nothing to do with either reading on that line.
+        expect(ui).toContain('meta.append(rankMedal, bestCell, rank)');
+        expect(ui).toContain('foot.append(meta, medal)');
     });
 
 });

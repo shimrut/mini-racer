@@ -1,13 +1,16 @@
 /**
  * Lobby track carousel — the picker both Daily and Campaign use.
  *
- * One card sits in the middle and its neighbours peek in from both edges, so
- * the run of tracks is visible without opening anything. Swipe, A/D, arrows and
- * the two chevrons all move the same selection, and the rank chip on a card is
- * the way into that track's standings.
+ * Each card is a poster: the run and the circuit's name set along the left
+ * edge, the schematic of the circuit as the field, and one line of figures
+ * closing it. One poster sits in the middle and its neighbours peek in from
+ * both edges, so the run of tracks is visible without opening anything.
+ *
+ * Swipe, A/D, arrows and the two chevrons all move the same selection, and the
+ * rank on a card is the way into that track's standings.
  *
  * The view is model-driven: what a card *says* comes from a per-mode card
- * builder, and everything here is the rail that scrolls them.
+ * builder, and everything here is the plate that sets it.
  */
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
@@ -21,6 +24,11 @@ import {
 const PREVIEW_WIDTH = 320;
 const PREVIEW_HEIGHT = 176;
 const PREVIEW_CAR_SCALE = 2;
+// Matches the margin `getTrackBoundsLayout` keeps inside the preview canvas.
+const PREVIEW_RENDER_PADDING = 16;
+const DEFAULT_PLATE_ASPECT = 1.4;
+const MIN_PLATE_ASPECT = 0.62;
+const MAX_PLATE_ASPECT = 2.4;
 const SCROLL_SETTLE_MS = 90;
 const PROGRAMMATIC_SCROLL_TIMEOUT_MS = 1200;
 
@@ -52,6 +60,66 @@ function createUnlockMedalMeter(meter) {
     progress.setAttribute('stroke-dashoffset', String(100 - (meter.ratio * 100)));
     svg.insertBefore(progress, svg.querySelector('text'));
     return icon;
+}
+
+const plateAspectCache = new Map();
+
+/**
+ * The proportions of the track's own bounding box, published to CSS so the
+ * plate can be sized to the drawing rather than to whatever room is going.
+ *
+ * The schematic is fitted into its canvas preserving aspect, so a plate of any
+ * other shape letterboxes the drawing and leaves the frame floating around it.
+ * Clamped because a freakishly long track would otherwise flatten the plate to
+ * a strip.
+ */
+export function getTrackPlateAspect(trackKey) {
+    const cached = plateAspectCache.get(trackKey);
+    if (cached !== undefined) return cached;
+    const aspect = measureTrackPlateAspect(trackKey);
+    plateAspectCache.set(trackKey, aspect);
+    return aspect;
+}
+
+/** Walks the track's points; called once per track, then cached. */
+function measureTrackPlateAspect(trackKey) {
+    const track = TRACKS[trackKey];
+    const points = [...(track?.outer || []), ...(track?.inner || [])];
+    if (points.length < 2) return DEFAULT_PLATE_ASPECT;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const point of points) {
+        if (point.x < minX) minX = point.x;
+        if (point.x > maxX) maxX = point.x;
+        if (point.y < minY) minY = point.y;
+        if (point.y > maxY) maxY = point.y;
+    }
+    const width = maxX - minX;
+    const height = maxY - minY;
+    if (!(width > 0) || !(height > 0)) return DEFAULT_PLATE_ASPECT;
+    return Math.min(MAX_PLATE_ASPECT, Math.max(MIN_PLATE_ASPECT, width / height));
+}
+
+/**
+ * One reading on the timing row: a tracked-out label with its figure below.
+ *
+ * `element` is the tag the cell is built from, so the rank — the row's one
+ * pressable cell — is a button without being drawn differently from the two
+ * beside it.
+ */
+function createSpecCell(label, element = 'span') {
+    const cell = document.createElement(element);
+    cell.className = 'track-carousel__spec';
+    if (element === 'button') cell.type = 'button';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'track-carousel__spec-label';
+    labelEl.textContent = label;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'track-carousel__spec-value';
+    cell.append(labelEl, valueEl);
+    return [cell, valueEl, labelEl];
 }
 
 export function findCarouselIndex(cards = [], challengeId = null) {
@@ -93,6 +161,7 @@ export class TrackCarousel {
         return globalThis.document?.getElementById?.(`${this.idPrefix}-${suffix}`) || null;
     }
 
+    get root() { return globalThis.document?.getElementById?.(this.idPrefix) || null; }
     get viewport() { return this.element('viewport'); }
     get rail() { return this.element('rail'); }
     get prevBtn() { return this.element('prev'); }
@@ -117,11 +186,13 @@ export class TrackCarousel {
         viewport.addEventListener('wheel', takeScrollControl, { passive: true });
         viewport.addEventListener('scrollend', () => this.handleScrollEnd(), { passive: true });
         window.addEventListener('resize', () => {
+            this.syncCardWidth();
             this.fitPreviews();
             this.scrollToSelected({ animate: false });
         });
         if (typeof ResizeObserver === 'function') {
             this._resizeObserver = new ResizeObserver(() => {
+                this.syncCardWidth();
                 this.fitPreviews();
                 this.scrollToSelected({ animate: false });
             });
@@ -156,6 +227,11 @@ export class TrackCarousel {
     } = {}) {
         const rail = this.rail;
         if (!rail) return;
+
+        // Before the cards exist: a poster built at the wrong width would be
+        // laid out, measured and painted once at that width before the first
+        // scroll pass could correct it.
+        this.syncCardWidth();
 
         const previousIds = this._cards.map((card) => card.challengeId).join('|');
         const nextIds = cards.map((card) => card.challengeId).join('|');
@@ -275,47 +351,56 @@ export class TrackCarousel {
         canvas.width = PREVIEW_WIDTH;
         canvas.height = PREVIEW_HEIGHT;
         canvas.setAttribute('aria-hidden', 'true');
-        const medal = document.createElement('div');
-        medal.className = 'daily-playlist-hero-medal';
-        medal.setAttribute('aria-hidden', 'true');
+        // The gate: the puck, and under it what opens this stage. The wording
+        // sits on the plate because the plate is the band that can give room
+        // away — on the scoreline the same sentence ran to a second line and
+        // pushed itself down onto Start Race.
+        const gate = document.createElement('div');
+        gate.className = 'track-carousel__gate';
+        gate.hidden = true;
         const previewLock = document.createElement('span');
         previewLock.className = 'track-carousel__preview-lock';
         previewLock.setAttribute('aria-hidden', 'true');
         previewLock.appendChild(createLockIconSvg('track-carousel__preview-lock-icon'));
+        const gateNote = document.createElement('span');
+        gateNote.className = 'track-carousel__gate-note';
+        gate.append(previewLock, gateNote);
         previewArt.append(canvas);
-        preview.append(previewArt, previewLock);
+        preview.append(previewArt, gate);
 
-        const content = document.createElement('div');
-        content.className = 'daily-playlist-hero-content';
-
-        // Two rows: what the track is called in the run, then what it is and how
-        // the player stands on it.
+        // Three bands down the card: what the run is, the drawing of it, and
+        // how the player stands on it. The drawing takes whatever the two type
+        // bands leave, so no title length can ever run into it.
         const head = document.createElement('div');
         head.className = 'track-carousel__card-head';
         const foot = document.createElement('div');
         foot.className = 'track-carousel__card-foot';
 
-        const info = document.createElement('div');
-        info.className = 'daily-playlist-hero-info';
-
+        // The billing: which run this card belongs to at one end of a hairline,
+        // how long that run is at the other. The lap count reads here rather
+        // than on the scoreline below because it is true of the track before
+        // the player has turned a wheel on it — and moving it up is what left
+        // the scoreline room for the ladder.
+        const billing = document.createElement('div');
+        billing.className = 'track-carousel__billing';
         const eyebrow = document.createElement('span');
         eyebrow.className = 'daily-playlist-hero-day';
+        const billingRule = document.createElement('span');
+        billingRule.className = 'track-carousel__billing-rule';
+        billingRule.setAttribute('aria-hidden', 'true');
+        const format = document.createElement('span');
+        format.className = 'track-carousel__format';
         const title = document.createElement('span');
         title.className = 'daily-playlist-hero-title';
-        const meta = document.createElement('span');
+
+        // The scoreline: the player's record on this track and where it puts
+        // them, then the ladder they are climbing on it. Two readings and the
+        // pips, on one line, over the card's second rule.
+        const meta = document.createElement('div');
         meta.className = 'track-carousel__meta';
-        const rank = document.createElement('button');
-        rank.type = 'button';
-        rank.className = 'track-carousel__rank';
-        const rankLabel = document.createElement('span');
-        rankLabel.className = 'track-carousel__rank-label';
-        rankLabel.textContent = 'Rank';
-        const rankValue = document.createElement('span');
-        rankValue.className = 'track-carousel__rank-value';
-        const rankMedal = document.createElement('span');
-        rankMedal.className = 'track-carousel__unlock-medal-host';
-        rankMedal.hidden = true;
-        rank.append(rankLabel, rankValue, rankMedal);
+        const [bestCell, bestValue] = createSpecCell('Best');
+        const [rank, rankValue, rankLabel] = createSpecCell('Rank', 'button');
+        rank.classList.add('track-carousel__rank');
         rank.addEventListener('click', (event) => {
             event.stopPropagation();
             const current = this._cards[Number(element.dataset.index)] || null;
@@ -323,12 +408,26 @@ export class TrackCarousel {
                 this.onOpenLeaderboard?.(current.challenge, current);
             }
         });
+        // A gated stage has no best and no standing, so the count that opens it
+        // is the one reading it can put at the left of its scoreline. It reads
+        // where Best would, because it is the same kind of thing: the number
+        // this card is currently worth.
+        const rankMedal = document.createElement('span');
+        rankMedal.className = 'track-carousel__unlock-medal-host';
+        rankMedal.hidden = true;
+        meta.append(rankMedal, bestCell, rank);
 
-        info.append(title, meta);
-        head.append(eyebrow, medal);
-        foot.append(info, rank);
-        content.append(head, foot);
-        element.append(preview, content);
+        // The ladder stays on a locked card. Four dormant tiers say what is on
+        // offer up there, which is most of the reason to look at a stage you
+        // cannot race yet.
+        const medal = document.createElement('div');
+        medal.className = 'daily-playlist-hero-medal';
+        medal.setAttribute('aria-hidden', 'true');
+
+        billing.append(eyebrow, billingRule, format);
+        head.append(billing, title);
+        foot.append(meta, medal);
+        element.append(head, preview, foot);
 
         // Poking a peeking card is the obvious way to bring it in.
         element.addEventListener('click', () => {
@@ -337,8 +436,9 @@ export class TrackCarousel {
         });
 
         element._parts = {
-            canvas, eyebrow, title, meta, rank, rankLabel, rankValue, rankMedal, medal,
-            previewLock,
+            canvas, eyebrow, format, title, meta, rank, rankLabel, rankValue, rankMedal, medal,
+            preview, gate, gateNote, head, foot,
+            bestCell, bestValue,
         };
         this.paintCard(element, card);
         return element;
@@ -350,13 +450,28 @@ export class TrackCarousel {
         element.dataset.challengeId = card.challengeId;
 
         setText(parts.eyebrow, card.eyebrowLabel);
+        setText(parts.format, card.lapsLabel || '');
         setText(parts.title, card.trackName);
-        setText(parts.meta, card.metaLabel);
+        this.paintSpec(parts, card);
+        element.style?.setProperty?.(
+            '--track-plate-aspect',
+            String(getTrackPlateAspect(card.trackKey)),
+        );
+        // Track names run from "Number Five" to "Harbor Principality" in a
+        // column barely wider than one of those words. The measurements below
+        // let CSS size the name so the longest word always fits on a line and
+        // the whole name always fits in the two the poster reserves — without
+        // them a long name broke to three lines and pushed the plate down.
+        const name = String(card.trackName || '');
+        const words = name.split(/\s+/).filter(Boolean);
+        const longestWord = words.reduce((longest, word) => Math.max(longest, word.length), 0);
+        element.style?.setProperty?.('--title-longest-word', String(longestWord || 1));
+        element.style?.setProperty?.('--title-length', String(name.length || 1));
         // `current` is the sheet's own treatment for the track in play; the
         // track a player is on gets it here for the same reason.
         element.classList.toggle('current', Boolean(card.isCurrent));
         element.classList.toggle('is-locked', Boolean(card.locked));
-        parts.previewLock.hidden = !card.locked;
+        this.paintGate(parts, card);
 
         this.paintRank(parts, card);
 
@@ -366,11 +481,46 @@ export class TrackCarousel {
     }
 
     /**
+     * A gated stage says so twice, and neither says it in the same place: the
+     * puck over the drawing, and the price in words beneath it.
+     *
+     * `lockedLabel` runs to a full sentence — "A medal on Number Zero to
+     * unlock" — which is why it is set here and not on the scoreline. The plate
+     * is the card's flexible row: it may wrap to two lines, and on a window too
+     * short for that it is clipped, and no other band moves either way.
+     */
+    paintGate(parts, card) {
+        const locked = Boolean(card.locked);
+        parts.gate.hidden = !locked;
+        setText(parts.gateNote, locked ? (card.lockedLabel || 'Locked') : '');
+    }
+
+    /**
+     * The player's record on this track, at the left of the scoreline.
+     *
+     * A never-raced track keeps its Best reading and states an em dash in it.
+     * Dropping the reading instead would re-set the line differently from one
+     * card to the next as the rail moves, and the absence is worth saying.
+     *
+     * A gated stage has no best to state, and the whole left of its scoreline
+     * stays empty: what it has instead is the requirement, and that reads on
+     * the plate where it has room to wrap.
+     */
+    paintSpec(parts, card) {
+        parts.bestCell.hidden = Boolean(card.locked);
+        parts.bestCell.classList.toggle('is-muted', !card.bestLabel);
+        setText(parts.bestValue, card.bestLabel || '—');
+    }
+
+    /**
      * Every tier the track offers, bronze through author, so the card shows the
      * whole ladder and how far up it the player is. Read as a row of pips rather
      * than four separate badges, so the wordmark and tier caption the shared
      * medal carries would only be noise at this size. Rebuilt only when the
      * earned set changes — this runs on every repaint.
+     *
+     * A gated stage shows its ladder dormant rather than not at all: what is on
+     * offer up the track is most of why a stage out of reach earns a card.
      */
     paintMedals(element, card) {
         const tiers = Array.isArray(card.medalTiers) ? card.medalTiers : [];
@@ -401,17 +551,16 @@ export class TrackCarousel {
     }
 
     /**
-     * A locked track has no standings to open, so the chip states the gate. The
-     * medal count is the one number governing it, and it belongs in the slot the
-     * card already sizes for a number rather than in the fine print.
+     * The standing, and the way into the leaderboard. A gated stage has no
+     * standing to state and no standings to open, so the reading steps aside
+     * and the medal count that governs the gate opens the scoreline in its
+     * place.
      */
     paintRank(parts, card) {
         if (card.locked) {
             const meter = card.lockMeter || null;
-            setText(parts.rankValue, meter ? '' : 'Locked');
-            setText(parts.rankLabel, 'Rank');
-            parts.rankLabel.hidden = true;
-            parts.rankValue.hidden = Boolean(meter);
+            parts.rank.hidden = true;
+            parts.rank.disabled = true;
             parts.rankMedal.hidden = !meter;
             if (meter) {
                 const key = `${meter.value}:${meter.ratio}`;
@@ -419,23 +568,21 @@ export class TrackCarousel {
                     parts.rankMedal.dataset.meterKey = key;
                     parts.rankMedal.replaceChildren(createUnlockMedalMeter(meter));
                 }
+                parts.rankMedal.setAttribute(
+                    'aria-label',
+                    `${card.trackName} is locked. ${card.lockedLabel || ''}`.trim(),
+                );
             }
-            parts.rank.disabled = true;
-            parts.rank.classList.toggle('is-muted', !meter);
-            parts.rank.setAttribute(
-                'aria-label',
-                `${card.trackName} is locked. ${card.lockedLabel || ''}`.trim(),
-            );
             return;
         }
 
         parts.rankMedal.hidden = true;
+        parts.rank.hidden = false;
         parts.rankValue.hidden = false;
+        parts.rankLabel.hidden = false;
         setText(parts.rankLabel, 'Rank');
         parts.rank.disabled = false;
-        setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || 'Unranked'));
-        // "Rank Unranked" reads as a stutter; the word stands on its own.
-        parts.rankLabel.hidden = !card.rankPending && !card.rankLabel;
+        setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || '—'));
         parts.rank.classList.toggle('is-muted', card.rankPending || !card.rankLabel);
         parts.rank.setAttribute(
             'aria-label',
@@ -448,10 +595,53 @@ export class TrackCarousel {
      * size and redrawn by `fitPreviews` once its real box is known — a 16:9
      * bitmap letterboxed into a tall panel is mostly empty gradient.
      */
+    /**
+     * How wide the framed plate should be.
+     *
+     * CSS can cap the plate's height at what the drawing needs for the full
+     * width of the column, but it cannot do the reverse: when the window is
+     * short the drawing is limited by height instead, and the frame is left
+     * spanning a column several times wider than the track inside it. The
+     * height the plate actually got is a measurement, so the width that matches
+     * it is computed here and handed back to CSS.
+     *
+     * The head keeps the full column so the name never reflows as a result —
+     * a title that rewrapped would change the plate's height, which would
+     * change this width, which would rewrap the title again.
+     */
+    fitPlateFrames() {
+        for (const element of this._elements) {
+            const preview = element?._parts?.preview;
+            if (!preview) continue;
+            const card = this._cards[Number(element.dataset.index)];
+            if (!card) continue;
+            // The plate's own row, measured, rather than the card less its two
+            // type bands: the grid also spends a row gap on either side of the
+            // drawing, and inferring the row from the bands counted that gap as
+            // room the schematic could be drawn in.
+            const available = preview.clientHeight;
+            if (!(available > 0)) continue;
+            // The schematic keeps a fixed margin inside its own canvas, so the
+            // drawing is that much shorter than the plate and correspondingly
+            // narrower. Framing the plate rather than the drawing would leave a
+            // band of dead space inside the rules on every card.
+            const margin = 2 * (PREVIEW_RENDER_PADDING / this.previewPixelScale());
+            const drawn = Math.max(0, available - margin);
+            const width = Math.round((drawn * getTrackPlateAspect(card.trackKey)) + margin);
+            element.style?.setProperty?.('--plate-frame-width', `${width}px`);
+        }
+    }
+
+    /** Bitmap pixels per CSS pixel the previews are drawn at. */
+    previewPixelScale() {
+        return Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));
+    }
+
     fitPreviews() {
+        this.fitPlateFrames();
         // Draw at device resolution: a 1x bitmap stretched this far reads as a
         // soft, smeared track.
-        const scale = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));
+        const scale = this.previewPixelScale();
         for (const element of this._elements) {
             const canvas = element?._parts?.canvas;
             // Layout box, not the painted one: a peeking card is scaled down, and
@@ -672,6 +862,28 @@ export class TrackCarousel {
     }
 
     /**
+     * The width one poster gets, published to CSS in pixels.
+     *
+     * It is the lobby shell's own measure — the carousel reads it rather than
+     * restating it, so Home and the two mode screens stay the same width and
+     * the shell keeps every responsive step it already defines. A percentage
+     * cannot do this job: the rail is an intrinsically sized flex container, so
+     * `100%` on a card resolves against the rail's own content width and the
+     * card grows to whatever it happened to measure.
+     */
+    syncCardWidth() {
+        const viewport = this.viewport;
+        // Published on the carousel root rather than the rail: the peek either
+        // side is a fraction of this measure, and the rail's own `gap` is part
+        // of that peek — so the rail has to be able to read it too.
+        const host = this.root || this.rail;
+        const width = viewport?.clientWidth || 0;
+        if (!host || !(width > 0)) return false;
+        host.style?.setProperty?.('--track-carousel-card-width', `${width}px`);
+        return true;
+    }
+
+    /**
      * Give both ends a measured spacer. Percentage sizing inside an intrinsic
      * flex rail is inconsistent in embedded WebViews, which can make the final
      * card hit maxScrollLeft before its centre reaches the viewport centre.
@@ -683,6 +895,7 @@ export class TrackCarousel {
             || !(viewport.clientWidth > 0) || !(element.offsetWidth > 0)) {
             return false;
         }
+        this.syncCardWidth();
         const edgeSpace = Math.max(0, (viewport.clientWidth - element.offsetWidth) / 2);
         rail.style?.setProperty?.('--track-carousel-edge-space', `${edgeSpace}px`);
         this.syncTailShortfall();

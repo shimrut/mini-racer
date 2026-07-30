@@ -38,6 +38,38 @@ Some files intentionally span more than one product surface. Those boundaries
 reflect contiguous sections of the original stylesheet and avoid changing which
 equally specific rule wins.
 
+## Daily And Campaign Poster Contract
+
+Daily and Campaign share one responsive poster composition rather than
+maintaining mode-specific card layouts:
+
+- `lobby-modes.css` owns the shared toolbar, mode pane, and bottom primary row.
+- `track-carousel.css` owns the poster rail and its three bands: run billing,
+  circuit schematic, and player scoreline.
+- `game/ui/track-carousel.js` generates the shared DOM. Daily and Campaign model
+  builders supply different data without duplicating markup.
+- `#start-group` remains the only width and height owner. The carousel reads its
+  measured width and must not restate it with `100vw` or a second max width.
+- Cards, rail, and preview stay transparent and shadowless. The selected
+  schematic is the visual anchor; neighboring schematics crop at the edges.
+- The existing tokens remain the complete visual system: racing palette,
+  `--header-font`, `--mono-font`, border colors, radius values, and motion
+  durations/curves. The poster adds no parallel color, type, spacing, or
+  breakpoint vocabulary.
+- Billing and unplayed scoreline context use `--text-dim`; live values use
+  `--text-color`; red remains reserved for the active run and Start Race.
+- Toolbar utilities and carousel arrows retain at least a `2.75rem` square tap
+  area while their glyphs remain visually compact.
+- The poster grid holds billing and scoreline at content height and lets only
+  the schematic yield. At `max-height: 500px`, the name becomes one line, the
+  medal ladder yields, and a locked stage keeps its requirement after the lock
+  puck yields.
+
+Selection is a behavior contract as well as a visual one. The centred card must
+remain the source for Start Race and Standings, and measured pixel edge spacers,
+positive-geometry guards, `ResizeObserver`, `touch-action: pan-x`, and gesture
+interruption must remain intact for retained Reddit WebViews.
+
 ## Motion Tokens
 
 `foundation.css` owns the timing vocabulary, and every partial transitions
@@ -91,3 +123,7 @@ For structural or cross-file changes:
 4. Smoke-check loading, lobby, race HUD, pause, results, standings, tracks,
    garage, settings and sharing at desktop, narrow mobile and short landscape
    sizes.
+5. For Daily/Campaign poster work, include 375 × 596, 390 × 844, 844 × 390,
+   723 × 592, and 1463 × 725; verify no document scroll, no scoreline/CTA
+   overlap, selected-card recentering after resize, and synchronized
+   Start/Standings lock state.

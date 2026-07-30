@@ -120,10 +120,14 @@ flowchart LR
   lobby keeps the original compact `#start-group` footprint with title at the
   top and one bottom-pinned action cluster (`margin-top: auto` on the active
   pane only). Home keeps its Daily, Campaign, Garage, and Settings mode-action
-  list. Daily and Campaign expand only their selector surface to the full
-  viewport: the selected track schematic is the background artwork, neighboring
-  tracks crop in at the screen edges, and no card or inner preview panel is
-  visible. Each schematic places the player's currently selected Garage car at
+  list. Daily and Campaign fill the selector area inside the shared lobby shell
+  with one race-programme poster: run/date and lap count above the circuit,
+  personal best/rank and the medal ladder below it, and one Start Race action
+  after it. The selected track schematic is the background artwork, neighboring
+  tracks crop at the selector edges, and no card or inner preview panel is
+  visible. The poster uses the existing racing palette, Outfit / JetBrains Mono,
+  border tokens, medal/lock assets, and motion vocabulary. Each schematic places
+  the player's currently selected Garage car at
   the start pose instead of the generic direction triangle; the shared loaded
   sprite and its asset key invalidate both Daily and Campaign preview caches
   when the selection changes. Its preview size uses the race renderer's live
@@ -133,7 +137,11 @@ flowchart LR
   car-to-track proportion across different tracks and DPRs while leaving the
   deliberately larger standalone post-preview car unchanged. The
   existing Back, Standings, Garage, and Settings toolbar stays above that
-  surface, while one centered Start Race action anchors the bottom.
+  surface, while one centered Start Race action anchors the bottom. Toolbar and
+  carousel utilities keep at least a 2.75rem square mobile target. The billing
+  and scoreline keep their readable context while the schematic gives up height
+  first; at 500px viewport height and below, the one-line title and reduced
+  secondary detail protect the track, requirement, and action from overlap.
   Pressing Start Race in either selector eases the full lobby surface to the
   track over 100ms while any required track preparation continues behind it;
   the countdown begins once both the fade and preparation are complete.
@@ -145,7 +153,8 @@ flowchart LR
   `header` element because that would override these mode-specific stacks. The
   Mini Racer wordmark animates on the first Home reveal only; returning from a
   mode restores its final visible state without replaying the hidden keyframe.
-- Daily and Campaign selector surfaces show the full bronze-to-author medal ladder.
+- Daily and Campaign selector surfaces show the full bronze-to-author medal ladder
+  whenever height permits.
   The inline medal SVGs may shrink vertically inside the preview on Reddit's
   shorter WebView sizes; their intrinsic minimum height must not push the first
   or last medal outside the clipped card.
