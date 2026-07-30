@@ -1,8 +1,8 @@
 /* Lobby track carousel — shared by Daily and Campaign.
  *
- * The cards are the tracks sheet's hero rows — colour, type, radius, medal and
- * shadow all come from `.daily-playlist-entry--hero`. Everything here is the
- * rail that scrolls them and the stacked layout the taller lobby card wants.
+ * The selector is the mode's full visual surface. Track rows retain the shared
+ * playlist DOM and behavior, but lose their sheet-card chrome here so the
+ * schematic, title and neighboring peeks read as one continuous race poster.
  */
 
 /* The rail runs edge to edge, so in these modes the shell stops being the width
@@ -14,18 +14,39 @@ body[data-lobby-mode="campaign"] {
     --track-shell-width: min(30rem, calc(100vw - 2rem));
 }
 
+body[data-lobby-mode="daily"] #start-overlay,
+body[data-lobby-mode="campaign"] #start-overlay {
+    --start-overlay-pad-top: 0px;
+    --start-overlay-pad-bottom: 0px;
+    background:
+        radial-gradient(80% 58% at 50% 52%, rgba(37, 55, 84, 0.34), transparent 72%),
+        #0b1426;
+    backdrop-filter: none;
+}
+
 body[data-lobby-mode="daily"] #start-group,
 body[data-lobby-mode="campaign"] #start-group {
     width: 100vw;
     max-width: 100vw;
+    height: var(--screen-fill-height);
+    max-height: var(--screen-fill-height);
     padding-inline: 0;
+    gap: 0;
+    overflow: hidden;
     /* A reserved gutter would shrink the shell out from under the maths below. */
     scrollbar-gutter: auto;
 }
 
 body[data-lobby-mode="daily"] .lobby-header,
+body[data-lobby-mode="campaign"] .lobby-header {
+    position: relative;
+    z-index: 3;
+    width: var(--track-shell-width);
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    margin-inline: auto;
+}
+
 body[data-lobby-mode="daily"] .lobby-panes,
-body[data-lobby-mode="campaign"] .lobby-header,
 body[data-lobby-mode="campaign"] .lobby-panes {
     width: var(--track-shell-width);
     margin-inline: auto;
@@ -41,27 +62,20 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     justify-content: flex-end;
     min-height: 0;
     margin-top: 0;
+    padding: 0;
+    gap: 0;
 }
 
 .track-carousel {
-    /* Matches .lobby-primary-row: 95% of the pane, which is the shell less the
-       menu's padding. Derived, so the card cannot drift wider than the buttons. */
-    --track-card-width: calc(0.95 * (var(--track-shell-width) - 0.8rem));
+    /* Narrower than the viewport by design: the neighboring schematics crop in
+       at the real screen edges, while the selected surface remains dominant. */
+    --track-card-width: min(72vw, 36rem);
     position: relative;
-    /* Wider than the shell column it sits in, so the neighbouring days run off
-       the real screen edges. The menu aligns its children right, so this has to
-       centre itself to overflow evenly on both sides. */
     align-self: center;
-    width: min(100vw, 44rem);
-    /* Takes the room the pane has and shrinks into whatever is left on a short
-       screen; the actions stay pinned where every other pane puts them.
-       Tied to the card's own width rather than to the pane: track drawings are
-       landscape, so a card that simply ate the pane's height letterboxed the
-       one thing on it worth looking at. */
-    flex: 0 1 auto;
-    height: min(32rem, calc(var(--track-card-width) * 1.18));
-    min-height: 15rem;
-    margin-block: auto 1rem;
+    flex: 1 1 auto;
+    width: 100vw;
+    min-height: 0;
+    margin: 0;
 }
 
 .track-carousel__viewport {
@@ -86,9 +100,8 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     align-items: stretch;
     height: 100%;
     box-sizing: border-box;
-    gap: 0.75rem;
-    /* Room for the centred card's drop shadow; the viewport clips vertically. */
-    padding-block: 0.55rem;
+    gap: clamp(0.5rem, 2vw, 1rem);
+    padding-block: 0;
 }
 
 /* The room the end cards need on their outer side to reach the middle. Carried
@@ -99,7 +112,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 .track-carousel__edge {
     flex: 0 0 var(
         --track-carousel-edge-space,
-        calc((min(100vw, 44rem) - var(--track-card-width)) / 2)
+        calc((100vw - var(--track-card-width)) / 2)
     );
 }
 
@@ -110,44 +123,31 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     flex-basis: calc(
         var(
             --track-carousel-edge-space,
-            calc((min(100vw, 44rem) - var(--track-card-width)) / 2)
+            calc((100vw - var(--track-card-width)) / 2)
         )
         + var(--track-carousel-tail-shortfall, 0px)
     );
 }
 
-/* The sheet lays a track out as a wide row; the lobby has height and not much
-   width, so the same parts stack instead: a lit plate carrying the track, and
-   the card's own ground below it carrying what the track is.
-   The card frames the plate rather than being one flat slab — the padding here
-   is that frame, and the raked gradient gives it a top edge to catch light. */
+/* Shared playlist rows become borderless slices of one continuous surface. */
 .track-carousel .daily-playlist-entry--hero {
+    position: relative;
     flex: 0 0 var(--track-card-width);
     flex-direction: column;
     min-height: 0;
-    padding: 0.45rem 0.45rem 0.15rem;
-    border-color: rgba(148, 178, 255, 0.14);
-    background: linear-gradient(163deg, #1a2440 0%, #111b2f 46%, #0b1322 100%);
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     scroll-snap-align: center;
-    /* The sheet's card shadow overlaps through the narrow rail gaps and is
-       clipped by the viewport into one translucent rail-sized slab. Only the
-       centred card carries one, tight enough to stay inside the rail padding. */
     box-shadow: none;
-    /* Peeking cards are scenery: set back, not just faded. Both track how close
-       the card is to the middle rather than whether it holds it, so a swipe
-       brings a card forward continuously instead of switching it on when it
-       crosses the centre. The transform is visual only — centring measures
-       offsetWidth, which it does not touch. */
-    opacity: calc(0.42 + (0.58 * var(--card-proximity, 0)));
-    transform: scale(calc(0.93 + (0.07 * var(--card-proximity, 0))));
-    transition: border-color var(--dur-base) ease-out;
+    opacity: calc(0.48 + (0.52 * var(--card-proximity, 0)));
+    transform: none;
 }
 
 .track-carousel .daily-playlist-entry--hero.is-carousel-selected {
-    border-color: rgba(148, 178, 255, 0.2);
-    box-shadow:
-        0 1px 0 rgba(190, 210, 255, 0.07) inset,
-        0 10px 26px -14px rgba(0, 0, 0, 0.9);
+    box-shadow: none;
     cursor: default;
 }
 
@@ -172,39 +172,39 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     pointer-events: none;
 }
 
+/* The later shared sheet partial bottom-pins hero content. This selector is
+   intentionally more specific: on the full-surface mode poster the context and
+   title belong together at the top, above the background schematic. */
+#lobby-daily-pane .track-carousel .daily-playlist-hero-content,
+#lobby-campaign-pane .track-carousel .daily-playlist-hero-content {
+    justify-content: flex-start;
+}
+
 /* The sheet's rows lift on hover; a card in the rail is placed by the scroll
    position, so it restates that rather than letting the lift move it. */
 .track-carousel .daily-playlist-entry--hero:hover {
-    transform: scale(calc(0.93 + (0.07 * var(--card-proximity, 0))));
+    transform: none;
 }
 
 .track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected):hover {
     box-shadow: none;
 }
 
-/* The top of the card is a lit plate and the track drawing fills it. The medal
-   ladder used to run down the right of this box and took a third of the width
-   from the one drawing that tells a player which track this is.
-   `width`/`height` are restated because the narrow-screen sheet rules pin them. */
+/* The schematic is the background artwork, not a panel inside the surface. */
 .track-carousel .daily-playlist-hero-preview {
-    position: relative;
+    position: absolute;
+    inset: clamp(7.4rem, 19vh, 10.5rem) 0 clamp(0.75rem, 3vh, 2rem);
     display: flex;
-    flex: 1 1 auto;
     align-items: stretch;
     width: auto;
     height: auto;
     min-width: 0;
-    min-height: 6.5rem;
-    padding: 0.6rem;
-    overflow: hidden;
-    border-radius: calc(var(--radius-lg) - 0.4rem);
-    /* A schematic drawn in flat greys needs something to sit on: the spotlight
-       is off-centre and cool, so the plate reads as lit rather than as a panel
-       with a gradient on it. */
-    background:
-        radial-gradient(118% 84% at 46% 30%, rgba(86, 116, 178, 0.34) 0%, rgba(13, 21, 38, 0) 68%),
-        linear-gradient(180deg, #101a2e 0%, #0a1120 100%);
-    box-shadow: inset 0 0 0 1px rgba(148, 178, 255, 0.08);
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .track-carousel .daily-playlist-hero-preview canvas {
@@ -218,37 +218,49 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     position: relative;
     flex: 1 1 auto;
     min-width: 0;
+    transform: scale(calc(0.88 + (0.12 * var(--card-proximity, 0))));
+    transition: transform var(--dur-base) var(--ease-settle);
 }
 
-/* Below the plate, on the card's own ground: which track in the run this is and
-   how far up its ladder the player is, then what it is and where they stand. */
+/* Context sits directly on the surface above the schematic. */
 .track-carousel .daily-playlist-hero-content {
+    position: relative;
+    z-index: 2;
     display: flex;
-    flex: 0 0 auto;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
     flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-    padding: 0.7rem 0.55rem 0.55rem;
+    align-items: center;
+    gap: 0.35rem;
+    padding: clamp(0.35rem, 1.5vh, 0.8rem) clamp(0.25rem, 2vw, 1rem) 0;
+    pointer-events: none;
 }
 
 .track-carousel__card-head,
 .track-carousel__card-foot {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 0.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
     min-width: 0;
 }
 
 .track-carousel__card-head {
-    align-items: center;
+    flex-direction: row-reverse;
+    justify-content: space-between;
 }
 
 .track-carousel .daily-playlist-hero-info {
-    align-items: flex-start;
-    gap: 0.3rem;
-    /* The rank keeps its column; a long track name wraps rather than pushes. */
-    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 0 1 auto;
+    text-align: center;
+}
+
+.track-carousel__card-foot {
+    flex-direction: column;
 }
 
 /* Bronze through author, read left to right: a row of pips is the ladder and
@@ -287,7 +299,10 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 /* The lobby speaks in caps — the title is the one part of the sheet's card that
    does not, and it reads as a stray next to TODAY / 3 LAPS / START RACE. */
 .track-carousel .daily-playlist-hero-title {
-    font-size: 1.4rem;
+    max-width: 100%;
+    font-size: clamp(1.75rem, 7.5vw, 3.2rem);
+    line-height: 0.95;
+    text-align: center;
     text-transform: uppercase;
     text-wrap: balance;
 }
@@ -304,13 +319,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 .track-carousel__rank {
     display: flex;
     flex: 0 0 auto;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.1rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
     padding: 0;
     border: 0;
     background: none;
     cursor: pointer;
+    pointer-events: auto;
 }
 
 .track-carousel__rank:disabled {
@@ -330,7 +346,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 .track-carousel__rank-value {
     color: var(--text-color);
     font-family: var(--mono-font);
-    font-size: 1.3rem;
+    font-size: 0.78rem;
     font-variant-numeric: tabular-nums;
     font-weight: 900;
     letter-spacing: -0.02em;
@@ -352,7 +368,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 /* Loading or never raced: the value is a word, not a number, so it steps down. */
 .track-carousel__rank.is-muted .track-carousel__rank-value {
     color: var(--text-dim);
-    font-size: 0.7rem;
+    font-size: 0.62rem;
     font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -363,9 +379,9 @@ body[data-lobby-mode="campaign"] .lobby-panes {
    accessible name. */
 .track-carousel__unlock-medal-host {
     display: block;
-    width: 3.25rem;
-    height: 3.25rem;
-    margin-block: -0.35rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-block: -0.2rem;
 }
 
 .track-carousel__unlock-medal-host[hidden] {
@@ -477,9 +493,9 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     height: 2.25rem;
     margin-block: auto;
     padding: 0;
-    border: 1px solid var(--border-default);
+    border: 0;
     border-radius: var(--radius-full);
-    background: rgba(15, 23, 42, 0.82);
+    background: transparent;
     color: var(--text-color);
     cursor: pointer;
 }
@@ -491,15 +507,15 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 .track-carousel__nav--prev {
-    left: 0.3rem;
+    left: max(0.3rem, env(safe-area-inset-left));
 }
 
 .track-carousel__nav--next {
-    right: 0.3rem;
+    right: max(0.3rem, env(safe-area-inset-right));
 }
 
 .track-carousel__nav:hover:not(:disabled) {
-    border-color: var(--border-strong);
+    color: var(--accent-bright);
 }
 
 .track-carousel__nav:disabled {
@@ -518,6 +534,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
        against — the entrance has to be a keyframe, which replays on its own
        every time the element comes back into rendering. */
     animation: trackCarouselStatusIn var(--dur-base) ease-out both;
+}
+
+#lobby-daily-pane .lobby-primary-row--race,
+#lobby-campaign-pane .lobby-primary-row--race {
+    position: relative;
+    z-index: 3;
+    width: min(84vw, 30rem);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 @keyframes trackCarouselStatusIn {
@@ -555,19 +579,24 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     }
 }
 
-/* Last resort. Below this the card cannot hold the art and the text both, and
-   the day, name and rank are the parts a player cannot do without. */
+/* Short landscape keeps the track visible; secondary context yields first. */
 @media (max-height: 480px) {
     .track-carousel {
-        /* Sized by content: it must neither stretch (overflows the shell) nor
-           shrink (clips the rank chip). */
-        flex: 0 0 auto;
-        height: auto;
+        flex: 1 1 auto;
         min-height: 0;
-        margin-block: auto 0.75rem;
     }
 
     .track-carousel .daily-playlist-hero-preview {
+        inset: 3.5rem 0 0;
+    }
+
+    .track-carousel .daily-playlist-hero-title {
+        font-size: clamp(1.35rem, 5vw, 2rem);
+    }
+
+    .track-carousel .daily-playlist-hero-medal,
+    .track-carousel__meta,
+    .track-carousel__rank {
         display: none;
     }
 }
@@ -577,6 +606,10 @@ body[data-lobby-mode="campaign"] .lobby-panes {
        something the interface is performing — but nothing scales. */
     .track-carousel .daily-playlist-entry--hero,
     .track-carousel .daily-playlist-entry--hero:hover {
+        transform: none;
+    }
+
+    .track-carousel__preview-art {
         transition: none;
         transform: none;
     }

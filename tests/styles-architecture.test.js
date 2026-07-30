@@ -109,23 +109,30 @@ describe('game stylesheet architecture', () => {
         expect(strays).toEqual([]);
     });
 
-    it('keeps playlist card shadows off every card the rail is not centring', () => {
+    it('turns the Daily and Campaign selector into a full-surface poster', () => {
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*box-shadow:\s*none;/s,
+            /body\[data-lobby-mode="daily"\] #start-overlay,[\s\S]*body\[data-lobby-mode="campaign"\] #start-overlay\s*\{[^}]*--start-overlay-pad-top:\s*0px;[^}]*--start-overlay-pad-bottom:\s*0px;[^}]*backdrop-filter:\s*none;/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-entry--hero:not\(\.is-carousel-selected\):hover\s*\{[^}]*box-shadow:\s*none;/s,
+            /\.track-carousel\s*\{[^}]*--track-card-width:\s*min\(72vw,\s*36rem\);[^}]*width:\s*100vw;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-entry--hero\s*\{[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-hero-preview\s*\{[^}]*position:\s*absolute;[^}]*padding:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /#lobby-daily-pane \.track-carousel \.daily-playlist-hero-content,[\s\S]*#lobby-campaign-pane \.track-carousel \.daily-playlist-hero-content\s*\{[^}]*justify-content:\s*flex-start;/s,
         );
     });
 
-    it('keeps the centred card lifted, and inside the rail padding that clears it', () => {
+    it('keeps the toolbar and Start Race above the full-surface selector', () => {
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-entry--hero\.is-carousel-selected\s*\{[^}]*box-shadow:[^;]+;/s,
+            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-header\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*3;/s,
         );
-        // The viewport clips vertically, so the shadow only survives if the rail
-        // reserves room above and below the cards for it.
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel__rail\s*\{[^}]*padding-block:\s*0\.55rem;/s,
+            /#lobby-daily-pane \.lobby-primary-row--race,[\s\S]*#lobby-campaign-pane \.lobby-primary-row--race\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*3;[^}]*width:\s*min\(84vw,\s*30rem\);/s,
         );
     });
 

@@ -33,9 +33,13 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Standalone game launch opens Home with Daily, Campaign, Garage, and
   Settings as matching mode-action rows, and no Home Start button.
 - [ ] Daily and Campaign direct launches show a labeled Back action at top left
-  and Standings, Garage, and Settings icons at top right, with a full-width
-  Start Race button as the only bottom action. Back returns to Home, and
-  Standings opens on the track currently centred in the carousel.
+  and Standings, Garage, and Settings icons at top right. The selected track is
+  a borderless full-surface schematic, neighboring tracks peek at both screen
+  edges, and a centered Start Race pill is the only bottom action. Back returns
+  to Home, and Standings opens on the track currently centred in the carousel.
+- [ ] At the first and last Daily/Campaign entries, the selected track still
+  centers in the Reddit WebView. Swiping or tapping an edge track updates the
+  selected title, Standings target, and Start Race target together.
 - [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.

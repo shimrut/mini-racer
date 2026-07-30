@@ -120,16 +120,18 @@ flowchart LR
   lobby keeps the original compact `#start-group` footprint with title at the
   top and one bottom-pinned action cluster (`margin-top: auto` on the active
   pane only). Home keeps its Daily, Campaign, Garage, and Settings mode-action
-  list. Daily and Campaign replace the wordmark/subhead with one top toolbar:
-  labeled Back at left and Font Awesome Standings, Garage, and Settings icons
-  at right. Their only bottom action is a full-width Start Race button.
+  list. Daily and Campaign expand only their selector surface to the full
+  viewport: the selected track schematic is the background artwork, neighboring
+  tracks crop in at the screen edges, and no card or inner preview panel is
+  visible. The existing Back, Standings, Garage, and Settings toolbar stays
+  above that surface, while one centered Start Race action anchors the bottom.
   Standings resolves the carousel's currently centred track at click time.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. Desktop responsive rules must not target the generic
   `header` element because that would override these mode-specific stacks. The
   Mini Racer wordmark animates on the first Home reveal only; returning from a
   mode restores its final visible state without replaying the hidden keyframe.
-- Daily and Campaign carousel cards show the full bronze-to-author medal ladder.
+- Daily and Campaign selector surfaces show the full bronze-to-author medal ladder.
   The inline medal SVGs may shrink vertically inside the preview on Reddit's
   shorter WebView sizes; their intrinsic minimum height must not push the first
   or last medal outside the clipped card.

@@ -1,5 +1,10 @@
 # Changelog
 
+- Reworked the Daily and Campaign selector as one full-screen race surface.
+  Track cards and inner preview panels no longer sit above the background; the
+  selected schematic becomes the dominant artwork, neighboring tracks crop in
+  at the screen edges, and the existing toolbar and Start Race action remain
+  anchored above it.
 - Replaced the Campaign locked-card MEDALS label, fraction, and bar with one
   medal-shaped counter. The earned/required count sits inside the medal while
   a perimeter stroke shows unlock progress. Incomplete counts and progress are
