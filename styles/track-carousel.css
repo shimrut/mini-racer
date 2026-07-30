@@ -87,11 +87,27 @@ body[data-lobby-mode="campaign"] #start-overlay {
     overflow: hidden;
 }
 
+/* The rail's lane, pinned to the carousel rather than sized as a percentage of
+ * it.
+ *
+ * `height: 100%` here only holds while every ancestor's height is definite, and
+ * on this screen the chain runs through `#start-group` (`flex: 1 1 auto`) and
+ * the mode pane (a grid container that is itself a flex item) — heights that
+ * are only settled by flexing, and that are flexed again when the runtime
+ * publishes `--app-visible-height`. In the Reddit WebView that percentage
+ * resolved against an indefinite height, the rail fell back to the poster's
+ * intrinsic height, and `.track-carousel`'s clip took the difference off the
+ * bottom: the scoreline, which is the band that sits there.
+ *
+ * Out of flow against a positioned parent there is no percentage left to fail.
+ * The lane is exactly the row the pane gave the carousel, the card is stretched
+ * to it, and the card's own grid can do what it promises — take the schematic
+ * down and never the figures. */
 .track-carousel__viewport {
+    position: absolute;
+    inset: 0;
     display: flex;
-    height: 100%;
     min-height: 0;
-    max-height: 100%;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
@@ -106,12 +122,14 @@ body[data-lobby-mode="campaign"] #start-overlay {
     display: none;
 }
 
+/* `height: 100%` is safe here: the lane above is an absolutely positioned box
+   with all four insets, so its height is definite by position rather than by an
+   ancestor's flexing. */
 .track-carousel__rail {
     display: flex;
     align-items: stretch;
     height: 100%;
     min-height: 0;
-    max-height: 100%;
     box-sizing: border-box;
     gap: var(--poster-gap);
     padding-block: 0;
@@ -324,39 +342,69 @@ body[data-lobby-mode="campaign"] #start-overlay {
     background: var(--accent-color);
 }
 
-/* The lobby speaks in caps — the title is the one part of the sheet's card that
-   does not, and it reads as a stray next to TODAY / LAPS / START RACE.
-   Two lines' worth of room is always reserved: names run from NUMBER FIVE to
-   HARBOR PRINCIPALITY, and sizing the band to each one would resize the
-   schematic under it as the rail moves. */
-/* Hung from the rule above rather than stacked under it: two lines' worth of
-   room is always reserved, and on the many names that take one the slack falls
-   as leading below the billing instead of as a gap between the name and its
-   drawing. The name reads as the caption to the schematic, which is what it is. */
+/* The circuit, in the lobby's own hand.
+ *
+ * MINI over RACER is how this game says its own name: the first word small and
+ * white, the last big and red, stacked tight and ranged left. A track is the
+ * same two words, so it is set the same way — the poster stops being a card
+ * with a caption on it and becomes the same printed thing as the front screen.
+ *
+ * Two rows always, and the split is structural rather than a wrap. Sizing the
+ * band to each name, or letting one name take a line and the next take two,
+ * would resize the schematic under it as the rail moved.
+ *
+ * Hung from the rule above rather than stacked under it, so the slack falls as
+ * leading below the billing instead of as a gap between the name and its
+ * drawing. The name reads as the caption to the schematic, which is what it is.
+ */
 .track-carousel .daily-playlist-hero-title {
+    /* The headline scale the shell allows; the short-landscape step below is
+       the only thing that changes it. */
+    --title-cap: clamp(1.5rem, 8.5vw, 3rem);
+    /* MINI to RACER, near enough: the white line is the subtitle and the red
+       one is the name. */
+    --title-lead-scale: 0.62;
     display: grid;
     align-content: end;
     width: 100%;
-    min-height: calc(2em * 0.86);
     /* Sized against four limits, smallest wins:
        - the shell, at the scale a bill sets its headline;
-       - the height, because the reserved two lines are charged against the same
-         height the schematic is drawn in, and a short landscape window should
-         get a smaller name rather than a postage-stamp track;
-       - the name itself. `0.7em` per character is this italic black face at its
-         widest (measured: H, O and R run ~0.77, I and L ~0.63), so the first
-         term keeps the longest word on one line and the second keeps the whole
-         name inside two. */
+       - the height, because the two rows are charged against the same height
+         the schematic is drawn in, and a short landscape window should get a
+         smaller name rather than a postage-stamp track;
+       - each row's own word. `0.7em` per character is this italic black face at
+         its widest (measured: H, O and R run ~0.77, I and L ~0.63), and the
+         white row is charged at its own smaller scale. */
     font-size: min(
-        clamp(1.5rem, 8.5vw, 3rem),
+        var(--title-cap),
         8vh,
-        calc(var(--poster-column) / (var(--title-longest-word, 8) * 0.7)),
-        calc(var(--poster-column) / (var(--title-length, 14) * 0.36))
+        calc(var(--poster-column) / (var(--title-tail-length, 8) * 0.7)),
+        calc(
+            var(--poster-column)
+            / (var(--title-lead-length, 8) * 0.7 * var(--title-lead-scale))
+        )
     );
     line-height: 0.86;
     letter-spacing: -0.02em;
     text-align: left;
     text-transform: uppercase;
+}
+
+/* The first word. `min-height` is one line of its own size, so the one kind of
+   name that has nothing to put here still holds the row and the drawing below
+   does not move up. */
+.track-carousel__title-lead {
+    display: block;
+    min-height: 0.86em;
+    font-size: calc(1em * var(--title-lead-scale));
+    color: var(--text-color);
+}
+
+/* The last word, at full size and in the accent: the name the card is known by,
+   and the only red on the poster besides the run it belongs to. */
+.track-carousel__title-tail {
+    display: block;
+    color: var(--accent-color);
 }
 
 /* The plate: the drawing's own box, and the field of the poster.
@@ -685,7 +733,11 @@ body[data-lobby-mode="campaign"] #start-overlay {
     text-wrap: balance;
 }
 
-.track-carousel .daily-playlist-entry--hero.is-locked .daily-playlist-hero-title {
+/* A stage out of reach loses the accent with everything else: red on this
+   surface says raceable, and both rows of the name have to say the same thing
+   the dimmed drawing and the Locked button do. */
+.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__title-lead,
+.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__title-tail {
     color: var(--text-dim);
 }
 
@@ -785,16 +837,12 @@ body[data-lobby-mode="campaign"] #start-overlay {
 
 /* Short landscape keeps the track visible; secondary context yields first. */
 @media (max-height: 500px) {
-    /* One line, and the reserve goes back to the track: a landscape phone has
-       barely enough height for the drawing as it is. Block rather than the grid
-       above, so a name too long for the card ellipsises instead of wrapping. */
+    /* Both rows stay — the name is two words set as two words on every card,
+       and a landscape phone is not a different poster. What yields is the
+       scale: the headline cap comes down and the reserve goes back to the
+       drawing, which is what a landscape phone is short of. */
     .track-carousel .daily-playlist-hero-title {
-        display: block;
-        min-height: 0;
-        font-size: clamp(1.2rem, 4.6vw, 2rem);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        --title-cap: clamp(1.2rem, 4.6vw, 2rem);
     }
 
     .track-carousel__card-head {

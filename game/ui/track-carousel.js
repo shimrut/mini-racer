@@ -390,8 +390,17 @@ export class TrackCarousel {
         billingRule.setAttribute('aria-hidden', 'true');
         const format = document.createElement('span');
         format.className = 'track-carousel__format';
+        // The circuit, set the way the lobby sets its own title: the first word
+        // in white over the last in red, on two lines every time. The split is
+        // structural rather than a wrap, so the name is the same shape on every
+        // card and the schematic under it never resizes as the rail moves.
         const title = document.createElement('span');
         title.className = 'daily-playlist-hero-title';
+        const titleLead = document.createElement('span');
+        titleLead.className = 'track-carousel__title-lead';
+        const titleTail = document.createElement('span');
+        titleTail.className = 'track-carousel__title-tail';
+        title.append(titleLead, titleTail);
 
         // The scoreline: the player's record on this track and where it puts
         // them, then the ladder they are climbing on it. Two readings and the
@@ -436,7 +445,8 @@ export class TrackCarousel {
         });
 
         element._parts = {
-            canvas, eyebrow, format, title, meta, rank, rankLabel, rankValue, rankMedal, medal,
+            canvas, eyebrow, format, titleLead, titleTail, meta, rank, rankLabel, rankValue,
+            rankMedal, medal,
             preview, gate, gateNote, head, foot,
             bestCell, bestValue,
         };
@@ -451,22 +461,12 @@ export class TrackCarousel {
 
         setText(parts.eyebrow, card.eyebrowLabel);
         setText(parts.format, card.lapsLabel || '');
-        setText(parts.title, card.trackName);
+        this.paintTitle(parts, element, card);
         this.paintSpec(parts, card);
         element.style?.setProperty?.(
             '--track-plate-aspect',
             String(getTrackPlateAspect(card.trackKey)),
         );
-        // Track names run from "Number Five" to "Harbor Principality" in a
-        // column barely wider than one of those words. The measurements below
-        // let CSS size the name so the longest word always fits on a line and
-        // the whole name always fits in the two the poster reserves — without
-        // them a long name broke to three lines and pushed the plate down.
-        const name = String(card.trackName || '');
-        const words = name.split(/\s+/).filter(Boolean);
-        const longestWord = words.reduce((longest, word) => Math.max(longest, word.length), 0);
-        element.style?.setProperty?.('--title-longest-word', String(longestWord || 1));
-        element.style?.setProperty?.('--title-length', String(name.length || 1));
         // `current` is the sheet's own treatment for the track in play; the
         // track a player is on gets it here for the same reason.
         element.classList.toggle('current', Boolean(card.isCurrent));
@@ -478,6 +478,34 @@ export class TrackCarousel {
         this.paintMedals(parts.medal, card);
 
         this.renderPreview(parts.canvas, card);
+    }
+
+    /**
+     * The circuit, in the lobby's own hand: the first word in white over the
+     * last in red, two lines on every card.
+     *
+     * Every track in the catalogue is two words, so the space is the split. A
+     * name that ever arrives with more keeps the extra on the white line, and a
+     * one-word name takes the red line alone — the white row holds its height
+     * either way, so the drawing below never moves.
+     *
+     * The two readings are block boxes, so the space closing the white line
+     * never prints; it is there to keep `textContent` the track's actual name
+     * for anything reading the card rather than looking at it.
+     *
+     * Track names run from "Number Five" to "Harbor Principality" in a column
+     * barely wider than one of those words, so each line's length is published
+     * for CSS to size the pair against — without it the longest name outgrew
+     * the column and broke to a third line.
+     */
+    paintTitle(parts, element, card) {
+        const words = String(card.trackName || '').split(/\s+/).filter(Boolean);
+        const tail = words.length ? words[words.length - 1] : '';
+        const lead = words.slice(0, -1).join(' ');
+        setText(parts.titleLead, lead ? `${lead} ` : '');
+        setText(parts.titleTail, tail);
+        element.style?.setProperty?.('--title-lead-length', String(lead.length || 1));
+        element.style?.setProperty?.('--title-tail-length', String(tail.length || 1));
     }
 
     /**

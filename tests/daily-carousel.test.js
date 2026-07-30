@@ -600,6 +600,42 @@ describe('TrackCarousel selection', () => {
             delete globalThis.document;
         }
     });
+
+    /**
+     * The name is set the way the lobby sets its own: the first word white over
+     * the last in red, two rows on every card. The split is the card's, not a
+     * wrap's, so a poster is the same shape whatever track it is showing.
+     */
+    it('splits the circuit into a white first word over a red last word', () => {
+        const carousel = new TrackCarousel();
+        const parts = { titleLead: { textContent: '' }, titleTail: { textContent: '' } };
+        const element = { style: { setProperty: vi.fn() } };
+
+        carousel.paintTitle(parts, element, { trackName: 'Harbor Principality' });
+
+        expect(parts.titleLead.textContent).toBe('Harbor ');
+        expect(parts.titleTail.textContent).toBe('Principality');
+        // The trailing space never prints — both rows are block boxes — and it
+        // keeps the element's text the track's actual name.
+        expect(`${parts.titleLead.textContent}${parts.titleTail.textContent}`)
+            .toBe('Harbor Principality');
+        expect(element.style.setProperty).toHaveBeenCalledWith('--title-lead-length', '6');
+        expect(element.style.setProperty).toHaveBeenCalledWith('--title-tail-length', '12');
+    });
+
+    it('gives a one-word circuit the red row and keeps the white one empty', () => {
+        const carousel = new TrackCarousel();
+        const parts = { titleLead: { textContent: 'stale' }, titleTail: { textContent: '' } };
+        const element = { style: { setProperty: vi.fn() } };
+
+        carousel.paintTitle(parts, element, { trackName: 'Circuit' });
+
+        expect(parts.titleLead.textContent).toBe('');
+        expect(parts.titleTail.textContent).toBe('Circuit');
+        // The empty row still holds its height in CSS, so the drawing below it
+        // does not move up on that one card.
+        expect(element.style.setProperty).toHaveBeenCalledWith('--title-lead-length', '1');
+    });
 });
 
 describe('lobby keyboard handoff to the carousels', () => {

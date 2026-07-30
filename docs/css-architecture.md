@@ -65,6 +65,14 @@ maintaining mode-specific card layouts:
   content beneath the action. Inside each poster, the scoreline owns a fixed
   `2.6rem` row; only the schematic row may shrink. Best, Rank, and the medal
   ladder remain present at short-height breakpoints rather than being discarded.
+- The rail's lane is pinned, not scaled. `.track-carousel__viewport` is
+  `position: absolute; inset: 0` inside the carousel, so the rail and every card
+  are stretched to the row the pane actually granted. A percentage height there
+  resolves through `#start-group` and the pane — heights that are only settled
+  by flexing, and that flex again when `--app-visible-height` is published — and
+  when the WebView treats that chain as indefinite the rail takes the poster's
+  intrinsic height and the carousel's clip removes the scoreline. No height on
+  the rail, the lane, or the card may depend on that chain.
 - Cards, rail, and preview stay transparent and shadowless. The selected
   schematic is the visual anchor; neighboring schematics crop at the edges.
 - The existing tokens remain the complete visual system: racing palette,
@@ -72,7 +80,14 @@ maintaining mode-specific card layouts:
   durations/curves. The poster adds no parallel color, type, spacing, or
   breakpoint vocabulary.
 - Billing and unplayed scoreline context use `--text-dim`; live values use
-  `--text-color`; red remains reserved for the active run and Start Race.
+  `--text-color`; red is the lobby title's own structure — the circuit's last
+  word, the active run, and Start Race — and nothing else on the poster.
+- The circuit name repeats the lobby title's composition: two rows on every
+  card, the first word in `--text-color` at `--title-lead-scale`, the last in
+  `--accent-color` at full size. `game/ui/track-carousel.js` owns the split and
+  publishes each row's length; CSS sizes the pair against the column so neither
+  row can wrap. A locked stage loses the accent with the rest of its card. The
+  short-height step lowers `--title-cap`; it does not collapse the two rows.
 - Toolbar utilities and carousel arrows retain at least a `2.75rem` square tap
   area while their glyphs remain visually compact.
 - The poster grid holds billing and scoreline at content height and lets only

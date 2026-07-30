@@ -153,11 +153,26 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__card-foot\s*\{[^}]*justify-content:\s*space-between;[^}]*border-top:\s*1px solid var\(--border-subtle\);/s,
         );
-        // Two lines are always reserved for the name, and it is sized so the
-        // longest word fits one of them. Hung from the rule above rather than
-        // stacked under it, so a one-line name sits on its drawing.
+        // The name is set the way the lobby sets MINI over RACER: two rows on
+        // every card, the first word white and smaller, the last word red and
+        // full size. Both rows are sized against their own word, and the band
+        // is hung from the rule above so the name sits on its drawing.
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel \.daily-playlist-hero-title\s*\{[^}]*align-content:\s*end;[^}]*min-height:\s*calc\(2em \* 0\.86\);[^}]*var\(--title-longest-word, 8\)/s,
+            /\.track-carousel \.daily-playlist-hero-title\s*\{[^}]*align-content:\s*end;[^}]*var\(--title-tail-length, 8\)[^}]*var\(--title-lead-length, 8\)/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__title-lead\s*\{[^}]*font-size:\s*calc\(1em \* var\(--title-lead-scale\)\);[^}]*color:\s*var\(--text-color\);/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__title-tail\s*\{[^}]*color:\s*var\(--accent-color\);/s,
+        );
+        // The two rows survive the short-landscape step: it takes the headline
+        // scale down, it does not collapse the name back onto one line.
+        expect(trackCarouselStyles).toMatch(
+            /@media \(max-height:\s*500px\)\s*\{[\s\S]*\.track-carousel \.daily-playlist-hero-title\s*\{[^}]*--title-cap:/s,
+        );
+        expect(trackCarouselStyles).not.toMatch(
+            /\.track-carousel \.daily-playlist-hero-title\s*\{[^}]*white-space:\s*nowrap;/s,
         );
     });
 
@@ -201,6 +216,17 @@ describe('game stylesheet architecture', () => {
         );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel\s*\{[^}]*overflow:\s*hidden;/s,
+        );
+        // The rail's lane is pinned to the carousel, not sized as a percentage
+        // of it. A percentage here resolves through `#start-group` and the mode
+        // pane — heights only settled by flexing — so in the Reddit WebView it
+        // resolved against an indefinite height, the rail took the poster's
+        // intrinsic height, and the clip above removed the scoreline.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__viewport\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;/s,
+        );
+        expect(trackCarouselStyles).not.toMatch(
+            /\.track-carousel__viewport\s*\{[^}]*(?:height|max-height):\s*100%;/s,
         );
         // The scoreline owns a fixed row, the drawing is the only row that can
         // be taken, and `minmax(0, 1fr)` lets it be taken all the way to
@@ -276,7 +302,8 @@ describe('game stylesheet architecture', () => {
         // close the frame in on a drawing that ran out of height first.
         expect(ui).toContain('--track-plate-aspect');
         expect(ui).toContain('--plate-frame-width');
-        expect(ui).toContain('--title-longest-word');
+        expect(ui).toContain('--title-lead-length');
+        expect(ui).toContain('--title-tail-length');
         expect(ui).toMatch(/fitPreviews\(\)\s*\{\s*this\.fitPlateFrames\(\);/);
     });
 
