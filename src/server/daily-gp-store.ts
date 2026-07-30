@@ -1,5 +1,4 @@
 import { redis } from '@devvit/redis';
-import { createHash } from 'node:crypto';
 import {
     DEFAULT_TRACK_KEY,
     getTrackName,
@@ -8,7 +7,6 @@ import {
 } from '../../game/track/catalog.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import {
-    normalizeLeaderboardIdentityPreference,
     resolveLeaderboardDisplayName,
     sanitizeRedditUsername,
 } from '../../game/shared/leaderboard-identity.js';
@@ -20,12 +18,7 @@ import {
     createRedisChallengeLeaderboardKey,
     DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS,
     DAILY_GP_DEFAULT_LIMIT,
-    DAILY_GP_GUEST_PROFILE_TTL_SECONDS,
-    DAILY_GP_NEARBY_RADIUS,
     DAILY_GP_PLAYLIST_DAYS,
-    DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS,
-    encodeDailyGpLeaderboardScore,
-    formatRankLabel,
     formatUtcChallengeDate,
     getUtcDayIndex,
     getDailyGpCompetitionTtlSeconds,
@@ -43,21 +36,15 @@ import { toDailyCompetition } from './competition.js';
 import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import {
     createEmptySnapshot,
-    isCompleteOpponentRecord,
     parseStoredEntry,
     readEntryByPlayerId,
-    readPlayerRank,
-    readRowsByRankRange,
     readSnapshot,
-    toSnapshotRow,
     writeEntry,
     type SnapshotPayload,
-    type SnapshotRow,
 } from './competition-leaderboard.js';
 import {
     claimNewGuestPlayerProfile,
     normalizePlayerPreferences,
-    parseStoredPlayerProfile,
     readPlayerProfile,
     readPlayerProfileMap,
     resolveAuthorizedPlayerIdentity,

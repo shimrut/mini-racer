@@ -129,10 +129,6 @@ export class TrackCarousel {
         }
     }
 
-    getCards() {
-        return this._cards;
-    }
-
     getSelectedCard() {
         return this._cards[this._selectedIndex] || null;
     }
@@ -818,7 +814,4 @@ export class TrackCarousel {
         if (card) this.onSelect?.(card.challenge, card);
     }
 
-    focusSelected() {
-        this._elements[this._selectedIndex]?._parts?.rank?.focus?.();
-    }
 }

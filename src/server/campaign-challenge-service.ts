@@ -304,17 +304,6 @@ async function savePost(
     return saved;
 }
 
-function publicChallengeBody(
-    record: CampaignChallengeRecord,
-    result: CampaignChallengeResult | null = null,
-): Record<string, unknown> {
-    return {
-        challenge: toCampaignChallengePostData(record),
-        opponentGhost: record.frozenGhost,
-        bestResult: result,
-    };
-}
-
 export function createCampaignChallengeService(
     dependencies: CampaignChallengeServiceDependencies,
 ) {

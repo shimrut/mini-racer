@@ -352,10 +352,6 @@ export const raceEngineMethods = {
     );
   },
 
-  syncSteeringKeys() {
-    this.steeringInput.syncKeys();
-  },
-
   setSteeringSource(direction, sourceId, isDown) {
     this.steeringInput.setSource(direction, sourceId, isDown);
   },
@@ -459,10 +455,6 @@ export const raceEngineMethods = {
 
   getSelectedCarAssetName() {
     return readPlayerCarSkinAssetName();
-  },
-
-  getDailyChallengeCarAssetName() {
-    return this.activeDailyChallenge ? STOCK_CAR_ASSET_NAME : null;
   },
 
   syncCarSpriteAsset() {

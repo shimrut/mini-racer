@@ -69,11 +69,6 @@
     align-self: flex-end;
 }
 
-.leaderboard-summary__time {
-    color: var(--text-color);
-    opacity: 1;
-}
-
 .leaderboard-summary__racer-icon {
     width: 1.05em;
     height: 0.85em;

@@ -382,10 +382,6 @@ export class DailyChallengeUi {
         return this._dailyChallengeSummary;
     }
 
-    getDailyChallengeScoreboardSnapshot() {
-        return this._dailyChallengeSummary?.scoreboardSnapshot || null;
-    }
-
     refreshDailyChallengeVerificationState(challengeId = this._dailyChallengeSummary?.challengeId) {
         if (!challengeId || this._dailyChallengeSummary?.challengeId !== challengeId) return;
 

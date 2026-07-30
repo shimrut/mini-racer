@@ -30,10 +30,6 @@ function ensurePath2D() {
     }
 }
 
-export function getShareImageRelativePath(trackKey) {
-    return `share/${trackKey}.jpg`;
-}
-
 export function getShareImageAbsolutePath(trackKey, assetsRoot = join(repoRoot, 'assets')) {
     return join(assetsRoot, 'share', `${trackKey}.jpg`);
 }

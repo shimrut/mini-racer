@@ -461,16 +461,6 @@ export const dailyChallengeEngineMethods = {
     return personalBest;
   },
 
-  waitForPlaylistModalPaint() {
-    return new Promise((resolve) => {
-      if (typeof requestAnimationFrame !== "function") {
-        setTimeout(resolve, 0);
-        return;
-      }
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
-    });
-  },
-
   waitForTrackPrewarmIdle() {
     return new Promise((resolve) => {
       if (typeof requestIdleCallback === "function") {
@@ -578,12 +568,6 @@ export const dailyChallengeEngineMethods = {
     await this.loadTrack(targetTrackKey, {
       loadPlayerProgress: false,
     });
-  },
-
-  getChallengeRunTitle() {
-    return this.activeDailyChallenge
-      ? getDailyChallengeTrackName(this.activeDailyChallenge)
-      : "Daily";
   },
 
   syncChallengeHudPrimaryStats() {

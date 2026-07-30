@@ -168,21 +168,20 @@ function runAll() {
         'modal--',
         'speedometer--',
         'garage-tab-panel--',
-        'modal-sheet-panel--'
+        'modal-sheet-panel--',
+        'track-carousel__edge--'
     ]);
 
     // 2. preview.css -> preview page
     console.log('Analyzing preview.css...');
     const previewFiles = [
         path.resolve('preview.html'),
-        path.resolve('preview.js')
+        path.resolve('preview.js'),
+        path.resolve('game/medals/medal-icon.js')
     ];
-    reports['preview.css'] = analyzeCSS('preview.css', previewFiles, []);
-
-    // 3. temp_additions.css -> all (dead css check)
-    console.log('Analyzing temp_additions.css...');
-    const allFiles = [...gameFiles, ...previewFiles];
-    reports['temp_additions.css'] = analyzeCSS('temp_additions.css', allFiles, []);
+    reports['preview.css'] = analyzeCSS('preview.css', previewFiles, [
+        'challenge-status--'
+    ]);
 
     // Print summary table
     console.log('\n========================================================================');

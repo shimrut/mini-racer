@@ -136,3 +136,45 @@ Validation after removal:
 - `npm run build`: passed.
 - Targeted source and built-output scans found no remaining achievements code,
   markup, or styling.
+
+## Shipped-surface cleanup: July 30, 2026
+
+The current game, server, tools, stylesheets, tests, and production asset tree
+were reviewed together. Removal was limited to definitions with no production
+or compatibility caller, selectors with no static or dynamic producer, and
+assets with no source, stylesheet, HTML, test, or build reference.
+
+The cleanup removed:
+
+- 31 uncalled helpers and UI methods across the game, server, and local tools,
+  plus compiler-confirmed unused imports.
+- The retired StartOverlay keyboard-listener path. The active `LobbyUi`
+  keyboard navigation remains the single owner of lobby navigation.
+- Retired lobby text/detail/icon, action-status, modal-stat-center, and
+  leaderboard-time CSS families.
+- 12 unreferenced root-level car variants under `public/assets/` (about
+  1.9 MB). All selectable cars under `public/assets/cars/` remain.
+- A stale `temp_additions.css` branch in the CSS analyzer. The analyzer now
+  recognizes the current carousel edge and medal-icon producers.
+
+Compatibility and deployment boundaries were preserved: test-only APIs remain,
+the `parseStoredPlayerProfile` re-export remains, live tool entrypoints remain,
+dynamic selector families remain, and both root and `fonts/` WOFF2 outputs
+remain in the production package.
+
+Validation after removal:
+
+- Focused regression coverage: 21 files and 623 tests passed.
+- `npm test`: 2,084/2,088 tests passed, exactly matching the branch baseline.
+  The four existing failures remain two expired playlist-cache fixtures, one
+  stale Campaign medal expectation, and the track-registry fingerprint.
+- `npm run build`: passed.
+- The producer-aware CSS audit reports zero unused selectors or IDs in
+  `styles.css` and `preview.css`.
+- The production output contains all live car sprites and both required font
+  paths, and contains none of the removed root-level car variants.
+- Production-build Playwright smoke checks reached both Home and Campaign after
+  keyboard input. The inspected canvas stayed correctly rendered; console
+  output contained only the expected missing Devvit API requests from static
+  hosting.
+- `git diff --check`: passed.

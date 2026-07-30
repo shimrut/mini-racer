@@ -848,35 +848,6 @@ function getReplayPathUntilTime(samples, timeSec) {
     return path;
 }
 
-function interpolateReplaySampleAtProgress(samples, progress) {
-    if (!samples.length) {
-        return {
-            x: TRACKS[state.trackKey].startPos.x,
-            y: TRACKS[state.trackKey].startPos.y,
-            angle: TRACKS[state.trackKey].startAngle,
-            speed: 0,
-            time: 0
-        };
-    }
-    if (samples.length === 1) {
-        return samples[0];
-    }
-
-    const scaledIndex = clamp(progress, 0, 1) * (samples.length - 1);
-    const baseIndex = Math.floor(scaledIndex);
-    const nextIndex = Math.min(samples.length - 1, baseIndex + 1);
-    const t = scaledIndex - baseIndex;
-    const start = samples[baseIndex];
-    const end = samples[nextIndex];
-    return {
-        x: lerp(start.x, end.x, t),
-        y: lerp(start.y, end.y, t),
-        angle: normalizeAngle(start.angle + normalizeAngle(end.angle - start.angle) * t),
-        speed: lerp(start.speed, end.speed, t),
-        time: lerp(start.time, end.time, t)
-    };
-}
-
 function simulateReplayCandidate(trackKey, durationSec, candidate) {
     const track = TRACKS[trackKey];
     const assets = getTrackAssets(trackKey);

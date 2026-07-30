@@ -11,7 +11,6 @@ import {
     clearPendingCampaignResult,
     createCampaignChallenge,
     deriveCampaignProgress,
-    getPendingCampaignResults,
     mergePendingCampaignResults,
     recordPendingCampaignResult,
     getCampaignBootstrap,

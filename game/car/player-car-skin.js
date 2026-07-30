@@ -123,10 +123,6 @@ function writeStoredPlayerCarSkinAssetName(assetName) {
     }
 }
 
-export function getPlayerCarUnlockSnapshot() {
-    return currentCarUnlockSnapshot;
-}
-
 export function setPlayerCarUnlockSnapshot(snapshot) {
     currentCarUnlockSnapshot = normalizeCarUnlockSnapshot(snapshot);
     const current = readStoredPlayerCarSkinAssetName();

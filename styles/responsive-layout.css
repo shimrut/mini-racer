@@ -155,11 +155,6 @@
         font-size: 1.9rem;
     }
 
-    .start-btn-sub {
-        margin-top: 0.36rem;
-        font-size: 0.76rem;
-        letter-spacing: 0.12em;
-    }
 }
 
 @media(max-height:760px)and (max-width:520px) {
@@ -179,10 +174,6 @@
         font-size: 1.62rem;
     }
 
-    .start-btn-sub {
-        margin-top: 0.32rem;
-        font-size: 0.64rem;
-    }
 }
 
 @media(orientation:landscape)and (max-height:500px) {

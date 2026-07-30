@@ -355,27 +355,6 @@ export class ModalContentUi {
 
     get modalStatsRow() { return document.getElementById('modal-stats-row'); }
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
-
-
-
-    setModalStatCenter(labelText, valueText, valueClass) {
-    if (!this.modalStatsRow) return;
-    this.modalStatsRow.replaceChildren();
-    const center = document.createElement('span');
-    center.className = 'modal-stat-center';
-    if (labelText) {
-        const label = document.createElement('span');
-        label.className = 'modal-stat-label';
-        label.textContent = labelText;
-        center.appendChild(label);
-    }
-    const value = document.createElement('span');
-    value.className = `modal-stat-value${valueClass ? ` ${valueClass}` : ''}`;
-    value.textContent = valueText;
-    center.appendChild(value);
-    this.modalStatsRow.appendChild(center);
-}
-
     setModalStatLeftRight(lapText, deltaText, bestText, { leftLabel = 'Lap', rightLabel = 'Best' } = {}) {
     if (!this.modalStatsRow) return;
     this.modalStatsRow.replaceChildren();

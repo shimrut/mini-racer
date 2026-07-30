@@ -1,5 +1,4 @@
 import { CONFIG } from "../config.js";
-import { TRACK_MODE_DAILY_GP } from "../config.js";
 import { TRACKS } from "./tracks.js";
 import {
   getTrackCanvasAsset,

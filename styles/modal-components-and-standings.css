@@ -586,18 +586,6 @@
     align-items: flex-end
 }
 
-.modal-stat-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%
-}
-
-.modal-stats-row:has(.modal-stat-center) {
-    margin-bottom: 0;
-    align-items: center
-}
-
 .modal-stat-label {
     font-family: var(--mono-font);
     font-size: .65rem;

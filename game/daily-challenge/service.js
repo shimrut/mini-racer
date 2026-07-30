@@ -291,10 +291,6 @@ export function requestFeaturedDailyChallengeStart() {
     }
 }
 
-function normalizeObjectiveType(value) {
-    return value === 'multi_lap_total' ? 'multi_lap_total' : 'single_lap_fastest';
-}
-
 export function normalizeDailyChallenge(raw) {
     if (!raw || typeof raw !== 'object') return null;
     if (typeof raw.id !== 'string' || !raw.id) return null;

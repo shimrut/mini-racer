@@ -1,17 +1,9 @@
 import {
     collectVisibleActionButtons,
     createMenuKeyboardState,
-    dismissMenuKeyboardCue,
-    handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
 
-const BLOCKING_OVERLAY_IDS = [
-    'modal',
-    'settings-modal',
-    'garage-modal',
-    'daily-playlist-modal',
-];
 const RACE_START_EXIT_MS = 100;
 
 export class StartOverlay {
@@ -26,8 +18,6 @@ export class StartOverlay {
         this._raceStartTransitionGeneration = 0;
         this._raceStartTransitionPending = false;
         this._menuKeyboardState = createMenuKeyboardState();
-        this._menuKeydownHandler = null;
-        this._menuPointerMoveHandler = null;
     }
 
     get startOverlay() { return document.getElementById('start-overlay'); }
@@ -43,30 +33,11 @@ export class StartOverlay {
         document.body.classList.toggle("start-selection-active", Boolean(isActive));
     }
 
-    refreshStartOverlay(
-        status,
-        hasAnyData,
-        isReturningPlayer = false,
-    ) {
-        const overlay = this.startOverlay;
-        if (status !== "ready" || (overlay && overlay.style.display === "none")) return;
-        this.updateStartOverlayMode(hasAnyData, isReturningPlayer);
-    }
-
     isStartOverlayVisible() {
         const overlay = this.startOverlay;
         return Boolean(
             overlay && overlay.style.display !== "none",
         );
-    }
-
-    isLobbyKeyboardNavBlocked() {
-        if (this._raceStartTransitionPending) return true;
-        for (const id of BLOCKING_OVERLAY_IDS) {
-            const el = document.getElementById(id);
-            if (el?.classList?.contains('active')) return true;
-        }
-        return false;
     }
 
     getLobbyMenuButtons() {
@@ -84,43 +55,6 @@ export class StartOverlay {
             preferredIndex: this.getLobbyPreferredIndex(buttons),
             container: this.mainMenu,
             focusPreferred: true,
-        });
-    }
-
-    bindKeyboardNavigation() {
-        if (typeof document === 'undefined') return;
-        if (!this._menuKeydownHandler) {
-            this._menuKeydownHandler = (event) => this.handleLobbyMenuKeydown(event);
-            document.addEventListener('keydown', this._menuKeydownHandler, true);
-        }
-        if (!this._menuPointerMoveHandler) {
-            this._menuPointerMoveHandler = (event) => this.handleLobbyMenuPointerMove(event);
-            document.addEventListener('pointermove', this._menuPointerMoveHandler, true);
-        }
-    }
-
-    handleLobbyMenuKeydown(event) {
-        if (!this.isStartOverlayVisible()) return;
-        if (this.isLobbyKeyboardNavBlocked()) return;
-
-        const buttons = this.getLobbyMenuButtons();
-        handleMenuListKeydown(event, {
-            buttons,
-            state: this._menuKeyboardState,
-            container: this.mainMenu,
-        });
-    }
-
-    handleLobbyMenuPointerMove(event) {
-        if (!this._menuKeyboardState.keyboardNavActive) return;
-        if (event.pointerType && event.pointerType !== 'mouse') return;
-        if (!this.isStartOverlayVisible()) return;
-        if (this.isLobbyKeyboardNavBlocked()) return;
-
-        const buttons = this.getLobbyMenuButtons();
-        dismissMenuKeyboardCue(this._menuKeyboardState, buttons, {
-            container: this.mainMenu,
-            preferredIndex: this.getLobbyPreferredIndex(buttons),
         });
     }
 

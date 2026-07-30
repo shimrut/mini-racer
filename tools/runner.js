@@ -29,10 +29,6 @@ function midpoint(a, b) {
     };
 }
 
-function normalizeAngle(angle) {
-    return Math.atan2(Math.sin(angle), Math.cos(angle));
-}
-
 function pointInPolygon(point, polygon) {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {

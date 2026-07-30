@@ -1,9 +1,5 @@
 const START_POS_OFFSET = 1.25;
 
-function clonePoint(point) {
-    return { x: Number(point.x), y: Number(point.y) };
-}
-
 function midpoint(a, b) {
     return {
         x: (a.x + b.x) / 2,
@@ -85,16 +81,5 @@ export function snapStartPose(seedPoint, startLine, options = {}) {
         },
         startAngle,
         along,
-    };
-}
-
-export function cloneStartPose(pose) {
-    if (!pose) {
-        return null;
-    }
-    return {
-        startPos: clonePoint(pose.startPos),
-        startAngle: pose.startAngle,
-        along: pose.along,
     };
 }

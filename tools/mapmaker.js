@@ -95,18 +95,6 @@ function normalizeVector(x, y) {
     return { x: x / length, y: y / length };
 }
 
-function signedArea(points) {
-    if (!points || points.length < 3) {
-        return 0;
-    }
-    let area = 0;
-    for (let index = 0; index < points.length; index += 1) {
-        const next = points[(index + 1) % points.length];
-        area += points[index].x * next.y - next.x * points[index].y;
-    }
-    return area / 2;
-}
-
 function totalLoopLength(points) {
     if (!points || points.length < 2) {
         return 0;

@@ -135,15 +135,6 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     cursor: pointer;
 }
 
-.lobby-pane-heading__eyebrow {
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}
-
 .lobby-mode-action__label {
     font-family: var(--header-font);
     font-size: clamp(1.35rem, 5vw, 1.85rem);
@@ -156,29 +147,6 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
 
 .lobby-mode-action.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-}
-
-.lobby-mode-action__status {
-    display: block;
-    margin-top: 0.2rem;
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    line-height: 1.2;
-    text-align: left;
-}
-
-.lobby-mode-action__status[hidden] {
-    display: none !important;
-}
-
-.lobby-pane-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    width: 100%;
 }
 
 .lobby-primary-row {

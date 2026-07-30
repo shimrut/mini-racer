@@ -112,14 +112,6 @@ function darkenHex(hex, factor = 0.55) {
     return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/**
- * @param {number} scale
- * @returns {string}
- */
-function hexScaleTransform(scale) {
-    return `translate(${HEX_CENTER}) scale(${scale}) translate(-320 -320)`;
-}
-
 /** @returns {SVGSVGElement} */
 function createGradient(id, type, attrs, stops) {
     const grad = document.createElementNS(SVG_NS, type === 'radial' ? 'radialGradient' : 'linearGradient');

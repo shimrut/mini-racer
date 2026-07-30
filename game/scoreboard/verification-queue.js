@@ -414,10 +414,6 @@ export function getCampaignVerificationEntry(raceId) {
   return getEntry("campaign", raceId);
 }
 
-export function getCampaignVerificationState(raceId) {
-  return getState("campaign", raceId);
-}
-
 /**
  * Unlike Daily, a slower run never replaces a queued faster one, because
  * Campaign keeps the best time per race and the server rejects regressions.
@@ -473,16 +469,6 @@ export function markCampaignVerificationPending(
   options = {},
 ) {
   return markPending("campaign", raceId, nextAttemptAt, options);
-}
-
-export function markCampaignVerificationRejected(raceId) {
-  return markTerminal(
-    "campaign",
-    raceId,
-    "rejected",
-    VERIFICATION_STAGE_REJECTED,
-    null,
-  );
 }
 
 export function markCampaignVerificationError(raceId, errorMessage = null) {

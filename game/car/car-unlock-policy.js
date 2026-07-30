@@ -65,16 +65,6 @@ export const CAR_UNLOCK_REQUIREMENTS = Object.freeze({
 
 const PLAYER_ASSET_SET = new Set(GENERATED_PLAYER_SELECTABLE_CAR_ASSETS);
 
-export function createEmptyCarUnlockProgress() {
-    return {
-        completedRace: 0,
-        campaignGoldOrBetter: 0,
-        campaignAuthor: 0,
-        headToHeadTracksPosted: 0,
-        headToHeadWins: 0,
-    };
-}
-
 function normalizeCount(value, max = Number.MAX_SAFE_INTEGER) {
     const count = Number(value);
     return Number.isFinite(count)

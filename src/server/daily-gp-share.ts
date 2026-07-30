@@ -9,9 +9,7 @@ import {
     getServerDailyGpPlayableChallenge,
 } from './daily-gp-store.js';
 import {
-    acquireDailyGpPostCreationLock,
     readDailyGpPostRecord,
-    releaseDailyGpPostCreationLock,
     writeDailyGpPostRecord,
     writeDailyGpPostRecordIfAbsent,
     type DailyGpPostRecord,

@@ -58,10 +58,6 @@ export class InteractionsUi {
         );
     }
 
-    bindMenu() {
-        this.startOverlay?.bindKeyboardNavigation?.();
-    }
-
     bindPrimaryActions() {
         if (this.startBtn) {
             this.startBtn.addEventListener("click", () => {
@@ -86,15 +82,6 @@ export class InteractionsUi {
             this.bindTapAction(this.mobileSpeedometer, this.onPauseRun);
         if (this.pauseBtn && this.onPauseRun)
             this.pauseBtn.addEventListener("click", this.onPauseRun);
-    }
-
-    showBottomNavPlaceholder(title, message) {
-        if (!this.modal?.showModal) return;
-
-        this.modal.showModal(title, message, null, {
-            primaryActionLabel: "Back to Race",
-            primaryAction: () => this.modal.closeModal?.(),
-        });
     }
 
     bindSteeringControls({

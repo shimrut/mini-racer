@@ -1852,21 +1852,6 @@ export class ModalShell {
         );
     }
 
-    showModalRunsPayload() {
-        if (!this._modalRunsPayload) return;
-
-        this.showRunsModal(
-            this._modalRunsPayload.lapTimesArray,
-            this._modalRunsPayload.bestTime,
-            this._modalRunsPayload.currentTime,
-            'back',
-            {
-                ...buildModalRunsViewOptions(this._modalRunsPayload),
-                onRaceOpponent: this._onRaceOpponent,
-            }
-        );
-    }
-
     renderLeaderboardStandaloneIntro() {
         if (!shouldRenderLeaderboardStandaloneIntro(this._modalRunsPayload)) return;
         this.renderLeaderboardDayRail();
