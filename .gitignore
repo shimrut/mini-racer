@@ -1,4 +1,5 @@
 reports/
+output/
 node_modules/
 
 # Dependencies & build
@@ -14,6 +15,10 @@ tools/*
 !tools/generate-lp-assets.js
 !tools/analyze-unused-css.js
 !tools/bust-client-asset-cache.js
+!tools/vitest-global-setup.js
+!tools/mapmaker.html
+!tools/mapmaker.js
+!tools/mapmaker.css
 !tools/mapmaker/
 !tools/mapmaker/*.js
 public/assets/logo/
