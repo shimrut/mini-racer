@@ -294,11 +294,6 @@ function pendingEntry(fields) {
   };
 }
 
-export function isVerificationExpired(entry, now = Date.now()) {
-  const expiresAt = resolveEntryExpiry(entry);
-  return expiresAt === null || expiresAt <= now;
-}
-
 export function getDailyChallengeVerificationEntry(challengeId) {
   return getEntry("daily", challengeId);
 }
@@ -404,7 +399,8 @@ export function getDueDailyChallengeVerifications(now = Date.now()) {
 }
 
 export function isDailyChallengeVerificationExpired(entry, now = Date.now()) {
-  return isVerificationExpired(entry, now);
+  const expiresAt = resolveEntryExpiry(entry);
+  return expiresAt === null || expiresAt <= now;
 }
 
 export function getCampaignVerificationEntry(raceId) {

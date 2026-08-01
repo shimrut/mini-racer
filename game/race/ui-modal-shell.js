@@ -197,7 +197,7 @@ export class ModalShell {
             const index = firstOptionIndex >= 0 ? firstOptionIndex : 0;
             this._garageMenuKeyboardState.selectedIndex = index;
             this._garageMenuKeyboardState.keyboardNavActive = true;
-            applyMenuSelection(items, index, { showCue: true, container });
+            applyMenuSelection(items, index, { container });
             return index;
         }
 
@@ -286,7 +286,7 @@ export class ModalShell {
 
         if (keepCue && this._standingsMenuKeyboardState?.keyboardNavActive && items.length) {
             this._standingsMenuKeyboardState.selectedIndex = preferredIndex;
-            applyMenuSelection(items, preferredIndex, { showCue: true, container });
+            applyMenuSelection(items, preferredIndex, { container });
             return preferredIndex;
         }
 
@@ -873,11 +873,6 @@ export class ModalShell {
             title: lapData.lapMedal === 'challenge' || lapData.challengeConfirmPhase === 'won'
                 ? 'Challenge beaten'
                 : 'RACE COMPLETE',
-            statLabels: [
-                (lapData.requiredLaps ?? lapData.completedLaps ?? 1) > 1
-                    ? 'RACE TIME'
-                    : 'THIS LAP',
-            ],
             lapMedal: lapData.lapMedal ?? null,
             challengeFinish: Boolean(lapData.challengeFinish),
             challengeConfirmPhase: lapData.challengeConfirmPhase ?? null,

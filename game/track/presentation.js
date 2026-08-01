@@ -25,8 +25,6 @@ const DEFAULT_TRACK_PRESENTATION = Object.freeze({
     tireWallTreadColor: 'rgba(248, 250, 252, 0.1)'
 });
 
-const TRACK_BASE_PRESENTATIONS = Object.freeze({});
-
 const EVENT_TRACK_PRESENTATION_OVERRIDES = Object.freeze({
     'daily-challenge': Object.freeze({
         kettleRun: Object.freeze({
@@ -135,11 +133,9 @@ export function resolveTrackPresentation(trackKey, {
     surface = TRACK_PRESENTATION_SURFACES.RACE,
     event = null
 } = {}) {
-    const baseOverride = trackKey ? TRACK_BASE_PRESENTATIONS[trackKey] : null;
     const basePresentation = {
         ...DEFAULT_TRACK_PRESENTATION,
-        ...(baseOverride || {}),
-        key: baseOverride?.key || getDefaultPresentationKey(trackKey || 'default')
+        key: getDefaultPresentationKey(trackKey || 'default')
     };
 
     if (!trackKey || !event || event.trackKey !== trackKey) {

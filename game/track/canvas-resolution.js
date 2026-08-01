@@ -1,22 +1,18 @@
-const DEFAULT_MAX_DEVICE_PIXEL_RATIO = 2;
+const MAX_DEVICE_PIXEL_RATIO = 2;
 
 function normalizeCssPixels(value) {
     return Math.max(1, Math.round(Number(value) || 0));
 }
 
-function normalizeDevicePixelRatio(devicePixelRatio, maxDevicePixelRatio = DEFAULT_MAX_DEVICE_PIXEL_RATIO) {
+function normalizeDevicePixelRatio(devicePixelRatio) {
     if (!Number.isFinite(devicePixelRatio) || devicePixelRatio <= 0) return 1;
-    if (!Number.isFinite(maxDevicePixelRatio) || maxDevicePixelRatio <= 0) return 1;
-    return Math.min(devicePixelRatio, maxDevicePixelRatio);
+    return Math.min(devicePixelRatio, MAX_DEVICE_PIXEL_RATIO);
 }
 
-export function resolveCanvasViewport(width, height, devicePixelRatio, options = {}) {
+export function resolveCanvasViewport(width, height, devicePixelRatio) {
     const cssWidth = normalizeCssPixels(width);
     const cssHeight = normalizeCssPixels(height);
-    const normalizedDevicePixelRatio = normalizeDevicePixelRatio(
-        devicePixelRatio,
-        options.maxDevicePixelRatio
-    );
+    const normalizedDevicePixelRatio = normalizeDevicePixelRatio(devicePixelRatio);
 
     return {
         cssWidth,
@@ -27,8 +23,8 @@ export function resolveCanvasViewport(width, height, devicePixelRatio, options =
     };
 }
 
-export function configureCanvasViewport(canvas, ctx, width, height, devicePixelRatio, options = {}) {
-    const viewport = resolveCanvasViewport(width, height, devicePixelRatio, options);
+export function configureCanvasViewport(canvas, ctx, width, height, devicePixelRatio) {
+    const viewport = resolveCanvasViewport(width, height, devicePixelRatio);
     if (canvas) {
         canvas.width = viewport.pixelWidth;
         canvas.height = viewport.pixelHeight;

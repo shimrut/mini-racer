@@ -1,4 +1,4 @@
-import type { Application } from 'express';
+import type { Application, Response } from 'express';
 
 type ServiceResult = {
     status: number;
@@ -21,7 +21,7 @@ function parseOptionalInteger(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function send(res: Parameters<Application['get']>[1] extends (...args: infer P) => unknown ? P[1] : never, result: ServiceResult) {
+function send(res: Response, result: ServiceResult) {
     res.status(result.status).json(result.body);
 }
 

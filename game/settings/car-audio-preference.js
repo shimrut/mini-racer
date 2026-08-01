@@ -6,8 +6,7 @@ const carProceduralAudioPreference = createBooleanPreference(
     CAR_PROCEDURAL_AUDIO_STORAGE_KEY,
     {
         treatMissingAsTrue: true,
-        readLabel: 'car procedural audio preference',
-        writeLabel: 'car procedural audio preference',
+        label: 'car procedural audio preference',
     },
 );
 

@@ -18,7 +18,7 @@ function getChallengeTimeMs(challenge, field) {
     return Date.parse(value);
 }
 
-export function getObjectiveRequiredLaps(challenge) {
+export function getDailyChallengeRequiredLaps(challenge) {
     if (challenge?.objectiveType === 'multi_lap_total') {
         const lapCount = getStrictDailyChallengeLapCount(challenge);
         return lapCount && lapCount > 1 ? lapCount : 1;
@@ -26,15 +26,11 @@ export function getObjectiveRequiredLaps(challenge) {
     return 1;
 }
 
-export function getDailyChallengeRequiredLaps(challenge) {
-    return getObjectiveRequiredLaps(challenge);
-}
-
 export function getDailyChallengeObjectiveLabel(challenge) {
     if (!challenge) return 'Daily Challenge';
 
     if (challenge.objectiveType === 'multi_lap_total') {
-        const lapCount = getObjectiveRequiredLaps(challenge);
+        const lapCount = getDailyChallengeRequiredLaps(challenge);
         return `${lapCount} ${lapCount === 1 ? 'lap' : 'laps'}`;
     }
 

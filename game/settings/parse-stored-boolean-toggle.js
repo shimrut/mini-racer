@@ -16,14 +16,13 @@ export function parseStoredBooleanToggle(raw, { treatMissingAsTrue = false } = {
 
 /**
  * Builds a boolean preference backed by localStorage, returning `{ get, set }`.
- * `readLabel`/`writeLabel` are used in console errors so each preference reports its own name.
+ * `label` is used in console errors so each preference reports its own name.
  * @param {string} storageKey
- * @param {{ treatMissingAsTrue?: boolean, readLabel?: string, writeLabel?: string }} [opts]
+ * @param {{ treatMissingAsTrue?: boolean, label?: string }} [opts]
  */
 export function createBooleanPreference(storageKey, {
     treatMissingAsTrue = false,
-    readLabel = 'boolean preference',
-    writeLabel = readLabel,
+    label = 'boolean preference',
 } = {}) {
     function get() {
         if (typeof window === 'undefined' || !window.localStorage) {
@@ -35,7 +34,7 @@ export function createBooleanPreference(storageKey, {
                 { treatMissingAsTrue },
             );
         } catch (error) {
-            console.error(`Error reading ${readLabel}:`, error);
+            console.error(`Error reading ${label}:`, error);
             return treatMissingAsTrue;
         }
     }
@@ -48,7 +47,7 @@ export function createBooleanPreference(storageKey, {
         try {
             window.localStorage.setItem(storageKey, next ? '1' : '0');
         } catch (error) {
-            console.error(`Error writing ${writeLabel}:`, error);
+            console.error(`Error writing ${label}:`, error);
         }
         return next;
     }

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { redis, type RedisClient } from '@devvit/redis';
+import { redis } from '@devvit/redis';
 import type {
     CampaignChallengeRecord,
     CampaignChallengeResult,
@@ -69,16 +69,14 @@ function parseJson<T>(raw: string | null): T | null {
 
 export async function readCampaignChallenge(
     challengeId: string,
-    client: RedisClient = redis,
 ): Promise<CampaignChallengeRecord | null> {
-    return parseJson<CampaignChallengeRecord>(await client.get(challengeKey(challengeId)));
+    return parseJson<CampaignChallengeRecord>(await redis.get(challengeKey(challengeId)));
 }
 
 export async function writeCampaignChallenge(
     record: CampaignChallengeRecord,
-    client: RedisClient = redis,
 ): Promise<void> {
-    await client.set(challengeKey(record.challengeId), JSON.stringify(record));
+    await redis.set(challengeKey(record.challengeId), JSON.stringify(record));
 }
 
 export async function readCampaignChallengePostIdentity(
@@ -86,9 +84,8 @@ export async function readCampaignChallengePostIdentity(
     username: string,
     raceId: string,
     bestTimeMs: number,
-    client: RedisClient = redis,
 ): Promise<CampaignChallengePostIdentity | null> {
-    return parseJson<CampaignChallengePostIdentity>(await client.get(
+    return parseJson<CampaignChallengePostIdentity>(await redis.get(
         postKey(subredditName, username, raceId, bestTimeMs),
     ));
 }
@@ -99,9 +96,8 @@ export async function writeCampaignChallengePostIdentity(
     raceId: string,
     bestTimeMs: number,
     identity: CampaignChallengePostIdentity,
-    client: RedisClient = redis,
 ): Promise<void> {
-    await client.set(
+    await redis.set(
         postKey(subredditName, username, raceId, bestTimeMs),
         JSON.stringify(identity),
     );
@@ -112,24 +108,21 @@ export async function deleteCampaignChallengePostIdentity(
     username: string,
     raceId: string,
     bestTimeMs: number,
-    client: RedisClient = redis,
 ): Promise<void> {
-    await client.del(postKey(subredditName, username, raceId, bestTimeMs));
+    await redis.del(postKey(subredditName, username, raceId, bestTimeMs));
 }
 
 export async function readCampaignChallengeResult(
     challengeId: string,
     username: string,
-    client: RedisClient = redis,
 ): Promise<CampaignChallengeResult | null> {
-    return parseJson<CampaignChallengeResult>(await client.get(resultKey(challengeId, username)));
+    return parseJson<CampaignChallengeResult>(await redis.get(resultKey(challengeId, username)));
 }
 
 export async function writeCampaignChallengeResult(
     result: CampaignChallengeResult,
-    client: RedisClient = redis,
 ): Promise<void> {
-    await client.set(
+    await redis.set(
         resultKey(result.challengeId, result.viewerUsername),
         JSON.stringify(result),
     );
@@ -163,21 +156,20 @@ export async function reserveCampaignChallengePostSlot(
     subredditName: string,
     username: string,
     now: Date,
-    client: RedisClient = redis,
 ): Promise<boolean> {
     const utcDate = now.toISOString().slice(0, 10);
     const key = createCountKey(subredditName, username, utcDate);
-    const count = await client.incrBy(key, 1);
+    const count = await redis.incrBy(key, 1);
     if (count === 1) {
         const nextUtcDay = Date.UTC(
             now.getUTCFullYear(),
             now.getUTCMonth(),
             now.getUTCDate() + 1,
         );
-        await client.expire(key, Math.max(1, Math.ceil((nextUtcDay - now.getTime()) / 1000)));
+        await redis.expire(key, Math.max(1, Math.ceil((nextUtcDay - now.getTime()) / 1000)));
     }
     if (count <= 3) return true;
-    await client.incrBy(key, -1);
+    await redis.incrBy(key, -1);
     return false;
 }
 
@@ -185,10 +177,9 @@ export async function releaseCampaignChallengePostSlot(
     subredditName: string,
     username: string,
     now: Date,
-    client: RedisClient = redis,
 ): Promise<void> {
     const utcDate = now.toISOString().slice(0, 10);
     const key = createCountKey(subredditName, username, utcDate);
-    const count = await client.incrBy(key, -1);
-    if (count < 0) await client.set(key, '0');
+    const count = await redis.incrBy(key, -1);
+    if (count < 0) await redis.set(key, '0');
 }

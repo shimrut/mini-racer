@@ -4,8 +4,7 @@ export const MUSIC_STORAGE_KEY = 'VectorGpMusicEnabled';
 
 const musicPreference = createBooleanPreference(MUSIC_STORAGE_KEY, {
     treatMissingAsTrue: true,
-    readLabel: 'music preference',
-    writeLabel: 'music preference',
+    label: 'music preference',
 });
 
 export function getMusicEnabled() {

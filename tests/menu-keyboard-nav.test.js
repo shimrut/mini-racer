@@ -197,7 +197,7 @@ describe('menu keyboard nav helper', () => {
         const state = createMenuKeyboardState();
         state.selectedIndex = 1;
         state.keyboardNavActive = true;
-        applyMenuSelection(buttons, 1, { showCue: true });
+        applyMenuSelection(buttons, 1);
         const event = makeEvent('Enter');
 
         expect(handleMenuListKeydown(event, {
@@ -214,7 +214,7 @@ describe('menu keyboard nav helper', () => {
         const buttons = [makeButton('a'), makeButton('b', { primary: true })];
         const state = createMenuKeyboardState();
         state.keyboardNavActive = true;
-        applyMenuSelection(buttons, 0, { showCue: true });
+        applyMenuSelection(buttons, 0);
 
         resetMenuKeyboardState(state, buttons, { preferredIndex: 1 });
 
@@ -232,7 +232,7 @@ describe('menu keyboard nav helper', () => {
         const state = createMenuKeyboardState();
         state.selectedIndex = 0;
         state.keyboardNavActive = true;
-        applyMenuSelection(buttons, 0, { showCue: true });
+        applyMenuSelection(buttons, 0);
 
         dismissMenuKeyboardCue(state, buttons, { preferredIndex: 1 });
 

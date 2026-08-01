@@ -77,15 +77,14 @@ export function dismissMenuKeyboardCue(state, buttons = [], {
 }
 
 export function applyMenuSelection(buttons, index, {
-    showCue = true,
     container = null,
 } = {}) {
     if (!buttons?.length) return null;
     const safeIndex = ((index % buttons.length) + buttons.length) % buttons.length;
     for (let i = 0; i < buttons.length; i += 1) {
-        buttons[i].classList?.toggle?.(MENU_SELECTED_CLASS, showCue && i === safeIndex);
+        buttons[i].classList?.toggle?.(MENU_SELECTED_CLASS, i === safeIndex);
     }
-    container?.classList?.toggle?.(MENU_KEYBOARD_CUE_CLASS, Boolean(showCue));
+    container?.classList?.add?.(MENU_KEYBOARD_CUE_CLASS);
     const target = buttons[safeIndex];
     if (typeof target?.focus === 'function') {
         target.focus();
@@ -207,7 +206,7 @@ export function handleMenuListKeydown(event, {
             event.preventDefault?.();
             event.stopPropagation?.();
             state.keyboardNavActive = true;
-            applyMenuSelection(buttons, currentIndex, { showCue: true, container });
+            applyMenuSelection(buttons, currentIndex, { container });
             return true;
         }
 
@@ -215,7 +214,7 @@ export function handleMenuListKeydown(event, {
         event.stopPropagation?.();
         state.selectedIndex = nextIndex;
         state.keyboardNavActive = true;
-        applyMenuSelection(buttons, nextIndex, { showCue: true, container });
+        applyMenuSelection(buttons, nextIndex, { container });
         return true;
     }
 

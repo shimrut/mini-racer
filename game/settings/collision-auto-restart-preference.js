@@ -8,8 +8,7 @@ const collisionAutoRestartPreference = createBooleanPreference(
     COLLISION_AUTO_RESTART_STORAGE_KEY,
     {
         treatMissingAsTrue: false,
-        readLabel: 'collision auto-restart preference',
-        writeLabel: 'collision auto-restart preference',
+        label: 'collision auto-restart preference',
     },
 );
 

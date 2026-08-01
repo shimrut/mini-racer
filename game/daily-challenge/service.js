@@ -38,7 +38,6 @@ export {
     getDailyChallengeModifierLabel,
     getDailyChallengeObjectiveLabel,
     getDailyChallengeRequiredLaps,
-    getObjectiveRequiredLaps,
     getStrictDailyChallengeLapCount,
     isDailyChallengeLapCount,
 } from './labels.js';

@@ -82,7 +82,7 @@ function drawCurbs(ctx, path, presentation) {
     ctx.restore();
 }
 
-function getTrackBoundsLayout(trackGeometry, width, height, topInset = 0, bottomInset = 0, sideInset = 0) {
+function getTrackBoundsLayout(trackGeometry, width, height) {
     const padding = 16;
     const trackOuter = trackGeometry?.outer ?? [];
     const trackInner = trackGeometry?.inner ?? [];
@@ -93,11 +93,11 @@ function getTrackBoundsLayout(trackGeometry, width, height, topInset = 0, bottom
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const usableWidth = width - padding * 2 - sideInset * 2;
-    const usableHeight = height - topInset - bottomInset - padding * 2;
+    const usableWidth = width - padding * 2;
+    const usableHeight = height - padding * 2;
     const scale = Math.min(usableWidth / Math.max(1, maxX - minX), usableHeight / Math.max(1, maxY - minY));
-    const offsetX = sideInset + padding + (usableWidth - (maxX - minX) * scale) / 2;
-    const offsetY = topInset + padding + (usableHeight - (maxY - minY) * scale) / 2;
+    const offsetX = padding + (usableWidth - (maxX - minX) * scale) / 2;
+    const offsetY = padding + (usableHeight - (maxY - minY) * scale) / 2;
 
     return {
         scale,
@@ -108,7 +108,7 @@ function getTrackBoundsLayout(trackGeometry, width, height, topInset = 0, bottom
     };
 }
 
-function getReplayLayout(payload, width, height, topInset = 0, bottomInset = 0, sideInset = 0) {
+function getReplayLayout(payload, width, height) {
     const padding = 28;
     const trackOuter = payload.trackGeometry?.outer ?? [];
     const trackInner = payload.trackGeometry?.inner ?? [];
@@ -123,15 +123,13 @@ function getReplayLayout(payload, width, height, topInset = 0, bottomInset = 0, 
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const usableWidth = width - padding * 2 - sideInset * 2;
-    const usableHeight = height - topInset - bottomInset - padding * 2;
+    const usableWidth = width - padding * 2;
+    const usableHeight = height - padding * 2;
     const scale = Math.min(usableWidth / Math.max(1, maxX - minX), usableHeight / Math.max(1, maxY - minY));
-    const offsetX = sideInset + padding + (usableWidth - (maxX - minX) * scale) / 2;
-    const offsetY = topInset + padding + (usableHeight - (maxY - minY) * scale) / 2;
+    const offsetX = padding + (usableWidth - (maxX - minX) * scale) / 2;
+    const offsetY = padding + (usableHeight - (maxY - minY) * scale) / 2;
 
     return {
-        bottomInset,
-        run,
         mapPoint: (point) => ({
             x: offsetX + (point.x - minX) * scale,
             y: offsetY + (point.y - minY) * scale

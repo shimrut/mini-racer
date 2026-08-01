@@ -4,8 +4,7 @@ export const PB_GHOST_STORAGE_KEY = 'VectorGpPersonalBestGhostEnabled';
 
 const pbGhostPreference = createBooleanPreference(PB_GHOST_STORAGE_KEY, {
     treatMissingAsTrue: true,
-    readLabel: 'personal best ghost preference',
-    writeLabel: 'personal best ghost preference',
+    label: 'personal best ghost preference',
 });
 
 export function getPbGhostEnabled() {

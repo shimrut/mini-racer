@@ -5,8 +5,8 @@ import {
     formatDailyChallengeResultLabel,
     formatDailyChallengeStatusDate,
     getDailyChallengeCardStatus,
+    getDailyChallengeRequiredLaps,
     getMissingDailyChallengeSnapshotIds,
-    getObjectiveRequiredLaps,
     isCachedActiveChallengeStillCurrent,
     isDailyChallengeStoredResultForChallenge,
     normalizeDailyChallenge,
@@ -153,27 +153,27 @@ describe('exported daily-challenge helpers — mutation kills', () => {
         })).toBe(true);
     });
 
-    it('getObjectiveRequiredLaps accepts only supported persisted lap counts', () => {
-        expect(getObjectiveRequiredLaps(null)).toBe(1);
-        expect(getObjectiveRequiredLaps({ objectiveType: 'single_lap_fastest' })).toBe(1);
-        expect(getObjectiveRequiredLaps({ objectiveType: 'multi_lap_total' })).toBe(1);
-        expect(getObjectiveRequiredLaps({
+    it('getDailyChallengeRequiredLaps accepts only supported persisted lap counts', () => {
+        expect(getDailyChallengeRequiredLaps(null)).toBe(1);
+        expect(getDailyChallengeRequiredLaps({ objectiveType: 'single_lap_fastest' })).toBe(1);
+        expect(getDailyChallengeRequiredLaps({ objectiveType: 'multi_lap_total' })).toBe(1);
+        expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: {},
         })).toBe(1);
-        expect(getObjectiveRequiredLaps({
+        expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 0 },
         })).toBe(1);
-        expect(getObjectiveRequiredLaps({
+        expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 1 },
         })).toBe(1);
-        expect(getObjectiveRequiredLaps({
+        expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 3.9 },
         })).toBe(1);
-        expect(getObjectiveRequiredLaps({
+        expect(getDailyChallengeRequiredLaps({
             objectiveType: 'multi_lap_total',
             objectiveParams: { lapCount: 5 },
         })).toBe(1);

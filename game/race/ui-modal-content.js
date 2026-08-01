@@ -673,7 +673,6 @@ export class ModalContentUi {
         bestLap,
         scoreboardSnapshot,
         title = 'RACE COMPLETE',
-        statLabels = ['THIS LAP', 'BEST LAP'],
         lapMedal = null,
         challengeFinish = false,
         challengeConfirmPhase = null,
