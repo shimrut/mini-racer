@@ -32,6 +32,7 @@ import {
     campaignEngineMethods,
     normalizeCampaignLeaderboardSnapshot,
 } from '../game/campaign/engine-methods.js';
+import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GarageUi } from '../game/settings/garage-ui.js';
@@ -211,6 +212,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 updateModalScoreboardSnapshot: vi.fn(),
                 matchesModalScoreboardContext: vi.fn(() => true),
                 setCombinedWinMedal: vi.fn(),
+                setCombinedNextRaceEnabled: vi.fn(),
             },
             restartActiveRace: vi.fn(),
             showCampaignLobby: vi.fn(),
@@ -263,6 +265,65 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(progress.unlockedRaceIds).toContain('numbered-v1-01');
     });
 
+    it('offers the stage this finish opened straight from the sheet', () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
+            applyCampaignLobbyBootstrap: vi.fn(),
+            startCampaignNextStage: vi.fn(),
+        });
+
+        context.handleCampaignWin({ lapTime: 7.0 });
+
+        const { nextRace } = context.modal.showModal.mock.calls[0][3];
+        expect(nextRace).toMatchObject({ label: 'Next', enabled: true });
+        expect(nextRace.ariaLabel).toBe('Race Number One');
+
+        nextRace.action();
+        expect(context.startCampaignNextStage).toHaveBeenCalledWith(
+            expect.objectContaining({ raceId: 'numbered-v1-01' }),
+        );
+    });
+
+    it('shows the next stage gated when the run earned nothing to open it', () => {
+        const context = createCampaignFinishContext({
+            campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
+            applyCampaignLobbyBootstrap: vi.fn(),
+            campaignLobbyState: {
+                stages: [{
+                    id: 'numbered-v1-01',
+                    unlocked: false,
+                    unlockRequirementLabel: 'A medal on Number Zero to unlock',
+                }],
+            },
+        });
+
+        // Outside Number Zero's bronze target, so the stage stays shut.
+        context.handleCampaignWin({ lapTime: 10.5 });
+
+        const { nextRace } = context.modal.showModal.mock.calls[0][3];
+        expect(nextRace).toMatchObject({
+            enabled: false,
+            ariaLabel: 'A medal on Number Zero to unlock',
+        });
+    });
+
+    it('offers nothing after the last stage of the campaign', () => {
+        const context = createCampaignFinishContext();
+        // Whatever the ladder ends on today, not a stage number that moves when
+        // the campaign grows.
+        const lastStage = CAMPAIGN_STAGES.at(-1);
+        const finalStage = {
+            raceId: lastStage.raceId,
+            trackKey: lastStage.trackKey,
+            lapCount: lastStage.lapCount,
+            rulesRevision: lastStage.rulesRevision,
+        };
+
+        context.showCampaignFinish(finalStage, { finalTime: 60, medal: 'gold' });
+
+        expect(context.modal.showModal.mock.calls[0][3].nextRace).toBe(null);
+    });
+
     it('closes the stage again when the server refuses the run that opened it', async () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
@@ -287,6 +348,8 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(context.campaignBootstrap.progress.unlockedRaceIds)
             .not.toContain('numbered-v1-01');
+        // The sheet is still open, so the button it offered has to close too.
+        expect(context.modal.setCombinedNextRaceEnabled).toHaveBeenCalledWith(false);
     });
 
     it('opens the finish modal once and queues the run before submission settles', async () => {
@@ -957,8 +1020,10 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).toMatch(
             /\.lobby-pane\.main-menu\s*\{[^}]*margin-top:\s*auto;/s,
         );
+        // All panes share one measured grid cell; the transition veil covers the
+        // synchronous hidden/mode swap so the old screen cannot bleed through.
         expect(css).toMatch(
-            /\.lobby-panes\s*\{[^}]*flex-direction:\s*column;/s,
+            /\.lobby-panes\s*\{[^}]*display:\s*grid;/s,
         );
         expect(css).toMatch(
             /\.lobby-primary-row\s*\{[^}]*width:\s*95%;[^}]*margin-inline:\s*auto;/s,
@@ -978,13 +1043,21 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(css).not.toContain('width: min(94vw, 60rem)');
         expect(css).toMatch(
-            /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn var\(--dur-base\) ease-out both;/s,
+            /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn var\(--dur-base\) var\(--ease-settle\) both;/s,
+        );
+        // The picker rises into its lane; the veil handles the outgoing screen.
+        const paneEntrance = css.match(/@keyframes lobbyPaneIn\s*\{[\s\S]*?\n\}/)?.[0];
+        expect(paneEntrance).toMatch(/opacity:\s*0;[\s\S]*opacity:\s*1;/);
+        expect(paneEntrance).toMatch(/translate:\s*0 var\(--lobby-pane-travel\);[\s\S]*translate:\s*0 0;/);
+        expect(css).toMatch(
+            /\.lobby-pane\[hidden\]\s*\{[^}]*translate:\s*0 var\(--lobby-pane-travel\);/s,
         );
         expect(css).toMatch(
-            /@keyframes lobbyPaneIn\s*\{[\s\S]*opacity:\s*0;[\s\S]*translate3d\(0,\s*0\.5rem,\s*0\);[\s\S]*opacity:\s*1;[\s\S]*translate3d\(0,\s*0,\s*0\);[\s\S]*\}/,
+            /\.lobby-pane\[hidden\]\s*\{[^}]*display:\s*none !important;[^}]*animation:\s*none;/s,
         );
+        // Reduced motion keeps the swap instant.
         expect(css).toMatch(
-            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.lobby-pane\s*\{[^}]*animation:\s*none;/,
+            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.lobby-pane\s*\{[^}]*animation:\s*none;[^}]*transition:\s*none;/,
         );
     });
 
@@ -1135,6 +1208,66 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(event.preventDefault).not.toHaveBeenCalled();
         expect(lobbyUi.onBack).not.toHaveBeenCalled();
+    });
+
+    it('covers a mode swap and releases the veil after the pane is painted', () => {
+        const originalDocument = global.document;
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        const frameCallbacks = [];
+        const overlay = createElement('div');
+        overlay.removeAttribute = vi.fn();
+        const panes = {
+            home: createElement('section'),
+            daily: createElement('section'),
+            campaign: createElement('section'),
+            challenge: createElement('section'),
+        };
+        const subhead = createElement('div');
+        const label = createElement('p');
+        const track = createElement('p');
+        const body = { dataset: {} };
+        global.document = {
+            body,
+            getElementById: (id) => {
+                if (id === 'start-overlay') return overlay;
+                const match = id.match(/^lobby-(home|daily|campaign|challenge)-pane$/);
+                return match ? panes[match[1]] : null;
+            },
+            querySelector: (selector) => ({
+                '[data-lobby-subhead]': subhead,
+                '[data-lobby-mode-label]': label,
+                '[data-lobby-mode-track]': track,
+            }[selector] || null),
+            addEventListener: vi.fn(),
+        };
+        global.requestAnimationFrame = vi.fn((callback) => {
+            frameCallbacks.push(callback);
+            return frameCallbacks.length;
+        });
+
+        try {
+            const lobby = new LobbyUi();
+            lobby.resetKeyboardNav = vi.fn();
+            lobby.focus = vi.fn();
+
+            lobby.showDaily();
+
+            expect(overlay.classList.contains('is-lobby-transitioning')).toBe(true);
+            expect(panes.home.hidden).toBe(true);
+            expect(panes.daily.hidden).toBe(false);
+            expect(lobby.isKeyboardNavBlocked()).toBe(true);
+
+            frameCallbacks.shift()();
+            frameCallbacks.shift()();
+            expect(overlay.classList.contains('is-lobby-transitioning')).toBe(true);
+            frameCallbacks.shift()();
+
+            expect(overlay.classList.contains('is-lobby-transitioning')).toBe(false);
+            expect(overlay.removeAttribute).toHaveBeenCalledWith('aria-busy');
+        } finally {
+            global.requestAnimationFrame = originalRequestAnimationFrame;
+            global.document = originalDocument;
+        }
     });
 
     it('keeps Home unchanged and swaps mode-screen branding for the toolbar', () => {

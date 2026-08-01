@@ -29,7 +29,7 @@ export const CAR_UNLOCK_REQUIREMENTS = Object.freeze({
     [EXTRA_CAR_ASSETS.blaze]: Object.freeze({
         progressKey: 'campaignGoldOrBetter',
         required: 10,
-        label: 'Earn Gold or Author on all 10 Campaign stages',
+        label: 'Earn Gold or Author on 10 Campaign stages',
     }),
     [EXTRA_CAR_ASSETS.surge]: Object.freeze({
         progressKey: 'campaignAuthor',
@@ -39,7 +39,7 @@ export const CAR_UNLOCK_REQUIREMENTS = Object.freeze({
     [EXTRA_CAR_ASSETS.arctic]: Object.freeze({
         progressKey: 'campaignAuthor',
         required: 10,
-        label: 'Earn Author on all 10 Campaign stages',
+        label: 'Earn Author on 10 Campaign stages',
     }),
     [EXTRA_CAR_ASSETS.fuchsia]: Object.freeze({
         progressKey: 'headToHeadTracksPosted',

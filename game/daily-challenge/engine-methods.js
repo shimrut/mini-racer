@@ -874,7 +874,6 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
-    this.resetCanvasPresentation();
     const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
     if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
     claimPbGhostSelection(this, challenge.id);

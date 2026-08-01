@@ -1,5 +1,12 @@
 # Changelog
 
+- Campaign now runs to thirteen stages: Imaginary Number (10, 2 laps), Infinite
+  Pie (11, 1 lap), and Euler's Number (12, 1 lap) continue the numbered ladder.
+  Their gates follow the same curve as stages 03 onward — 25, 27, and 30
+  medals, each still reachable without a single Author — and each stage keeps
+  the medal-on-the-previous-stage condition that opens one stage at a time. The
+  Campaign car unlocks stay at ten Gold and ten Author stages so nothing
+  already earned is revoked.
 - Replaced the leaderboard's text-only **Race** affordance with a stopwatch
   icon while preserving the full accessible opponent-race label. The shared
   action column now hugs the icon controls instead of reserving the old text

@@ -18,7 +18,6 @@ import desertBridge from './definitions/desert-bridge.js';
 import templeStraight from './definitions/temple-straight.js';
 import goldenMarsh from './definitions/golden-marsh.js';
 import harborPrincipality from './definitions/harbor-principality.js';
-import lunarLimbo from './definitions/lunar-limbo.js';
 import serpentCrossing from './definitions/serpent-crossing.js';
 import ardennesRidge from './definitions/ardennes-ridge.js';
 import pretzelArena from './definitions/pretzel-arena.js';
@@ -27,11 +26,9 @@ import jumpingJack from './definitions/jumping-jack.js';
 import caspianBoulevard from './definitions/caspian-boulevard.js';
 import velvetWombat from './definitions/velvet-wombat.js';
 import cobaltRun from './definitions/cobalt-run.js';
-import blackstoneRun from './definitions/blackstone-run.js';
 import pebblePass from './definitions/pebble-pass.js';
 import zenithRun from './definitions/zenith-run.js';
 import speedAltar from './definitions/speed-altar.js';
-import titanTown from './definitions/titan-town.js';
 import groundControl from './definitions/ground-control.js';
 import crystalineHarbor from './definitions/crystaline-harbor.js';
 import ironHook from './definitions/iron-hook.js';
@@ -44,7 +41,6 @@ import redLagoon from './definitions/red-lagoon.js';
 import copperVale from './definitions/copper-vale.js';
 import obsidianRidge from './definitions/obsidian-ridge.js';
 import auroraRing from './definitions/aurora-ring.js';
-import furiousFast from './definitions/furious-fast.js';
 import lanternPier from './definitions/lantern-pier.js';
 import quartzHollow from './definitions/quartz-hollow.js';
 import needleChicane from './definitions/needle-chicane.js';
@@ -61,10 +57,18 @@ import numberSeven from './definitions/number-seven.js';
 import numberEight from './definitions/number-eight.js';
 import numberNine from './definitions/number-nine.js';
 import analogAudio from './definitions/analog-audio.js';
+import sundayMarket from './definitions/sunday-market.js';
 import hardHitter from './definitions/hard-hitter.js';
 import roadRage from './definitions/road-rage.js';
 import yellowYard from './definitions/yellow-yard.js';
-import sundayMarket from './definitions/sunday-market.js';
+import lunarLimbo from './definitions/lunar-limbo.js';
+import furiousFast from './definitions/furious-fast.js';
+import blackstoneRun from './definitions/blackstone-run.js';
+import titanTown from './definitions/titan-town.js';
+import eulersNumber from './definitions/eulers-number.js';
+import imaginaryNumber from './definitions/imaginary-number.js';
+import infinitePie from './definitions/infinite-pie.js';
+import centralDrop from './definitions/central-drop.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -88,7 +92,6 @@ const TRACK_GEOMETRY = {
     templeStraight,
     goldenMarsh,
     harborPrincipality,
-    lunarLimbo,
     serpentCrossing,
     ardennesRidge,
     pretzelArena,
@@ -97,11 +100,9 @@ const TRACK_GEOMETRY = {
     caspianBoulevard,
     velvetWombat,
     cobaltRun,
-    blackstoneRun,
     pebblePass,
     zenithRun,
     speedAltar,
-    titanTown,
     groundControl,
     crystalineHarbor,
     ironHook,
@@ -114,7 +115,6 @@ const TRACK_GEOMETRY = {
     copperVale,
     obsidianRidge,
     auroraRing,
-    furiousFast,
     lanternPier,
     quartzHollow,
     needleChicane,
@@ -131,10 +131,18 @@ const TRACK_GEOMETRY = {
     numberEight,
     numberNine,
     analogAudio,
+    sundayMarket,
     hardHitter,
     roadRage,
     yellowYard,
-    sundayMarket,
+    lunarLimbo,
+    furiousFast,
+    blackstoneRun,
+    titanTown,
+    eulersNumber,
+    imaginaryNumber,
+    infinitePie,
+    centralDrop,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

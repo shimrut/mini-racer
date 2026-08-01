@@ -711,7 +711,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       lastPlayedDailyChallenge: null,
       currentTrackKey: "circuit",
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       loadTrack: vi.fn(async function loadTrack(trackKey) {
         this.currentTrackKey = trackKey;
       }),
@@ -762,7 +761,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       startOverlay: {
         beginRaceStartTransition: vi.fn(() => raceStartTransition),
       },
-      resetCanvasPresentation: vi.fn(),
       applyDailyChallenge: vi.fn(),
       startSequence: vi.fn(),
       journeys: { startAttempt: vi.fn() },
@@ -841,7 +839,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       activeDailyChallenge: { id: "previous", trackKey: "harborParkLoop" },
       currentTrackKey: "harborParkLoop",
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       reset: vi.fn(function reset() {
         this.status = "ready";
       }),
@@ -883,7 +880,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       activeDailyChallenge: { id: "previous", trackKey: "harborParkLoop" },
       currentTrackKey: "harborParkLoop",
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       reset: vi.fn(),
       loadTrack: vi.fn(async function loadTrack(trackKey) {
         this.currentTrackKey = trackKey;
@@ -928,7 +924,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       activeDailyChallenge: null,
       currentTrackKey: "blueSector",
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
       startSequence: vi.fn(),
@@ -964,7 +959,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       preparedPbGhostChallengeId: challenge.id,
       pendingPbGhostCandidateChallengeIds: new Set([challenge.id]),
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
       startSequence: vi.fn(),
@@ -1000,7 +994,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       pbGhostSelectionChallengeId: challenge.id,
       pbGhostSelectionGeneration: 1,
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
       startSequence: vi.fn(),
@@ -1091,7 +1084,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentTrackKey: challenge.trackKey,
       preparedPbGhostChallengeId: challenge.id,
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
       startSequence: vi.fn(),
@@ -1361,7 +1353,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         canvas,
         trackLayerCanvas,
         resize: RealTimeRacer.prototype.resize,
-        resetCanvasPresentation: vi.fn(),
         container: {
           clientWidth: 1000,
           get clientHeight() {
@@ -1412,7 +1403,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       activeTimers: [],
       bestLapTime: null,
       frameSkip: 1,
-      resetCanvasPresentation: vi.fn(),
       isPracticeMode: () => false,
       isDailyChallengeRun: () => false,
       activeDailyChallenge: { rulesRevision: 1 },
@@ -1494,7 +1484,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       activeTimers: [],
       bestLapTime: null,
       frameSkip: 1,
-      resetCanvasPresentation: vi.fn(),
       isPracticeMode: () => false,
       isDailyChallengeRun: () => false,
       scoreboardReplay: { reset: vi.fn() },

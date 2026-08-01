@@ -750,7 +750,6 @@ export const raceEngineMethods = {
       this.startOverlay.hideStartOverlay();
     } else {
       this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-      this.resetCanvasPresentation();
     }
 
     this.resize({ render: false });

@@ -98,6 +98,29 @@
     transition: opacity var(--dur-fast) ease-out;
     pointer-events: none;
     overflow: hidden;
+    isolation: isolate;
+}
+
+/* Mode changes happen under one short, opaque veil. The live race canvas and
+   the outgoing pane therefore cannot bleed into the next screen while the
+   body mode, header and carousel are being replaced. The veil is applied
+   synchronously, then removed on the next painted frames so its exit is the
+   only visible transition. */
+#start-overlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: var(--bg-color);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-base) var(--ease-standard);
+}
+
+#start-overlay.is-lobby-transitioning::after {
+    opacity: 1;
+    pointer-events: auto;
+    transition: none;
 }
 
 #start-overlay.is-ready {
@@ -116,6 +139,10 @@ body.start-selection-active #start-overlay {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    #start-overlay::after {
+        transition: none;
+    }
+
     #start-overlay.is-ready.is-race-start-exiting {
         transition: none;
     }
@@ -136,6 +163,11 @@ body.start-selection-active #start-overlay {
     padding: 0;
     margin: 0 auto;
     gap: 1rem;
+    z-index: 1;
+}
+
+#start-overlay.is-lobby-transitioning #start-group {
+    pointer-events: none;
 }
 
 #start-lights {

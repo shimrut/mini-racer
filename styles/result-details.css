@@ -205,9 +205,27 @@
     letter-spacing: 0.1em;
 }
 
-#modal-combined-view #combined-playlist-btn,
-#modal-combined-view #combined-menu-btn {
+/* Whichever button is not carrying the accent is the quiet option, and on a
+   Campaign finish the accent moves to Next once that stage is open. */
+#modal-combined-view .combined-action-btn:not(.combined-action-btn--primary) {
     background: rgba(51, 65, 85, 0.8);
+}
+
+/* Campaign's forward exit shares one row with Home rather than adding a fifth
+   full-width button to a sheet that is already the height of the screen. */
+#modal-combined-view .combined-actions--with-next {
+    flex-flow: row wrap;
+}
+
+#modal-combined-view .combined-actions--with-next > .combined-action-btn {
+    flex: 0 0 100%;
+}
+
+#modal-combined-view .combined-actions--with-next > #combined-menu-btn,
+#modal-combined-view .combined-actions--with-next > #combined-next-btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
 }
 
 .pause-header {

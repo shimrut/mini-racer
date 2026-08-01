@@ -233,7 +233,8 @@ export class TrackCarousel {
         // scroll pass could correct it.
         this.syncCardWidth();
 
-        const previousIds = this._cards.map((card) => card.challengeId).join('|');
+        const previousCards = this._cards;
+        const previousIds = previousCards.map((card) => card.challengeId).join('|');
         const nextIds = cards.map((card) => card.challengeId).join('|');
         const sameRun = previousIds === nextIds && this._elements.length === cards.length;
         this._cards = cards;
@@ -249,11 +250,15 @@ export class TrackCarousel {
         }
 
         if (sameRun) {
-            cards.forEach((card, index) => this.paintCard(this._elements[index], card));
+            cards.forEach((card, index) => {
+                const previousCard = previousCards[index];
+                const previewChanged = previousCard?.trackKey !== card.trackKey
+                    || previousCard?.skin !== card.skin;
+                this.paintCard(this._elements[index], card, { renderPreview: previewChanged });
+            });
         } else {
             this._elements = cards.map((card, index) => this.buildCard(card, index));
             rail.replaceChildren(this.edgeSpacer('lead'), ...this._elements, this.edgeSpacer('tail'));
-            this.playRailEntrance(rail);
         }
 
         const requestedIndex = findCarouselIndex(cards, selectedChallengeId);
@@ -297,25 +302,6 @@ export class TrackCarousel {
             this[key] = spacer;
         }
         return this[key];
-    }
-
-    /**
-     * The rail is only rebuilt when the run of tracks changes, which in
-     * practice is the frame the tracks finish loading and replace "Loading
-     * tracks". The class carries the entrance; it comes back off so that
-     * re-showing the lobby after a race does not replay it on top of the
-     * pane's own entrance.
-     */
-    playRailEntrance(rail) {
-        if (!rail?.classList) return;
-        rail.classList.remove('is-entering');
-        void rail.offsetWidth;
-        rail.classList.add('is-entering');
-        rail.addEventListener?.(
-            'animationend',
-            () => rail.classList.remove('is-entering'),
-            { once: true },
-        );
     }
 
     renderStatus({ loading = false } = {}) {
@@ -450,11 +436,11 @@ export class TrackCarousel {
             preview, gate, gateNote, head, foot,
             bestCell, bestValue,
         };
-        this.paintCard(element, card);
+        this.paintCard(element, card, { renderPreview: false });
         return element;
     }
 
-    paintCard(element, card) {
+    paintCard(element, card, { renderPreview = true } = {}) {
         const parts = element?._parts;
         if (!parts || !card) return;
         element.dataset.challengeId = card.challengeId;
@@ -477,7 +463,7 @@ export class TrackCarousel {
 
         this.paintMedals(parts.medal, card);
 
-        this.renderPreview(parts.canvas, card);
+        if (renderPreview) this.renderPreview(parts.canvas, card);
     }
 
     /**
@@ -679,11 +665,15 @@ export class TrackCarousel {
             if (!canvas || !host?.offsetWidth || !host?.offsetHeight) continue;
             const width = Math.round(host.offsetWidth * scale);
             const height = Math.round(host.offsetHeight * scale);
-            if (canvas.width === width && canvas.height === height) continue;
-            canvas.width = width;
-            canvas.height = height;
             const card = this._cards[Number(element.dataset.index)];
-            if (card) this.renderPreview(canvas, card, { force: true });
+            const sizeChanged = canvas.width !== width || canvas.height !== height;
+            if (sizeChanged) {
+                canvas.width = width;
+                canvas.height = height;
+            }
+            if (card && (sizeChanged || !canvas.dataset?.previewKey)) {
+                this.renderPreview(canvas, card, { force: sizeChanged });
+            }
         }
     }
 
@@ -816,20 +806,23 @@ export class TrackCarousel {
         const width = viewport?.clientWidth || 0;
         // Before the pane is visible there is no geometry to measure against;
         // fall back to the selection so a card is never stranded invisible.
-        const measurable = width > 0 && this._elements.some((element) => element.offsetWidth > 0);
+        const measurements = this._elements.map((element) => ({
+            left: element?.offsetLeft || 0,
+            width: element?.offsetWidth || 0,
+        }));
+        const measurable = width > 0 && measurements.some(({ width: cardWidth }) => cardWidth > 0);
         const center = measurable ? viewport.scrollLeft + (width / 2) : 0;
 
-        // Measured in full, then written in full. Writing a custom property the
-        // card's transform reads invalidates its style, so reading the next
-        // card's box in the same pass forces a fresh layout on every card, on
-        // every frame of every scroll.
-        const proximities = this._elements.map((element, index) => {
-            if (!measurable || !(element.offsetWidth > 0)) {
+        // Complete all layout reads before writing the custom properties that
+        // the cards' transforms consume. Mixing the two invalidated styles and
+        // forced a fresh layout for every following card on every scroll frame.
+        const proximities = measurements.map(({ left, width: cardWidth }, index) => {
+            if (!measurable || !(cardWidth > 0)) {
                 return index === this._selectedIndex ? 1 : 0;
             }
-            const distance = Math.abs((element.offsetLeft + (element.offsetWidth / 2)) - center);
+            const distance = Math.abs((left + (cardWidth / 2)) - center);
             // Falls to zero exactly as the neighbouring card takes centre.
-            return Math.max(0, 1 - (distance / element.offsetWidth));
+            return Math.max(0, 1 - (distance / cardWidth));
         });
 
         this._elements.forEach((element, index) => {

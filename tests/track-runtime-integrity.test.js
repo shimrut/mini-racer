@@ -127,6 +127,9 @@ describe('track runtime integrity', () => {
             'roadRage',
             'yellowYard',
             'sundayMarket',
+            'eulersNumber',
+            'imaginaryNumber',
+            'infinitePie',
         ]);
 
         const intentionallyReviewedKeys = new Set([
@@ -151,6 +154,9 @@ describe('track runtime integrity', () => {
             'roadRage',
             'yellowYard',
             'sundayMarket',
+            'eulersNumber',
+            'imaginaryNumber',
+            'infinitePie',
         ]);
         const unchangedTrackRegistry = Object.fromEntries(
             Object.entries(TRACKS)
@@ -169,7 +175,7 @@ describe('track runtime integrity', () => {
             'ce25152f99a73a2aafb669858c68d2a7252bcce2c696ce0e0edeeefeecaa2648',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '0f2d663d1f1c6fddd7bd89865acc9e08703e72b06991c351ebdc959e2bae928e',
+            'eae1e8665d99be4c060582d23b0cbb224cec919320a81973d511dd0cb0740483',
         );
     });
 

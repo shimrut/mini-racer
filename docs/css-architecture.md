@@ -100,6 +100,28 @@ remain the source for Start Race and Standings, and measured pixel edge spacers,
 positive-geometry guards, `ResizeObserver`, `touch-action: pan-x`, and gesture
 interruption must remain intact for retained Reddit WebViews.
 
+## Lobby Mode Transition Contract
+
+`LobbyUi.showPane()` owns the Home, Daily, Campaign and Challenge handoff. On a
+real mode change it adds `is-lobby-transitioning` to `#start-overlay`, swaps the
+pane and body mode synchronously under the veil, then removes the class after
+two animation frames. The overlay's opaque `::after` layer fades away with
+`--dur-base`, so the live race canvas, old pane and independently changing
+header cannot bleed through the swap.
+
+The panes remain in one grid cell for stable measurement, but hidden panes leave
+the layout immediately. Only the arriving pane runs `lobbyPaneIn`; the lobby no
+longer relies on a delayed `display` transition or `allow-discrete` support in
+an embedded WebView. Keyboard navigation and pointer input are blocked while
+the veil is active.
+
+`TrackCarousel` builds the card DOM first and paints new preview canvases from
+the following layout frame. It also completes all carousel geometry reads
+before writing proximity properties, avoiding a forced layout between every
+card during a swipe. Neighbor peeks remain a steady-state carousel affordance;
+the transition veil, rather than card opacity, contains them during screen
+navigation.
+
 ## Motion Tokens
 
 `foundation.css` owns the timing vocabulary, and every partial transitions

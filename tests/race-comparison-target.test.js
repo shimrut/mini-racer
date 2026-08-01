@@ -381,7 +381,6 @@ describe('leaderboard race comparison target', () => {
       raceComparisonTarget: { displayName: 'Rival' },
       clearRaceComparisonTarget: vi.fn(),
       startOverlay: { hideStartOverlay: vi.fn() },
-      resetCanvasPresentation: vi.fn(),
       reset: vi.fn(),
       loadTrack: vi.fn(),
       applyDailyChallenge: vi.fn(),

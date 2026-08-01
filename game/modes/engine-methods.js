@@ -23,7 +23,12 @@ export const modeRouterEngineMethods = {
         this.clearDailyChallengeRun();
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.lobbyUi.showHome();
-        this.resetCanvasPresentation();
+        // Home renders the day's track behind the menu, and racing anything else
+        // leaves `currentTrackKey` pointing at whatever was driven last. Only the
+        // boot path used to set this background, so one race on a campaign stage
+        // — or on any day but today — replaced the featured track for the rest of
+        // the session.
+        void this.syncReadyBackgroundTrack(this.currentDailyChallenge);
     },
 
     showDailyLobby({ selectChallengeId = null } = {}) {

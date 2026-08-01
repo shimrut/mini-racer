@@ -335,6 +335,24 @@
     "silver": 13.68,
     "bronze": 13.91
   },
+  "eulersNumber": {
+    "author": 13.51,
+    "gold": 13.89,
+    "silver": 14.31,
+    "bronze": 14.74
+  },
+  "imaginaryNumber": {
+    "author": 11.35,
+    "gold": 11.67,
+    "silver": 11.98,
+    "bronze": 12.26
+  },
+  "infinitePie": {
+    "author": 17.02,
+    "gold": 17.41,
+    "silver": 17.93,
+    "bronze": 18.29
+  },
   "jumpingJack": {
     "author": 11.45,
     "gold": 11.81,
@@ -400,5 +418,11 @@
     "gold": 10.87,
     "silver": 11.39,
     "bronze": 12.01
+  },
+  "centralDrop": {
+    "author": 9.22,
+    "gold": 9.53,
+    "silver": 9.89,
+    "bronze": 10.21
   }
 }

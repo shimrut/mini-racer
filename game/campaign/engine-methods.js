@@ -128,6 +128,32 @@ function getExistingCampaignScoreboardSnapshot(engine, stage) {
 }
 
 /**
+ * The stage after this one, and whether it is open.
+ *
+ * Progress has already absorbed the finish by the time the sheet is built, so
+ * the gate read here is the same one the lobby draws — a run that opened the
+ * next stage offers it immediately, and one that did not says what is missing.
+ */
+function getCampaignNextStageTarget(engine, stage) {
+    const stageIndex = CAMPAIGN_STAGES.findIndex(
+        (candidate) => candidate.raceId === stage?.raceId,
+    );
+    const nextStage = stageIndex < 0 ? null : CAMPAIGN_STAGES[stageIndex + 1] ?? null;
+    if (!nextStage) return null;
+
+    const lobbyStage = engine.campaignLobbyState?.stages?.find(
+        (candidate) => candidate?.id === nextStage.raceId,
+    ) ?? null;
+    return {
+        stage: nextStage,
+        unlocked: (engine.campaignBootstrap?.progress?.unlockedRaceIds || [])
+            .includes(nextStage.raceId),
+        trackName: getTrackName(nextStage.trackKey, nextStage.trackKey),
+        requirementLabel: lobbyStage?.unlockRequirementLabel || null,
+    };
+}
+
+/**
  * Where Campaign should land when the player has not picked a stage themselves.
  * A finished campaign is asking for nothing, so it lands on the last stage the
  * player reached rather than sending them back to Stage 00.
@@ -766,6 +792,7 @@ export const campaignEngineMethods = {
                 ? paceBaseline.finishTimeSec
                 : null);
         const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
+        const nextTarget = getCampaignNextStageTarget(this, stage);
         this.modal.showModal(
             'Campaign race complete',
             null,
@@ -815,12 +842,36 @@ export const campaignEngineMethods = {
                 restartAction: () => this.restartActiveRace(),
                 settingsAction: () => this.settings.openSettings(),
                 shareRequest,
+                nextRace: nextTarget
+                    ? {
+                        label: 'Next',
+                        ariaLabel: nextTarget.unlocked
+                            ? `Race ${nextTarget.trackName}`
+                            : nextTarget.requirementLabel
+                                || `${nextTarget.trackName} is still locked`,
+                        enabled: nextTarget.unlocked,
+                        action: () => void this.startCampaignNextStage(nextTarget.stage),
+                    }
+                    : null,
             },
         );
         if (this.modal.modalMsg) {
             this.modal.modalMsg.style.display = '';
             this.modal.modalMsg.textContent = message || trackLine;
         }
+    },
+
+    /**
+     * Straight from the finish sheet into the stage that run opened, without the
+     * detour through the lobby. Clearing the finished run is what closes the
+     * sheet and hands the screen back; the start itself is the lobby's own.
+     */
+    async startCampaignNextStage(stage) {
+        if (!stage || this.startButtonPending) return;
+        this.selectedCampaignStageId = stage.raceId;
+        this.reset(false, { showStartOverlay: false });
+        this.activeRaceMode = 'campaign';
+        await this.startCampaignStage(stage);
     },
 
     handleCampaignWin(winData) {
@@ -1040,6 +1091,11 @@ export const campaignEngineMethods = {
         revokePendingCampaignResult(this, raceId, entry.bestTime);
         if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
             this.modal.setCombinedWinMedal?.(null);
+            // Medals from other stages may still hold the gate open, so the
+            // button follows the re-derived progress rather than simply closing.
+            this.modal.setCombinedNextRaceEnabled?.(
+                getCampaignNextStageTarget(this, stage)?.unlocked === true,
+            );
         }
         this.updateCampaignFinishSnapshot(
             raceId,

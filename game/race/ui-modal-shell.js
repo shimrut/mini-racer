@@ -491,6 +491,7 @@ export class ModalShell {
     get modalCombinedView() { return document.getElementById('modal-combined-view'); }
     get modalPauseView() { return document.getElementById('modal-pause-view'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
+    get combinedNextBtn() { return document.getElementById('combined-next-btn'); }
     get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
     get combinedGarageBtn() { return document.getElementById('combined-garage-btn'); }
     get combinedPlaylistBtn() { return document.getElementById('combined-playlist-btn'); }
@@ -518,6 +519,58 @@ export class ModalShell {
         const labelNode = button?.querySelector?.('.combined-action-btn-label');
         if (labelNode) labelNode.textContent = label.toUpperCase();
         else if (button) button.textContent = label;
+    }
+
+    /**
+     * The finish sheet's forward exit. Only Campaign has a race waiting after
+     * this one, so the button stays out of every other sheet; a stage still
+     * behind its gate shows disabled rather than missing, because what the
+     * campaign is asking for next is worth seeing before it opens.
+     */
+    _syncCombinedNextRace(nextRace = null) {
+        const button = this.combinedNextBtn;
+        if (!button) return;
+        const actions = this.modalCombinedView?.querySelector?.('.combined-actions');
+        const visible = Boolean(nextRace);
+        const enabled = visible
+            && nextRace.enabled !== false
+            && typeof nextRace.action === 'function';
+        button.hidden = !visible;
+        button.style.display = visible ? '' : 'none';
+        actions?.classList?.toggle?.('combined-actions--with-next', visible);
+        // A stage that is actually open is the move the sheet is offering, so it
+        // takes the accent and Improve steps back to a plain button. A gated one
+        // never does: the accent would be pointing at something unreachable.
+        button.classList?.toggle?.('combined-action-btn--primary', enabled);
+        this.combinedRestartBtn?.classList?.toggle?.(
+            'combined-action-btn--primary',
+            !enabled,
+        );
+        if (!visible) {
+            this._bindClickAction(button, null);
+            return;
+        }
+        const label = nextRace.label || 'Next';
+        this._setShareButtonLabel(button, label);
+        button.setAttribute('aria-label', nextRace.ariaLabel || label);
+        button.disabled = !enabled;
+        this._bindClickAction(button, enabled ? () => nextRace.action() : null);
+    }
+
+    /**
+     * The gate can move under an open sheet: a run the server refuses takes back
+     * the stage it opened, and the button has to close with it.
+     */
+    setCombinedNextRaceEnabled(enabled) {
+        const button = this.combinedNextBtn;
+        if (!button || button.hidden) return false;
+        button.disabled = !enabled;
+        button.classList?.toggle?.('combined-action-btn--primary', Boolean(enabled));
+        this.combinedRestartBtn?.classList?.toggle?.(
+            'combined-action-btn--primary',
+            !enabled,
+        );
+        return true;
     }
 
     setCombinedPrimaryAction({
@@ -886,6 +939,8 @@ export class ModalShell {
             this.combinedPlaylistBtn.setAttribute('aria-label', shareAria);
             this.combinedPlaylistBtn.disabled = Boolean(options.shareRequest) && !shareEnabled;
         }
+
+        this._syncCombinedNextRace(options.nextRace || null);
 
         this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
         this._bindClickAction(this.combinedSettingsBtn, options.settingsAction);

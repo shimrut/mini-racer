@@ -84,7 +84,6 @@ function revealDeferredMedalIcon(
         if (!reduced) {
             const animationTarget = rowSlot || icon;
             animationTarget.classList.add('medal-svg--medal-entrance');
-            animationTarget.style.animationDelay = '0ms';
             playUnlockSound?.(tier);
         } else {
             playUnlockSound?.(tier);

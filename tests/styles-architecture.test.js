@@ -16,6 +16,10 @@ const raceControlStyles = readFileSync(
     new URL('../styles/race-controls-and-feedback.css', import.meta.url),
     'utf8',
 );
+const lobbyModeStyles = readFileSync(
+    new URL('../styles/lobby-modes.css', import.meta.url),
+    'utf8',
+);
 
 const expectedImports = [
     './fonts.css',
@@ -174,6 +178,95 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).not.toMatch(
             /\.track-carousel \.daily-playlist-hero-title\s*\{[^}]*white-space:\s*nowrap;/s,
         );
+    });
+
+    /**
+     * The picker arrives with one short animation. The outgoing screen is
+     * covered by the shared transition veil rather than kept in the layout.
+     */
+    it('slides the picker in and back out without a script to drive it', () => {
+        const paneEntrance = lobbyModeStyles.match(/@keyframes lobbyPaneIn\s*\{[\s\S]*?\n\}/)?.[0];
+        expect(paneEntrance).toMatch(/opacity:\s*0;[\s\S]*opacity:\s*1;/);
+        expect(paneEntrance).toMatch(/translate:\s*0 var\(--lobby-pane-travel\);[\s\S]*translate:\s*0 0;/);
+
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn var\(--dur-base\) var\(--ease-settle\) both;/s,
+        );
+
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-pane\[hidden\]\s*\{[^}]*opacity:\s*0;[^}]*translate:\s*0 var\(--lobby-pane-travel\);/s,
+        );
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-pane\[hidden\]\s*\{[^}]*display:\s*none !important;[^}]*animation:\s*none;/s,
+        );
+        expect(lobbyModeStyles).not.toContain('allow-discrete');
+    });
+
+    it('covers the mode swap so it neither jumps nor shows the old screen', () => {
+        // One cell, every pane in it. In a flex column the two panes stack end
+        // to end and shove the layout down mid-slide; out of flow the leaving
+        // one collapses off its `flex` and the carousel re-measures against it.
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-panes\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*1fr;[^}]*grid-template-columns:\s*1fr;/s,
+        );
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-pane\s*\{[^}]*grid-row:\s*1;[^}]*grid-column:\s*1;/s,
+        );
+        expect(lobbyModeStyles).not.toMatch(
+            /\.lobby-pane\[hidden\]\s*\{[^}]*position:\s*absolute;/s,
+        );
+
+        // Measured: without this the pane's travel hangs over the lane, counts
+        // as scrollable content, and lifts the header 8px for exactly as long as
+        // the entrance runs — the jump. `clip`, never `hidden`: a scroll
+        // container here changes how the carousel measures itself.
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-panes\s*\{[^}]*overflow:\s*clip;/s,
+        );
+
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-pane\[hidden\]\s*\{[^}]*pointer-events:\s*none;/s,
+        );
+
+        // The active pane owns the lane; hidden panes are removed instead of
+        // relying on embedded-WebView support for discrete display transitions.
+        expect(lobbyModeStyles).toMatch(/\.lobby-pane\s*\{[^}]*z-index:\s*1;/s);
+        expect(lobbyModeStyles).toMatch(/\.lobby-pane\[hidden\]\s*\{[^}]*z-index:\s*0;/s);
+
+        // The opaque veil is the single handoff surface. It covers the live
+        // canvas, header swap and outgoing pane before the new mode is revealed.
+        expect(raceControlStyles).toMatch(
+            /#start-overlay::after\s*\{[\s\S]*background:\s*var\(--bg-color\);[\s\S]*opacity:\s*0;[\s\S]*transition:\s*opacity var\(--dur-base\) var\(--ease-standard\);/s,
+        );
+        expect(raceControlStyles).toMatch(
+            /#start-overlay\.is-lobby-transitioning::after\s*\{[\s\S]*opacity:\s*1;[\s\S]*transition:\s*none;/s,
+        );
+
+        // The filling panes take the whole lane from the first frame, so the
+        // poster never measures itself against a short box.
+        expect(trackCarouselStyles).toMatch(
+            /#lobby-daily-pane\.lobby-pane,[\s\S]*#lobby-campaign-pane\.lobby-pane\s*\{[^}]*align-self:\s*stretch;/s,
+        );
+
+        // The rail's fade comes off its own contents, so there is no class to
+        // stall mid-animation and replay the next time the lobby is shown.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__rail\s*\{[^}]*transition:\s*opacity var\(--dur-base\)/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__rail:not\(:has\(\.daily-playlist-entry--hero\)\)\s*\{[^}]*opacity:\s*0;/s,
+        );
+        expect(trackCarouselStyles).not.toContain('is-entering');
+
+        // The race chrome crosses with the scrim rather than waiting for it,
+        // read off the class the overlay already wears for its own fade.
+        expect(foundationStyles).toMatch(
+            /body\.start-overlay-active:not\(:has\(#start-overlay\.is-race-start-exiting\)\)/,
+        );
+        expect(foundationStyles).toMatch(
+            /body:has\(#start-overlay\.is-race-start-exiting\) :is\([^)]*\)\s*\{[^}]*animation:\s*raceChromeIn/s,
+        );
+        expect(foundationStyles).not.toContain('body.race-start-exiting');
     });
 
     it('makes it structurally impossible for the card to reach Start Race', () => {

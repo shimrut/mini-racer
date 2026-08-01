@@ -164,6 +164,14 @@ flowchart LR
   `header` element because that would override these mode-specific stacks. The
   Mini Racer wordmark animates on the first Home reveal only; returning from a
   mode restores its final visible state without replaying the hidden keyframe.
+- Mode changes use one shared handoff: `game/lobby/ui.js` adds
+  `#start-overlay.is-lobby-transitioning`, swaps pane/header/body state under an
+  opaque veil, then releases it after the new pane has painted. The veil lives
+  in `styles/race-controls-and-feedback.css`; `styles/lobby-modes.css` keeps
+  hidden panes out of layout and animates only the arriving pane.
+- `game/ui/track-carousel.js` keeps first preview painting out of the card-build
+  task and batches carousel geometry reads before proximity style writes, so
+  mode entry and horizontal swipes do not force a layout per card.
 - Daily and Campaign selector surfaces show the full bronze-to-author medal ladder
   whenever height permits.
   The inline medal SVGs may shrink vertically inside the preview on Reddit's

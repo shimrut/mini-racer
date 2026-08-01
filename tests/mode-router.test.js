@@ -13,7 +13,6 @@ function createEngine(overrides = {}) {
         isReturningPlayer: true,
         reset: vi.fn(),
         clearDailyChallengeRun: vi.fn(),
-        resetCanvasPresentation: vi.fn(),
         startOverlay: { showStartOverlay: vi.fn() },
         lobbyUi: { showHome: vi.fn(), showDaily: vi.fn() },
         journeys: { endAttempt: vi.fn(), startAttempt: vi.fn() },
@@ -33,6 +32,8 @@ function createEngine(overrides = {}) {
         },
         openDailyCarouselStandings: vi.fn(),
         openCampaignStandings: vi.fn(),
+        syncReadyBackgroundTrack: vi.fn(() => Promise.resolve()),
+        currentDailyChallenge: { id: 'daily-today', trackKey: 'albertGardens' },
         ...overrides,
     };
 }
@@ -117,6 +118,21 @@ describe('mode router', () => {
         expect(daily.activeRaceMode).toBe('daily');
         expect(daily.activeCampaignStage).toBeNull();
         expect(daily.activeCampaignChallenge).toBeNull();
+    });
+
+    it("puts the day's track back behind Home after racing something else", () => {
+        // Home draws the featured track behind the menu. Racing a campaign
+        // stage, or any day but today, leaves the engine pointing at that track;
+        // only the boot path used to set the background, so it never came back.
+        const engine = createEngine({
+            activeRaceMode: 'campaign',
+            currentDailyChallenge: { id: 'daily-today', trackKey: 'ardennesRidge' },
+        });
+        engine.showHomeLobby();
+        expect(engine.syncReadyBackgroundTrack).toHaveBeenCalledWith({
+            id: 'daily-today',
+            trackKey: 'ardennesRidge',
+        });
     });
 
     it('tears down a live run before showing a lobby', () => {

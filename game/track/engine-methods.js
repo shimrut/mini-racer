@@ -194,16 +194,6 @@ export const trackEngineMethods = {
     }
   },
 
-  resetCanvasPresentation() {
-    [this.trackLayerCanvas, this.canvas].forEach((canvas) => {
-      if (!canvas) return;
-      canvas.classList.remove("canvas-opacity-instant");
-      canvas.style.transition = "";
-      canvas.style.opacity = "1";
-    });
-  },
-
-
   async syncTrackLayerBitmap(trackLoadRequestId = this.trackLoadRequestId) {
     if (!this.trackCanvas) return;
     await this.trackLayer.syncBitmap({

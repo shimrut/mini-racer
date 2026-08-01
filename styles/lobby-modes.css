@@ -1,15 +1,53 @@
+/* Every pane sits in the same single grid cell, so changing `hidden` cannot
+ * change the shell's measured height. The transition veil on #start-overlay
+ * covers the one-frame swap; the pane itself only animates its arrival. */
 .lobby-panes {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: 1fr;
+    grid-template-columns: 1fr;
     flex: 1 1 auto;
     min-height: 0;
+    /* The travel starts below the lane, and an untrimmed pane hanging over the
+       edge counts as content: it grew this box's scrollable height by exactly
+       the travel for as long as the entrance ran, which pushed the flex column
+       above and lifted the header 8px until the animation ended, then dropped
+       it back. `clip` and not `hidden` — the lane must not become a scroll
+       container, which would change how the carousel measures inside it. */
+    overflow: clip;
 }
 
+/* The picker rises into its lane. A mode swap is covered by the overlay veil, so
+ * the old pane can leave the layout immediately and the arriving pane does not
+ * need a fragile discrete `display` transition. This also avoids a blank delay
+ * before the new screen starts moving.
+ *
+ * The arrival is a keyframe because an animation replays by itself every time
+ * the pane goes from `display: none` to rendered — the case that has to survive
+ * the lobby being built inside an overlay that is not shown yet.
+ *
+ * `both` keeps the pane at its from-state until the animation owns it, then
+ * leaves it at rest without a second transition to fight the veil. */
 .lobby-pane {
+    grid-row: 1;
+    grid-column: 1;
     width: 100%;
-    flex: 0 0 auto;
     min-height: 0;
-    animation: lobbyPaneIn var(--dur-base) ease-out both;
+    align-self: end;
+    --lobby-pane-travel: 0.75rem;
+    z-index: 1;
+    animation: lobbyPaneIn var(--dur-base) var(--ease-settle) both;
+}
+
+@keyframes lobbyPaneIn {
+    from {
+        opacity: 0;
+        translate: 0 var(--lobby-pane-travel);
+    }
+
+    to {
+        opacity: 1;
+        translate: 0 0;
+    }
 }
 
 /* One bottom pin — same personality as main: title top, actions bottom. */
@@ -17,20 +55,18 @@
     margin-top: auto;
 }
 
+/* Hidden panes leave immediately. The veil owns the outgoing-screen fade, so a
+ * hidden pane never remains painted underneath a new pane or relies on
+ * discrete-display support in an embedded WebView. */
 .lobby-pane[hidden] {
     display: none !important;
-}
-
-@keyframes lobbyPaneIn {
-    from {
-        opacity: 0;
-        transform: translate3d(0, 0.5rem, 0);
-    }
-
-    to {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
+    opacity: 0;
+    translate: 0 var(--lobby-pane-travel);
+    z-index: 0;
+    /* Cancel an interrupted entrance so rapid Back / mode taps cannot replay a
+       stale pane over the newly selected screen. */
+    animation: none;
+    pointer-events: none;
 }
 
 .lobby-mode-toolbar {
@@ -43,6 +79,14 @@ body[data-lobby-home-returned="true"] #start-overlay.is-ready .lobby-title__mini
 body[data-lobby-home-returned="true"] #start-overlay.is-ready .lobby-title__racer {
     opacity: 1;
     animation: none;
+}
+
+/* The header changes with the panes, but the transition veil covers the
+ * synchronous `display` swap. The short arrival animation keeps the toolbar or
+ * returned wordmark from cutting in after the content below it. */
+body[data-lobby-home-returned="true"] .lobby-title,
+.lobby-mode-toolbar {
+    animation: lobbyPaneIn var(--dur-base) var(--ease-settle) both;
 }
 
 /* Home and Challenge keep their established headers. Daily and Campaign use
@@ -245,7 +289,15 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .lobby-pane {
+        --lobby-pane-travel: 0;
+        animation: none;
+        transition: none;
+    }
+
+    body[data-lobby-home-returned="true"] .lobby-title,
+    .lobby-mode-toolbar {
         animation: none;
     }
 }

@@ -110,7 +110,7 @@ challenge records.
 
 The regression suite checks:
 
-- schedule keys are a valid subset of the catalog;
+- schedule keys are unique and form a valid subset of the catalog;
 - the compatibility `TRACKS` registry contains every scheduled track;
 - the compatibility `TRACKS` registry also contains every Campaign track;
 - player-facing names match between catalog metadata and the assembled

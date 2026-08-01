@@ -60,6 +60,11 @@ body[data-lobby-mode="campaign"] #start-overlay {
     grid-template-rows: minmax(0, 1fr) auto;
     align-items: stretch;
     flex: 1 1 auto;
+    /* These two fill the lane where the bottom-pinned panes hang off its end.
+       In the stacked cell that is `align-self`, not `flex` — and it has to be
+       the full lane on the very first frame, or the poster would measure itself
+       against a short box and resize once the slide finished. */
+    align-self: stretch;
     min-height: 0;
     margin-top: 0;
     padding: 0;
@@ -811,28 +816,32 @@ body[data-lobby-mode="campaign"] #start-overlay {
 }
 
 /*
- * Set only while the rail is actually rebuilt, which is the moment the tracks
- * finish loading. A late rank or medal patches the existing cards instead, so
- * browsing the rail never replays this.
+ * Cards replacing "Loading tracks" fade up; nothing else here animates.
+ *
+ * A transition off "has no cards" rather than a class the script adds and takes
+ * away again: the state is the rail's own contents, so there is nothing to
+ * strand. A class had to be removed on `animationend`, and the one moment that
+ * matters most is the moment no event arrives — tapping Start Race mid-fade
+ * puts the rail inside a `display:none` overlay, which drops the animation
+ * without firing end or cancel. The class outlived it and replayed the next
+ * time the lobby was shown. A transition has no such leftover: an interrupted
+ * one simply stops, and the rail is at rest wherever it is next rendered.
  *
  * Carried by the rail rather than the cards: a passing card sits at low opacity
  * and the centred one at 1, so fading each card to 1 would flash the
  * neighbours bright before dropping them back.
+ *
+ * `:has` and not `:empty` — the rail also carries the two edge spacers, and
+ * `:empty` would additionally be broken by a stray newline in the markup.
  */
-.track-carousel__rail.is-entering {
-    animation: trackCarouselCardIn var(--dur-base) var(--ease-settle) both;
+.track-carousel__rail {
+    transition: opacity var(--dur-base) ease-out;
 }
 
-@keyframes trackCarouselCardIn {
-    from {
-        opacity: 0;
-        transform: translate3d(0, 0.4rem, 0);
-    }
-
-    to {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
+.track-carousel__rail:not(:has(.daily-playlist-entry--hero)) {
+    opacity: 0;
+    /* Nothing to fade *out* — the empty state is where the fade starts. */
+    transition: none;
 }
 
 /* Short landscape keeps the track visible; secondary context yields first. */
@@ -885,9 +894,12 @@ body[data-lobby-mode="campaign"] #start-overlay {
         scroll-behavior: auto;
     }
 
-    .track-carousel__status,
-    .track-carousel__rail.is-entering {
+    .track-carousel__status {
         animation: none;
+    }
+
+    .track-carousel__rail {
+        transition: none;
     }
 
     .track-carousel__rank .track-carousel__spec-value {

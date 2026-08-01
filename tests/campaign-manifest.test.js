@@ -28,6 +28,9 @@ describe('Campaign manifest', () => {
             { raceId: 'numbered-v1-07', trackKey: 'numberSeven', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 17, previousRaceId: 'numbered-v1-06' } },
             { raceId: 'numbered-v1-08', trackKey: 'numberEight', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 20, previousRaceId: 'numbered-v1-07' } },
             { raceId: 'numbered-v1-09', trackKey: 'numberNine', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 22, previousRaceId: 'numbered-v1-08' } },
+            { raceId: 'numbered-v1-10', trackKey: 'imaginaryNumber', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 25, previousRaceId: 'numbered-v1-09' } },
+            { raceId: 'numbered-v1-11', trackKey: 'infinitePie', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 27, previousRaceId: 'numbered-v1-10' } },
+            { raceId: 'numbered-v1-12', trackKey: 'eulersNumber', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 30, previousRaceId: 'numbered-v1-11' } },
         ]);
         expect(Object.isFrozen(CAMPAIGN_STAGES)).toBe(true);
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);
@@ -40,7 +43,7 @@ describe('Campaign manifest', () => {
      */
     it('keeps every gate reachable on Gold alone and strictly rising', () => {
         const requirements = CAMPAIGN_STAGES.map((stage) => stage.unlock.requiredMedals ?? 0);
-        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22]);
+        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30]);
         requirements.forEach((required, index) => {
             // Gold on every stage before this one, the best a player can do
             // without ever touching an Author time.
@@ -101,7 +104,7 @@ describe('Campaign manifest', () => {
      */
     it('opens one stage at a time however strong the early runs are', () => {
         for (const medal of ['gold', 'author']) {
-            for (let played = 1; played <= 9; played += 1) {
+            for (let played = 1; played < CAMPAIGN_STAGES.length; played += 1) {
                 const results = {};
                 for (const stage of CAMPAIGN_STAGES.slice(0, played)) {
                     results[stage.raceId] = { medal };

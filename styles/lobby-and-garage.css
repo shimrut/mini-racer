@@ -20,11 +20,6 @@
     display: block
 }
 
-#trackLayerCanvas,
-#gameCanvas {
-    opacity: 1
-}
-
 #trackLayerCanvas {
     z-index: var(--z-canvas)
 }

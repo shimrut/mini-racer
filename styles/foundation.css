@@ -122,17 +122,53 @@ body {
     -webkit-user-select: none
 }
 
-body.start-overlay-active .hud-bar,
-body.start-overlay-active .speedometer,
-body.start-overlay-active .mobile-hud-bar,
-body.start-overlay-active .mobile-controls,
-body.start-overlay-active .hud-pause-btn,
-body.start-overlay-active .lap-flash,
-body.start-selection-active .hud-bar,
-body.start-selection-active .speedometer,
-body.start-selection-active .mobile-hud-bar,
-body.start-selection-active .mobile-controls,
-body.start-selection-active .hud-pause-btn,
-body.start-selection-active .lap-flash {
+/* The race chrome is out of the tree while the lobby owns the screen.
+ *
+ * The lobby's own exit is the exception, and it is what keeps the start from
+ * arriving in two events. The scrim is what the player was looking at, so the
+ * moment it begins to go the track underneath is already the whole screen —
+ * chrome that waits for the exit to finish then appears a beat after the car,
+ * which reads as the interface being late rather than the race being early.
+ * It comes back in during the exit instead, and crosses with the scrim.
+ *
+ * Read off the class the overlay already wears for its own fade, rather than a
+ * second one on `body`: one state, set in one place, and the script stays out
+ * of it. The chrome sits *before* `#start-overlay` in the markup, so `:has` on
+ * a common ancestor is what reaches backwards to it. */
+body.start-overlay-active:not(:has(#start-overlay.is-race-start-exiting)) :is(.hud-bar,
+    .speedometer,
+    .mobile-hud-bar,
+    .mobile-controls,
+    .hud-pause-btn,
+    .lap-flash),
+body.start-selection-active :is(.hud-bar,
+    .speedometer,
+    .mobile-hud-bar,
+    .mobile-controls,
+    .hud-pause-btn,
+    .lap-flash) {
     display: none !important
+}
+
+/* Only the three top-level bands carry the entrance. The speedometer and the
+   pause button are inside them, and fading a child on top of its own parent
+   multiplies the two curves — the reading holds at nothing and then rushes. */
+body:has(#start-overlay.is-race-start-exiting) :is(.hud-bar, .mobile-hud-bar, .mobile-controls) {
+    animation: raceChromeIn var(--dur-race-start-exit) ease-out both;
+}
+
+@keyframes raceChromeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body:has(#start-overlay.is-race-start-exiting) :is(.hud-bar, .mobile-hud-bar, .mobile-controls) {
+        animation: none;
+    }
 }

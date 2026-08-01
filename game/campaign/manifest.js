@@ -26,6 +26,12 @@ export const CAMPAIGN_RULES_REVISION = 1;
  * keeps a second, cheap condition instead: a medal on the stage immediately
  * before. That caps progress at one new stage at a time, because the stage after
  * next cannot have been medalled while it was locked.
+ *
+ * Stages past the numbered ten stay on the same curve, so the ladder can keep
+ * growing without repricing anything already earned. Their lap counts follow the
+ * track rather than the tier the stage sits in: Infinite Pie is the longest
+ * layout in the campaign, and three laps of it would be a far longer race than
+ * anything before it.
  */
 const STAGE_DEFINITIONS = [
     ['00', 'numberZero', 1, 0],
@@ -38,6 +44,9 @@ const STAGE_DEFINITIONS = [
     ['07', 'numberSeven', 3, 17],
     ['08', 'numberEight', 3, 20],
     ['09', 'numberNine', 3, 22],
+    ['10', 'imaginaryNumber', 2, 25],
+    ['11', 'infinitePie', 1, 27],
+    ['12', 'eulersNumber', 1, 30],
 ];
 
 export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(

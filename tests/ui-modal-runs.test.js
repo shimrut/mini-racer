@@ -1264,3 +1264,114 @@ describe('ui modal runs helpers', () => {
     });
 
 });
+
+describe('combined finish next race button', () => {
+    function combinedActionsDom() {
+        return new JSDOM(`
+            <div id="modal-combined-view">
+                <div class="combined-actions">
+                    <button id="combined-restart-btn" class="combined-action-btn combined-action-btn--primary"><span class="combined-action-btn-label">RETRY</span></button>
+                    <button id="combined-menu-btn"><span class="combined-action-btn-label">HOME</span></button>
+                    <button id="combined-next-btn" hidden style="display: none;"><span class="combined-action-btn-label">NEXT</span></button>
+                </div>
+            </div>
+        `);
+    }
+
+    function nextButtonContext(dom) {
+        return {
+            _syncCombinedNextRace: ModalShell.prototype._syncCombinedNextRace,
+            setCombinedNextRaceEnabled: ModalShell.prototype.setCombinedNextRaceEnabled,
+            _bindClickAction: ModalShell.prototype._bindClickAction,
+            _setShareButtonLabel: ModalShell.prototype._setShareButtonLabel,
+            get combinedNextBtn() {
+                return dom.window.document.getElementById('combined-next-btn');
+            },
+            get combinedRestartBtn() {
+                return dom.window.document.getElementById('combined-restart-btn');
+            },
+            modalCombinedView: dom.window.document.getElementById('modal-combined-view'),
+        };
+    }
+
+    const isAccented = (button) => button.classList.contains('combined-action-btn--primary');
+
+    it('pairs an offered next race with Home and runs its action', () => {
+        const dom = combinedActionsDom();
+        const context = nextButtonContext(dom);
+        const action = vi.fn();
+
+        context._syncCombinedNextRace({
+            label: 'Next',
+            ariaLabel: 'Race Number One',
+            enabled: true,
+            action,
+        });
+
+        const button = context.combinedNextBtn;
+        expect(button.hidden).toBe(false);
+        expect(button.disabled).toBe(false);
+        expect(button.querySelector('.combined-action-btn-label').textContent).toBe('NEXT');
+        expect(button.getAttribute('aria-label')).toBe('Race Number One');
+        expect(context.modalCombinedView.querySelector('.combined-actions')
+            .classList.contains('combined-actions--with-next')).toBe(true);
+
+        button.onclick();
+        expect(action).toHaveBeenCalledTimes(1);
+
+        // The forward move takes the accent; Improve drops back to plain.
+        expect(isAccented(button)).toBe(true);
+        expect(isAccented(context.combinedRestartBtn)).toBe(false);
+    });
+
+    it('shows a gated next race as a dead button rather than hiding it', () => {
+        const dom = combinedActionsDom();
+        const context = nextButtonContext(dom);
+        const action = vi.fn();
+
+        context._syncCombinedNextRace({
+            label: 'Next',
+            ariaLabel: '1/3 medals to unlock',
+            enabled: false,
+            action,
+        });
+
+        const button = context.combinedNextBtn;
+        expect(button.hidden).toBe(false);
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute('aria-label')).toBe('1/3 medals to unlock');
+        expect(button.onclick).toBe(null);
+        // Nothing to go forward to, so Improve keeps the accent.
+        expect(isAccented(button)).toBe(false);
+        expect(isAccented(context.combinedRestartBtn)).toBe(true);
+    });
+
+    it('keeps the row to Home alone on a finish with nothing after it', () => {
+        const dom = combinedActionsDom();
+        const context = nextButtonContext(dom);
+
+        context._syncCombinedNextRace({ enabled: true, action: vi.fn() });
+        context._syncCombinedNextRace(null);
+
+        const button = context.combinedNextBtn;
+        expect(button.hidden).toBe(true);
+        expect(button.style.display).toBe('none');
+        expect(button.onclick).toBe(null);
+        expect(context.modalCombinedView.querySelector('.combined-actions')
+            .classList.contains('combined-actions--with-next')).toBe(false);
+    });
+
+    it('closes an offered next race when a late verdict takes the stage back', () => {
+        const dom = combinedActionsDom();
+        const context = nextButtonContext(dom);
+
+        context._syncCombinedNextRace({ enabled: true, action: vi.fn() });
+        expect(context.setCombinedNextRaceEnabled(false)).toBe(true);
+        expect(context.combinedNextBtn.disabled).toBe(true);
+        expect(isAccented(context.combinedNextBtn)).toBe(false);
+        expect(isAccented(context.combinedRestartBtn)).toBe(true);
+
+        context._syncCombinedNextRace(null);
+        expect(context.setCombinedNextRaceEnabled(true)).toBe(false);
+    });
+});

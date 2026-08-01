@@ -65,6 +65,7 @@ export class LobbyUi {
         this._campaignPrimaryLoading = false;
         this._campaignSelectedStage = null;
         this._menuKeyboardState = createMenuKeyboardState();
+        this._paneTransitionGeneration = 0;
         this._bound = false;
         this._keydownHandler = (event) => this.handleKeydown(event);
         this._pointerMoveHandler = (event) => this.handlePointerMove(event);
@@ -123,9 +124,30 @@ export class LobbyUi {
         this.showPane('challenge');
     }
 
+    beginPaneTransition() {
+        const overlay = this.overlay;
+        if (!overlay) return;
+
+        const generation = ++this._paneTransitionGeneration;
+        overlay.classList?.add?.('is-lobby-transitioning');
+        overlay.setAttribute?.('aria-busy', 'true');
+
+        const schedule = typeof globalThis.requestAnimationFrame === 'function'
+            ? globalThis.requestAnimationFrame.bind(globalThis)
+            : (callback) => setTimeout(callback, 0);
+        schedule(() => {
+            schedule(() => {
+                if (generation !== this._paneTransitionGeneration) return;
+                overlay.classList?.remove?.('is-lobby-transitioning');
+                overlay.removeAttribute?.('aria-busy');
+            });
+        });
+    }
+
     showPane(mode) {
         if (!LOBBY_MODES.includes(mode)) return false;
         const previousMode = this.mode;
+        if (previousMode !== mode) this.beginPaneTransition();
         this.mode = mode;
         for (const candidate of LOBBY_MODES) {
             const pane = document.getElementById(`lobby-${candidate}-pane`);
@@ -253,7 +275,8 @@ export class LobbyUi {
     }
 
     isKeyboardNavBlocked() {
-        if (this.overlay?.classList?.contains?.('is-race-start-exiting')) {
+        if (this.overlay?.classList?.contains?.('is-race-start-exiting')
+            || this.overlay?.classList?.contains?.('is-lobby-transitioning')) {
             return true;
         }
         return BLOCKING_OVERLAY_IDS.some((id) => (
