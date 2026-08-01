@@ -1,17 +1,4 @@
-/**
- * Lobby track carousel — the picker both Daily and Campaign use.
- *
- * Each card is a poster: the run and the circuit's name set along the left
- * edge, the schematic of the circuit as the field, and one line of figures
- * closing it. One poster sits in the middle and its neighbours peek in from
- * both edges, so the run of tracks is visible without opening anything.
- *
- * Swipe, A/D, arrows and the two chevrons all move the same selection, and the
- * rank on a card is the way into that track's standings.
- *
- * The view is model-driven: what a card *says* comes from a per-mode card
- * builder, and everything here is the plate that sets it.
- */
+/** Lobby track carousel — the picker both Daily and Campaign use. Card content comes from a per-mode builder; this file is the plate that renders it. */
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { TRACKS } from '../track/tracks.js';
@@ -64,15 +51,7 @@ function createUnlockMedalMeter(meter) {
 
 const plateAspectCache = new Map();
 
-/**
- * The proportions of the track's own bounding box, published to CSS so the
- * plate can be sized to the drawing rather than to whatever room is going.
- *
- * The schematic is fitted into its canvas preserving aspect, so a plate of any
- * other shape letterboxes the drawing and leaves the frame floating around it.
- * Clamped because a freakishly long track would otherwise flatten the plate to
- * a strip.
- */
+/** Aspect ratio of the track's own bounding box, published to CSS so the plate frames the drawing instead of letterboxing it. Clamped so an extreme track can't flatten the plate to a strip. */
 export function getTrackPlateAspect(trackKey) {
     const cached = plateAspectCache.get(trackKey);
     if (cached !== undefined) return cached;
@@ -102,13 +81,7 @@ function measureTrackPlateAspect(trackKey) {
     return Math.min(MAX_PLATE_ASPECT, Math.max(MIN_PLATE_ASPECT, width / height));
 }
 
-/**
- * One reading on the timing row: a tracked-out label with its figure below.
- *
- * `element` is the tag the cell is built from, so the rank — the row's one
- * pressable cell — is a button without being drawn differently from the two
- * beside it.
- */
+/** One timing-row reading: a label with its figure below. `element` lets the rank cell be a button without looking different from its neighbours. */
 function createSpecCell(label, element = 'span') {
     const cell = document.createElement(element);
     cell.className = 'track-carousel__spec';
@@ -177,9 +150,8 @@ export class TrackCarousel {
         this.prevBtn?.addEventListener('click', () => this.step(-1));
         this.nextBtn?.addEventListener('click', () => this.step(1));
         viewport.addEventListener('scroll', () => this.handleScroll(), { passive: true });
-        // A player may grab the rail while a button/restore scroll is still in
-        // flight. Their gesture owns selection immediately; a fixed suppression
-        // window otherwise leaves the visible card and Start target disagreeing.
+        // A grab mid-scroll takes selection immediately, or the visible card and
+        // Start target disagree until a fixed suppression window expires.
         const takeScrollControl = () => this.handleUserScrollIntent();
         viewport.addEventListener('pointerdown', takeScrollControl, { passive: true });
         viewport.addEventListener('touchstart', takeScrollControl, { passive: true });
@@ -216,11 +188,7 @@ export class TrackCarousel {
         return this._cards.length === 0;
     }
 
-    /**
-     * Repaints the rail. Cards are rebuilt only when the run of tracks actually
-     * changes — a rank or medal arriving late patches the existing card so the
-     * scroll position and any in-flight swipe survive the update.
-     */
+    /** Repaints the rail. Cards rebuild only when the run of tracks changes; a late rank/medal patches the existing card so scroll position and any in-flight swipe survive. */
     render(cards = [], {
         selectedChallengeId = this.getSelectedChallengeId(),
         loading = false,
@@ -228,9 +196,8 @@ export class TrackCarousel {
         const rail = this.rail;
         if (!rail) return;
 
-        // Before the cards exist: a poster built at the wrong width would be
-        // laid out, measured and painted once at that width before the first
-        // scroll pass could correct it.
+        // Card width must be set before cards exist, or the first one lays out
+        // and paints once at the wrong width before a scroll pass corrects it.
         this.syncCardWidth();
 
         const previousCards = this._cards;
@@ -267,15 +234,9 @@ export class TrackCarousel {
         this._selectedIndex = nextIndex;
         this.applySelectionClasses();
         this.syncNavButtons();
-        // A fresh rail has no layout yet, so centring and sizing the previews
-        // both have to wait for the paint.
-        //
-        // Never animated: a render is a repaint, not a navigation. Smooth
-        // scrolling belongs to select()/step(), where the player asked to move.
-        // Re-entering a mode screen used to animate here — and because the rail
-        // sits inside a display:none overlay while a race is on, its scrollLeft
-        // is clamped to 0 by then, so "no change" became a half-second glide
-        // across the whole rail before the centred card arrived.
+        // Never animated: a render is a repaint, not a navigation. The rail's
+        // scrollLeft is clamped to 0 while its display:none overlay is hidden
+        // during a race, so animating here glided across the whole rail.
         this.scrollToSelected({ animate: false });
         if (typeof requestAnimationFrame === 'function') {
             requestAnimationFrame(() => this.fitPreviews());
@@ -283,16 +244,7 @@ export class TrackCarousel {
         if (changed || !sameRun) this.emitSelection();
     }
 
-    /**
-     * The room the first and last cards need on their outer side to reach the
-     * middle of the viewport.
-     *
-     * A real child rather than the rail's own `padding-inline`: a scroll
-     * container's trailing padding is dropped by some WebKit builds, and the
-     * embedded Reddit browser is one of them — the rail then runs out of scroll
-     * a third of a card early and the last track stops short of centre. A flex
-     * item is counted by every engine.
-     */
+    /** Spacer giving the first/last card room to reach viewport centre. A real element, not rail padding — some WebKit builds drop a scroll container's trailing padding, so a flex item is used instead. */
     edgeSpacer(side) {
         const key = side === 'lead' ? '_edgeLead' : '_edgeTail';
         if (!this[key]) {
@@ -316,11 +268,7 @@ export class TrackCarousel {
         status.textContent = loading ? 'Loading tracks' : 'No tracks available';
     }
 
-    /**
-     * Built from the same hero-row parts the tracks sheet uses, so a track card
-     * looks like a track card wherever it is shown; the carousel only changes
-     * how they are laid out.
-     */
+    /** Built from the tracks-sheet hero-row parts, so a card looks like a track card wherever it's shown. */
     buildCard(card, index) {
         const element = document.createElement('div');
         element.className = 'daily-playlist-entry--hero';
@@ -337,10 +285,8 @@ export class TrackCarousel {
         canvas.width = PREVIEW_WIDTH;
         canvas.height = PREVIEW_HEIGHT;
         canvas.setAttribute('aria-hidden', 'true');
-        // The gate: the puck, and under it what opens this stage. The wording
-        // sits on the plate because the plate is the band that can give room
-        // away — on the scoreline the same sentence ran to a second line and
-        // pushed itself down onto Start Race.
+        // Gate note sits on the plate rather than the scoreline: on the
+        // scoreline it wrapped to a second line and pushed into Start Race.
         const gate = document.createElement('div');
         gate.className = 'track-carousel__gate';
         gate.hidden = true;
@@ -354,19 +300,15 @@ export class TrackCarousel {
         previewArt.append(canvas);
         preview.append(previewArt, gate);
 
-        // Three bands down the card: what the run is, the drawing of it, and
-        // how the player stands on it. The drawing takes whatever the two type
-        // bands leave, so no title length can ever run into it.
+        // Three bands: run, drawing, standing. The drawing takes what the two
+        // type bands leave, so title length never crowds it.
         const head = document.createElement('div');
         head.className = 'track-carousel__card-head';
         const foot = document.createElement('div');
         foot.className = 'track-carousel__card-foot';
 
-        // The billing: which run this card belongs to at one end of a hairline,
-        // how long that run is at the other. The lap count reads here rather
-        // than on the scoreline below because it is true of the track before
-        // the player has turned a wheel on it — and moving it up is what left
-        // the scoreline room for the ladder.
+        // Lap count is billed here (true before the player has raced) rather
+        // than on the scoreline below, which frees room there for the ladder.
         const billing = document.createElement('div');
         billing.className = 'track-carousel__billing';
         const eyebrow = document.createElement('span');
@@ -376,10 +318,8 @@ export class TrackCarousel {
         billingRule.setAttribute('aria-hidden', 'true');
         const format = document.createElement('span');
         format.className = 'track-carousel__format';
-        // The circuit, set the way the lobby sets its own title: the first word
-        // in white over the last in red, on two lines every time. The split is
-        // structural rather than a wrap, so the name is the same shape on every
-        // card and the schematic under it never resizes as the rail moves.
+        // Two lines always (first word / last word), not a wrap, so the
+        // schematic below never resizes as the name changes.
         const title = document.createElement('span');
         title.className = 'daily-playlist-hero-title';
         const titleLead = document.createElement('span');
@@ -388,9 +328,6 @@ export class TrackCarousel {
         titleTail.className = 'track-carousel__title-tail';
         title.append(titleLead, titleTail);
 
-        // The scoreline: the player's record on this track and where it puts
-        // them, then the ladder they are climbing on it. Two readings and the
-        // pips, on one line, over the card's second rule.
         const meta = document.createElement('div');
         meta.className = 'track-carousel__meta';
         const [bestCell, bestValue] = createSpecCell('Best');
@@ -403,18 +340,15 @@ export class TrackCarousel {
                 this.onOpenLeaderboard?.(current.challenge, current);
             }
         });
-        // A gated stage has no best and no standing, so the count that opens it
-        // is the one reading it can put at the left of its scoreline. It reads
-        // where Best would, because it is the same kind of thing: the number
-        // this card is currently worth.
+        // A locked stage has no Best/Rank, so the unlock medal count takes
+        // that spot on the scoreline instead.
         const rankMedal = document.createElement('span');
         rankMedal.className = 'track-carousel__unlock-medal-host';
         rankMedal.hidden = true;
         meta.append(rankMedal, bestCell, rank);
 
-        // The ladder stays on a locked card. Four dormant tiers say what is on
-        // offer up there, which is most of the reason to look at a stage you
-        // cannot race yet.
+        // The ladder still shows on a locked card, dormant, as the preview of
+        // what's on offer.
         const medal = document.createElement('div');
         medal.className = 'daily-playlist-hero-medal';
         medal.setAttribute('aria-hidden', 'true');
@@ -424,7 +358,6 @@ export class TrackCarousel {
         foot.append(meta, medal);
         element.append(head, preview, foot);
 
-        // Poking a peeking card is the obvious way to bring it in.
         element.addEventListener('click', () => {
             const cardIndex = Number(element.dataset.index);
             if (Number.isInteger(cardIndex)) this.select(cardIndex);
@@ -453,8 +386,6 @@ export class TrackCarousel {
             '--track-plate-aspect',
             String(getTrackPlateAspect(card.trackKey)),
         );
-        // `current` is the sheet's own treatment for the track in play; the
-        // track a player is on gets it here for the same reason.
         element.classList.toggle('current', Boolean(card.isCurrent));
         element.classList.toggle('is-locked', Boolean(card.locked));
         this.paintGate(parts, card);
@@ -466,24 +397,7 @@ export class TrackCarousel {
         if (renderPreview) this.renderPreview(parts.canvas, card);
     }
 
-    /**
-     * The circuit, in the lobby's own hand: the first word in white over the
-     * last in red, two lines on every card.
-     *
-     * Every track in the catalogue is two words, so the space is the split. A
-     * name that ever arrives with more keeps the extra on the white line, and a
-     * one-word name takes the red line alone — the white row holds its height
-     * either way, so the drawing below never moves.
-     *
-     * The two readings are block boxes, so the space closing the white line
-     * never prints; it is there to keep `textContent` the track's actual name
-     * for anything reading the card rather than looking at it.
-     *
-     * Track names run from "Number Five" to "Harbor Principality" in a column
-     * barely wider than one of those words, so each line's length is published
-     * for CSS to size the pair against — without it the longest name outgrew
-     * the column and broke to a third line.
-     */
+    /** Track name as two lines (first word white, last word red). Line lengths are published to CSS so the longest name (e.g. "Harbor Principality") doesn't wrap to a third line in the narrow column. */
     paintTitle(parts, element, card) {
         const words = String(card.trackName || '').split(/\s+/).filter(Boolean);
         const tail = words.length ? words[words.length - 1] : '';
@@ -494,48 +408,21 @@ export class TrackCarousel {
         element.style?.setProperty?.('--title-tail-length', String(tail.length || 1));
     }
 
-    /**
-     * A gated stage says so twice, and neither says it in the same place: the
-     * puck over the drawing, and the price in words beneath it.
-     *
-     * `lockedLabel` runs to a full sentence — "A medal on Number Zero to
-     * unlock" — which is why it is set here and not on the scoreline. The plate
-     * is the card's flexible row: it may wrap to two lines, and on a window too
-     * short for that it is clipped, and no other band moves either way.
-     */
+    /** Lock state shown twice: the puck over the drawing, and the unlock condition in words on the plate (which wraps/clips independently of the rest of the card). */
     paintGate(parts, card) {
         const locked = Boolean(card.locked);
         parts.gate.hidden = !locked;
         setText(parts.gateNote, locked ? (card.lockedLabel || 'Locked') : '');
     }
 
-    /**
-     * The player's record on this track, at the left of the scoreline.
-     *
-     * A never-raced track keeps its Best reading and states an em dash in it.
-     * Dropping the reading instead would re-set the line differently from one
-     * card to the next as the rail moves, and the absence is worth saying.
-     *
-     * A gated stage has no best to state, and the whole left of its scoreline
-     * stays empty: what it has instead is the requirement, and that reads on
-     * the plate where it has room to wrap.
-     */
+    /** Best time on the scoreline. An unraced track keeps the cell and shows an em dash rather than hiding it, so the row doesn't reflow card to card. A locked stage hides it — the requirement reads on the plate instead. */
     paintSpec(parts, card) {
         parts.bestCell.hidden = Boolean(card.locked);
         parts.bestCell.classList.toggle('is-muted', !card.bestLabel);
         setText(parts.bestValue, card.bestLabel || '—');
     }
 
-    /**
-     * Every tier the track offers, bronze through author, so the card shows the
-     * whole ladder and how far up it the player is. Read as a row of pips rather
-     * than four separate badges, so the wordmark and tier caption the shared
-     * medal carries would only be noise at this size. Rebuilt only when the
-     * earned set changes — this runs on every repaint.
-     *
-     * A gated stage shows its ladder dormant rather than not at all: what is on
-     * offer up the track is most of why a stage out of reach earns a card.
-     */
+    /** Bronze-through-author ladder as a row of pips (a full medal badge per tier would be noise at this size). Rebuilt only when the earned set changes. Locked stages still show it, dormant. */
     paintMedals(element, card) {
         const tiers = Array.isArray(card.medalTiers) ? card.medalTiers : [];
         const key = tiers.map(({ tier, filled }) => `${tier}${filled ? '+' : '-'}`).join('');
@@ -543,7 +430,6 @@ export class TrackCarousel {
         element.dataset.medalKey = key;
 
         if (!tiers.length) {
-            // A track with no thresholds has no ladder to show.
             element.replaceChildren(createMedalIconSvg('white', {
                 className: 'track-carousel__medal',
                 outline: true,
@@ -564,12 +450,7 @@ export class TrackCarousel {
         }));
     }
 
-    /**
-     * The standing, and the way into the leaderboard. A gated stage has no
-     * standing to state and no standings to open, so the reading steps aside
-     * and the medal count that governs the gate opens the scoreline in its
-     * place.
-     */
+    /** Rank + leaderboard entry point. A locked stage has neither, so its unlock medal count takes that spot on the scoreline instead. */
     paintRank(parts, card) {
         if (card.locked) {
             const meter = card.lockMeter || null;
@@ -604,41 +485,20 @@ export class TrackCarousel {
         );
     }
 
-    /**
-     * The card stretches to the pane, so the preview is drawn once at a nominal
-     * size and redrawn by `fitPreviews` once its real box is known — a 16:9
-     * bitmap letterboxed into a tall panel is mostly empty gradient.
-     */
-    /**
-     * How wide the framed plate should be.
-     *
-     * CSS can cap the plate's height at what the drawing needs for the full
-     * width of the column, but it cannot do the reverse: when the window is
-     * short the drawing is limited by height instead, and the frame is left
-     * spanning a column several times wider than the track inside it. The
-     * height the plate actually got is a measurement, so the width that matches
-     * it is computed here and handed back to CSS.
-     *
-     * The head keeps the full column so the name never reflows as a result —
-     * a title that rewrapped would change the plate's height, which would
-     * change this width, which would rewrap the title again.
-     */
+    /** Plate width matching the drawing's aspect at its measured height. CSS can cap height from width but not the reverse, so a short window leaves the frame wider than the track; this computes the matching width and hands it back to CSS. Keyed off the head's own column so a wrapped title can't create a feedback loop. */
     fitPlateFrames() {
         for (const element of this._elements) {
             const preview = element?._parts?.preview;
             if (!preview) continue;
             const card = this._cards[Number(element.dataset.index)];
             if (!card) continue;
-            // The plate's own row, measured, rather than the card less its two
-            // type bands: the grid also spends a row gap on either side of the
-            // drawing, and inferring the row from the bands counted that gap as
-            // room the schematic could be drawn in.
+            // Preview's own measured height, not the card minus its two type
+            // bands — that would double-count the grid's row gaps as drawable
+            // space.
             const available = preview.clientHeight;
             if (!(available > 0)) continue;
-            // The schematic keeps a fixed margin inside its own canvas, so the
-            // drawing is that much shorter than the plate and correspondingly
-            // narrower. Framing the plate rather than the drawing would leave a
-            // band of dead space inside the rules on every card.
+            // Subtract the canvas's own render margin so the frame doesn't
+            // leave a dead band around the drawing.
             const margin = 2 * (PREVIEW_RENDER_PADDING / this.previewPixelScale());
             const drawn = Math.max(0, available - margin);
             const width = Math.round((drawn * getTrackPlateAspect(card.trackKey)) + margin);
@@ -653,14 +513,12 @@ export class TrackCarousel {
 
     fitPreviews() {
         this.fitPlateFrames();
-        // Draw at device resolution: a 1x bitmap stretched this far reads as a
-        // soft, smeared track.
+        // Device resolution: a 1x bitmap stretched this far reads as smeared.
         const scale = this.previewPixelScale();
         for (const element of this._elements) {
             const canvas = element?._parts?.canvas;
-            // Layout box, not the painted one: a peeking card is scaled down, and
-            // measuring that would size its bitmap for the smaller of the two
-            // sizes it is shown at, then stretch it when the card takes centre.
+            // Layout box, not the painted (scaled-down peek) box, or the
+            // bitmap is sized for the smaller peek and stretches at centre.
             const host = canvas?.parentElement;
             if (!canvas || !host?.offsetWidth || !host?.offsetHeight) continue;
             const width = Math.round(host.offsetWidth * scale);
@@ -790,22 +648,11 @@ export class TrackCarousel {
         this.updateProximity();
     }
 
-    /**
-     * How close each card is to the middle of the viewport, 0 to 1, published to
-     * CSS as `--card-proximity`.
-     *
-     * The card's fade, its set-back scale and whether its details are showing
-     * all hang off this. They used to hang off `is-carousel-selected`, which
-     * flips the instant a card takes the centre — so mid-swipe, a card's date,
-     * laps, best time and rank all appeared at once, in one step, while the
-     * player's finger was still moving. Tying them to distance instead means
-     * the details arrive with the card.
-     */
+    /** Distance-to-centre per card, 0 to 1, published as `--card-proximity` for fade/scale/detail-reveal. Tied to distance rather than `is-carousel-selected` so details arrive gradually with the card instead of snapping in mid-swipe. */
     updateProximity() {
         const viewport = this.viewport;
         const width = viewport?.clientWidth || 0;
-        // Before the pane is visible there is no geometry to measure against;
-        // fall back to the selection so a card is never stranded invisible.
+        // No geometry before the pane is visible; fall back to selection.
         const measurements = this._elements.map((element) => ({
             left: element?.offsetLeft || 0,
             width: element?.offsetWidth || 0,
@@ -813,15 +660,13 @@ export class TrackCarousel {
         const measurable = width > 0 && measurements.some(({ width: cardWidth }) => cardWidth > 0);
         const center = measurable ? viewport.scrollLeft + (width / 2) : 0;
 
-        // Complete all layout reads before writing the custom properties that
-        // the cards' transforms consume. Mixing the two invalidated styles and
-        // forced a fresh layout for every following card on every scroll frame.
+        // All layout reads complete before any style write below, or mixing
+        // the two forces a fresh layout per card on every scroll frame.
         const proximities = measurements.map(({ left, width: cardWidth }, index) => {
             if (!measurable || !(cardWidth > 0)) {
                 return index === this._selectedIndex ? 1 : 0;
             }
             const distance = Math.abs((left + (cardWidth / 2)) - center);
-            // Falls to zero exactly as the neighbouring card takes centre.
             return Math.max(0, 1 - (distance / cardWidth));
         });
 
@@ -850,9 +695,8 @@ export class TrackCarousel {
         if (!viewport || !element) return;
 
         const apply = () => {
-            // display:none panes report zero geometry in retained mobile
-            // WebViews. Do not turn that temporary layout into a new selection;
-            // ResizeObserver will centre the remembered card when it is visible.
+            // Hidden panes report zero geometry in retained mobile WebViews;
+            // don't treat that as a real selection change.
             if (!(viewport.clientWidth > 0) || !(element.offsetWidth > 0)) return;
             this.syncEdgeSpacing(element);
             const left = element.offsetLeft
@@ -882,21 +726,11 @@ export class TrackCarousel {
         }
     }
 
-    /**
-     * The width one poster gets, published to CSS in pixels.
-     *
-     * It is the lobby shell's own measure — the carousel reads it rather than
-     * restating it, so Home and the two mode screens stay the same width and
-     * the shell keeps every responsive step it already defines. A percentage
-     * cannot do this job: the rail is an intrinsically sized flex container, so
-     * `100%` on a card resolves against the rail's own content width and the
-     * card grows to whatever it happened to measure.
-     */
+    /** One card's width, published to CSS in pixels — the lobby shell's own measure, read rather than restated, so Home and both mode screens stay the same width. */
     syncCardWidth() {
         const viewport = this.viewport;
-        // Published on the carousel root rather than the rail: the peek either
-        // side is a fraction of this measure, and the rail's own `gap` is part
-        // of that peek — so the rail has to be able to read it too.
+        // Published on the root, not the rail: the peek on either side is a
+        // fraction of this measure, and includes the rail's own gap.
         const host = this.root || this.rail;
         const width = viewport?.clientWidth || 0;
         if (!host || !(width > 0)) return false;
@@ -904,11 +738,7 @@ export class TrackCarousel {
         return true;
     }
 
-    /**
-     * Give both ends a measured spacer. Percentage sizing inside an intrinsic
-     * flex rail is inconsistent in embedded WebViews, which can make the final
-     * card hit maxScrollLeft before its centre reaches the viewport centre.
-     */
+    /** Measured (not percentage) edge spacers — percentage sizing inside an intrinsic flex rail is inconsistent in embedded WebViews and can strand the last card short of centre. */
     syncEdgeSpacing(element = this._elements[this._selectedIndex]) {
         const viewport = this.viewport;
         const rail = this.rail;
@@ -923,15 +753,7 @@ export class TrackCarousel {
         return true;
     }
 
-    /**
-     * Whatever the rail can actually be scrolled to is the last word on whether
-     * the final card can reach the middle. Measuring it and topping the tail up
-     * by the difference covers the rounding a fractional card width leaves
-     * behind, and any engine that measures the rail short for its own reasons.
-     *
-     * The shortfall is read with the current top-up already applied, so it
-     * accumulates onto itself and settles instead of oscillating.
-     */
+    /** Tops up the tail spacer by however short the rail's actual scroll range falls of centring the last card — covers rounding and any engine that measures the rail short. Reads its own prior top-up so it settles instead of oscillating. */
     syncTailShortfall() {
         const viewport = this.viewport;
         const rail = this.rail;
@@ -969,9 +791,8 @@ export class TrackCarousel {
     }
 
     handleUserScrollIntent() {
-        // Pointer/touch/wheel input interrupts a smooth scroll in browsers. It
-        // must also interrupt our bookkeeping so the following scroll event can
-        // adopt the card now under the viewport centre.
+        // Interrupts our bookkeeping too, so the next scroll event adopts
+        // whatever card the user's gesture left under viewport centre.
         this.cancelProgrammaticScroll();
         if (this._settleTimer !== null) {
             clearTimeout(this._settleTimer);
@@ -1002,9 +823,7 @@ export class TrackCarousel {
             : (callback) => setTimeout(callback, 16);
         this._scrollFrame = schedule(() => {
             this._scrollFrame = null;
-            // Once a frame, and whoever moved the rail: a button's smooth scroll
-            // brings the details up exactly the way a swipe does. Selection is
-            // the part a programmatic scroll must not touch mid-flight.
+            // Selection must not move during a programmatic (button) scroll.
             this.updateProximity();
             if (!this._suppressScrollSync) this.syncSelectionFromScroll();
         });

@@ -1,13 +1,9 @@
 /**
- * Picking a rival off a leaderboard and handing back their ghost.
- *
- * One implementation for every mode: Daily and Campaign had a copy each, with
- * identical selection normalizers and identical refusal reasons.
- *
- * Two ways in. A `row` selection names a specific standings row and must still
- * match it exactly, so a board that moved under the player is refused rather
- * than silently racing someone else. A `next-faster` selection walks up from the
- * player's own time to the closest rival above them.
+ * Picks a rival off a leaderboard and hands back their ghost, shared across
+ * modes (Daily and Campaign previously kept identical copies). A `row`
+ * selection must still match its named standings row exactly — a board that
+ * moved under the player is refused rather than silently racing someone
+ * else. A `next-faster` selection walks up to the closest rival above them.
  */
 import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';

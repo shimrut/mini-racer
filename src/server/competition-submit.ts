@@ -1,12 +1,8 @@
 /**
- * One path from "a player finished" to "the player is ranked".
- *
- * Daily and Campaign each had their own copy of this: match the track, rate
- * limit, validate the replay, normalise the splits, take a per-player lock,
- * keep the run only if it beats the stored one, then persist the personal best
- * and its ghost. Same eight steps, two implementations, two response shapes.
- *
- * The response is Daily's, unchanged, because Daily's is the one with clients.
+ * One path from "a player finished" to "the player is ranked": match track,
+ * rate limit, validate replay, normalise splits, lock, keep only if better,
+ * persist PB + ghost. Daily and Campaign each had their own copy of this;
+ * the response shape is Daily's, unchanged, since it's the one with clients.
  */
 import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';

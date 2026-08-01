@@ -1,10 +1,4 @@
-/**
- * Lets a lobby-mode tap paint its new pane before carousel construction starts.
- *
- * Work queued in the first animation frame still runs before that frame paints,
- * so the second frame is intentional: the browser gets one complete rendering
- * opportunity with the lightweight pane state first.
- */
+/** Defers carousel construction to a second animation frame, so the browser gets one complete paint of the lightweight pane state first (queuing in the first frame still runs before it paints). */
 export function deferLobbyWorkUntilAfterPaint(engine, expectedMode, work) {
     if (!engine || typeof work !== 'function') return null;
     const token = (engine._deferredLobbyWorkToken || 0) + 1;

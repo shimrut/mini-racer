@@ -14,17 +14,10 @@ export const CAMPAIGN_REQUEST_TIMEOUT_MS = 20_000;
 const PENDING_RESULTS_KEY = `MiniRacerCampaignPending:${CAMPAIGN_ID}`;
 
 /**
- * Finishes that have not come back from the server yet.
- *
- * The medal is one shared function of a time, so the client can work out what a
- * run earned the moment it ends and open the next stage straight away, the same
- * way Daily banks a best time before it is confirmed. These entries are held
- * only until the server answers for that race: an accepted run replaces them
- * with verified progress, a refused one drops them.
- *
- * They are not a second source of truth. Ranking, and the gate on entering a
- * stage, are enforced server-side on every submission regardless of what is
- * stored here.
+ * Finishes not yet confirmed by the server, held only until it answers for
+ * that race (accepted → replaced by verified progress, refused → dropped).
+ * Not a second source of truth: ranking and stage entry are still enforced
+ * server-side on every submission regardless of what's stored here.
  */
 function readPendingResults(root = globalThis) {
     try {
@@ -140,11 +133,7 @@ async function requestJson(url, options = {}) {
     }
 }
 
-/**
- * Campaign ranks guests the same way Daily does, so every request carries the
- * player identity. A signed-in request has its username attached server-side
- * and ignores these.
- */
+/** Every request carries the player identity so guests can be ranked like Daily; signed-in requests get their username attached server-side and ignore these. */
 function withPlayerIdentity(url) {
     url.searchParams.set('playerId', getOrCreatePlayerId('campaign'));
     const guestToken = getGuestPlayerToken();
@@ -183,11 +172,7 @@ export function normalizeCampaignStandings(value) {
     return standings;
 }
 
-/**
- * Progress is whatever the server says it is, for guests as much as for signed-in
- * players — both are ranked server-side. An unreachable server therefore reports
- * nothing rather than inventing a local ladder that would disagree with it.
- */
+/** Progress is whatever the server says, for guests and signed-in players alike; an unreachable server reports nothing rather than inventing a local ladder that could disagree with it. */
 function unavailableCampaignBootstrap() {
     return {
         campaignId: CAMPAIGN_ID,

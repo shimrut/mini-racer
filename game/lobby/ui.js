@@ -23,15 +23,7 @@ function setText(element, value) {
     if (element) element.textContent = value;
 }
 
-/**
- * The primary label is the one word that answers the campaign request, so it
- * fades rather than cutting. Only a real change is worth animating: the button
- * re-renders on every carousel step, and replaying the fade on identical text
- * would flicker the label while the player is only browsing stages.
- *
- * Restarting a running animation needs the class gone for a frame, which is
- * what reading the layout below forces.
- */
+/** Fades the label on real text changes only — the button re-renders on every carousel step, and fading identical text would flicker while just browsing. The layout read forces the class off for a frame so the animation can restart. */
 function setSwappingText(element, value) {
     if (!element || element.textContent === value) return;
     element.textContent = value;

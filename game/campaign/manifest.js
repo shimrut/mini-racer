@@ -9,29 +9,12 @@ export const CAMPAIGN_ID = 'numbered-v1';
 export const CAMPAIGN_RULES_REVISION = 1;
 
 /**
- * A stage opens on the player's medal total across the whole campaign rather
- * than on one medal on the stage before it. A chain makes a single track the
- * player cannot Gold a full stop; a total lets strength on one track pay for
- * weakness on another, and gives Author a reason to exist beyond pride.
- *
- * From stage 03 the requirement is Silver on every previous track plus Gold on
- * half of them — 2n + floor(n / 2). Stages 01 and 02 are set below that curve so
- * the opening is not a wall. Every gate stays reachable without a single Author
- * (each is under 3n, the Gold-on-everything total).
- *
- * A total on its own cannot keep the ladder sequential: medals earned on early
- * stages spend against every gate at once, so six Authors would open four stages
- * the player had never driven. Pricing that out would mean asking 33 of the 36
- * medals available by stage 09 — Author on nearly everything — so the ladder
- * keeps a second, cheap condition instead: a medal on the stage immediately
- * before. That caps progress at one new stage at a time, because the stage after
- * next cannot have been medalled while it was locked.
- *
- * Stages past the numbered ten stay on the same curve, so the ladder can keep
- * growing without repricing anything already earned. Their lap counts follow the
- * track rather than the tier the stage sits in: Infinite Pie is the longest
- * layout in the campaign, and three laps of it would be a far longer race than
- * anything before it.
+ * Gates open on the player's total campaign medals rather than one medal on
+ * the stage before it, so strength on one track can pay for weakness on
+ * another. From stage 03 the requirement is 2n + floor(n / 2) — Silver on
+ * every prior track plus Gold on half — always reachable without Author. Each
+ * gate also requires a medal on the immediately preceding stage, since the
+ * total alone would let early medals fund skipping several stages at once.
  */
 const STAGE_DEFINITIONS = [
     ['00', 'numberZero', 1, 0],
@@ -82,11 +65,7 @@ export function getCampaignStage(raceId) {
     return typeof raceId === 'string' ? STAGE_BY_RACE_ID.get(raceId) ?? null : null;
 }
 
-/**
- * What one stage contributes to the total: the number of medals showing in its
- * stack, which is what the lobby card already draws. Bronze is worth 1 and
- * Author 4, so an Author is two Silvers ahead where a Gold is one.
- */
+/** Medal count toward the campaign total: bronze=1 through author=4. */
 export function getCampaignStageMedalCount(medal) {
     const rank = typeof medal === 'string' ? STANDARD_MEDAL_TIER_RANK[medal] : undefined;
     return rank === undefined ? 0 : rank + 1;
@@ -101,11 +80,7 @@ export function countCampaignMedals(resultsByRaceId = {}) {
     return total;
 }
 
-/**
- * Progress only ever keeps a better medal per stage, so the total climbs and an
- * unlock earned here cannot lapse. The one path back is the explicit revoke of a
- * finish the server refused, which drops the result and re-derives from scratch.
- */
+/** An unlock can't lapse — progress only keeps the better medal per stage — except by an explicit server-side revoke, which re-derives from scratch. */
 export function getCampaignUnlockedRaceIds(resultsByRaceId = {}) {
     const medalTotal = countCampaignMedals(resultsByRaceId);
     return CAMPAIGN_STAGES

@@ -189,15 +189,7 @@ export function sanitizeCarSpriteAsset(image) {
   return canvas;
 }
 
-/**
- * Manages async car sprite asset loading with an internal cache and a
- * load-token mechanism that discards stale callbacks when assets are
- * switched mid-flight.
- *
- * The engine creates one instance and delegates `prefetchCarSpriteAsset`
- * and `loadCarSpriteAsset` through it, keeping only the visual state
- * (carSprite, carSpriteDrawWidth/Height) on the engine itself.
- */
+/** Async car sprite loading with a cache and a load-token that discards stale callbacks when assets switch mid-flight. The engine keeps one instance and only the visual state on itself. */
 export class CarSpriteLoader {
   #cache = new Map();
   #loadToken = 0;

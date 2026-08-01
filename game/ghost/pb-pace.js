@@ -10,13 +10,7 @@ function interpolateTimeSec(before, after, fraction) {
   return beforeSec + (afterSec - beforeSec) * fraction;
 }
 
-/**
- * Recovers cumulative lap-boundary timestamps from an older canonical ghost.
- *
- * The trace uses the same car position and ordered checkpoint/start-line gates
- * as simulation. A partial or ambiguous reconstruction is rejected instead of
- * presenting an invented pace delta.
- */
+/** Recovers cumulative lap-boundary timestamps from an older canonical ghost, using the same checkpoint/start-line gates as simulation; rejects a partial or ambiguous reconstruction rather than inventing a pace delta. */
 export function deriveLapCompletionTimesSecFromGhost(record, track, lapCount) {
   const expectedLaps = Math.trunc(Number(lapCount));
   const normalizedGhost = normalizePbGhostRecord(record);

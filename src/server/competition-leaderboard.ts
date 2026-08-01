@@ -1,13 +1,8 @@
 /**
- * One ranked board, for every mode.
- *
- * Lifted from Daily's implementation without behaviour changes and
- * re-parameterised on a Competition, so Campaign ranks players through the same
- * code — and therefore reports the same snapshot shape — instead of keeping a
- * second board with its own payload the client has to adapt.
- *
- * Every redis key arrives on the descriptor, already built by the owning mode.
- * Nothing here templates a key.
+ * One ranked board, shared across modes — lifted from Daily's implementation
+ * unchanged and re-parameterised on a Competition, so Campaign reports the
+ * same snapshot shape instead of a second payload the client has to adapt.
+ * Redis keys arrive pre-built on the descriptor; nothing here templates one.
  */
 import { redis } from '@devvit/redis';
 import {

@@ -58,12 +58,9 @@ function toRaceChallenge(stage, mode = 'campaign') {
 }
 
 /**
- * Best medal already banked for this stage, so the finish sheet can tell a first
- * unlock from a medal the player owned before this run.
- *
- * Campaign medals scale with the stage lap count and belong to a stage rather
- * than to a track, so they live in Campaign progress by raceId — the per-track
- * lap-medal store the Daily finish reads never sees them.
+ * Best medal already banked for this stage. Campaign medals scale with lap
+ * count and belong to a stage rather than a track, so they live in Campaign
+ * progress by raceId, not the per-track store the Daily finish reads.
  * @returns {'author'|'gold'|'silver'|'bronze'|null}
  */
 function getStoredCampaignStageMedal(bootstrap, raceId) {
@@ -127,13 +124,7 @@ function getExistingCampaignScoreboardSnapshot(engine, stage) {
     });
 }
 
-/**
- * The stage after this one, and whether it is open.
- *
- * Progress has already absorbed the finish by the time the sheet is built, so
- * the gate read here is the same one the lobby draws — a run that opened the
- * next stage offers it immediately, and one that did not says what is missing.
- */
+/** Next stage and whether it's open, read off the same gate the lobby uses (progress has already absorbed this finish by the time the sheet builds). */
 function getCampaignNextStageTarget(engine, stage) {
     const stageIndex = CAMPAIGN_STAGES.findIndex(
         (candidate) => candidate.raceId === stage?.raceId,
@@ -153,11 +144,7 @@ function getCampaignNextStageTarget(engine, stage) {
     };
 }
 
-/**
- * Where Campaign should land when the player has not picked a stage themselves.
- * A finished campaign is asking for nothing, so it lands on the last stage the
- * player reached rather than sending them back to Stage 00.
- */
+/** Default landing stage when none is picked: the last stage reached, not Stage 00. */
 function getDefaultCampaignLobbyStage(lobbyState) {
     const unlockedStages = Array.isArray(lobbyState?.stages)
         ? lobbyState.stages.filter((stage) => stage.unlocked)
@@ -201,15 +188,7 @@ function decorateCampaignState(bootstrap) {
     };
 }
 
-/**
- * Opens the next stage on the strength of the run that just ended, before the
- * server has confirmed it. The medal is a shared function of the time, so the
- * client already knows what was earned; waiting on a round trip only delays the
- * unlock, and on a dropped connection it never arrives at all.
- *
- * Verified progress replaces this as soon as it lands, and a refused run has it
- * revoked. The server gate on entering and submitting to a stage is unchanged.
- */
+/** Opens the next stage optimistically off the client-computed medal, before the server confirms — verified progress replaces this once it lands, and a refused run has it revoked. */
 function applyPendingCampaignResult(engine, stage, finalTime, medal) {
     if (!engine.campaignBootstrap) return;
     const bestTimeMs = Math.round(Number(finalTime) * 1000);
@@ -225,10 +204,7 @@ function applyPendingCampaignResult(engine, stage, finalTime, medal) {
     engine.applyCampaignLobbyBootstrap?.(engine.campaignBootstrap);
 }
 
-/**
- * Takes back an unlock the server refused. Only the entry this run put there is
- * dropped: a verified result for the same stage outranks it and stays.
- */
+/** Takes back an unlock the server refused; a verified result for the same stage outranks it and stays. */
 function revokePendingCampaignResult(engine, raceId, bestTime) {
     clearPendingCampaignResult(raceId);
     const progress = engine.campaignBootstrap?.progress;
@@ -254,10 +230,7 @@ function buildProvisionalCampaignBootstrap(previous = null) {
     };
 }
 
-/**
- * Campaign standings arrive in the shared snapshot shape now, so there is
- * nothing left to adapt — only the null guard the call sites rely on.
- */
+/** Campaign standings already match the shared snapshot shape; this is just the null guard call sites rely on. */
 export function normalizeCampaignLeaderboardSnapshot(body) {
     return body ? normalizeScoreboardSnapshot(body) : null;
 }
@@ -419,10 +392,7 @@ export const campaignEngineMethods = {
         void this.ensureCampaignBootstrap({ forceRefresh: true });
     },
 
-    /**
-     * The Campaign pane is the stage picker: every stage gets a card, locked
-     * ones included, so the shape of the campaign is visible from the lobby.
-     */
+    /** Every stage gets a card, locked ones included, so the shape of the campaign is visible from the lobby. */
     paintCampaignCarousel() {
         if (!this.campaignCarousel) return;
         const cards = buildCampaignCarouselCards(this.campaignLobbyState);
@@ -480,14 +450,9 @@ export const campaignEngineMethods = {
             const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
             if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
 
-            // Same shape as Daily: nothing on the wire gates the countdown. Both
-            // requests go out now and are folded in once the lights are running,
-            // so the player waits for the track load and nothing else.
-            //
-            // Sent whatever the bootstrap last reported. Both already swallow
-            // their own failures, and the ghost answer is what clears a stale
-            // personal best — skipping the request on a bootstrap that merely
-            // failed would cost the player their ghost for the run.
+            // Same as Daily: start/ghost requests fire now and fold in once the
+            // lights are running, so nothing on the wire gates the countdown.
+            // Both swallow their own failures rather than being skipped.
             const startRequest = startServerCampaignRace(stage.raceId).catch((error) => {
                 console.warn('Could not stamp the Campaign race start:', error);
                 return null;
@@ -558,23 +523,7 @@ export const campaignEngineMethods = {
         return this.raceComparisonTarget !== null;
     },
 
-    /**
-     * Records the server-side race start without holding up the lights.
-     *
-     * The stamp only drives progress bookkeeping — submission re-validates the
-     * unlock on its own — so a dropped request lets the run continue and rank
-     * normally. Only an outright refusal means the stage was never raceable,
-     * and that sends the player back to a refreshed lobby.
-     */
-    /**
-     * Folds the server's answer into a race that is already running.
-     *
-     * Only a refusal of this particular stage takes the player out of it: the
-     * stage is locked, or it does not exist. Anything else — unreachable, not
-     * identified, server error — says nothing about whether the stage is
-     * playable, and pulling someone out of a countdown they already started
-     * would be the worse answer. An unranked run still queues and retries.
-     */
+    /** Folds the start-stamp response into a race already running. Only an outright refusal (locked/missing stage) pulls the player out; any other failure (network, server error) leaves the countdown alone. */
     async confirmCampaignRaceStart(stage, startRequest) {
         const started = await startRequest;
         if (!started) return;
@@ -606,12 +555,7 @@ export const campaignEngineMethods = {
         await this.loadCampaignLobby({ show: true });
     },
 
-    /**
-     * Folds a Campaign personal best into the run that is already counting down.
-     *
-     * The ghost only has to be prepared before GO to race against; a slower
-     * response just means this attempt runs without one.
-     */
+    /** Folds a personal-best ghost into the run already counting down; a slow response just means this attempt runs without one. */
     applyCampaignPersonalBest(stage, personalBest) {
         if (this.activeCampaignStage?.raceId !== stage.raceId) return;
         this.trackPersonalBestByTrackKey ??= Object.create(null);
@@ -861,11 +805,7 @@ export const campaignEngineMethods = {
         }
     },
 
-    /**
-     * Straight from the finish sheet into the stage that run opened, without the
-     * detour through the lobby. Clearing the finished run is what closes the
-     * sheet and hands the screen back; the start itself is the lobby's own.
-     */
+    /** Starts the stage the finish sheet just unlocked without detouring through the lobby. */
     async startCampaignNextStage(stage) {
         if (!stage || this.startButtonPending) return;
         this.selectedCampaignStageId = stage.raceId;
@@ -946,19 +886,13 @@ export const campaignEngineMethods = {
             return;
         }
 
-        // The medal is already known, so the stage it opens is opened now
-        // rather than a round trip later.
+        // Medal is already known client-side, so its stage unlocks now rather
+        // than after a round trip.
         applyPendingCampaignResult(this, stage, finalTime, medal);
 
-        // Same pattern as Daily: the finish sheet opens immediately and the
-        // durable queue confirms in the background, so a dropped connection
-        // retries instead of losing the run.
-        //
-        // Queued whatever the bootstrap last said about being rankable. A
-        // bootstrap that failed says nothing about this run, and a guest whose
-        // token is not minted yet will have one by the time the queue retries.
-        // Only the server gets to refuse a run, and when it does the queue
-        // reports that refusal on the sheet.
+        // Same as Daily: finish sheet opens immediately, durable queue
+        // confirms in the background so a dropped connection retries.
+
         const { enqueued, entry } = enqueueCampaignVerification({
             raceId: stage.raceId,
             trackKey: stage.trackKey,

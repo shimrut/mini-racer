@@ -1,13 +1,8 @@
 /**
- * Who is submitting, and the profile that names them on a leaderboard.
- *
- * Identity is not a Daily concept — every ranked competition needs the same
- * answer to "which player is this, and may they rank at all". Moved out of
- * daily-gp-store unchanged so Campaign can resolve players the same way rather
- * than keeping its own signed-in-only rule.
- *
- * Profile keys, TTLs and the guest token contract are untouched: these address
- * live production rows.
+ * Who is submitting, and the profile that names them on a leaderboard —
+ * shared across every ranked mode, moved out of daily-gp-store unchanged so
+ * Campaign resolves players the same way. Profile keys, TTLs and the guest
+ * token contract are untouched; they address live production rows.
  */
 import { redis } from '@devvit/redis';
 import { createHash } from 'node:crypto';

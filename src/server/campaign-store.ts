@@ -518,15 +518,11 @@ export async function getServerCampaignChallengeSource({
 }
 
 /**
- * Moves a guest's Campaign standing onto their Reddit account at sign-in.
- *
- * Daily can afford to strand a guest's row — a challenge expires in a week.
- * Campaign progress is permanent and gates which stages a player may enter, so
- * losing it at sign-in would cost them the ladder they already climbed.
- *
- * Per stage the better time wins, and everything that describes that time moves
- * with it: the progress entry, the leaderboard row and the PB record with its
- * ghost. Guest keys are dropped afterwards, so a repeated call is a no-op.
+ * Moves a guest's Campaign standing onto their Reddit account at sign-in —
+ * unlike Daily, Campaign progress is permanent and gates stage entry, so it
+ * can't be stranded on the guest id. Per stage the better time wins, and its
+ * progress entry, leaderboard row, and PB+ghost all move together. Guest
+ * keys are dropped after, so a repeated call is a no-op.
  */
 export async function mergeGuestCampaignProgress({
     guestPlayerId,

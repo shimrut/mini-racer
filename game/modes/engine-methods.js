@@ -1,11 +1,4 @@
-/**
- * Cross-mode routing for the race engine.
- *
- * Home, Daily, Campaign, and player Challenge all share one race loop, so the
- * decision of which mode owns a lobby, a restart, or a finish belongs here
- * rather than inside any single mode's module. Each mode still implements its
- * own lobby and finish behaviour; this layer only dispatches to them.
- */
+/** Cross-mode routing: Home, Daily, Campaign and Challenge share one race loop, so which mode owns a lobby/restart/finish is decided here and dispatched to each mode's own implementation. */
 import {
     cancelDeferredLobbyWork,
     deferLobbyWorkUntilAfterPaint,
@@ -23,11 +16,8 @@ export const modeRouterEngineMethods = {
         this.clearDailyChallengeRun();
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.lobbyUi.showHome();
-        // Home renders the day's track behind the menu, and racing anything else
-        // leaves `currentTrackKey` pointing at whatever was driven last. Only the
-        // boot path used to set this background, so one race on a campaign stage
-        // — or on any day but today — replaced the featured track for the rest of
-        // the session.
+        // Re-syncs the background to today's track, since a race on any other
+        // track (or day) leaves currentTrackKey pointing at it.
         void this.syncReadyBackgroundTrack(this.currentDailyChallenge).catch((error) => {
             console.error('Error syncing Home background track:', error);
         });

@@ -1,14 +1,8 @@
 /**
- * One description of "a ranked race", for every mode.
- *
- * Daily and Campaign run the same competition — race N laps, submit a replay,
- * get validated, get ranked — and differ only in where the rows live and how
- * long they survive. This descriptor carries both halves: the race itself, and
- * the storage policy the shared leaderboard/PB/submit modules need.
- *
- * The redis keys are **pre-built strings, produced by each mode's own existing
- * key builders**, never templated from a prefix here. Daily's keys address live
- * production rows; a format drift would orphan every one of them silently.
+ * One "ranked race" descriptor shared by every mode (Daily, Campaign): the
+ * race itself plus the storage policy the shared leaderboard/PB/submit
+ * modules need. Redis keys are pre-built strings from each mode's own key
+ * builders, never templated from a prefix here — Daily's address live rows.
  */
 import {
     createRedisChallengeEntryHashKey,

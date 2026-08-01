@@ -205,14 +205,11 @@ export function isRetryableVerificationFailure(result) {
 }
 
 /**
- * Every mode queues a run the same way, so the queue is one implementation
- * parameterised on its bucket.
- *
- * What stays per-mode is only which field names an entry carries: Daily keys on
- * challengeId, Campaign on raceId. Those names are not cosmetic — entries live
- * in localStorage that outlives a deploy, and an entry this file cannot read is
- * deleted rather than skipped, so renaming one would silently discard real
- * queued runs along with their replays.
+ * One queue implementation parameterised on its bucket; only the field names
+ * differ per mode (Daily: challengeId, Campaign: raceId). Those names aren't
+ * cosmetic — entries persist in localStorage across deploys, and an entry
+ * this file can't read is deleted rather than skipped, so renaming one would
+ * silently discard real queued runs.
  */
 function getEntry(bucket, entryId) {
   if (!entryId) return null;

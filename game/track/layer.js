@@ -1,17 +1,7 @@
 import { configureCanvasViewport } from "./canvas-resolution.js";
 import { drawViewportPresentationBackground } from "./canvas.js";
 
-/**
- * Manages the two-canvas track-layer rendering system.
- *
- * On capable browsers the track is rendered into an OffscreenCanvas
- * on a dedicated worker thread so the main thread never blocks on large blits.
- * When OffscreenCanvas is unavailable the renderer falls back to a regular
- * main-thread 2D context.
- *
- * The engine holds one instance and delegates setup, viewport resizing,
- * bitmap sync, and per-frame drawing through this class.
- */
+/** Two-canvas track-layer renderer: OffscreenCanvas on a worker thread when available (so the main thread never blocks on large blits), else a main-thread 2D context fallback. The engine holds one instance. */
 export class TrackLayerRenderer {
   constructor(canvas) {
     /** The DOM trackLayerCanvas element. */
@@ -108,11 +98,9 @@ export class TrackLayerRenderer {
   }
 
   /**
-   * Resizes the main-thread canvas to match the container.
-   * For worker-backed renderers this is a no-op — the viewport is updated
-   * inline with the render message in draw() so the clear and repaint happen
-   * as one visible update.
-   *
+   * Resizes the main-thread canvas to match the container. No-op for
+   * worker-backed renderers — draw() updates the viewport inline so clear
+   * and repaint land as one visible update.
    * @param {HTMLElement} container - The game container element.
    * @param {number} devicePixelRatio
    */

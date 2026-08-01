@@ -60,15 +60,7 @@ const LEADERBOARD_ROW_ACTION_SHARE = 'share';
 const LEADERBOARD_ROW_ACTION_RACE = 'race';
 const LEADERBOARD_ROW_ACTION_NONE = 'none';
 
-/**
- * Rows are keyed by the slot they stand in, not by who is standing in it. A
- * refresh that swaps the name at rank 3 should rewrite that row's text rather
- * than deal a fresh list, because every new element replays the entrance
- * animation and a standings screen re-publishes several times per open.
- *
- * Ties and rows with no usable rank fall back to a positional suffix so two
- * specs can never claim the same key.
- */
+/** Rows key by slot, not occupant, so a refresh patches text in place instead of dealing a fresh list (every new element replays its entrance). Ties/unranked rows fall back to a positional suffix. */
 function buildLeaderboardRowKey(prefix, rank, usedKeys) {
     const base = `${prefix}:${rank ?? ''}`;
     let key = base;
@@ -178,16 +170,7 @@ function applyLeaderboardRowSpec(item, spec) {
     syncLeaderboardRowAction(item, spec.actionState);
 }
 
-/**
- * Keyed reconcile against what is already on screen: rows that keep their slot
- * are patched where they stand, so only genuinely new rows are created and
- * only they play the entrance. Rows that move are re-inserted, which does
- * replay it — the right read for a row that changed position.
- *
- * Rows leaving the list are dropped up front rather than swept at the end, so
- * a row disappearing from the middle does not count as a move for everything
- * below it and set the rest of the list re-dealing.
- */
+/** Keyed reconcile: rows keeping their slot are patched in place (no replayed entrance); moved rows are re-inserted and do replay it. Leaving rows are dropped up front so they don't register as a move for the rest of the list. */
 function syncLeaderboardRows(list, rowSpecs) {
     const kindByKey = new Map(rowSpecs.map((spec) => [spec.key, spec.kind]));
     const existingByKey = new Map();

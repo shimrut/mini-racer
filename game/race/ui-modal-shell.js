@@ -1015,20 +1015,7 @@ export class ModalShell {
         });
     }
 
-    /**
-     * Patch challenge finish medal hero + Brag without remounting the sheet.
-     * @param {{
-     *   phase: 'pending'|'won'|'lost'|'tie'|'error',
-     *   statusText?: string|null,
-     *   error?: string|null,
-     *   shareRequest?: { kind: string, challengeId: string }|null,
-     * }} params
-     */
-    /**
-     * Repaints the hero medal on a finish that is already open. Campaign uses
-     * this to drop a medal the server refused, so the sheet never implies a
-     * stage unlock that never happened.
-     */
+    /** Repaints the hero medal on an already-open finish sheet; Campaign uses this to drop a medal the server refused. */
     setCombinedWinMedal(lapMedal) {
         if (!this.modalCombinedView?.classList.contains('active-view')) return;
         const lapData = this._combinedResultsLapData;
@@ -1051,6 +1038,7 @@ export class ModalShell {
         );
     }
 
+    /** Patches the challenge finish hero medal + Brag without remounting the sheet. */
     updateChallengeFinishHero({
         phase,
         statusText = null,

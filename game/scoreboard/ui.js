@@ -533,14 +533,7 @@ export class LeaderboardsUi {
         };
     }
 
-    /**
-     * A snapshot landing is a content change, not a new screen. Re-running the
-     * whole modal show would tear the standings down and build them again, and
-     * every rebuilt row replays its entrance — the flash the player sees when
-     * the fetch answers. It would also reinstall the day options this open
-     * closed over, undoing any fresher rail the playlist fetch has published
-     * since.
-     */
+    /** A snapshot landing is a content change, not a new screen — re-running the whole modal show would replay every row's entrance and reinstall stale day options. */
     publishDailyChallengeLeaderboardSnapshot(scoreboardSnapshot) {
         this.updateModalScoreboardSnapshot(scoreboardSnapshot);
     }

@@ -285,13 +285,11 @@ async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
 }
 
 /**
- * Catalog-order pointer selection: walk TRACK_SCHEDULE_KEYS one track per day,
- * wrapping at the end. The playhead is the most-recent ledger entry before today
- * (its trackKey). Tomorrow plays the next key after the playhead.
- *
- * Editing the explicit catalog schedule only affects days that have not been
- * written yet; past days are frozen in the ledger. If the playhead trackKey is
- * no longer scheduled or the ledger is empty, fall back to the catalog default.
+ * Walks TRACK_SCHEDULE_KEYS one track per day, wrapping at the end. The
+ * playhead is the most recent ledger entry before today; tomorrow plays the
+ * next key after it. Editing the schedule only affects unwritten days — past
+ * days stay frozen in the ledger — and falls back to the catalog default if
+ * the playhead track is no longer scheduled or the ledger is empty.
  */
 async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
     const pool = TRACK_SCHEDULE_KEYS;
