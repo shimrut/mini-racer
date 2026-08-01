@@ -123,19 +123,25 @@ describe('track runtime integrity', () => {
             'numberEight',
             'numberNine',
             'analogAudio',
+            'sundayMarket',
             'hardHitter',
             'roadRage',
             'yellowYard',
-            'sundayMarket',
+            'lunarLimbo',
+            'furiousFast',
+            'blackstoneRun',
+            'titanTown',
             'eulersNumber',
             'imaginaryNumber',
             'infinitePie',
+            'centralDrop',
         ]);
 
         const intentionallyReviewedKeys = new Set([
             'pretzelArena',
             'cobaltRun',
             'lunarLimbo',
+            'furiousFast',
             'blackstoneRun',
             'titanTown',
             'mistfallCircuit',
@@ -157,13 +163,14 @@ describe('track runtime integrity', () => {
             'eulersNumber',
             'imaginaryNumber',
             'infinitePie',
+            'centralDrop',
         ]);
         const unchangedTrackRegistry = Object.fromEntries(
             Object.entries(TRACKS)
                 .filter(([trackKey]) => !intentionallyReviewedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(unchangedTrackRegistry)).toBe(
-            '44b65607c71b304e296c49a68006faafa939f08482e93e613b014a9857b326d5',
+            '5cec3840798ec34708048929b1d96c5b84f65fb4b5df350638c68dbacc5f03ea',
         );
 
         const existingTrackRegistry = Object.fromEntries(
@@ -172,10 +179,10 @@ describe('track runtime integrity', () => {
                 .map((trackKey) => [trackKey, TRACKS[trackKey]]),
         );
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
-            'ce25152f99a73a2aafb669858c68d2a7252bcce2c696ce0e0edeeefeecaa2648',
+            '0ddcb5069d55ce590d2d304ee54b6a1a3be145d325bb33ceddda5a4d7fa7139e',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'eae1e8665d99be4c060582d23b0cbb224cec919320a81973d511dd0cb0740483',
+            'e955ac4d5f55657bb0686b84931b28a690aa5514291780482f0b7b7b0b4cac75',
         );
     });
 
