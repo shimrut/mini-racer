@@ -198,7 +198,7 @@ export function bindPodiumPlayNow(documentRef, openGame = openFeaturedGameFromPo
 export async function openFeaturedGameFromPodium(event) {
     requestFeaturedDailyChallengeStart();
     try {
-        // Hosted custom posts only; local podium-test.html has no Devvit client.
+        // Hosted custom posts only; a plain local page has no Devvit client.
         const { requestExpandedMode } = await import('@devvit/web/client');
         await requestExpandedMode(event, 'game');
     } catch (error) {
