@@ -28,7 +28,9 @@ export const modeRouterEngineMethods = {
         // boot path used to set this background, so one race on a campaign stage
         // — or on any day but today — replaced the featured track for the rest of
         // the session.
-        void this.syncReadyBackgroundTrack(this.currentDailyChallenge);
+        void this.syncReadyBackgroundTrack(this.currentDailyChallenge).catch((error) => {
+            console.error('Error syncing Home background track:', error);
+        });
     },
 
     showDailyLobby({ selectChallengeId = null } = {}) {

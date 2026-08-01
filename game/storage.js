@@ -102,9 +102,7 @@ export async function getPlayerProgressState() {
       return remoteState;
     }
   } catch (error) {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      console.error("Error loading player progress state:", error);
-    }
+    console.error("Error loading player progress state:", error);
   }
 
   return getLocalPlayerProgressState();

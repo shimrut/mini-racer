@@ -223,9 +223,17 @@ async function checkRateLimit(username: string): Promise<number | null> {
     if (attempts === 1) await redis.expire(key, SHARE_RATE_LIMIT_SECONDS);
     if (attempts <= SHARE_RATE_LIMIT_MAX) return null;
     const expiresAt = await redis.expireTime(key);
-    return Number.isFinite(expiresAt) && expiresAt > 0
-        ? Math.max(1, expiresAt - Math.floor(Date.now() / 1000))
-        : SHARE_RATE_LIMIT_SECONDS;
+    if (Number.isFinite(expiresAt) && expiresAt > 0) {
+        return Math.max(1, expiresAt - Math.floor(Date.now() / 1000));
+    }
+    // The key is scoped to the username only (no challenge/competition id to
+    // age it out), so a missing TTL here — from a crash between incrBy and
+    // expire above, or any other gap — would otherwise wedge this user's
+    // counter above the limit forever: it can keep incrementing but never
+    // expire. Repair it so the window actually restarts instead of just
+    // reporting a retry time that never becomes true.
+    await redis.expire(key, SHARE_RATE_LIMIT_SECONDS);
+    return SHARE_RATE_LIMIT_SECONDS;
 }
 
 export async function registerDailyGpPost({

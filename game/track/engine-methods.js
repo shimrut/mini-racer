@@ -148,6 +148,7 @@ export const trackEngineMethods = {
     this.collisionHash = runtime.collisionHash;
     this.setLoadingStatus(75, "Syncing Graphics...");
     await this.refreshTrackPresentation(requestId);
+    if (requestId !== this.trackLoadRequestId) return;
 
     this.bestLapTime = null;
     this.syncCurrentRunPolicy();
