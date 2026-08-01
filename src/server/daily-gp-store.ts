@@ -6,6 +6,7 @@ import {
     TRACK_SCHEDULE_KEYS,
 } from '../../game/track/catalog.js';
 import { TRACKS } from '../../game/track/tracks.js';
+import { formatRaceTime } from './format-race-time.js';
 import {
     resolveLeaderboardDisplayName,
     sanitizeRedditUsername,
@@ -431,14 +432,6 @@ export function normalizeOffset(offset: unknown): number {
 
 
 
-function formatPodiumTime(bestTimeMs: number): string {
-    const totalMilliseconds = Math.max(0, Math.round(bestTimeMs));
-    const minutes = Math.floor(totalMilliseconds / 60_000);
-    const seconds = Math.floor((totalMilliseconds % 60_000) / 1000);
-    const milliseconds = totalMilliseconds % 1000;
-    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
-}
-
 async function readFinalPodiumPositions(
     challenge: DailyGpChallenge,
 ): Promise<FinalDailyGpPodium['positions']> {
@@ -471,7 +464,7 @@ async function readFinalPodiumPositions(
                 redditUsername,
             }),
             identityType: usesRedditIdentity ? 'reddit' as const : 'private' as const,
-            formattedTime: formatPodiumTime(entry.bestTimeMs),
+            formattedTime: formatRaceTime(entry.bestTimeMs),
         };
     });
 

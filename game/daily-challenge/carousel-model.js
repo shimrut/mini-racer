@@ -11,6 +11,7 @@ import {
     getMedalForRaceTime,
 } from '../medals/medal-timing.js';
 import { TRACKS } from '../track/tracks.js';
+import { formatLapsLabel } from '../shared/laps-label.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -48,10 +49,6 @@ export function formatDailyCarouselDayLabel(challenge, nowMs = Date.now()) {
     }).format(new Date(timeMs));
 }
 
-export function formatDailyCarouselLapsLabel(laps) {
-    return `${laps} ${laps === 1 ? 'Lap' : 'Laps'}`;
-}
-
 export function buildDailyCarouselCards(challenges = [], {
     getSnapshot = () => null,
     nowMs = Date.now(),
@@ -78,7 +75,7 @@ export function buildDailyCarouselCards(challenges = [], {
             ? getMedalForRaceTime(challenge.trackKey, bestTime, requiredLaps)
             : null;
         const dayLabel = formatDailyCarouselDayLabel(challenge, nowMs);
-        const lapsLabel = formatDailyCarouselLapsLabel(requiredLaps);
+        const lapsLabel = formatLapsLabel(requiredLaps);
         // No unit: the card's meta line is uppercased, and "18.00S" reads as a
         // typo. Matches how the campaign card states a best.
         const bestLabel = hasBestTime ? bestTime.toFixed(3) : null;

@@ -1,3 +1,5 @@
+import { clamp } from '../shared/clamp.js';
+
 const PHYSICS_DT = 1 / 60;
 export const KPH_PER_WORLD_UNIT = 20;
 
@@ -12,10 +14,6 @@ export const DEFAULT_PHYSICS_TUNING = Object.freeze({
     highSpeedSteerTrim: 0.3175,
     angularResponse: 22
 });
-
-export function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
-}
 
 export function normalizePhysicsConfig(config = {}, fallback = DEFAULT_PHYSICS_TUNING) {
     const normalized = { ...fallback };

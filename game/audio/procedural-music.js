@@ -1,9 +1,6 @@
 import { getMusicEnabled } from '../settings/music-preference.js';
 import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js';
-
-function clamp(val, min, max) {
-    return Math.max(min, Math.min(max, val));
-}
+import { clamp } from '../shared/clamp.js';
 
 function midiToFreq(note) {
     return 440 * Math.pow(2, (note - 69) / 12);

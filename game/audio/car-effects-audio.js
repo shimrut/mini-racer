@@ -1,4 +1,5 @@
 import { KPH_PER_WORLD_UNIT } from '../car/handling.js';
+import { clamp } from '../shared/clamp.js';
 import { getCarProceduralAudioEnabled } from '../settings/car-audio-preference.js';
 import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unlock.js';
 
@@ -8,10 +9,6 @@ const IDLE_AUDIO_SUSPEND_MS = 250;
 
 export function userGesturePrepareCarEffects() {
     registeredApi?.prepareOnUserGesture?.();
-}
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
 }
 
 function createLoopingNoiseBuffer(audioCtx, seconds = 2) {

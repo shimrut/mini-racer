@@ -1,4 +1,5 @@
-import { clamp, KPH_PER_WORLD_UNIT } from '../car/handling.js';
+import { KPH_PER_WORLD_UNIT } from '../car/handling.js';
+import { clamp } from '../shared/clamp.js';
 import { getCrossingFraction, getIntersection } from '../track/geometry.js';
 import {
     handleFinishCrossing,

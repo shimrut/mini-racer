@@ -7,17 +7,13 @@
  */
 import { getCombinedMedalStackTiers } from '../medals/medal-timing.js';
 import { TRACKS } from '../track/tracks.js';
+import { formatLapsLabel } from '../shared/laps-label.js';
 
 export function formatCampaignStageLabel(stage) {
     const number = typeof stage?.numberLabel === 'string' && stage.numberLabel.trim()
         ? stage.numberLabel.trim()
         : null;
     return number ? `Stage ${number}` : 'Stage';
-}
-
-function formatLapsLabel(laps) {
-    const safeLaps = Number.isInteger(laps) && laps > 0 ? laps : 1;
-    return `${safeLaps} ${safeLaps === 1 ? 'Lap' : 'Laps'}`;
 }
 
 /**

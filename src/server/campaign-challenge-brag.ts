@@ -2,6 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
 import { getTrackName } from '../../game/track/catalog.js';
+import { formatRaceTime } from './format-race-time.js';
 import type {
     CampaignChallengeRequestContext,
     CampaignChallengeServiceResult,
@@ -67,19 +68,11 @@ function sharedKey(challengeId: string, username: string): string {
     return `${PREFIX}:shared:${challengeId}:${viewerHash}`;
 }
 
-function formatBragTime(bestTimeMs: number): string {
-    const rounded = Math.round(bestTimeMs);
-    const minutes = Math.floor(rounded / 60000);
-    const seconds = Math.floor((rounded % 60000) / 1000);
-    const remainder = rounded % 1000;
-    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(remainder).padStart(3, '0')}`;
-}
-
 export function formatChallengeBragComment(
     bestTimeMs: number,
     trackKey: string,
 ): string {
-    const time = formatBragTime(bestTimeMs);
+    const time = formatRaceTime(bestTimeMs);
     const trackName = getTrackName(trackKey, 'this track');
     return `I beat this challenge with ${time} on ${trackName}. 🏁`;
 }

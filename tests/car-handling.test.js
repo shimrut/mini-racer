@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
     DEFAULT_PHYSICS_TUNING,
-    clamp,
     normalizePhysicsConfig,
     simulateStraightLine,
 } from '../game/car/handling.js';
+import { clamp } from '../game/shared/clamp.js';
 
 describe('car handling helpers', () => {
     it('clamps values to inclusive bounds', () => {
