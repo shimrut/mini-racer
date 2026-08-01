@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
     MAX_REPLAY_FRAMES,
     REPLAY_FRAMES_PER_LAP,
-    validateDailyGpReplay,
     validateDailyGpReplayDetailed,
 } from '../src/server/replay-validator.ts';
 import { isValidPbGhostTrace } from '../src/server/pb-ghost-trace.ts';
@@ -162,12 +161,14 @@ describe('server replay validator', () => {
     });
 
     it('computes a finish time, ghost, and millisecond rounding from replay inputs', () => {
-        const result = validateDailyGpReplay({
+        const outcome = validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: FINISHING_REPLAY,
         });
 
+        expect(outcome.ok).toBe(true);
+        const result = outcome.run;
         expect(result).toMatchObject({
             completedLaps: 1,
             checkpointTimesSec: null,
@@ -193,7 +194,7 @@ describe('server replay validator', () => {
     });
 
     it('rejects submissions that do not replay to a valid finish', () => {
-        expect(validateDailyGpReplay({
+        expect(validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: {
@@ -202,9 +203,9 @@ describe('server replay validator', () => {
                     { frames: 10, left: false, right: false, relaunchDelay: false },
                 ],
             },
-        })).toBe(null);
+        }).ok).toBe(false);
 
-        expect(validateDailyGpReplay({
+        expect(validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: STRAIGHT_TRACK,
             replay: {
@@ -213,7 +214,7 @@ describe('server replay validator', () => {
                     { frames: 1, left: 'no', right: false, relaunchDelay: false },
                 ],
             },
-        })).toBe(null);
+        }).ok).toBe(false);
     });
 
     it('reports no_finish failure details for short incomplete replays', () => {

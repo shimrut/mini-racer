@@ -341,12 +341,3 @@ export function validateDailyGpReplayDetailed({
         failure: getStateFailureDetails('no_finish', state, frameCount),
     };
 }
-
-export function validateDailyGpReplay(options: {
-    challenge: DailyGpChallenge;
-    replay?: unknown;
-    track?: Record<string, any>;
-}): ReplayValidationResult | null {
-    const outcome = validateDailyGpReplayDetailed(options);
-    return outcome.ok ? outcome.run : null;
-}

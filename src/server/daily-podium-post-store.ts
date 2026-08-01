@@ -133,14 +133,6 @@ export async function readDailyGpPodiumPostRecord(
     );
 }
 
-export async function writeDailyGpPodiumPostRecord(
-    record: DailyGpPodiumPostRecord,
-): Promise<void> {
-    const key = createPodiumPostRecordKey(record.subredditName, record.challengeId);
-    await redis.set(key, JSON.stringify(record));
-    await redis.expire(key, DAILY_GP_REDIS_TTL_SECONDS);
-}
-
 /** First-writer-wins create. Returns false if a record already exists. */
 export async function writeDailyGpPodiumPostRecordIfAbsent(
     record: DailyGpPodiumPostRecord,

@@ -14,7 +14,6 @@ vi.mock('../src/server/daily-podium-post-store.js', () => ({
     acquireDailyGpPodiumPostCreationLock: vi.fn(),
     readDailyGpPodiumPostRecord: vi.fn(),
     releaseDailyGpPodiumPostCreationLock: vi.fn(),
-    writeDailyGpPodiumPostRecord: vi.fn(),
 }));
 vi.mock('../src/server/request-context.js', () => ({ getRequestAppSlug: vi.fn() }));
 

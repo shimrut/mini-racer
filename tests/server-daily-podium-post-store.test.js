@@ -19,7 +19,6 @@ const {
     readDailyGpPodiumPendingSnapshot,
     readDailyGpPodiumPostRecord,
     releaseDailyGpPodiumPostCreationLock,
-    writeDailyGpPodiumPostRecord,
     writeDailyGpPodiumPostRecordIfAbsent,
     writeDailyGpPodiumPendingSnapshot,
 } = await import('../src/server/daily-podium-post-store.ts');
@@ -46,7 +45,7 @@ describe('daily podium post store', () => {
         });
     });
 
-    it('reads and writes the canonical subreddit/challenge record', async () => {
+    it('reads the canonical subreddit/challenge record', async () => {
         const record = {
             subredditName: 'MiniRacer',
             challengeId: 'daily-gp-2026-07-10',
@@ -61,16 +60,6 @@ describe('daily podium post store', () => {
         ).resolves.toEqual(record);
         expect(mockRedis.get).toHaveBeenCalledWith(
             `dailygp:podium-post:miniracer:${record.challengeId}`,
-        );
-
-        await writeDailyGpPodiumPostRecord(record);
-        expect(mockRedis.set).toHaveBeenCalledWith(
-            `dailygp:podium-post:miniracer:${record.challengeId}`,
-            JSON.stringify(record),
-        );
-        expect(mockRedis.expire).toHaveBeenCalledWith(
-            `dailygp:podium-post:miniracer:${record.challengeId}`,
-            45 * 24 * 60 * 60,
         );
     });
 
