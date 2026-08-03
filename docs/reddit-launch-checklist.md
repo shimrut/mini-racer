@@ -20,6 +20,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
 ### Product and UX
 
 - [ ] The in-feed launch card is clear at first glance and explains the action: race today’s challenge.
+- [ ] The stable Current Daily launcher always displays the active UTC-day track and opens the expanded game in Daily mode; it never reuses a dated post payload.
+- [ ] The Campaign launcher opens the expanded game in Campaign mode.
+- [ ] The Lobby launcher opens the expanded game in the Home lobby, even after a previous Daily or Campaign launch on the same device.
 - [ ] The full game is understandable for a first-time player without extra instructions.
 - [ ] The launch card works without inline scroll traps.
 - [ ] The expanded game works across phone and desktop layouts.
@@ -114,6 +117,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] A dedicated production subreddit exists for Mini Racer: `MiniRacerGame`. Do not launch from `mini_racer_dev`.
 - [ ] The moderator install flow is confirmed in the target subreddit.
 - [ ] The **Create Mini Racer post** menu item successfully creates a playable post.
+- [ ] The **Create current Daily launcher**, **Create Campaign launcher**, and **Create Lobby launcher** menu items each create the correct canonical post and navigate to it.
+- [ ] Repeating any launcher creation action reuses the existing subreddit launcher post instead of creating a duplicate.
 - [ ] At least one example post has been created and reviewed end to end.
 - [ ] Moderator, scheduler, and repeated create actions reuse the same canonical post for the subreddit and UTC day.
 - [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.
@@ -145,7 +150,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 ### Devvit Journeys playtest
 
 - [ ] `journeys` permission and the official `/api/telemetry` route are present, with no custom analytics route, store, dashboard, or Redis record.
-- [ ] `App.Ready` fires once after the expanded lobby becomes interactive; preview and podium entrypoints do not fire it.
+- [ ] `App.Ready` fires once after the expanded lobby becomes interactive; preview, Daily launcher, Campaign launcher, and podium entrypoints do not fire it.
 - [ ] Explicit Start/Retry/Improve/Restart begins an attempt with the matching Journey start reason, checkpoint progress never moves backward, pause/resume use fixed actions, and valid/incomplete endings match the race lifecycle.
 - [ ] Journey payloads contain no player identity, guest token, challenge or track identifier, replay data, device details, or lap score.
 - [ ] `npx devvit playtest` on `mini_racer_dev` returns a Journey receipt without affecting race behavior. `JOURNEY_RECEIPT_DENIED_NOT_ALLOWLISTED` proves routing only; `JOURNEY_RECEIPT_VALID` is required to claim ingestion.

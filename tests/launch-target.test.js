@@ -32,6 +32,22 @@ describe('game launch target', () => {
             .toEqual({ mode: 'daily', challengeId: null });
     });
 
+    it.each([
+        ['daily-launcher', 'daily'],
+        ['campaign-launcher', 'campaign'],
+        ['lobby-launcher', 'home'],
+    ])('uses the %s post target even when a stale stored target exists', (postType, mode) => {
+        const root = createRoot({ postData: { postType, launchMode: mode } });
+        requestGameLaunchTarget('daily', { root });
+        expect(resolveGameLaunchTarget(root)).toEqual({ mode, challengeId: null });
+    });
+
+    it('accepts a generic mode launcher post target', () => {
+        expect(resolveGameLaunchTarget(createRoot({
+            postData: { postType: 'mode-launcher', launchMode: 'campaign' },
+        }))).toEqual({ mode: 'campaign', challengeId: null });
+    });
+
     it('gives immutable challenge post data precedence over a stale stored target', () => {
         const root = createRoot({
             postData: { postType: 'campaign-challenge', challengeId: 'challenge-1' },

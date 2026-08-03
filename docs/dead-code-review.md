@@ -18,7 +18,9 @@ The unused tracked assets were removed. Local draft logos and the duplicate meda
 
 `fixDevvitHtmlEntrypoints()` in `vite.config.js` searches for old HTML strings such as `?v=1.90`. The current source uses different versions, and the Devvit Vite plugin already emits `/default.js`, `/default.css`, `/game.js`, and `/game.css`. The custom plugin now reads and rewrites the files without changing them.
 
-The custom rewrite plugin was removed. The production build still emits the correct three HTML entrypoints and generated asset names.
+The custom rewrite plugin was removed. The production build still emits the
+configured HTML entrypoints and generated asset names; each named Devvit
+entrypoint now has an explicit HTML input rather than relying on a rewrite.
 
 ### 3. Unused JavaScript functions
 

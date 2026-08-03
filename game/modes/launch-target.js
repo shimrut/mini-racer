@@ -14,6 +14,28 @@ function readQueryTarget(root) {
     }
 }
 
+function readExplicitPostTarget(root) {
+    const postData = root?.devvit?.context?.postData;
+    if (!postData || typeof postData !== 'object') return null;
+
+    const fixedTargetByPostType = {
+        'daily-launcher': 'daily',
+        'campaign-launcher': 'campaign',
+        'lobby-launcher': 'home',
+    };
+    const fixedTarget = Object.prototype.hasOwnProperty.call(
+        fixedTargetByPostType,
+        postData.postType,
+    )
+        ? fixedTargetByPostType[postData.postType]
+        : null;
+    if (fixedTarget) return { mode: fixedTarget, challengeId: null };
+
+    if (postData.postType !== 'mode-launcher') return null;
+    const mode = normalizeTarget(postData.launchMode);
+    return mode ? { mode, challengeId: null } : null;
+}
+
 function readPostTarget(root) {
     const postData = root?.devvit?.context?.postData;
     if (!postData || typeof postData !== 'object') return null;
@@ -89,6 +111,11 @@ function peekStoredCampaignTarget(root) {
 export function resolveGameLaunchTarget(root = globalThis) {
     const queryMode = readQueryTarget(root);
     if (queryMode) return { mode: queryMode, challengeId: null };
+
+    // Launcher posts are intentionally deterministic. They must not inherit a
+    // one-use target left by a previous Daily, Campaign, or challenge action.
+    const explicitPostTarget = readExplicitPostTarget(root);
+    if (explicitPostTarget) return explicitPostTarget;
 
     // Own-challenge Accept stores campaign; that must beat challenge post data.
     const storedCampaign = peekStoredCampaignTarget(root);

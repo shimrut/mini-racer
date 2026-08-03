@@ -71,11 +71,11 @@ function getMockDailyUrlParams() {
     }
 }
 
-/** Standalone local preview card (`preview.html`) — use mock data only outside Reddit hosting. */
+/** Standalone local preview cards (`preview.html` and `daily.html`) — use mock data only outside Reddit hosting. */
 export function isPreviewPage() {
     if (typeof window === 'undefined') return false;
     const path = window.location?.pathname || '';
-    return /(?:^|\/)preview\.html$/i.test(path);
+    return /(?:^|\/)(?:preview|daily)\.html$/i.test(path);
 }
 
 /** mockDaily=true → random track; mockDaily=<trackKey> → that track only */
@@ -672,13 +672,16 @@ export function getDailyChallengeTrackName(challenge) {
     return getTrackName(challenge?.trackKey, 'Unknown Track');
 }
 
-export async function getActiveDailyChallenge({ allowExpiredPost = false } = {}) {
+export async function getActiveDailyChallenge({
+    allowExpiredPost = false,
+    ignorePostData = false,
+} = {}) {
     const startOverride = readDailyStartOverride();
     if (startOverride?.mode === 'featured') {
         clearDailyStartOverride();
     }
 
-    const postChallenge = getPostBoundDailyChallengeFromContext();
+    const postChallenge = ignorePostData ? null : getPostBoundDailyChallengeFromContext();
     if (postChallenge) {
         cacheDailyChallengePlaylist([postChallenge]);
         if (allowExpiredPost || isChallengeStillUsable(postChallenge)) {

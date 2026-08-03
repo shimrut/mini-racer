@@ -5,7 +5,8 @@
 `styles.css` remains the single stylesheet entrypoint loaded by `game.html`. It is
 an ordered manifest whose imports are bundled into the production `game.css`.
 
-Standalone post surfaces (`preview.css`, `podium.css`, `campaign-challenge.css`)
+Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
+`campaign-challenge.css`)
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the

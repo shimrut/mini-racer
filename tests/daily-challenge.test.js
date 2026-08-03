@@ -352,6 +352,42 @@ describe('daily-challenge service', () => {
         expect(challenge.id).toBe('daily-gp-2026-06-02');
     });
 
+    it('can ignore frozen post data for the current Daily launcher', async () => {
+        globalThis.devvit = {
+            context: {
+                postData: {
+                    postType: 'daily-launcher',
+                    challenge: {
+                        id: 'frozen-launcher-data',
+                        trackKey: 'circuit',
+                        startsAt: '2026-07-16T00:00:00.000Z',
+                        endsAt: '2026-07-17T00:00:00.000Z',
+                        availableUntil: '2026-07-23T00:00:00.000Z',
+                        objectiveType: 'single_lap_fastest',
+                        objectiveParams: {},
+                    },
+                },
+            },
+        };
+        fetch.mockResolvedValue(createJsonResponse({
+            id: 'current-launcher-data',
+            trackKey: 'sunlitTemple',
+            startsAt: '2026-07-18T00:00:00.000Z',
+            endsAt: '2026-07-19T00:00:00.000Z',
+            availableUntil: '2026-07-25T00:00:00.000Z',
+            objectiveType: 'single_lap_fastest',
+            objectiveParams: {},
+        }));
+
+        const challenge = await getActiveDailyChallenge({
+            allowExpiredPost: true,
+            ignorePostData: true,
+        });
+
+        expect(challenge.id).toBe('current-launcher-data');
+        expect(challenge.trackKey).toBe('sunlitTemple');
+    });
+
     it('getActiveDailyChallenge fetches the server featured challenge for expired post starts', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-06-10T12:00:00.000Z'));

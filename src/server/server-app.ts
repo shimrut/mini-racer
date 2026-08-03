@@ -44,6 +44,7 @@ import {
     deleteDailyPodiumAutopostSubscription,
     readAllDailyPodiumAutopostSubscriptions,
 } from './daily-podium-autopost-store.js';
+import { ensureMiniRacerLauncherPostForSubreddit } from './launcher-post-service.js';
 import { resolveMenuTargetSubredditName } from './moderator-access.js';
 import { registerPlayerRoutes } from './routes/player-routes.js';
 import { registerCompetitionRoutes } from './routes/competition-routes.js';
@@ -148,6 +149,7 @@ function registerProductionRoutes(app: express.Application): void {
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,
         ensureDailyMiniRacerPostForSubreddit,
+        ensureMiniRacerLauncherPostForSubreddit,
         enableDailyAutopost,
         deleteDailyAutopostSubscription,
         ensureDailyMiniRacerPodiumPostForSubreddit,

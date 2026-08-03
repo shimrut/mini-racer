@@ -345,7 +345,7 @@ flowchart LR
 | Personal-best ghost | `game/ghost/pb-ghost.js`, `game/ghost/pb-ghost-service.js`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | Challenge PB state, verified trace generation, playback, selected-car rendering | Replay validator, player identity, Redis, settings |
 | Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/car-unlock-policy.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js`, `src/server/car-unlock-store.ts` | Car art, asset loading, permanent achievement unlocks, garage selection, trail style, and the selected-car marker in Daily/Campaign lobby previews | `public/assets/cars/*`, generated asset list, Campaign results, verified race/challenge events, shared track carousel, Redis |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/labels.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
-| Campaign and challenges | `game/campaign/*`, `game/lobby/*`, `game/modes/launch-target.js`, `src/server/campaign-*`, `campaign-challenge.html` | Permanent staged progression, Campaign standings/PBs, isolated verified player duels and custom posts | Shared simulation/replay/medal rules, Redis, Reddit post context |
+| Campaign and challenges | `game/campaign/*`, `game/lobby/*`, `game/modes/launch-target.js`, `src/server/campaign-*`, `campaign.html`, `campaign-challenge.html` | Permanent staged progression, Campaign standings/PBs, isolated verified player duels, launcher posts, and custom challenges | Shared simulation/replay/medal rules, Redis, Reddit post context |
 | Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow, share entry point | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js`, `game/player/preferences.js` | Identity, audio toggles, collision auto-restart and delay, durable preference sync | Browser cache, player APIs, Redis profile, modal helpers |
 | Audio | `game/audio/*` | Sound playback | Settings preferences |
@@ -425,7 +425,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |
 | Devvit Journey lifecycle | `game/journeys/service.js`, `game/engine.js`, `game/race/engine-methods.js` | `game/daily-challenge/engine-methods.js`, `src/server/server-app.ts`, `devvit.json` | Ready, explicit start, monotonic progress, interaction, and end events must remain non-blocking and free of custom persistence or identifiers |
 | Replay verification / anti-cheat changes | `src/server/replay-validator.ts`, `game/race/simulation.js`, `game/track/runtime.js`, `game/config.js` | `src/server/daily-gp-store.ts`, `game/scoreboard/engine-methods.js` | This is the highest-risk area because client and server must stay logically identical |
-| Moderator workflows, daily or podium autoposting, or public post discovery copy | `src/server/daily-post-service.ts`, `src/server/daily-podium-service.ts`, `src/server/moderator-access.ts`, `src/server/reddit-post-title.ts` | `src/server/routes/internal-routes.ts`, `devvit.json`, `README.md`, `CHANGELOG.md`, route/workflow tests | These flows are server-owned and tied to Devvit/Reddit context; race and podium subscriptions and canonical records remain independent |
+| Moderator workflows, daily/podium autoposting, or launcher post discovery copy | `src/server/daily-post-service.ts`, `src/server/daily-podium-service.ts`, `src/server/launcher-post-service.ts`, `src/server/launcher-post-store.ts`, `src/server/moderator-access.ts`, `src/server/reddit-post-title.ts` | `src/server/routes/internal-routes.ts`, `devvit.json`, `README.md`, `CHANGELOG.md`, route/workflow tests | These flows are server-owned and tied to Devvit/Reddit context; dated Daily, launcher, and podium canonical records remain independent |
 
 ## High-Risk Shared Contracts
 
@@ -456,8 +456,23 @@ These are useful, but they are not on the critical player path:
   described in `docs/track-authoring.md`.
 - `tools/runner.*`
   Auxiliary workflow tooling.
-- `preview.html`, `preview.js`, `preview.css`
-  Custom Reddit post preview entrypoint and standalone local review surface. The current challenge is labeled `Today`; the preview shows its lap count and scaled gold-medal threshold with shared gold medal artwork, and draws the stock in-game car clearly past the start line with a short trail. In-game schematic previews do not use that post-only treatment.
+- `preview.html`, `daily.html`, `preview.js`, `preview.css`
+  Custom Reddit post preview surfaces. `default` receives immutable challenge
+  data and remains bound to that dated Daily post; `daily` is the stable
+  current-track launcher and explicitly ignores any frozen challenge payload.
+  Both show the lap count, scaled gold-medal threshold, shared gold medal
+  artwork, and the stock in-game car clearly past the start line. In-game
+  schematic previews do not use that post-only treatment.
+- `campaign.html`, `campaign.js`, `campaign.css`
+  Stable Campaign launcher surface. Its CTA stores the Campaign launch target
+  and expands the shared `game` entrypoint. The `game` entrypoint itself is the
+  stable lobby surface; launcher post metadata pins it to Home so stale
+  one-use Daily/Campaign targets cannot change the destination.
+- `src/server/launcher-post-service.ts`, `src/server/launcher-post-store.ts`,
+  and the launcher routes in `src/server/routes/internal-routes.ts` create one
+  canonical Current Daily, Campaign, and Lobby post per subreddit. Launcher
+  post creation is idempotent and does not alter the dated Daily post or its
+  score-thread workflow.
 
 ## Recommended Scoping Heuristic
 

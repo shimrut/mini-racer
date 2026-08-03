@@ -2,6 +2,7 @@ import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
 import type { DailyGpChallenge } from '../daily-gp-model.js';
 import type { FinalDailyGpPodium } from '../daily-podium-model.js';
+import type { LauncherPostKind } from '../launcher-post-store.js';
 import { isDailyGpPodiumPublicationOpen } from '../daily-podium-service.js';
 
 type DailyAutopostSubscription = {
@@ -32,6 +33,10 @@ export type InternalRouteDependencies = {
     ensureDailyMiniRacerPostForSubreddit(
         subredditName: string,
         challenge: DailyGpChallenge,
+    ): Promise<PostResult>;
+    ensureMiniRacerLauncherPostForSubreddit(
+        subredditName: string,
+        kind: LauncherPostKind,
     ): Promise<PostResult>;
     enableDailyAutopost(subredditName: string): Promise<void>;
     deleteDailyAutopostSubscription(subredditName: string): Promise<void>;
@@ -107,6 +112,54 @@ export function registerInternalRoutes(
             );
             res.json({ navigateTo: result.postUrl });
         },
+    );
+
+    const registerLauncherCreateAction = (
+        path: string,
+        kind: LauncherPostKind,
+        label: string,
+    ) => {
+        registerMenuAction(
+            app,
+            dependencies,
+            path,
+            {
+                missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
+                failureLogMessage: `Failed to create Mini Racer ${kind} launcher post:`,
+                failureToastPrefix: `Could not create the Mini Racer ${kind} launcher post`,
+            },
+            async (subredditName, res) => {
+                const result = await dependencies.ensureMiniRacerLauncherPostForSubreddit(
+                    subredditName,
+                    kind,
+                );
+                res.json({
+                    showToast: {
+                        text: result.created
+                            ? `${label} created for r/${subredditName}.`
+                            : `${label} already exists for r/${subredditName}.`,
+                        appearance: 'success',
+                    },
+                    navigateTo: result.postUrl,
+                });
+            },
+        );
+    };
+
+    registerLauncherCreateAction(
+        '/internal/menu/launcher-daily-create',
+        'daily',
+        'Current Daily launcher post',
+    );
+    registerLauncherCreateAction(
+        '/internal/menu/launcher-campaign-create',
+        'campaign',
+        'Campaign launcher post',
+    );
+    registerLauncherCreateAction(
+        '/internal/menu/launcher-lobby-create',
+        'lobby',
+        'Lobby launcher post',
     );
 
     registerMenuAction(

@@ -63,6 +63,11 @@ Older posts keep their original track while it is still available. If that day's
 
 Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
 
+Communities can also create three stable launcher posts: **Current Daily** always
+renders the active track and opens Daily mode, **Campaign** opens the permanent
+Campaign lobby, and **Lobby** opens the Home lobby. These launcher posts do not
+embed a dated Daily challenge, so they do not become frozen when the day changes.
+
 Final podium posts (separate moderator opt-in) show the top three verified times for the track that just expired, with each finalist's Reddit name or private racer name, their avatar when available, and a **Play Now** button for today's featured track.
 
 ## Garage
@@ -86,7 +91,10 @@ Install Mini Racer in your subreddit, then use the subreddit menu:
 
 | Menu item | What it does |
 | --- | --- |
-| **Create Mini Racer post** | Creates a playable race post for today |
+| **Create Mini Racer post** | Creates a playable frozen Daily challenge post for the current UTC day |
+| **Create current Daily launcher** | Creates or reuses one post that always shows today's featured track and opens Daily mode |
+| **Create Campaign launcher** | Creates or reuses one post that opens Mini Racer in Campaign mode |
+| **Create Lobby launcher** | Creates or reuses one post that opens the Mini Racer Home lobby |
 | **Enable daily Mini Racer posts** | Auto-posts a new race each day (UTC) |
 | **Disable daily Mini Racer posts** | Stops the daily auto-posts |
 | **Enable daily Mini Racer podium posts** | Auto-posts the final podium after a track expires, with hourly retries during the six-hour publication window |
@@ -95,6 +103,7 @@ Install Mini Racer in your subreddit, then use the subreddit menu:
 Tips:
 
 - Only **one** race post is used per community per day — creating again reuses that post instead of flooding the feed
+- Each launcher type is also canonical per community — repeated menu actions reuse its existing post
 - Every race post gets a pinned **Mini Racer score thread** for player result comments
 - Podium posts are informational, use an independent opt-in, and never create a score thread
 - Players share scores as replies in that thread, from their own accounts

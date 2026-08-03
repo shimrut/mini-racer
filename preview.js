@@ -13,7 +13,18 @@ import {
 } from './game/medals/medal-timing.js';
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+export function isCurrentDailyLauncherPost(root = globalThis) {
+    return root?.devvit?.context?.postData?.postType === 'daily-launcher';
+}
+
+export function getDailyPreviewChallengeOptions(root = globalThis) {
+    return {
+        allowExpiredPost: true,
+        ignorePostData: isCurrentDailyLauncherPost(root),
+    };
+}
+
+export async function bootDailyPreview() {
     const playButton = document.getElementById('play-button');
     const trackNameEl = document.getElementById('track-name');
     const canvas = document.getElementById('track-preview');
@@ -32,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const postPreviewCarPromise = loadPostPreviewCar();
 
     try {
-        const challenge = await getActiveDailyChallenge({ allowExpiredPost: true });
+        const challenge = await getActiveDailyChallenge(getDailyPreviewChallengeOptions());
         currentChallenge = challenge;
         currentTrackKey = TRACKS[challenge.trackKey] ? challenge.trackKey : 'circuit';
         currentTrack = TRACKS[currentTrackKey] || fallbackTrack;
@@ -70,7 +81,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
         });
     });
-});
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        void bootDailyPreview();
+    });
+}
 
 function loadPostPreviewCar() {
     const loader = new CarSpriteLoader();

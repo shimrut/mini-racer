@@ -21,8 +21,16 @@
         "height": "tall",
         "entry": "preview.html"
       },
+      "daily": {
+        "height": "tall",
+        "entry": "daily.html"
+      },
       "game": {
         "entry": "game.html"
+      },
+      "campaign": {
+        "height": "tall",
+        "entry": "campaign.html"
       },
       "campaign-challenge": {
         "height": "tall",
@@ -42,10 +50,31 @@
     "items": [
       {
         "label": "Create Mini Racer post",
-        "description": "Publish a playable Mini Racer game post in this subreddit",
+        "description": "Publish a frozen Daily challenge post in this subreddit",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "Create current Daily launcher",
+        "description": "Publish one post that always shows today's featured track",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/launcher-daily-create"
+      },
+      {
+        "label": "Create Campaign launcher",
+        "description": "Publish one post that opens Mini Racer in Campaign mode",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/launcher-campaign-create"
+      },
+      {
+        "label": "Create Lobby launcher",
+        "description": "Publish one post that opens the Mini Racer lobby",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/launcher-lobby-create"
       },
       {
         "label": "Enable daily Mini Racer posts",

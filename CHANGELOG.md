@@ -1,5 +1,10 @@
 # Changelog
 
+- Added stable Current Daily, Campaign, and Lobby launcher posts. Current Daily
+  follows the active UTC-day track without freezing, Campaign opens the shared
+  game in Campaign mode, and Lobby opens the Home lobby. Each launcher is
+  idempotently created from its subreddit menu action while dated Daily posts
+  keep their existing frozen behavior.
 - Fixed Daily and Campaign identity in the shared lobby header: Mini Racer,
   the mode label, divider, and billing row stay fixed while carousel movement
   updates only the right-side date/stage value. Removed the per-card identity
