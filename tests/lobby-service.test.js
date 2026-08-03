@@ -74,7 +74,22 @@ describe('lobby service', () => {
         expect(state.stages[0].unlockRequirementLabel).toBeNull();
         expect(state.stages[1].unlockRequirementLabel).toBeNull();
         // The stage before it is medalled, so the total is what is left to do.
-        expect(state.stages[2].unlockRequirementLabel).toBe('6/10 medals to unlock');
+        expect(state.stages[2].unlockRequirementLabel).toBe('4 more medals needed');
+        expect(state.stages[2].unlockRequirements).toEqual([
+            {
+                id: 'previous-medal',
+                copy: 'Medal earned on Number Six',
+                satisfied: true,
+            },
+            {
+                id: 'medal-total',
+                copy: 'Additional medals needed',
+                satisfied: false,
+                medalTotal: 6,
+                requiredMedals: 10,
+                remainingMedals: 4,
+            },
+        ]);
         // No unlock metadata, and the row above it is locked too: say it needs
         // more without inventing a number or pointing at an unreachable track.
         expect(state.stages[3].unlockRequirementLabel).toBe('More medals to unlock');
@@ -105,8 +120,41 @@ describe('lobby service', () => {
 
         // Four medals already clears the price of 3, so naming the total would
         // read as though nothing were owed.
-        expect(state.stages[2].unlockRequirementLabel).toBe('A medal on Number Six to unlock');
-        expect(state.stages[3].unlockRequirementLabel).toBe('4/9 medals to unlock');
+        expect(state.stages[2].unlockRequirementLabel).toBe('Earn any medal on Number Six');
+        expect(state.stages[3].unlockRequirementLabel).toBe('5 more medals needed');
+        expect(state.stages[2].unlockRequirements).toEqual([
+            {
+                id: 'previous-medal',
+                copy: 'Earn any medal on Number Six',
+                satisfied: false,
+            },
+            {
+                id: 'medal-total',
+                copy: 'Medal total reached',
+                satisfied: true,
+                medalTotal: 4,
+                requiredMedals: 3,
+                remainingMedals: 0,
+            },
+        ]);
+    });
+
+    it('uses singular copy when exactly one medal remains', () => {
+        const state = normalizeCampaignLobbyState({
+            stages: [
+                { id: 'a', trackName: 'Number Five', unlocked: true, medal: 'Author' },
+                { id: 'b', trackName: 'Number Six', unlocked: true, medal: 'Author' },
+                { id: 'c', trackName: 'Number Seven', unlocked: true, medal: 'Bronze' },
+                {
+                    id: 'd',
+                    trackName: 'Number Eight',
+                    unlocked: false,
+                    unlock: { type: 'medal_total', requiredMedals: 10, previousRaceId: 'c' },
+                },
+            ],
+        });
+
+        expect(state.stages[3].unlockRequirementLabel).toBe('One more medal needed');
     });
 
     it('flags exactly one stage as the one to race next', () => {

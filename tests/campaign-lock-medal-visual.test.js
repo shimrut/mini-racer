@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 describe('Campaign locked-stage medal progress visual', () => {
-    it('puts the count inside a medal and fills progress around its perimeter', () => {
+    it('uses stateful medal placeholders for both unlock requirements', () => {
         const ui = readFileSync(
             new URL('../game/ui/track-carousel.js', import.meta.url),
             'utf8',
@@ -16,43 +16,71 @@ describe('Campaign locked-stage medal progress visual', () => {
             'utf8',
         );
 
-        expect(ui).toContain("centerText: meter.value");
-        expect(ui).toContain("icon.classList.toggle('is-complete', meter.ratio >= 1)");
-        expect(ui).toContain("progress.setAttribute('pathLength', '100')");
         expect(ui).toContain(
-            "progress.setAttribute('stroke-dashoffset', String(100 - (meter.ratio * 100)))",
+            'centerText: meter.remainingMedals',
         );
-        expect(css).toMatch(
-            /\.track-carousel__unlock-medal-progress\s*\{[^}]*stroke:\s*rgba\(148,\s*163,\s*184,\s*0\.58\);/s,
-        );
-        expect(css).toMatch(
-            /\.track-carousel__unlock-medal \.medal-svg__center-time\s*\{[^}]*fill:\s*rgba\(148,\s*163,\s*184,\s*0\.72\);/s,
-        );
-        expect(css).toMatch(
-            /\.track-carousel__unlock-medal\.is-complete \.track-carousel__unlock-medal-progress\s*\{[^}]*stroke:\s*var\(--text-color\);/s,
-        );
-        expect(css).toMatch(
-            /\.track-carousel__unlock-medal \.medal-svg__center-time\s*\{[^}]*font-family:\s*var\(--mono-font\);/s,
-        );
+        expect(ui).toContain('function createRequirementMedalIcon(requirement)');
+        expect(ui).toContain("'medal-svg--row-placeholder'");
+        expect(ui).toContain("check.setAttribute('d', REQUIREMENT_CHECK_PATH)");
+        expect(ui).toContain("check.setAttribute('fill', 'rgb(30, 48, 80)')");
+        expect(ui).not.toContain('track-carousel__unlock-medal-progress');
         expect(ui).toContain("createLockIconSvg('track-carousel__preview-lock-icon')");
-        // The puck and the requirement are one gate on the plate, shown and
-        // hidden together. The wording sits here rather than on the scoreline
-        // because the plate is the band that can wrap or be clipped without
-        // moving anything else — on the scoreline the same sentence ran to a
-        // second line and pushed itself down onto Start Race.
-        expect(ui).toContain('gate.append(previewLock, gateNote)');
+        expect(ui).toContain(
+            "className: 'track-carousel__preview-lock-medal medal-svg--row-placeholder'",
+        );
+        expect(ui).toContain('previewLock.append(');
+        // The lock plate remains on the drawing; the two requirements are a
+        // dedicated checklist below the schematic instead of a second unlock
+        // title block. Identity lives in the fixed lobby header, outside the card.
+        expect(ui).toContain('gate.append(previewLock)');
+        expect(ui).toContain('element.append(preview, foot)');
+        expect(ui).not.toContain('head.append(wordmark, billing)');
+        expect(ui).toContain('requirement.append(requirementList)');
+        expect(ui).not.toContain('Unlock requirements');
+        expect(ui).not.toContain('requirement-label');
+        expect(ui).toContain("status.className = 'track-carousel__requirement-medal'");
+        expect(ui).toContain('status.append(createRequirementMedalIcon(requirement))');
+        expect(ui).toContain('foot.append(requirement, meta, medal)');
+        expect(ui).not.toContain("status.textContent = requirement.satisfied ? '✓' : '•'");
         expect(ui).toContain('preview.append(previewArt, gate)');
         expect(ui).toContain('parts.gate.hidden = !locked');
+        expect(ui).toContain('parts.meta.hidden = locked');
+        expect(ui).toContain('parts.medal.hidden = locked');
         expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
         expect(lockIcon).toContain("lock.setAttribute('viewBox', '0 -32 384 544')");
-        // Steel, at the size the puck was tuned to: the accent is what the lobby
-        // spends on the track you can race and the button that starts it.
+        // The lock medal itself is the opaque container; there is no second CSS
+        // hex behind it to create a mismatched double outline.
         expect(css).toMatch(
-            /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4\.5rem;[^}]*height:\s*4\.5rem;[^}]*background:\s*rgba\(15,\s*23,\s*42,\s*0\.92\);[^}]*color:\s*var\(--text-dim\);/s,
+            /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4rem;[^}]*height:\s*4rem;[^}]*opacity:\s*1;/s,
+        );
+        expect(css).toMatch(
+            /\.track-carousel__preview-lock-medal\.medal-svg--outline \.medal-svg__shape\s*\{[^}]*fill:\s*#1e3050;[^}]*stroke:\s*#6f83a5;/s,
         );
         expect(css).not.toMatch(
-            /\.track-carousel__preview-lock\s*\{[^}]*background:\s*var\(--accent-color\)/s,
+            /\.track-carousel__preview-lock\s*\{[^}]*background:\s*rgba\(/s,
+        );
+        expect(css).not.toMatch(
+            /\.track-carousel__preview-lock\s*\{[^}]*clip-path:/s,
+        );
+        expect(css).toContain('.track-carousel__preview-lock-medal');
+        expect(css).toMatch(
+            /\.track-carousel \.daily-playlist-entry--hero\.is-locked \.track-carousel__preview-art canvas\s*\{[^}]*opacity:\s*1;[^}]*filter:\s*saturate\(0\.55\)\s+brightness\(0\.78\);/s,
         );
         expect(css).not.toContain('.track-carousel__meter-fill');
+        expect(css).toMatch(
+            /\.track-carousel__requirement-medal-icon\.medal-svg--outline \.medal-svg__shape,[\s\S]*?stroke:\s*#6f83a5;/s,
+        );
+        expect(css).toMatch(
+            /\.track-carousel__requirement-medal-icon\.is-satisfied \.medal-svg__shape\s*\{[^}]*stroke:\s*var\(--text-color\);[^}]*stroke-dasharray:\s*none;/s,
+        );
+        expect(css).toMatch(
+            /\.track-carousel__requirement-medal-icon \.medal-svg__center-time,[\s\S]*?fill:\s*var\(--text-dim\);[^}]*font-size:\s*220px;/s,
+        );
+        expect(css).toContain('.track-carousel__requirement-check');
+        expect(css).toContain('fill: rgb(30, 48, 80);');
+        expect(css).not.toContain('-webkit-mask-image: linear-gradient(');
+        expect(css).toMatch(
+            /\.track-carousel__requirement-note\s*\{[^}]*color:\s*var\(--text-dim\);[^}]*font-size:\s*clamp\(/s,
+        );
     });
 });

@@ -70,6 +70,7 @@ export const TRACK_CATALOG = {
     imaginaryNumber: { name: "Imaginary Number" },
     infinitePie: { name: "Infinite Pie" },
     centralDrop: { name: "Central Drop" },
+    goldenRatio: { name: "Golden Ratio" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [

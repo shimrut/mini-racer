@@ -104,7 +104,7 @@ Tips:
 ### 1.4.1
 
 - Race times now show full milliseconds everywhere, including the HUD, results, standings, shared comments, and podiums
-- Standings use a stopwatch icon for available opponent races
+- Standings use a ghost icon for available opponent races
 - Ghosts are more reliable — the **ghost unavailable** message should appear a lot less
 - Ghosts no longer jump a bit ahead right after the race starts
 - Improved leaderboard timing — times are accurate to the millisecond (no longer stuck ending in only 0, 3, or 7)

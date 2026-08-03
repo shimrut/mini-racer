@@ -124,6 +124,48 @@ function getExistingCampaignScoreboardSnapshot(engine, stage) {
     });
 }
 
+function createCampaignLeaderboardRefreshSession(previousSession = null) {
+    return {
+        refreshedRaceIds: new Set(),
+        inFlightByRaceId: new Map(),
+        snapshotByRaceId: new Map(previousSession?.snapshotByRaceId || []),
+        selectedRaceId: null,
+    };
+}
+
+function requestCampaignLeaderboardSessionRefresh(raceId, refreshSession) {
+    if (refreshSession.refreshedRaceIds.has(raceId)) {
+        return Promise.resolve(refreshSession.snapshotByRaceId.get(raceId) || null);
+    }
+
+    const existingRequest = refreshSession.inFlightByRaceId.get(raceId);
+    if (existingRequest) return existingRequest;
+
+    let requestPromise = null;
+    requestPromise = getCampaignSnapshot(raceId, {
+        limit: 50,
+        offset: 0,
+    }).then((response) => {
+        const snapshot = response.ok
+            ? normalizeCampaignLeaderboardSnapshot(response.body)
+            : null;
+        if (
+            snapshot
+            && refreshSession.inFlightByRaceId.get(raceId) === requestPromise
+        ) {
+            refreshSession.refreshedRaceIds.add(raceId);
+            refreshSession.snapshotByRaceId.set(raceId, snapshot);
+        }
+        return snapshot;
+    }).finally(() => {
+        if (refreshSession.inFlightByRaceId.get(raceId) === requestPromise) {
+            refreshSession.inFlightByRaceId.delete(raceId);
+        }
+    });
+    refreshSession.inFlightByRaceId.set(raceId, requestPromise);
+    return requestPromise;
+}
+
 /** Next stage and whether it's open, read off the same gate the lobby uses (progress has already absorbed this finish by the time the sheet builds). */
 function getCampaignNextStageTarget(engine, stage) {
     const stageIndex = CAMPAIGN_STAGES.findIndex(
@@ -237,15 +279,15 @@ export function normalizeCampaignLeaderboardSnapshot(body) {
 
 export function buildCampaignLeaderboardOptions(campaignState) {
     const stages = Array.isArray(campaignState?.stages) ? campaignState.stages : [];
-    return stages
-        .filter((stage) => stage.unlocked)
-        .map((stage) => ({
-            challengeId: stage.id,
-            monthLabel: 'Stage',
-            dayNumberLabel: stage.numberLabel,
-            dateLabel: stage.trackName,
-            ariaLabel: `View ${stage.trackName} campaign standings`,
-        }));
+    // The standings rail is an index of Campaign stages, not an unlock gate.
+    // A stage can have a public leaderboard before this player has a rank on it.
+    return stages.map((stage) => ({
+        challengeId: stage.id,
+        monthLabel: 'Stage',
+        dayNumberLabel: stage.numberLabel,
+        dateLabel: stage.trackName,
+        ariaLabel: `View ${stage.trackName} campaign standings`,
+    }));
 }
 
 function campaignPlayerRow(bestTime) {
@@ -447,6 +489,7 @@ export const campaignEngineMethods = {
                 || requestedId,
             );
             if (!stage) return;
+            const replacesCurrentRun = this.status !== 'ready';
             const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
             if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
 
@@ -465,6 +508,12 @@ export const campaignEngineMethods = {
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
             this.activeCampaignChallenge = null;
+            if (replacesCurrentRun && stage.trackKey === this.currentTrackKey) {
+                this.reset(false, {
+                    preserveRaceComparisonTarget,
+                    showStartOverlay: false,
+                });
+            }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
             if (stage.trackKey !== this.currentTrackKey) {
                 await this.loadTrack(stage.trackKey, {
@@ -1038,6 +1087,13 @@ export const campaignEngineMethods = {
     },
 
     async refreshCampaignAfterAcceptedRun(stage) {
+        const activeStandingsSession = this._activeCampaignStandingsRefreshSession;
+        const olderRequest = activeStandingsSession?.inFlightByRaceId.get(stage.raceId);
+        if (olderRequest) {
+            await olderRequest.catch(() => null);
+        }
+        activeStandingsSession?.refreshedRaceIds.delete(stage.raceId);
+
         try {
             const snapshotResponse = await getCampaignSnapshot(stage.raceId, {
                 limit: 50,
@@ -1045,7 +1101,17 @@ export const campaignEngineMethods = {
             });
             if (snapshotResponse.ok) {
                 const snapshot = normalizeCampaignLeaderboardSnapshot(snapshotResponse.body);
-                if (snapshot) this.updateCampaignFinishSnapshot(stage.raceId, snapshot);
+                if (snapshot) {
+                    this.updateCampaignFinishSnapshot(stage.raceId, snapshot);
+                    const refreshSessions = new Set([
+                        activeStandingsSession,
+                        this._lastCampaignStandingsRefreshSession,
+                    ]);
+                    for (const refreshSession of refreshSessions) {
+                        refreshSession?.snapshotByRaceId.set(stage.raceId, snapshot);
+                        refreshSession?.refreshedRaceIds.add(stage.raceId);
+                    }
+                }
             }
         } catch (snapshotError) {
             console.warn('Campaign finish opened without a live rank snapshot:', snapshotError);
@@ -1185,26 +1251,43 @@ export const campaignEngineMethods = {
         })();
     },
 
-    async openCampaignStandings(stageLike = null, { returnMode = 'close' } = {}) {
+    async openCampaignStandings(stageLike = null, {
+        returnMode = 'close',
+        refreshSession: providedRefreshSession = null,
+    } = {}) {
         await this.ensureCampaignBootstrap();
         if (this.activeRaceMode !== 'campaign') return;
 
         const lobbyState = this.campaignLobbyState;
-        const unlockedStages = Array.isArray(lobbyState?.stages)
-            ? lobbyState.stages.filter((stage) => stage.unlocked)
+        const campaignStages = Array.isArray(lobbyState?.stages)
+            ? lobbyState.stages
             : [];
         const defaultStage = getDefaultCampaignLobbyStage(lobbyState);
         const requestedStageId = typeof stageLike === 'string'
             ? stageLike
             : (stageLike?.raceId || stageLike?.id || defaultStage?.id);
-        const selectedLobbyStage = unlockedStages.find((stage) => stage.id === requestedStageId);
+        const selectedLobbyStage = campaignStages.find((stage) => stage.id === requestedStageId);
         const stage = getCampaignStage(selectedLobbyStage?.id);
         if (!stage) return;
 
+        const refreshSession = providedRefreshSession
+            || createCampaignLeaderboardRefreshSession(
+                this._lastCampaignStandingsRefreshSession,
+            );
+        this._activeCampaignStandingsRefreshSession = refreshSession;
+        this._lastCampaignStandingsRefreshSession = refreshSession;
+        refreshSession.selectedRaceId = stage.raceId;
         const requestId = (this._campaignStandingsRequestId || 0) + 1;
         this._campaignStandingsRequestId = requestId;
         const leaderboardOptions = buildCampaignLeaderboardOptions(lobbyState);
-        let currentSnapshot = null;
+        const existingSnapshot = refreshSession.snapshotByRaceId.get(stage.raceId)
+            || getExistingCampaignScoreboardSnapshot(this, stage);
+        if (existingSnapshot && !refreshSession.snapshotByRaceId.has(stage.raceId)) {
+            refreshSession.snapshotByRaceId.set(stage.raceId, existingSnapshot);
+        }
+        const shouldRefresh = refreshSession.inFlightByRaceId.has(stage.raceId)
+            || !refreshSession.refreshedRaceIds.has(stage.raceId);
+        let currentSnapshot = existingSnapshot;
         let pageRequest = null;
 
         const onLoadMoreLeaderboard = async () => {
@@ -1220,6 +1303,8 @@ export const campaignEngineMethods = {
                 if (
                     !response.ok
                     || requestId !== this._campaignStandingsRequestId
+                    || this._activeCampaignStandingsRefreshSession !== refreshSession
+                    || refreshSession.selectedRaceId !== stage.raceId
                     || !this.modal.isRunsViewActive?.()
                 ) {
                     return currentSnapshot;
@@ -1238,7 +1323,11 @@ export const campaignEngineMethods = {
         };
 
         const modalOptions = {
-            scoreboardSnapshot: { isLoading: true },
+            scoreboardSnapshot: shouldRefresh
+                ? (existingSnapshot
+                    ? { ...existingSnapshot, isRefreshing: true }
+                    : { isLoading: true })
+                : existingSnapshot,
             scoreboardMode: 'campaign',
             scoreboardChallengeId: stage.raceId,
             scoreboardTrackKey: stage.trackKey,
@@ -1247,7 +1336,10 @@ export const campaignEngineMethods = {
             leaderboardDayOptions: leaderboardOptions,
             leaderboardRailLabel: 'Campaign stages',
             selectedLeaderboardDayId: stage.raceId,
-            onSelectLeaderboardDay: (raceId) => void this.openCampaignStandings(raceId, { returnMode }),
+            onSelectLeaderboardDay: (raceId) => void this.openCampaignStandings(raceId, {
+                returnMode,
+                refreshSession,
+            }),
             onRaceOpponent: (entry) => this.prepareAndStartLeaderboardOpponent?.({
                 mode: 'campaign',
                 competitionId: stage.raceId,
@@ -1258,6 +1350,13 @@ export const campaignEngineMethods = {
             allowLeaderboardOpen: false,
             onClose: () => {
                 this._campaignStandingsRequestId = (this._campaignStandingsRequestId || 0) + 1;
+                if (
+                    this._activeCampaignStandingsRefreshSession === refreshSession
+                    && refreshSession.selectedRaceId === stage.raceId
+                ) {
+                    refreshSession.selectedRaceId = null;
+                    this._activeCampaignStandingsRefreshSession = null;
+                }
                 // Browsing the stage rail inside the standings moves the lobby
                 // with it, so closing lands on the stage last looked at.
                 this.campaignCarousel?.selectChallenge?.(stage.raceId);
@@ -1265,25 +1364,32 @@ export const campaignEngineMethods = {
         };
         this.modal.showRunsModal(null, null, null, returnMode, modalOptions);
 
+        if (!shouldRefresh) return;
+
         try {
-            const response = await getCampaignSnapshot(stage.raceId, { limit: 50, offset: 0 });
+            const snapshot = await requestCampaignLeaderboardSessionRefresh(
+                stage.raceId,
+                refreshSession,
+            );
             if (
                 requestId !== this._campaignStandingsRequestId
+                || this._activeCampaignStandingsRefreshSession !== refreshSession
+                || refreshSession.selectedRaceId !== stage.raceId
                 || !this.modal.isRunsViewActive?.()
             ) {
                 return;
             }
-            currentSnapshot = response.ok
-                ? normalizeCampaignLeaderboardSnapshot(response.body)
-                : normalizeScoreboardSnapshot(null);
+            currentSnapshot = snapshot || existingSnapshot;
             this.modal.updateModalScoreboardSnapshot(currentSnapshot);
         } catch (error) {
             console.error('Could not load Campaign standings:', error);
             if (
                 requestId === this._campaignStandingsRequestId
+                && this._activeCampaignStandingsRefreshSession === refreshSession
+                && refreshSession.selectedRaceId === stage.raceId
                 && this.modal.isRunsViewActive?.()
             ) {
-                currentSnapshot = normalizeScoreboardSnapshot(null);
+                currentSnapshot = existingSnapshot;
                 this.modal.updateModalScoreboardSnapshot(currentSnapshot);
             }
         }

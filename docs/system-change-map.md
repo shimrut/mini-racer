@@ -128,13 +128,21 @@ flowchart LR
   Reddit's expanded-post header and footer remain outside that WebView, so
   Daily and Campaign add no guessed native-chrome spacer. A two-row grid keeps
   the poster above a separate bottom Start Race row; neither layer is positioned
-  over the other. The poster reserves its Best / Rank / medals scoreline as a
-  fixed row and yields schematic height first.
+  over the other. Inside the poster, the schematic owns a bounded middle hero
+  row between the identity and status bands. Card clipping keeps that preview
+  out of the Start Race row and preserves the text hierarchy at short heights.
   Home keeps its Daily, Campaign, Garage, and Settings mode-action
   list. Daily and Campaign fill the selector area inside the shared lobby shell
-  with one race-programme poster: run/date and lap count above the circuit,
-  personal best/rank and the medal ladder below it, and one Start Race action
-  after it. The selected track schematic is the background artwork, neighboring
+  with one race-programme poster: the mode sits at the left of the billing line
+  and the run/date label at its right above the circuit, the personal-best
+  icon/rank and medal ladder below it, and one Start Race action after it. The
+  actual Mini Racer wordmark remains in the shared top header, outside the
+  horizontal rail. The header's mode label and divider are also fixed; only the
+  right-side date/stage value is repainted when the centred card changes. The
+  selected track's bold name, separator dot, and `Lap`/`Laps`
+  count are a secondary line under that red action, so the race brief follows
+  the control and is not repeated in the poster's upper-right corner. The selected track schematic is
+  the background artwork, neighboring
   tracks crop at the selector edges, and no card or inner preview panel is
   visible. The poster uses the existing racing palette, Outfit / JetBrains Mono,
   border tokens, medal/lock assets, and motion vocabulary. Each schematic places
@@ -147,12 +155,17 @@ flowchart LR
   multiplier. This keeps the marker consistently twice the gameplay
   car-to-track proportion across different tracks and DPRs while leaving the
   deliberately larger standalone post-preview car unchanged. The
-  existing Back, Standings, Garage, and Settings toolbar stays above that
-  surface, while one centered Start Race action anchors the bottom. Toolbar and
-  carousel utilities keep at least a 2.75rem square mobile target. The billing
-  and scoreline keep their readable context while the schematic gives up height
-  first; at 500px viewport height and below, the one-line title and reduced
-  secondary detail protect the track, requirement, and action from overlap.
+  existing Back, Standings, Garage, and Settings toolbar stays in the top header
+  as one right-aligned icon-only rail, while the billing starts at the
+  upper-left beside it and one centered Start Race action anchors the bottom.
+  The buttons retain accessible aria-labels and their original compact minimum
+  tap area. The track name now travels with that action as its smaller race
+  brief, with a dot between the track name and `N Lap(s)`; the mode at the left
+  and run/date billing at the right in the fixed header; the selected schematic
+  and status span the poster's side peek to align with the shell. The billing and scoreline
+  keep their readable context while the schematic gives up height first; at
+  500px viewport height and below, the reduced secondary detail protects the
+  track, requirement, and action from overlap.
   Pressing Start Race in either selector eases the full lobby surface to the
   track over 100ms while any required track preparation continues behind it;
   the countdown begins once both the fade and preparation are complete.
@@ -227,6 +240,12 @@ flowchart LR
   challenger Reddit avatar URL (no ghost, player ID, or private persistence).
   The Accept card shows challenger and viewer avatars (generic Snoo while signed
   out) and labels the mode Head to Head.
+- `campaign-challenge.css` owns the standalone post's race-poster visual: the
+  duel and target time remain the primary reading path, the circuit stays open as
+  the right-side hero, and the single Race Head to Head CTA anchors beneath it.
+  Desktop uses a split brief/track composition; compact widths keep the trace
+  contained below the brief without introducing an inline scroll surface. Preserve
+  the existing challenge element IDs and the reduced-motion/focus-visible states.
 - The full standings modal requests scored racers in 50-row rank pages. `/api/daily/snapshot` and `/api/scoreboard/snapshot` accept `offset` plus `limit` and return `pageOffset`, `pageLimit`, `hasMore`, and `nextOffset`; scrolling near the end loads and appends the next page. Only the first page is persisted in the daily snapshot cache, while later pages are request-keyed by challenge, offset, and limit.
 - Standings entry points open that selected-day modal directly. The date rail and touch swipe navigation switch available days inside it; there is no intermediate standings track-picker. The separate Tracks playlist remains the race-selection flow.
 - Daily and Campaign standings can prepare a normal competition race against a
@@ -258,9 +277,19 @@ flowchart LR
   `clearPrepared` leave an opponent alone; only `clearRaceComparisonTarget`
   (via `clearOpponent`) removes one, and any start that never reached its
   requested race clears the opponent rather than leaking it into the next run.
-- Campaign adapts that same standings rail to unlocked stage numbers. Every
-  selection requests `/api/campaign/snapshot` for exactly one `raceId`; results
-  and pagination remain isolated per permanent stage. The shared Tracks modal
+- Campaign adapts that same horizontally scrollable standings rail to every
+  defined stage. Seven page slots are visible at a time; the rail scrolls through
+  the remaining stages, including entries with no player rank or an unmet unlock
+  gate. Campaign now follows Daily's standings-session contract: the selected
+  stage refreshes once from `/api/campaign/snapshot` when the screen opens, a
+  stage revisited in that same screen reuses its normalized first-page snapshot,
+  and closing then reopening starts a new refresh session. Cached rows remain
+  visible with the compact refresh state and survive a failed refresh; an
+  accepted results refresh the affected stage and update the open finish sheet;
+  a failed result refresh leaves that stage stale for the next view. Requests
+  and pagination remain isolated per `raceId`, and stale stage responses cannot
+  repaint the current selection. Race start and submission still enforce the
+  unlock gate server-side. The shared Tracks modal
   swaps its Daily playlist renderer for Campaign progress when entered from the
   Campaign lobby. Opening Campaign paints the lobby immediately from provisional
   or cached progress while `/api/campaign/bootstrap` refreshes in the background;
@@ -270,8 +299,8 @@ flowchart LR
 - All player-visible race times use three decimal places, matching the verified
   millisecond precision across the HUD, results, splits, deltas, selectors,
   leaderboard, Reddit result copy, and podiums. Raceable opponent rows use a
-  stopwatch glyph in the same compact action column as Share while the row
-  keeps its full accessible action label.
+  ghost glyph in the same compact action column as Share while the row keeps
+  its full accessible action label.
 - On touch devices, the standings list accepts deliberate horizontal swipes as an alternative to the day rail: swipe left for an older available day and right for a newer one. The original date strip remains visible, tappable, and horizontally scrollable; swipe navigation does not replace it. Short or vertically dominant gestures, day buttons, links, and the shareable player row keep their existing tap/scroll behavior.
 
 ### Server And Shared Validation

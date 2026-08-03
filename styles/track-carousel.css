@@ -2,53 +2,41 @@
  *
  * Every card is an entry in a race programme, bracketed by two hairlines:
  *
- *     ▪ STAGE 03 ─────────────────── 3 LAPS   the billing
  *     NUMBER THREE                            the circuit
+ *     ▪ CAMPAIGN ───────────────────── STAGE 03   the billing
  *              ⌒⌒⌒                            the field
  *     ─────────────────────────────────────
- *     BEST 12.345  RANK P12        ◆ ◆ ◇ ◇    the scoreline
+ *     ◷ 12.345   RANK P12        ◆ ◆ ◇ ◇    the scoreline
  *
- * Both rules carry a reading at each end, so the top band says what the run is
- * and how long it is, and the bottom band says what the player has done on it
- * and how far up its ladder that puts them. Track rows keep the shared playlist
- * DOM, but lose their sheet-card chrome so the schematic and its type read as
- * one printed surface.
+ * The fixed Mini Racer wordmark and mode/date billing line live in the lobby
+ * header. The carousel owns only the schematic and the bottom status band, so
+ * horizontal selection cannot move the screen identity. The selected track name
+ * belongs to the Start Race action. Track rows keep the shared
+ * playlist DOM, but lose their sheet-card chrome so the schematic and its type
+ * read as one printed surface.
  *
  * The lobby shell owns the width, the safe areas and the responsive steps, the
- * same as on Home; nothing here restates them.
+ * same as on Home; nothing here restates them. Daily and Campaign keep the
+ * header in flow so its identity bands remain fixed above the rail.
  *
- * The card is a three-row grid, and that is what keeps the scoreline off Start
- * Race. The billing is content-height and the scoreline owns an explicit fixed
- * row; the drawing is `minmax(0, 1fr)` and gives up everything down to nothing.
- * A short window takes the drawing away first and can never reach the figures
- * or the action below them.
+ * The card is a two-band poster: a bounded track hero and player status. The
+ * header owns identity above it, and Start Race is outside the card in the
+ * pane's own intrinsic row, so the artwork cannot reach the action below.
  */
 
-/* Home lets the live track-of-the-day render show through a light scrim, and
-   these modes keep that — an opaque fill here erases the one thing on screen
-   that is actually moving.
- *
- * The vignette runs the other way round from Home's, though: darkest in the
- * middle, lightest at the edges. The schematic's road is the same mid-slate as
- * the road in the render behind it, so a scrim that thinned towards the centre
- * put the drawing on top of the one part of the background it could not be told
- * apart from. Motion now survives only in the margins, where nothing is read. */
+/* Keep a restrained hint of the live track-of-the-day render behind the
+   selector without stacking a gradient and a second translucent fill. The
+   schematic remains the visual anchor; the moving canvas is atmosphere only. */
 body[data-lobby-mode="daily"] #start-overlay,
 body[data-lobby-mode="campaign"] #start-overlay {
-    background:
-        radial-gradient(
-            78% 55% at 50% 46%,
-            rgba(2, 6, 23, 0.94),
-            rgba(2, 6, 23, 0.8) 55%,
-            rgba(2, 6, 23, 0.55) 100%
-        ),
-        rgba(2, 6, 23, 0.34);
-    backdrop-filter: blur(8px) saturate(0.8);
-    -webkit-backdrop-filter: blur(8px) saturate(0.8);
+    background: rgba(2, 6, 23, 0.8);
+    backdrop-filter: blur(4px) saturate(0.9);
+    -webkit-backdrop-filter: blur(4px) saturate(0.9);
 }
 
 /* These panes are pickers, not menus: the poster claims the run from the
-   toolbar down to Start Race rather than hugging one end.
+   top edge, alongside the overlaid toolbar, down to Start Race rather than
+   hugging one end.
 
    The two rows are one layout contract. Start Race is not sticky, fixed or
    layered over the poster; it owns the second grid row, and the carousel can
@@ -187,25 +175,12 @@ body[data-lobby-mode="campaign"] #start-overlay {
     --poster-column: calc(
         var(--track-carousel-card-width, 20rem) - (2 * var(--poster-peek))
     );
-    /* The frame the drawing is set in: the shell's measure, closed in to the
-       width the drawing wants whenever it is limited by height rather than
-       width (`--plate-frame-width`, measured by the carousel). */
-    --plate-frame: clamp(
-        min(var(--poster-column), 15rem),
-        var(--plate-frame-width, var(--poster-column)),
-        var(--poster-column)
-    );
     position: relative;
-    /* Three rows: billing, drawing, scoreline. The scoreline owns an exact row;
-       the drawing is the only one that can be taken, and `minmax(0, 1fr)` lets
-       it be taken all the way down to nothing. `overflow: hidden` contains the
-       preview during WebKit's intermediate resize frames. */
+    /* Two bands: schematic and status. The header owns billing outside the
+       rail, and the artwork yields first when the embedded WebView is short. */
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) 2.6rem;
-    /* The air the drawing sits in. Carried by the grid rather than by padding
-       on the two type bands, because the drawing is measured against the row it
-       is given and a band's padding is not part of that row — the schematic
-       grew into it and came to rest against both rules. */
+    grid-template-rows: minmax(0, 1fr) 4rem;
+    grid-template-columns: minmax(0, 1fr);
     row-gap: clamp(0.55rem, 2.2vh, 1.35rem);
     flex: 0 0 var(--poster-column);
     min-height: 0;
@@ -214,6 +189,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     border: 0;
     border-radius: 0;
     background: transparent;
+    isolation: isolate;
     scroll-snap-align: center;
     box-shadow: none;
     opacity: calc(0.42 + (0.58 * var(--card-proximity, 0)));
@@ -223,10 +199,11 @@ body[data-lobby-mode="campaign"] #start-overlay {
 .track-carousel .daily-playlist-entry--hero.is-carousel-selected {
     box-shadow: none;
     cursor: default;
+    z-index: 2;
 }
 
 /* A card that is not the one being chosen states nothing. Fading the whole card
-   still left its medals, rank, date, laps and best time legible enough to read,
+   still left its medals, rank, laps and best time legible enough to read,
    so a second card's detail competed with the one in hand.
 
    On a steeper ramp than the card itself: the details hold at nothing until the
@@ -235,15 +212,12 @@ body[data-lobby-mode="campaign"] #start-overlay {
    Faded rather than removed: every card's bands are the same height, so taking
    the details out of the layout would let a passing card's drawing grow larger
    than the selected one's. */
-.track-carousel__card-head,
 .track-carousel__card-foot {
     opacity: clamp(0, calc((var(--card-proximity, 0) - 0.55) * 3.2), 1);
 }
 
-/* Nothing in the head is pressable, and a swipe that starts on the track name
-   has to move the rail rather than select the name. Only the foot takes input,
-   and only on the card that is actually selectable. */
-.track-carousel__card-head,
+/* Only the selected card's status row takes input; neighboring cards are
+   scenery while the rail is moving. */
 .track-carousel .daily-playlist-entry--hero:not(.is-carousel-selected) .track-carousel__card-foot {
     pointer-events: none;
 }
@@ -258,184 +232,16 @@ body[data-lobby-mode="campaign"] #start-overlay {
     box-shadow: none;
 }
 
-/* The masthead: what run this is, then what circuit it is, both set from the
-   left edge. Centred type in a stack was the single thing that made this screen
-   read as a card floating on a page rather than as a printed bill. */
-.track-carousel__card-head {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: clamp(0.3rem, 1.2vh, 0.6rem);
-    width: 100%;
-    min-width: 0;
-    min-height: 0;
-    box-sizing: border-box;
-    overflow: hidden;
-    text-align: left;
-    user-select: none;
-}
-
-/* The billing: which run this is at one end of a hairline, how long it is at
-   the other. The rule is what turns two captions into a printed line — without
-   it the format reading floats out on the right with nothing holding it to the
-   run, and the whole band reads as a header row rather than as part of the
-   card. It is also the reason the ladder does not belong up here: the line is
-   already spoken for at both ends. */
-.track-carousel__billing {
-    display: flex;
-    align-items: center;
-    gap: clamp(0.5rem, 2.5vw, 0.85rem);
-    width: 100%;
-    min-width: 0;
-}
-
-.track-carousel__billing-rule {
-    flex: 1 1 auto;
-    min-width: 0.75rem;
-    height: 1px;
-    background: var(--border-default);
-}
-
-/* How long the run is — the one thing about a track that is fixed before the
-   player has done anything on it, which is why it belongs on the billing and
-   not on the scoreline with the figures the player earned. */
-.track-carousel__format {
-    flex: 0 0 auto;
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    line-height: 1;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-/* The date or stage number is a caption over the name, not a chip off to one
-   side. A fixed line box keeps it the same height whether or not this is the
-   track in play, so the schematic below is the same size on every card. */
-.track-carousel .daily-playlist-hero-day {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    min-height: 1.1rem;
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.22em;
-    line-height: 1;
-}
-
-/* The track in play is marked the way a timing screen marks the live session —
-   a lit square against the label. The shared sheet gives it a filled rounded
-   chip, which on this surface was a second red pill competing with Start Race
-   for the one accent on screen. */
-.track-carousel .daily-playlist-entry--hero.current .daily-playlist-hero-day {
-    padding: 0;
-    border-radius: 0;
-    background: none;
-    color: var(--accent-color);
-}
-
-.track-carousel .daily-playlist-entry--hero.current .daily-playlist-hero-day::before {
-    content: "";
-    width: 0.4rem;
-    height: 0.4rem;
-    margin-right: 0.55rem;
-    background: var(--accent-color);
-}
-
-/* The circuit, in the lobby's own hand.
- *
- * MINI over RACER is how this game says its own name: the first word small and
- * white, the last big and red, stacked tight and ranged left. A track is the
- * same two words, so it is set the same way — the poster stops being a card
- * with a caption on it and becomes the same printed thing as the front screen.
- *
- * Two rows always, and the split is structural rather than a wrap. Sizing the
- * band to each name, or letting one name take a line and the next take two,
- * would resize the schematic under it as the rail moved.
- *
- * Hung from the rule above rather than stacked under it, so the slack falls as
- * leading below the billing instead of as a gap between the name and its
- * drawing. The name reads as the caption to the schematic, which is what it is.
- */
-.track-carousel .daily-playlist-hero-title {
-    /* The headline scale the shell allows; the short-landscape step below is
-       the only thing that changes it. */
-    --title-cap: clamp(1.5rem, 8.5vw, 3rem);
-    /* MINI to RACER, near enough: the white line is the subtitle and the red
-       one is the name. */
-    --title-lead-scale: 0.62;
-    display: grid;
-    align-content: end;
-    width: 100%;
-    /* Sized against four limits, smallest wins:
-       - the shell, at the scale a bill sets its headline;
-       - the height, because the two rows are charged against the same height
-         the schematic is drawn in, and a short landscape window should get a
-         smaller name rather than a postage-stamp track;
-       - each row's own word. `0.7em` per character is this italic black face at
-         its widest (measured: H, O and R run ~0.77, I and L ~0.63), and the
-         white row is charged at its own smaller scale. */
-    font-size: min(
-        var(--title-cap),
-        8vh,
-        calc(var(--poster-column) / (var(--title-tail-length, 8) * 0.7)),
-        calc(
-            var(--poster-column)
-            / (var(--title-lead-length, 8) * 0.7 * var(--title-lead-scale))
-        )
-    );
-    line-height: 0.86;
-    letter-spacing: -0.02em;
-    text-align: left;
-    text-transform: uppercase;
-}
-
-/* The first word. `min-height` is one line of its own size, so the one kind of
-   name that has nothing to put here still holds the row and the drawing below
-   does not move up. */
-.track-carousel__title-lead {
-    display: block;
-    min-height: 0.86em;
-    font-size: calc(1em * var(--title-lead-scale));
-    color: var(--text-color);
-}
-
-/* The last word, at full size and in the accent: the name the card is known by,
-   and the only red on the poster besides the run it belongs to. */
-.track-carousel__title-tail {
-    display: block;
-    color: var(--accent-color);
-}
-
-/* The plate: the drawing's own box, and the field of the poster.
- *
- * It takes the height the type bands leave, but never more than the drawing can
- * use — `--track-plate-aspect` is the track's own bounding box, published per
- * card by the carousel — so a wide circuit is drawn wide and a tall one tall,
- * instead of both being letterboxed into the same rectangle. */
+/* The plate: the drawing owns the middle band of the poster. */
 .track-carousel .daily-playlist-hero-preview {
+    grid-area: 1 / 1;
     position: relative;
+    align-self: center;
     display: flex;
     align-items: stretch;
-    /* The drawing's row is taller than the drawing whenever the circuit is
-       squarer than the column; centring it in the row is what keeps the figure
-       floating between the two rules instead of hanging off the name. */
-    align-self: center;
     box-sizing: border-box;
+    width: 100%;
     height: 100%;
-    /* The height the drawing wants at the full width of the shell, plus the
-       margin the schematic renderer keeps inside its own canvas — without that
-       allowance the plate is a few pixels short, the drawing becomes
-       height-limited, and it never grows to the width the frame promises. */
-    max-height: calc(
-        (var(--poster-column) / var(--track-plate-aspect, 1.4)) + 1.75rem
-    );
-    width: var(--plate-frame);
     min-width: 0;
     min-height: 0;
     margin-inline: auto;
@@ -443,6 +249,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+    pointer-events: none;
 }
 
 .track-carousel .daily-playlist-hero-preview canvas {
@@ -462,37 +269,35 @@ body[data-lobby-mode="campaign"] #start-overlay {
     transition: transform var(--dur-base) var(--ease-settle);
 }
 
-/* The scoreline: what the player has done on this track from the left edge, how
-   far up its ladder that puts them from the right, over the card's second rule.
- *
- * Exactly one line, on every card and in every state. The height is fixed, not
- * a floor — every card's drawing is then the same size as its neighbour's, so
- * the schematic does not resize as the rail moves. `nowrap` and the clip are
- * what hold the promise: a reading long enough to want a second line is cut
- * instead, because nothing on this band may grow the band. The gated stage that
- * used to state its requirement here in words — the one card that took two
- * lines — states it on the plate now, where there is room to wrap. */
+/* The footer is the status line: the player's figures on an open card, or the
+ * unlock lines on a locked card. Its height is fixed, so the status cannot
+ * overlap Start Race or change the poster's geometry as it wraps. */
 .track-carousel__card-foot {
-    display: flex;
+    grid-area: 2 / 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
     gap: clamp(0.6rem, 3vw, 1.25rem);
     width: 100%;
     min-width: 0;
-    height: 2.6rem;
+    height: 4rem;
     box-sizing: border-box;
-    padding-top: clamp(0.45rem, 1.6vh, 0.9rem);
-    border-top: 1px solid var(--border-subtle);
     overflow: hidden;
     text-align: left;
-    white-space: nowrap;
     user-select: none;
+}
+
+/* A locked card has one compact checklist, not an empty meta column plus
+   dormant reward pips. The checklist spans the footer and points directly to
+   the action below it. */
+.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__card-foot {
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .track-carousel__meta {
     display: flex;
     flex: 0 1 auto;
-    align-items: baseline;
+    align-items: center;
     justify-content: flex-start;
     gap: clamp(0.7rem, 3.5vw, 1.3rem);
     min-width: 0;
@@ -507,7 +312,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
    rather than punctuation. */
 .track-carousel__spec {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.4rem;
     min-width: 0;
     padding: 0;
@@ -529,6 +334,16 @@ body[data-lobby-mode="campaign"] #start-overlay {
     color: var(--text-dim);
     font-weight: 700;
     letter-spacing: 0.16em;
+}
+
+.track-carousel__spec-icon {
+    display: block;
+    flex: 0 0 auto;
+    align-self: center;
+    width: 1rem;
+    height: 1rem;
+    color: var(--text-dim);
+    fill: currentColor;
 }
 
 .track-carousel__spec-value {
@@ -607,17 +422,14 @@ body[data-lobby-mode="campaign"] #start-overlay {
     opacity: 1;
 }
 
-/* Locked-stage price: the count and its progress are one neutral medal token in
-   the place the ladder would hold, not three detached pieces of UI. The full
-   requirement remains on the token's accessible name. */
-/* Sized to the scoreline's content box, like the pips it stands in for — the
-   band's height is fixed, so a token taller than it is a token with its bottom
-   cut off. */
+/* Locked-stage requirements use the same medal placeholder language as the
+   campaign ladder: blue-gray means pending, white means satisfied. The count
+   lives inside the total placeholder so the copy can stay short and scannable. */
 .track-carousel__unlock-medal-host {
     display: block;
     flex: 0 0 auto;
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 2rem;
+    height: 2rem;
 }
 
 .track-carousel__unlock-medal-host[hidden] {
@@ -630,67 +442,68 @@ body[data-lobby-mode="campaign"] #start-overlay {
     height: 100%;
 }
 
-.track-carousel__unlock-medal.medal-svg--outline .track-carousel__unlock-medal-track {
-    fill: rgba(148, 163, 184, 0.05);
-    stroke: rgba(148, 163, 184, 0.28);
-    stroke-width: 28;
+.track-carousel__requirement-medal-icon {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
-.track-carousel__unlock-medal-progress {
+.track-carousel__requirement-medal-icon.medal-svg--outline .medal-svg__shape,
+.track-carousel__unlock-medal.medal-svg--outline .medal-svg__shape {
     fill: none;
-    stroke: rgba(148, 163, 184, 0.58);
-    stroke-width: 32;
-    stroke-linecap: round;
-    transition: stroke-dashoffset var(--dur-base) var(--ease-settle);
+    stroke: #6f83a5;
+    stroke-dasharray: 24 16;
+    stroke-width: 24;
 }
 
+.track-carousel__requirement-medal-icon .medal-svg__placeholder-fill,
+.track-carousel__unlock-medal .medal-svg__placeholder-fill {
+    fill: rgba(30, 48, 80, 0.72);
+}
+
+.track-carousel__requirement-medal-icon .medal-svg__center-time,
 .track-carousel__unlock-medal .medal-svg__center-time {
-    fill: rgba(148, 163, 184, 0.72);
-    stroke: none;
-    filter: none;
-    font-family: var(--mono-font);
-    font-size: 112px;
-    font-style: normal;
-    font-weight: 900;
-    letter-spacing: -0.06em;
-    paint-order: normal;
+    fill: var(--text-dim);
+    font-size: 220px;
+    stroke: rgba(2, 6, 23, 0.65);
+    stroke-width: 8px;
 }
 
-.track-carousel__unlock-medal.is-complete .track-carousel__unlock-medal-progress {
+.track-carousel__requirement-medal-icon.is-satisfied .medal-svg__shape {
     stroke: var(--text-color);
+    stroke-dasharray: none;
 }
 
-.track-carousel__unlock-medal.is-complete .medal-svg__center-time {
+.track-carousel__requirement-medal-icon.is-satisfied {
+    opacity: 1;
+}
+
+.track-carousel__requirement-medal-icon.is-satisfied .medal-svg__placeholder-fill {
     fill: var(--text-color);
 }
 
-/* A locked stage still shows its track and its gate — it just cannot be raced,
-   and the art steps back so the card reads as out of reach. */
-.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__preview-art canvas {
-    opacity: 0.35;
+.track-carousel__requirement-check {
+    fill: rgb(30, 48, 80);
 }
 
-/* The gate: the puck, and under it the price in words.
- *
- * The wording lives on the plate because the plate is the one band on the card
- * that can give room away — it can wrap to two lines, or be clipped on a short
- * window, and nothing else moves. On the scoreline it could do neither: that
- * band is one line by contract, and a requirement that ran to two was exactly
- * what used to push type down onto Start Race. */
+/* A locked stage still shows its track and its gate — it just cannot be raced.
+   Keep the schematic fully opaque so the live canvas cannot show through it;
+   color and brightness, not alpha, make the state feel out of reach. */
+.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__preview-art canvas {
+    opacity: 1;
+    filter: saturate(0.55) brightness(0.78);
+}
+
+/* The gate is only the opaque lock plate. The requirement lives in the fixed
+   status footer so the track stays a clean visual anchor instead of becoming a
+   text canvas or sharing a column with the title. */
 .track-carousel__gate {
     position: absolute;
     z-index: 1;
     inset: 0;
-    display: flex;
-    flex-direction: column;
+    display: grid;
     align-items: center;
     justify-content: center;
-    gap: 0.85rem;
-    padding-inline: 0.5rem;
-    /* Clipped to the plate. Centred content overflows its box in both
-       directions once it stops fitting, and the top of the drawing's row is the
-       track name and the bottom is the scoreline's rule — the gate may lose its
-       own bottom line, but it may not print over either of them. */
     overflow: hidden;
     pointer-events: none;
 }
@@ -699,51 +512,108 @@ body[data-lobby-mode="campaign"] #start-overlay {
     display: none;
 }
 
-/* Steel, not accent: red is what the lobby uses for the track you can race and
-   the button that starts it, so spending it on the one card you cannot race
-   read as a call to action. */
+/* The lock uses the same placeholder medal language as the footer. Its face is
+   solid blue-gray so the track cannot show through the state indicator. */
 .track-carousel__preview-lock {
+    position: relative;
     display: grid;
     flex: 0 0 auto;
-    width: 4.5rem;
-    height: 4.5rem;
+    width: 4rem;
+    height: 4rem;
     place-items: center;
-    border-radius: var(--radius-full);
-    background: rgba(15, 23, 42, 0.92);
-    box-shadow:
-        inset 0 0 0 1px rgba(148, 163, 184, 0.28),
-        0 8px 20px -10px rgba(0, 0, 0, 0.9);
     color: var(--text-dim);
     opacity: 1;
+}
+
+.track-carousel__preview-lock-medal {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+}
+
+.track-carousel__preview-lock-medal.medal-svg--outline .medal-svg__shape {
+    fill: #1e3050;
+    stroke: #6f83a5;
+    stroke-dasharray: 24 16;
+    stroke-width: 24;
+}
+
+.track-carousel__preview-lock-medal .medal-svg__placeholder-fill {
+    fill: #1e3050;
 }
 
 .track-carousel__preview-lock-icon {
     width: 1.65rem;
     height: 2.2rem;
+    position: relative;
+    z-index: 1;
 }
 
-/* What opens it, in the fewest words the requirement can be put in. Set in the
-   utility face like every other reading on the card, and dim, because it is the
-   one line here the player cannot act on yet. */
-.track-carousel__gate-note {
+/* The locked footer's two deliberate status readings. It is hidden when the
+   stage is unlocked; the fixed footer still keeps the open and locked posters
+   aligned. Daily has no gate. */
+.track-carousel__requirement {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0;
+}
+
+/* Each row names one independent gate. The medal carries state and, for the
+   total gate, the exact count; the words carry the instruction. */
+.track-carousel__requirement-list {
+    display: grid;
+    gap: 0.3rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.track-carousel__requirement-item {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr);
+    align-items: center;
+    column-gap: 0.5rem;
+    min-width: 0;
+}
+
+.track-carousel__requirement-medal {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+}
+
+.track-carousel__requirement-medal .track-carousel__unlock-medal-host {
+    width: 100%;
+    height: 100%;
+}
+
+/* Remaining medal gaps are written in words rather than as a fraction. */
+.track-carousel__requirement-note {
+    display: block;
     max-width: 100%;
     color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    line-height: 1.45;
-    text-align: center;
-    text-transform: uppercase;
+    font-family: var(--header-font);
+    font-size: clamp(0.72rem, 2.1vw, 0.92rem);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    text-align: left;
     text-wrap: balance;
 }
 
-/* A stage out of reach loses the accent with everything else: red on this
-   surface says raceable, and both rows of the name have to say the same thing
-   the dimmed drawing and the Locked button do. */
-.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__title-lead,
-.track-carousel .daily-playlist-entry--hero.is-locked .track-carousel__title-tail {
-    color: var(--text-dim);
+.track-carousel__requirement-item.is-satisfied .track-carousel__requirement-note {
+    color: var(--text-color);
 }
 
 .track-carousel__nav {
@@ -846,33 +716,55 @@ body[data-lobby-mode="campaign"] #start-overlay {
 
 /* Short landscape keeps the track visible; secondary context yields first. */
 @media (max-height: 500px) {
-    /* Both rows stay — the name is two words set as two words on every card,
-       and a landscape phone is not a different poster. What yields is the
-       scale: the headline cap comes down and the reserve goes back to the
-       drawing, which is what a landscape phone is short of. */
-    .track-carousel .daily-playlist-hero-title {
-        --title-cap: clamp(1.2rem, 4.6vw, 2rem);
-    }
-
-    .track-carousel__card-head {
-        gap: 0.2rem;
-        padding-bottom: 0.4rem;
-    }
-
     .track-carousel__card-foot {
-        height: 1.9rem;
-        padding-top: 0.4rem;
+        height: 3.6rem;
+        padding-top: 0;
     }
 
     .track-carousel__unlock-medal-host {
-        width: 1.4rem;
-        height: 1.4rem;
+        width: 1.5rem;
+        height: 1.5rem;
     }
 
-    /* The puck goes and the requirement stays. A landscape phone has room for
-       one of them, and only one of them tells the player what to go and do —
-       the dimmed drawing and the LOCKED button already say the other. */
+    /* Landscape keeps the same two-band contract. The hero yields first while
+       the status line and fixed header remain readable. */
+    .track-carousel .daily-playlist-entry--hero {
+        grid-template-rows: minmax(0, 1fr) 3.6rem;
+        row-gap: 0.25rem;
+        padding: 0;
+    }
+
+    .track-carousel__requirement {
+        align-items: flex-start;
+        justify-content: center;
+        gap: 0;
+    }
+
+    .track-carousel__requirement-list {
+        gap: 0.18rem;
+    }
+
+    .track-carousel__requirement-item {
+        grid-template-columns: 1.5rem minmax(0, 1fr);
+        column-gap: 0.3rem;
+    }
+
+    .track-carousel__requirement-medal {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .track-carousel__requirement-note {
+        font-size: 0.62rem;
+        line-height: 1.05;
+        text-wrap: nowrap;
+        white-space: normal;
+    }
+
     .track-carousel__preview-lock {
+        /* The caption and Locked action already state the gate in this very
+           short lane. Removing the lock plate gives the schematic its silhouette
+           back instead of covering the only readable pixels. */
         display: none;
     }
 }

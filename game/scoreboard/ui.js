@@ -2,7 +2,6 @@ import { hasTrack } from '../track/catalog.js';
 import { TRACK_MODE_DAILY_GP } from '../config.js';
 import {
     DAY_MS,
-    DAILY_PLAYLIST_DAYS,
     getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
     getDailyChallengePlaylist,
@@ -12,6 +11,7 @@ import {
 import { getScoreboardSnapshot } from './service.js';
 
 const FULL_STANDINGS_PAGE_SIZE = 50;
+export const DAILY_STANDINGS_PAGE_COUNT = 7;
 
 export function mergeLeaderboardPages(currentSnapshot, nextPage) {
     if (!currentSnapshot || typeof currentSnapshot !== 'object') return nextPage || null;
@@ -138,7 +138,6 @@ function buildLeaderboardDayOptionForDate(dateKey, challenge = null, nowMs = Dat
 export function buildLeaderboardDayOptionsForWindow({
     anchorChallenge,
     playlistChallenges = [],
-    dayCount = DAILY_PLAYLIST_DAYS,
     nowMs = Date.now(),
 } = {}) {
     const anchorMs = resolveAnchorDateMs(anchorChallenge, nowMs);
@@ -153,7 +152,7 @@ export function buildLeaderboardDayOptionsForWindow({
     }
 
     const options = [];
-    for (let offset = 0; offset < dayCount; offset += 1) {
+    for (let offset = 0; offset < DAILY_STANDINGS_PAGE_COUNT; offset += 1) {
         const dateKey = new Date(anchorMs - offset * DAY_MS).toISOString().slice(0, 10);
         const option = buildLeaderboardDayOptionForDate(
             dateKey,

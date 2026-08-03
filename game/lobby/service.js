@@ -36,6 +36,13 @@ function normalizeMedalName(medal) {
     return typeof medal === 'string' ? medal.trim().toLowerCase() : '';
 }
 
+function formatRemainingMedalsLabel(medalTotal, requiredMedals) {
+    const remainingMedals = Math.max(0, requiredMedals - medalTotal);
+    if (remainingMedals === 1) return 'One more medal needed';
+    if (remainingMedals > 1) return `${remainingMedals} more medals needed`;
+    return null;
+}
+
 /** Gold is what counts a stage as cleared: Author clears it too, nothing below does. */
 export function isCampaignGoldMedal(medal) {
     const rank = STANDARD_MEDAL_TIER_RANK[normalizeMedalName(medal)];
@@ -87,13 +94,11 @@ export function normalizeCampaignLobbyState(state = {}) {
         ? state.stages
         : Array.from({ length: 10 }, (_, index) => ({ index, unlocked: index === 0 }));
     const normalized = sourceStages.map(normalizeCampaignStage);
-    // A locked row that only says "Locked" hides the whole rule. Two things gate
-    // a stage now, and the row names the one the player can go and do something
-    // about: a stage they can already race but have not medalled is a single
-    // run away, so it wins. Naming it further down the ladder would point at
-    // tracks they cannot even reach yet, five rows all reading the same, so
-    // every other locked stage quotes the total instead — that is the number
-    // that tells them how far the campaign still runs.
+    // A locked row that only says "Locked" hides the whole rule. Every Campaign
+    // gate has two independent requirements, so preserve both as structured
+    // copy: a medal on the previous stage and the campaign-wide medal total.
+    // `unlockRequirementLabel` remains the first unmet sentence for legacy
+    // callers, while the carousel renders the complete checklist.
     const medalTotal = normalized.reduce(
         (total, stage) => total + getCampaignStageMedalCount(normalizeMedalName(stage.medal)),
         0,
@@ -109,19 +114,59 @@ export function normalizeCampaignLobbyState(state = {}) {
             && getCampaignStageMedalCount(normalizeMedalName(previous.medal)) === 0;
         const requiredMedals = Number(stage.unlock?.requiredMedals);
         const hasPrice = Number.isInteger(requiredMedals) && requiredMedals > 0;
+        const previousMedalEarned = Boolean(previous)
+            && getCampaignStageMedalCount(normalizeMedalName(previous.medal)) > 0;
+        const unlockRequirements = [];
+        if (previous) {
+            unlockRequirements.push({
+                id: 'previous-medal',
+                copy: previousMedalEarned
+                    ? `Medal earned on ${previous.trackName}`
+                    : `Earn any medal on ${previous.trackName}`,
+                satisfied: previousMedalEarned,
+            });
+        }
+        if (hasPrice) {
+            const remainingMedals = Math.max(0, requiredMedals - medalTotal);
+            unlockRequirements.push({
+                id: 'medal-total',
+                copy: medalTotal >= requiredMedals
+                    ? 'Medal total reached'
+                    : 'Additional medals needed',
+                satisfied: remainingMedals === 0,
+                medalTotal,
+                requiredMedals,
+                remainingMedals,
+            });
+        }
+        if (!unlockRequirements.length) {
+            unlockRequirements.push({
+                id: 'unlock',
+                copy: 'More medals to unlock',
+                satisfied: false,
+            });
+        }
         let label = 'More medals to unlock';
         if (awaitingPreviousMedal) {
-            label = `A medal on ${previous.trackName} to unlock`;
+            label = `Earn any medal on ${previous.trackName}`;
         } else if (hasPrice) {
-            label = `${medalTotal}/${requiredMedals} medals to unlock`;
+            label = formatRemainingMedalsLabel(medalTotal, requiredMedals)
+                || (previous && !previous.unlocked
+                    ? 'Complete the previous stage first'
+                    : 'More medals needed');
         }
         return {
             ...stage,
             unlockRequirementLabel: label,
-            // The card shows the count where an unlocked stage shows its rank,
-            // so it needs the two numbers rather than the sentence.
+            unlockRequirements,
+            // The card's visual ring uses the total requirement, while the
+            // checklist keeps both gates readable in words.
             unlockProgress: hasPrice
-                ? { medalTotal, requiredMedals, awaitingPreviousMedal }
+                ? {
+                    medalTotal,
+                    requiredMedals,
+                    awaitingPreviousMedal,
+                }
                 : null,
         };
     });

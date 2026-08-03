@@ -177,6 +177,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     min-width: 0;
 }
 
+.lobby-subhead__rule,
+.lobby-mode-selection {
+    display: none;
+}
+
 .lobby-back-btn {
     display: flex;
     flex-shrink: 0;
@@ -376,6 +381,67 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     align-items: center;
     line-height: 0.9;
     text-shadow: none;
+}
+
+.main-menu__item--primary .main-menu__race-brief {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    width: 100%;
+    box-sizing: border-box;
+    color: rgba(255, 255, 255, 0.78);
+    font-family: var(--header-font);
+    font-size: 0.7rem;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.main-menu__item--primary .main-menu__race-brief-track {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: inherit;
+    font-weight: 900;
+}
+
+.main-menu__item--primary .main-menu__race-brief-separator {
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.main-menu__item--primary .main-menu__race-brief-laps {
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.92);
+    font-family: inherit;
+    font-size: inherit;
+    font-style: normal;
+    font-weight: 900;
+    letter-spacing: inherit;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.main-menu__item--primary .main-menu__race-brief-separator[hidden],
+.main-menu__item--primary .main-menu__race-brief-laps[hidden],
+.main-menu__item--primary .main-menu__race-brief-track[hidden] {
+    display: none;
+}
+
+.main-menu__item--primary .main-menu__race-brief[hidden] {
+    display: none;
 }
 
 .main-menu__item--primary:not(:disabled):hover {

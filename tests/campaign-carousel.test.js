@@ -41,7 +41,8 @@ describe('campaign carousel card model', () => {
             'numbered-v1-03',
         ]);
         expect(cards.map((card) => card.locked)).toEqual([false, true, true, true]);
-        expect(cards[0].eyebrowLabel).toBe('Stage 00');
+        expect(cards[0].modeLabel).toBe('Campaign');
+        expect(cards[0].billingLabel).toBe('Stage 00');
     });
 
     it('marks the stage the campaign is asking for next', () => {
@@ -71,16 +72,41 @@ describe('campaign carousel card model', () => {
 
         expect(cards[0].metaLabel).toBe('1 Lap');
         expect(cards[1].locked).toBe(true);
-        expect(cards[1].metaLabel).toContain('to unlock');
-        expect(cards[1].lockedLabel).toContain('to unlock');
+        expect(cards[1].metaLabel).toContain('Earn any medal on');
+        expect(cards[1].lockedLabel).toContain('Earn any medal on');
     });
 
     /**
-     * The count goes where an unlocked card puts its rank, so the meta line has
-     * no reason to say it a second time — the stage goes back to describing
-     * itself. The one exception is the stage waiting on the run before it: that
-     * sentence is not in the counter, so the meta line still carries it.
+     * The card keeps both independent gates as structured copy: the previous
+     * stage medal and the campaign-wide total. The legacy label remains the
+     * first actionable sentence for non-carousel callers.
      */
+    it('carries both unlock requirements to the card', () => {
+        const cards = buildCampaignCarouselCards(campaignState([
+            { unlocked: true, medal: null },
+            {
+                unlocked: false,
+                unlock: { type: 'medal_total', requiredMedals: 3, previousRaceId: 'numbered-v1-00' },
+            },
+        ]));
+
+        expect(cards[1].unlockRequirements).toEqual([
+            {
+                id: 'previous-medal',
+                copy: 'Earn any medal on Number 0',
+                satisfied: false,
+            },
+            {
+                id: 'medal-total',
+                copy: 'Additional medals needed',
+                satisfied: false,
+                medalTotal: 0,
+                requiredMedals: 3,
+                remainingMedals: 3,
+            },
+        ]);
+    });
+
     it('hands the medal count to the card and stops repeating it in the meta', () => {
         const cards = buildCampaignCarouselCards(campaignState([
             { unlocked: true, medal: 'gold' },
@@ -91,10 +117,10 @@ describe('campaign carousel card model', () => {
             },
         ]));
 
-        expect(cards[1].lockMeter).toEqual({ label: 'Medals', value: '3/12', ratio: 0.25 });
+        expect(cards[1].lockMeter).toEqual({ label: 'Medals', remainingMedals: 9, ratio: 0.25 });
         expect(cards[1].metaLabel).toBe('3 Laps');
         // The sentence stays reachable for the screen reader on the rank chip.
-        expect(cards[1].lockedLabel).toBe('3/12 medals to unlock');
+        expect(cards[1].lockedLabel).toBe('9 more medals needed');
     });
 
     it('keeps the sentence on the meta line while the run before is unmedalled', () => {
@@ -106,8 +132,8 @@ describe('campaign carousel card model', () => {
             },
         ]));
 
-        expect(cards[1].metaLabel).toBe('A medal on Number 0 to unlock');
-        expect(cards[1].lockMeter).toEqual({ label: 'Medals', value: '0/12', ratio: 0 });
+        expect(cards[1].metaLabel).toBe('Earn any medal on Number 0');
+        expect(cards[1].lockMeter).toEqual({ label: 'Medals', remainingMedals: 12, ratio: 0 });
     });
 
     it('leaves an unlocked card without a meter and never overflows the bar', () => {
@@ -122,8 +148,10 @@ describe('campaign carousel card model', () => {
         ]));
 
         expect(cards[0].lockMeter).toBeNull();
-        // Eight medals against a price of three: the bar fills, it does not spill.
-        expect(cards[2].lockMeter).toEqual({ label: 'Medals', value: '8/3', ratio: 1 });
+        // Eight medals against a price of three: the ring fills, but no
+        // misleading over-target fraction is printed into it.
+        expect(cards[2].lockMeter).toBeNull();
+        expect(cards[2].lockedLabel).toBe('Complete the previous stage first');
         // A locked stage with no price quoted has no bar to draw.
         expect(cards[3].lockMeter).toBeNull();
     });

@@ -1,5 +1,30 @@
 # Changelog
 
+- Fixed Daily and Campaign identity in the shared lobby header: Mini Racer,
+  the mode label, divider, and billing row stay fixed while carousel movement
+  updates only the right-side date/stage value. Removed the per-card identity
+  and billing duplicates. Restored the compact carousel wordmark cap and mono
+  billing scale so the mode screens do not inherit Home's large display type.
+- Removed the oversized lap circle from the shared Daily/Campaign Start Race
+  brief, leaving a compact dot separator before the `N Lap(s)` text.
+- Added the singular/plural `Lap` label beside the filled lap-number circle in
+  the shared Daily/Campaign Start Race brief.
+- Restyled the shared Daily/Campaign race brief to use the header font, bold the
+  selected track name, and show only the lap number inside a filled circular badge.
+- Tightened the Daily/Campaign Mini Racer wordmark to the former track-name
+  title position beside the top toolbar instead of leaving a full toolbar-height
+  gap above it.
+- Restored the fixed Mini Racer wordmark above the Daily/Campaign billing row,
+  exactly in the poster's former track-name title slot, while keeping the
+  selected track name and lap count on the Start Race action.
+- Moved the selected track name into the Daily/Campaign Start Race action so
+  its smaller second line reads `Track Name - N Laps`; the poster now keeps only
+  the mode/date-stage billing above the schematic.
+- Replaced the poster's left date/stage caption with the active mode label and
+  moved the Daily date or Campaign stage to the right end of the billing line.
+- Moved the selected track's lap count out of the Daily/Campaign poster header
+  and onto the red Start Race action as a smaller line beneath the button label.
+  The count follows the centred track in both modes.
 - Campaign now runs to thirteen stages: Imaginary Number (10, 2 laps), Infinite
   Pie (11, 1 lap), and Euler's Number (12, 1 lap) continue the numbered ladder.
   Their gates follow the same curve as stages 03 onward — 25, 27, and 30
@@ -7,7 +32,7 @@
   the medal-on-the-previous-stage condition that opens one stage at a time. The
   Campaign car unlocks stay at ten Gold and ten Author stages so nothing
   already earned is revoked.
-- Replaced the leaderboard's text-only **Race** affordance with a stopwatch
+- Replaced the leaderboard's text-only **Race** affordance with a ghost
   icon while preserving the full accessible opponent-race label. The shared
   action column now hugs the icon controls instead of reserving the old text
   label width.

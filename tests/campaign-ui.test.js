@@ -63,6 +63,7 @@ function createElement(tagName = 'div') {
         disabled: false,
         hidden: false,
         textContent: '',
+        attributes: {},
         listeners,
         addEventListener: vi.fn((name, handler) => listeners.set(name, handler)),
         append(...children) {
@@ -75,11 +76,24 @@ function createElement(tagName = 'div') {
         replaceChildren(...children) {
             this.children = children;
         },
-        setAttribute: vi.fn(),
+        setAttribute: vi.fn((name, value) => {
+            element.attributes[name] = value;
+        }),
+        removeAttribute: vi.fn((name) => {
+            delete element.attributes[name];
+        }),
         toggleAttribute: vi.fn(),
         querySelector(selector) {
             if (selector === '.main-menu__label') {
                 return this.children.find((child) => child.className === 'main-menu__label') || null;
+            }
+            if (selector === '.main-menu__race-brief') {
+                return this.children.find((child) => child.className === 'main-menu__race-brief') || null;
+            }
+            if (selector === '.main-menu__race-brief-track'
+                || selector === '.main-menu__race-brief-separator'
+                || selector === '.main-menu__race-brief-laps') {
+                return this.children.find((child) => child.className === selector.slice(1)) || null;
             }
             if (selector === '.main-menu__spinner' || selector === '.modal-rank-spinner') {
                 return this.children.find((child) => String(child.className).includes('spinner')) || null;
@@ -156,9 +170,36 @@ function campaignState() {
                 bestTimeLabel: 'No time',
                 medal: null,
                 unlock: { type: 'medal_total', requiredMedals: 3 },
-                unlockRequirementLabel: '1/3 medals to unlock',
+                unlockRequirementLabel: '2 more medals needed',
             },
         ],
+    };
+}
+
+function campaignStandingsSnapshot(displayName, bestTimeMs = 12_000) {
+    return {
+        topRows: [{
+            rank: 1,
+            displayName,
+            bestTimeMs,
+            isCurrentPlayer: displayName === 'You',
+        }],
+        currentPlayerRow: displayName === 'You'
+            ? {
+                rank: 1,
+                displayName,
+                bestTimeMs,
+                isCurrentPlayer: true,
+            }
+            : null,
+        totalCount: 1,
+        leaderboardEntryCount: 1,
+        playerRank: displayName === 'You' ? 1 : null,
+        playerRankLabel: displayName === 'You' ? '#1' : null,
+        pageOffset: 0,
+        pageLimit: 50,
+        hasMore: false,
+        nextOffset: null,
     };
 }
 
@@ -292,7 +333,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 stages: [{
                     id: 'numbered-v1-01',
                     unlocked: false,
-                    unlockRequirementLabel: 'A medal on Number Zero to unlock',
+                    unlockRequirementLabel: 'Earn any medal on Number Zero',
                 }],
             },
         });
@@ -303,7 +344,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         const { nextRace } = context.modal.showModal.mock.calls[0][3];
         expect(nextRace).toMatchObject({
             enabled: false,
-            ariaLabel: 'A medal on Number Zero to unlock',
+            ariaLabel: 'Earn any medal on Number Zero',
         });
     });
 
@@ -670,7 +711,16 @@ describe('Campaign lobby and shared modal adapters', () => {
     });
 
     it('still shows the accepted result when PB ghost and lobby refreshes fail', async () => {
-        const context = createCampaignFinishContext();
+        const standingsSession = {
+            refreshedRaceIds: new Set(['numbered-v1-00']),
+            inFlightByRaceId: new Map(),
+            snapshotByRaceId: new Map(),
+            selectedRaceId: 'numbered-v1-00',
+        };
+        const context = createCampaignFinishContext({
+            _activeCampaignStandingsRefreshSession: standingsSession,
+            _lastCampaignStandingsRefreshSession: standingsSession,
+        });
         campaignServiceMocks.submitCampaignRun.mockResolvedValue({
             ok: true,
             body: {
@@ -715,6 +765,11 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(context.campaignBootstrap.progress).toEqual({
             unlockedRaceIds: ['numbered-v1-00'],
+        });
+        expect(standingsSession.refreshedRaceIds).toContain('numbered-v1-00');
+        expect(standingsSession.snapshotByRaceId.get('numbered-v1-00')).toMatchObject({
+            playerRankLabel: '#1',
+            totalCount: 3,
         });
         // The already-open finish sheet is patched in place, never remounted.
         expect(context.modal.showModal).not.toHaveBeenCalled();
@@ -986,25 +1041,61 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('places navigation and utilities in the header with a full-width Start Race', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
+        const lobbyCss = readFileSync(
+            new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
 
         const toolbarMarkup = html.match(
             /<nav class="lobby-mode-toolbar"[\s\S]*?<\/nav>/,
         )?.[0];
+        expect(toolbarMarkup).toContain('class="lobby-mode-toolbar__actions"');
+        expect(toolbarMarkup).toMatch(
+            /<button id="lobby-mode-back-btn"[\s\S]*id="lobby-mode-standings-btn"[\s\S]*id="lobby-mode-garage-btn"[\s\S]*id="lobby-mode-settings-btn"/,
+        );
         expect(toolbarMarkup).toContain('id="lobby-mode-back-btn"');
         expect(toolbarMarkup).toContain('data-lobby-back');
-        expect(toolbarMarkup).toContain('<span>Back</span>');
         expect(toolbarMarkup).toContain('id="lobby-mode-standings-btn"');
         expect(toolbarMarkup).toContain('aria-label="Standings"');
         expect(toolbarMarkup).toContain('id="lobby-mode-garage-btn"');
         expect(toolbarMarkup).toContain('aria-controls="garage-modal"');
         expect(toolbarMarkup).toContain('id="lobby-mode-settings-btn"');
         expect(toolbarMarkup).toContain('aria-controls="settings-modal"');
+        expect(toolbarMarkup).not.toContain('lobby-mode-toolbar__label');
 
         expect(html).not.toContain('id="lobby-daily-back-btn"');
         expect(html).not.toContain('id="lobby-daily-garage-btn"');
         expect(html).not.toContain('id="lobby-campaign-back-btn"');
         expect(html).not.toContain('id="lobby-campaign-garage-btn"');
         expect(html).toMatch(/id="challenge-accept-btn"[\s\S]*main-menu__label">Accept</);
+        expect(html).toMatch(
+            /id="daily-challenge-start-btn"[\s\S]*main-menu__label">Start Race<\/span>[\s\S]*class="main-menu__race-brief"/,
+        );
+        expect(html).toMatch(
+            /id="campaign-primary-btn"[\s\S]*main-menu__label">Start Race<\/span>[\s\S]*class="main-menu__race-brief"/,
+        );
+        expect(html).toMatch(
+            /class="main-menu__race-brief"[\s\S]*class="main-menu__race-brief-track"[\s\S]*class="main-menu__race-brief-separator"[\s\S]*class="main-menu__race-brief-laps"/,
+        );
+        expect(lobbyCss).toMatch(
+            /\.main-menu__item--primary \.main-menu__race-brief\s*\{[^}]*font-family:\s*var\(--header-font\);/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.main-menu__item--primary \.main-menu__race-brief-track\s*\{[^}]*font-weight:\s*900;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.main-menu__item--primary \.main-menu__race-brief-track\s*\{[^}]*font-family:\s*inherit;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.main-menu__item--primary \.main-menu__race-brief-separator\s*\{[^}]*font-family:\s*inherit;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.main-menu__item--primary \.main-menu__race-brief-laps\s*\{[^}]*font-family:\s*inherit;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.main-menu__item--primary \.main-menu__race-brief-separator\s*\{[^}]*font-size:\s*0\.78rem;/s,
+        );
+        expect(lobbyCss).not.toContain('.main-menu__race-brief-laps-number');
         expect(html).not.toContain('id="lobby-challenge-back-btn"');
         expect(html).not.toContain('id="lobby-challenge-garage-btn"');
         const headerBack = html.match(/<button id="lobby-back-btn"[\s\S]*?<\/button>/)?.[0];
@@ -1019,6 +1110,27 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(css).toMatch(
             /\.lobby-pane\.main-menu\s*\{[^}]*margin-top:\s*auto;/s,
+        );
+        expect(css).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-header\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*3;[^}]*display:\s*flex;/s,
+        );
+        expect(css).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-mode-toolbar,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-mode-toolbar\s*\{[^}]*position:\s*absolute;[^}]*top:\s*0;[^}]*right:\s*0;[^}]*width:\s*auto;/s,
+        );
+        expect(css).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-subhead,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-subhead\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto;/s,
+        );
+        expect(css).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-panes,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-panes\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-toolbar__action\s*\{[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*width:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*height:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*min-width:\s*2\.75rem;[^}]*min-height:\s*2\.75rem;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-toolbar__action svg\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-toolbar__back svg\s*\{[^}]*width:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);[^}]*height:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);/s,
         );
         // All panes share one measured grid cell; the transition veil covers the
         // synchronous hidden/mode swap so the old screen cannot bleed through.
@@ -1040,6 +1152,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(css).toMatch(
             /\.lobby-primary-row--race \.main-menu__item--primary\s*\{[^}]*font-size:\s*1\.5rem;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-primary-row--race \.main-menu__item--primary\s*\{[^}]*flex-direction:\s*column;[^}]*gap:\s*0\.3rem;/s,
         );
         expect(css).not.toContain('width: min(94vw, 60rem)');
         expect(css).toMatch(
@@ -1087,7 +1202,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         const settingsMarkup = html.match(
             /<button id="lobby-mode-settings-btn"[\s\S]*?<\/button>/,
         )?.[0];
-        expect(settingsMarkup).toContain('class="lobby-header-action"');
+        expect(settingsMarkup).toContain('lobby-header-action');
         expect(settingsMarkup).toContain('aria-label="Settings"');
         expect(settingsMarkup).toContain('aria-controls="settings-modal"');
         expect(settingsMarkup).toContain('viewBox="0 0 512 512"');
@@ -1298,13 +1413,16 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-header\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-start;/s,
         );
         expect(modeCss).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*display:\s*block;/,
+            /body\[data-lobby-mode="daily"\] \.lobby-header,[\s\S]*position:\s*relative;[\s\S]*display:\s*flex;/,
+        );
+        expect(modeCss).not.toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-title,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-title\s*\{[^}]*display:\s*none;/,
         );
         expect(modeCss).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-title,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-subhead[\s\S]*display:\s*none;/,
+            /body\[data-lobby-mode="daily"\] \.lobby-mode-toolbar,[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;/,
         );
         expect(modeCss).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-mode-toolbar,[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*space-between;/,
+            /body\[data-lobby-mode="daily"\] \.lobby-subhead,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto;/,
         );
         expect(lobbyCss).toMatch(
             /\.lobby-subhead\s*\{[^}]*margin-top:\s*0\.45rem;/s,
@@ -1319,6 +1437,10 @@ describe('Campaign lobby and shared modal adapters', () => {
         const label = createElement('p');
         const track = createElement('p');
         track.hidden = true;
+        const rule = createElement('span');
+        rule.hidden = true;
+        const selection = createElement('p');
+        selection.hidden = true;
         const overlay = createElement('div');
         const panes = {
             home: createElement('section'),
@@ -1338,6 +1460,8 @@ describe('Campaign lobby and shared modal adapters', () => {
                 if (selector === '[data-lobby-subhead]') return subhead;
                 if (selector === '[data-lobby-mode-label]') return label;
                 if (selector === '[data-lobby-mode-track]') return track;
+                if (selector === '[data-lobby-subhead-rule]') return rule;
+                if (selector === '[data-lobby-mode-selection]') return selection;
                 return null;
             },
             addEventListener: vi.fn(),
@@ -1347,21 +1471,36 @@ describe('Campaign lobby and shared modal adapters', () => {
         lobby.focus = vi.fn();
         vi.stubGlobal('requestAnimationFrame', (cb) => cb());
 
-        // Daily's track name lives on the carousel card, so the subhead is the
-        // mode name and nothing else.
+        // The wordmark is the real header, and only the selected day occupies
+        // the right-hand end of the fixed billing line.
         lobby.showDaily();
         expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Daily');
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
+        expect(rule.hidden).toBe(false);
+        expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('daily');
+
+        lobby.setDailySelectedChallenge(
+            { trackName: 'Classic Circuit', objectiveParams: { lapCount: 1 } },
+            { trackName: 'Classic Circuit', laps: 1, billingLabel: 'Today' },
+        );
+        expect(selection.textContent).toBe('Today');
+        expect(selection.hidden).toBe(false);
 
         lobby.showCampaign();
         expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Campaign');
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
+        expect(rule.hidden).toBe(false);
+        expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('campaign');
+
+        lobby.setCampaignSelectedStage({ numberLabel: '10', unlocked: true, laps: 1 });
+        expect(selection.textContent).toBe('Stage 10');
+        expect(selection.hidden).toBe(false);
 
         lobby.showChallenge({
             ranked: true,
@@ -1378,6 +1517,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(track.hidden).toBe(false);
         expect(track.textContent).toBe('u/shimroot challenges you');
         expect(track.classList.contains('lobby-mode-track--challenge')).toBe(true);
+        expect(rule.hidden).toBe(true);
+        expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('challenge');
 
         lobby.showHome();
@@ -1385,6 +1526,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(label.textContent).toBe('');
         expect(track.hidden).toBe(true);
         expect(track.classList.contains('lobby-mode-track--challenge')).toBe(false);
+        expect(rule.hidden).toBe(true);
+        expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('home');
         expect(body.dataset.lobbyHomeReturned).toBe('true');
         expect(modeCss).toMatch(
@@ -1399,8 +1542,17 @@ describe('Campaign lobby and shared modal adapters', () => {
         const originalDocument = global.document;
         const label = createElement('span');
         label.className = 'main-menu__label';
+        const brief = createElement('span');
+        brief.className = 'main-menu__race-brief';
+        const track = createElement('span');
+        track.className = 'main-menu__race-brief-track';
+        const separator = createElement('span');
+        separator.className = 'main-menu__race-brief-separator';
+        const laps = createElement('span');
+        laps.className = 'main-menu__race-brief-laps';
+        brief.children.push(track, separator, laps);
         const primary = createElement('button');
-        primary.children.push(label);
+        primary.children.push(label, brief);
         global.document = {
             getElementById: (id) => (id === 'campaign-primary-btn' ? primary : null),
             querySelector: () => null,
@@ -1422,20 +1574,52 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
 
         // Every unlocked stage reads the same: the button races what is centred.
-        lobby.setCampaignSelectedStage({ id: 'numbered-v1-00', unlocked: true });
+        lobby.setCampaignSelectedStage({
+            id: 'numbered-v1-00',
+            trackName: 'Number Zero',
+            unlocked: true,
+            laps: 1,
+        });
         expect(label.textContent).toBe('Start Race');
+        expect(track.textContent).toBe('Number Zero');
+        expect(separator.hidden).toBe(false);
+        expect(laps.textContent).toBe('1 Lap');
+        expect(laps.attributes['aria-label']).toBe('1 Lap');
         expect(primary.disabled).toBe(false);
 
-        lobby.setCampaignSelectedStage({ id: 'numbered-v1-01', unlocked: true });
+        lobby.setCampaignSelectedStage({
+            id: 'numbered-v1-01',
+            trackName: 'Number One',
+            unlocked: true,
+            laps: 3,
+        });
         expect(label.textContent).toBe('Start Race');
+        expect(track.textContent).toBe('Number One');
+        expect(separator.hidden).toBe(false);
+        expect(laps.textContent).toBe('3 Laps');
+        expect(laps.attributes['aria-label']).toBe('3 Laps');
         expect(primary.disabled).toBe(false);
 
         // A locked stage cannot be started.
-        lobby.setCampaignSelectedStage({ id: 'numbered-v1-02', unlocked: false });
+        lobby.setCampaignSelectedStage({
+            id: 'numbered-v1-02',
+            trackName: 'Number Two',
+            unlocked: false,
+            laps: 2,
+        });
         expect(label.textContent).toBe('Locked');
+        expect(track.textContent).toBe('Number Two');
+        expect(separator.hidden).toBe(false);
+        expect(laps.textContent).toBe('2 Laps');
+        expect(laps.attributes['aria-label']).toBe('2 Laps');
         expect(primary.disabled).toBe(true);
 
-        lobby.setCampaignSelectedStage({ id: 'numbered-v1-01', unlocked: true });
+        lobby.setCampaignSelectedStage({
+            id: 'numbered-v1-01',
+            trackName: 'Number One',
+            unlocked: true,
+            laps: 3,
+        });
         primary.listeners.get('click')();
         expect(onStartCampaign).toHaveBeenCalledTimes(1);
 
@@ -1529,7 +1713,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
     });
 
-    it('shows only unlocked stage selectors and loads each stage independently', async () => {
+    it('shows every stage selector, including locked stages without a player rank', async () => {
         campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
             ok: true,
             body: {
@@ -1557,21 +1741,161 @@ describe('Campaign lobby and shared modal adapters', () => {
         };
 
         expect(buildCampaignLeaderboardOptions(state).map((option) => option.challengeId))
-            .toEqual(['numbered-v1-00', 'numbered-v1-01']);
+            .toEqual(state.stages.map((stage) => stage.id));
 
-        await campaignEngineMethods.openCampaignStandings.call(context);
+        await campaignEngineMethods.openCampaignStandings.call(context, 'numbered-v1-02');
 
         expect(campaignServiceMocks.getCampaignSnapshot).toHaveBeenCalledWith(
-            'numbered-v1-01',
+            'numbered-v1-02',
             { limit: 50, offset: 0 },
         );
         const modalOptions = modal.showRunsModal.mock.calls[0][4];
         expect(modalOptions.scoreboardMode).toBe('campaign');
         expect(modalOptions.leaderboardRailLabel).toBe('Campaign stages');
-        expect(modalOptions.selectedLeaderboardDayId).toBe('numbered-v1-01');
+        expect(modalOptions.selectedLeaderboardDayId).toBe('numbered-v1-02');
         expect(modalOptions.scoreboardSnapshot).toEqual({ isLoading: true });
         expect(modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
             expect.objectContaining({ topRows: [], totalCount: 0 }),
+        );
+    });
+
+    it('shows every Campaign standings entry without rank filtering', () => {
+        const state = {
+            stages: CAMPAIGN_STAGES.map((stage, index) => ({
+                id: stage.raceId,
+                numberLabel: stage.stageNumber,
+                trackName: stage.trackKey,
+                unlocked: index === 0,
+                playerRank: index === 0 ? 1 : null,
+            })),
+        };
+
+        const options = buildCampaignLeaderboardOptions(state);
+
+        expect(options).toHaveLength(CAMPAIGN_STAGES.length);
+        expect(options.map((option) => option.challengeId)).toEqual(
+            CAMPAIGN_STAGES.map((stage) => stage.raceId),
+        );
+    });
+
+    it('reuses a refreshed stage when switching back within one standings session', async () => {
+        campaignServiceMocks.getCampaignSnapshot
+            .mockResolvedValueOnce({
+                ok: true,
+                body: campaignStandingsSnapshot('Stage Zero'),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                body: campaignStandingsSnapshot('Stage One', 13_000),
+            });
+        const modal = {
+            showRunsModal: vi.fn(),
+            isRunsViewActive: vi.fn(() => true),
+            updateModalScoreboardSnapshot: vi.fn(),
+        };
+        const context = {
+            ...campaignEngineMethods,
+            campaignLobbyState: campaignState(),
+            modal,
+            activeRaceMode: 'campaign',
+            ensureCampaignBootstrap: vi.fn().mockResolvedValue({}),
+        };
+
+        await context.openCampaignStandings('numbered-v1-00');
+        modal.showRunsModal.mock.calls[0][4].onSelectLeaderboardDay('numbered-v1-01');
+        await vi.waitFor(() => expect(modal.showRunsModal).toHaveBeenCalledTimes(2));
+        await vi.waitFor(() => expect(campaignServiceMocks.getCampaignSnapshot)
+            .toHaveBeenCalledTimes(2));
+        modal.showRunsModal.mock.calls[1][4].onSelectLeaderboardDay('numbered-v1-00');
+        await vi.waitFor(() => expect(modal.showRunsModal).toHaveBeenCalledTimes(3));
+
+        expect(campaignServiceMocks.getCampaignSnapshot).toHaveBeenCalledTimes(2);
+        expect(modal.showRunsModal.mock.calls[2][4].scoreboardSnapshot).toMatchObject({
+            topRows: [expect.objectContaining({ displayName: 'Stage Zero' })],
+        });
+        expect(modal.showRunsModal.mock.calls[2][4].scoreboardSnapshot).not.toHaveProperty(
+            'isLoading',
+        );
+        expect(modal.showRunsModal.mock.calls[2][4].scoreboardSnapshot).not.toHaveProperty(
+            'isRefreshing',
+        );
+    });
+
+    it('starts a new refresh session after standings closes', async () => {
+        campaignServiceMocks.getCampaignSnapshot
+            .mockResolvedValueOnce({
+                ok: true,
+                body: campaignStandingsSnapshot('Cached'),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                body: campaignStandingsSnapshot('Fresh', 11_000),
+            });
+        const modal = {
+            showRunsModal: vi.fn(),
+            isRunsViewActive: vi.fn(() => true),
+            updateModalScoreboardSnapshot: vi.fn(),
+        };
+        const context = {
+            ...campaignEngineMethods,
+            campaignLobbyState: campaignState(),
+            modal,
+            activeRaceMode: 'campaign',
+            ensureCampaignBootstrap: vi.fn().mockResolvedValue({}),
+        };
+
+        await context.openCampaignStandings('numbered-v1-00');
+        modal.showRunsModal.mock.calls[0][4].onClose();
+        await context.openCampaignStandings('numbered-v1-00');
+
+        expect(campaignServiceMocks.getCampaignSnapshot).toHaveBeenCalledTimes(2);
+        expect(modal.showRunsModal.mock.calls[1][4].scoreboardSnapshot).toMatchObject({
+            isRefreshing: true,
+            topRows: [expect.objectContaining({ displayName: 'Cached' })],
+        });
+        expect(modal.updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                topRows: [expect.objectContaining({ displayName: 'Fresh' })],
+            }),
+        );
+    });
+
+    it('keeps the cached Campaign snapshot when a new-session refresh fails', async () => {
+        campaignServiceMocks.getCampaignSnapshot
+            .mockResolvedValueOnce({
+                ok: true,
+                body: campaignStandingsSnapshot('Cached'),
+            })
+            .mockRejectedValueOnce(new Error('offline'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const modal = {
+            showRunsModal: vi.fn(),
+            isRunsViewActive: vi.fn(() => true),
+            updateModalScoreboardSnapshot: vi.fn(),
+        };
+        const context = {
+            ...campaignEngineMethods,
+            campaignLobbyState: campaignState(),
+            modal,
+            activeRaceMode: 'campaign',
+            ensureCampaignBootstrap: vi.fn().mockResolvedValue({}),
+        };
+
+        await context.openCampaignStandings('numbered-v1-00');
+        modal.showRunsModal.mock.calls[0][4].onClose();
+        await context.openCampaignStandings('numbered-v1-00');
+
+        expect(modal.showRunsModal.mock.calls[1][4].scoreboardSnapshot).toMatchObject({
+            isRefreshing: true,
+            topRows: [expect.objectContaining({ displayName: 'Cached' })],
+        });
+        expect(modal.updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                topRows: [expect.objectContaining({ displayName: 'Cached' })],
+            }),
+        );
+        expect(modal.updateModalScoreboardSnapshot.mock.calls.at(-1)[0]).not.toHaveProperty(
+            'isRefreshing',
         );
     });
 
@@ -2008,6 +2332,36 @@ describe('Campaign lobby and shared modal adapters', () => {
             ...overrides,
         };
     }
+
+    it('resets a completed same-track Campaign run before a ghost replay', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+        const reset = vi.fn(function resetRun(_autoStart, options) {
+            this.status = 'ready';
+            return options;
+        });
+        const context = createStartContext({
+            status: 'won',
+            raceComparisonTarget: { displayName: 'Rival' },
+            reset,
+        });
+
+        await context.startCampaignStage(
+            { raceId: 'numbered-v1-00' },
+            { preserveRaceComparisonTarget: true },
+        );
+
+        expect(reset).toHaveBeenCalledWith(false, {
+            preserveRaceComparisonTarget: true,
+            showStartOverlay: false,
+        });
+        expect(context.loadTrack).not.toHaveBeenCalled();
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(context.startButtonPending).toBe(false);
+    });
 
     it('starts the lights without waiting on the start stamp or the PB ghost', async () => {
         let resolveStart;

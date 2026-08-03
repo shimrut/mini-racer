@@ -289,9 +289,9 @@ describe('ui modal content helpers', () => {
         expect(rows[0].getAttribute('tabindex')).toBe('0');
         expect(rows[0].getAttribute('aria-label')).toBe("Race Fast Racer's ghost");
         const raceIcon = rows[0].querySelector('.leaderboard-row__race-icon');
-        expect(raceIcon?.getAttribute('viewBox')).toBe('0 0 448 512');
+        expect(raceIcon?.getAttribute('viewBox')).toBe('0 0 384 512');
         expect(raceIcon?.getAttribute('fill')).toBe('currentColor');
-        expect(raceIcon?.querySelector('path')?.getAttribute('d')).toContain('M168.5 0');
+        expect(raceIcon?.querySelector('path')?.getAttribute('d')).toContain('M40.1 467.1');
         expect(raceIcon?.textContent).toBe('');
         expect(rows[0]._opponentRaceEntry).toBe(opponent);
         expect(rows[1].classList.contains('is-raceable')).toBe(false);

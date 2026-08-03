@@ -1085,9 +1085,10 @@ export const dailyChallengeEngineMethods = {
     this.dailyCarousel.render(cards, { selectedChallengeId, loading });
   },
 
-  handleDailyCarouselSelect(challenge) {
+  handleDailyCarouselSelect(challenge, card = null) {
     if (!challenge?.id) return;
     this.selectedDailyChallengeId = challenge.id;
+    this.lobbyUi?.setDailySelectedChallenge?.(challenge, card);
     this.setDailyChallengeLobbySummary(challenge);
   },
 

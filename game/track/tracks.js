@@ -69,6 +69,7 @@ import eulersNumber from './definitions/eulers-number.js';
 import imaginaryNumber from './definitions/imaginary-number.js';
 import infinitePie from './definitions/infinite-pie.js';
 import centralDrop from './definitions/central-drop.js';
+import goldenRatio from './definitions/golden-ratio.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -143,6 +144,7 @@ const TRACK_GEOMETRY = {
     imaginaryNumber,
     infinitePie,
     centralDrop,
+    goldenRatio,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

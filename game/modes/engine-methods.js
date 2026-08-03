@@ -50,7 +50,6 @@ export const modeRouterEngineMethods = {
         }
         if (mode === 'campaign') {
             const stage = this.campaignCarousel?.getSelectedChallenge?.();
-            if (stage?.unlocked === false) return;
             if (stage) {
                 void this.openCampaignStandings?.(stage, { returnMode: 'close' });
             }

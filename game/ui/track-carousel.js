@@ -11,13 +11,11 @@ import {
 const PREVIEW_WIDTH = 320;
 const PREVIEW_HEIGHT = 176;
 const PREVIEW_CAR_SCALE = 2;
-// Matches the margin `getTrackBoundsLayout` keeps inside the preview canvas.
-const PREVIEW_RENDER_PADDING = 16;
-const DEFAULT_PLATE_ASPECT = 1.4;
-const MIN_PLATE_ASPECT = 0.62;
-const MAX_PLATE_ASPECT = 2.4;
 const SCROLL_SETTLE_MS = 90;
 const PROGRAMMATIC_SCROLL_TIMEOUT_MS = 1200;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const REQUIREMENT_CHECK_PATH =
+    'M434.8 70.1c14.3 10.4 17.5 30.4 7.1 44.7l-256 352c-5.5 7.6-14 12.3-23.4 13.1s-18.5-2.7-25.1-9.3l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l101.5 101.5 234-321.7c10.4-14.3 30.4-17.5 44.7-7.1z';
 
 function setText(element, value) {
     if (element) element.textContent = value;
@@ -25,70 +23,101 @@ function setText(element, value) {
 
 function createUnlockMedalMeter(meter) {
     const icon = createMedalIconSvg('silver', {
-        className: 'track-carousel__unlock-medal',
+        className: 'track-carousel__unlock-medal medal-svg--row-placeholder',
         outline: true,
-        centerText: meter.value,
+        rowPlaceholder: true,
+        // The sentence says what is needed; the medal placeholder carries the
+        // exact remaining count without turning the footer into a number string.
+        centerText: meter.remainingMedals,
         showEmblem: false,
     });
-    icon.classList.toggle('is-complete', meter.ratio >= 1);
     icon.setAttribute('aria-hidden', 'true');
-    const svg = icon.querySelector?.('svg');
-    const track = svg?.querySelector?.('.medal-svg__shape');
-    if (!svg || !track) return icon;
-
-    track.classList.add('track-carousel__unlock-medal-track');
-    track.setAttribute('pathLength', '100');
-    track.removeAttribute('stroke-dasharray');
-
-    const progress = track.cloneNode(false);
-    progress.setAttribute('class', 'track-carousel__unlock-medal-progress');
-    progress.setAttribute('pathLength', '100');
-    progress.setAttribute('stroke-dasharray', '100');
-    progress.setAttribute('stroke-dashoffset', String(100 - (meter.ratio * 100)));
-    svg.insertBefore(progress, svg.querySelector('text'));
     return icon;
 }
 
-const plateAspectCache = new Map();
+function createRequirementMedalIcon(requirement) {
+    const remainingMedals = Number.isInteger(requirement.remainingMedals)
+        ? requirement.remainingMedals
+        : null;
+    const icon = createMedalIconSvg('silver', {
+        className: [
+            'track-carousel__requirement-medal-icon',
+            'medal-svg--row-placeholder',
+            requirement.satisfied ? 'is-satisfied' : 'is-locked',
+        ].join(' '),
+        outline: true,
+        rowPlaceholder: true,
+        centerText: requirement.id === 'medal-total' && !requirement.satisfied
+            ? remainingMedals
+            : null,
+        showEmblem: false,
+    });
+    icon.setAttribute('aria-hidden', 'true');
 
-/** Aspect ratio of the track's own bounding box, published to CSS so the plate frames the drawing instead of letterboxing it. Clamped so an extreme track can't flatten the plate to a strip. */
-export function getTrackPlateAspect(trackKey) {
-    const cached = plateAspectCache.get(trackKey);
-    if (cached !== undefined) return cached;
-    const aspect = measureTrackPlateAspect(trackKey);
-    plateAspectCache.set(trackKey, aspect);
-    return aspect;
-}
-
-/** Walks the track's points; called once per track, then cached. */
-function measureTrackPlateAspect(trackKey) {
-    const track = TRACKS[trackKey];
-    const points = [...(track?.outer || []), ...(track?.inner || [])];
-    if (points.length < 2) return DEFAULT_PLATE_ASPECT;
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const point of points) {
-        if (point.x < minX) minX = point.x;
-        if (point.x > maxX) maxX = point.x;
-        if (point.y < minY) minY = point.y;
-        if (point.y > maxY) maxY = point.y;
+    if (requirement.satisfied) {
+        const svg = icon.querySelector?.('svg');
+        if (svg) {
+            const check = document.createElementNS(SVG_NS, 'path');
+            check.setAttribute('class', 'track-carousel__requirement-check');
+            check.setAttribute('d', REQUIREMENT_CHECK_PATH);
+            check.setAttribute('fill', 'rgb(30, 48, 80)');
+            check.setAttribute('transform', 'translate(208 190) scale(0.5)');
+            svg.append(check);
+        }
     }
-    const width = maxX - minX;
-    const height = maxY - minY;
-    if (!(width > 0) || !(height > 0)) return DEFAULT_PLATE_ASPECT;
-    return Math.min(MAX_PLATE_ASPECT, Math.max(MIN_PLATE_ASPECT, width / height));
+    return icon;
 }
 
-/** One timing-row reading: a label with its figure below. `element` lets the rank cell be a button without looking different from its neighbours. */
+const PERSONAL_BEST_ICON_PATH =
+    'M168.5 0c-13.3 0-24 10.7-24 24s10.7 24 24 24l32 0 0 25.3c-108 11.9-192 103.5-192 214.7 0 119.3 96.7 216 216 216s216-96.7 216-216c0-39.8-10.8-77.1-29.6-109.2l28.2-28.2c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-23.4 23.4c-32.9-30.2-75.2-50.3-122-55.5l0-25.3 32 0c13.3 0 24-10.7 24-24s-10.7-24-24-24l-112 0zm80 184l0 104c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-104c0-13.3 10.7-24 24-24s24 10.7 24 24z';
+const STANDINGS_ICON_PATH =
+    'M353.8 118.1L330.2 70.3C326.3 62 314.1 61.7 309.8 70.3L286.2 118.1L233.9 125.6C224.6 127 220.6 138.5 227.5 145.4L265.5 182.4L256.5 234.5C255.1 243.8 264.7 251 273.3 246.7L320.2 221.9L366.8 246.3C375.4 250.6 385.1 243.4 383.6 234.1L374.6 182L412.6 145.4C419.4 138.6 415.5 127.1 406.2 125.6L353.9 118.1zM288 320C261.5 320 240 341.5 240 368L240 528C240 554.5 261.5 576 288 576L352 576C378.5 576 400 554.5 400 528L400 368C400 341.5 378.5 320 352 320L288 320zM80 384C53.5 384 32 405.5 32 432L32 528C32 554.5 53.5 576 80 576L144 576C170.5 576 192 554.5 192 528L192 432C192 405.5 170.5 384 144 384L80 384zM448 496L448 528C448 554.5 469.5 576 496 576L560 576C586.5 576 608 554.5 608 528L608 496C608 469.5 586.5 448 560 448L496 448C469.5 448 448 469.5 448 496z';
+
+function createPersonalBestIcon() {
+    const icon = document.createElementNS(SVG_NS, 'svg');
+    icon.classList.add('track-carousel__spec-icon');
+    icon.setAttribute('viewBox', '0 0 448 512');
+    // Keep intrinsic dimensions on the SVG as a fallback for embedded clients
+    // that serve a stale/partial stylesheet during an asset refresh. Without
+    // them, this flex item can collapse to 0x0 even though the icon is in the
+    // DOM.
+    icon.setAttribute('width', '16');
+    icon.setAttribute('height', '16');
+    icon.setAttribute('role', 'img');
+    icon.setAttribute('aria-label', 'Personal best');
+    icon.setAttribute('focusable', 'false');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', PERSONAL_BEST_ICON_PATH);
+    path.setAttribute('fill', 'currentColor');
+    icon.append(path);
+    return icon;
+}
+
+function createStandingsIcon() {
+    const icon = document.createElementNS(SVG_NS, 'svg');
+    icon.classList.add('track-carousel__spec-icon');
+    icon.setAttribute('viewBox', '0 0 640 640');
+    icon.setAttribute('width', '16');
+    icon.setAttribute('height', '16');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.setAttribute('focusable', 'false');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', STANDINGS_ICON_PATH);
+    path.setAttribute('fill', 'currentColor');
+    icon.append(path);
+    return icon;
+}
+
+/** One timing-row reading: a text label or icon with its figure beside it. `element` lets the rank cell be a button without looking different from its neighbours. */
 function createSpecCell(label, element = 'span') {
     const cell = document.createElement(element);
     cell.className = 'track-carousel__spec';
     if (element === 'button') cell.type = 'button';
-    const labelEl = document.createElement('span');
-    labelEl.className = 'track-carousel__spec-label';
-    labelEl.textContent = label;
+    const labelEl = typeof label === 'string' ? document.createElement('span') : label;
+    if (typeof label === 'string') {
+        labelEl.className = 'track-carousel__spec-label';
+        labelEl.textContent = label;
+    }
     const valueEl = document.createElement('span');
     valueEl.className = 'track-carousel__spec-value';
     cell.append(labelEl, valueEl);
@@ -285,53 +314,45 @@ export class TrackCarousel {
         canvas.width = PREVIEW_WIDTH;
         canvas.height = PREVIEW_HEIGHT;
         canvas.setAttribute('aria-hidden', 'true');
-        // Gate note sits on the plate rather than the scoreline: on the
-        // scoreline it wrapped to a second line and pushed into Start Race.
+        // The lock remains on the drawing, while the instruction gets its own
+        // fixed status footer. Putting a sentence on the track competes with
+        // the schematic; putting it beside the title breaks the identity block.
         const gate = document.createElement('div');
         gate.className = 'track-carousel__gate';
         gate.hidden = true;
         const previewLock = document.createElement('span');
         previewLock.className = 'track-carousel__preview-lock';
         previewLock.setAttribute('aria-hidden', 'true');
-        previewLock.appendChild(createLockIconSvg('track-carousel__preview-lock-icon'));
-        const gateNote = document.createElement('span');
-        gateNote.className = 'track-carousel__gate-note';
-        gate.append(previewLock, gateNote);
+        const previewLockMedal = createMedalIconSvg('silver', {
+            className: 'track-carousel__preview-lock-medal medal-svg--row-placeholder',
+            outline: true,
+            rowPlaceholder: true,
+            showEmblem: false,
+        });
+        previewLockMedal.setAttribute('aria-hidden', 'true');
+        previewLock.append(
+            previewLockMedal,
+            createLockIconSvg('track-carousel__preview-lock-icon'),
+        );
+        gate.append(previewLock);
         previewArt.append(canvas);
         preview.append(previewArt, gate);
 
-        // Three bands: run, drawing, standing. The drawing takes what the two
-        // type bands leave, so title length never crowds it.
-        const head = document.createElement('div');
-        head.className = 'track-carousel__card-head';
+        // The fixed Mini Racer wordmark and Daily/Campaign billing live in the
+        // lobby header. A card only owns its schematic and player status, so
+        // horizontal selection cannot move the screen identity.
         const foot = document.createElement('div');
         foot.className = 'track-carousel__card-foot';
-
-        // Lap count is billed here (true before the player has raced) rather
-        // than on the scoreline below, which frees room there for the ladder.
-        const billing = document.createElement('div');
-        billing.className = 'track-carousel__billing';
-        const eyebrow = document.createElement('span');
-        eyebrow.className = 'daily-playlist-hero-day';
-        const billingRule = document.createElement('span');
-        billingRule.className = 'track-carousel__billing-rule';
-        billingRule.setAttribute('aria-hidden', 'true');
-        const format = document.createElement('span');
-        format.className = 'track-carousel__format';
-        // Two lines always (first word / last word), not a wrap, so the
-        // schematic below never resizes as the name changes.
-        const title = document.createElement('span');
-        title.className = 'daily-playlist-hero-title';
-        const titleLead = document.createElement('span');
-        titleLead.className = 'track-carousel__title-lead';
-        const titleTail = document.createElement('span');
-        titleTail.className = 'track-carousel__title-tail';
-        title.append(titleLead, titleTail);
+        const requirement = document.createElement('div');
+        requirement.className = 'track-carousel__requirement';
+        requirement.hidden = true;
+        const requirementList = document.createElement('div');
+        requirementList.className = 'track-carousel__requirement-list';
 
         const meta = document.createElement('div');
         meta.className = 'track-carousel__meta';
-        const [bestCell, bestValue] = createSpecCell('Best');
-        const [rank, rankValue, rankLabel] = createSpecCell('Rank', 'button');
+        const [bestCell, bestValue] = createSpecCell(createPersonalBestIcon());
+        const [rank, rankValue, rankIcon] = createSpecCell(createStandingsIcon(), 'button');
         rank.classList.add('track-carousel__rank');
         rank.addEventListener('click', (event) => {
             event.stopPropagation();
@@ -340,23 +361,22 @@ export class TrackCarousel {
                 this.onOpenLeaderboard?.(current.challenge, current);
             }
         });
-        // A locked stage has no Best/Rank, so the unlock medal count takes
-        // that spot on the scoreline instead.
+        // A locked stage has no Best/Rank. The medal host moves into the total
+        // requirement row, where it carries the exact remaining count.
         const rankMedal = document.createElement('span');
         rankMedal.className = 'track-carousel__unlock-medal-host';
         rankMedal.hidden = true;
-        meta.append(rankMedal, bestCell, rank);
+        requirement.append(requirementList);
+        meta.append(bestCell, rank);
 
-        // The ladder still shows on a locked card, dormant, as the preview of
-        // what's on offer.
+        // The ladder data remains available, but a locked card hides this
+        // reward preview until its gate opens.
         const medal = document.createElement('div');
         medal.className = 'daily-playlist-hero-medal';
         medal.setAttribute('aria-hidden', 'true');
 
-        billing.append(eyebrow, billingRule, format);
-        head.append(billing, title);
-        foot.append(meta, medal);
-        element.append(head, preview, foot);
+        foot.append(requirement, meta, medal);
+        element.append(preview, foot);
 
         element.addEventListener('click', () => {
             const cardIndex = Number(element.dataset.index);
@@ -364,9 +384,9 @@ export class TrackCarousel {
         });
 
         element._parts = {
-            canvas, eyebrow, format, titleLead, titleTail, meta, rank, rankLabel, rankValue,
+            canvas, meta, rank, rankIcon, rankValue,
             rankMedal, medal,
-            preview, gate, gateNote, head, foot,
+            preview, gate, requirement, requirementList, foot,
             bestCell, bestValue,
         };
         this.paintCard(element, card, { renderPreview: false });
@@ -378,14 +398,7 @@ export class TrackCarousel {
         if (!parts || !card) return;
         element.dataset.challengeId = card.challengeId;
 
-        setText(parts.eyebrow, card.eyebrowLabel);
-        setText(parts.format, card.lapsLabel || '');
-        this.paintTitle(parts, element, card);
         this.paintSpec(parts, card);
-        element.style?.setProperty?.(
-            '--track-plate-aspect',
-            String(getTrackPlateAspect(card.trackKey)),
-        );
         element.classList.toggle('current', Boolean(card.isCurrent));
         element.classList.toggle('is-locked', Boolean(card.locked));
         this.paintGate(parts, card);
@@ -397,32 +410,51 @@ export class TrackCarousel {
         if (renderPreview) this.renderPreview(parts.canvas, card);
     }
 
-    /** Track name as two lines (first word white, last word red). Line lengths are published to CSS so the longest name (e.g. "Harbor Principality") doesn't wrap to a third line in the narrow column. */
-    paintTitle(parts, element, card) {
-        const words = String(card.trackName || '').split(/\s+/).filter(Boolean);
-        const tail = words.length ? words[words.length - 1] : '';
-        const lead = words.slice(0, -1).join(' ');
-        setText(parts.titleLead, lead ? `${lead} ` : '');
-        setText(parts.titleTail, tail);
-        element.style?.setProperty?.('--title-lead-length', String(lead.length || 1));
-        element.style?.setProperty?.('--title-tail-length', String(tail.length || 1));
-    }
-
-    /** Lock state shown twice: the puck over the drawing, and the unlock condition in words on the plate (which wraps/clips independently of the rest of the card). */
+    /** Lock state shown as a medal plate over the drawing and a two-item medal checklist below it. */
     paintGate(parts, card) {
         const locked = Boolean(card.locked);
         parts.gate.hidden = !locked;
-        setText(parts.gateNote, locked ? (card.lockedLabel || 'Locked') : '');
+        parts.requirement.hidden = !locked;
+        parts.meta.hidden = locked;
+        parts.medal.hidden = locked;
+        if (!locked) {
+            parts.requirementList.replaceChildren();
+            return;
+        }
+        const requirements = Array.isArray(card.unlockRequirements) && card.unlockRequirements.length
+            ? card.unlockRequirements
+            : [{
+                id: 'unlock',
+                copy: card.lockedLabel || 'Locked',
+                satisfied: false,
+            }];
+        parts.requirementList.replaceChildren(...requirements.map((requirement) => {
+            const item = document.createElement('div');
+            item.className = 'track-carousel__requirement-item';
+            item.classList.toggle('is-satisfied', Boolean(requirement.satisfied));
+            const status = document.createElement('span');
+            status.className = 'track-carousel__requirement-medal';
+            if (requirement.id === 'medal-total' && !requirement.satisfied && card.lockMeter) {
+                status.append(parts.rankMedal);
+            } else {
+                status.append(createRequirementMedalIcon(requirement));
+            }
+            const copy = document.createElement('span');
+            copy.className = 'track-carousel__requirement-note';
+            setText(copy, requirement.copy || 'Locked');
+            item.append(status, copy);
+            return item;
+        }));
     }
 
-    /** Best time on the scoreline. An unraced track keeps the cell and shows an em dash rather than hiding it, so the row doesn't reflow card to card. A locked stage hides it — the requirement reads on the plate instead. */
+    /** Best time on the open-card status row. An unraced track keeps the cell and shows an em dash rather than hiding it, so the row does not reflow card to card. A locked stage hides it in favour of the prerequisite. */
     paintSpec(parts, card) {
         parts.bestCell.hidden = Boolean(card.locked);
         parts.bestCell.classList.toggle('is-muted', !card.bestLabel);
         setText(parts.bestValue, card.bestLabel || '—');
     }
 
-    /** Bronze-through-author ladder as a row of pips (a full medal badge per tier would be noise at this size). Rebuilt only when the earned set changes. Locked stages still show it, dormant. */
+    /** Bronze-through-author ladder as a row of pips (a full medal badge per tier would be noise at this size). Locked stages keep the data but hide the reward preview until the gate opens. Rebuilt only when the earned set changes. */
     paintMedals(element, card) {
         const tiers = Array.isArray(card.medalTiers) ? card.medalTiers : [];
         const key = tiers.map(({ tier, filled }) => `${tier}${filled ? '+' : '-'}`).join('');
@@ -450,7 +482,7 @@ export class TrackCarousel {
         }));
     }
 
-    /** Rank + leaderboard entry point. A locked stage has neither, so its unlock medal count takes that spot on the scoreline instead. */
+    /** Rank + leaderboard entry point. A locked stage has neither; its visible status row uses the prerequisite instead. */
     paintRank(parts, card) {
         if (card.locked) {
             const meter = card.lockMeter || null;
@@ -458,14 +490,14 @@ export class TrackCarousel {
             parts.rank.disabled = true;
             parts.rankMedal.hidden = !meter;
             if (meter) {
-                const key = `${meter.value}:${meter.ratio}`;
+                const key = `${meter.remainingMedals}:${meter.ratio}`;
                 if (parts.rankMedal.dataset.meterKey !== key) {
                     parts.rankMedal.dataset.meterKey = key;
                     parts.rankMedal.replaceChildren(createUnlockMedalMeter(meter));
                 }
                 parts.rankMedal.setAttribute(
                     'aria-label',
-                    `${card.trackName} is locked. ${card.lockedLabel || ''}`.trim(),
+                    `${card.trackName} is locked. ${meter.remainingMedals} additional medals needed`,
                 );
             }
             return;
@@ -474,8 +506,7 @@ export class TrackCarousel {
         parts.rankMedal.hidden = true;
         parts.rank.hidden = false;
         parts.rankValue.hidden = false;
-        parts.rankLabel.hidden = false;
-        setText(parts.rankLabel, 'Rank');
+        parts.rankIcon.hidden = false;
         parts.rank.disabled = false;
         setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || '—'));
         parts.rank.classList.toggle('is-muted', card.rankPending || !card.rankLabel);
@@ -485,34 +516,12 @@ export class TrackCarousel {
         );
     }
 
-    /** Plate width matching the drawing's aspect at its measured height. CSS can cap height from width but not the reverse, so a short window leaves the frame wider than the track; this computes the matching width and hands it back to CSS. Keyed off the head's own column so a wrapped title can't create a feedback loop. */
-    fitPlateFrames() {
-        for (const element of this._elements) {
-            const preview = element?._parts?.preview;
-            if (!preview) continue;
-            const card = this._cards[Number(element.dataset.index)];
-            if (!card) continue;
-            // Preview's own measured height, not the card minus its two type
-            // bands — that would double-count the grid's row gaps as drawable
-            // space.
-            const available = preview.clientHeight;
-            if (!(available > 0)) continue;
-            // Subtract the canvas's own render margin so the frame doesn't
-            // leave a dead band around the drawing.
-            const margin = 2 * (PREVIEW_RENDER_PADDING / this.previewPixelScale());
-            const drawn = Math.max(0, available - margin);
-            const width = Math.round((drawn * getTrackPlateAspect(card.trackKey)) + margin);
-            element.style?.setProperty?.('--plate-frame-width', `${width}px`);
-        }
-    }
-
     /** Bitmap pixels per CSS pixel the previews are drawn at. */
     previewPixelScale() {
         return Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));
     }
 
     fitPreviews() {
-        this.fitPlateFrames();
         // Device resolution: a 1x bitmap stretched this far reads as smeared.
         const scale = this.previewPixelScale();
         for (const element of this._elements) {

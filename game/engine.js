@@ -243,7 +243,7 @@ export class RealTimeRacer {
     this.selectedDailyChallengeId = null;
     this.dailyCarousel = new TrackCarousel({
       idPrefix: "daily-carousel",
-      onSelect: (challenge) => this.handleDailyCarouselSelect(challenge),
+      onSelect: (challenge, card) => this.handleDailyCarouselSelect(challenge, card),
       onOpenLeaderboard: (challenge) => this.openDailyCarouselStandings(challenge),
       onSettle: (card) => this.handleDailyCarouselSettled(card),
       getPreviewCarImage: () => (

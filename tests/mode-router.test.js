@@ -158,12 +158,14 @@ describe('mode router', () => {
         );
     });
 
-    it('does not open standings outside Daily or Campaign, or for a locked stage', () => {
+    it('does not open standings outside Daily or Campaign', () => {
         const home = createEngine({ activeRaceMode: 'home' });
         home.openVisibleLobbyStandings('home');
         expect(home.openDailyCarouselStandings).not.toHaveBeenCalled();
         expect(home.openCampaignStandings).not.toHaveBeenCalled();
+    });
 
+    it('opens Campaign standings for a centred locked stage', () => {
         const locked = createEngine({
             activeRaceMode: 'campaign',
             campaignCarousel: {
@@ -174,6 +176,9 @@ describe('mode router', () => {
             },
         });
         locked.openVisibleLobbyStandings('campaign');
-        expect(locked.openCampaignStandings).not.toHaveBeenCalled();
+        expect(locked.openCampaignStandings).toHaveBeenCalledWith(
+            { id: 'numbered-v1-04', unlocked: false },
+            { returnMode: 'close' },
+        );
     });
 });

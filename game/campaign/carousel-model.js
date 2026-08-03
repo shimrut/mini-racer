@@ -27,14 +27,14 @@ function buildMetaLabel(stage, lapsLabel) {
         : `${lapsLabel} · PB ${stage.bestTimeLabel}`;
 }
 
-/** Locked-card meter: medal progress toward the unlock, as a fill-bar ratio rather than a bare fraction. */
+/** Locked-card meter: the medal progress ring; the remaining count is written in the total row of the gate checklist. */
 function buildLockMeter(stage) {
     const progress = stage.unlocked ? null : stage.unlockProgress;
-    if (!progress) return null;
+    if (!progress || progress.medalTotal >= progress.requiredMedals) return null;
     const { medalTotal, requiredMedals } = progress;
     return {
         label: 'Medals',
-        value: `${medalTotal}/${requiredMedals}`,
+        remainingMedals: Math.max(0, requiredMedals - medalTotal),
         ratio: Math.max(0, Math.min(1, medalTotal / requiredMedals)),
     };
 }
@@ -53,7 +53,8 @@ export function buildCampaignCarouselCards(campaignState = {}) {
             trackKey: stage.trackKey,
             trackName: stage.trackName,
             skin: null,
-            eyebrowLabel: formatCampaignStageLabel(stage),
+            modeLabel: 'Campaign',
+            billingLabel: formatCampaignStageLabel(stage),
             // The stage the campaign is asking for next is the one to mark.
             isCurrent: Boolean(stage.isNext && stage.unlocked),
             laps: stage.laps,
@@ -69,6 +70,9 @@ export function buildCampaignCarouselCards(campaignState = {}) {
             rankPending: stage.standingsResolved === false,
             locked: !stage.unlocked,
             lockedLabel: stage.unlockRequirementLabel || null,
+            unlockRequirements: Array.isArray(stage.unlockRequirements)
+                ? stage.unlockRequirements
+                : [],
             lockMeter: buildLockMeter(stage),
         });
     }

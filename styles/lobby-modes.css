@@ -82,84 +82,179 @@ body[data-lobby-home-returned="true"] #start-overlay.is-ready .lobby-title__race
 }
 
 /* The header changes with the panes, but the transition veil covers the
- * synchronous `display` swap. The short arrival animation keeps the toolbar or
- * returned wordmark from cutting in after the content below it. */
+ * synchronous `display` swap. The wordmark and billing line stay in this
+ * header, outside the horizontal rail, so carousel movement cannot move them. */
 body[data-lobby-home-returned="true"] .lobby-title,
 .lobby-mode-toolbar {
     animation: lobbyPaneIn var(--dur-base) var(--ease-settle) both;
 }
 
-/* Home and Challenge keep their established headers. Daily and Campaign use
-   the available top edge for navigation and utilities instead of repeating
-   the product and mode names already made clear by the selected surface. */
+/* Home and Challenge keep their established headers. Daily and Campaign keep
+   the complete header in flow: the toolbar is pinned to its upper-right, while
+   the wordmark and the mode/date billing row reserve their own space above the
+   carousel. */
 body[data-lobby-mode="daily"] .lobby-header,
 body[data-lobby-mode="campaign"] .lobby-header {
-    display: block;
-    padding-bottom: 0.75rem;
+    position: relative;
+    z-index: 3;
+    display: flex;
 }
 
+/* Daily/Campaign keep the compact printed masthead that previously lived on
+   each carousel card. Home owns the larger display treatment; the fixed mode
+   header must not inherit that scale. */
 body[data-lobby-mode="daily"] .lobby-title,
-body[data-lobby-mode="campaign"] .lobby-title,
-body[data-lobby-mode="daily"] .lobby-subhead,
-body[data-lobby-mode="campaign"] .lobby-subhead {
-    display: none;
+body[data-lobby-mode="campaign"] .lobby-title {
+    --lobby-title-cap: clamp(1.5rem, 8.5vw, 3rem);
+    font-size: min(var(--lobby-title-cap), 8vh);
+    line-height: 0.86;
+    letter-spacing: -0.02em;
+}
+
+body[data-lobby-mode="daily"] .lobby-title__mini,
+body[data-lobby-mode="campaign"] .lobby-title__mini {
+    font-size: 0.62em;
+    letter-spacing: -0.02em;
+}
+
+body[data-lobby-mode="daily"] .lobby-title__racer,
+body[data-lobby-mode="campaign"] .lobby-title__racer {
+    font-size: 1em;
+    letter-spacing: -0.02em;
 }
 
 body[data-lobby-mode="daily"] .lobby-mode-toolbar,
 body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
+    position: absolute;
+    top: 0;
+    right: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 1rem;
+    width: auto;
+}
+
+body[data-lobby-mode="daily"] .lobby-subhead,
+body[data-lobby-mode="campaign"] .lobby-subhead {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(0.5rem, 2.5vw, 0.85rem);
+    margin-top: 0.75rem;
+}
+
+body[data-lobby-mode="daily"] .lobby-subhead__text,
+body[data-lobby-mode="campaign"] .lobby-subhead__text {
+    display: contents;
+}
+
+body[data-lobby-mode="daily"] .lobby-back-btn,
+body[data-lobby-mode="campaign"] .lobby-back-btn {
+    display: none;
+}
+
+body[data-lobby-mode="daily"] .lobby-mode-label,
+body[data-lobby-mode="campaign"] .lobby-mode-label {
+    grid-column: 1;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+}
+
+body[data-lobby-mode="daily"] .lobby-subhead__rule,
+body[data-lobby-mode="campaign"] .lobby-subhead__rule {
+    grid-column: 2;
+    display: block;
     width: 100%;
+    height: 1px;
+    background: var(--border-default);
+}
+
+body[data-lobby-mode="daily"] .lobby-mode-selection,
+body[data-lobby-mode="campaign"] .lobby-mode-selection {
+    grid-column: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 1.1rem;
+    margin: 0;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-align: right;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+body[data-lobby-mode="daily"] .lobby-panes,
+body[data-lobby-mode="campaign"] .lobby-panes {
+    position: relative;
+    z-index: 1;
 }
 
 .lobby-mode-toolbar__actions {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: clamp(0.15rem, 1.5vw, 0.5rem);
 }
 
-.lobby-mode-toolbar .lobby-header-action {
-    display: flex;
+.lobby-mode-toolbar__action {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: clamp(2.6rem, 10vw, 3rem);
+    height: clamp(2.6rem, 10vw, 3rem);
     min-width: 2.75rem;
     min-height: 2.75rem;
-}
-
-.lobby-mode-toolbar__back {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.55rem;
-    min-height: 2.75rem;
-    padding: 0.45rem 0.6rem 0.45rem 0;
+    padding: 0.65rem;
     color: #fff;
     background: transparent;
     border: 0;
     cursor: pointer;
-    font-family: var(--header-font);
-    font-size: clamp(1rem, 4vw, 1.2rem);
-    font-style: italic;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.lobby-mode-toolbar__action svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    flex: 0 0 auto;
+    fill: currentColor;
+}
+
+.lobby-mode-toolbar__back {
+    padding: 0.45rem 0.6rem 0.45rem 0;
 }
 
 .lobby-mode-toolbar__back svg {
     width: clamp(1.5rem, 5vw, 1.9rem);
     height: clamp(1.5rem, 5vw, 1.9rem);
-    flex: 0 0 auto;
-    fill: currentColor;
 }
 
-.lobby-mode-toolbar__back:focus-visible,
-.lobby-mode-toolbar__back.is-menu-selected {
+.lobby-mode-toolbar__action:focus-visible,
+.lobby-mode-toolbar__action.is-menu-selected {
     outline: 2px solid #fff;
     outline-offset: 2px;
 }
 
-.lobby-mode-toolbar__back:active {
+.lobby-mode-toolbar__action:active {
     transform: scale(0.94);
+}
+
+.lobby-mode-toolbar .lobby-header-action {
+    display: inline-flex;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
 }
 
 .lobby-mode-menu {
@@ -219,6 +314,8 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     padding-inline: 1.25rem;
     font-size: 1.5rem;
     letter-spacing: 0.05em;
+    flex-direction: column;
+    gap: 0.3rem;
 }
 
 .challenge-lobby {

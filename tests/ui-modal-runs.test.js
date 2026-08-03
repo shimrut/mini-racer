@@ -1331,7 +1331,7 @@ describe('combined finish next race button', () => {
 
         context._syncCombinedNextRace({
             label: 'Next',
-            ariaLabel: '1/3 medals to unlock',
+            ariaLabel: 'One more medal needed',
             enabled: false,
             action,
         });
@@ -1339,7 +1339,7 @@ describe('combined finish next race button', () => {
         const button = context.combinedNextBtn;
         expect(button.hidden).toBe(false);
         expect(button.disabled).toBe(true);
-        expect(button.getAttribute('aria-label')).toBe('1/3 medals to unlock');
+        expect(button.getAttribute('aria-label')).toBe('One more medal needed');
         expect(button.onclick).toBe(null);
         // Nothing to go forward to, so Improve keeps the accent.
         expect(isAccented(button)).toBe(false);

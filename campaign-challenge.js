@@ -117,7 +117,7 @@ export function renderCampaignChallenge(documentRef, rawValue) {
         : 'Campaign race';
     if (target) target.textContent = formatCampaignChallengePreviewTime(value.targetTimeMs);
     if (format) {
-        format.textContent = `${value.lapCount} ${value.lapCount === 1 ? 'LAP' : 'LAPS'} · VERIFIED GHOST`;
+        format.textContent = `${value.lapCount} ${value.lapCount === 1 ? 'LAP' : 'LAPS'}`;
     }
     renderChallengeTrack(documentRef, value.trackKey);
     return value;

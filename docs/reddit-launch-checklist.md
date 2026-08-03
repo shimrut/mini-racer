@@ -32,9 +32,12 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
 - [ ] Standalone game launch opens Home with Daily, Campaign, Garage, and
   Settings as matching mode-action rows, and no Home Start button.
-- [ ] Daily and Campaign direct launches show a labeled Back action at top left
-  and Standings, Garage, and Settings icons at top right. The selected track is
-  a borderless full-surface schematic, neighboring tracks peek at both screen
+- [ ] Daily and Campaign direct launches show Back, Standings, Garage, and
+  Settings as compact icon-only actions in the top-right rail. The Mini Racer
+  title is part of that fixed header, and the mode label, divider, and right-side
+  date/stage billing stay fixed while the carousel moves; only the date/stage
+  value changes. The selected track is
+  a borderless bounded schematic hero, neighboring tracks peek at both screen
   edges, and a tiny version of the currently selected Garage car replaces the
   generic direction triangle at the start line. Its size relative to the track
   remains a consistent `2x` version of the in-race car-to-track proportion on
@@ -43,19 +46,24 @@ Mini Racer is a **game**, so the most important launch requirements are:
   returns to Home, and Standings opens on the track currently centred in the
   carousel.
 - [ ] At the first and last Daily/Campaign entries, the selected track still
-  centers in the Reddit WebView. Swiping or tapping an edge track updates the
-  selected title, Standings target, and Start Race target together.
+  centers in the Reddit WebView. Swiping or tapping an edge track updates only
+  the right-side date/stage billing plus the selected Standings and Start Race
+  targets; the fixed title, mode label, and divider do not move.
 - [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.
 - [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3,3,3` lap sequence, require
   the configured medal total plus any medal on the immediately previous stage,
   and keep independent permanent standings and PB ghosts.
-- [ ] A locked Campaign card shows its earned/required medal count inside one
-  medal shape, with a white perimeter stroke clamped to the unlock progress;
+- [ ] A locked Campaign card shows both unlock gates with medal placeholders:
+  pending gates are blue-gray, satisfied gates are white with a dark-blue
+  checkmark, and the total gate shows the remaining medal count inside its
+  placeholder. The lock itself uses an opaque blue-gray medal-shaped plate;
   it does not show the old MEDALS label or horizontal bar.
-- [ ] Campaign standings can switch between unlocked stages without combining
-  their rows, and each stage continues paging its own leaderboard.
+- [ ] Daily standings expose exactly seven navigation pages. Campaign standings
+  expose every stage in a horizontally scrollable rail with seven page slots
+  visible at a time, including pages where the player has no rank. Each selected
+  page keeps its own leaderboard rows and paging. Race start remains unlock-gated.
 - [ ] A newly completed verified Daily, Campaign, or Head-to-Head race unlocks
   Crimson; an accepted Head-to-Head loss or tie still counts as completion.
   Retained accepted Daily history and any saved Campaign result from before
@@ -92,6 +100,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
   actionable result sheet, including when PB ghost or lobby refresh fails.
 - [ ] A signed-in Campaign result creates a reusable custom challenge post;
   guests cannot create or accept one.
+- [ ] The Head to Head post makes the challenger, viewer, track name, target
+  time, lap count, and Race Head to Head action legible without
+  inline scrolling on desktop or compact Reddit WebView widths.
 - [ ] A challenge post opens the correct frozen opponent ghost, permits its
   locked Campaign track only for that duel, reports win/tie/loss correctly,
   and writes no Campaign progress, PB, or leaderboard data.

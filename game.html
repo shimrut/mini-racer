@@ -63,16 +63,17 @@
                         <span class="lobby-title__racer">RACER</span>
                     </h1>
                     <nav class="lobby-mode-toolbar" aria-label="Race mode actions">
-                        <button id="lobby-mode-back-btn" class="lobby-mode-toolbar__back" type="button"
-                            data-lobby-back data-lobby-action aria-label="Back to modes">
-                            <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-                                <path
-                                    d="M512 256a256 256 0 1 0 -512 0 256 256 0 1 0 512 0zM124.7 244.7l104-104c4.6-4.6 11.5-5.9 17.4-3.5s9.9 8.3 9.9 14.8l0 56 96 0c17.7 0 32 14.3 32 32l0 32c0 17.7-14.3 32-32 32l-96 0 0 56c0 6.5-3.9 12.3-9.9 14.8s-12.9 1.1-17.4-3.5l-104-104c-6.2-6.2-6.2-16.4 0-22.6z" />
-                            </svg>
-                            <span>Back</span>
-                        </button>
                         <div class="lobby-mode-toolbar__actions">
-                            <button id="lobby-mode-standings-btn" class="lobby-header-action" type="button"
+                            <button id="lobby-mode-back-btn"
+                                class="lobby-mode-toolbar__action lobby-mode-toolbar__back" type="button"
+                                data-lobby-back data-lobby-action aria-label="Back to modes">
+                                <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+                                    <path
+                                        d="M512 256a256 256 0 1 0 -512 0 256 256 0 1 0 512 0zM124.7 244.7l104-104c4.6-4.6 11.5-5.9 17.4-3.5s9.9 8.3 9.9 14.8l0 56 96 0c17.7 0 32 14.3 32 32l0 32c0 17.7-14.3 32-32 32l-96 0 0 56c0 6.5-3.9 12.3-9.9 14.8s-12.9 1.1-17.4-3.5l-104-104c-6.2-6.2-6.2-16.4 0-22.6z" />
+                                </svg>
+                            </button>
+                            <button id="lobby-mode-standings-btn"
+                                class="lobby-mode-toolbar__action lobby-header-action" type="button"
                                 data-lobby-action aria-label="Standings">
                                 <svg viewBox="0 0 640 640" aria-hidden="true" focusable="false">
                                     <!-- Font Awesome Free v7.3.1, https://fontawesome.com/license/free -->
@@ -80,7 +81,8 @@
                                         d="M353.8 118.1L330.2 70.3C326.3 62 314.1 61.7 309.8 70.3L286.2 118.1L233.9 125.6C224.6 127 220.6 138.5 227.5 145.4L265.5 182.4L256.5 234.5C255.1 243.8 264.7 251 273.3 246.7L320.2 221.9L366.8 246.3C375.4 250.6 385.1 243.4 383.6 234.1L374.6 182L412.6 145.4C419.4 138.6 415.5 127.1 406.2 125.6L353.9 118.1zM288 320C261.5 320 240 341.5 240 368L240 528C240 554.5 261.5 576 288 576L352 576C378.5 576 400 554.5 400 528L400 368C400 341.5 378.5 320 352 320L288 320zM80 384C53.5 384 32 405.5 32 432L32 528C32 554.5 53.5 576 80 576L144 576C170.5 576 192 554.5 192 528L192 432C192 405.5 170.5 384 144 384L80 384zM448 496L448 528C448 554.5 469.5 576 496 576L560 576C586.5 576 608 554.5 608 528L608 496C608 469.5 586.5 448 560 448L496 448C469.5 448 448 469.5 448 496z" />
                                 </svg>
                             </button>
-                            <button id="lobby-mode-garage-btn" class="lobby-header-action" type="button"
+                            <button id="lobby-mode-garage-btn"
+                                class="lobby-mode-toolbar__action lobby-header-action" type="button"
                                 data-lobby-action aria-label="Garage" aria-expanded="false"
                                 aria-controls="garage-modal">
                                 <svg viewBox="0 0 576 512" aria-hidden="true" focusable="false">
@@ -89,7 +91,8 @@
                                         d="M0 142.1L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-240c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32l0 240c0 17.7 14.3 32 32 32s32-14.3 32-32l0-337.9c0-27.5-17.6-52-43.8-60.7L303.2 5.1c-9.9-3.3-20.5-3.3-30.4 0L43.8 81.4C17.6 90.1 0 114.6 0 142.1zM464 256l-352 0 0 64 352 0 0-64zM112 416l352 0 0-64-352 0 0 64zm352 32l-352 0 0 64 352 0 0-64z" />
                                 </svg>
                             </button>
-                            <button id="lobby-mode-settings-btn" class="lobby-header-action" type="button"
+                            <button id="lobby-mode-settings-btn"
+                                class="lobby-mode-toolbar__action lobby-header-action" type="button"
                                 data-lobby-action aria-label="Settings" aria-controls="settings-modal">
                                 <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
                                     <!-- Font Awesome Free v7.3.1, https://fontawesome.com/license/free -->
@@ -111,6 +114,10 @@
                             <p class="lobby-mode-label" data-lobby-mode-label></p>
                             <p class="lobby-mode-track" data-lobby-mode-track hidden></p>
                         </div>
+                        <span class="lobby-subhead__rule" data-lobby-subhead-rule
+                            aria-hidden="true" hidden></span>
+                        <p class="lobby-mode-selection" data-lobby-mode-selection
+                            aria-live="polite" hidden></p>
                     </div>
                 </header>
 
@@ -166,6 +173,11 @@
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action disabled>
                                 <span class="main-menu__label">Start Race</span>
+                                <span class="main-menu__race-brief" hidden>
+                                    <span class="main-menu__race-brief-track"></span>
+                                    <span class="main-menu__race-brief-separator" aria-hidden="true">·</span>
+                                    <span class="main-menu__race-brief-laps"></span>
+                                </span>
                             </button>
                         </div>
                     </section>
@@ -199,6 +211,11 @@
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action>
                                 <span class="main-menu__label">Start Race</span>
+                                <span class="main-menu__race-brief" hidden>
+                                    <span class="main-menu__race-brief-track"></span>
+                                    <span class="main-menu__race-brief-separator" aria-hidden="true">·</span>
+                                    <span class="main-menu__race-brief-laps"></span>
+                                </span>
                             </button>
                         </div>
                     </section>

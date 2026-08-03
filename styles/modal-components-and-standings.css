@@ -186,6 +186,11 @@
     width: 100%;
 }
 
+.result-modal .modal-card-section--runs .modal-lap-times-container:has(> .leaderboard-day-rail) {
+    /* Let the nested standings rail claim horizontal touch gestures. */
+    touch-action: auto;
+}
+
 .leaderboard-section {
     width: 100%;
     margin-top: 0;
@@ -300,15 +305,23 @@
 }
 
 .leaderboard-day-rail {
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: minmax(2.35rem, auto);
+    grid-template-columns: repeat(7, calc(14.285714% - 0.2142857rem));
+    grid-auto-columns: calc(14.285714% - 0.2142857rem);
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 0.25rem;
     width: 100%;
     flex-shrink: 0;
     min-height: 2rem;
     padding: 0.2rem 0.2rem 0.35rem;
     overflow-x: auto;
     overflow-y: hidden;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     margin: -0.15rem 0 0.15rem;
     box-sizing: border-box;
@@ -322,9 +335,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 2.25rem;
+    width: 100%;
+    min-width: 0;
     min-height: 2.35rem;
-    flex: 0 0 auto;
     border: none;
     border-radius: var(--radius-full);
     background: transparent;

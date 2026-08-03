@@ -101,6 +101,8 @@ describe('daily carousel card model', () => {
 
         expect(multiLap.laps).toBe(3);
         expect(multiLap.lapsLabel).toBe('3 Laps');
+        expect(multiLap.modeLabel).toBe('Daily');
+        expect(multiLap.billingLabel).toBe('Today');
         expect(multiLap.bestLabel).toBe('42.500');
         expect(multiLap.metaLabel).toBe('3 Laps · PB 42.500');
         expect(noBest.lapsLabel).toBe('1 Lap');
@@ -133,6 +135,62 @@ describe('daily carousel card model', () => {
         expect(findCarouselIndex(cards, 'b')).toBe(1);
         expect(findCarouselIndex(cards, 'gone')).toBe(-1);
         expect(findCarouselIndex(cards, null)).toBe(-1);
+    });
+});
+
+describe('Daily Start Race race brief', () => {
+    it('puts a bold track name, separator, and labelled lap count below Start Race', () => {
+        const originalDocument = global.document;
+        const track = { hidden: true, textContent: '' };
+        const separator = { hidden: true, textContent: '·' };
+        const laps = {
+            hidden: true,
+            textContent: '',
+            setAttribute: vi.fn(),
+            removeAttribute: vi.fn(),
+        };
+        const brief = {
+            hidden: true,
+            textContent: '',
+            setAttribute: vi.fn(),
+            querySelector: (selector) => ({
+                '.main-menu__race-brief-track': track,
+                '.main-menu__race-brief-separator': separator,
+                '.main-menu__race-brief-laps': laps,
+            }[selector] || null),
+        };
+        const button = {
+            querySelector: (selector) => selector === '.main-menu__race-brief' ? brief : null,
+        };
+        global.document = {
+            getElementById: (id) => id === 'daily-challenge-start-btn' ? button : null,
+        };
+
+        try {
+            const lobby = new LobbyUi();
+            lobby.setDailySelectedChallenge(
+                { id: 'multi-lap-day' },
+                { trackName: 'Classic Circuit', laps: 3 },
+            );
+            expect(track.textContent).toBe('Classic Circuit');
+            expect(track.hidden).toBe(false);
+            expect(separator.hidden).toBe(false);
+            expect(laps.textContent).toBe('3 Laps');
+            expect(laps.hidden).toBe(false);
+            expect(laps.setAttribute).toHaveBeenCalledWith('aria-label', '3 Laps');
+            expect(brief.hidden).toBe(false);
+
+            lobby.setDailySelectedChallenge(
+                { id: 'single-lap-day' },
+                { trackName: 'Sunlit Temple', laps: 1 },
+            );
+            expect(track.textContent).toBe('Sunlit Temple');
+            expect(separator.hidden).toBe(false);
+            expect(laps.textContent).toBe('1 Lap');
+            expect(laps.setAttribute).toHaveBeenLastCalledWith('aria-label', '1 Lap');
+        } finally {
+            global.document = originalDocument;
+        }
     });
 });
 
@@ -568,40 +626,33 @@ describe('TrackCarousel selection', () => {
         }
     });
 
-    /**
-     * The name is set the way the lobby sets its own: the first word white over
-     * the last in red, two rows on every card. The split is the card's, not a
-     * wrap's, so a poster is the same shape whatever track it is showing.
-     */
-    it('splits the circuit into a white first word over a red last word', () => {
+    it('keeps the standings value icon-only while preserving the rank action', () => {
         const carousel = new TrackCarousel();
-        const parts = { titleLead: { textContent: '' }, titleTail: { textContent: '' } };
-        const element = { style: { setProperty: vi.fn() } };
+        const parts = {
+            rank: {
+                hidden: true,
+                disabled: true,
+                classList: { toggle: vi.fn() },
+                setAttribute: vi.fn(),
+            },
+            rankIcon: { hidden: true },
+            rankValue: { hidden: true, textContent: '' },
+            rankMedal: { hidden: true },
+        };
 
-        carousel.paintTitle(parts, element, { trackName: 'Harbor Principality' });
+        carousel.paintRank(parts, {
+            locked: false,
+            rankPending: false,
+            rankLabel: '#4',
+            trackName: 'Circuit',
+        });
 
-        expect(parts.titleLead.textContent).toBe('Harbor ');
-        expect(parts.titleTail.textContent).toBe('Principality');
-        // The trailing space never prints — both rows are block boxes — and it
-        // keeps the element's text the track's actual name.
-        expect(`${parts.titleLead.textContent}${parts.titleTail.textContent}`)
-            .toBe('Harbor Principality');
-        expect(element.style.setProperty).toHaveBeenCalledWith('--title-lead-length', '6');
-        expect(element.style.setProperty).toHaveBeenCalledWith('--title-tail-length', '12');
-    });
-
-    it('gives a one-word circuit the red row and keeps the white one empty', () => {
-        const carousel = new TrackCarousel();
-        const parts = { titleLead: { textContent: 'stale' }, titleTail: { textContent: '' } };
-        const element = { style: { setProperty: vi.fn() } };
-
-        carousel.paintTitle(parts, element, { trackName: 'Circuit' });
-
-        expect(parts.titleLead.textContent).toBe('');
-        expect(parts.titleTail.textContent).toBe('Circuit');
-        // The empty row still holds its height in CSS, so the drawing below it
-        // does not move up on that one card.
-        expect(element.style.setProperty).toHaveBeenCalledWith('--title-lead-length', '1');
+        expect(parts.rankIcon.hidden).toBe(false);
+        expect(parts.rankValue.textContent).toBe('#4');
+        expect(parts.rank.setAttribute).toHaveBeenCalledWith(
+            'aria-label',
+            'Circuit standings. Your rank: #4',
+        );
     });
 });
 

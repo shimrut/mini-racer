@@ -52,6 +52,13 @@ leaderboard, and retention rules.
 - Every campaign race declares a fixed lap count of 1, 2, or 3.
 - Campaign progress and leaderboards are separate from Daily GP.
 - Tracks unlock from medals earned in the campaign.
+- When a cumulative medal gate is the remaining blocker, the lobby reports
+  `Additional medals needed` and puts the exact remaining count in the medal
+  placeholder beside it rather than showing a raw earned/required fraction.
+  Pending placeholders use the campaign's blue-gray state; satisfied gates use
+  a white placeholder with a dark-blue checkmark. When the total is complete,
+  its placeholder becomes a satisfied check row and the previous-stage medal
+  requirement remains actionable.
 - Campaign races use the same lap, timing, replay, medal, and finish behavior
   as Daily GP.
 
@@ -353,9 +360,12 @@ contract. Guest retention or account-upgrade behavior is a product decision.
 Home provides explicit Daily and Campaign entry points. Both mode lobbies use
 the same compact action layout:
 
-- Standings opens the shared standings modal. Daily switches between published
-  days; Campaign switches between unlocked stages and reads the independent
-  leaderboard stored for the selected stage.
+- Standings opens the shared standings modal. Daily exposes exactly seven
+  navigation pages; Campaign exposes every stage in a horizontally scrollable
+  rail with seven page slots visible at a time, including entries where the
+  player has no rank. Each page reads the independent leaderboard for its
+  selected day or stage. Unlock gates still apply to starting and submitting
+  races.
 - Tracks opens the shared Tracks modal. Daily shows the published playlist;
   Campaign shows Gold progress, locked/unlocked state, fixed laps, best
   medal/time, and lets the player select any unlocked stage.

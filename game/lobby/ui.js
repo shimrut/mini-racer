@@ -10,6 +10,7 @@ import {
     normalizeCampaignLobbyState,
     normalizeChallengeLobbyState,
 } from './service.js';
+import { formatLapsLabel } from '../shared/laps-label.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
 const BLOCKING_OVERLAY_IDS = [
@@ -21,6 +22,41 @@ const BLOCKING_OVERLAY_IDS = [
 
 function setText(element, value) {
     if (element) element.textContent = value;
+}
+
+function setRaceBriefText(element, trackName, laps) {
+    if (!element) return;
+    const safeTrackName = typeof trackName === 'string' ? trackName.trim() : '';
+    const safeLaps = Number.isInteger(laps) && laps > 0 ? laps : null;
+    const lapsLabel = safeLaps === null ? '' : formatLapsLabel(safeLaps);
+
+    const trackElement = element.querySelector?.('.main-menu__race-brief-track');
+    const separatorElement = element.querySelector?.('.main-menu__race-brief-separator');
+    const lapsElement = element.querySelector?.('.main-menu__race-brief-laps');
+    if (trackElement && separatorElement && lapsElement) {
+        trackElement.hidden = !safeTrackName;
+        trackElement.textContent = safeTrackName;
+        separatorElement.hidden = !safeTrackName || safeLaps === null;
+        lapsElement.hidden = safeLaps === null;
+        lapsElement.textContent = lapsLabel;
+        if (safeLaps === null) {
+            lapsElement.removeAttribute?.('aria-label');
+        } else {
+            lapsElement.setAttribute?.('aria-label', lapsLabel);
+        }
+        element.hidden = !safeTrackName && safeLaps === null;
+        element.setAttribute?.(
+            'aria-label',
+            [safeTrackName, lapsLabel].filter(Boolean).join(', '),
+        );
+        return;
+    }
+
+    // Keep a safe fallback for partial/legacy DOM fixtures while the shipped
+    // markup uses the styled track and lap elements above.
+    const brief = [safeTrackName, lapsLabel].filter(Boolean).join(' · ');
+    element.hidden = !brief;
+    element.textContent = brief;
 }
 
 /** Fades the label on real text changes only — the button re-renders on every carousel step, and fading identical text would flicker while just browsing. The layout read forces the class off for a frame so the animation can restart. */
@@ -56,6 +92,10 @@ export class LobbyUi {
         this.challengeState = normalizeChallengeLobbyState();
         this._campaignPrimaryLoading = false;
         this._campaignSelectedStage = null;
+        this._dailySelectedTrackName = null;
+        this._dailySelectedLaps = null;
+        this._dailySelectedBillingLabel = null;
+        this._campaignSelectedBillingLabel = null;
         this._menuKeyboardState = createMenuKeyboardState();
         this._paneTransitionGeneration = 0;
         this._bound = false;
@@ -65,6 +105,7 @@ export class LobbyUi {
 
     get overlay() { return document.getElementById('start-overlay'); }
     get activePane() { return document.getElementById(`lobby-${this.mode}-pane`); }
+    get dailyPrimaryBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get campaignPrimaryBtn() { return document.getElementById('campaign-primary-btn'); }
     get challengeAcceptBtn() { return document.getElementById('challenge-accept-btn'); }
 
@@ -102,6 +143,7 @@ export class LobbyUi {
 
     showDaily() {
         this.showPane('daily');
+        this.renderDaily();
     }
 
     showCampaign(state = this.campaignState) {
@@ -195,7 +237,31 @@ export class LobbyUi {
      * nowhere else on the screen. Daily's track name is on the carousel card.
      */
     syncLobbySubheadDetail() {
-        const track = document.querySelector('[data-lobby-mode-track]');
+        const querySelector = document.querySelector?.bind(document);
+        const track = querySelector?.('[data-lobby-mode-track]') || null;
+        const selection = querySelector?.('[data-lobby-mode-selection]') || null;
+        const rule = querySelector?.('[data-lobby-subhead-rule]') || null;
+        if (this.mode === 'daily' || this.mode === 'campaign') {
+            const billingLabel = this.mode === 'daily'
+                ? this._dailySelectedBillingLabel
+                : this._campaignSelectedBillingLabel;
+            if (track) {
+                track.hidden = true;
+                track.textContent = '';
+                track.classList.remove('lobby-mode-track--challenge');
+            }
+            if (rule) rule.hidden = false;
+            if (selection) {
+                selection.hidden = !billingLabel;
+                selection.textContent = billingLabel || '';
+            }
+            return;
+        }
+        if (rule) rule.hidden = true;
+        if (selection) {
+            selection.hidden = true;
+            selection.textContent = '';
+        }
         if (!track) return;
         if (this.mode === 'challenge') {
             const opponent = this.challengeState?.opponentLabel?.trim() || '';
@@ -216,8 +282,9 @@ export class LobbyUi {
     syncModeToolbarState() {
         const standings = document.getElementById('lobby-mode-standings-btn');
         if (!standings) return;
-        standings.disabled = this.mode === 'campaign'
-            && this._campaignSelectedStage?.unlocked === false;
+        // Standings are readable for every Campaign stage. Unlock state only
+        // gates starting/submitting a race, not viewing its leaderboard.
+        standings.disabled = false;
     }
 
     getPaneAriaLabel(mode = this.mode) {
@@ -319,9 +386,38 @@ export class LobbyUi {
         });
     }
 
-    /** The carousel drives the primary action, so it has to say which stage. */
+    /** The Daily carousel drives the lap sublabel on the primary action. */
+    setDailySelectedChallenge(challenge = null, card = null) {
+        this._dailySelectedTrackName = typeof card?.trackName === 'string'
+            ? card.trackName
+            : (typeof challenge?.trackName === 'string' ? challenge.trackName : null);
+        this._dailySelectedLaps = Number.isInteger(card?.laps)
+            ? card.laps
+            : (Number.isInteger(challenge?.laps) ? challenge.laps : null);
+        this._dailySelectedBillingLabel = typeof card?.billingLabel === 'string'
+            ? card.billingLabel.trim() || null
+            : null;
+        this.syncLobbySubheadDetail();
+        this.renderDaily();
+    }
+
+    renderDaily() {
+        setRaceBriefText(
+            this.dailyPrimaryBtn?.querySelector('.main-menu__race-brief'),
+            this._dailySelectedTrackName,
+            this._dailySelectedLaps,
+        );
+    }
+
     setCampaignSelectedStage(stage = null) {
         this._campaignSelectedStage = stage;
+        const numberLabel = typeof stage?.numberLabel === 'string'
+            ? stage.numberLabel.trim()
+            : '';
+        this._campaignSelectedBillingLabel = numberLabel
+            ? `Stage ${numberLabel}`
+            : null;
+        this.syncLobbySubheadDetail();
         this.renderCampaign();
         this.syncModeToolbarState();
     }
@@ -335,6 +431,16 @@ export class LobbyUi {
         if (stage) return stage.unlocked ? 'Start Race' : 'Locked';
         return this.campaignState.primaryLabel
             || (this._campaignPrimaryLoading ? 'Loading' : '');
+    }
+
+    getCampaignPrimaryLaps() {
+        const stage = this._campaignSelectedStage || this.campaignState.nextStage;
+        return stage?.laps ?? stage?.lapCount ?? null;
+    }
+
+    getCampaignPrimaryTrackName() {
+        const stage = this._campaignSelectedStage || this.campaignState.nextStage;
+        return typeof stage?.trackName === 'string' ? stage.trackName : null;
     }
 
     renderCampaign() {
@@ -351,6 +457,11 @@ export class LobbyUi {
         setSwappingText(
             this.campaignPrimaryBtn.querySelector('.main-menu__label'),
             this.getCampaignPrimaryLabel(),
+        );
+        setRaceBriefText(
+            this.campaignPrimaryBtn.querySelector('.main-menu__race-brief'),
+            this.getCampaignPrimaryTrackName(),
+            this.getCampaignPrimaryLaps(),
         );
     }
 
