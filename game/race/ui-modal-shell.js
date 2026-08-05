@@ -605,7 +605,10 @@ export class ModalShell {
         }
     }
 
-    _showShareOutcome(panel, triggerButton, result, { bragged = false } = {}) {
+    _showShareOutcome(panel, triggerButton, result, {
+        bragged = false,
+        keepShareAvailable = false,
+    } = {}) {
         const isChallengeCreate = Boolean(result?.postUrl) && !result?.commentText;
         panel.replaceChildren();
         const title = document.createElement('h3');
@@ -624,9 +627,66 @@ export class ModalShell {
         done.onclick = () => this._closeSharePanel();
         actions.appendChild(done);
         panel.append(title, copy, actions);
-        triggerButton.disabled = true;
-        this._setShareButtonLabel(triggerButton, bragged ? 'Bragged' : 'Shared');
+        triggerButton.disabled = !keepShareAvailable;
+        this._setShareButtonLabel(
+            triggerButton,
+            keepShareAvailable ? 'Share' : bragged ? 'Bragged' : 'Shared',
+        );
         resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
+            preferredIndex: 0,
+            container: actions,
+            focusPreferred: true,
+        });
+    }
+
+    _startShareChooser(request, triggerButton, hostView) {
+        if (!triggerButton || !hostView) return;
+        this._closeSharePanel?.({ restoreScroll: false });
+        const scrim = document.createElement('section');
+        scrim.className = 'result-share-panel';
+        scrim.setAttribute('role', 'dialog');
+        scrim.setAttribute('aria-label', 'Share race result');
+        scrim.dataset.savedScrollTop = String(this.modalLapTimes?.scrollTop || 0);
+        const panel = document.createElement('div');
+        panel.className = 'result-share-panel__card';
+        scrim.appendChild(panel);
+
+        const title = document.createElement('h3');
+        title.className = 'result-share-panel__title';
+        title.textContent = 'Share';
+        const description = document.createElement('p');
+        description.className = 'result-share-panel__status';
+        description.textContent = 'Choose how to share this finish.';
+        const actions = document.createElement('div');
+        actions.className = 'result-share-panel__actions';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'result-share-panel__button';
+        cancel.textContent = 'Cancel';
+        cancel.onclick = () => {
+            triggerButton.disabled = false;
+            this._closeSharePanel();
+        };
+        const comment = document.createElement('button');
+        comment.type = 'button';
+        comment.className = 'result-share-panel__button';
+        comment.textContent = 'Comment Time';
+        comment.onclick = () => this._startShare(request, triggerButton, hostView);
+        const challenge = document.createElement('button');
+        challenge.type = 'button';
+        challenge.className = 'result-share-panel__button result-share-panel__button--primary';
+        challenge.textContent = 'Issue Challenge';
+        challenge.onclick = () => this._startShare({
+            ...request,
+            kind: 'campaign-challenge',
+            source: 'daily',
+        }, triggerButton, hostView);
+        actions.append(comment, challenge, cancel);
+        panel.append(title, description, actions);
+        hostView.appendChild(scrim);
+        triggerButton.disabled = true;
+        this.clearFinishMenuKeyboardCue();
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [comment, challenge, cancel], {
             preferredIndex: 0,
             container: actions,
             focusPreferred: true,
@@ -637,6 +697,9 @@ export class ModalShell {
         if (!triggerButton || !hostView) return;
         const isChallenge = request?.kind === 'campaign-challenge';
         const isBrag = request?.kind === 'challenge-brag';
+        const isDailyShare = isChallenge
+            ? request?.source === 'daily'
+            : request?.source === 'finish';
         this._closeSharePanel?.({ restoreScroll: false });
         const scrim = document.createElement('section');
         scrim.className = 'result-share-panel';
@@ -696,7 +759,10 @@ export class ModalShell {
             const response = await this.previewShare(request);
             const body = response?.body || {};
             if (body.status === 'already_shared' || body.status === 'already_created') {
-                this._showShareOutcome(panel, triggerButton, body, { bragged: isBrag });
+                this._showShareOutcome(panel, triggerButton, body, {
+                    bragged: isBrag,
+                    keepShareAvailable: isDailyShare,
+                });
                 return;
             }
             if (!response?.ok || body.status !== 'ready') {
@@ -742,7 +808,10 @@ export class ModalShell {
                     if (!confirmed?.ok || !successfulStatuses.includes(confirmed?.body?.status)) {
                         throw new Error(confirmed?.body?.error || 'Could not share this result.');
                     }
-                    this._showShareOutcome(panel, triggerButton, confirmed.body, { bragged: isBrag });
+                    this._showShareOutcome(panel, triggerButton, confirmed.body, {
+                        bragged: isBrag,
+                        keepShareAvailable: isDailyShare,
+                    });
                 } catch (error) {
                     confirm.disabled = false;
                     cancelReady.disabled = false;
@@ -900,6 +969,11 @@ export class ModalShell {
             return () => fn();
         };
 
+        const shareKind = options.shareRequest?.kind;
+        const isChallengeShare = shareKind === 'campaign-challenge';
+        const isChallengeBrag = shareKind === 'challenge-brag';
+        const isDailyShare = !shareKind && options.shareRequest?.source === 'finish';
+
         if (this.combinedRestartBtn) {
             const canImprove = typeof (options.restartAction || options.primaryAction) === 'function';
             this.combinedRestartBtn.style.display = canImprove ? '' : 'none';
@@ -914,22 +988,19 @@ export class ModalShell {
         if (this.combinedPlaylistBtn) {
             const hasAuxiliaryAction = Boolean(options.shareRequest || options.playlistAction);
             this.combinedPlaylistBtn.style.display = hasAuxiliaryAction ? '' : 'none';
-            const shareKind = options.shareRequest?.kind;
-            const isChallengeShare = shareKind === 'campaign-challenge';
-            const isChallengeBrag = shareKind === 'challenge-brag';
             const shareEnabled = options.shareEnabled !== false;
             const shareLabel = isChallengeBrag
                 ? 'Brag'
                 : isChallengeShare
                     ? 'Challenge'
-                    : 'Share Time';
+                    : isDailyShare ? 'Share' : 'Share Time';
             const shareAria = isChallengeBrag
                 ? (shareEnabled
                     ? 'Brag that you beat this challenge'
                     : 'Brag available after beating this challenge')
                 : isChallengeShare
                     ? 'Challenge other racers'
-                    : 'Share time';
+                    : isDailyShare ? 'Share result options' : 'Share time';
             this._setShareButtonLabel(this.combinedPlaylistBtn, shareLabel);
             this.combinedPlaylistBtn.setAttribute('aria-label', shareAria);
             this.combinedPlaylistBtn.disabled = Boolean(options.shareRequest) && !shareEnabled;
@@ -943,7 +1014,13 @@ export class ModalShell {
         this._bindClickAction(
             this.combinedPlaylistBtn,
             options.shareRequest && options.shareEnabled !== false
-                ? () => void this._startShare(options.shareRequest, this.combinedPlaylistBtn, this.modalCombinedView)
+                ? isDailyShare
+                    ? () => void this._startShareChooser(
+                        options.shareRequest,
+                        this.combinedPlaylistBtn,
+                        this.modalCombinedView,
+                    )
+                    : () => void this._startShare(options.shareRequest, this.combinedPlaylistBtn, this.modalCombinedView)
                 : (!options.shareRequest ? options.playlistAction : null),
         );
         this._bindClickAction(

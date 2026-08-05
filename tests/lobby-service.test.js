@@ -225,7 +225,7 @@ describe('lobby service', () => {
         expect(normalizeCampaignLobbyState(state).primaryLabel).toBe('Start Race');
     });
 
-    it('blocks guests from accepting a player challenge', () => {
+    it('allows an authorized guest to accept a player challenge', () => {
         const guest = normalizeChallengeLobbyState({
             challengerName: 'RaceFan',
             trackName: 'Number Three',
@@ -233,6 +233,7 @@ describe('lobby service', () => {
             targetTimeMs: 25640,
             medal: 'Gold',
             signedIn: false,
+            canRace: true,
         });
         const player = normalizeChallengeLobbyState({
             challengerName: 'u/RaceFan',
@@ -247,9 +248,10 @@ describe('lobby service', () => {
             opponentLabel: 'u/RaceFan challenges you',
             trackLabel: 'Number Three · 2 laps',
             targetTimeLabel: '0:25.640',
-            canAccept: false,
-            statusMessage: 'Sign in to accept this challenge.',
+            canAccept: true,
+            statusMessage: '',
         });
+        expect(guest.signedIn).toBe(false);
         expect(player.canAccept).toBe(true);
         expect(player.statusMessage).toBe('');
     });

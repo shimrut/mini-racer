@@ -363,6 +363,13 @@ describe('ui race hud helpers', () => {
         expect(pauseBtn.style.display).toBe('none');
     });
 
+    it('keeps the HUD at its race position while the lobby header is visible', () => {
+        const hud = new RaceHud();
+
+        expect(hud.hudBar.style.top).toBe('12px');
+        expect(hud._hudAnchorResizeObserver).toBeNull();
+    });
+
     it('pins the HUD near the top when no header is present', () => {
         const hudBar = { style: {} };
         vi.spyOn(document, 'querySelector').mockImplementation((selector) => {

@@ -1498,8 +1498,14 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('campaign');
 
-        lobby.setCampaignSelectedStage({ numberLabel: '10', unlocked: true, laps: 1 });
-        expect(selection.textContent).toBe('Stage 10');
+        lobby.setCampaignSelectedStage({
+            numberLabel: '10',
+            trackName: 'Imaginary Number',
+            unlocked: true,
+            laps: 1,
+        });
+        expect(selection.textContent).toBe('Imaginary Number');
+        expect(selection.textContent).not.toBe('Stage 10');
         expect(selection.hidden).toBe(false);
 
         lobby.showChallenge({
@@ -2083,6 +2089,43 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.startOverlay.showStartOverlay).not.toHaveBeenCalled();
     });
 
+    it('keeps an anonymous ready challenge raceable for guest entry', async () => {
+        campaignServiceMocks.getCampaignChallenge.mockResolvedValue({
+            ok: true,
+            status: 200,
+            body: {
+                status: 'ready',
+                viewerType: 'anonymous',
+                challenge: {
+                    challengeId: 'challenge-1',
+                    challengerUsername: 'RaceFan',
+                    trackKey: 'numberThree',
+                    lapCount: 2,
+                    targetTimeMs: 25_640,
+                    medal: 'gold',
+                },
+            },
+        });
+        const showChallenge = vi.fn();
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            activeCampaignChallenge: null,
+            hasAnyData: false,
+            isReturningPlayer: false,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: { showChallenge },
+        };
+
+        await campaignEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
+
+        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
+            signedIn: false,
+            canRace: true,
+            available: true,
+        }));
+    });
+
     it('paints the Campaign lobby before bootstrap resolves', async () => {
         const frameCallbacks = [];
         vi.stubGlobal('requestAnimationFrame', vi.fn((callback) => {
@@ -2175,6 +2218,10 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(lobbyUi.showCampaign).toHaveBeenCalledTimes(2);
         expect(lobbyUi.showCampaign.mock.calls[1][0].primaryLabel).toBe('Start Race');
         expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenLastCalledWith(false);
+
+        const requestCount = campaignServiceMocks.getCampaignBootstrap.mock.calls.length;
+        context.showCampaignLobby({ refresh: false });
+        expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(requestCount);
     });
 
     it('leaves the primary spinner to a start that is already running', async () => {

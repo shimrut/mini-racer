@@ -24,7 +24,8 @@
     "@devvit/analytics": "0.13.9",
     "@devvit/redis": "0.13.9",
     "@devvit/web": "0.13.9",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "fflate": "0.4.8"
   },
   "engines": {
     "node": ">=22.2.0"

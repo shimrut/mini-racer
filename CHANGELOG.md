@@ -1,5 +1,31 @@
 # Changelog
 
+- Fixed Head to Head post entry for guests and signed-in viewers. A ready
+  challenge no longer gets a sign-in-only CTA, the post retries once with a
+  fresh guest identity when a stored token is stale, and unavailable responses
+  are no longer mislabeled as “Sign in to Race.” Challenge reads and submissions
+  now also carry the current Reddit post ID, which the server needs to resolve
+  the immutable challenge contract from the custom post. If a client cannot
+  expose post context, the challenge ID now resolves to the stored Reddit post
+  identity and the server still reads the replay from that post body. The
+  frozen replay itself is not stored as a second server copy.
+- Campaign challenge posts now keep their frozen target and ghost in the
+  Reddit text fallback: human-readable copy comes first, followed by a
+  versioned gzip/base64url replay envelope. The server validates its hash
+  against post data and fails closed when the body is missing or changed;
+  Redis retains only the post identity needed to locate that body when client
+  context is unavailable.
+- Campaign lap balancing now keeps the existing stage order while using the
+  fixed `2,2,1,1,2,1,1,3,2,1,3,1,2,2` sequence for Number Zero through Golden
+  Ratio.
+- Campaign's right-side lobby header now shows the selected track name instead
+  of the stage number; Daily keeps its selected date label.
+- New Daily GP publication now limits races to one or two laps. The shared
+  race contract still reads historical three-lap Daily records and supports
+  Campaign's fixed one-, two-, and three-lap stages.
+- Added Golden Ratio as Campaign stage 13: a three-lap finale unlocked at 32
+  total Campaign medals plus a medal on Euler's Number. It remains out of Daily
+  rotation.
 - Added stable Current Daily, Campaign, and Lobby launcher posts. Current Daily
   follows the active UTC-day track without freezing, Campaign opens the shared
   game in Campaign mode, and Lobby opens the Home lobby. Each launcher is

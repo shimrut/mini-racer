@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const strings = new Map();
+const hashes = new Map();
+let challengePost = null;
 const redis = {
     get: vi.fn(async (key) => strings.get(key) ?? null),
     set: vi.fn(async (key, value, options = {}) => {
@@ -10,7 +12,15 @@ const redis = {
     }),
     del: vi.fn(async (key) => {
         strings.delete(key);
+        hashes.delete(key);
         return 1;
+    }),
+    hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
+    hSet: vi.fn(async (key, entries) => {
+        const hash = hashes.get(key) ?? new Map();
+        for (const [field, value] of Object.entries(entries)) hash.set(field, value);
+        hashes.set(key, hash);
+        return Object.keys(entries).length;
     }),
     expire: vi.fn(async () => true),
     watch: vi.fn(async () => {
@@ -33,10 +43,7 @@ const redis = {
 };
 
 const reddit = {
-    getPostById: vi.fn(async () => ({
-        id: 't3_challenge1',
-        url: 'https://reddit.com/r/miniracer/challenge1',
-    })),
+    getPostById: vi.fn(async () => challengePost),
     submitComment: vi.fn(async () => ({
         id: 't1_brag1',
         url: 'https://reddit.com/r/miniracer/challenge1/brag1',
@@ -53,9 +60,13 @@ const {
     previewCampaignChallengeBrag,
     confirmCampaignChallengeBrag,
 } = await import('../src/server/campaign-challenge-brag.ts');
-const { writeCampaignChallenge, writeCampaignChallengeResult } = await import(
+const { writeCampaignChallengeResult } = await import(
     '../src/server/campaign-challenge-store.ts'
 );
+const {
+    encodeCampaignChallengeReplay,
+    formatCampaignChallengeTextFallback,
+} = await import('../src/server/campaign-challenge-replay.ts');
 
 const challenge = {
     postType: 'campaign-challenge',
@@ -79,9 +90,38 @@ const challenge = {
     postUrl: 'https://reddit.com/r/miniracer/challenge1',
 };
 
+function installChallengePost() {
+    const postData = {
+        postType: challenge.postType,
+        challengeId: challenge.challengeId,
+        campaignId: challenge.campaignId,
+        raceId: challenge.raceId,
+        challengerUsername: challenge.challengerUsername,
+        challengerAvatarUrl: challenge.challengerAvatarUrl,
+        trackKey: challenge.trackKey,
+        lapCount: challenge.lapCount,
+        targetTimeMs: challenge.targetTimeMs,
+        medal: challenge.medal,
+        rulesRevision: challenge.rulesRevision,
+        trackFingerprint: challenge.trackFingerprint,
+        createdAt: challenge.createdAt,
+    };
+    const replay = encodeCampaignChallengeReplay(postData, challenge.frozenGhost);
+    const immutablePostData = { ...postData, replayDataHash: replay.hash };
+    challengePost = {
+        id: challenge.postId,
+        url: challenge.postUrl,
+        subredditName: challenge.subredditName,
+        body: formatCampaignChallengeTextFallback(immutablePostData, challenge.frozenGhost),
+        getPostData: vi.fn(async () => immutablePostData),
+    };
+}
+
 describe('campaign challenge brag', () => {
     beforeEach(() => {
         strings.clear();
+        hashes.clear();
+        installChallengePost();
         vi.clearAllMocks();
     });
 
@@ -92,7 +132,6 @@ describe('campaign challenge brag', () => {
     });
 
     it('rejects brag when the viewer has not beaten the challenge', async () => {
-        await writeCampaignChallenge(challenge);
         await writeCampaignChallengeResult({
             challengeId: 'challenge-1',
             viewerUsername: 'OtherRacer',
@@ -103,24 +142,22 @@ describe('campaign challenge brag', () => {
         });
         const preview = await previewCampaignChallengeBrag(
             { challengeId: 'challenge-1' },
-            { username: 'OtherRacer', subredditName: 'MiniRacer' },
+            { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(preview.status).toBe(404);
         expect(preview.body.status).toBe('result_unavailable');
     });
 
     it('rejects brag on your own challenge', async () => {
-        await writeCampaignChallenge(challenge);
         const preview = await previewCampaignChallengeBrag(
             { challengeId: 'challenge-1' },
-            { username: 'RaceFan', subredditName: 'MiniRacer' },
+            { username: 'RaceFan', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(preview.status).toBe(403);
         expect(preview.body.status).toBe('own_challenge');
     });
 
     it('previews and confirms a brag comment on the challenge post', async () => {
-        await writeCampaignChallenge(challenge);
         await writeCampaignChallengeResult({
             challengeId: 'challenge-1',
             viewerUsername: 'OtherRacer',
@@ -132,7 +169,7 @@ describe('campaign challenge brag', () => {
 
         const preview = await previewCampaignChallengeBrag(
             { challengeId: 'challenge-1' },
-            { username: 'OtherRacer', subredditName: 'MiniRacer' },
+            { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(preview.status).toBe(200);
         expect(preview.body).toMatchObject({
@@ -144,7 +181,7 @@ describe('campaign challenge brag', () => {
 
         const confirmed = await confirmCampaignChallengeBrag(
             { shareToken: preview.body.shareToken },
-            { username: 'OtherRacer', subredditName: 'MiniRacer' },
+            { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(confirmed.status).toBe(200);
         expect(confirmed.body).toMatchObject({
@@ -159,7 +196,7 @@ describe('campaign challenge brag', () => {
 
         const again = await previewCampaignChallengeBrag(
             { challengeId: 'challenge-1' },
-            { username: 'OtherRacer', subredditName: 'MiniRacer' },
+            { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(again.body.status).toBe('already_shared');
     });

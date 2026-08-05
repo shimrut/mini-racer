@@ -6,13 +6,26 @@ import {
     TRACK_PRESENTATION_SURFACES,
 } from './game/track/presentation.js';
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
+import {
+    getGuestPlayerToken,
+    getOrCreatePlayerId,
+    rotateGuestPlayerIdentity,
+    setGuestPlayerToken,
+} from './game/scoreboard/player-identity.js';
 
 const POST_TYPE = 'campaign-challenge';
 const GENERIC_SNOO_URL = 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
-const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head. Opening your Campaign.";
+const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
 
 function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
+}
+
+function readChallengePostId(root = globalThis) {
+    const postId = root?.devvit?.context?.postId;
+    return typeof postId === 'string' && postId.startsWith('t3_')
+        ? postId
+        : '';
 }
 
 export function isRedditAvatarUrl(value) {
@@ -48,11 +61,30 @@ export function normalizeCampaignChallengePostData(value) {
     const input = value && typeof value === 'object' ? value : {};
     const lapCount = input.lapCount === 2 || input.lapCount === 3 ? input.lapCount : 1;
     const targetTimeMs = Number(input.targetTimeMs);
+    const origin = input.origin?.mode === 'daily'
+        && typeof input.origin.challengeId === 'string'
+        ? { mode: 'daily', challengeId: input.origin.challengeId }
+        : input.origin?.mode === 'campaign'
+            && input.origin.campaignId === 'numbered-v1'
+            && typeof input.origin.raceId === 'string'
+            ? {
+                mode: 'campaign',
+                campaignId: input.origin.campaignId,
+                raceId: input.origin.raceId,
+            }
+            : input.campaignId === 'numbered-v1' && typeof input.raceId === 'string'
+                ? {
+                    mode: 'campaign',
+                    campaignId: input.campaignId,
+                    raceId: input.raceId,
+                }
+                : null;
     return {
         postType: POST_TYPE,
         challengeId: cleanText(input.challengeId),
         campaignId: input.campaignId === 'numbered-v1' ? input.campaignId : '',
         raceId: cleanText(input.raceId),
+        origin,
         challengerUsername: cleanText(input.challengerUsername) || 'A racer',
         challengerAvatarUrl: isRedditAvatarUrl(input.challengerAvatarUrl)
             ? input.challengerAvatarUrl
@@ -114,7 +146,7 @@ export function renderCampaignChallenge(documentRef, rawValue) {
     });
     if (trackName) trackName.textContent = value.trackKey
         ? getTrackName(value.trackKey, value.trackKey)
-        : 'Campaign race';
+        : value.origin?.mode === 'daily' ? 'Daily race' : 'Campaign race';
     if (target) target.textContent = formatCampaignChallengePreviewTime(value.targetTimeMs);
     if (format) {
         format.textContent = `${value.lapCount} ${value.lapCount === 1 ? 'LAP' : 'LAPS'}`;
@@ -148,19 +180,82 @@ function renderChallengeTrack(documentRef, trackKey) {
     });
 }
 
-export async function resolveCampaignChallengeAccess(root = globalThis) {
-    if (typeof root?.fetch !== 'function') return { signedIn: false, ownChallenge: false };
+export async function resolveCampaignChallengeAccess(root = globalThis, challengeId = null) {
+    if (typeof root?.fetch !== 'function') {
+        return { signedIn: false, canRace: false, ownChallenge: false };
+    }
     try {
-        const response = await root.fetch('/api/campaign/challenge');
+        const url = new URL(
+            '/api/campaign/challenge',
+            root.location?.origin || 'http://localhost',
+        );
+        const requestedChallengeId = cleanText(challengeId);
+        if (requestedChallengeId) {
+            url.searchParams.set('challengeId', requestedChallengeId);
+        }
+        const postId = readChallengePostId(root);
+        if (postId) url.searchParams.set('postId', postId);
+        url.searchParams.set('playerId', getOrCreatePlayerId('challenge preview'));
+        const guestToken = getGuestPlayerToken();
+        if (guestToken) url.searchParams.set('guestToken', guestToken);
+        const response = await root.fetch(url.toString());
         const body = await response?.json?.().catch?.(() => null) ?? null;
         if (body?.status === 'own_challenge') {
-            return { signedIn: true, ownChallenge: true, body };
+            return { signedIn: true, canRace: false, ownChallenge: true, body };
         }
-        if (!response?.ok) return { signedIn: false, ownChallenge: false, body };
-        return { signedIn: body?.status === 'ready', ownChallenge: false, body };
+        if (!response?.ok) return { signedIn: false, canRace: false, ownChallenge: false, body };
+        return {
+            signedIn: body?.viewerType === 'reddit',
+            // A ready post is public. Guest identity is established separately
+            // and the expanded game can finish the bootstrap if this preview
+            // was opened before the identity response arrived.
+            canRace: body?.status === 'ready',
+            ownChallenge: false,
+            body,
+        };
     } catch {
-        return { signedIn: false, ownChallenge: false };
+        return { signedIn: false, canRace: false, ownChallenge: false };
     }
+}
+
+export async function ensureChallengePlayerIdentity(root = globalThis) {
+    if (typeof root?.fetch !== 'function') return false;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            const url = new URL(
+                '/api/player/bootstrap',
+                root.location?.origin || 'http://localhost',
+            );
+            url.searchParams.set('playerId', getOrCreatePlayerId('challenge preview'));
+            const guestToken = getGuestPlayerToken();
+            if (guestToken) url.searchParams.set('guestToken', guestToken);
+            const response = await root.fetch(url.toString(), { method: 'GET' });
+            if (response?.status === 401 && attempt === 0) {
+                // A stored guest id cannot be reclaimed without its old token.
+                // Start a fresh guest identity once, matching the main game
+                // bootstrap recovery path, then retry the request.
+                rotateGuestPlayerIdentity();
+                continue;
+            }
+            if (!response?.ok) return false;
+            const body = await response.json?.().catch?.(() => null) ?? null;
+            if (body && Object.prototype.hasOwnProperty.call(body, 'guestToken')) {
+                setGuestPlayerToken(body.guestToken);
+            }
+            return Boolean(body?.playerId);
+        } catch (error) {
+            if (error?.status === 401 && attempt === 0) {
+                rotateGuestPlayerIdentity();
+                continue;
+            }
+            // The expanded game can retry bootstrap; the post preview should
+            // still render and let the challenge endpoint report its status.
+            return false;
+        }
+    }
+
+    return false;
 }
 
 export function showOwnChallengeMessage(documentRef, openCampaign = openCampaignAsRedirect) {
@@ -195,7 +290,7 @@ export function showOwnChallengeMessage(documentRef, openCampaign = openCampaign
 export function bindAcceptChallenge(
     documentRef,
     openGame = openCampaignChallenge,
-    { ownChallenge = false } = {},
+    { ownChallenge = false, openOwnChallenge = openCampaignAsRedirect } = {},
 ) {
     const button = documentRef?.getElementById('accept-challenge');
     if (!button || button.dataset.bound === '1') return button || null;
@@ -203,12 +298,31 @@ export function bindAcceptChallenge(
     button.addEventListener('click', async (event) => {
         if (ownChallenge) {
             event.preventDefault?.();
-            showOwnChallengeMessage(documentRef);
+            showOwnChallengeMessage(documentRef, openOwnChallenge);
             return;
         }
         await openGame(event);
     });
     return button;
+}
+
+export function applyCampaignChallengeAccessState(button, message, access = {}) {
+    if (!button) return;
+    const canRace = access.canRace === true;
+    const ownChallenge = access.ownChallenge === true;
+    button.disabled = !canRace && !ownChallenge;
+    button.textContent = ownChallenge
+        ? 'View Campaign'
+        : canRace
+            ? 'Race Head to Head'
+            : 'Challenge Unavailable';
+    if (message) {
+        message.textContent = ownChallenge
+            ? OWN_CHALLENGE_MESSAGE
+            : canRace
+                ? ''
+                : access.body?.error || 'This Head to Head is unavailable right now.';
+    }
 }
 
 export async function openCampaignAsRedirect(event) {
@@ -218,6 +332,16 @@ export async function openCampaignAsRedirect(event) {
         await requestExpandedMode(event, 'game');
     } catch (error) {
         console.error('Failed to open Mini Racer Campaign:', error);
+    }
+}
+
+export async function openDailyAsRedirect(event) {
+    try {
+        requestGameLaunchTarget('daily');
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        await requestExpandedMode(event, 'game');
+    } catch (error) {
+        console.error('Failed to open Mini Racer Daily:', error);
     }
 }
 
@@ -251,16 +375,16 @@ function applyAccessAvatars(documentRef, challenge, access) {
 async function boot() {
     const challenge = renderCampaignChallenge(document, readCampaignChallengePostData());
     const message = document.getElementById('challenge-message');
-    const access = await resolveCampaignChallengeAccess(globalThis);
+    await ensureChallengePlayerIdentity(globalThis);
+    const access = await resolveCampaignChallengeAccess(globalThis, challenge.challengeId);
     applyAccessAvatars(document, challenge, access);
     const button = bindAcceptChallenge(document, openCampaignChallenge, {
         ownChallenge: access.ownChallenge === true,
+        openOwnChallenge: challenge.origin?.mode === 'daily'
+            ? openDailyAsRedirect
+            : openCampaignAsRedirect,
     });
-    if (!access.signedIn && button) {
-        button.disabled = true;
-        button.textContent = 'Sign in to Race';
-        if (message) message.textContent = 'Reddit sign-in is required to race a Head to Head.';
-    }
+    applyCampaignChallengeAccessState(button, message, access);
     globalThis.render_game_to_text = () => JSON.stringify({
         screen: 'campaign-challenge-preview',
         challengeId: challenge.challengeId,
@@ -269,6 +393,7 @@ async function boot() {
         lapCount: challenge.lapCount,
         targetTimeMs: challenge.targetTimeMs,
         signedIn: access.signedIn,
+        canRace: access.canRace,
         ownChallenge: access.ownChallenge === true,
     });
     globalThis.advanceTime = () => {};

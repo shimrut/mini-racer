@@ -14,6 +14,7 @@ const mockRedis = {
     }),
     del: vi.fn(async (key) => {
         strings.delete(key);
+        hashes.delete(key);
         return 1;
     }),
     hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
@@ -108,6 +109,7 @@ describe('Campaign server store', () => {
         });
         mockRedis.del.mockImplementation(async (key) => {
             strings.delete(key);
+            hashes.delete(key);
             return 1;
         });
         mockRedis.hGet.mockImplementation(async (key, field) => hashes.get(key)?.get(field) ?? null);
@@ -141,9 +143,9 @@ describe('Campaign server store', () => {
             run: {
                 bestTimeSec: 12.345,
                 bestTimeMs: 12345,
-                completedLaps: 1,
+                completedLaps: 2,
                 checkpointTimesSec: [4.2, 9.8],
-                lapCompletionTimesSec: [12.345],
+                lapCompletionTimesSec: [6.1, 12.345],
                 ghost: {
                     schemaVersion: 2,
                     sampleIntervalMs: 50,
@@ -226,7 +228,7 @@ describe('Campaign server store', () => {
                 'numbered-v1-00': {
                     raceId: 'numbered-v1-00',
                     trackKey: 'numberZero',
-                    lapCount: 1,
+                    lapCount: 2,
                     rulesRevision: 1,
                     bestTimeMs: 1000,
                     medal: 'author',
@@ -253,9 +255,9 @@ describe('Campaign server store', () => {
             run: {
                 bestTimeSec: 1,
                 bestTimeMs: 1000,
-                completedLaps: 1,
+                completedLaps: 2,
                 checkpointTimesSec: [0.4, 0.8],
-                lapCompletionTimesSec: [1],
+                lapCompletionTimesSec: [0.5, 1],
                 ghost: {
                     schemaVersion: 2,
                     sampleIntervalMs: 50,
@@ -274,7 +276,7 @@ describe('Campaign server store', () => {
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
             bestTime: 1,
-            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [{ frames: 60, left: false, right: false, relaunchDelay: false }] },
+            replay: { rulesRevision: 1, targetLapNumber: 2, inputs: [{ frames: 60, left: false, right: false, relaunchDelay: false }] },
             redditUsername: 'RaceFan',
         });
 
@@ -298,7 +300,7 @@ describe('Campaign server store', () => {
         expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalledWith({
             challenge: expect.objectContaining({
                 trackKey: 'numberZero',
-                objectiveParams: { lapCount: 1 },
+                objectiveParams: { lapCount: 2 },
                 rulesRevision: 1,
             }),
             replay: expect.any(Object),
@@ -315,7 +317,7 @@ describe('Campaign server store', () => {
             body: {
                 personalBest: {
                     bestTimeMs: 1000,
-                    lapCompletionTimesSec: [1],
+                    lapCompletionTimesSec: [0.5, 1],
                 },
             },
         });
@@ -327,9 +329,9 @@ describe('Campaign server store', () => {
             run: {
                 bestTimeSec: 999,
                 bestTimeMs: 999_000,
-                completedLaps: 1,
+                completedLaps: 2,
                 checkpointTimesSec: [300, 600],
-                lapCompletionTimesSec: [999],
+                lapCompletionTimesSec: [499, 999],
                 ghost: {
                     schemaVersion: 2,
                     sampleIntervalMs: 50,
@@ -348,7 +350,7 @@ describe('Campaign server store', () => {
         const submission = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
-            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            replay: { rulesRevision: 1, targetLapNumber: 2, inputs: [] },
             redditUsername: 'NoMedalYet',
         });
         const stored = await getServerCampaignPbGhost({
@@ -374,7 +376,7 @@ describe('Campaign server store', () => {
             body: {
                 personalBest: {
                     bestTimeMs: 999_000,
-                    lapCompletionTimesSec: [999],
+                    lapCompletionTimesSec: [499, 999],
                 },
             },
         });
@@ -428,11 +430,11 @@ describe('Campaign server store', () => {
         const result = {
             raceId,
             trackKey: 'numberZero',
-            lapCount: 1,
+            lapCount: 2,
             rulesRevision: 1,
             bestTimeMs: 100,
             medal: 'author',
-            checkpointTimesSec: [0.02, 0.05, 0.08],
+            checkpointTimesSec: [0.02, 0.05, 0.08, 0.11, 0.14, 0.17],
             updatedAt,
         };
         const entryKey = `campaign:numbered-v1:leaderboard:${raceId}:entries`;
@@ -499,7 +501,7 @@ describe('Campaign server store', () => {
                     rank: 1,
                     displayName: 'Opponent',
                     bestTimeMs: 100,
-                    checkpointTimesSec: [0.02, 0.05, 0.08],
+                    checkpointTimesSec: [0.02, 0.05, 0.08, 0.11, 0.14, 0.17],
                     updatedAt,
                     ghost: { finishTimeMs: 100 },
                 },
@@ -515,10 +517,10 @@ describe('Campaign server store', () => {
         const baseResult = {
             raceId,
             trackKey: 'numberZero',
-            lapCount: 1,
+            lapCount: 2,
             rulesRevision: 1,
             medal: 'gold',
-            checkpointTimesSec: [0.02, 0.05, 0.08],
+            checkpointTimesSec: [0.02, 0.05, 0.08, 0.11, 0.14, 0.17],
         };
         seedPlayerProfile(rivalId, 'Opponent');
         seedPlayerProfile(playerId, 'RaceFan');
@@ -603,11 +605,11 @@ describe('Campaign server store', () => {
         const result = {
             raceId,
             trackKey: 'numberZero',
-            lapCount: 1,
+            lapCount: 2,
             rulesRevision: 1,
             bestTimeMs: 100,
             medal: 'author',
-            checkpointTimesSec: [0.02, 0.05, 0.08],
+            checkpointTimesSec: [0.02, 0.05, 0.08, 0.11, 0.14, 0.17],
             updatedAt: '2026-07-27T10:00:00.000Z',
         };
         const ghost = {
@@ -707,7 +709,7 @@ describe('Campaign server store', () => {
         const submission = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
-            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            replay: { rulesRevision: 1, targetLapNumber: 2, inputs: [] },
             playerId: 'guest-racer',
             guestToken,
         });
@@ -730,7 +732,7 @@ describe('Campaign server store', () => {
         await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
-            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            replay: { rulesRevision: 1, targetLapNumber: 2, inputs: [] },
             playerId: 'guest-ttl',
             guestToken,
         });
@@ -751,7 +753,7 @@ describe('Campaign server store', () => {
         await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
-            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            replay: { rulesRevision: 1, targetLapNumber: 2, inputs: [] },
             redditUsername: 'Permanent',
         });
 
@@ -775,9 +777,9 @@ describe('Campaign server store', () => {
             run: {
                 bestTimeSec: 1,
                 bestTimeMs: 1000,
-                completedLaps: 1,
+                completedLaps: 2,
                 checkpointTimesSec: [0.4],
-                lapCompletionTimesSec: [1],
+                lapCompletionTimesSec: [0.5, 1],
                 ghost: {
                     schemaVersion: 2,
                     sampleIntervalMs: 50,
@@ -791,7 +793,7 @@ describe('Campaign server store', () => {
         await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
-            replay: { rulesRevision: 1, targetLapNumber: 1, inputs: [] },
+            replay: { rulesRevision: 1, targetLapNumber: 2, inputs: [] },
             playerId: 'guest-merge',
             guestToken,
         });
@@ -822,6 +824,38 @@ describe('Campaign server store', () => {
         })).resolves.toEqual({ merged: false, mergedRaceIds: [] });
     });
 
+    it('moves a guest Head to Head result onto the account at sign-in', async () => {
+        const {
+            mergeGuestCampaignChallengeResults,
+            readCampaignChallengeResult,
+            writeCampaignChallengeResult,
+        } = await import('../src/server/campaign-challenge-store.ts');
+
+        await writeCampaignChallengeResult({
+            challengeId: 'challenge-guest-1',
+            viewerUsername: 'Guest racer',
+            viewerPlayerId: 'guest:guest-h2h',
+            bestTimeMs: 12_345,
+            medal: 'gold',
+            ghost: { finishTimeMs: 12_345 },
+            verifiedAt: '2026-07-27T10:00:00.000Z',
+        });
+
+        await expect(mergeGuestCampaignChallengeResults({
+            guestPlayerId: 'guest:guest-h2h',
+            redditPlayerId: 'reddit:claimed-h2h',
+        })).resolves.toBe(true);
+        await expect(readCampaignChallengeResult(
+            'challenge-guest-1',
+            'reddit:claimed-h2h',
+        )).resolves.toMatchObject({
+            viewerUsername: 'claimed-h2h',
+            viewerPlayerId: 'reddit:claimed-h2h',
+            bestTimeMs: 12_345,
+        });
+        expect(hashes.size).toBe(1);
+    });
+
     it('refuses to trade a verified account time down for a slower guest one', async () => {
         const { mergeGuestCampaignProgress, parseCampaignProgress } = await import('../src/server/campaign-store.ts');
         const progressKeyFor = (playerId) => `campaign:numbered-v1:progress:${
@@ -830,7 +864,7 @@ describe('Campaign server store', () => {
         const stageResult = (bestTimeMs, medal) => ({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
-            lapCount: 1,
+            lapCount: 2,
             rulesRevision: 1,
             bestTimeMs,
             medal,

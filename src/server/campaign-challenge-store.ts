@@ -24,10 +24,6 @@ function keyPart(value: string): string {
     return encodeURIComponent(value.trim().toLowerCase());
 }
 
-function challengeKey(challengeId: string): string {
-    return `${PREFIX}:${challengeId}`;
-}
-
 function postKey(
     subredditName: string,
     username: string,
@@ -42,6 +38,26 @@ function resultKey(challengeId: string, username: string): string {
         .update(username.trim().toLowerCase())
         .digest('hex');
     return `${PREFIX}:result:${challengeId}:${viewerHash}`;
+}
+
+function challengeKey(challengeId: string): string {
+    return `${PREFIX}:${challengeId}`;
+}
+
+function canonicalPlayerId(value: string): string {
+    const normalized = value.trim();
+    if (normalized.startsWith('reddit:')) {
+        return `reddit:${normalized.slice('reddit:'.length).toLowerCase()}`;
+    }
+    if (normalized.startsWith('guest:')) return normalized;
+    return `reddit:${normalized.toLowerCase()}`;
+}
+
+function resultCollectionKey(playerId: string): string {
+    const playerHash = createHash('sha256')
+        .update(canonicalPlayerId(playerId), 'utf8')
+        .digest('base64url');
+    return `${PREFIX}:results:${playerHash}`;
 }
 
 function createCountKey(subredditName: string, username: string, utcDate: string): string {
@@ -67,6 +83,7 @@ function parseJson<T>(raw: string | null): T | null {
     }
 }
 
+/** Legacy challenge records remain readable while old posts migrate. */
 export async function readCampaignChallenge(
     challengeId: string,
 ): Promise<CampaignChallengeRecord | null> {
@@ -77,6 +94,28 @@ export async function writeCampaignChallenge(
     record: CampaignChallengeRecord,
 ): Promise<void> {
     await redis.set(challengeKey(record.challengeId), JSON.stringify(record));
+}
+
+function challengePostIdentityKey(challengeId: string): string {
+    return `${PREFIX}:post-identity:${challengeId}`;
+}
+
+/** Stores only the Reddit post identity; the replay remains in the post body. */
+export async function readCampaignChallengePostIdentityByChallengeId(
+    challengeId: string,
+): Promise<CampaignChallengePostIdentity | null> {
+    return parseJson<CampaignChallengePostIdentity>(await redis.get(
+        challengePostIdentityKey(challengeId),
+    ));
+}
+
+export async function writeCampaignChallengePostIdentityByChallengeId(
+    identity: CampaignChallengePostIdentity,
+): Promise<void> {
+    await redis.set(
+        challengePostIdentityKey(identity.challengeId),
+        JSON.stringify(identity),
+    );
 }
 
 export async function readCampaignChallengePostIdentity(
@@ -114,18 +153,68 @@ export async function deleteCampaignChallengePostIdentity(
 
 export async function readCampaignChallengeResult(
     challengeId: string,
-    username: string,
+    playerIdOrUsername: string,
 ): Promise<CampaignChallengeResult | null> {
-    return parseJson<CampaignChallengeResult>(await redis.get(resultKey(challengeId, username)));
+    const identity = canonicalPlayerId(playerIdOrUsername);
+    const collection = await redis.hGetAll(resultCollectionKey(identity));
+    const current = parseJson<CampaignChallengeResult>(collection?.[challengeId] ?? null);
+    if (current) return current;
+
+    // Preserve results written by the previous per-challenge Reddit key until
+    // the viewer improves that result or signs in and the guest record merges.
+    if (!identity.startsWith('reddit:')) {
+        return null;
+    }
+    const username = identity.slice('reddit:'.length);
+    return parseJson<CampaignChallengeResult>(await redis.get(
+        resultKey(challengeId, username),
+    ));
 }
 
 export async function writeCampaignChallengeResult(
     result: CampaignChallengeResult,
 ): Promise<void> {
-    await redis.set(
-        resultKey(result.challengeId, result.viewerUsername),
-        JSON.stringify(result),
-    );
+    const identity = result.viewerPlayerId || canonicalPlayerId(result.viewerUsername);
+    await redis.hSet(resultCollectionKey(identity), {
+        [result.challengeId]: JSON.stringify(result),
+    });
+}
+
+export async function mergeGuestCampaignChallengeResults({
+    guestPlayerId,
+    redditPlayerId,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+}): Promise<boolean> {
+    if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
+        return false;
+    }
+    const guestResults = await redis.hGetAll(resultCollectionKey(guestPlayerId));
+    const guestEntries = Object.entries(guestResults || {})
+        .map(([challengeId, raw]) => [
+            challengeId,
+            parseJson<CampaignChallengeResult>(raw),
+        ] as const)
+        .filter((entry): entry is readonly [string, CampaignChallengeResult] => Boolean(entry[1]));
+    if (!guestEntries.length) return false;
+
+    const updates: Record<string, string> = {};
+    const redditUsername = redditPlayerId.slice('reddit:'.length);
+    for (const [challengeId, guestResult] of guestEntries) {
+        const existing = await readCampaignChallengeResult(challengeId, redditUsername);
+        if (existing && existing.bestTimeMs <= guestResult.bestTimeMs) continue;
+        updates[challengeId] = JSON.stringify({
+            ...guestResult,
+            viewerUsername: redditUsername,
+            viewerPlayerId: redditPlayerId,
+        });
+    }
+    if (Object.keys(updates).length) {
+        await redis.hSet(resultCollectionKey(redditPlayerId), updates);
+    }
+    await redis.del(resultCollectionKey(guestPlayerId));
+    return true;
 }
 
 export async function acquireCampaignChallengeCreationLock(
@@ -147,9 +236,13 @@ export async function releaseCampaignChallengeCreationLock(lock: RedisLock | nul
 
 export async function acquireCampaignChallengeResultLock(
     challengeId: string,
-    username: string,
+    playerId: string,
 ): Promise<RedisLock | null> {
-    return acquireRedisLock(`${resultKey(challengeId, username)}:lock`, RESULT_LOCK_TTL_MS, redis);
+    return acquireRedisLock(
+        `${resultCollectionKey(playerId)}:${challengeId}:lock`,
+        RESULT_LOCK_TTL_MS,
+        redis,
+    );
 }
 
 export async function reserveCampaignChallengePostSlot(

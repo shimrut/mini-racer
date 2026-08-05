@@ -149,6 +149,26 @@ function playerIdentityBody(extra = {}) {
     };
 }
 
+function readChallengePostId() {
+    const postId = globalThis.devvit?.context?.postId;
+    return typeof postId === 'string' && postId.startsWith('t3_') ? postId : null;
+}
+
+function challengePostIdentityBody(extra = {}) {
+    const postId = readChallengePostId();
+    return playerIdentityBody({
+        ...extra,
+        ...(postId ? { postId } : {}),
+    });
+}
+
+function challengeUrl(route) {
+    const url = campaignUrl(route);
+    const postId = readChallengePostId();
+    if (postId) url.searchParams.set('postId', postId);
+    return url;
+}
+
 function campaignUrl(route) {
     return withPlayerIdentity(
         new URL(route, globalThis.location?.origin ?? 'http://localhost'),
@@ -251,16 +271,16 @@ export async function previewCampaignChallenge(input) {
     });
 }
 
-export async function createCampaignChallenge(challengeToken) {
+export async function createCampaignChallenge(challengeToken, extra = {}) {
     return requestJson(API_ROUTES.campaignChallengeCreateUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeToken }),
+        body: JSON.stringify({ challengeToken, ...extra }),
     });
 }
 
 export async function getCampaignChallenge(challengeId) {
-    const url = new URL(API_ROUTES.campaignChallengeUrl, globalThis.location?.origin ?? 'http://localhost');
+    const url = challengeUrl(API_ROUTES.campaignChallengeUrl);
     url.searchParams.set('challengeId', challengeId);
     return requestJson(url.toString());
 }
@@ -269,15 +289,19 @@ export async function submitCampaignChallengeRun({ challengeId, replay }) {
     return requestJson(API_ROUTES.campaignChallengeSubmitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeId, replay }),
+        body: JSON.stringify(challengePostIdentityBody({ challengeId, replay })),
     });
 }
 
 export async function previewCampaignChallengeBrag({ challengeId }) {
+    const postId = readChallengePostId();
     return requestJson(API_ROUTES.campaignChallengeBragPreviewUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeId }),
+        body: JSON.stringify({
+            challengeId,
+            ...(postId ? { postId } : {}),
+        }),
     });
 }
 

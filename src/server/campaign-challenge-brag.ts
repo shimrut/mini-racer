@@ -7,10 +7,8 @@ import type {
     CampaignChallengeRequestContext,
     CampaignChallengeServiceResult,
 } from './campaign-challenge-service.js';
-import {
-    readCampaignChallenge,
-    readCampaignChallengeResult,
-} from './campaign-challenge-store.js';
+import { resolveCampaignChallengeRecord } from './campaign-challenge-post.js';
+import { readCampaignChallengeResult } from './campaign-challenge-store.js';
 import {
     acquireRedisLock,
     beginOwnedRedisLockTransaction,
@@ -146,7 +144,7 @@ export async function previewCampaignChallengeBrag(
         };
     }
     const challengeId = typeof input.challengeId === 'string' ? input.challengeId : '';
-    const challenge = challengeId ? await readCampaignChallenge(challengeId) : null;
+    const challenge = await resolveCampaignChallengeRecord(challengeId, context);
     if (!challenge || normalizeName(challenge.subredditName) !== normalizeName(request.subredditName)) {
         return {
             status: 404,

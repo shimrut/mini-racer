@@ -40,6 +40,22 @@ function postChallengeId(postData: Record<string, unknown> | null): string | nul
         ? postData.challengeId
         : null;
 }
+
+function withRequestIdentity(
+    context: CampaignChallengeRequestContext,
+    input: Record<string, unknown> | null | undefined,
+): CampaignChallengeRequestContext {
+    const requestedPostId = typeof input?.postId === 'string'
+        && input.postId.startsWith('t3_')
+        ? input.postId
+        : null;
+    return {
+        ...context,
+        postId: requestedPostId || context.postId || null,
+        playerId: typeof input?.playerId === 'string' ? input.playerId : null,
+        guestToken: typeof input?.guestToken === 'string' ? input.guestToken : null,
+    };
+}
 export function registerCampaignChallengeRoutes(
     app: Application,
     dependencies: CampaignChallengeRouteDependencies,
@@ -77,7 +93,10 @@ export function registerCampaignChallengeRoutes(
                 : null;
             const result = await dependencies.getCampaignChallenge(
                 queryId || postChallengeId(dependencies.readContextPostData()),
-                await dependencies.getCampaignChallengeRequestContext(),
+                withRequestIdentity(
+                    await dependencies.getCampaignChallengeRequestContext(),
+                    req.query as Record<string, unknown>,
+                ),
             );
             res.status(result.status).json(result.body);
         } catch (error) {
@@ -96,7 +115,10 @@ export function registerCampaignChallengeRoutes(
                         ? body.challengeId
                         : postChallengeId(dependencies.readContextPostData()),
                 },
-                await dependencies.getCampaignChallengeRequestContext(),
+                withRequestIdentity(
+                    await dependencies.getCampaignChallengeRequestContext(),
+                    body,
+                ),
             );
             res.status(result.status).json(result.body);
         } catch (error) {
@@ -109,7 +131,10 @@ export function registerCampaignChallengeRoutes(
         try {
             const result = await dependencies.previewCampaignChallengeBrag(
                 req.body ?? {},
-                await dependencies.getCampaignChallengeRequestContext(),
+                withRequestIdentity(
+                    await dependencies.getCampaignChallengeRequestContext(),
+                    req.body ?? {},
+                ),
             );
             res.status(result.status).json(result.body);
         } catch (error) {

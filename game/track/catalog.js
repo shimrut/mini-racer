@@ -71,6 +71,16 @@ export const TRACK_CATALOG = {
     infinitePie: { name: "Infinite Pie" },
     centralDrop: { name: "Central Drop" },
     goldenRatio: { name: "Golden Ratio" },
+    fedoraHat: { name: "Fedora Hat" },
+    infinityIsle: { name: "Inifinity Isle" },
+    kangarooKyle: { name: "Kangaroo Kyle" },
+    quarterlyQuestion: { name: "Quarterly Question" },
+    romanianRhapsody: { name: "Romanian Rhapsody" },
+    fairyLand: { name: "Fairy Land" },
+    felineFace: { name: "Feline Face" },
+    darkMatter: { name: "Dark Matter" },
+    appleStrudel: { name: "Apple Strudel" },
+    heavyMetal: { name: "Heavy Metal" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -132,6 +142,16 @@ export const TRACK_SCHEDULE_KEYS = [
     'blackstoneRun',
     'titanTown',
     'centralDrop',
+    'fedoraHat',
+    'infinityIsle',
+    'kangarooKyle',
+    'quarterlyQuestion',
+    'romanianRhapsody',
+    'fairyLand',
+    'felineFace',
+    'darkMatter',
+    'appleStrudel',
+    'heavyMetal',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

@@ -110,6 +110,8 @@ function registerProductionRoutes(app: express.Application): void {
             username: getRequestUsername(),
             subredditName: readContextSubredditName(),
             appSlug: getRequestAppSlug(),
+            postId: readContextPostId(),
+            postData: readContextPostData(),
         }),
         readContextPostData,
         previewCampaignChallenge: campaignChallengeService.preview,

@@ -70,6 +70,16 @@ import imaginaryNumber from './definitions/imaginary-number.js';
 import infinitePie from './definitions/infinite-pie.js';
 import centralDrop from './definitions/central-drop.js';
 import goldenRatio from './definitions/golden-ratio.js';
+import fedoraHat from './definitions/fedora-hat.js';
+import infinityIsle from './definitions/infinity-isle.js';
+import kangarooKyle from './definitions/kangaroo-kyle.js';
+import quarterlyQuestion from './definitions/quarterly-question.js';
+import romanianRhapsody from './definitions/romanian-rhapsody.js';
+import fairyLand from './definitions/fairy-land.js';
+import felineFace from './definitions/feline-face.js';
+import darkMatter from './definitions/dark-matter.js';
+import appleStrudel from './definitions/apple-strudel.js';
+import heavyMetal from './definitions/heavy-metal.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -145,6 +155,16 @@ const TRACK_GEOMETRY = {
     infinitePie,
     centralDrop,
     goldenRatio,
+    fedoraHat,
+    infinityIsle,
+    kangarooKyle,
+    quarterlyQuestion,
+    romanianRhapsody,
+    fairyLand,
+    felineFace,
+    darkMatter,
+    appleStrudel,
+    heavyMetal,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

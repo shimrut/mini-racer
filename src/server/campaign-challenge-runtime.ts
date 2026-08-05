@@ -2,21 +2,27 @@ import { CAMPAIGN_ID, getCampaignStage } from '../../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../../game/medals/medal-timing.js';
 import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 import { TRACKS } from '../../game/track/tracks.js';
-import { getServerCampaignChallengeSource } from './campaign-store.js';
 import {
+    getServerCampaignChallengeSource,
+} from './campaign-store.js';
+import {
+    getServerDailyGpPlayableChallenge,
+} from './daily-gp-store.js';
+import {
+    getCampaignChallengeOrigin,
     type CampaignChallengeRecord,
     type CampaignChallengeSource,
 } from './campaign-challenge-model.js';
-import {
-    readCampaignChallenge,
-    readCampaignChallengeResult,
-} from './campaign-challenge-store.js';
+import type { CampaignChallengePostContext } from './campaign-challenge-post.js';
+import { resolveCampaignChallengeRecord } from './campaign-challenge-post.js';
+import { readCampaignChallengeResult } from './campaign-challenge-store.js';
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 
 export async function resolveCampaignChallengeSource(
     input: Record<string, unknown>,
     username: string,
+    context: CampaignChallengePostContext = {},
 ): Promise<CampaignChallengeSource | null> {
     if (input.source === 'campaign' && typeof input.raceId === 'string') {
         return getServerCampaignChallengeSource({
@@ -24,17 +30,50 @@ export async function resolveCampaignChallengeSource(
             redditUsername: username,
         });
     }
+    if (input.source === 'daily' && typeof input.challengeId === 'string') {
+        const challenge = await getServerDailyGpPlayableChallenge(input.challengeId);
+        const track = challenge ? TRACKS[challenge.trackKey] : null;
+        if (!challenge || !track || input.replay == null) return null;
+        const validation = validateDailyGpReplayDetailed({
+            challenge,
+            replay: input.replay,
+        });
+        if (!validation.ok || !validation.run.ghost) return null;
+        return {
+            sourceKind: 'daily',
+            sourceId: challenge.id,
+            origin: {
+                mode: 'daily',
+                challengeId: challenge.id,
+            },
+            trackKey: challenge.trackKey,
+            lapCount: challenge.objectiveParams.lapCount,
+            bestTimeMs: validation.run.bestTimeMs,
+            medal: getMedalForRaceTime(
+                challenge.trackKey,
+                validation.run.bestTimeSec,
+                challenge.objectiveParams.lapCount,
+            ),
+            rulesRevision: challenge.rulesRevision,
+            trackFingerprint: createTrackFingerprint(track),
+            ghost: validation.run.ghost,
+        };
+    }
     if (input.source !== 'duel' || typeof input.challengeId !== 'string') return null;
     const [challenge, result] = await Promise.all([
-        readCampaignChallenge(input.challengeId),
+        resolveCampaignChallengeRecord(input.challengeId, context),
         readCampaignChallengeResult(input.challengeId, username),
     ]);
     if (!challenge || !result?.ghost) return null;
+    const origin = getCampaignChallengeOrigin(challenge);
+    if (!origin) return null;
     return {
         sourceKind: 'duel',
         sourceId: challenge.challengeId,
-        campaignId: CAMPAIGN_ID,
-        raceId: challenge.raceId,
+        origin,
+        ...(origin.mode === 'campaign'
+            ? { campaignId: CAMPAIGN_ID, raceId: origin.raceId }
+            : {}),
         trackKey: challenge.trackKey,
         lapCount: challenge.lapCount,
         bestTimeMs: result.bestTimeMs,
@@ -49,23 +88,28 @@ export function validateCampaignChallengeReplay(
     challenge: CampaignChallengeRecord,
     replay: unknown,
 ) {
-    const stage = getCampaignStage(challenge.raceId);
+    const origin = getCampaignChallengeOrigin(challenge);
     const track = TRACKS[challenge.trackKey];
-    if (
+    const stage = origin?.mode === 'campaign'
+        ? getCampaignStage(origin.raceId)
+        : null;
+    if (!origin || !track || createTrackFingerprint(track) !== challenge.trackFingerprint) {
+        return { ok: false as const, reason: 'challenge_contract_mismatch' };
+    }
+    if (origin.mode === 'campaign' && (
         !stage
-        || !track
-        || challenge.campaignId !== CAMPAIGN_ID
         || stage.trackKey !== challenge.trackKey
         || stage.lapCount !== challenge.lapCount
         || stage.rulesRevision !== challenge.rulesRevision
-        || createTrackFingerprint(track) !== challenge.trackFingerprint
-    ) {
+    )) {
         return { ok: false as const, reason: 'challenge_contract_mismatch' };
     }
     const validation = validateDailyGpReplayDetailed({
         challenge: {
             id: challenge.challengeId,
-            challengeDate: CAMPAIGN_ID,
+            challengeDate: origin.mode === 'campaign'
+                ? origin.campaignId
+                : origin.challengeId,
             trackKey: challenge.trackKey,
             startsAt: '1970-01-01T00:00:00.000Z',
             endsAt: '9999-12-31T23:59:59.999Z',
@@ -79,10 +123,16 @@ export function validateCampaignChallengeReplay(
         },
         replay,
     });
-    if (!validation.ok || validation.run.completedLaps !== challenge.lapCount || !validation.run.ghost) {
+    if (validation.ok === false) {
         return {
             ok: false as const,
-            reason: validation.ok ? 'lap_count_mismatch' : validation.failure.reason,
+            reason: validation.failure.reason,
+        };
+    }
+    if (validation.run.completedLaps !== challenge.lapCount || !validation.run.ghost) {
+        return {
+            ok: false as const,
+            reason: 'lap_count_mismatch',
         };
     }
     return {

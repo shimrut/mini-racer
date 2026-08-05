@@ -17,19 +17,20 @@ export const CAMPAIGN_RULES_REVISION = 1;
  * total alone would let early medals fund skipping several stages at once.
  */
 const STAGE_DEFINITIONS = [
-    ['00', 'numberZero', 1, 0],
-    ['01', 'numberOne', 1, 1],
+    ['00', 'numberZero', 2, 0],
+    ['01', 'numberOne', 2, 1],
     ['02', 'numberTwo', 1, 3],
-    ['03', 'numberThree', 2, 7],
+    ['03', 'numberThree', 1, 7],
     ['04', 'numberFour', 2, 10],
-    ['05', 'numberFive', 2, 12],
-    ['06', 'numberSix', 3, 15],
+    ['05', 'numberFive', 1, 12],
+    ['06', 'numberSix', 1, 15],
     ['07', 'numberSeven', 3, 17],
-    ['08', 'numberEight', 3, 20],
-    ['09', 'numberNine', 3, 22],
-    ['10', 'imaginaryNumber', 2, 25],
+    ['08', 'numberEight', 2, 20],
+    ['09', 'numberNine', 1, 22],
+    ['10', 'imaginaryNumber', 3, 25],
     ['11', 'infinitePie', 1, 27],
-    ['12', 'eulersNumber', 1, 30],
+    ['12', 'eulersNumber', 2, 30],
+    ['13', 'goldenRatio', 2, 32],
 ];
 
 export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(

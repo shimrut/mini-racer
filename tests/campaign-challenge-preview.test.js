@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+    applyCampaignChallengeAccessState,
     bindAcceptChallenge,
+    ensureChallengePlayerIdentity,
     formatCampaignChallengePreviewTime,
     normalizeCampaignChallengePostData,
     openCampaignAsRedirect,
@@ -9,6 +11,7 @@ import {
     resolveCampaignChallengeAccess,
     showOwnChallengeMessage,
 } from '../campaign-challenge.js';
+import { getGuestPlayerToken, setGuestPlayerToken } from '../game/scoreboard/player-identity.js';
 import { LAUNCH_TARGET_KEY } from '../game/modes/launch-target.js';
 
 describe('campaign challenge custom-post preview', () => {
@@ -63,6 +66,7 @@ describe('campaign challenge custom-post preview', () => {
         });
         expect(guest).toEqual({
             signedIn: false,
+            canRace: false,
             ownChallenge: false,
             body: { status: 'signed_in_required' },
         });
@@ -81,12 +85,112 @@ describe('campaign challenge custom-post preview', () => {
         });
         expect(access).toEqual({
             signedIn: true,
+            canRace: false,
             ownChallenge: true,
             body: {
                 status: 'own_challenge',
                 error: "You can't accept your own challenge.",
             },
         });
+    });
+
+    it('lets a guest with a bootstrapped identity race a ready challenge', async () => {
+        const fetch = vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                status: 'ready',
+                viewerType: 'guest',
+                challenge: { challengeId: 'challenge-1' },
+            }),
+        }));
+        const access = await resolveCampaignChallengeAccess({
+            fetch,
+            devvit: { context: { postId: 't3_challenge1' } },
+            location: { origin: 'https://miniracer.example' },
+        }, 'challenge-1');
+        expect(access).toMatchObject({
+            signedIn: false,
+            canRace: true,
+            ownChallenge: false,
+            body: { viewerType: 'guest' },
+        });
+        const requestedUrl = new URL(fetch.mock.calls[0][0]);
+        expect(requestedUrl.searchParams.get('challengeId')).toBe('challenge-1');
+        expect(requestedUrl.searchParams.get('postId')).toBe('t3_challenge1');
+    });
+
+    it('keeps a public ready challenge raceable before the viewer type is known', async () => {
+        const access = await resolveCampaignChallengeAccess({
+            fetch: vi.fn(async () => ({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    status: 'ready',
+                    viewerType: 'anonymous',
+                    challenge: { challengeId: 'challenge-1' },
+                }),
+            })),
+        }, 'challenge-1');
+        expect(access).toMatchObject({
+            signedIn: false,
+            canRace: true,
+            ownChallenge: false,
+        });
+    });
+
+    it('rotates a stale guest identity once and keeps the refreshed token', async () => {
+        setGuestPlayerToken('stale-token');
+        const fetch = vi.fn()
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 401,
+                json: async () => ({ error: 'Guest token is required for this player.' }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    playerId: 'guest:refreshed',
+                    guestToken: 'refreshed-token',
+                }),
+            });
+
+        try {
+            await expect(ensureChallengePlayerIdentity({
+                fetch,
+                location: { origin: 'https://miniracer.example' },
+            })).resolves.toBe(true);
+            expect(fetch).toHaveBeenCalledTimes(2);
+            expect(new URL(fetch.mock.calls[0][0]).searchParams.get('guestToken'))
+                .toBe('stale-token');
+            expect(new URL(fetch.mock.calls[1][0]).searchParams.get('guestToken'))
+                .toBeNull();
+            expect(getGuestPlayerToken()).toBe('refreshed-token');
+        } finally {
+            setGuestPlayerToken(null);
+        }
+    });
+
+    it('never labels an unavailable or guest-ready challenge as sign-in gated', () => {
+        const button = { disabled: true, textContent: '' };
+        const message = { textContent: '' };
+        applyCampaignChallengeAccessState(button, message, {
+            signedIn: false,
+            canRace: true,
+            ownChallenge: false,
+        });
+        expect(button).toEqual({ disabled: false, textContent: 'Race Head to Head' });
+        expect(message.textContent).toBe('');
+
+        applyCampaignChallengeAccessState(button, message, {
+            signedIn: false,
+            canRace: false,
+            ownChallenge: false,
+            body: { error: 'This challenge is unavailable.' },
+        });
+        expect(button).toEqual({ disabled: true, textContent: 'Challenge Unavailable' });
+        expect(message.textContent).toBe('This challenge is unavailable.');
     });
 
     it('shows an own-challenge overlay and opens Campaign on OK', async () => {

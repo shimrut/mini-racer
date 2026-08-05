@@ -15,6 +15,10 @@ import {
 } from "../daily-challenge/service.js";
 import { getTrackName } from "../track/catalog.js";
 import { createPersonalBestPaceBaseline } from "../ghost/pb-pace.js";
+import {
+  PbGhostSizeCapture,
+  shouldCapturePbGhostSize,
+} from "../ghost/pb-ghost-size-debug.js";
 import { normalizeLapCompletionTimesSec } from "../shared/lap-completion-times.js";
 
 const CAMERA_DT_MIN_S = 1 / 120;
@@ -253,6 +257,60 @@ export const raceEngineMethods = {
     this.prevAngle = this.angle;
   },
 
+  getPbGhostSizeRunMetadata() {
+    const challenge = this.activeDailyChallenge;
+    const campaignStage = this.activeCampaignStage;
+    const campaignChallenge = this.activeCampaignChallenge;
+    const rulesRevision = Number.isInteger(challenge?.rulesRevision)
+      ? challenge.rulesRevision
+      : Number.isInteger(campaignStage?.rulesRevision)
+        ? campaignStage.rulesRevision
+        : Number.isInteger(campaignChallenge?.rulesRevision)
+          ? campaignChallenge.rulesRevision
+          : Number.isInteger(this.currentRunPolicy?.rulesRevision)
+            ? this.currentRunPolicy.rulesRevision
+            : 0;
+    const challengeId = challenge?.id
+      || campaignStage?.raceId
+      || campaignChallenge?.challengeId
+      || null;
+
+    return {
+      trackKey: this.currentTrackKey,
+      mode: this.activeRaceMode,
+      challengeId,
+      rulesRevision,
+      lapCount: this.currentRunPolicy?.requiredLaps || 1,
+      position: this.pos,
+      angle: this.angle,
+    };
+  },
+
+  beginPbGhostSizeRun() {
+    if (!this.pbGhostSizeCapture && shouldCapturePbGhostSize()) {
+      this.pbGhostSizeCapture = new PbGhostSizeCapture();
+    }
+    this.pbGhostSizeCapture?.beginRun?.(this.getPbGhostSizeRunMetadata());
+  },
+
+  finishPbGhostSizeRun(winData) {
+    if (!this.pbGhostSizeCapture) return;
+    if (!this.pbGhostSizeCapture.recorder) {
+      this.beginPbGhostSizeRun?.();
+    }
+    const finishTimeSec = Number.isFinite(winData?.lapTime)
+      ? winData.lapTime
+      : this.currentTime;
+    void this.pbGhostSizeCapture.finishRun?.({
+      finishTimeSec,
+      position: this.pos,
+      angle: this.angle,
+      checkpointTimesSec: this.getLapCheckpointTimesSec?.() ?? null,
+    }).catch?.((error) => {
+      console.error('[PB ghost size] capture failed', error);
+    });
+  },
+
   _resetLapTrailAfterIntermediateLap() {
     this.routeTrace.clear();
     this.runHistory.clear();
@@ -264,6 +322,7 @@ export const raceEngineMethods = {
   startSequence() {
     if (this.status !== "ready") return;
 
+    this.beginPbGhostSizeRun?.();
     this.status = "starting";
     this.activePersonalBestPaceBaseline = null;
     this.carEffectsAudio?.prepareOnUserGesture?.();
@@ -381,6 +440,7 @@ export const raceEngineMethods = {
   restartCurrentRunAfterCollision() {
     this.status = "playing";
     this.pbGhost?.beginRun?.();
+    this.pbGhostSizeCapture?.cancelRun?.();
     this.scoreboardReplay.reset();
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
@@ -388,6 +448,7 @@ export const raceEngineMethods = {
       currentTime: 0,
       relaunchDelay: this.collisionRestartDelaySec,
     });
+    this.beginPbGhostSizeRun?.();
     this.modal.closeModal();
     this.hud.setPauseVisible(true);
     this.hud.setHudPersonalBestsOpenAllowed(false);
@@ -648,6 +709,12 @@ export const raceEngineMethods = {
       this.collisionSegments,
     );
 
+    this.pbGhostSizeCapture?.sample?.({
+      timeSec: this.currentTime,
+      position: this.pos,
+      angle: this.angle,
+    });
+
     if (events.wallImpact?.kind === "scrape") {
       this.carEffectsAudio?.scheduleScrape?.(
         events.wallImpact.impactKph,
@@ -664,6 +731,9 @@ export const raceEngineMethods = {
     }
 
     if (events.challengeLapCompleted) {
+      this.pbGhostSizeCapture?.recordLapCompletion?.(
+        events.challengeElapsedTime,
+      );
       this.handleActiveRaceLapCompleted(events.challengeCompletedLapTime, {
         elapsedTimeSec: events.challengeElapsedTime,
         completedLaps: events.challengeProgressLaps,
@@ -672,6 +742,7 @@ export const raceEngineMethods = {
       });
     }
     if (events.winTriggered) {
+      this.finishPbGhostSizeRun?.(events.winData);
       this.handleActiveRaceWin(events.winData);
     }
   },
@@ -684,6 +755,7 @@ export const raceEngineMethods = {
       showStartOverlay = !autoStart,
     } = {},
   ) {
+    this.pbGhostSizeCapture?.cancelRun?.();
     if (!autoStart) {
       void this.journeys?.endAttempt?.({ complete: false });
     }
@@ -1034,7 +1106,7 @@ export const raceEngineMethods = {
       this._needsRender = false;
     }
 
-    if (shouldUpdate) {
+    if (shouldUpdate && this.status === "playing") {
       this.hud.syncHud({ time: this.currentTime, speed: this.cachedSpeed });
     }
 

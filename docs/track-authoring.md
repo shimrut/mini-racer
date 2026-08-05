@@ -73,9 +73,10 @@ start/finish line and snaps onto that line's center axis when moved.
    track to the Daily schedule; wiring stages still happens in
    `game/campaign/manifest.js`.
 4. Add medal thresholds in `game/medals/medal-times.json`.
-   The Author threshold is also the Daily GP lap-band input: author times over
-   10.95 seconds allow 1–2 laps; author times at or below 10.95 seconds allow
-   1–3 laps. Missing or invalid Author times conservatively publish as one lap.
+   New Daily GP publication currently selects only 1–2 laps for every track
+   with valid Author data. Missing or invalid Author times conservatively
+   publish as one lap. Campaign lap counts are declared separately in
+   `game/campaign/manifest.js` and may remain 1, 2, or 3.
 5. Add or adjust `game/track/presentation.js` only when the track needs a
    non-default preview or race presentation.
 6. Update the intentional full-registry fingerprint in
@@ -121,7 +122,7 @@ The regression suite checks:
   collision geometry;
 - published Daily GP history refers only to catalog tracks;
 - every catalog track has medal thresholds.
-- every scheduled track has a valid Author threshold so its multi-lap eligibility is intentional.
+- every scheduled track has a valid Author threshold for medal calibration.
 
 Run the focused checks:
 

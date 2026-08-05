@@ -644,23 +644,16 @@ export function updateSimulation(
             // The configured max speed is authoritative and caps the total car speed.
             state.cachedSpeed = Math.sqrt(state.velocity.x ** 2 + state.velocity.y ** 2);
             let allowedSpeed = safeMaxSpeed;
-            if (steerInput !== 0) {
-                const slip = tractionSlipRatio;
-                if (typeof state.slipSpeedGateClamp !== 'boolean') {
-                    state.slipSpeedGateClamp = false;
-                }
-                const slipClampOn = 0.11;
-                const slipClampOff = 0.055;
-                if (slip >= slipClampOn) {
-                    state.slipSpeedGateClamp = true;
-                } else if (slip <= slipClampOff) {
-                    state.slipSpeedGateClamp = false;
-                }
-                if (state.slipSpeedGateClamp) {
-                    allowedSpeed = Math.min(safeMaxSpeed, currentSpeed);
-                }
-            } else {
-                state.slipSpeedGateClamp = false;
+            // Apply a continuous speed penalty curve based on tire slip.
+            // This replaces the binary slipSpeedGateClamp to ensure all steering inputs
+            // (analog sticks and digital taps) are penalized fairly and smoothly.
+            const slipPenaltyFactor = 1.08;
+            const slipPenalty = Math.min(1, (tractionSlipRatio ** 2) * slipPenaltyFactor);
+            allowedSpeed = safeMaxSpeed * (1 - slipPenalty);
+            
+            // Clean up old state property to prevent any residual bugs
+            if (typeof state.slipSpeedGateClamp !== 'undefined') {
+                delete state.slipSpeedGateClamp;
             }
             if (state.cachedSpeed > allowedSpeed) {
                 const speedScale = allowedSpeed / state.cachedSpeed;

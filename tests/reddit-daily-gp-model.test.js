@@ -31,6 +31,7 @@ import {
     getUtcDayIndex,
     isDailyGpChallengePlayable,
     isValidDailyGpTime,
+    normalizeDailyGpRaceContract,
     selectDailyGpLapCount,
     toBestTimeMs,
 } from '../src/server/daily-gp-model.ts';
@@ -65,7 +66,7 @@ describe('reddit daily gp model', () => {
         expect(challenge.status).toBe('active');
         expect(challenge.rulesRevision).toBe(1);
         expect(challenge.objectiveParams.lapCount).toBeGreaterThanOrEqual(1);
-        expect(challenge.objectiveParams.lapCount).toBeLessThanOrEqual(3);
+        expect(challenge.objectiveParams.lapCount).toBeLessThanOrEqual(2);
         expect(challenge.objectiveType).toBe(
             challenge.objectiveParams.lapCount === 1 ? 'single_lap_fastest' : 'multi_lap_total',
         );
@@ -129,6 +130,7 @@ describe('reddit daily gp model', () => {
         expect(TRACK_SCHEDULE_KEYS).not.toContain('numberSeven');
         expect(TRACK_SCHEDULE_KEYS).not.toContain('numberEight');
         expect(TRACK_SCHEDULE_KEYS).not.toContain('numberNine');
+        expect(TRACK_SCHEDULE_KEYS).not.toContain('goldenRatio');
     });
 
     it('keeps day indexing stable within the same UTC day', () => {
@@ -141,9 +143,9 @@ describe('reddit daily gp model', () => {
         );
     });
 
-    it('selects deterministic eligible lap counts from the author-time boundary', () => {
+    it('selects deterministic one- or two-lap Daily races', () => {
         expect(getDailyGpEligibleLapCounts('cedarRidgeCircuit')).toEqual([1, 2]);
-        expect(getDailyGpEligibleLapCounts('moebiusStrip')).toEqual([1, 2, 3]);
+        expect(getDailyGpEligibleLapCounts('moebiusStrip')).toEqual([1, 2]);
         expect(getDailyGpEligibleLapCounts('not-a-track')).toEqual([1]);
 
         const challengeId = 'daily-gp-2026-05-06';
@@ -156,7 +158,19 @@ describe('reddit daily gp model', () => {
                 'moebiusStrip',
             )),
         );
-        expect(outcomes).toEqual(new Set([1, 2, 3]));
+        expect(outcomes).toEqual(new Set([1, 2]));
+    });
+
+    it('keeps persisted three-lap contracts valid for historical Daily races', () => {
+        expect(normalizeDailyGpRaceContract({
+            rulesRevision: 1,
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 3 },
+        })).toEqual({
+            rulesRevision: 1,
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount: 3 },
+        });
     });
 
     it('formats ids, redis keys, ranks, and submission times consistently', () => {

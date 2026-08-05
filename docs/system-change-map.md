@@ -68,12 +68,14 @@ flowchart LR
 - `game/track/assets.js` caches geometry, runtime collision data, and rendered track canvases.
 - `game/track/engine-methods.js` owns track loading, resize behavior, and track presentation refresh.
 - Track creation and integration steps are documented in `docs/track-authoring.md`.
-- Local development exposes the deterministic gameplay state and time-step helpers through `window.__RACER_DEBUG__` plus the standard `render_game_to_text` / `advanceTime` browser-game test contract; hosted builds remove those hooks.
+- Local development exposes the deterministic gameplay state and time-step helpers through `window.__RACER_DEBUG__` plus the standard `render_game_to_text` / `advanceTime` browser-game test contract; hosted builds remove those hooks. Loopback hosts and `.local` development aliases are treated as local.
+- Local builds enable PB ghost sizing automatically; `?debugPbGhostSize=1` or `window.__PB_GHOST_SIZE_DEBUG__.enable()` also enables it on any game URL. `game/ghost/pb-ghost-size-debug.js` mirrors the schema-v2 pose recorder, writes JSON byte counts to browser storage synchronously at finish, fills gzip/base64 Redis-envelope fields asynchronously using the native stream API or a portable gzip fallback, reloads prior reports into the next debug session, keeps the last ten complete reports in browser storage, and exposes them through developer-only hooks. It remains browser-local and does not change submission or Redis persistence.
 
 ### Devvit Journeys
 
 - `game/journeys/service.js` is the only client adapter for Reddit's official Devvit Journeys API. It serializes lifecycle calls, suppresses duplicate or non-increasing events, reports receipts only to the developer console, and contains SDK failures so they cannot affect loading, racing, finishing, or score submission.
 - The lobby receives its visual `is-ready` state behind the loading-screen fade so its title and controls are already present when the loader clears. Start input remains separately gated until dismissal completes; only then does the expanded game report `App.Ready`. Each explicit player intent starts one Journey attempt (`initial_start`, `track_switch`, `restart`, `retry`, or `improve`); checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, or track switches end incomplete before the next start. Mid-run track switches replace the active Journey through `replaceActive` end-then-start sequencing. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
+- `game/ui/loader.js` accepts only monotonic progress updates from parallel startup work and applies the terminal `Ready!` state at 100%, so late async callbacks cannot make the global loading bar or status regress.
 - Journey payloads contain no player ID, Reddit username, guest token, challenge ID, track key, replay, device details, or lap score. The official `/api/telemetry` router enriches events in Devvit; Mini Racer adds no custom analytics route, Redis record, retention policy, or dashboard.
 
 ### UI And Modal Flow
@@ -109,7 +111,12 @@ flowchart LR
 - PB ghost playback uses the same interpolated render timestamp as the live car. It does not render directly from the 60 Hz fixed-step clock, so uneven or higher-refresh display frames cannot expose the ghost as repeated positions followed by jumps.
 - Tracks-to-race handoff hides the lobby immediately, resets the selected track without restoring the start overlay, and starts the countdown without awaiting PB ghost work. Ghost playback freezes when the countdown completes, allowing a canonical submission response received during the countdown to join that attempt without delaying GO.
 - `game/race/ui-modal-shell.js` owns the shared result-confirmation UI used by both the finish screen and daily standings. `game/daily-challenge/service.js` sends preview and confirm requests; the browser never composes the public comment itself.
+- A Daily finish labels its action **Share** and opens a small chooser for
+  **Comment Time** or **Issue Challenge**. Commenting keeps the existing
+  signed-in Reddit score-thread flow; issuing a challenge sends the exact
+  verified finish replay through the challenge preview/create contract.
 - Daily GP track selection walks the explicit `TRACK_SCHEDULE_KEYS` order from `game/track/catalog.js`, one track per day, using the most-recent published day as the playhead; `src/server/daily-gp-store.ts` persists each new day to the `dailygp:challenges` Redis ledger (first-writer-wins) so past days never change.
+- New Daily publication currently selects only one or two laps for scheduled tracks; the shared three-lap contract remains for historical Daily records and Campaign stages.
 - Published Daily GP playlist rows come from server-side challenge history, not from recalculating old dates against the current track file.
 - The independent podium scheduler runs hourly at minute 1 for challenges that expired during the previous six hours. The first attempt freezes a sanitized global top-three snapshot before avatar or Reddit work; later attempts reuse it until a canonical post exists or the deadline passes. Reddit identities use the Reddit-hosted Snoovatar URL returned by Devvit; accounts without an exposed Snoovatar, private identities, unavailable avatars, and missing places use Reddit's official hosted default Snoo. Podium posts do not share race-post records or score threads. A Play Now control requests today's featured challenge start override and opens the game entrypoint.
 - Explicit mock modes and standalone preview pages use a local mock challenge (`DEFAULT_TRACK_KEY`, or a track forced via `?mockDaily=<trackKey>`); normal local game runs use `/api/daily/*` or Devvit post data so they match the server-published track.
@@ -134,11 +141,12 @@ flowchart LR
   Home keeps its Daily, Campaign, Garage, and Settings mode-action
   list. Daily and Campaign fill the selector area inside the shared lobby shell
   with one race-programme poster: the mode sits at the left of the billing line
-  and the run/date label at its right above the circuit, the personal-best
+  and the Daily date or selected Campaign track name at its right above the
+  circuit, the personal-best
   icon/rank and medal ladder below it, and one Start Race action after it. The
   actual Mini Racer wordmark remains in the shared top header, outside the
   horizontal rail. The header's mode label and divider are also fixed; only the
-  right-side date/stage value is repainted when the centred card changes. The
+  right-side Daily date or Campaign track name is repainted when the centred card changes. The
   selected track's bold name, separator dot, and `Lap`/`Laps`
   count are a secondary line under that red action, so the race brief follows
   the control and is not repeated in the poster's upper-right corner. The selected track schematic is
@@ -171,6 +179,11 @@ flowchart LR
   the countdown begins once both the fade and preparation are complete.
   Intermediate track resets preserve the fading surface, and its actions and
   keyboard navigation stay inactive during the handoff.
+  The race HUD uses a stable `12px` race position throughout this handoff.
+  `RaceHud.anchorHudBar()` deliberately does not observe the generic first
+  `header`, which lives inside the fading lobby overlay and collapses when the
+  overlay becomes `display: none`; this prevents the lap HUD from jumping after
+  the race chrome has appeared.
   Standings resolves the carousel's currently centred track at click time.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. Desktop responsive rules must not target the generic
@@ -191,9 +204,11 @@ flowchart LR
   shorter WebView sizes; their intrinsic minimum height must not push the first
   or last medal outside the clipped card.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
-  Number Zero through Nine with fixed `1,1,1,2,2,2,3,3,3,3` laps and Gold/Author
-  gating on the preceding stage. `TRACK_CATALOG`/`TRACKS` contain all playable
-  geometry; `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
+  Number Zero through Nine, Imaginary Number, Infinite Pie, Euler's Number,
+  and Golden Ratio with fixed `2,2,1,1,2,1,1,3,2,1,3,1,2,2` laps and
+  medal-total gating plus a preceding-stage medal. `TRACK_CATALOG`/`TRACKS`
+  contain all playable geometry; `TRACK_SCHEDULE_KEYS` is only the future
+  Daily publication subset.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
   player challenges. Campaign finishes open the result sheet immediately (same
@@ -209,10 +224,15 @@ flowchart LR
   confirmation. Starting a signed-in Campaign stage begins the lights as soon
   as its track is ready: race-start bookkeeping and the stage PB ghost fetch
   run concurrently in the background, with submission re-validating the
-  unlock. The lobby keeps its primary action pending until bootstrap resolves
-  rather than briefly guessing Start or Continue; a completed Campaign keeps a
-  Complete primary action that opens Tracks. Follow-up PB ghost and lobby
-  refreshes also stay in the background. The detached start acknowledgement
+  unlock. A direct Campaign launcher includes its bootstrap in the existing
+  critical startup gate, so the global loading screen stays up until the
+  player's progress, stage list, and unlocks are available; the first Campaign
+  lobby paint therefore does not show a provisional primary-action spinner.
+  Campaign opened later from Home keeps its normal background refresh. The
+  lobby keeps its primary action pending until bootstrap resolves rather than
+  briefly guessing Start or Continue; a completed Campaign keeps a Complete
+  primary action that opens Tracks. Follow-up PB ghost and lobby refreshes also
+  stay in the background. The detached start acknowledgement
   owns only the Campaign `startedAt` stamp; it must not replace progress results,
   because its pre-race snapshot can arrive after a finish and erase the new
   medal from the selector. Campaign client requests abort after 20 seconds so a stalled
@@ -225,21 +245,52 @@ flowchart LR
   replay validation, and server-derived medals. Campaign records do not share
   Daily keys or expiry policy.
 - `src/server/campaign-challenge-*` owns verified-result source resolution,
-  frozen opponent ghosts, isolated duel results, custom-post idempotency, and
-  the three-new-posts per player/subreddit/UTC-day limit. Guests cannot create
-  or accept challenges. The challenger cannot accept or submit against their
-  own post (`own_challenge`); the in-feed Accept card shows an expired-style
-  message and opens Campaign via a stored launch target that overrides challenge
-  post data. Challenge finishes do not award medals, campaign progress, or
-  leaderboard ranks. One finish sheet always offers Improve / Brag / Home; Brag
-  unlocks only after a verified beat. Confirmation status is patched into the
-  medal hero (Submitting/Verifying → medal or error). Duel submissions
-  never call the Campaign store.
+  isolated duel results, custom-post idempotency, and the three-new-posts per
+  player/subreddit/UTC-day limit. The immutable challenge target and ghost are
+  encoded in the Reddit custom post's text fallback after the human-readable
+  copy under `Challenge replay data:`. The payload is a versioned gzip/base64url
+  envelope with a SHA-256 hash carried in `postData`; challenge reads and
+  submissions reconstruct it from the current Reddit post and fail closed when
+  the body is missing or tampered. Resolution accepts the Devvit `Post` body's
+  documented `body`/`selftext` strings plus SDK fallback and `toJSON` variants
+  (including nested `{ text }` values), but every candidate must still pass the
+  replay marker, SHA-256 hash, and exact race-contract checks. It returns typed,
+  sanitized failure reasons for hosted diagnostics without logging the fallback,
+  replay token, or ghost; player-facing unavailable responses remain generic.
+  New challenge creation also stores only the
+  Reddit post identity by challenge ID, so a client without post context can
+  locate that post and the server can still read the replay from its body.
+  Post-bound validation remains preferred whenever context is supplied. Legacy
+  challenge posts may use a matching stored record during migration. Redis
+  retains the post identity alongside the separate operational challenge
+  indexes, locks, limits, and viewer results; it does not store the new frozen
+  replay. Signed-in
+  Reddit users create posts; guests can load, race, and submit against them
+  using the existing guest identity/token, and their isolated results merge at
+  sign-in. A Daily-origin post keeps its embedded race contract after the
+  normal Daily window, while regular Daily mode remains expiry-scoped. The
+  standalone post and expanded game both forward the current Reddit `postId`
+  with challenge reads and submissions; the server accepts that explicit
+  context only as a validated `t3_` post ID before re-reading the Reddit post.
+  The challenger cannot accept or submit against their own post (`own_challenge`);
+  the in-feed Accept card shows an expired-style message and opens the source
+  mode via a stored launch target that overrides challenge post data. Challenge
+  finishes do not award medals, campaign progress, Daily/Campaign standings,
+  or PBs. One finish sheet always offers Improve / Brag / Home; Brag unlocks
+  only after a verified beat. Confirmation status is patched into the medal
+  hero (Submitting/Verifying → medal or error). Duel submissions never call
+  the Campaign store.
 - `campaign-challenge.html` is the dedicated in-feed Head to Head custom-post
-  entrypoint. Public post data includes the immutable race target plus a frozen
-  challenger Reddit avatar URL (no ghost, player ID, or private persistence).
-  The Accept card shows challenger and viewer avatars (generic Snoo while signed
-  out) and labels the mode Head to Head.
+  entrypoint. Public post data includes the immutable race target, replay hash,
+  and frozen challenger Reddit avatar URL (no ghost or player ID in public post
+  data). The human-readable text fallback is followed by the complete
+  machine replay payload so old Reddit/third-party surfaces can still carry the
+  challenge. The Accept card bootstraps a guest identity when needed, rotates
+  once when a stored guest token is stale, and treats a validated ready post as
+  playable without waiting for Reddit viewer classification. It shows
+  challenger and viewer avatars (generic Snoo while signed out), and labels
+  the mode Head to Head. Unavailable responses remain disabled but are not
+  presented as a sign-in requirement.
 - `campaign-challenge.css` owns the standalone post's race-poster visual: the
   duel and target time remain the primary reading path, the circuit stays open as
   the right-side hero, and the single Race Head to Head CTA anchors beneath it.
@@ -420,6 +471,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/routes/competition-routes.ts`, `src/server/daily-gp-store.ts`, `src/server/community-context.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned; community size and submission rate-limit identity come from trusted server context |
 | Leaderboard opponent races | `game/scoreboard/opponent-race-service.js`, `game/scoreboard/opponent-race-engine-methods.js`, `src/server/leaderboard-race-service.ts`, `src/server/routes/leaderboard-race-routes.ts` | Daily/Campaign stores, standings UI, PB ghost, HUD, result sheet, verification queues | A selected row is only a lookup key: the server must re-resolve its current verified replay and the normal competition submission path must remain authoritative |
 | Result sharing or score-thread behavior | `game/race/ui-modal-shell.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-share.ts`, `src/server/daily-gp-post-store.ts` | `src/server/daily-post-service.ts`, `src/server/routes/share-routes.ts`, `devvit.json`, finish and standings tests | The same confirmation contract serves finish and standings; Reddit user-action permission and post/comment identity are server-enforced |
+| Head to Head guests or Daily-origin challenges | `campaign-challenge.js`, `game/campaign/service.js`, `game/campaign/engine-methods.js`, `src/server/campaign-challenge-post.ts`, `src/server/campaign-challenge-runtime.ts`, `src/server/campaign-challenge-store.ts` | `src/server/competition-identity.ts`, `src/server/daily-gp-store.ts`, challenge replay/service/route tests | Guest identity is authorized separately from Reddit identity; embedded Daily challenge data bypasses only Daily expiry for the isolated Head to Head path |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the independently expiring Reddit Redis player profile as the durable source |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |

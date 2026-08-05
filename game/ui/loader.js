@@ -9,6 +9,7 @@ export class LoadingScreen {
     this.statusText = document.getElementById("loader-status");
     this.activeClass = "loading-active";
     this.isComplete = false;
+    this.highestProgress = 0;
   }
 
   /**
@@ -20,6 +21,8 @@ export class LoadingScreen {
     if (this.isComplete) return;
 
     const safePercent = Math.min(Math.max(0, percent), 100);
+    if (safePercent < this.highestProgress) return;
+    this.highestProgress = safePercent;
     
     if (this.progressBar) {
       this.progressBar.style.width = `${safePercent}%`;
@@ -40,9 +43,8 @@ export class LoadingScreen {
    */
   async dismiss() {
     if (this.isComplete) return;
-    this.isComplete = true;
-
     this.update(100, "Ready!");
+    this.isComplete = true;
 
     // Double frame wait to ensure browser has painted the lobby behind the loader
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));

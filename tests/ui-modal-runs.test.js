@@ -1265,6 +1265,108 @@ describe('ui modal runs helpers', () => {
 
 });
 
+describe('Daily finish share chooser', () => {
+    it('wires the Daily finish Share action without throwing', () => {
+        const originalDocument = global.document;
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        const dom = new JSDOM(`
+            <div id="modal">
+                <div id="modal-main-view"></div>
+                <div id="modal-runs-view"></div>
+                <div id="modal-combined-view">
+                    <div id="combined-stats-right-group"></div>
+                    <div id="combined-hero-medal"></div>
+                    <div class="combined-actions">
+                        <button id="combined-menu-btn"></button>
+                        <button id="combined-settings-btn"></button>
+                        <button id="combined-garage-btn"></button>
+                        <button id="combined-playlist-btn"><span class="combined-action-btn-label"></span></button>
+                        <button id="combined-restart-btn"><span class="combined-action-btn-label"></span></button>
+                        <button id="combined-next-btn"></button>
+                    </div>
+                </div>
+            </div>
+        `, { url: 'http://localhost' });
+        global.document = dom.window.document;
+        global.requestAnimationFrame = (callback) => callback();
+        const shell = new ModalShell({
+            content: { renderCombinedResults: vi.fn() },
+            getCurrentTrackKey: () => 'number-zero',
+        });
+        shell.activateModalFocusTrap = vi.fn();
+        shell.resetMenuKeyboardNav = vi.fn();
+        const request = {
+            source: 'finish',
+            challengeId: 'daily-gp-2026-07-23',
+            replay: { rulesRevision: 1 },
+        };
+
+        shell.showCombinedResults(
+            { lapTime: 12.345, bestTime: 12.345, trackKey: 'number-zero' },
+            { shareRequest: request },
+        );
+
+        const shareButton = dom.window.document.getElementById('combined-playlist-btn');
+        expect(shareButton.querySelector('.combined-action-btn-label').textContent).toBe('SHARE');
+        expect(typeof shareButton.onclick).toBe('function');
+
+        shareButton.onclick();
+        expect(dom.window.document.querySelector('.result-share-panel')).not.toBeNull();
+
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+    });
+
+    it('offers Comment Time and Issue Challenge for a Daily finish', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="modal">
+                <div id="modal-lap-times"></div>
+                <div id="modal-combined-view"></div>
+                <button id="combined-playlist-btn"><span class="combined-action-btn-label">SHARE</span></button>
+            </div>
+        `, { url: 'http://localhost' });
+        global.document = dom.window.document;
+        const shell = new ModalShell();
+        const startShare = vi.fn();
+        shell._startShare = startShare;
+        const request = {
+            source: 'finish',
+            challengeId: 'daily-gp-2026-07-23',
+            replay: { rulesRevision: 1 },
+        };
+
+        shell._startShareChooser(
+            request,
+            shell.combinedPlaylistBtn,
+            shell.modalCombinedView,
+        );
+
+        const panel = dom.window.document.querySelector('.result-share-panel');
+        const buttons = [...panel.querySelectorAll('button')];
+        expect(buttons.map((button) => button.textContent)).toEqual([
+            'Comment Time',
+            'Issue Challenge',
+            'Cancel',
+        ]);
+        expect(shell.combinedPlaylistBtn.disabled).toBe(true);
+
+        buttons[0].click();
+        expect(startShare).toHaveBeenCalledWith(request, shell.combinedPlaylistBtn, shell.modalCombinedView);
+
+        startShare.mockClear();
+        shell._startShareChooser(request, shell.combinedPlaylistBtn, shell.modalCombinedView);
+        [...dom.window.document.querySelectorAll('.result-share-panel button')][1].click();
+        expect(startShare).toHaveBeenCalledWith({
+            ...request,
+            kind: 'campaign-challenge',
+            source: 'daily',
+        }, shell.combinedPlaylistBtn, shell.modalCombinedView);
+
+        global.document = originalDocument;
+    });
+});
+
 describe('combined finish next race button', () => {
     function combinedActionsDom() {
         return new JSDOM(`

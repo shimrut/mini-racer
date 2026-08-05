@@ -8,7 +8,7 @@ Open a Mini Racer post, tap **Race Now**, learn the track, and try again until y
 
 ## How the game works
 
-Every Daily GP attempt is **1, 2, or 3 laps**, frozen when that day's challenge is published. Cross the finish line after the required laps to complete it.
+Every new Daily GP attempt is **1 or 2 laps**, frozen when that day's challenge is published. Cross the finish line after the required laps to complete it.
 Press **R** to restart while racing, paused, or on the finish screen.
 Steer, finish the complete race as fast as you can, then try again.
 
@@ -18,14 +18,15 @@ Steer, finish the complete race as fast as you can, then try again.
 - Earn **medals** by beating the target times on each track
 - Climb that day's **leaderboard** in Standings
 - Missed a day? You can replay the last **7 days** of tracks
-- Play the permanent ten-stage **Campaign**, banking medals to unlock each
+- Play the permanent fourteen-stage **Campaign**, banking medals to unlock each
   fixed 1-, 2-, or 3-lap race; locked cards put the count inside a medal-shaped
   perimeter progress indicator
 - Change how your car looks in the **Garage** (available and achievement-unlocked
   skins plus trails — handling stays the same)
 - **Share** a finished race or a verified daily best as a Reddit comment (you preview the text first)
 - When signed in, turn a verified Campaign or player-challenge result into a
-  custom challenge post with your frozen ghost
+  custom challenge post with a frozen target and ghost carried by the post
+  itself
 
 Your selected car look and settings are saved to your player profile. Car
 unlocks are permanent. Other guest profile data expires after 7 inactive days;
@@ -35,7 +36,8 @@ signed-in profile data expires after 30 inactive days.
 
 - A **new track** becomes the featured race each day (day changes at midnight UTC)
 - Once a day's track is posted, it **stays that track** — it does not get swapped later
-- Longer tracks randomly use 1 or 2 laps; shorter tracks randomly use 1, 2, or 3 laps
+- New Daily races randomly use 1 or 2 laps; no new Daily race uses 3 laps
+- Previously published three-lap Daily races remain playable under their stored rules
 - Medal targets scale from the one-lap targets, and intermediate finishes show the medal earned on cumulative race time
 - Tracks stay playable for **7 days**, then drop out of the list
 - Communities can auto-publish that track's final global podium when the window closes
@@ -45,15 +47,26 @@ signed-in profile data expires after 30 inactive days.
 ## Standings and sharing
 
 - Standings show the full daily ranking as you scroll; **your rank stays visible** even if you are far down the list
-- On the finish screen: **Improve**, **Share Time**, and **Home**
+- On the finish screen: **Improve**, **Share**, and **Home**; **Share** offers **Comment Time** or **Issue Challenge**
 - In Standings: **Share Best** appears when you have a verified time for the day you are viewing
 - Shared results go to the post's pinned **score thread**, as a comment from your Reddit account after you confirm
 - Sharing the same result again reuses the existing comment instead of posting a duplicate
 
 Campaign has a separate permanent leaderboard for each stage. Guests can
 practice Campaign locally, but Reddit sign-in is required for permanent
-Campaign competition and all player challenges. Challenge duels are isolated:
-they do not unlock Campaign stages or change Campaign standings.
+Campaign competition and for creating challenge posts. Guests can still open,
+race, and submit Head to Head challenges; their challenge results are kept on
+their guest identity and merge when they sign in. The Head to Head post itself
+does not require Reddit sign-in; stale guest tokens are refreshed automatically.
+Challenge duels are isolated:
+they do not unlock Campaign stages or change Daily/Campaign standings or PBs.
+
+Daily finishes use **Share**. **Comment Time** keeps the existing verified
+score-thread flow, while **Issue Challenge** creates a Head to Head post from
+that exact finish. The post carries the immutable Daily race contract and
+frozen ghost, so that Head to Head remains playable after the Daily track's
+normal window expires. This exception applies only to the Head to Head post;
+regular Daily entry and ranking still follow Daily availability.
 
 ## First look on Reddit
 
@@ -121,6 +134,9 @@ Tips:
 - Small "Standings" screen tweaks so it's easier to read
 - Once in game "Start race" starts the last played track
 - Code maintenance
+- Guests can race Head to Head challenges; Daily finishes offer **Share** with
+  **Comment Time** and **Issue Challenge** choices, and Daily-origin challenges
+  remain playable from their embedded post data after Daily expiry
 
 ### 1.3
 
@@ -142,7 +158,7 @@ Tips:
 
 ### 1.1
 
-- **Share Time** after a finish, and **Share Best** from Standings — preview the comment, then post it from your Reddit account
+- **Share** after a finish offers **Comment Time** or **Issue Challenge**; **Share Best** remains available from Standings — preview the action, then post it from your Reddit account
 - Every race post gets a pinned **score thread** for those shared results
 - Clearer daily post titles and better plain-text description under the post
 - Car look and settings save to your Reddit profile (less likely to reset after an update)

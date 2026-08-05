@@ -55,6 +55,12 @@ import { getMusicEnabled } from "./settings/music-preference.js";
 import { getPbGhostEnabled } from "./settings/pb-ghost-preference.js";
 import { PbGhost } from "./ghost/pb-ghost.js";
 import { PbGhostService } from "./ghost/pb-ghost-service.js";
+import {
+  getLargestPbGhostSizeReport,
+  PB_GHOST_SIZE_ENABLED_STORAGE_KEY,
+  PbGhostSizeCapture,
+  shouldCapturePbGhostSize,
+} from "./ghost/pb-ghost-size-debug.js";
 import { JourneyService } from "./journeys/service.js";
 import {
   applyPlayerPreferences,
@@ -64,6 +70,24 @@ import {
   confirmDailyChallengeShare,
   previewDailyChallengeShare,
 } from "./daily-challenge/service.js";
+
+export function addCampaignBootstrapToStartupGate(
+  startupPromises,
+  launchTarget,
+  ensureCampaignBootstrap,
+) {
+  if (
+    launchTarget?.mode !== "campaign"
+    || typeof ensureCampaignBootstrap !== "function"
+  ) {
+    return startupPromises;
+  }
+
+  return [
+    ...startupPromises,
+    ensureCampaignBootstrap({ forceRefresh: true }),
+  ];
+}
 
 export class RealTimeRacer {
   constructor() {
@@ -136,6 +160,9 @@ export class RealTimeRacer {
     this.activePersonalBestPaceBaseline = null;
     this.pbGhost = new PbGhost({ enabled: getPbGhostEnabled() });
     this.pbGhostService = new PbGhostService();
+    this.pbGhostSizeCapture = (shouldExposeDebugHooks() || shouldCapturePbGhostSize())
+      ? new PbGhostSizeCapture()
+      : null;
     this.journeys = new JourneyService();
     this.preparedPbGhostChallengeId = null;
     this.pbGhostSelectionChallengeId = null;
@@ -330,7 +357,7 @@ export class RealTimeRacer {
       },
       confirmShare: (shareToken, request) => {
         if (request?.kind === "campaign-challenge") {
-          return this.confirmCampaignChallenge(shareToken);
+          return this.confirmCampaignChallenge(shareToken, request);
         }
         if (request?.kind === "challenge-brag") {
           return this.confirmCampaignChallengeBrag(shareToken);
@@ -478,20 +505,28 @@ export class RealTimeRacer {
       });
     this.dailyChallengePromise = this.loadDailyChallengeCritical();
     this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
-    Promise.allSettled([
-      this.playerHistoryPromise,
-      this.dailyChallengePromise,
-      this.initialPbGhostAssetPromise,
-      this.carAssetPromise,
-      this.trackReadyPromise,
-    ]).finally(async () => {
+    if (this.launchTarget.mode === "campaign") {
+      this.setLoadingStatus(70, "Loading Campaign...");
+    }
+    const startupPromises = addCampaignBootstrapToStartupGate(
+      [
+        this.playerHistoryPromise,
+        this.dailyChallengePromise,
+        this.initialPbGhostAssetPromise,
+        this.carAssetPromise,
+        this.trackReadyPromise,
+      ],
+      this.launchTarget,
+      (options) => this.ensureCampaignBootstrap(options),
+    );
+    Promise.allSettled(startupPromises).finally(async () => {
       this.loadingScreen.update(95, "Displaying Lobby...");
 
       this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
       if (this.launchTarget.mode === "daily") {
         this.showDailyLobby();
       } else if (this.launchTarget.mode === "campaign") {
-        this.showCampaignLobby();
+        this.showCampaignLobby({ refresh: false });
       } else if (this.launchTarget.mode === "challenge") {
         await this.loadChallengeLobby(this.launchTarget.challengeId);
       } else {
@@ -536,6 +571,7 @@ export class RealTimeRacer {
     });
 
     this.resize();
+    this.exposePbGhostSizeDebugHooks();
     if (shouldExposeDebugHooks()) {
       this.exposeTestHooks();
     } else {
@@ -613,10 +649,45 @@ export class RealTimeRacer {
   exposeTestHooks() {
     const renderGameToText = () => this.renderGameToText();
     const advanceTime = (ms) => this.advanceTime(ms);
+    const getPbGhostSizeReports = () => (
+      this.pbGhostSizeCapture?.getReports?.() || []
+    );
+    const getLastPbGhostSizeReport = () => (
+      this.pbGhostSizeCapture?.getLastReport?.() || null
+    );
+    const getLargestPbGhostSizeReportForDebug = () => (
+      getLargestPbGhostSizeReport(this.pbGhostSizeCapture?.getReports?.() || [])
+    );
 
-    window.__RACER_DEBUG__ = Object.freeze({ renderGameToText, advanceTime });
+    window.__RACER_DEBUG__ = Object.freeze({
+      renderGameToText,
+      advanceTime,
+      getPbGhostSizeReports,
+      getLastPbGhostSizeReport,
+      getLargestPbGhostSizeReport: getLargestPbGhostSizeReportForDebug,
+    });
     window.render_game_to_text = renderGameToText;
     window.advanceTime = advanceTime;
+  }
+
+  exposePbGhostSizeDebugHooks() {
+    window.__PB_GHOST_SIZE_DEBUG__ = Object.freeze({
+      enabled: () => Boolean(this.pbGhostSizeCapture),
+      enable: () => {
+        try {
+          window.localStorage?.setItem(PB_GHOST_SIZE_ENABLED_STORAGE_KEY, '1');
+        } catch (_error) {
+          // The in-memory debug capture still works when storage is unavailable.
+        }
+        this.pbGhostSizeCapture ??= new PbGhostSizeCapture();
+        return true;
+      },
+      getReports: () => this.pbGhostSizeCapture?.getReports?.() || [],
+      getLastReport: () => this.pbGhostSizeCapture?.getLastReport?.() || null,
+      getLargestReport: () => getLargestPbGhostSizeReport(
+        this.pbGhostSizeCapture?.getReports?.() || [],
+      ),
+    });
   }
 
   renderGameToText() {

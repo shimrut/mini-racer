@@ -5,10 +5,13 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
 export const DAILY_GP_RULES_REVISION = 1;
 export const DAILY_GP_LEGACY_RULES_REVISION = 0;
+/** Retained for a future Daily three-lap publication policy. */
 export const DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS = 10.95;
 
 export type DailyGpLapCount = 1 | 2 | 3;
 export type DailyGpRulesRevision = typeof DAILY_GP_LEGACY_RULES_REVISION | typeof DAILY_GP_RULES_REVISION;
+
+const DAILY_GP_CURRENT_ELIGIBLE_LAP_COUNTS = Object.freeze([1, 2] as const);
 
 export type DailyGpRaceContract = Pick<
     DailyGpChallenge,
@@ -181,10 +184,15 @@ function deterministicSeedIndex(seed: string, length: number): number {
     return (hash >>> 0) % length;
 }
 
+/**
+ * New Daily challenges intentionally publish only one or two laps. Keep the
+ * persisted contract validator at 1–3 so historical Daily records and
+ * Campaign races remain compatible if three-lap publication returns later.
+ */
 export function getDailyGpEligibleLapCounts(trackKey: string): readonly DailyGpLapCount[] {
     const authorTime = getAuthorMedalSeconds(trackKey);
     if (!Number.isFinite(authorTime)) return [1];
-    return authorTime > DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS ? [1, 2] : [1, 2, 3];
+    return DAILY_GP_CURRENT_ELIGIBLE_LAP_COUNTS;
 }
 
 export function selectDailyGpLapCount(

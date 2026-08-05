@@ -43,7 +43,7 @@ import {
 function toRaceChallenge(stage, mode = 'campaign') {
     return {
         id: stage.raceId,
-        challengeDate: 'Campaign',
+        challengeDate: stage.challengeDate || (mode === 'challenge' ? 'Head to Head' : 'Campaign'),
         trackKey: stage.trackKey,
         startsAt: '1970-01-01T00:00:00.000Z',
         endsAt: '9999-12-31T23:59:59.999Z',
@@ -403,7 +403,7 @@ export const campaignEngineMethods = {
         return this.campaignLobbyState;
     },
 
-    showCampaignLobby() {
+    showCampaignLobby({ refresh = true } = {}) {
         this._campaignCarouselPaintReady = false;
         this.activeCampaignStage = null;
         this.activeCampaignChallenge = null;
@@ -431,7 +431,9 @@ export const campaignEngineMethods = {
             this._campaignCarouselPaintReady = true;
             this.paintCampaignCarousel();
         });
-        void this.ensureCampaignBootstrap({ forceRefresh: true });
+        if (refresh || !hadReadyBootstrap) {
+            void this.ensureCampaignBootstrap({ forceRefresh: true });
+        }
     },
 
     /** Every stage gets a card, locked ones included, so the shape of the campaign is visible from the lobby. */
@@ -667,12 +669,18 @@ export const campaignEngineMethods = {
             this.reset(false, { showStartOverlay: false });
         }
         const response = await getCampaignChallenge(challengeId);
+        const contextual = globalThis.devvit?.context?.postData;
         if (response.body?.status === 'own_challenge') {
             this.activeCampaignChallenge = null;
-            await this.showCampaignLobby();
+            const ownOrigin = response.body?.challenge?.origin
+                || contextual?.origin;
+            if (ownOrigin?.mode === 'daily') {
+                this.showDailyLobby?.();
+            } else {
+                await this.showCampaignLobby();
+            }
             return;
         }
-        const contextual = globalThis.devvit?.context?.postData;
         const challenge = response.body?.challenge
             || (contextual?.postType === 'campaign-challenge' ? contextual : null);
         this.activeRaceMode = 'challenge';
@@ -680,10 +688,14 @@ export const campaignEngineMethods = {
             ...challenge,
             frozenGhost: response.body?.opponentGhost ?? null,
         } : null;
+        const challengeReady = response.ok
+            && response.body?.status === 'ready'
+            && Boolean(challenge);
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.lobbyUi.showChallenge({
-            signedIn: response.ok,
-            available: response.ok && Boolean(challenge),
+            signedIn: response.body?.viewerType === 'reddit',
+            canRace: challengeReady,
+            available: challengeReady,
             challengerName: challenge?.challengerUsername,
             trackName: getTrackName(challenge?.trackKey, challenge?.trackKey || ''),
             laps: challenge?.lapCount,
@@ -698,8 +710,12 @@ export const campaignEngineMethods = {
         if (!challenge || this.startButtonPending) return;
         this.startButtonPending = true;
         try {
+            const origin = challenge.origin?.mode === 'daily'
+                ? challenge.origin
+                : null;
             const stage = {
-                raceId: challenge.raceId,
+                raceId: origin?.challengeId || challenge.raceId,
+                challengeDate: origin?.challengeId || 'Campaign',
                 trackKey: challenge.trackKey,
                 lapCount: challenge.lapCount,
                 rulesRevision: challenge.rulesRevision,
@@ -717,7 +733,8 @@ export const campaignEngineMethods = {
                 });
             }
             if (challenge.frozenGhost) {
-                this.pbGhost.prepare({
+                const prepareGhost = this.pbGhost.prepareOpponent || this.pbGhost.prepare;
+                prepareGhost?.call(this.pbGhost, {
                     bestTimeMs: challenge.targetTimeMs,
                     ghost: challenge.frozenGhost,
                 });
@@ -1399,8 +1416,10 @@ export const campaignEngineMethods = {
         return previewCampaignChallenge(request);
     },
 
-    async confirmCampaignChallenge(token) {
-        const response = await createCampaignChallenge(token);
+    async confirmCampaignChallenge(token, request = null) {
+        const response = await createCampaignChallenge(token, request?.source === 'daily'
+            ? { replay: request.replay }
+            : {});
         if (response?.ok) this.applyCarUnlockSnapshot?.(response.body?.carUnlocks);
         return response;
     },

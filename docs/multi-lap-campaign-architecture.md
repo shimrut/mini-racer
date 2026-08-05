@@ -13,8 +13,9 @@ leaderboard, and retention rules.
 ### Implemented Campaign contract
 
 - Campaign ID: `numbered-v1`.
-- Stages: Number Zero through Number Nine.
-- Fixed lap counts: `1, 1, 1, 2, 2, 2, 3, 3, 3, 3`.
+- Stages: Number Zero through Number Nine, Imaginary Number, Infinite Pie,
+  Euler's Number, and Golden Ratio.
+- Fixed lap counts: `2, 2, 1, 1, 2, 1, 1, 3, 2, 1, 3, 1, 2, 2`.
 - Unlock rule: Gold or Author on the immediately preceding stage.
 - Signed-in starts, progress, per-stage bests, PB ghosts, and leaderboards are
   permanent Campaign records. Guest progress is local practice data only.
@@ -37,10 +38,13 @@ leaderboard, and retention rules.
 
 ### Daily GP
 
-- Each published challenge permanently records a lap count of 1, 2, or 3.
-- The chosen lap count is random within the track's allowed set.
-- Long tracks can be 1 or 2 laps.
-- Short tracks can be 1, 2, or 3 laps.
+- Each newly published challenge permanently records a lap count of 1 or 2.
+- The chosen lap count is random within `[1, 2]` for tracks with valid Author
+  data; missing or invalid Author data conservatively publishes one lap.
+- Previously published three-lap Daily challenges remain valid because their
+  stored race contract is authoritative.
+- The shared race contract still allows three laps for Campaign and a future
+  Daily publication policy.
 - Medal targets are the one-lap targets multiplied by the lap count.
 - At every intermediate finish-line crossing, the game flashes the medal
   earned by the player's cumulative race pace at that point.
@@ -50,6 +54,8 @@ leaderboard, and retention rules.
 
 - Campaign tracks are a curated, permanent set and do not rotate.
 - Every campaign race declares a fixed lap count of 1, 2, or 3.
+- Golden Ratio is the final stage (`numbered-v1-13`), a three-lap race gated at
+  32 total Campaign medals plus a medal on Euler's Number.
 - Campaign progress and leaderboards are separate from Daily GP.
 - Tracks unlock from medals earned in the campaign.
 - When a cumulative medal gate is the remaining blocker, the lobby reports
@@ -62,20 +68,18 @@ leaderboard, and retention rules.
 - Campaign races use the same lap, timing, replay, medal, and finish behavior
   as Daily GP.
 
-## Confirmed Product Rule
+## Current Product Rule
 
-The request uses "author time over 10.95 seconds" for both lap-count bands. The
-recommended interpretation is:
+New Daily publication uses an equal chance between one and two laps for every
+track with valid Author data. Missing or invalid Author data falls back to one
+lap. The chosen value is seeded from the challenge identity and track, then
+persisted in the append-only challenge ledger; players, retries, old posts, and
+later app versions must never reroll a published challenge.
 
-| One-lap author time | Allowed Daily GP lap counts |
-| --- | --- |
-| `> 10.95s` | 1 or 2 |
-| `<= 10.95s` | 1, 2, or 3 |
-
-This interpretation was confirmed. Use an equal chance among the allowed lap
-counts. Seed the selection from the challenge identity and track, then persist
-the chosen value in the append-only challenge ledger. Players, retries, old
-posts, and later app versions must never reroll a published challenge.
+The shared contract and validators continue to accept three laps so historical
+three-lap Daily records remain playable and Campaign can keep its fixed 1-, 2-,
+and 3-lap stages. `DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS` remains available
+for a future Daily policy that reintroduces three-lap selection.
 
 ## Historical implementation audit
 
@@ -385,7 +389,7 @@ Mode adapters supply the actions:
 | Standings | Daily challenge leaderboard | Campaign race leaderboard |
 | Home | Daily lobby | Campaign lobby |
 | Submit | Expiring Daily competition | Permanent campaign race |
-| Share/podium | Existing Daily behavior | Not included initially |
+| Share | Daily finish chooser: Comment Time or Issue Challenge | Campaign Head to Head result Brag |
 
 ## Implementation Sequence
 
@@ -406,8 +410,8 @@ This phase should be behavior-neutral for production Daily GP.
    podium, and playlist boundary.
 3. Make replay validation and PB/ghost identity race-aware.
 4. Add intermediary medal flash and scaled final medals.
-5. Validate 1/2/3-lap submission, Improve ghost, old posts, standings,
-   sharing, expiry, and podiums.
+5. Validate current 1/2-lap publication, historical 3-lap compatibility,
+   Improve ghost, old posts, standings, sharing, expiry, and podiums.
 
 ### Phase 3 — Campaign foundation
 
@@ -429,7 +433,7 @@ This phase should be behavior-neutral for production Daily GP.
 
 Automated coverage must include:
 
-- deterministic Daily lap selection at both sides of the 10.95-second rule;
+- deterministic Daily lap selection across the current one- and two-lap pool;
 - historical one-lap challenge compatibility;
 - challenge cache and post-bound lap-count preservation;
 - exact scaled thresholds for every medal tier and lap count;
@@ -450,14 +454,17 @@ leaderboards.
 
 ## Decisions Needed Before Implementation
 
-1. Confirm that tracks at or below 10.95 seconds are the ones eligible for
-   three laps.
-2. Confirm equal random probability among allowed lap counts.
-3. Define the first campaign's track list, fixed lap counts, and unlock graph.
+1. Decide whether and when a future Daily policy should reintroduce three-lap
+   selection, potentially using the retained 10.95-second threshold.
+2. Revisit the current equal random probability between one and two laps only
+   if the Daily publication policy changes.
+3. Define a future Campaign version's track list, fixed lap counts, and unlock
+   graph; `numbered-v1` is now defined in `game/campaign/manifest.js`.
 4. Decide whether Campaign launches with PB ghosts.
-5. Decide whether Campaign results are shareable; the recommendation is to
-   keep Daily sharing/podium behavior unchanged and omit Campaign sharing from
-   the first release.
+5. Campaign stage finishes remain non-shareable directly. Head to Head posts
+   are shareable from signed-in results, and a Daily-origin Head to Head keeps
+   its embedded race contract after the normal Daily window without changing
+   Daily ranking or PB behavior.
 6. Decide how campaign rule changes work after launch: immutable campaign
    version (recommended) or in-place migration.
 7. ~~Define campaign progress retention for guests and whether guest progress can

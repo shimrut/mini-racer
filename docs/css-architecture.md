@@ -81,12 +81,14 @@ maintaining mode-specific card layouts:
   while locked cards replace that context with a two-item prerequisite checklist.
 - The Daily/Campaign header remains in normal flow above the rail. The actual
   `.lobby-title` is the fixed Mini Racer wordmark, and `.lobby-subhead` owns the
-  mode label, divider, and right-side date/stage selection. Carousel movement
+  mode label, divider, and right-side Daily date or Campaign track selection.
+  Carousel movement
   updates only `[data-lobby-mode-selection]`; the wordmark, mode label, and
   divider keep their layout coordinates. Daily/Campaign reuse the compact
   carousel wordmark cap and mono billing scale; Home keeps its larger display
-  treatment. The selected track name is carried by the Start Race action
-  instead of repeating in the poster.
+  treatment. Campaign repeats the selected track name in the right-side header;
+  both modes also carry it in the Start Race action instead of repeating it in
+  the poster.
 - The header billing line spans the shell beside the Back/Standings/Garage/
   Settings rail. The preview and status footer remain clipped to the selected
   card and cannot paint into the adjacent track or Start Race row.
@@ -136,8 +138,8 @@ maintaining mode-specific card layouts:
   active run, and Start Race — and nothing else on the poster.
 - The lobby header owns the fixed Mini Racer wordmark above the schematic. Mode
   billing anchors left and `[data-lobby-mode-selection]` closes the same divider
-  on the right; `game/lobby/ui.js` changes only that date/stage text when the
-  carousel selection changes. The selected card's bold track name, separator
+  on the right; `game/lobby/ui.js` changes only that Daily date or Campaign track
+  name when the carousel selection changes. The selected card's bold track name, separator
   dot, and lap count are rendered as the secondary race-brief line under the
   red Start Race action. A locked stage keeps that brief while the primary label
   changes to `Locked`.
@@ -180,6 +182,11 @@ the layout immediately. Only the arriving pane runs `lobbyPaneIn`; the lobby no
 longer relies on a delayed `display` transition or `allow-discrete` support in
 an embedded WebView. Keyboard navigation and pointer input are blocked while
 the veil is active.
+
+The race HUD keeps a stable `12px` top position during the race-start handoff.
+`RaceHud.anchorHudBar()` does not measure the generic lobby `header`, because
+that header is inside the fading overlay and collapses when the overlay is
+hidden; observing it would make the HUD jump after its entrance animation.
 
 `TrackCarousel` builds the card DOM first and paints new preview canvases from
 the following layout frame. It also completes all carousel geometry reads

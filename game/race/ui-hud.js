@@ -94,37 +94,14 @@ export class RaceHud {
 
 
     anchorHudBar() {
-        const header = this.header;
         const hudBar = this.hudBar;
         if (!hudBar) return;
-        if (!header) {
-            hudBar.style.top = '12px';
-            this._hudAnchorResizeObserver?.disconnect?.();
-            this._hudAnchorResizeObserver = null;
-            return;
-        }
 
-        const getHeaderHeight = (entry) => {
-            const observedSize = entry?.borderBoxSize;
-            if (Array.isArray(observedSize) && observedSize[0]?.blockSize) {
-                return observedSize[0].blockSize;
-            }
-            if (observedSize?.blockSize) {
-                return observedSize.blockSize;
-            }
-            return header.offsetHeight;
-        };
-
-        const setHudTop = (entry) => {
-            hudBar.style.top = `${Math.round(getHeaderHeight(entry)) + 12}px`;
-        };
-
-        setHudTop();
+        // The lobby header lives inside the fading start overlay and collapses
+        // when that overlay is hidden. It is not a stable race HUD anchor.
+        hudBar.style.top = '12px';
         this._hudAnchorResizeObserver?.disconnect?.();
-        this._hudAnchorResizeObserver = new ResizeObserver((entries) =>
-            setHudTop(entries[0])
-        );
-        this._hudAnchorResizeObserver.observe(header);
+        this._hudAnchorResizeObserver = null;
     }
 
     initSpeedBars() {

@@ -72,6 +72,7 @@ import {
     getCampaignResultsForCarUnlocks,
     mergeGuestCampaignProgress,
 } from './campaign-store.js';
+import { mergeGuestCampaignChallengeResults } from './campaign-challenge-store.js';
 import {
     STOCK_CAR_ASSET_NAME,
     isCarAssetUnlocked,
@@ -847,6 +848,10 @@ export async function getServerPlayerBootstrap({
                     redditPlayerId: identity.canonicalPlayerId,
                 }),
                 mergeGuestCarUnlockProgress({
+                    guestPlayerId: `guest:${guestPlayerId}`,
+                    redditPlayerId: identity.canonicalPlayerId,
+                }),
+                mergeGuestCampaignChallengeResults({
                     guestPlayerId: `guest:${guestPlayerId}`,
                     redditPlayerId: identity.canonicalPlayerId,
                 }),

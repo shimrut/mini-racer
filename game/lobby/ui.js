@@ -411,12 +411,9 @@ export class LobbyUi {
 
     setCampaignSelectedStage(stage = null) {
         this._campaignSelectedStage = stage;
-        const numberLabel = typeof stage?.numberLabel === 'string'
-            ? stage.numberLabel.trim()
-            : '';
-        this._campaignSelectedBillingLabel = numberLabel
-            ? `Stage ${numberLabel}`
-            : null;
+        // Keep the header identity on the same selected-stage source as the
+        // Start Race brief below it.
+        this._campaignSelectedBillingLabel = this.getCampaignPrimaryTrackName();
         this.syncLobbySubheadDetail();
         this.renderCampaign();
         this.syncModeToolbarState();
@@ -507,7 +504,7 @@ export class LobbyUi {
             this.challengeAcceptBtn.disabled = !this.challengeState.canAccept;
             setText(
                 this.challengeAcceptBtn.querySelector('.main-menu__label'),
-                this.challengeState.signedIn ? 'Accept' : 'Sign in required',
+                this.challengeState.canRace ? 'Accept' : 'Unavailable',
             );
         }
         if (this.mode === 'challenge') this.syncLobbySubheadDetail();

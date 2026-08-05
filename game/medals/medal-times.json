@@ -288,22 +288,22 @@
     "bronze": 10.29
   },
   "numberTwo": {
-    "author": 14.25,
-    "gold": 14.79,
-    "silver": 15.17,
-    "bronze": 15.71
+    "author": 14.45,
+    "gold": 14.99,
+    "silver": 15.37,
+    "bronze": 15.91
   },
   "numberThree": {
-    "author": 12.60,
-    "gold": 12.92,
-    "silver": 13.44,
-    "bronze": 13.99
+    "author": 12.70,
+    "gold": 12.99,
+    "silver": 13.48,
+    "bronze": 14.05
   },
   "numberFour": {
-    "author": 11.15,
-    "gold": 11.42,
-    "silver": 11.97,
-    "bronze": 12.45
+    "author": 11.35,
+    "gold": 11.72,
+    "silver": 12.17,
+    "bronze": 12.65
   },
   "numberFive": {
     "author": 15.05,
@@ -312,16 +312,16 @@
     "bronze": 16.48
   },
   "numberSix": {
-    "author": 16.57,
-    "gold": 16.98,
-    "silver": 17.27,
-    "bronze": 17.79
+    "author": 13.75,
+    "gold": 14.22,
+    "silver": 14.43,
+    "bronze": 14.93
   },
   "numberSeven": {
-    "author": 13.40,
-    "gold": 13.71,
-    "silver": 14.09,
-    "bronze": 14.42
+    "author": 13.60,
+    "gold": 13.91,
+    "silver": 14.29,
+    "bronze": 14.62
   },
   "numberEight": {
     "author": 10.10,
@@ -330,10 +330,10 @@
     "bronze": 10.93
   },
   "numberNine": {
-    "author": 13.00,
-    "gold": 13.33,
-    "silver": 13.68,
-    "bronze": 13.91
+    "author": 13.50,
+    "gold": 13.73,
+    "silver": 13.98,
+    "bronze": 14.31
   },
   "eulersNumber": {
     "author": 13.51,
@@ -342,16 +342,16 @@
     "bronze": 14.74
   },
   "imaginaryNumber": {
-    "author": 11.35,
-    "gold": 11.67,
-    "silver": 11.98,
-    "bronze": 12.26
+    "author": 11.40,
+    "gold": 11.72,
+    "silver": 12.01,
+    "bronze": 12.35
   },
   "infinitePie": {
-    "author": 17.02,
-    "gold": 17.41,
-    "silver": 17.93,
-    "bronze": 18.29
+    "author": 17.12,
+    "gold": 17.51,
+    "silver": 17.99,
+    "bronze": 18.39
   },
   "jumpingJack": {
     "author": 11.45,
@@ -424,5 +424,53 @@
     "gold": 9.53,
     "silver": 9.89,
     "bronze": 10.21
+  },
+  "goldenRatio": {
+    "author": 16.20,
+    "gold": 16.51,
+    "silver": 16.99,
+    "bronze": 17.42
+  },
+  "kangarooKyle": {
+    "author": 14.51,
+    "gold": 14.99,
+    "silver": 15.42,
+    "bronze": 15.87
+  },
+  "infinityIsle": {
+    "author": 8.43,
+    "gold": 8.68,
+    "silver": 8.99,
+    "bronze": 9.35
+  },
+  "fedoraHat": {
+    "author": 13.31,
+    "gold": 13.75,
+    "silver": 14.01,
+    "bronze": 14.44
+  },
+  "quarterlyQuestion": {
+    "author": 11.72,
+    "gold": 12.08,
+    "silver": 12.46,
+    "bronze": 12.91
+  },
+  "romanianRhapsody": {
+    "author": 13.65,
+    "gold": 13.98,
+    "silver": 14.51,
+    "bronze": 14.87
+  },
+  "fairyLand": {
+    "author": 12.52,
+    "gold": 12.83,
+    "silver": 13.22,
+    "bronze": 13.67
+  },
+  "darkMatter": {
+    "author": 10.00,
+    "gold": 10.35,
+    "silver": 10.79,
+    "bronze": 11.22
   }
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { RealTimeRacer } from "../game/engine.js";
+import {
+  addCampaignBootstrapToStartupGate,
+  RealTimeRacer,
+} from "../game/engine.js";
 import { CarSpriteLoader, getCarAssetNameForPresetConfig, getCarAssetUrlCandidates } from "../game/car/sprite.js";
 import { readTrackLastLapMedal } from "../game/medals/last-lap-medal-storage.js";
 import {
@@ -9,6 +12,43 @@ import {
 } from "../game/scoreboard/verification-queue.js";
 
 describe("RealTimeRacer daily challenge modal payload", () => {
+  it("holds the critical startup gate on Campaign bootstrap", async () => {
+    let resolveBootstrap;
+    const bootstrap = new Promise((resolve) => {
+      resolveBootstrap = resolve;
+    });
+    const ensureCampaignBootstrap = vi.fn(() => bootstrap);
+    const startupPromises = addCampaignBootstrapToStartupGate(
+      [Promise.resolve("assets ready")],
+      { mode: "campaign" },
+      ensureCampaignBootstrap,
+    );
+    let startupSettled = false;
+    const startup = Promise.allSettled(startupPromises).then(() => {
+      startupSettled = true;
+    });
+
+    await Promise.resolve();
+    expect(startupSettled).toBe(false);
+    expect(ensureCampaignBootstrap).toHaveBeenCalledWith({ forceRefresh: true });
+
+    resolveBootstrap({ stages: [], progress: {} });
+    await startup;
+    expect(startupSettled).toBe(true);
+  });
+
+  it("does not add Campaign bootstrap to non-Campaign startup", () => {
+    const startupPromises = [Promise.resolve("assets ready")];
+    const ensureCampaignBootstrap = vi.fn();
+
+    expect(addCampaignBootstrapToStartupGate(
+      startupPromises,
+      { mode: "home" },
+      ensureCampaignBootstrap,
+    )).toBe(startupPromises);
+    expect(ensureCampaignBootstrap).not.toHaveBeenCalled();
+  });
+
   it("compares intermediate laps using cumulative elapsed pace at equivalent PB boundaries", () => {
     const showLapFlash = vi.fn();
     const engine = {

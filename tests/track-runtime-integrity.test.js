@@ -135,6 +135,7 @@ describe('track runtime integrity', () => {
             'imaginaryNumber',
             'infinitePie',
             'centralDrop',
+            'goldenRatio',
         ]);
 
         const intentionallyReviewedKeys = new Set([
@@ -164,6 +165,7 @@ describe('track runtime integrity', () => {
             'imaginaryNumber',
             'infinitePie',
             'centralDrop',
+            'goldenRatio',
         ]);
         const unchangedTrackRegistry = Object.fromEntries(
             Object.entries(TRACKS)
@@ -182,7 +184,7 @@ describe('track runtime integrity', () => {
             '0ddcb5069d55ce590d2d304ee54b6a1a3be145d325bb33ceddda5a4d7fa7139e',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'e955ac4d5f55657bb0686b84931b28a690aa5514291780482f0b7b7b0b4cac75',
+            'b145742569739bc989c3a66ee3fc5e1f2700193d0d9bd6cdf923c24baaf71cbc',
         );
     });
 

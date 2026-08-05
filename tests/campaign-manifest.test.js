@@ -18,19 +18,20 @@ describe('Campaign manifest', () => {
             lapCount: stage.lapCount,
             unlock: stage.unlock,
         }))).toEqual([
-            { raceId: 'numbered-v1-00', trackKey: 'numberZero', lapCount: 1, unlock: { type: 'start' } },
-            { raceId: 'numbered-v1-01', trackKey: 'numberOne', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 1, previousRaceId: 'numbered-v1-00' } },
+            { raceId: 'numbered-v1-00', trackKey: 'numberZero', lapCount: 2, unlock: { type: 'start' } },
+            { raceId: 'numbered-v1-01', trackKey: 'numberOne', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 1, previousRaceId: 'numbered-v1-00' } },
             { raceId: 'numbered-v1-02', trackKey: 'numberTwo', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 3, previousRaceId: 'numbered-v1-01' } },
-            { raceId: 'numbered-v1-03', trackKey: 'numberThree', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 7, previousRaceId: 'numbered-v1-02' } },
+            { raceId: 'numbered-v1-03', trackKey: 'numberThree', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 7, previousRaceId: 'numbered-v1-02' } },
             { raceId: 'numbered-v1-04', trackKey: 'numberFour', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 10, previousRaceId: 'numbered-v1-03' } },
-            { raceId: 'numbered-v1-05', trackKey: 'numberFive', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 12, previousRaceId: 'numbered-v1-04' } },
-            { raceId: 'numbered-v1-06', trackKey: 'numberSix', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 15, previousRaceId: 'numbered-v1-05' } },
+            { raceId: 'numbered-v1-05', trackKey: 'numberFive', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 12, previousRaceId: 'numbered-v1-04' } },
+            { raceId: 'numbered-v1-06', trackKey: 'numberSix', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 15, previousRaceId: 'numbered-v1-05' } },
             { raceId: 'numbered-v1-07', trackKey: 'numberSeven', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 17, previousRaceId: 'numbered-v1-06' } },
-            { raceId: 'numbered-v1-08', trackKey: 'numberEight', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 20, previousRaceId: 'numbered-v1-07' } },
-            { raceId: 'numbered-v1-09', trackKey: 'numberNine', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 22, previousRaceId: 'numbered-v1-08' } },
-            { raceId: 'numbered-v1-10', trackKey: 'imaginaryNumber', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 25, previousRaceId: 'numbered-v1-09' } },
+            { raceId: 'numbered-v1-08', trackKey: 'numberEight', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 20, previousRaceId: 'numbered-v1-07' } },
+            { raceId: 'numbered-v1-09', trackKey: 'numberNine', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 22, previousRaceId: 'numbered-v1-08' } },
+            { raceId: 'numbered-v1-10', trackKey: 'imaginaryNumber', lapCount: 3, unlock: { type: 'medal_total', requiredMedals: 25, previousRaceId: 'numbered-v1-09' } },
             { raceId: 'numbered-v1-11', trackKey: 'infinitePie', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 27, previousRaceId: 'numbered-v1-10' } },
-            { raceId: 'numbered-v1-12', trackKey: 'eulersNumber', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 30, previousRaceId: 'numbered-v1-11' } },
+            { raceId: 'numbered-v1-12', trackKey: 'eulersNumber', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 30, previousRaceId: 'numbered-v1-11' } },
+            { raceId: 'numbered-v1-13', trackKey: 'goldenRatio', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 32, previousRaceId: 'numbered-v1-12' } },
         ]);
         expect(Object.isFrozen(CAMPAIGN_STAGES)).toBe(true);
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);
@@ -43,7 +44,7 @@ describe('Campaign manifest', () => {
      */
     it('keeps every gate reachable on Gold alone and strictly rising', () => {
         const requirements = CAMPAIGN_STAGES.map((stage) => stage.unlock.requiredMedals ?? 0);
-        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30]);
+        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30, 32]);
         requirements.forEach((required, index) => {
             // Gold on every stage before this one, the best a player can do
             // without ever touching an Author time.

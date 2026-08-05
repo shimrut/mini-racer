@@ -64,6 +64,8 @@ const reddit = {
             url: `https://reddit.com/r/miniracer/challenge${postNumber}`,
             subredditName: input.subredditName,
             removed: false,
+            body: input.textFallback?.text || '',
+            getPostData: vi.fn(async () => input.postData),
         };
         activePosts.set(post.id, post);
         return post;
@@ -78,13 +80,14 @@ const {
     formatCampaignChallengeTitle,
 } = await import('../src/server/campaign-challenge-service.ts');
 const {
-    readCampaignChallenge,
-} = await import('../src/server/campaign-challenge-store.ts');
-
+    resolveCampaignChallengeRecordResult,
+} = await import('../src/server/campaign-challenge-post.ts');
+const { writeCampaignChallenge } = await import('../src/server/campaign-challenge-store.ts');
 const context = {
     username: 'RaceFan',
     subredditName: 'MiniRacer',
     appSlug: 'mini-racer',
+    postId: 't3_challenge1',
 };
 
 function source(bestTimeMs = 25_640, sourceKind = 'campaign') {
@@ -100,6 +103,24 @@ function source(bestTimeMs = 25_640, sourceKind = 'campaign') {
         rulesRevision: 1,
         trackFingerprint: 'track-fingerprint',
         ghost: { schemaVersion: 2, samples: ['frozen'] },
+    };
+}
+
+function dailySource(bestTimeMs = 18_240) {
+    return {
+        sourceKind: 'daily',
+        sourceId: 'daily-gp-2026-07-23',
+        origin: {
+            mode: 'daily',
+            challengeId: 'daily-gp-2026-07-23',
+        },
+        trackKey: 'numberThree',
+        lapCount: 2,
+        bestTimeMs,
+        medal: 'gold',
+        rulesRevision: 1,
+        trackFingerprint: 'track-fingerprint',
+        ghost: { schemaVersion: 2, samples: ['daily-frozen'] },
     };
 }
 
@@ -136,7 +157,7 @@ describe('campaign challenge service', () => {
         vi.clearAllMocks();
     });
 
-    it('derives immutable public post data from the verified source and freezes the ghost server-side', async () => {
+    it('puts the verified target and ghost in the post body without storing the replay in Redis', async () => {
         const service = makeService();
         const preview = await service.preview({ bestTimeMs: 1, ghost: 'forged' }, context);
 
@@ -161,9 +182,88 @@ describe('campaign challenge service', () => {
             }),
         }));
         expect(reddit.submitCustomPost.mock.calls[0][0].postData).not.toHaveProperty('ghost');
-        const stored = await readCampaignChallenge(created.body.challengeId);
-        expect(stored.frozenGhost).toEqual(source().ghost);
-        expect(stored.challengerAvatarUrl).toBe('https://i.redd.it/RaceFan.png');
+        const submitted = reddit.submitCustomPost.mock.calls[0][0];
+        expect(submitted.postData.replayDataHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(submitted.textFallback.text).toContain('Beat **25.640** on **Number Three** (2 laps).');
+        expect(submitted.textFallback.text).toContain('Challenge replay data:');
+        expect(submitted.textFallback.text).toContain('MINIRACER-CHALLENGE-REPLAY-V1');
+        expect([...strings.values()].join('\n')).not.toContain('frozen');
+    });
+
+    it('embeds a Daily origin and rechecks the exact finish when creating a challenge', async () => {
+        const resolveSource = vi.fn(async (input) => {
+            expect(input).toMatchObject({
+                source: 'daily',
+                challengeId: 'daily-gp-2026-07-23',
+            });
+            return dailySource();
+        });
+        const replay = {
+            rulesRevision: 1,
+            targetLapNumber: 2,
+            inputs: [{ frames: 12, left: false, right: false, relaunchDelay: false }],
+        };
+        const service = createCampaignChallengeService({
+            resolveSource,
+            validateReplay: vi.fn(),
+            now: () => new Date('2026-07-23T12:00:00.000Z'),
+            createId: () => 'daily-challenge-post',
+        });
+        const preview = await service.preview({
+            source: 'daily',
+            challengeId: 'daily-gp-2026-07-23',
+            replay,
+        }, context);
+        const created = await service.create({
+            challengeToken: preview.body.challengeToken,
+            replay,
+        }, context);
+
+        expect(created.body.status).toBe('created');
+        expect(reddit.submitCustomPost.mock.calls[0][0].postData).toMatchObject({
+            origin: {
+                mode: 'daily',
+                challengeId: 'daily-gp-2026-07-23',
+            },
+        });
+        expect(resolveSource).toHaveBeenCalledTimes(2);
+        expect(resolveSource.mock.calls[1][0]).toMatchObject({ replay });
+    });
+
+    it('loads a newly created Daily challenge when the viewer request has no post context', async () => {
+        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const service = createCampaignChallengeService({
+            resolveSource: vi.fn(async () => dailySource()),
+            validateReplay: vi.fn(),
+            now: () => new Date('2026-07-23T12:00:00.000Z'),
+            createId: () => 'daily-challenge-post',
+        });
+        const replay = { inputs: [{ frames: 12 }] };
+        const preview = await service.preview({
+            source: 'daily',
+            challengeId: 'daily-gp-2026-07-23',
+            replay,
+        }, context);
+        const created = await service.create({
+            challengeToken: preview.body.challengeToken,
+            replay,
+        }, context);
+        const guestPlayerId = 'daily-h2h-racer';
+
+        const loaded = await service.get(created.body.challengeId, {
+            subredditName: context.subredditName,
+            playerId: guestPlayerId,
+            guestToken: await mintGuestPlayerToken(guestPlayerId),
+        });
+
+        expect(loaded).toMatchObject({
+            status: 200,
+            body: {
+                status: 'ready',
+                viewerType: 'guest',
+                opponentGhost: dailySource().ghost,
+            },
+        });
     });
 
     it('returns challenger and viewer avatars when loading a Head to Head', async () => {
@@ -181,6 +281,239 @@ describe('campaign challenge service', () => {
             challenge: {
                 challengerUsername: 'RaceFan',
                 challengerAvatarUrl: 'https://i.redd.it/RaceFan.png',
+            },
+            opponentGhost: source().ghost,
+        });
+    });
+
+    it('uses the request post data when Reddit returns an incomplete post-data copy', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        const postData = await post.getPostData();
+        post.getPostData = vi.fn(async () => ({}));
+
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            postData,
+            username: 'OtherRacer',
+        });
+
+        expect(loaded).toMatchObject({
+            status: 200,
+            body: {
+                status: 'ready',
+                opponentGhost: source().ghost,
+            },
+        });
+    });
+
+    it('loads the frozen ghost from a nested Devvit richtext fallback shape', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        const submittedFallback = reddit.submitCustomPost.mock.calls[0][0].textFallback.text;
+        post.body = undefined;
+        post.richtextFallback = {
+            text: submittedFallback.replace(/\n/g, '\r\n'),
+        };
+
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            username: 'OtherRacer',
+        });
+
+        expect(loaded).toMatchObject({
+            status: 200,
+            body: {
+                status: 'ready',
+                opponentGhost: source().ghost,
+            },
+        });
+    });
+
+    it('loads the frozen ghost from a JSON-serialized toJSON selftext shape', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        const submittedFallback = reddit.submitCustomPost.mock.calls[0][0].textFallback.text;
+        post.body = undefined;
+        post.toJSON = () => ({
+            selftext: JSON.stringify({ text: submittedFallback }),
+        });
+
+        const resolved = await resolveCampaignChallengeRecordResult(
+            created.body.challengeId,
+            context,
+        );
+
+        expect(resolved).toMatchObject({
+            ok: true,
+            record: { frozenGhost: source().ghost },
+        });
+    });
+
+    it('returns a typed diagnostic when the fallback hash does not validate', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        const postData = await post.getPostData();
+        post.getPostData = vi.fn(async () => ({
+            ...postData,
+            replayDataHash: '0'.repeat(64),
+        }));
+
+        const resolved = await resolveCampaignChallengeRecordResult(
+            created.body.challengeId,
+            context,
+        );
+
+        expect(resolved).toEqual({
+            ok: false,
+            reason: 'replay_hash_mismatch',
+        });
+    });
+
+    it('distinguishes a missing fallback from invalid replay data', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        post.body = undefined;
+
+        const resolved = await resolveCampaignChallengeRecordResult(
+            created.body.challengeId,
+            context,
+        );
+
+        expect(resolved).toEqual({
+            ok: false,
+            reason: 'replay_fallback_missing',
+        });
+    });
+
+    it('does not revive a challenge when its replay body is missing', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const service = makeService();
+        const created = await createChallenge(service);
+        activePosts.get('t3_challenge1').body = '# Head to Head · RaceFan\n\nThe replay was removed.';
+
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            username: 'OtherRacer',
+        });
+        expect(loaded.status).toBe(404);
+        expect(loaded.body.status).toBe('challenge_unavailable');
+        expect(warn).toHaveBeenCalledWith('Campaign challenge resolution failed.', {
+            challengeId: created.body.challengeId,
+            postId: 't3_challenge1',
+            reason: 'replay_token_not_found',
+        });
+        expect(JSON.stringify(warn.mock.calls)).not.toContain('MINIRACER-CHALLENGE-REPLAY-V1');
+        warn.mockRestore();
+    });
+
+    it('keeps legacy Campaign posts playable from their matching stored record', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        const postData = await post.getPostData();
+        await writeCampaignChallenge({
+            ...postData,
+            replayDataHash: undefined,
+            subredditName: context.subredditName,
+            sourceKind: 'campaign',
+            sourceId: 'numbered-v1-03',
+            frozenGhost: source().ghost,
+            postId: 't3_challenge1',
+            postUrl: post.url,
+        });
+        const legacyPostData = { ...postData };
+        delete legacyPostData.origin;
+        delete legacyPostData.replayDataHash;
+        post.getPostData = vi.fn(async () => legacyPostData);
+        post.body = '# Head to Head · RaceFan\n\nBeat **25.640** on **Number Three** (2 laps).';
+
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            username: 'OtherRacer',
+        });
+
+        expect(loaded).toMatchObject({
+            status: 200,
+            body: {
+                status: 'ready',
+                opponentGhost: source().ghost,
+            },
+        });
+    });
+
+    it('uses the stored Reddit post identity when an older client omits post context', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+
+        const loaded = await service.get(created.body.challengeId, {
+            username: 'OtherRacer',
+            subredditName: context.subredditName,
+        });
+
+        expect(loaded).toMatchObject({
+            status: 200,
+            body: {
+                status: 'ready',
+                opponentGhost: source().ghost,
+            },
+        });
+    });
+
+    it('keeps a legacy Daily post playable from its matching stored record', async () => {
+        const service = createCampaignChallengeService({
+            resolveSource: vi.fn(async () => dailySource()),
+            validateReplay: vi.fn(async () => ({
+                ok: true,
+                bestTimeMs: 18_000,
+                medal: 'gold',
+                ghost: { schemaVersion: 2, samples: ['viewer'] },
+            })),
+            now: () => new Date('2026-07-23T12:00:00.000Z'),
+            createId: () => 'daily-challenge-post',
+        });
+        const replay = { inputs: [{ frames: 12 }] };
+        const preview = await service.preview({
+            source: 'daily',
+            challengeId: 'daily-gp-2026-07-23',
+            replay,
+        }, context);
+        const created = await service.create({
+            challengeToken: preview.body.challengeToken,
+            replay,
+        }, context);
+        const post = activePosts.get('t3_challenge1');
+        const postData = await post.getPostData();
+        await writeCampaignChallenge({
+            ...postData,
+            replayDataHash: undefined,
+            subredditName: context.subredditName,
+            sourceKind: 'daily',
+            sourceId: 'daily-gp-2026-07-23',
+            frozenGhost: dailySource().ghost,
+            postId: 't3_challenge1',
+            postUrl: post.url,
+        });
+        const legacyPostData = { ...postData };
+        delete legacyPostData.replayDataHash;
+        post.getPostData = vi.fn(async () => legacyPostData);
+        post.body = '# Head to Head · RaceFan\n\nBeat **18.240** on **Number Three** (2 laps).';
+
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            username: 'OtherRacer',
+        });
+
+        expect(loaded).toMatchObject({
+            status: 200,
+            body: {
+                status: 'ready',
+                opponentGhost: dailySource().ghost,
             },
         });
     });
@@ -257,6 +590,56 @@ describe('campaign challenge service', () => {
             outcome: 'tie',
             resultLabel: 'Tie',
             differenceMs: 0,
+        });
+    });
+
+    it('lets a guest load and submit a challenge result', async () => {
+        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const service = makeService({ validatedTimeMs: 25_000 });
+        const created = await createChallenge(service);
+        const guestPlayerId = 'guest:h2h-racer';
+        const guestContext = {
+            subredditName: context.subredditName,
+            postId: created.body.postUrl ? 't3_challenge1' : null,
+            playerId: guestPlayerId.slice('guest:'.length),
+            guestToken: await mintGuestPlayerToken(guestPlayerId.slice('guest:'.length)),
+        };
+
+        const loaded = await service.get(created.body.challengeId, guestContext);
+        expect(loaded).toMatchObject({
+            status: 200,
+            body: {
+                viewerType: 'guest',
+                viewerUsername: 'Guest racer',
+            },
+        });
+
+        const submitted = await service.submit(
+            { challengeId: created.body.challengeId, replay: {} },
+            guestContext,
+        );
+        expect(submitted).toMatchObject({
+            status: 200,
+            body: {
+                accepted: true,
+                bestResult: { viewerUsername: 'Guest racer', bestTimeMs: 25_000 },
+            },
+        });
+    });
+
+    it('reports missing guest identity without telling the player to sign in', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const submitted = await service.submit(
+            { challengeId: created.body.challengeId, replay: {} },
+            { subredditName: context.subredditName, postId: 't3_challenge1' },
+        );
+        expect(submitted).toEqual({
+            status: 401,
+            body: {
+                status: 'player_identity_required',
+                error: 'Guest identity unavailable. Reload the challenge to continue.',
+            },
         });
     });
 

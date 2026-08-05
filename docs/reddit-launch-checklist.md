@@ -22,6 +22,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The in-feed launch card is clear at first glance and explains the action: race today’s challenge.
 - [ ] The stable Current Daily launcher always displays the active UTC-day track and opens the expanded game in Daily mode; it never reuses a dated post payload.
 - [ ] The Campaign launcher opens the expanded game in Campaign mode.
+- [ ] The Campaign launcher keeps the expanded game's loading screen visible until Campaign progress, stages, and unlocks resolve; the first Campaign lobby paint shows the actual player state without a pending Start Race spinner.
 - [ ] The Lobby launcher opens the expanded game in the Home lobby, even after a previous Daily or Campaign launch on the same device.
 - [ ] The full game is understandable for a first-time player without extra instructions.
 - [ ] The launch card works without inline scroll traps.
@@ -31,15 +32,15 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The PB ghost uses the player's currently selected car and is visibly more transparent than the live player car.
 - [ ] `Race Now` keeps the custom-post loading screen visible until the resolved track ghost is prepared: valid historical posts load their own ghost, while expired posts load today's featured-track ghost.
 - [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.
-- [ ] The finish screen shows `Improve`, `Share Time`, and `Home`, and sharing displays the exact comment plus Reddit username before posting.
+- [ ] The finish screen shows `Improve`, `Share`, and `Home`; `Share` offers `Comment Time` or `Issue Challenge`, and each signed-in action displays its exact copy plus Reddit username before posting.
 - [ ] `Share Best` appears only for a verified time in the selected standings day and keeps the selected day and scroll position after canceling.
 - [ ] Standalone game launch opens Home with Daily, Campaign, Garage, and
   Settings as matching mode-action rows, and no Home Start button.
 - [ ] Daily and Campaign direct launches show Back, Standings, Garage, and
   Settings as compact icon-only actions in the top-right rail. The Mini Racer
   title is part of that fixed header, and the mode label, divider, and right-side
-  date/stage billing stay fixed while the carousel moves; only the date/stage
-  value changes. The selected track is
+  slot stay fixed while the carousel moves; Daily updates its date and Campaign
+  updates its selected track name. The selected track is
   a borderless bounded schematic hero, neighboring tracks peek at both screen
   edges, and a tiny version of the currently selected Garage car replaces the
   generic direction triangle at the start line. Its size relative to the track
@@ -50,12 +51,13 @@ Mini Racer is a **game**, so the most important launch requirements are:
   carousel.
 - [ ] At the first and last Daily/Campaign entries, the selected track still
   centers in the Reddit WebView. Swiping or tapping an edge track updates only
-  the right-side date/stage billing plus the selected Standings and Start Race
-  targets; the fixed title, mode label, and divider do not move.
+  the right-side Daily date or Campaign track name plus the selected Standings
+  and Start Race targets; the fixed title, mode label, and divider do not move.
 - [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.
-- [ ] Campaign stages use the fixed `1,1,1,2,2,2,3,3,3,3` lap sequence, require
+- [ ] Campaign stages use the fixed `2,2,1,1,2,1,1,3,2,1,3,1,2,2` lap sequence,
+  including Golden Ratio as the final three-lap stage, and require
   the configured medal total plus any medal on the immediately previous stage,
   and keep independent permanent standings and PB ghosts.
 - [ ] A locked Campaign card shows both unlock gates with medal placeholders:
@@ -101,14 +103,21 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Crossing the final Campaign finish line opens a saving sheet immediately;
   accepted, rejected, timed-out, and interrupted-response paths all end on an
   actionable result sheet, including when PB ghost or lobby refresh fails.
-- [ ] A signed-in Campaign result creates a reusable custom challenge post;
-  guests cannot create or accept one.
+- [ ] A signed-in Campaign or Daily result creates a reusable custom challenge
+  post; guests can open, race, and submit Head to Head challenges but cannot
+  create posts.
 - [ ] The Head to Head post makes the challenger, viewer, track name, target
   time, lap count, and Race Head to Head action legible without
   inline scrolling on desktop or compact Reddit WebView widths.
 - [ ] A challenge post opens the correct frozen opponent ghost, permits its
-  locked Campaign track only for that duel, reports win/tie/loss correctly,
-  and writes no Campaign progress, PB, or leaderboard data.
+  locked Campaign track or expired Daily track only for that duel, reports
+  win/tie/loss correctly, and writes no Daily/Campaign progress, PB, or
+  leaderboard data.
+- [ ] A guest can race a Head to Head from the in-feed post, keep a best result
+  across retries, and merge that result when the guest later signs in.
+- [ ] Open a Head to Head with no Reddit session and with a stale stored guest
+  token; verify the post refreshes the guest identity once, enables Race Head to
+  Head, and never shows a sign-in requirement for a ready challenge.
 - [ ] Challenge-post reuse and the three-new-posts per
   player/subreddit/UTC-day limit are confirmed with real Reddit context.
 
@@ -134,7 +143,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Reddit username display behaves correctly when identity is enabled.
 - [ ] Guest fallback identity behaves correctly when Reddit username display is unavailable or off.
 - [ ] Invalid or suspicious replay submissions are rejected cleanly.
-- [ ] Published 1-, 2-, and 3-lap challenges keep the same lap count across post reloads, retries, and playlist history.
+- [ ] Published one- and two-lap Daily challenges, historical three-lap Daily
+  records, and Campaign three-lap stages keep the same lap count across reloads,
+  retries, and stored history.
 - [ ] Intermediate finish lines flash the medal for cumulative elapsed time at that completed-lap scale, without permanently awarding it before the final finish.
 - [ ] Multi-lap submissions rank only after all required laps, preserve cumulative checkpoint splits, and reject mismatched replay rules or target lap counts.
 - [ ] Share previews, score-thread comments, text fallback, and final podium posts show the complete race time and correct lap count.

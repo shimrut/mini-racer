@@ -204,6 +204,7 @@ export function normalizeCampaignLobbyState(state = {}) {
 export function normalizeChallengeLobbyState(state = {}) {
     const targetTimeMs = toFiniteNumber(state.targetTimeMs);
     const signedIn = Boolean(state.signedIn);
+    const canRace = state.canRace === undefined ? signedIn : Boolean(state.canRace);
     const available = state.available !== false && targetTimeMs !== null && targetTimeMs >= 0;
     const laps = Math.max(1, Math.trunc(toFiniteNumber(state.laps) ?? 1));
     const rawName = typeof state.challengerName === 'string'
@@ -216,8 +217,9 @@ export function normalizeChallengeLobbyState(state = {}) {
     return {
         ...state,
         signedIn,
+        canRace,
         available,
-        canAccept: signedIn && available,
+        canAccept: canRace && available,
         challengerName,
         opponentLabel: `${challengerName} challenges you`,
         trackLabel: typeof state.trackName === 'string' && state.trackName.trim()
@@ -229,8 +231,8 @@ export function normalizeChallengeLobbyState(state = {}) {
         medal: typeof state.medal === 'string' && state.medal.trim()
             ? state.medal.trim()
             : null,
-        statusMessage: !signedIn
-            ? 'Sign in to accept this challenge.'
-            : (!available ? 'This challenge is unavailable.' : ''),
+        statusMessage: !available
+            ? 'This challenge is unavailable.'
+            : (!canRace ? 'This challenge is unavailable right now.' : ''),
     };
 }

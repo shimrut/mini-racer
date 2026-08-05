@@ -43,9 +43,9 @@ export default {
         Point(21.346, 12.064),
         Point(10.561, 17.853)
     ],
-    startLine: { p1: Point(16.489, 4.596), p2: Point(17.863, 9.054) },
-    startPos: Point(15.804, 7.131),
-    startAngle: -0.256,
+    startLine: { p1: Point(16.582, 4.627), p2: Point(17.977, 9.068) },
+    startPos: Point(16.087, 7.222),
+    startAngle: -0.304,
     checkpoints: [
         { p1: Point(35.113, 25.492), p2: Point(40.669, 26.706) },
         { p1: Point(23.209, 56.882), p2: Point(24.107, 61.595) },
