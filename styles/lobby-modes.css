@@ -205,6 +205,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before {
     position: relative;
     z-index: 1;
     flex: 1 1 50%;
+    width: 50%;
     text-align: center;
 }
 

@@ -187,25 +187,35 @@ export class LobbyUi {
         const previousMode = this.mode;
         if (previousMode !== mode) this.beginPaneTransition();
         this.mode = mode;
-        for (const candidate of LOBBY_MODES) {
-            const pane = document.getElementById(`lobby-${candidate}-pane`);
-            if (!pane) continue;
-            const isActive = candidate === mode;
-            pane.hidden = !isActive;
-            pane.classList.toggle('is-active', isActive);
-            pane.setAttribute('aria-hidden', String(!isActive));
-        }
-        if (document.body?.dataset) {
-            document.body.dataset.lobbyMode = mode;
-            if (mode === 'home' && previousMode !== 'home') {
-                document.body.dataset.lobbyHomeReturned = 'true';
+
+        const updateDom = () => {
+            for (const candidate of LOBBY_MODES) {
+                const pane = document.getElementById(`lobby-${candidate}-pane`);
+                if (!pane) continue;
+                const isActive = candidate === mode;
+                pane.hidden = !isActive;
+                pane.classList.toggle('is-active', isActive);
+                pane.setAttribute('aria-hidden', String(!isActive));
             }
+            if (document.body?.dataset) {
+                document.body.dataset.lobbyMode = mode;
+                if (mode === 'home' && previousMode !== 'home') {
+                    document.body.dataset.lobbyHomeReturned = 'true';
+                }
+            }
+            this.updateModeLabel(mode);
+            this.syncModeToolbarState();
+            this.overlay?.setAttribute('aria-label', this.getPaneAriaLabel(mode));
+            this.resetKeyboardNav();
+            requestAnimationFrame(() => this.focus());
+        };
+
+        if (document.startViewTransition && previousMode !== mode && previousMode !== 'home') {
+            document.startViewTransition(() => updateDom());
+        } else {
+            updateDom();
         }
-        this.updateModeLabel(mode);
-        this.syncModeToolbarState();
-        this.overlay?.setAttribute('aria-label', this.getPaneAriaLabel(mode));
-        this.resetKeyboardNav();
-        requestAnimationFrame(() => this.focus());
+
         return true;
     }
 
