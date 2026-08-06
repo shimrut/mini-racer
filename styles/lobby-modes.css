@@ -469,9 +469,9 @@ html.is-lobby-view-transition {
     view-transition-name: none;
 }
 /* Bulletproof fallback: explicitly hide the root transition if the browser still creates it */
-::view-transition-group(root),
-::view-transition-old(root),
-::view-transition-new(root) {
+html.is-lobby-view-transition::view-transition-group(root),
+html.is-lobby-view-transition::view-transition-old(root),
+html.is-lobby-view-transition::view-transition-new(root) {
     animation: none !important;
     display: none !important;
 }
