@@ -465,7 +465,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 
 /* Scope View Transitions to panes only to prevent header blinking */
-html.is-lobby-view-transition {
+:root {
     view-transition-name: none;
 }
 .lobby-panes {
