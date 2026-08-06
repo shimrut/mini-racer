@@ -1176,14 +1176,6 @@ export const dailyChallengeEngineMethods = {
       };
     }
 
-    const tk =
-      typeof this.activeDailyChallenge?.trackKey === "string"
-        ? this.activeDailyChallenge.trackKey
-        : this.currentTrackKey;
-    const progressMedal = tk
-      ? getMedalForRaceTime(tk, raceElapsedTime, lapNumber)
-      : null;
-
     if (!isFinalLap) {
       this.hud.showLapFlash({
         lapNumber,
@@ -1196,7 +1188,6 @@ export const dailyChallengeEngineMethods = {
           ? requiredLaps
           : this.currentChallengeRun.requiredLaps,
         elapsedTimeSec: raceElapsedTime,
-        medal: progressMedal,
       });
       this._resetLapTrailAfterIntermediateLap();
     }
