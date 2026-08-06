@@ -461,3 +461,12 @@ body[data-lobby-mode="campaign"] .lobby-panes {
         animation: none;
     }
 }
+
+
+/* Scope View Transitions to panes only to prevent header blinking */
+html.is-lobby-view-transition {
+    view-transition-name: none;
+}
+.lobby-panes {
+    view-transition-name: lobby-panes;
+}
