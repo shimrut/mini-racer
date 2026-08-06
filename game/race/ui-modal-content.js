@@ -464,11 +464,11 @@ export class ModalContentUi {
     const objectiveType = typeof scoreboardSnapshot?.objectiveType === 'string'
         ? scoreboardSnapshot.objectiveType
         : null;
-    const poolTotal = Math.max(0, Math.trunc(Number(scoreboardSnapshot?.totalCount)));
     const rawEntry = scoreboardSnapshot?.leaderboardEntryCount;
     const leaderboardEntryCount = rawEntry != null && Number.isFinite(Number(rawEntry))
         ? Math.max(0, Math.trunc(Number(rawEntry)))
-        : poolTotal;
+        : Math.max(0, Math.trunc(Number(scoreboardSnapshot?.totalCount)));
+    const poolTotal = leaderboardEntryCount;
     const openCommunitySlots = Math.max(0, poolTotal - leaderboardEntryCount);
     const hasRowActions = Boolean(shareBest)
         || (

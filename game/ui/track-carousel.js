@@ -176,6 +176,11 @@ export class TrackCarousel {
         if (!viewport) return;
         this._bound = true;
 
+        this._footParts = this.buildFoot();
+        if (this.root) {
+            this.root.append(this._footParts.foot);
+        }
+
         this.prevBtn?.addEventListener('click', () => this.step(-1));
         this.nextBtn?.addEventListener('click', () => this.step(1));
         viewport.addEventListener('scroll', () => this.handleScroll(), { passive: true });
@@ -338,9 +343,21 @@ export class TrackCarousel {
         previewArt.append(canvas);
         preview.append(previewArt, gate);
 
-        // The fixed Mini Racer wordmark and Daily/Campaign billing live in the
-        // lobby header. A card only owns its schematic and player status, so
-        // horizontal selection cannot move the screen identity.
+        element.append(preview);
+
+        element.addEventListener('click', () => {
+            const cardIndex = Number(element.dataset.index);
+            if (Number.isInteger(cardIndex)) this.select(cardIndex);
+        });
+
+        element._parts = {
+            canvas, preview, gate,
+        };
+        this.paintCard(element, card, { renderPreview: false });
+        return element;
+    }
+
+    buildFoot() {
         const foot = document.createElement('div');
         foot.className = 'track-carousel__card-foot';
         const requirement = document.createElement('div');
@@ -356,7 +373,7 @@ export class TrackCarousel {
         rank.classList.add('track-carousel__rank');
         rank.addEventListener('click', (event) => {
             event.stopPropagation();
-            const current = this._cards[Number(element.dataset.index)] || null;
+            const current = this.getSelectedCard();
             if (current && !current.locked) {
                 this.onOpenLeaderboard?.(current.challenge, current);
             }
@@ -376,21 +393,11 @@ export class TrackCarousel {
         medal.setAttribute('aria-hidden', 'true');
 
         foot.append(requirement, meta, medal);
-        element.append(preview, foot);
 
-        element.addEventListener('click', () => {
-            const cardIndex = Number(element.dataset.index);
-            if (Number.isInteger(cardIndex)) this.select(cardIndex);
-        });
-
-        element._parts = {
-            canvas, meta, rank, rankIcon, rankValue,
-            rankMedal, medal,
-            preview, gate, requirement, requirementList, foot,
-            bestCell, bestValue,
+        return {
+            foot, requirement, requirementList, meta, bestCell, bestValue,
+            rank, rankValue, rankIcon, rankMedal, medal,
         };
-        this.paintCard(element, card, { renderPreview: false });
-        return element;
     }
 
     paintCard(element, card, { renderPreview = true } = {}) {
@@ -398,22 +405,82 @@ export class TrackCarousel {
         if (!parts || !card) return;
         element.dataset.challengeId = card.challengeId;
 
-        this.paintSpec(parts, card);
         element.classList.toggle('current', Boolean(card.isCurrent));
         element.classList.toggle('is-locked', Boolean(card.locked));
-        this.paintGate(parts, card);
-
-        this.paintRank(parts, card);
-
-        this.paintMedals(parts.medal, card);
+        parts.gate.hidden = !Boolean(card.locked);
 
         if (renderPreview) this.renderPreview(parts.canvas, card);
     }
 
-    /** Lock state shown as a medal plate over the drawing and a two-item medal checklist below it. */
-    paintGate(parts, card) {
+    paintFoot(card) {
+        if (!this._footParts || !card) return;
+        const parts = this._footParts;
+
+        if (this.root) {
+            this.root.classList.toggle('is-locked', Boolean(card.locked));
+        }
+
         const locked = Boolean(card.locked);
-        parts.gate.hidden = !locked;
+        
+        parts.bestCell.hidden = locked;
+        parts.bestCell.classList.toggle('is-muted', !card.bestLabel);
+        setText(parts.bestValue, card.bestLabel || '—');
+
+        if (locked) {
+            const meter = card.lockMeter || null;
+            parts.rank.hidden = true;
+            parts.rank.disabled = true;
+            parts.rankMedal.hidden = !meter;
+            if (meter) {
+                const key = `${meter.remainingMedals}:${meter.ratio}`;
+                if (parts.rankMedal.dataset.meterKey !== key) {
+                    parts.rankMedal.dataset.meterKey = key;
+                    parts.rankMedal.replaceChildren(createUnlockMedalMeter(meter));
+                }
+                parts.rankMedal.setAttribute(
+                    'aria-label',
+                    `${card.trackName} is locked. ${meter.remainingMedals} additional medals needed`,
+                );
+            }
+        } else {
+            parts.rankMedal.hidden = true;
+            parts.rank.hidden = false;
+            parts.rankValue.hidden = false;
+            parts.rankIcon.hidden = false;
+            parts.rank.disabled = false;
+            setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || '—'));
+            parts.rank.classList.toggle('is-muted', card.rankPending || !card.rankLabel);
+            parts.rank.setAttribute(
+                'aria-label',
+                `${card.trackName} standings. Your rank: ${card.rankPending ? 'loading' : (card.rankLabel || 'unranked')}`,
+            );
+        }
+
+        const tiers = Array.isArray(card.medalTiers) ? card.medalTiers : [];
+        const key = tiers.map(({ tier, filled }) => `${tier}${filled ? '+' : '-'}`).join('');
+        if (parts.medal.dataset.medalKey !== key) {
+            parts.medal.dataset.medalKey = key;
+
+            if (!tiers.length) {
+                parts.medal.replaceChildren(createMedalIconSvg('white', {
+                    className: 'track-carousel__medal',
+                    outline: true,
+                    rowPlaceholder: true,
+                    showEmblem: false,
+                }));
+            } else {
+                parts.medal.replaceChildren(...tiers.map(({ tier, filled }) => {
+                    const icon = createMedalIconSvg(tier, {
+                        className: 'track-carousel__medal',
+                        outline: !filled,
+                        showEmblem: false,
+                    });
+                    icon.classList?.toggle?.('is-earned', filled);
+                    return icon;
+                }));
+            }
+        }
+
         parts.requirement.hidden = !locked;
         parts.meta.hidden = locked;
         parts.medal.hidden = locked;
@@ -447,74 +514,7 @@ export class TrackCarousel {
         }));
     }
 
-    /** Best time on the open-card status row. An unraced track keeps the cell and shows an em dash rather than hiding it, so the row does not reflow card to card. A locked stage hides it in favour of the prerequisite. */
-    paintSpec(parts, card) {
-        parts.bestCell.hidden = Boolean(card.locked);
-        parts.bestCell.classList.toggle('is-muted', !card.bestLabel);
-        setText(parts.bestValue, card.bestLabel || '—');
-    }
-
-    /** Bronze-through-author ladder as a row of pips (a full medal badge per tier would be noise at this size). Locked stages keep the data but hide the reward preview until the gate opens. Rebuilt only when the earned set changes. */
-    paintMedals(element, card) {
-        const tiers = Array.isArray(card.medalTiers) ? card.medalTiers : [];
-        const key = tiers.map(({ tier, filled }) => `${tier}${filled ? '+' : '-'}`).join('');
-        if (element.dataset.medalKey === key) return;
-        element.dataset.medalKey = key;
-
-        if (!tiers.length) {
-            element.replaceChildren(createMedalIconSvg('white', {
-                className: 'track-carousel__medal',
-                outline: true,
-                rowPlaceholder: true,
-                showEmblem: false,
-            }));
-            return;
-        }
-
-        element.replaceChildren(...tiers.map(({ tier, filled }) => {
-            const icon = createMedalIconSvg(tier, {
-                className: 'track-carousel__medal',
-                outline: !filled,
-                showEmblem: false,
-            });
-            icon.classList?.toggle?.('is-earned', filled);
-            return icon;
-        }));
-    }
-
-    /** Rank + leaderboard entry point. A locked stage has neither; its visible status row uses the prerequisite instead. */
-    paintRank(parts, card) {
-        if (card.locked) {
-            const meter = card.lockMeter || null;
-            parts.rank.hidden = true;
-            parts.rank.disabled = true;
-            parts.rankMedal.hidden = !meter;
-            if (meter) {
-                const key = `${meter.remainingMedals}:${meter.ratio}`;
-                if (parts.rankMedal.dataset.meterKey !== key) {
-                    parts.rankMedal.dataset.meterKey = key;
-                    parts.rankMedal.replaceChildren(createUnlockMedalMeter(meter));
-                }
-                parts.rankMedal.setAttribute(
-                    'aria-label',
-                    `${card.trackName} is locked. ${meter.remainingMedals} additional medals needed`,
-                );
-            }
-            return;
-        }
-
-        parts.rankMedal.hidden = true;
-        parts.rank.hidden = false;
-        parts.rankValue.hidden = false;
-        parts.rankIcon.hidden = false;
-        parts.rank.disabled = false;
-        setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || '—'));
-        parts.rank.classList.toggle('is-muted', card.rankPending || !card.rankLabel);
-        parts.rank.setAttribute(
-            'aria-label',
-            `${card.trackName} standings. Your rank: ${card.rankPending ? 'loading' : (card.rankLabel || 'unranked')}`,
-        );
-    }
+    // Footer paint is now handled in paintFoot
 
     /** Bitmap pixels per CSS pixel the previews are drawn at. */
     previewPixelScale() {
@@ -650,10 +650,13 @@ export class TrackCarousel {
             const isSelected = index === this._selectedIndex;
             element.classList.toggle('is-carousel-selected', isSelected);
             element.setAttribute('aria-hidden', String(!isSelected));
-            const rank = element._parts?.rank;
-            // Only the centred card is reachable; the peeking ones are scenery.
-            if (rank) rank.tabIndex = isSelected ? 0 : -1;
         });
+        
+        const card = this.getSelectedCard();
+        if (card) {
+            this.paintFoot(card);
+        }
+
         this.updateProximity();
     }
 

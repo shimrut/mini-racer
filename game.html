@@ -64,14 +64,6 @@
                     </h1>
                     <nav class="lobby-mode-toolbar" aria-label="Race mode actions">
                         <div class="lobby-mode-toolbar__actions">
-                            <button id="lobby-mode-back-btn"
-                                class="lobby-mode-toolbar__action lobby-mode-toolbar__back" type="button"
-                                data-lobby-back data-lobby-action aria-label="Back to modes">
-                                <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-                                    <path
-                                        d="M512 256a256 256 0 1 0 -512 0 256 256 0 1 0 512 0zM124.7 244.7l104-104c4.6-4.6 11.5-5.9 17.4-3.5s9.9 8.3 9.9 14.8l0 56 96 0c17.7 0 32 14.3 32 32l0 32c0 17.7-14.3 32-32 32l-96 0 0 56c0 6.5-3.9 12.3-9.9 14.8s-12.9 1.1-17.4-3.5l-104-104c-6.2-6.2-6.2-16.4 0-22.6z" />
-                                </svg>
-                            </button>
                             <button id="lobby-mode-standings-btn"
                                 class="lobby-mode-toolbar__action lobby-header-action" type="button"
                                 data-lobby-action aria-label="Standings">
@@ -100,17 +92,30 @@
                                         d="M195.1 9.5C198.1-5.3 211.2-16 226.4-16l59.8 0c15.2 0 28.3 10.7 31.3 25.5L332 79.5c14.1 6 27.3 13.7 39.3 22.8l67.8-22.5c14.4-4.8 30.2 1.2 37.8 14.4l29.9 51.8c7.6 13.2 4.9 29.8-6.5 39.9L447 233.3c.9 7.4 1.3 15 1.3 22.7s-.5 15.3-1.3 22.7l53.4 47.5c11.4 10.1 14 26.8 6.5 39.9l-29.9 51.8c-7.6 13.1-23.4 19.2-37.8 14.4l-67.8-22.5c-12.1 9.1-25.3 16.7-39.3 22.8l-14.4 69.9c-3.1 14.9-16.2 25.5-31.3 25.5l-59.8 0c-15.2 0-28.3-10.7-31.3-25.5l-14.4-69.9c-14.1-6-27.2-13.7-39.3-22.8L73.5 432.3c-14.4 4.8-30.2-1.2-37.8-14.4L5.8 366.1c-7.6-13.2-4.9-29.8 6.5-39.9l53.4-47.5c-.9-7.4-1.3-15-1.3-22.7s.5-15.3 1.3-22.7L12.3 185.8c-11.4-10.1-14-26.8-6.5-39.9L35.7 94.1c7.6-13.2 23.4-19.2 37.8-14.4l67.8 22.5c12.1-9.1 25.3-16.7 39.3-22.8L195.1 9.5zM256.3 336a80 80 0 1 0 -.6-160 80 80 0 1 0 .6 160z" />
                                 </svg>
                             </button>
+                            <button id="lobby-mode-back-btn"
+                                class="lobby-mode-toolbar__action lobby-mode-toolbar__back" type="button"
+                                data-lobby-back data-lobby-action aria-label="Back to modes">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+                                    <!--!Font Awesome Free v7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
+                                    <path d="M0 96C0 78.3 14.3 64 32 64l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 128C14.3 128 0 113.7 0 96zM64 256c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L96 288c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32L32 448c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32 14.3 32 32z"/>
+                                </svg>
+                            </button>
                         </div>
                     </nav>
                     <div class="lobby-subhead" data-lobby-subhead hidden>
                         <button id="lobby-back-btn" class="lobby-back-btn" type="button"
                             aria-label="Back to modes">
-                            <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-                                <path
-                                    d="M512 256a256 256 0 1 0 -512 0 256 256 0 1 0 512 0zM124.7 244.7l104-104c4.6-4.6 11.5-5.9 17.4-3.5s9.9 8.3 9.9 14.8l0 56 96 0c17.7 0 32 14.3 32 32l0 32c0 17.7-14.3 32-32 32l-96 0 0 56c0 6.5-3.9 12.3-9.9 14.8s-12.9 1.1-17.4-3.5l-104-104c-6.2-6.2-6.2-16.4 0-22.6z" />
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+                                <!--!Font Awesome Free v7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
+                                <path d="M0 96C0 78.3 14.3 64 32 64l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 128C14.3 128 0 113.7 0 96zM64 256c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L96 288c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32L32 448c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32 14.3 32 32z"/>
                             </svg>
                         </button>
                         <div class="lobby-subhead__text">
+                            <div class="lobby-mode-switch" data-lobby-mode-switch hidden>
+                                <button id="lobby-switch-daily-btn" class="lobby-mode-switch__btn" type="button">Daily</button>
+                                <span class="lobby-mode-switch__sep" aria-hidden="true">/</span>
+                                <button id="lobby-switch-campaign-btn" class="lobby-mode-switch__btn" type="button">Campaign</button>
+                            </div>
                             <p class="lobby-mode-label" data-lobby-mode-label></p>
                             <p class="lobby-mode-track" data-lobby-mode-track hidden></p>
                         </div>
@@ -159,9 +164,11 @@
                                     <path
                                         d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 246.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z" />
                                 </svg>
+                                <span class="track-carousel__nav-label">Prev</span>
                             </button>
                             <button id="daily-carousel-next" class="track-carousel__nav track-carousel__nav--next"
                                 type="button" aria-label="Next track" hidden>
+                                <span class="track-carousel__nav-label">Next</span>
                                 <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
                                     <path
                                         d="M311.1 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L243.2 256 73.9 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z" />
@@ -197,9 +204,11 @@
                                     <path
                                         d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 246.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z" />
                                 </svg>
+                                <span class="track-carousel__nav-label">Prev</span>
                             </button>
                             <button id="campaign-carousel-next" class="track-carousel__nav track-carousel__nav--next"
                                 type="button" aria-label="Next track" hidden>
+                                <span class="track-carousel__nav-label">Next</span>
                                 <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
                                     <path
                                         d="M311.1 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L243.2 256 73.9 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z" />

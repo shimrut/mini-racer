@@ -114,7 +114,11 @@ export class LobbyUi {
         this._bound = true;
         document.getElementById('lobby-home-daily-btn')
             ?.addEventListener('click', () => this.onSelectDaily?.());
+        document.getElementById('lobby-switch-daily-btn')
+            ?.addEventListener('click', () => this.onSelectDaily?.());
         document.getElementById('lobby-home-campaign-btn')
+            ?.addEventListener('click', () => this.onSelectCampaign?.());
+        document.getElementById('lobby-switch-campaign-btn')
             ?.addEventListener('click', () => this.onSelectCampaign?.());
         document.querySelectorAll?.('[data-lobby-back]')?.forEach((button) => {
             button.addEventListener('click', () => this.onBack?.(this.mode));
@@ -208,26 +212,32 @@ export class LobbyUi {
     updateModeLabel(mode = this.mode) {
         const subhead = document.querySelector('[data-lobby-subhead]');
         const label = document.querySelector('[data-lobby-mode-label]');
+        const toggle = document.querySelector('[data-lobby-mode-switch]');
+        const switchDaily = document.getElementById('lobby-switch-daily-btn');
+        const switchCampaign = document.getElementById('lobby-switch-campaign-btn');
         if (!label) return;
-        if (mode === 'daily') {
+        if (mode === 'daily' || mode === 'campaign') {
             if (subhead) subhead.hidden = false;
-            label.textContent = 'Daily';
-            this.syncLobbySubheadDetail();
-            return;
-        }
-        if (mode === 'campaign') {
-            if (subhead) subhead.hidden = false;
-            label.textContent = 'Campaign';
+            label.hidden = true;
+            if (toggle) toggle.hidden = false;
+            if (switchDaily && switchCampaign) {
+                switchDaily.setAttribute('aria-pressed', String(mode === 'daily'));
+                switchCampaign.setAttribute('aria-pressed', String(mode === 'campaign'));
+            }
             this.syncLobbySubheadDetail();
             return;
         }
         if (mode === 'challenge') {
             if (subhead) subhead.hidden = false;
+            if (toggle) toggle.hidden = true;
+            label.hidden = false;
             label.textContent = 'Challenge';
             this.syncLobbySubheadDetail();
             return;
         }
         if (subhead) subhead.hidden = true;
+        if (toggle) toggle.hidden = true;
+        label.hidden = false;
         label.textContent = '';
         this.syncLobbySubheadDetail();
     }

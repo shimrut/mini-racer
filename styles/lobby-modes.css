@@ -154,6 +154,46 @@ body[data-lobby-mode="campaign"] .lobby-back-btn {
     display: none;
 }
 
+body[data-lobby-mode="daily"] .lobby-mode-switch,
+body[data-lobby-mode="campaign"] .lobby-mode-switch {
+    grid-column: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.lobby-mode-switch__btn {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s ease-out;
+}
+
+.lobby-mode-switch__btn[aria-pressed="true"] {
+    color: var(--text-default);
+}
+
+.lobby-mode-switch__btn:hover {
+    color: var(--text-default);
+}
+
+.lobby-mode-switch__sep {
+    color: var(--border-default);
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
 body[data-lobby-mode="daily"] .lobby-mode-label,
 body[data-lobby-mode="campaign"] .lobby-mode-label {
     grid-column: 1;

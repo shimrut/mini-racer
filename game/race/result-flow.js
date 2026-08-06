@@ -194,7 +194,7 @@ export function applyCombinedRankValue({
         rankValueEl.textContent = rankText;
     }
 
-    const totalRaw = Number(scoreboardSnapshot?.totalCount);
+    const totalRaw = Number(scoreboardSnapshot?.leaderboardEntryCount);
     const totalVal = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
     if (!rankTotalEl) return;
     if (totalVal > 0) {
@@ -231,7 +231,7 @@ export function formatCombinedRankOutOf(scoreboardSnapshot) {
     if (!scoreboardSnapshot || typeof scoreboardSnapshot !== 'object') return '--';
     if (scoreboardSnapshot.isLoading) return '--';
 
-    const totalRaw = Number(scoreboardSnapshot.totalCount);
+    const totalRaw = Number(scoreboardSnapshot.leaderboardEntryCount);
     const total = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
     const rank = getCombinedRankNumber(scoreboardSnapshot);
 
