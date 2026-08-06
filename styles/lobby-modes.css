@@ -463,10 +463,13 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 
-/* Scope View Transitions to panes only to prevent header blinking */
-html.is-lobby-view-transition {
-    view-transition-name: none;
+/* Scope View Transitions to panes and toggle only */
+html.is-lobby-view-transition::view-transition-group(root) {
+    animation: none;
 }
 .lobby-panes {
     view-transition-name: lobby-panes;
+}
+.lobby-mode-switch::before {
+    view-transition-name: lobby-mode-pill;
 }
