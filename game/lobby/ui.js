@@ -199,6 +199,9 @@ export class LobbyUi {
             }
             if (document.body?.dataset) {
                 document.body.dataset.lobbyMode = mode;
+                if (previousMode && previousMode !== mode) {
+                    document.body.dataset.lobbyPaneSwitched = 'true';
+                }
                 if (mode === 'home' && previousMode !== 'home') {
                     document.body.dataset.lobbyHomeReturned = 'true';
                 }
