@@ -462,10 +462,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     }
 }
 
-body[data-lobby-pane-switched="true"] .lobby-pane {
-    animation: none !important;
-}
-
 
 /* Scope View Transitions to carousel track only to prevent unwanted crossfades */
 :root {
