@@ -159,39 +159,35 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch {
     grid-column: 1;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    background: var(--bg-surface);
+    border-radius: var(--radius-full);
+    padding: 0.15rem;
 }
 
 .lobby-mode-switch__btn {
     appearance: none;
     background: transparent;
     border: none;
-    padding: 0;
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.68rem;
+    border-radius: var(--radius-full);
+    padding: 0.35rem 0.8rem;
+    color: var(--text-muted);
+    font-family: var(--header-font);
+    font-size: 0.75rem;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.1em;
     line-height: 1;
     text-transform: uppercase;
     cursor: pointer;
-    transition: color 0.2s ease-out;
+    transition: color var(--dur-base) ease, background-color var(--dur-base) ease;
 }
 
 .lobby-mode-switch__btn[aria-pressed="true"] {
-    color: var(--text-default);
+    background-color: var(--accent-color);
+    color: var(--text-color);
 }
 
-.lobby-mode-switch__btn:hover {
-    color: var(--text-default);
-}
-
-.lobby-mode-switch__sep {
-    color: var(--border-default);
-    font-family: var(--mono-font);
-    font-size: 0.68rem;
-    font-weight: 700;
-    line-height: 1;
+.lobby-mode-switch__btn:not([aria-pressed="true"]):hover {
+    color: var(--text-dim);
 }
 
 body[data-lobby-mode="daily"] .lobby-mode-label,
