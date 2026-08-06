@@ -211,11 +211,7 @@ export class LobbyUi {
         };
 
         if (document.startViewTransition && previousMode !== mode && previousMode !== 'home') {
-            document.documentElement.classList.add('is-lobby-view-transition');
-            const transition = document.startViewTransition(() => updateDom());
-            transition.finished.finally(() => {
-                document.documentElement.classList.remove('is-lobby-view-transition');
-            });
+            document.startViewTransition(() => updateDom());
         } else {
             updateDom();
         }

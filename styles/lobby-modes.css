@@ -463,13 +463,10 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 
-/* Scope View Transitions to panes and toggle only */
-html.is-lobby-view-transition::view-transition-group(root) {
-    animation: none;
+/* Scope View Transitions to carousel track only to prevent unwanted crossfades */
+:root {
+    view-transition-name: none;
 }
-.lobby-panes {
-    view-transition-name: lobby-panes;
-}
-.lobby-mode-switch::before {
-    view-transition-name: lobby-mode-pill;
+.track-carousel__rail {
+    view-transition-name: lobby-carousel-track;
 }
