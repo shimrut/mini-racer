@@ -185,9 +185,10 @@ export class LobbyUi {
     showPane(mode) {
         if (!LOBBY_MODES.includes(mode)) return false;
         const previousMode = this.mode;
+        if (previousMode !== mode) this.beginPaneTransition();
+        this.mode = mode;
 
-        const updateDOM = () => {
-            this.mode = mode;
+        const updateDom = () => {
             for (const candidate of LOBBY_MODES) {
                 const pane = document.getElementById(`lobby-${candidate}-pane`);
                 if (!pane) continue;
@@ -206,23 +207,15 @@ export class LobbyUi {
             this.syncModeToolbarState();
             this.overlay?.setAttribute('aria-label', this.getPaneAriaLabel(mode));
             this.resetKeyboardNav();
-        };
-
-        const afterTransition = () => {
             requestAnimationFrame(() => this.focus());
         };
 
-        if (previousMode !== mode) {
-            this.beginPaneTransition();
-            if (document.startViewTransition) {
-                const transition = document.startViewTransition(() => updateDOM());
-                transition.finished.finally(afterTransition);
-                return true;
-            }
+        if (document.startViewTransition && previousMode !== mode && previousMode !== 'home') {
+            document.startViewTransition(() => updateDom());
+        } else {
+            updateDom();
         }
 
-        updateDOM();
-        afterTransition();
         return true;
     }
 
