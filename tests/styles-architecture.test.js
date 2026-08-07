@@ -437,9 +437,10 @@ describe('game stylesheet architecture', () => {
         expect(actionRow).not.toMatch(
             /(?:^|[\s;])(?:background|border|border-radius|box-shadow|color|font|font-size|font-weight|letter-spacing|text-transform)\s*:/m,
         );
+        // Challenge races the same poster, so it takes the same safe-area row.
         expect(
             trackCarouselStyles.match(/\.lobby-primary-row/g),
-        ).toHaveLength(2);
+        ).toHaveLength(3);
     });
 
     it('eases the shared Daily and Campaign lobby away over the exact race-start duration', () => {

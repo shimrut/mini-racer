@@ -92,14 +92,6 @@
                                         d="M195.1 9.5C198.1-5.3 211.2-16 226.4-16l59.8 0c15.2 0 28.3 10.7 31.3 25.5L332 79.5c14.1 6 27.3 13.7 39.3 22.8l67.8-22.5c14.4-4.8 30.2 1.2 37.8 14.4l29.9 51.8c7.6 13.2 4.9 29.8-6.5 39.9L447 233.3c.9 7.4 1.3 15 1.3 22.7s-.5 15.3-1.3 22.7l53.4 47.5c11.4 10.1 14 26.8 6.5 39.9l-29.9 51.8c-7.6 13.1-23.4 19.2-37.8 14.4l-67.8-22.5c-12.1 9.1-25.3 16.7-39.3 22.8l-14.4 69.9c-3.1 14.9-16.2 25.5-31.3 25.5l-59.8 0c-15.2 0-28.3-10.7-31.3-25.5l-14.4-69.9c-14.1-6-27.2-13.7-39.3-22.8L73.5 432.3c-14.4 4.8-30.2-1.2-37.8-14.4L5.8 366.1c-7.6-13.2-4.9-29.8 6.5-39.9l53.4-47.5c-.9-7.4-1.3-15-1.3-22.7s.5-15.3 1.3-22.7L12.3 185.8c-11.4-10.1-14-26.8-6.5-39.9L35.7 94.1c7.6-13.2 23.4-19.2 37.8-14.4l67.8 22.5c12.1-9.1 25.3-16.7 39.3-22.8L195.1 9.5zM256.3 336a80 80 0 1 0 -.6-160 80 80 0 1 0 .6 160z" />
                                 </svg>
                             </button>
-                            <button id="lobby-mode-back-btn"
-                                class="lobby-mode-toolbar__action lobby-mode-toolbar__back" type="button"
-                                data-lobby-back data-lobby-action aria-label="Back to modes">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-                                    <!--!Font Awesome Free v7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
-                                    <path d="M0 96C0 78.3 14.3 64 32 64l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 128C14.3 128 0 113.7 0 96zM64 256c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L96 288c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32L32 448c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32 14.3 32 32z"/>
-                                </svg>
-                            </button>
                         </div>
                     </nav>
                     <div class="lobby-subhead" data-lobby-subhead hidden>
@@ -230,22 +222,51 @@
 
                     <section id="lobby-challenge-pane" class="lobby-pane lobby-pane--challenge main-menu"
                         data-lobby-pane="challenge" aria-label="Player challenge" hidden>
-                        <div class="challenge-lobby">
-                            <p id="challenge-track-label" class="challenge-lobby__track">Track unavailable</p>
-                            <div class="challenge-target">
-                                <span class="challenge-target__label">Time to beat</span>
-                                <strong id="challenge-target-time" class="challenge-target__time">--:--.---</strong>
-                                <span id="challenge-target-medal" class="challenge-target__medal" hidden></span>
+                        <div id="challenge-poster" class="track-carousel">
+                            <div class="track-carousel__viewport">
+                                <div class="track-carousel__rail">
+                                    <div class="daily-playlist-entry--hero current is-carousel-selected"
+                                        role="group" aria-label="Challenge track">
+                                        <div class="daily-playlist-hero-preview">
+                                            <div class="track-carousel__preview-art">
+                                                <canvas id="challenge-track-preview"
+                                                    aria-hidden="true"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                            <div class="track-carousel__card-foot">
+                                <div class="challenge-racer">
+                                    <img id="challenge-challenger-avatar"
+                                        class="challenge-avatar challenge-avatar--empty"
+                                        src="" alt="" aria-hidden="true">
+                                    <span class="challenge-racer__figures">
+                                        <span class="challenge-racer__label">Time to beat</span>
+                                        <strong id="challenge-target-time"
+                                            class="challenge-racer__time">--:--.---</strong>
+                                    </span>
+                                </div>
+                                <div class="challenge-racer challenge-racer--viewer">
+                                    <img id="challenge-viewer-avatar"
+                                        class="challenge-avatar challenge-avatar--empty"
+                                        src="" alt="" aria-hidden="true">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="lobby-primary-row lobby-primary-row--race">
                             <p id="challenge-sign-in-message" class="challenge-sign-in-message" hidden>
                                 Sign in to accept this challenge.
                             </p>
-                        </div>
-                        <div class="lobby-primary-row">
                             <button id="challenge-accept-btn"
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action disabled>
                                 <span class="main-menu__label">Accept</span>
+                                <span class="main-menu__race-brief" hidden>
+                                    <span class="main-menu__race-brief-track"></span>
+                                    <span class="main-menu__race-brief-separator" aria-hidden="true">·</span>
+                                    <span class="main-menu__race-brief-laps"></span>
+                                </span>
                             </button>
                         </div>
                     </section>

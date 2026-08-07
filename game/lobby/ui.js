@@ -10,6 +10,7 @@ import {
     normalizeCampaignLobbyState,
     normalizeChallengeLobbyState,
 } from './service.js';
+import { AVATAR_PLACEHOLDER_SRC } from '../ui/avatar-placeholder.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
@@ -22,6 +23,33 @@ const BLOCKING_OVERLAY_IDS = [
 
 function setText(element, value) {
     if (element) element.textContent = value;
+}
+
+/**
+ * A seat in the duel. An empty seat keeps its place with the default Snoo —
+ * the viewer's side is empty for exactly the stranger this screen invites.
+ */
+function setAvatar(element, url, label) {
+    if (!element) return;
+    const empty = () => {
+        element.src = AVATAR_PLACEHOLDER_SRC;
+        element.alt = '';
+        element.classList?.add?.('challenge-avatar--empty');
+        element.setAttribute?.('aria-hidden', 'true');
+    };
+    if (!url) {
+        element.onerror = null;
+        empty();
+        return;
+    }
+    element.onerror = () => {
+        element.onerror = null;
+        empty();
+    };
+    element.src = url;
+    element.alt = label;
+    element.classList?.remove?.('challenge-avatar--empty');
+    element.setAttribute?.('aria-hidden', 'false');
 }
 
 function setRaceBriefText(element, trackName, laps) {
@@ -78,6 +106,7 @@ export class LobbyUi {
         onStartDaily = null,
         onStartCampaign = null,
         onAcceptChallenge = null,
+        onRenderChallengePreview = null,
     } = {}) {
         this.onSelectDaily = onSelectDaily;
         this.onCarouselNavigate = onCarouselNavigate;
@@ -87,6 +116,7 @@ export class LobbyUi {
         this.onStartDaily = onStartDaily;
         this.onStartCampaign = onStartCampaign;
         this.onAcceptChallenge = onAcceptChallenge;
+        this.onRenderChallengePreview = onRenderChallengePreview;
         this.mode = 'home';
         this.campaignState = normalizeCampaignLobbyState();
         this.challengeState = normalizeChallengeLobbyState();
@@ -139,6 +169,9 @@ export class LobbyUi {
         });
         document.addEventListener('keydown', this._keydownHandler, true);
         document.addEventListener('pointermove', this._pointerMoveHandler, true);
+        globalThis.addEventListener?.('resize', () => {
+            if (this.mode === 'challenge') this.renderChallengePreview();
+        });
     }
 
     showHome() {
@@ -207,7 +240,11 @@ export class LobbyUi {
             this.syncModeToolbarState();
             this.overlay?.setAttribute('aria-label', this.getPaneAriaLabel(mode));
             this.resetKeyboardNav();
-            requestAnimationFrame(() => this.focus());
+            requestAnimationFrame(() => {
+                this.focus();
+                // The poster can only be measured once its pane is on screen.
+                if (this.mode === 'challenge') this.renderChallengePreview();
+            });
         };
 
         if (document.startViewTransition && previousMode !== mode && previousMode !== 'home') {
@@ -259,46 +296,39 @@ export class LobbyUi {
     }
 
     /**
-     * Only Challenge has a detail line left: it names the opponent, which is
-     * nowhere else on the screen. Daily's track name is on the carousel card.
+     * Every mode screen bills itself on one line: what this is on the left, who
+     * or when it is for on the right. Challenge names its opponent there, the
+     * way Daily names its day and Campaign its stage.
      */
     syncLobbySubheadDetail() {
         const querySelector = document.querySelector?.bind(document);
         const track = querySelector?.('[data-lobby-mode-track]') || null;
         const selection = querySelector?.('[data-lobby-mode-selection]') || null;
         const rule = querySelector?.('[data-lobby-subhead-rule]') || null;
-        if (this.mode === 'daily' || this.mode === 'campaign') {
-            const billingLabel = this.mode === 'daily'
-                ? this._dailySelectedBillingLabel
-                : this._campaignSelectedBillingLabel;
-            if (track) {
-                track.hidden = true;
-                track.textContent = '';
-                track.classList.remove('lobby-mode-track--challenge');
-            }
-            if (rule) rule.hidden = false;
+        if (track) {
+            track.hidden = true;
+            track.textContent = '';
+        }
+        const billingLabel = this.mode === 'daily'
+            ? this._dailySelectedBillingLabel
+            : this.mode === 'campaign'
+                ? this._campaignSelectedBillingLabel
+                : this.mode === 'challenge'
+                    ? this.challengeState?.challengerName?.trim() || null
+                    : null;
+        if (this.mode === 'home') {
+            if (rule) rule.hidden = true;
             if (selection) {
-                selection.hidden = !billingLabel;
-                selection.textContent = billingLabel || '';
+                selection.hidden = true;
+                selection.textContent = '';
             }
             return;
         }
-        if (rule) rule.hidden = true;
+        if (rule) rule.hidden = false;
         if (selection) {
-            selection.hidden = true;
-            selection.textContent = '';
+            selection.hidden = !billingLabel;
+            selection.textContent = billingLabel || '';
         }
-        if (!track) return;
-        if (this.mode === 'challenge') {
-            const opponent = this.challengeState?.opponentLabel?.trim() || '';
-            track.hidden = !opponent;
-            track.textContent = opponent;
-            track.classList.toggle('lobby-mode-track--challenge', Boolean(opponent));
-            return;
-        }
-        track.hidden = true;
-        track.textContent = '';
-        track.classList.remove('lobby-mode-track--challenge');
     }
 
     getMode() {
@@ -512,15 +542,32 @@ export class LobbyUi {
         }
     }
 
+    /** The duel's poster: the circuit it is raced on, drawn the way every other lobby track is. */
+    renderChallengePreview({ force = false } = {}) {
+        const canvas = document.getElementById('challenge-track-preview');
+        const trackKey = this.challengeState.trackKey;
+        if (!canvas || !trackKey) return;
+        this.onRenderChallengePreview?.(canvas, { trackKey, skin: null }, { force });
+    }
+
     renderChallenge() {
-        setText(document.getElementById('challenge-track-label'), this.challengeState.trackLabel);
+        setRaceBriefText(
+            this.challengeAcceptBtn?.querySelector('.main-menu__race-brief'),
+            this.challengeState.trackName,
+            this.challengeState.laps,
+        );
         setText(document.getElementById('challenge-target-time'), this.challengeState.targetTimeLabel);
-        const medal = document.getElementById('challenge-target-medal');
-        if (medal) {
-            medal.hidden = !this.challengeState.medal;
-            medal.textContent = this.challengeState.medal || '';
-            medal.dataset.medal = this.challengeState.medal?.toLowerCase() || '';
-        }
+        setAvatar(
+            document.getElementById('challenge-challenger-avatar'),
+            this.challengeState.challengerAvatarUrl,
+            `${this.challengeState.challengerName} avatar`,
+        );
+        setAvatar(
+            document.getElementById('challenge-viewer-avatar'),
+            this.challengeState.viewerAvatarUrl,
+            'Your avatar',
+        );
+        this.renderChallengePreview();
         const message = document.getElementById('challenge-sign-in-message');
         if (message) {
             message.hidden = !this.challengeState.statusMessage;

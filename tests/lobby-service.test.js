@@ -245,7 +245,6 @@ describe('lobby service', () => {
 
         expect(guest).toMatchObject({
             challengerName: 'u/RaceFan',
-            opponentLabel: 'u/RaceFan challenges you',
             trackLabel: 'Number Three · 2 laps',
             targetTimeLabel: '0:25.640',
             canAccept: true,

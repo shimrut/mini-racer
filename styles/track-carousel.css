@@ -27,6 +27,7 @@
 /* Keep a restrained hint of the live track-of-the-day render behind the
    selector without stacking a gradient and a second translucent fill. The
    schematic remains the visual anchor; the moving canvas is atmosphere only. */
+body[data-lobby-mode="challenge"] #start-overlay,
 body[data-lobby-mode="daily"] #start-overlay,
 body[data-lobby-mode="campaign"] #start-overlay {
     background: rgba(2, 6, 23, 0.8);
@@ -42,6 +43,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
    layered over the poster; it owns the second grid row, and the carousel can
    only use the first. This avoids WebKit's short-lived flex overflow during a
    native viewport resize and makes overlap structurally impossible. */
+#lobby-challenge-pane.lobby-pane,
 #lobby-daily-pane.lobby-pane,
 #lobby-campaign-pane.lobby-pane {
     display: grid;
@@ -64,10 +66,31 @@ body[data-lobby-mode="campaign"] #start-overlay {
  * poster whatever is left after this row takes its intrinsic height. The row
  * itself remains layout-only: button appearance stays with the shared lobby
  * styles, and there is no z-index because no overlap is permitted. */
+#lobby-challenge-pane .lobby-primary-row--race,
 #lobby-daily-pane .lobby-primary-row--race,
 #lobby-campaign-pane .lobby-primary-row--race {
     min-height: 0;
     padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}
+
+#challenge-poster .track-carousel__rail,
+#challenge-poster .daily-playlist-entry--hero {
+    width: 100%;
+}
+
+#challenge-poster .daily-playlist-entry--hero {
+    --card-proximity: 1;
+    flex: 1 1 100%;
+    min-width: 0;
+}
+
+#challenge-poster .track-carousel__preview-art {
+    flex: 0 1 auto;
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    aspect-ratio: var(--challenge-track-aspect, 1);
+    margin-inline: auto;
 }
 
 .track-carousel {

@@ -93,6 +93,7 @@ body[data-lobby-home-returned="true"] .lobby-title,
    the complete header in flow: the toolbar is pinned to its upper-right, while
    the wordmark and the mode/date billing row reserve their own space above the
    carousel. */
+body[data-lobby-mode="challenge"] .lobby-header,
 body[data-lobby-mode="daily"] .lobby-header,
 body[data-lobby-mode="campaign"] .lobby-header {
     position: relative;
@@ -103,6 +104,7 @@ body[data-lobby-mode="campaign"] .lobby-header {
 /* Daily/Campaign keep the compact printed masthead that previously lived on
    each carousel card. Home owns the larger display treatment; the fixed mode
    header must not inherit that scale. */
+body[data-lobby-mode="challenge"] .lobby-title,
 body[data-lobby-mode="daily"] .lobby-title,
 body[data-lobby-mode="campaign"] .lobby-title {
     --lobby-title-cap: clamp(1.5rem, 8.5vw, 3rem);
@@ -111,12 +113,14 @@ body[data-lobby-mode="campaign"] .lobby-title {
     letter-spacing: -0.02em;
 }
 
+body[data-lobby-mode="challenge"] .lobby-title__mini,
 body[data-lobby-mode="daily"] .lobby-title__mini,
 body[data-lobby-mode="campaign"] .lobby-title__mini {
     font-size: 0.62em;
     letter-spacing: -0.02em;
 }
 
+body[data-lobby-mode="challenge"] .lobby-title__racer,
 body[data-lobby-mode="daily"] .lobby-title__racer,
 body[data-lobby-mode="campaign"] .lobby-title__racer {
     font-size: 1em;
@@ -135,6 +139,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     width: auto;
 }
 
+body[data-lobby-mode="challenge"] .lobby-subhead,
 body[data-lobby-mode="daily"] .lobby-subhead,
 body[data-lobby-mode="campaign"] .lobby-subhead {
     display: grid;
@@ -144,11 +149,13 @@ body[data-lobby-mode="campaign"] .lobby-subhead {
     margin-top: 0.75rem;
 }
 
+body[data-lobby-mode="challenge"] .lobby-subhead__text,
 body[data-lobby-mode="daily"] .lobby-subhead__text,
 body[data-lobby-mode="campaign"] .lobby-subhead__text {
     display: contents;
 }
 
+body[data-lobby-mode="challenge"] .lobby-back-btn,
 body[data-lobby-mode="daily"] .lobby-back-btn,
 body[data-lobby-mode="campaign"] .lobby-back-btn {
     display: none;
@@ -218,6 +225,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before {
     color: var(--text-dim);
 }
 
+body[data-lobby-mode="challenge"] .lobby-mode-label,
 body[data-lobby-mode="daily"] .lobby-mode-label,
 body[data-lobby-mode="campaign"] .lobby-mode-label {
     grid-column: 1;
@@ -230,6 +238,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-label {
     line-height: 1;
 }
 
+body[data-lobby-mode="challenge"] .lobby-subhead__rule,
 body[data-lobby-mode="daily"] .lobby-subhead__rule,
 body[data-lobby-mode="campaign"] .lobby-subhead__rule {
     grid-column: 2;
@@ -239,6 +248,7 @@ body[data-lobby-mode="campaign"] .lobby-subhead__rule {
     background: var(--border-default);
 }
 
+body[data-lobby-mode="challenge"] .lobby-mode-selection,
 body[data-lobby-mode="daily"] .lobby-mode-selection,
 body[data-lobby-mode="campaign"] .lobby-mode-selection {
     grid-column: 3;
@@ -258,6 +268,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection {
     white-space: nowrap;
 }
 
+body[data-lobby-mode="challenge"] .lobby-panes,
 body[data-lobby-mode="daily"] .lobby-panes,
 body[data-lobby-mode="campaign"] .lobby-panes {
     position: relative;
@@ -382,64 +393,76 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     gap: 0.3rem;
 }
 
-.challenge-lobby {
-    width: 100%;
-    margin-top: 0.75rem;
-    padding: 0.85rem 0.9rem;
-    border-radius: var(--radius-sm);
-    background: rgba(8, 12, 20, 0.72);
+#challenge-poster .track-carousel__card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(0.75rem, 4vw, 1.5rem);
+    width: 95%;
+    margin-inline: auto;
 }
 
-.challenge-lobby__track {
-    margin: 0 0 0.65rem;
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.76rem;
-    font-weight: 700;
-    text-transform: uppercase;
+.challenge-racer {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.45rem, 2.2vw, 0.7rem);
+    min-width: 0;
 }
 
-.challenge-target {
+.challenge-racer__figures {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    padding-block: 0.65rem 0;
-    border-top: 1px solid var(--border-default);
+    gap: 0.2rem;
+    min-width: 0;
 }
 
-.challenge-target__label {
+.challenge-avatar {
+    display: block;
+    flex: 0 0 auto;
+    width: clamp(2.1rem, 8vw, 2.6rem);
+    height: clamp(2.1rem, 8vw, 2.6rem);
+    min-width: 0;
+    padding: 0;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-full);
+    background: var(--bg-surface);
+    object-fit: cover;
+}
+
+.challenge-avatar--empty {
+    padding: 0.4rem;
+    object-fit: contain;
+    opacity: 0.55;
+}
+
+.challenge-racer__label {
     color: var(--text-dim);
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.challenge-target__time {
     font-family: var(--mono-font);
-    font-size: clamp(1.75rem, 7vw, 2.5rem);
-    letter-spacing: -0.06em;
-    line-height: 1.05;
+    font-size: clamp(0.6rem, 2.3vw, 0.7rem);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
-.challenge-target__medal {
-    margin-top: 0.25rem;
-    color: var(--warning);
-    font-size: 0.68rem;
-    font-weight: 900;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+.challenge-racer__time {
+    color: var(--text-color);
+    font-family: var(--mono-font);
+    font-size: clamp(1.15rem, 5.4vw, 1.7rem);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .challenge-sign-in-message {
-    margin: 0.75rem 0 0;
+    margin: 0;
     color: var(--warning);
     font-size: 0.78rem;
     font-weight: 700;
-}
-
-.lobby-pane--challenge .lobby-primary-row {
-    margin-top: 0.85rem;
+    text-align: center;
 }
 
 @media (max-width: 430px) {

@@ -32,6 +32,12 @@ export function formatLobbyTime(milliseconds) {
     return `${minutes}:${String(seconds).padStart(2, '0')}.${String(remainder).padStart(3, '0')}`;
 }
 
+function normalizeAvatarUrl(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.startsWith('https://') ? trimmed : null;
+}
+
 function normalizeMedalName(medal) {
     return typeof medal === 'string' ? medal.trim().toLowerCase() : '';
 }
@@ -213,7 +219,8 @@ export function normalizeChallengeLobbyState(state = {}) {
     const challengerName = rawName
         ? (rawName.startsWith('u/') ? rawName : `u/${rawName}`)
         : 'A racer';
-
+    // A stranger arriving on the post has no avatar to show yet, so the duel
+    // keeps both seats and fills the empty one with the default Snoo.
     return {
         ...state,
         signedIn,
@@ -221,7 +228,12 @@ export function normalizeChallengeLobbyState(state = {}) {
         available,
         canAccept: canRace && available,
         challengerName,
-        opponentLabel: `${challengerName} challenges you`,
+        trackKey: typeof state.trackKey === 'string' && state.trackKey.trim()
+            ? state.trackKey.trim()
+            : null,
+        trackName: typeof state.trackName === 'string' && state.trackName.trim()
+            ? state.trackName.trim()
+            : null,
         trackLabel: typeof state.trackName === 'string' && state.trackName.trim()
             ? `${state.trackName.trim()} · ${laps} ${laps === 1 ? 'lap' : 'laps'}`
             : 'Track unavailable',
@@ -231,6 +243,8 @@ export function normalizeChallengeLobbyState(state = {}) {
         medal: typeof state.medal === 'string' && state.medal.trim()
             ? state.medal.trim()
             : null,
+        challengerAvatarUrl: normalizeAvatarUrl(state.challengerAvatarUrl),
+        viewerAvatarUrl: normalizeAvatarUrl(state.viewerAvatarUrl),
         statusMessage: !available
             ? 'This challenge is unavailable.'
             : (!canRace ? 'This challenge is unavailable right now.' : ''),

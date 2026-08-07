@@ -1051,10 +1051,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         )?.[0];
         expect(toolbarMarkup).toContain('class="lobby-mode-toolbar__actions"');
         expect(toolbarMarkup).toMatch(
-            /<button id="lobby-mode-back-btn"[\s\S]*id="lobby-mode-standings-btn"[\s\S]*id="lobby-mode-garage-btn"[\s\S]*id="lobby-mode-settings-btn"/,
+            /<button id="lobby-mode-standings-btn"[\s\S]*id="lobby-mode-garage-btn"[\s\S]*id="lobby-mode-settings-btn"/,
         );
-        expect(toolbarMarkup).toContain('id="lobby-mode-back-btn"');
-        expect(toolbarMarkup).toContain('data-lobby-back');
+        expect(toolbarMarkup).not.toContain('id="lobby-mode-back-btn"');
         expect(toolbarMarkup).toContain('id="lobby-mode-standings-btn"');
         expect(toolbarMarkup).toContain('aria-label="Standings"');
         expect(toolbarMarkup).toContain('id="lobby-mode-garage-btn"');
@@ -1475,7 +1474,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         // the right-hand end of the fixed billing line.
         lobby.showDaily();
         expect(subhead.hidden).toBe(false);
-        expect(label.textContent).toBe('Daily');
+        expect(label.hidden).toBe(true);
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
         expect(rule.hidden).toBe(false);
@@ -1491,7 +1490,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         lobby.showCampaign();
         expect(subhead.hidden).toBe(false);
-        expect(label.textContent).toBe('Campaign');
+        expect(label.hidden).toBe(true);
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
         expect(rule.hidden).toBe(false);
@@ -1518,20 +1517,20 @@ describe('Campaign lobby and shared modal adapters', () => {
             targetTimeMs: 9478,
             medal: 'gold',
         });
+        // Challenge bills itself on the same line every mode screen uses: what
+        // this is on the left, who it is against on the right.
         expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Challenge');
-        expect(track.hidden).toBe(false);
-        expect(track.textContent).toBe('u/shimroot challenges you');
-        expect(track.classList.contains('lobby-mode-track--challenge')).toBe(true);
-        expect(rule.hidden).toBe(true);
-        expect(selection.hidden).toBe(true);
+        expect(track.hidden).toBe(true);
+        expect(rule.hidden).toBe(false);
+        expect(selection.hidden).toBe(false);
+        expect(selection.textContent).toBe('u/shimroot');
         expect(body.dataset.lobbyMode).toBe('challenge');
 
         lobby.showHome();
         expect(subhead.hidden).toBe(true);
         expect(label.textContent).toBe('');
         expect(track.hidden).toBe(true);
-        expect(track.classList.contains('lobby-mode-track--challenge')).toBe(false);
         expect(rule.hidden).toBe(true);
         expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('home');

@@ -27,7 +27,11 @@ import { TrackLayerRenderer } from "./track/layer.js";
 import { RaceHud } from "./race/ui-hud.js";
 import { StartOverlay } from "./race/ui-start-overlay.js";
 import { DailyChallengeUi } from "./daily-challenge/ui.js";
-import { TrackCarousel } from "./ui/track-carousel.js";
+import {
+  fitTrackPreviewCanvas,
+  getTrackAspectRatio,
+  TrackCarousel,
+} from "./ui/track-carousel.js";
 import { ModalContentUi } from "./race/ui-modal-content.js";
 import { ModalShell } from "./race/ui-modal-shell.js";
 import { LoadingScreen } from "./ui/loader.js";
@@ -320,6 +324,31 @@ export class RealTimeRacer {
         this.campaignCarousel.getSelectedChallenge(),
       ),
       onAcceptChallenge: () => void this.startCampaignChallenge(),
+      onRenderChallengePreview: (canvas, card, options) => {
+        // The single poster hugs its circuit, so a portrait track in a short
+        // landscape window keeps its own measure instead of stranding.
+        const aspect = getTrackAspectRatio(card.trackKey);
+        if (canvas?.parentElement && aspect) {
+          canvas.parentElement.style.setProperty(
+            "--challenge-track-aspect",
+            String(aspect),
+          );
+        }
+        return fitTrackPreviewCanvas(canvas, card, {
+          ...options,
+          cacheNamespace: "challenge-poster",
+          carImage: this.carSpriteAssetKey ? this.carSprite : null,
+          carAssetKey: this.carSpriteAssetKey || "loading",
+          carWorldSize: {
+            width: (
+              this.carSpriteDrawWidth * (CONFIG.carSpriteRenderScale ?? 1)
+            ) / CONFIG.gridSize,
+            height: (
+              this.carSpriteDrawHeight * (CONFIG.carSpriteRenderScale ?? 1)
+            ) / CONFIG.gridSize,
+          },
+        });
+      },
     });
     this.hud = new RaceHud({
       getTrackPersonalBest: () => this.bestLapTime,

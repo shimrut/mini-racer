@@ -124,6 +124,112 @@ function createSpecCell(label, element = 'span') {
     return [cell, valueEl, labelEl];
 }
 
+/**
+ * A circuit's own width-to-height ratio. A single poster can hug the drawing
+ * with it, so a portrait track in a short landscape window sits in its own
+ * measure instead of stranding inside a full-width band.
+ */
+export function getTrackAspectRatio(trackKey) {
+    const track = TRACKS[trackKey];
+    const points = track?.outer;
+    if (!Array.isArray(points) || !points.length) return null;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const point of points) {
+        if (point.x < minX) minX = point.x;
+        if (point.x > maxX) maxX = point.x;
+        if (point.y < minY) minY = point.y;
+        if (point.y > maxY) maxY = point.y;
+    }
+    const width = maxX - minX;
+    const height = maxY - minY;
+    if (!(width > 0) || !(height > 0)) return null;
+    return width / height;
+}
+
+/** Bitmap pixels per CSS pixel a schematic is drawn at. */
+export function trackPreviewPixelScale() {
+    return Math.min(2, Math.max(1, Math.round(globalThis.devicePixelRatio || 1)));
+}
+
+/**
+ * Draws one track schematic the way the lobby draws every other one. The
+ * carousel and the Challenge poster both go through here, so a card and a
+ * duel show the same circuit in the same hand.
+ */
+export function renderTrackPreviewCanvas(canvas, card, {
+    cacheNamespace = 'track-preview',
+    carImage = null,
+    carAssetKey = 'fallback',
+    carWorldSize = null,
+    force = false,
+} = {}) {
+    const track = TRACKS[card?.trackKey];
+    if (!canvas || !track) return;
+    const previewCarWorldSize = carWorldSize
+        ? {
+            width: carWorldSize.width * PREVIEW_CAR_SCALE,
+            height: carWorldSize.height * PREVIEW_CAR_SCALE,
+        }
+        : null;
+    const previewCarSizeKey = previewCarWorldSize
+        ? `${previewCarWorldSize.width}x${previewCarWorldSize.height}`
+        : 'default-size';
+    const previewKey = [
+        card.trackKey,
+        card.skin || 'default',
+        carAssetKey,
+        previewCarSizeKey,
+        `${canvas.width}x${canvas.height}`,
+    ].join(':');
+    if (!force && canvas.dataset.previewKey === previewKey) return;
+    canvas.dataset.previewKey = previewKey;
+
+    renderCachedTrackPreviewCanvas(canvas, {
+        cacheKey: [
+            cacheNamespace,
+            card.trackKey,
+            card.skin || 'default',
+            carAssetKey,
+            previewCarSizeKey,
+        ].join(':'),
+        trackGeometry: { outer: track.outer, inner: track.inner },
+        presentation: resolveTrackPresentation(card.trackKey, {
+            surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+            event: card.skin
+                ? { key: 'daily-challenge', trackKey: card.trackKey, skin: card.skin }
+                : null,
+        }),
+        startLine: track.startLine,
+        startPos: track.startPos,
+        startAngle: track.startAngle,
+        transparentBackground: true,
+        previewRenderMode: 'schematic',
+        schematicCarImage: carImage,
+        schematicCarWorldSize: previewCarWorldSize,
+        hideSchematicStartArrow: Boolean(carImage),
+    });
+}
+
+/**
+ * Matches a schematic's bitmap to the box it is painted in, then redraws when
+ * that box changed. Returns whether anything was drawn.
+ */
+export function fitTrackPreviewCanvas(canvas, card, options = {}) {
+    const host = canvas?.parentElement;
+    if (!canvas || !host?.offsetWidth || !host?.offsetHeight) return false;
+    const scale = trackPreviewPixelScale();
+    const width = Math.round(host.offsetWidth * scale);
+    const height = Math.round(host.offsetHeight * scale);
+    const sizeChanged = canvas.width !== width || canvas.height !== height;
+    if (sizeChanged) {
+        canvas.width = width;
+        canvas.height = height;
+    }
+    if (!sizeChanged && canvas.dataset?.previewKey && !options.force) return false;
+    renderTrackPreviewCanvas(canvas, card, { ...options, force: sizeChanged || options.force });
+    return true;
+}
+
 export function findCarouselIndex(cards = [], challengeId = null) {
     if (!challengeId) return -1;
     return cards.findIndex((card) => card.challengeId === challengeId);
@@ -518,7 +624,7 @@ export class TrackCarousel {
 
     /** Bitmap pixels per CSS pixel the previews are drawn at. */
     previewPixelScale() {
-        return Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));
+        return trackPreviewPixelScale();
     }
 
     fitPreviews() {
@@ -553,53 +659,12 @@ export class TrackCarousel {
     }
 
     renderPreview(canvas, card, { force = false } = {}) {
-        const track = TRACKS[card.trackKey];
-        if (!canvas || !track) return;
-        const previewCarImage = this.getPreviewCarImage?.() || null;
-        const previewCarAssetKey = this.getPreviewCarAssetKey?.() || 'fallback';
-        const raceCarWorldSize = this.getPreviewCarWorldSize?.() || null;
-        const previewCarWorldSize = raceCarWorldSize
-            ? {
-                width: raceCarWorldSize.width * PREVIEW_CAR_SCALE,
-                height: raceCarWorldSize.height * PREVIEW_CAR_SCALE,
-            }
-            : null;
-        const previewCarSizeKey = previewCarWorldSize
-            ? `${previewCarWorldSize.width}x${previewCarWorldSize.height}`
-            : 'default-size';
-        const previewKey = [
-            card.trackKey,
-            card.skin || 'default',
-            previewCarAssetKey,
-            previewCarSizeKey,
-            `${canvas.width}x${canvas.height}`,
-        ].join(':');
-        if (!force && canvas.dataset.previewKey === previewKey) return;
-        canvas.dataset.previewKey = previewKey;
-
-        renderCachedTrackPreviewCanvas(canvas, {
-            cacheKey: [
-                this.previewCacheNamespace,
-                card.trackKey,
-                card.skin || 'default',
-                previewCarAssetKey,
-                previewCarSizeKey,
-            ].join(':'),
-            trackGeometry: { outer: track.outer, inner: track.inner },
-            presentation: resolveTrackPresentation(card.trackKey, {
-                surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
-                event: card.skin
-                    ? { key: 'daily-challenge', trackKey: card.trackKey, skin: card.skin }
-                    : null,
-            }),
-            startLine: track.startLine,
-            startPos: track.startPos,
-            startAngle: track.startAngle,
-            transparentBackground: true,
-            previewRenderMode: 'schematic',
-            schematicCarImage: previewCarImage,
-            schematicCarWorldSize: previewCarWorldSize,
-            hideSchematicStartArrow: Boolean(previewCarImage),
+        renderTrackPreviewCanvas(canvas, card, {
+            cacheNamespace: this.previewCacheNamespace,
+            carImage: this.getPreviewCarImage?.() || null,
+            carAssetKey: this.getPreviewCarAssetKey?.() || 'fallback',
+            carWorldSize: this.getPreviewCarWorldSize?.() || null,
+            force,
         });
     }
 
