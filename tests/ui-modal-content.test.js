@@ -159,10 +159,37 @@ describe('ui modal content helpers', () => {
             playerRankLabel: null,
         }, 'daily', 'circuit');
 
-        const ranks = [...container.querySelectorAll('.combined-row-rank')].map((node) => node.textContent);
-        expect(ranks[0]).toBe('1');
-        expect(ranks).not.toContain('0');
+        // Nobody has posted a time, so the board is empty rather than padded
+        // out to the 5 community members with placeholder rows.
+        expect(container.querySelectorAll('.combined-row-rank')).toHaveLength(0);
+        expect(container.textContent).toContain('No scores recorded yet.');
         expect(container.textContent).not.toContain('You');
+
+        global.document = originalDocument;
+    });
+
+    it('lists only racers who set a time, never the rest of the community', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM('<div id="leaderboard"></div>');
+        global.document = dom.window.document;
+
+        const container = dom.window.document.getElementById('leaderboard');
+        const component = new ModalContentUi();
+
+        // `totalCount` is padded by the subreddit member floor. Only the 2
+        // racers with times get rows; the other 3 members are not the board's
+        // business.
+        component.renderScoreboardList(container, {
+            topRows: [
+                { rank: 1, displayName: 'Leader', bestTime: 12.3 },
+                { rank: 2, displayName: 'Second', bestTime: 12.5 },
+            ],
+            leaderboardEntryCount: 2,
+            totalCount: 5,
+        }, 'daily', 'circuit');
+
+        expect(container.querySelectorAll('.leaderboard-row')).toHaveLength(2);
+        expect(container.textContent).not.toContain('No time yet');
 
         global.document = originalDocument;
     });
@@ -351,6 +378,7 @@ describe('ui modal content helpers', () => {
         );
         expect(rightGroup.hidden).toBe(false);
 
+        // A payload old enough to carry only `totalCount` still gets a total.
         component.renderCombinedResults(container, {
             time: 12.34,
             bestLap: 12.34,
@@ -363,6 +391,59 @@ describe('ui modal content helpers', () => {
         expect(rankValue.querySelector('.rank-num')?.textContent).toBe('3');
         expect(container.querySelector('#combined-rank-total').textContent).toBe('of 40');
         expect(rightGroup.hidden).toBe(false);
+
+        global.document = originalDocument;
+    });
+
+    it('counts the racers who posted a time, not the community behind them', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div id="combined-best-lap"></div>
+                <div id="combined-stat-label-1"></div>
+                <div id="combined-stat-label-2"></div>
+                <div id="combined-next-medal-stat"></div>
+                <div id="combined-next-medal-icon-slot"></div>
+                <div id="combined-next-medal-time"></div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+
+        // `totalCount` is padded by the subreddit member floor, so ranking "of
+        // 40" out of 3 actual racers is the bug this pins shut.
+        component.renderCombinedResults(container, {
+            time: 12.34,
+            bestLap: 12.34,
+            scoreboardSnapshot: {
+                isLoading: false,
+                playerRankLabel: '#2',
+                leaderboardEntryCount: 3,
+                totalCount: 40,
+            },
+        });
+
+        expect(container.querySelector('#combined-rank-total').textContent).toBe('of 3');
+
+        // A zero entry count means nobody has posted, not "fall through to 40".
+        component.renderCombinedResults(container, {
+            time: 12.34,
+            bestLap: 12.34,
+            scoreboardSnapshot: {
+                isLoading: false,
+                playerRankLabel: '#2',
+                leaderboardEntryCount: 0,
+                totalCount: 40,
+            },
+        });
+
+        expect(container.querySelector('#combined-rank-total').textContent).toBe('');
 
         global.document = originalDocument;
     });

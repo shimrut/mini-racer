@@ -52,17 +52,6 @@
     background: #3f1818;
 }
 
-.combined-row--community-open {
-    opacity: 0.72;
-}
-
-.combined-row--community-summary .combined-row-name {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: 0.02em;
-}
-
 .combined-row-rank {
     width: 2rem;
     height: 1.25rem;

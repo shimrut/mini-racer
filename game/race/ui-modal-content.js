@@ -3,8 +3,6 @@ import { applyCombinedRankValue, buildModalDeltaDisplay } from '../race/result-f
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
-const MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS = 150;
-
 const LEADERBOARD_SHARE_ICON_PATH = 'M307.8 18.4c-12 5-19.8 16.6-19.8 29.6l0 80-112 0c-97.2 0-176 78.8-176 176 0 113.3 81.5 163.9 100.2 174.1 2.5 1.4 5.3 1.9 8.1 1.9 10.9 0 19.7-8.9 19.7-19.7 0-7.5-4.3-14.4-9.8-19.5-9.4-8.8-22.2-26.4-22.2-56.7 0-53 43-96 96-96l96 0 0 80c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l160-160c12.5-12.5 12.5-32.8 0-45.3l-160-160c-9.2-9.2-22.9-11.9-34.9-6.9z';
 // Font Awesome Free v7.3.1 ghost icon.
 // https://fontawesome.com/license/free
@@ -464,12 +462,13 @@ export class ModalContentUi {
     const objectiveType = typeof scoreboardSnapshot?.objectiveType === 'string'
         ? scoreboardSnapshot.objectiveType
         : null;
+    // Only racers who actually posted a time reach this list. `totalCount` is
+    // padded by Daily's subreddit member floor, so it is a fallback for old
+    // payloads that lack an entry count, never a row count to render up to.
     const rawEntry = scoreboardSnapshot?.leaderboardEntryCount;
     const leaderboardEntryCount = rawEntry != null && Number.isFinite(Number(rawEntry))
         ? Math.max(0, Math.trunc(Number(rawEntry)))
         : Math.max(0, Math.trunc(Number(scoreboardSnapshot?.totalCount)));
-    const poolTotal = leaderboardEntryCount;
-    const openCommunitySlots = Math.max(0, poolTotal - leaderboardEntryCount);
     const hasRowActions = Boolean(shareBest)
         || (
             raceOpponentEnabled
@@ -500,7 +499,7 @@ export class ModalContentUi {
         || nearbyRows.length > 0
         || (currentPlayerRow && (Number.isFinite(currentPlayerRow.rank) || currentPlayerRow.rankLabel));
 
-    if (!hasScoredRow && (!poolTotal || isLoading)) {
+    if (!hasScoredRow && (!leaderboardEntryCount || isLoading)) {
         syncLeaderboardEmptyState(section, {
             isLoading,
             text: isLoading ? 'Loading leaderboard...' : 'No scores recorded yet.',
@@ -564,24 +563,6 @@ export class ModalContentUi {
         });
     };
 
-    const pushCommunityOpenRowSpec = (rank) => {
-        rowSpecs.push({
-            key: buildLeaderboardRowKey('open', rank, usedKeys),
-            kind: 'community-open',
-            hasCells: true,
-            rowClass: 'combined-row leaderboard-row combined-row--community-open',
-            role: null,
-            interactive: false,
-            opponentEntry: null,
-            hasRankData: true,
-            rank: String(rank),
-            rankText: String(rank),
-            nameText: 'No time yet',
-            timeText: '—',
-            actionState: hasRowActions ? LEADERBOARD_ROW_ACTION_NONE : null,
-        });
-    };
-
     topRows.forEach((entry) => pushScoreboardRowSpec(entry));
 
     if (!isPaginated && nearbyRows.length) {
@@ -605,32 +586,6 @@ export class ModalContentUi {
         && !topRows.some((entry) => entry.isCurrentPlayer)
     )) {
         pushScoreboardRowSpec(currentPlayerRow);
-    }
-
-    if (openCommunitySlots > 0 && !hasMore) {
-        const firstRank = leaderboardEntryCount + 1;
-        let shown = 0;
-        for (let rank = firstRank; rank <= poolTotal && shown < MAX_COMMUNITY_PLACEHOLDER_LEADERBOARD_ROWS; rank += 1) {
-            pushCommunityOpenRowSpec(rank);
-            shown += 1;
-        }
-        const remaining = openCommunitySlots - shown;
-        if (remaining > 0) {
-            rowSpecs.push({
-                key: buildLeaderboardRowKey('community-summary', null, usedKeys),
-                kind: 'community-summary',
-                hasCells: true,
-                rowClass: 'combined-row leaderboard-row combined-row--community-open combined-row--community-summary',
-                role: 'note',
-                interactive: false,
-                opponentEntry: null,
-                hasRankData: false,
-                rankText: '…',
-                nameText: `${remaining} more in this community — no time yet`,
-                timeText: '',
-                actionState: null,
-            });
-        }
     }
 
     if (hasMore) {

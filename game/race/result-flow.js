@@ -194,7 +194,13 @@ export function applyCombinedRankValue({
         rankValueEl.textContent = rankText;
     }
 
-    const totalRaw = Number(scoreboardSnapshot?.leaderboardEntryCount);
+    // The racers who actually posted a time, never `totalCount` — that carries
+    // Daily's community floor and would report the whole subreddit. `??` keeps
+    // a real 0 meaning "no racers" while still reading older payloads that
+    // only ever sent `totalCount`.
+    const totalRaw = Number(
+        scoreboardSnapshot?.leaderboardEntryCount ?? scoreboardSnapshot?.totalCount,
+    );
     const totalVal = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
     if (!rankTotalEl) return;
     if (totalVal > 0) {
@@ -231,7 +237,9 @@ export function formatCombinedRankOutOf(scoreboardSnapshot) {
     if (!scoreboardSnapshot || typeof scoreboardSnapshot !== 'object') return '--';
     if (scoreboardSnapshot.isLoading) return '--';
 
-    const totalRaw = Number(scoreboardSnapshot.leaderboardEntryCount);
+    const totalRaw = Number(
+        scoreboardSnapshot.leaderboardEntryCount ?? scoreboardSnapshot.totalCount,
+    );
     const total = Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : 0;
     const rank = getCombinedRankNumber(scoreboardSnapshot);
 
