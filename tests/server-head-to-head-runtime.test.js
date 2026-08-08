@@ -14,9 +14,6 @@ vi.mock('../src/server/daily-gp-store.js', () => ({
 vi.mock('../src/server/head-to-head-post.js', () => ({
     resolveHeadToHeadRecord: vi.fn(),
 }));
-vi.mock('../src/server/head-to-head-store.js', () => ({
-    readHeadToHeadResult: vi.fn(),
-}));
 vi.mock('../src/server/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateReplay,
 }));
