@@ -149,26 +149,6 @@ function playerIdentityBody(extra = {}) {
     };
 }
 
-function readChallengePostId() {
-    const postId = globalThis.devvit?.context?.postId;
-    return typeof postId === 'string' && postId.startsWith('t3_') ? postId : null;
-}
-
-function challengePostIdentityBody(extra = {}) {
-    const postId = readChallengePostId();
-    return playerIdentityBody({
-        ...extra,
-        ...(postId ? { postId } : {}),
-    });
-}
-
-function challengeUrl(route) {
-    const url = campaignUrl(route);
-    const postId = readChallengePostId();
-    if (postId) url.searchParams.set('postId', postId);
-    return url;
-}
-
 function campaignUrl(route) {
     return withPlayerIdentity(
         new URL(route, globalThis.location?.origin ?? 'http://localhost'),
@@ -261,54 +241,4 @@ export async function getCampaignPbGhost(raceId) {
     const url = campaignUrl(API_ROUTES.campaignPbGhostUrl);
     url.searchParams.set('raceId', raceId);
     return requestJson(url.toString());
-}
-
-export async function previewCampaignChallenge(input) {
-    return requestJson(API_ROUTES.campaignChallengePreviewUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-    });
-}
-
-export async function createCampaignChallenge(challengeToken, extra = {}) {
-    return requestJson(API_ROUTES.campaignChallengeCreateUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeToken, ...extra }),
-    });
-}
-
-export async function getCampaignChallenge(challengeId) {
-    const url = challengeUrl(API_ROUTES.campaignChallengeUrl);
-    url.searchParams.set('challengeId', challengeId);
-    return requestJson(url.toString());
-}
-
-export async function submitCampaignChallengeRun({ challengeId, replay }) {
-    return requestJson(API_ROUTES.campaignChallengeSubmitUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(challengePostIdentityBody({ challengeId, replay })),
-    });
-}
-
-export async function previewCampaignChallengeBrag({ challengeId }) {
-    const postId = readChallengePostId();
-    return requestJson(API_ROUTES.campaignChallengeBragPreviewUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            challengeId,
-            ...(postId ? { postId } : {}),
-        }),
-    });
-}
-
-export async function confirmCampaignChallengeBrag(shareToken) {
-    return requestJson(API_ROUTES.campaignChallengeBragConfirmUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shareToken }),
-    });
 }

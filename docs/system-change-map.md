@@ -128,7 +128,7 @@ flowchart LR
 
 - `game/lobby/ui.js` owns the Home, Daily, Campaign, and player-challenge
   panes. `game/modes/launch-target.js` resolves standalone Home, direct mode
-  queries, Daily post context, and Campaign challenge post context. The shared
+  queries, Daily post context, and Head to Head post context. The shared
   lobby keeps the original compact `#start-group` footprint with title at the
   top and one bottom-pinned action cluster (`margin-top: auto` on the active
   pane only). The shared shell takes height from the measured visible WebView.
@@ -244,7 +244,7 @@ flowchart LR
   permanent progress, one permanent leaderboard and PB ghost hash per stage,
   replay validation, and server-derived medals. Campaign records do not share
   Daily keys or expiry policy.
-- `src/server/campaign-challenge-*` owns verified-result source resolution,
+- `src/server/head-to-head-*` owns verified-result source resolution,
   isolated duel results, custom-post idempotency, and the three-new-posts per
   player/subreddit/UTC-day limit. The immutable challenge target and ghost are
   encoded in the Reddit custom post's text fallback after the human-readable
@@ -280,7 +280,7 @@ flowchart LR
   only after a verified beat. Confirmation status is patched into the medal
   hero (Submitting/Verifying → medal or error). Duel submissions never call
   the Campaign store.
-- `campaign-challenge.html` is the dedicated in-feed Head to Head custom-post
+- `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,
   and frozen challenger Reddit avatar URL (no ghost or player ID in public post
   data). The human-readable text fallback is followed by the complete
@@ -291,7 +291,7 @@ flowchart LR
   challenger and viewer avatars (generic Snoo while signed out), and labels
   the mode Head to Head. Unavailable responses remain disabled but are not
   presented as a sign-in requirement.
-- `campaign-challenge.css` owns the standalone post's race-poster visual: the
+- `head-to-head.css` owns the standalone post's race-poster visual: the
   duel and target time remain the primary reading path, the circuit stays open as
   the right-side hero, and the single Race Head to Head CTA anchors beneath it.
   Desktop uses a split brief/track composition; compact widths keep the trace
@@ -396,7 +396,7 @@ flowchart LR
 | Personal-best ghost | `game/ghost/pb-ghost.js`, `game/ghost/pb-ghost-service.js`, `src/server/pb-ghost-store.ts`, `src/server/pb-ghost-trace.ts` | Challenge PB state, verified trace generation, playback, selected-car rendering | Replay validator, player identity, Redis, settings |
 | Car visuals/customization | `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/car-unlock-policy.js`, `game/car/player-trail.js`, `game/settings/garage-ui.js`, `src/server/car-unlock-store.ts` | Car art, asset loading, permanent achievement unlocks, garage selection, trail style, and the selected-car marker in Daily/Campaign lobby previews | `public/assets/cars/*`, generated asset list, Campaign results, verified race/challenge events, shared track carousel, Redis |
 | Daily challenge | `game/daily-challenge/service.js`, `game/daily-challenge/labels.js`, `game/daily-challenge/ui.js`, `game/daily-challenge/storage.js` | Featured challenge state, playlist, local bests | Shared schedule, server APIs, preview renderer |
-| Campaign and challenges | `game/campaign/*`, `game/lobby/*`, `game/modes/launch-target.js`, `src/server/campaign-*`, `campaign.html`, `campaign-challenge.html` | Permanent staged progression, Campaign standings/PBs, isolated verified player duels, launcher posts, and custom challenges | Shared simulation/replay/medal rules, Redis, Reddit post context |
+| Campaign and challenges | `game/campaign/*`, `game/lobby/*`, `game/modes/launch-target.js`, `src/server/campaign-*`, `campaign.html`, `head-to-head.html` | Permanent staged progression, Campaign standings/PBs, isolated verified player duels, launcher posts, and custom challenges | Shared simulation/replay/medal rules, Redis, Reddit post context |
 | Leaderboards | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js`, `game/scoreboard/engine-methods.js` | Snapshot normalization, paginated standings display, submissions, verification retry flow, share entry point | API routes, daily challenge storage, server APIs |
 | Settings | `game/settings/ui.js`, `game/settings/*.js`, `game/player/preferences.js` | Identity, audio toggles, collision auto-restart and delay, durable preference sync | Browser cache, player APIs, Redis profile, modal helpers |
 | Audio | `game/audio/*` | Sound playback | Settings preferences |
@@ -423,10 +423,10 @@ These client-facing routes are registered under `src/server/routes/`:
 - `/api/campaign/snapshot`
 - `/api/campaign/submit`
 - `/api/campaign/pb-ghost`
-- `/api/campaign/challenge`
-- `/api/campaign/challenge/preview`
-- `/api/campaign/challenge/create`
-- `/api/campaign/challenge/submit`
+- `/api/head-to-head`
+- `/api/head-to-head/preview`
+- `/api/head-to-head/create`
+- `/api/head-to-head/submit`
 
 The browser-side API route table is `game/scoreboard/api-client.js`; player ID / guest token live in `game/scoreboard/player-identity.js`. Both leaderboard snapshot endpoints normalize their responses through `game/scoreboard/snapshot.js` before UI or cache use.
 
@@ -456,7 +456,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 
 | Change request | Primary files | Review too | Why this area ripples |
 | --- | --- | --- | --- |
-| Car skin, unlock rule, or new car art | `public/assets/cars/*`, `tools/generate-player-car-assets.js`, `game/car/generated-player-selectable-car-assets.js`, `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/car-unlock-policy.js`, `game/settings/garage-ui.js`, `src/server/car-unlock-store.ts` | `styles.css`, `game.html`, Daily/Campaign/challenge accepted-result paths, player bootstrap/preferences | New art affects asset discovery and fallback loading; gated cars also require authoritative progress, guest merge, server-side preference validation, and Garage lock states |
+| Car skin, unlock rule, or new car art | `public/assets/cars/*`, `tools/generate-player-car-assets.js`, `game/car/generated-player-selectable-car-assets.js`, `game/car/sprite.js`, `game/car/player-car-skin.js`, `game/car/car-unlock-policy.js`, `game/settings/garage-ui.js`, `src/server/car-unlock-store.ts` | `styles.css`, `game.html`, Daily/Campaign/head-to-head accepted-result paths, player bootstrap/preferences | New art affects asset discovery and fallback loading; gated cars also require authoritative progress, guest merge, server-side preference validation, and Garage lock states |
 | Car trail options | `game/car/player-trail.js`, `game/settings/garage-ui.js` | `styles.css`, `game/engine.js`, `game/player/preferences.js` | Trail choices are cached locally, persisted in the Redis player profile, and rendered from engine state |
 | Car size or render look | `game/config.js`, `game/car/sprite.js`, sometimes `public/assets/cars/*` | `game/race/engine-methods.js`, `styles.css` | Car scale is visual, but shadow and draw sizing live in config/orchestrator flow |
 | Car handling / physics tuning | `game/car/handling.js`, `game/config.js`, `game/race/simulation.js` | `src/server/replay-validator.ts`, `game/race/run-policy.js`, `game/race/engine-methods.js` | Server validation reuses shared gameplay logic, so tuning changes affect accepted runs |
@@ -471,7 +471,8 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Leaderboard snapshot or submit behavior | `game/scoreboard/service.js`, `game/scoreboard/snapshot.js`, `game/scoreboard/ui.js` | `src/server/routes/competition-routes.ts`, `src/server/daily-gp-store.ts`, `src/server/community-context.ts`, `game/scoreboard/engine-methods.js` | Client display and server payload shape must stay aligned; community size and submission rate-limit identity come from trusted server context |
 | Leaderboard opponent races | `game/scoreboard/opponent-race-service.js`, `game/scoreboard/opponent-race-engine-methods.js`, `src/server/leaderboard-race-service.ts`, `src/server/routes/leaderboard-race-routes.ts` | Daily/Campaign stores, standings UI, PB ghost, HUD, result sheet, verification queues | A selected row is only a lookup key: the server must re-resolve its current verified replay and the normal competition submission path must remain authoritative |
 | Result sharing or score-thread behavior | `game/race/ui-modal-shell.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-share.ts`, `src/server/daily-gp-post-store.ts` | `src/server/daily-post-service.ts`, `src/server/routes/share-routes.ts`, `devvit.json`, finish and standings tests | The same confirmation contract serves finish and standings; Reddit user-action permission and post/comment identity are server-enforced |
-| Head to Head guests or Daily-origin challenges | `campaign-challenge.js`, `game/campaign/service.js`, `game/campaign/engine-methods.js`, `src/server/campaign-challenge-post.ts`, `src/server/campaign-challenge-runtime.ts`, `src/server/campaign-challenge-store.ts` | `src/server/competition-identity.ts`, `src/server/daily-gp-store.ts`, challenge replay/service/route tests | Guest identity is authorized separately from Reddit identity; embedded Daily challenge data bypasses only Daily expiry for the isolated Head to Head path |
+| Head to Head guests or Daily-origin challenges | `head-to-head.js`, `game/campaign/service.js`, `game/campaign/engine-methods.js`, `src/server/head-to-head-post.ts`, `src/server/head-to-head-runtime.ts`, `src/server/head-to-head-store.ts` | `src/server/competition-identity.ts`, `src/server/daily-gp-store.ts`, challenge replay/service/route tests | Guest identity is authorized separately from Reddit identity; embedded Daily challenge data bypasses only Daily expiry for the isolated Head to Head path |
+| What a beaten Head to Head offers next | `game/head-to-head/engine-methods.js`, `game/race/ui-modal-shell.js`, `game/lobby/service.js`, `game/lobby/ui.js`, `game.html`, `styles/lobby-modes.css` | Daily and Campaign lobby entry (`game/modes/engine-methods.js`, `game/campaign/engine-methods.js`), finish-sheet action row shared by every mode | A duel is spent once won: only a verified `outcome === 'won'` trades Improve for Daily/Campaign and marks the poster beaten, so lost/tie/unverified finishes keep their retry. The win is session state carried by hand into `loadChallengeLobby` (`outcome` plus the server-verified `bestTimeMs`), not a per-viewer server record. The poster states the win as a margin in its empty second seat rather than a headline, so the gap must stay derived from the two verified times in `normalizeChallengeLobbyState`. The finish sheet's action row is shared by every mode and must be reset on every other finish |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the independently expiring Reddit Redis player profile as the durable source |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |

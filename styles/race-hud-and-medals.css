@@ -448,6 +448,26 @@
     color: #fecdd3;
 }
 
+/* The duel's margin, in the timing-screen grammar the split times already use. */
+.combined-medal-challenge-margin {
+    margin: 0.15rem 0 0;
+    text-align: center;
+    font-family: var(--mono-font);
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+}
+
+.combined-medal-challenge-margin.is-gain {
+    color: var(--success-bright);
+}
+
+.combined-medal-challenge-margin.is-loss {
+    color: #f87171;
+}
+
 .combined-hero-medal .medal-svg--hero.medal-svg--placeholder {
     filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
 }

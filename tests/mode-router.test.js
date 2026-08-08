@@ -8,7 +8,7 @@ function createEngine(overrides = {}) {
         currentChallengeRun: null,
         activeRaceMode: 'home',
         activeCampaignStage: { raceId: 'numbered-v1-00' },
-        activeCampaignChallenge: { challengeId: 'challenge-1' },
+        activeHeadToHead: { challengeId: 'challenge-1' },
         hasAnyData: true,
         isReturningPlayer: true,
         reset: vi.fn(),
@@ -18,7 +18,7 @@ function createEngine(overrides = {}) {
         journeys: { endAttempt: vi.fn(), startAttempt: vi.fn() },
         restartDailyChallenge: vi.fn(),
         handleCampaignWin: vi.fn(),
-        handleCampaignChallengeWin: vi.fn(),
+        handleHeadToHeadWin: vi.fn(),
         handleDailyChallengeWin: vi.fn(),
         handleDailyChallengeLapCompleted: vi.fn(),
         showCampaignLobby: vi.fn(() => 'campaign-lobby'),
@@ -49,7 +49,7 @@ describe('mode router', () => {
 
         const challenge = createEngine({ activeRaceMode: 'challenge' });
         challenge.handleActiveRaceWin(winData);
-        expect(challenge.handleCampaignChallengeWin).toHaveBeenCalledWith(winData);
+        expect(challenge.handleHeadToHeadWin).toHaveBeenCalledWith(winData);
 
         const daily = createEngine({ activeRaceMode: 'daily' });
         daily.handleActiveRaceWin(winData);
@@ -110,14 +110,14 @@ describe('mode router', () => {
         home.showHomeLobby();
         expect(home.activeRaceMode).toBe('home');
         expect(home.activeCampaignStage).toBeNull();
-        expect(home.activeCampaignChallenge).toBeNull();
+        expect(home.activeHeadToHead).toBeNull();
         expect(home.clearDailyChallengeRun).toHaveBeenCalled();
 
         const daily = createEngine({ activeRaceMode: 'campaign' });
         daily.showDailyLobby();
         expect(daily.activeRaceMode).toBe('daily');
         expect(daily.activeCampaignStage).toBeNull();
-        expect(daily.activeCampaignChallenge).toBeNull();
+        expect(daily.activeHeadToHead).toBeNull();
     });
 
     it("puts the day's track back behind Home after racing something else", () => {

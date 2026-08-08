@@ -1,24 +1,22 @@
 import { reddit } from '@devvit/web/server';
 import {
-    CAMPAIGN_CHALLENGE_ID,
-    CAMPAIGN_CHALLENGE_POST_TYPE,
-    getCampaignChallengeOrigin,
-    isCampaignChallengeMedal,
-    isCampaignChallengeRaceId,
-    isCampaignChallengeOrigin,
-    sameCampaignChallengeOrigin,
-    type CampaignChallengePostData,
-    type CampaignChallengeRecord,
-} from './campaign-challenge-model.js';
-import { decodeCampaignChallengeReplay } from './campaign-challenge-replay.js';
-import { readCampaignChallenge } from './campaign-challenge-store.js';
+    CAMPAIGN_ID,
+    HEAD_TO_HEAD_POST_TYPE,
+    getHeadToHeadOrigin,
+    isHeadToHeadMedal,
+    isHeadToHeadRaceId,
+    isHeadToHeadOrigin,
+    type HeadToHeadPostData,
+    type HeadToHeadRecord,
+} from './head-to-head-model.js';
+import { decodeHeadToHeadReplay } from './head-to-head-replay.js';
 
-export type CampaignChallengePostContext = {
+export type HeadToHeadPostContext = {
     postId?: string | null;
     postData?: Record<string, unknown> | null;
 };
 
-export type CampaignChallengeResolutionFailureReason =
+export type HeadToHeadResolutionFailureReason =
     | 'challenge_id_missing'
     | 'post_id_missing'
     | 'post_fetch_failed'
@@ -32,16 +30,14 @@ export type CampaignChallengeResolutionFailureReason =
     | 'replay_decompress_failed'
     | 'replay_envelope_invalid'
     | 'replay_contract_mismatch'
-    | 'legacy_record_missing'
-    | 'legacy_contract_mismatch'
     | 'post_identity_invalid';
 
-export type CampaignChallengeResolution = {
+export type HeadToHeadResolution = {
     ok: true;
-    record: CampaignChallengeRecord;
+    record: HeadToHeadRecord;
 } | {
     ok: false;
-    reason: CampaignChallengeResolutionFailureReason;
+    reason: HeadToHeadResolutionFailureReason;
     diff?: Record<string, unknown>;
 };
 
@@ -60,17 +56,17 @@ function validPostUrl(value: unknown): value is string {
 function validPostData(
     value: unknown,
     challengeId: string,
-): value is CampaignChallengePostData {
+): value is HeadToHeadPostData {
     if (!isRecord(value)) return false;
-    const origin = getCampaignChallengeOrigin(value as CampaignChallengePostData);
-    return value.postType === CAMPAIGN_CHALLENGE_POST_TYPE
+    const origin = getHeadToHeadOrigin(value as HeadToHeadPostData);
+    return value.postType === HEAD_TO_HEAD_POST_TYPE
         && value.challengeId === challengeId
         && origin !== null
         && (
-            isCampaignChallengeOrigin(value.origin)
+            isHeadToHeadOrigin(value.origin)
             || (
-                value.campaignId === CAMPAIGN_CHALLENGE_ID
-                && isCampaignChallengeRaceId(value.raceId)
+                value.campaignId === CAMPAIGN_ID
+                && isHeadToHeadRaceId(value.raceId)
             )
         )
         && typeof value.challengerUsername === 'string'
@@ -81,7 +77,7 @@ function validPostData(
         && (value.lapCount === 1 || value.lapCount === 2 || value.lapCount === 3)
         && Number.isSafeInteger(value.targetTimeMs)
         && Number(value.targetTimeMs) > 0
-        && isCampaignChallengeMedal(value.medal)
+        && isHeadToHeadMedal(value.medal)
         && Number.isSafeInteger(value.rulesRevision)
         && Number(value.rulesRevision) >= 0
         && typeof value.trackFingerprint === 'string'
@@ -95,26 +91,6 @@ function validPostData(
                 && /^[a-f0-9]{64}$/.test(value.replayDataHash)
             )
         );
-}
-
-function matchesStoredChallengeContract(
-    postData: CampaignChallengePostData,
-    stored: CampaignChallengeRecord,
-): boolean {
-    const postOrigin = getCampaignChallengeOrigin(postData);
-    const storedOrigin = getCampaignChallengeOrigin(stored);
-    return postOrigin !== null
-        && storedOrigin !== null
-        && sameCampaignChallengeOrigin(postOrigin, storedOrigin)
-        && postData.challengeId === stored.challengeId
-        && postData.challengerUsername === stored.challengerUsername
-        && postData.trackKey === stored.trackKey
-        && postData.lapCount === stored.lapCount
-        && postData.targetTimeMs === stored.targetTimeMs
-        && postData.medal === stored.medal
-        && postData.rulesRevision === stored.rulesRevision
-        && postData.trackFingerprint === stored.trackFingerprint
-        && postData.createdAt === stored.createdAt;
 }
 
 const FALLBACK_TEXT_KEYS = [
@@ -194,11 +170,11 @@ async function getPostData(
 }
 
 function toChallengeRecord(
-    postData: CampaignChallengePostData,
+    postData: HeadToHeadPostData,
     replayGhost: unknown,
     post: unknown,
     contextPostId: string | null | undefined,
-): CampaignChallengeRecord | null {
+): HeadToHeadRecord | null {
     const postObject = isRecord(post) ? post : {};
     const postId = validPostId(contextPostId)
         ? contextPostId
@@ -207,7 +183,7 @@ function toChallengeRecord(
     const subredditName = typeof postObject.subredditName === 'string'
         ? postObject.subredditName
         : null;
-    const origin = getCampaignChallengeOrigin(postData);
+    const origin = getHeadToHeadOrigin(postData);
     if (!postId || !postUrl || !subredditName || !origin) return null;
     return {
         ...postData,
@@ -225,10 +201,10 @@ function toChallengeRecord(
  * Posts created before replay data was embedded may use their matching stored
  * record during migration. New posts remain fully post-bound.
  */
-export async function resolveCampaignChallengeRecordResult(
+export async function resolveHeadToHeadRecordResult(
     challengeId: string | null,
-    context: CampaignChallengePostContext = {},
-): Promise<CampaignChallengeResolution> {
+    context: HeadToHeadPostContext = {},
+): Promise<HeadToHeadResolution> {
     if (!challengeId) return { ok: false, reason: 'challenge_id_missing' };
     if (!validPostId(context.postId)) return { ok: false, reason: 'post_id_missing' };
     let post: unknown;
@@ -248,12 +224,12 @@ export async function resolveCampaignChallengeRecordResult(
     }
     const rawPostData = postDataResult.data;
     const fallbackTexts = postFallbackTexts(post);
-    let lastReplayReason: CampaignChallengeResolutionFailureReason | undefined;
+    let lastReplayReason: HeadToHeadResolutionFailureReason | undefined;
     let lastReplayDiff: Record<string, unknown> | undefined;
     for (const fallbackText of fallbackTexts) {
-        const { decoded: replay, reason: replayReason, diff: replayDiff } = decodeCampaignChallengeReplay(fallbackText, rawPostData);
+        const { decoded: replay, reason: replayReason, diff: replayDiff } = decodeHeadToHeadReplay(fallbackText, rawPostData);
         if (!replay) {
-            lastReplayReason = (replayReason as CampaignChallengeResolutionFailureReason) || 'replay_validation_failed';
+            lastReplayReason = (replayReason as HeadToHeadResolutionFailureReason) || 'replay_validation_failed';
             lastReplayDiff = replayDiff;
             continue;
         }
@@ -267,45 +243,26 @@ export async function resolveCampaignChallengeRecordResult(
             ? { ok: true, record }
             : { ok: false, reason: 'post_identity_invalid' as const };
     }
-    const origin = getCampaignChallengeOrigin(rawPostData);
-    if (!origin || rawPostData.replayDataHash !== undefined) {
-        return {
-            ok: false,
-            reason: fallbackTexts.length > 0
-                ? (lastReplayReason || 'replay_validation_failed')
-                : 'replay_fallback_missing',
-            diff: lastReplayDiff,
-        };
-    }
-    let stored: CampaignChallengeRecord | null;
-    try {
-        stored = await readCampaignChallenge(challengeId);
-    } catch {
-        return { ok: false, reason: 'legacy_record_missing' };
-    }
-    if (!stored) return { ok: false, reason: 'legacy_record_missing' };
-    if (!matchesStoredChallengeContract(rawPostData, stored)) {
-        return { ok: false, reason: 'legacy_contract_mismatch' };
-    }
-    const record = toChallengeRecord(
-        rawPostData,
-        stored.frozenGhost,
-        post,
-        context.postId,
-    );
-    return record
-        ? { ok: true, record }
-        : { ok: false, reason: 'post_identity_invalid' };
+    // The post body is the only source of the frozen replay. There is no
+    // stored record to fall back on, so a post that cannot produce its own
+    // replay is unusable.
+    return {
+        ok: false,
+        reason: fallbackTexts.length > 0
+            ? (lastReplayReason || 'replay_validation_failed')
+            : 'replay_fallback_missing',
+        diff: lastReplayDiff,
+    };
 }
 
-export async function resolveCampaignChallengeRecord(
+export async function resolveHeadToHeadRecord(
     challengeId: string | null,
-    context: CampaignChallengePostContext = {},
-): Promise<CampaignChallengeRecord | null> {
-    const result = await resolveCampaignChallengeRecordResult(challengeId, context);
+    context: HeadToHeadPostContext = {},
+): Promise<HeadToHeadRecord | null> {
+    const result = await resolveHeadToHeadRecordResult(challengeId, context);
     if (result.ok) return result.record;
     if (result.reason !== 'challenge_id_missing' && result.reason !== 'post_id_missing') {
-        console.warn('Campaign challenge resolution failed.', {
+        console.warn('Head to Head resolution failed.', {
             challengeId: challengeId || null,
             postId: validPostId(context.postId) ? context.postId : null,
             reason: result.reason,

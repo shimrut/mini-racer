@@ -80,6 +80,12 @@ import felineFace from './definitions/feline-face.js';
 import darkMatter from './definitions/dark-matter.js';
 import appleStrudel from './definitions/apple-strudel.js';
 import heavyMetal from './definitions/heavy-metal.js';
+import knifesEdge from './definitions/knifes-edge.js';
+import pocketRun from './definitions/pocket-run.js';
+import crossCurrent from './definitions/cross-current.js';
+import squareDeal from './definitions/square-deal.js';
+import doubleHook from './definitions/double-hook.js';
+import doubleCrest from './definitions/double-crest.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -165,6 +171,12 @@ const TRACK_GEOMETRY = {
     darkMatter,
     appleStrudel,
     heavyMetal,
+    knifesEdge,
+    pocketRun,
+    crossCurrent,
+    squareDeal,
+    doubleHook,
+    doubleCrest,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

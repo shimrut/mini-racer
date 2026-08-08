@@ -32,6 +32,18 @@ export function formatLobbyTime(milliseconds) {
     return `${minutes}:${String(seconds).padStart(2, '0')}.${String(remainder).padStart(3, '0')}`;
 }
 
+/** A race margin: signed, in seconds, against the time that had to be beaten. */
+export function formatLobbyGap(milliseconds) {
+    const safeMilliseconds = toFiniteNumber(milliseconds);
+    if (safeMilliseconds === null) return null;
+    const rounded = Math.round(safeMilliseconds);
+    const sign = rounded < 0 ? '−' : '+';
+    const magnitude = Math.abs(rounded);
+    const seconds = Math.floor(magnitude / 1000);
+    const remainder = magnitude % 1000;
+    return `${sign}${seconds}.${String(remainder).padStart(3, '0')}`;
+}
+
 function normalizeAvatarUrl(value) {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
@@ -219,6 +231,12 @@ export function normalizeChallengeLobbyState(state = {}) {
     const challengerName = rawName
         ? (rawName.startsWith('u/') ? rawName : `u/${rawName}`)
         : 'A racer';
+    // A spent duel stops offering Accept and becomes the win's landing screen.
+    const beaten = state.outcome === 'won';
+    const bestTimeMs = toFiniteNumber(state.bestTimeMs);
+    const gapMs = beaten && bestTimeMs !== null && available
+        ? Math.round(bestTimeMs) - Math.round(targetTimeMs)
+        : null;
     // A stranger arriving on the post has no avatar to show yet, so the duel
     // keeps both seats and fills the empty one with the default Snoo.
     return {
@@ -226,7 +244,11 @@ export function normalizeChallengeLobbyState(state = {}) {
         signedIn,
         canRace,
         available,
-        canAccept: canRace && available,
+        beaten,
+        gapMs,
+        gapLabel: formatLobbyGap(gapMs),
+        winMarginLabel: gapMs === null ? null : formatLobbyGap(gapMs).slice(1),
+        canAccept: canRace && available && !beaten,
         challengerName,
         trackKey: typeof state.trackKey === 'string' && state.trackKey.trim()
             ? state.trackKey.trim()

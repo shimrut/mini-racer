@@ -222,6 +222,20 @@
 
                     <section id="lobby-challenge-pane" class="lobby-pane lobby-pane--challenge main-menu"
                         data-lobby-pane="challenge" aria-label="Player challenge" hidden>
+                        <div id="challenge-won-hero" class="challenge-won-hero" hidden>
+                            <div class="challenge-won-hero__portrait">
+                                <img id="challenge-won-avatar"
+                                    class="challenge-avatar challenge-avatar--hero challenge-avatar--generic"
+                                    src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png"
+                                    alt="" aria-hidden="true">
+                                <span id="challenge-won-medal" class="challenge-won-hero__medal"
+                                    aria-hidden="true"></span>
+                            </div>
+                            <p class="combined-medal-challenge-label combined-medal-challenge-label--won challenge-won-hero__title">
+                                Challenge beaten
+                            </p>
+                            <p id="challenge-won-summary" class="challenge-won-hero__summary"></p>
+                        </div>
                         <div id="challenge-poster" class="track-carousel">
                             <div class="track-carousel__viewport">
                                 <div class="track-carousel__rail">
@@ -239,18 +253,21 @@
                             <div class="track-carousel__card-foot">
                                 <div class="challenge-racer">
                                     <img id="challenge-challenger-avatar"
-                                        class="challenge-avatar challenge-avatar--empty"
-                                        src="" alt="" aria-hidden="true">
+                                        class="challenge-avatar challenge-avatar--generic"
+                                        src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png"
+                                        alt="" aria-hidden="true">
                                     <span class="challenge-racer__figures">
-                                        <span class="challenge-racer__label">Time to beat</span>
+                                        <span id="challenge-challenger-name"
+                                            class="challenge-racer__label">A racer</span>
                                         <strong id="challenge-target-time"
                                             class="challenge-racer__time">--:--.---</strong>
                                     </span>
                                 </div>
                                 <div class="challenge-racer challenge-racer--viewer">
                                     <img id="challenge-viewer-avatar"
-                                        class="challenge-avatar challenge-avatar--empty"
-                                        src="" alt="" aria-hidden="true">
+                                        class="challenge-avatar challenge-avatar--generic"
+                                        src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png"
+                                        alt="" aria-hidden="true">
                                 </div>
                             </div>
                         </div>
@@ -261,13 +278,24 @@
                             <button id="challenge-accept-btn"
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action disabled>
-                                <span class="main-menu__label">Accept</span>
+                                <span class="main-menu__label">Start Challenge</span>
                                 <span class="main-menu__race-brief" hidden>
                                     <span class="main-menu__race-brief-track"></span>
                                     <span class="main-menu__race-brief-separator" aria-hidden="true">·</span>
                                     <span class="main-menu__race-brief-laps"></span>
                                 </span>
                             </button>
+                            <div id="challenge-won-cta" class="challenge-won-cta" hidden>
+                                <button id="challenge-won-daily-btn"
+                                    class="main-menu__item main-menu__item--primary" type="button"
+                                    data-lobby-action>
+                                    <span class="main-menu__label">Race the Daily</span>
+                                </button>
+                                <button id="challenge-won-campaign-btn"
+                                    class="main-menu__item" type="button" data-lobby-action>
+                                    <span class="main-menu__label">Start the Campaign</span>
+                                </button>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -408,6 +436,12 @@
                             </button>
                             <button id="combined-playlist-btn" class="combined-action-btn" type="button" aria-label="Share time">
                                 <span class="combined-action-btn-label">SHARE TIME</span>
+                            </button>
+                            <p id="combined-mode-shortcuts-label" class="combined-mode-shortcuts-label" hidden>
+                                Try other modes
+                            </p>
+                            <button id="combined-more-btn" class="combined-action-btn" type="button" aria-label="Leave this head to head for the lobby" hidden style="display: none;">
+                                <span class="combined-action-btn-label">MORE</span>
                             </button>
                             <button id="combined-garage-btn" class="combined-action-btn" type="button" aria-label="Garage" style="display: none;"></button>
                             <button id="combined-menu-btn" class="combined-action-btn" type="button" aria-label="Home">

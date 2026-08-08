@@ -4,6 +4,7 @@ import {
     normalizeCampaignLobbyState,
     normalizeCampaignStage,
     normalizeChallengeLobbyState,
+    formatLobbyGap,
 } from '../game/lobby/service.js';
 
 describe('lobby service', () => {
@@ -253,5 +254,61 @@ describe('lobby service', () => {
         expect(guest.signedIn).toBe(false);
         expect(player.canAccept).toBe(true);
         expect(player.statusMessage).toBe('');
+        // Nothing was won here, so neither viewer is looking at a spent duel.
+        expect(guest.beaten).toBe(false);
+        expect(player.beaten).toBe(false);
+    });
+
+    it('closes Accept on a duel the viewer has already beaten', () => {
+        const base = {
+            challengerName: 'RaceFan',
+            trackName: 'Number Three',
+            laps: 2,
+            targetTimeMs: 25640,
+            signedIn: true,
+            canRace: true,
+        };
+
+        const beaten = normalizeChallengeLobbyState({
+            ...base,
+            outcome: 'won',
+            bestTimeMs: 25168,
+        });
+        expect(beaten).toMatchObject({
+            beaten: true,
+            canAccept: false,
+            // The poster keeps everything it was showing; only the ask changes.
+            available: true,
+            canRace: true,
+            targetTimeLabel: '0:25.640',
+            // The win is a margin against the time that had to be beaten.
+            gapMs: -472,
+            gapLabel: '−0.472',
+        });
+
+        // A win with no time behind it states no margin rather than a wrong one.
+        expect(normalizeChallengeLobbyState({ ...base, outcome: 'won' })).toMatchObject({
+            beaten: true,
+            gapMs: null,
+            gapLabel: null,
+        });
+
+        // A duel that was raced and not won is still there to be accepted again, and
+        // states no margin — there was none.
+        for (const outcome of ['lost', 'tie', null, undefined]) {
+            const state = normalizeChallengeLobbyState({ ...base, outcome, bestTimeMs: 26000 });
+            expect(state.beaten).toBe(false);
+            expect(state.canAccept).toBe(true);
+            expect(state.gapLabel).toBeNull();
+        }
+    });
+
+    it('signs a race gap the way a timing screen does', () => {
+        expect(formatLobbyGap(-472)).toBe('−0.472');
+        expect(formatLobbyGap(-12_451)).toBe('−12.451');
+        expect(formatLobbyGap(1_204)).toBe('+1.204');
+        expect(formatLobbyGap(0)).toBe('+0.000');
+        expect(formatLobbyGap(null)).toBeNull();
+        expect(formatLobbyGap('nope')).toBeNull();
     });
 });

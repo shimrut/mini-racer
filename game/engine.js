@@ -48,6 +48,7 @@ import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
 import { opponentRaceEngineMethods } from "./scoreboard/opponent-race-engine-methods.js";
 import { campaignEngineMethods } from "./campaign/engine-methods.js";
+import { headToHeadEngineMethods } from "./head-to-head/engine-methods.js";
 import { modeRouterEngineMethods } from "./modes/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
@@ -141,7 +142,7 @@ export class RealTimeRacer {
     this.activeDailyChallenge = null;
     this.activeRaceMode = "home";
     this.activeCampaignStage = null;
-    this.activeCampaignChallenge = null;
+    this.activeHeadToHead = null;
     this.campaignBootstrap = null;
     this.campaignLobbyState = null;
     this._campaignBootstrapReady = false;
@@ -323,7 +324,7 @@ export class RealTimeRacer {
       onStartCampaign: () => void this.startCampaignStage(
         this.campaignCarousel.getSelectedChallenge(),
       ),
-      onAcceptChallenge: () => void this.startCampaignChallenge(),
+      onAcceptChallenge: () => void this.startHeadToHead(),
       onRenderChallengePreview: (canvas, card, options) => {
         // The single poster hugs its circuit, so a portrait track in a short
         // landscape window keeps its own measure instead of stranding.
@@ -376,20 +377,20 @@ export class RealTimeRacer {
       getGarageUi: () => this.garage,
       getRedditUsername: () => this.redditUsername,
       previewShare: (payload) => {
-        if (payload?.kind === "campaign-challenge") {
-          return this.previewCampaignChallenge(payload);
+        if (payload?.kind === "head-to-head") {
+          return this.previewHeadToHead(payload);
         }
         if (payload?.kind === "challenge-brag") {
-          return this.previewCampaignChallengeBrag(payload);
+          return this.previewHeadToHeadBrag(payload);
         }
         return previewDailyChallengeShare(payload);
       },
       confirmShare: (shareToken, request) => {
-        if (request?.kind === "campaign-challenge") {
-          return this.confirmCampaignChallenge(shareToken, request);
+        if (request?.kind === "head-to-head") {
+          return this.confirmHeadToHead(shareToken, request);
         }
         if (request?.kind === "challenge-brag") {
-          return this.confirmCampaignChallengeBrag(shareToken);
+          return this.confirmHeadToHeadBrag(shareToken);
         }
         return confirmDailyChallengeShare(shareToken);
       },
@@ -755,7 +756,7 @@ export class RealTimeRacer {
           }
         : null,
       campaignRaceId: this.activeCampaignStage?.raceId || null,
-      playerChallengeId: this.activeCampaignChallenge?.challengeId || null,
+      playerChallengeId: this.activeHeadToHead?.challengeId || null,
       raceComparison: this.raceComparisonTarget
         ? {
             displayName: this.raceComparisonTarget.displayName,
@@ -828,6 +829,7 @@ Object.assign(
   scoreboardEngineMethods,
   opponentRaceEngineMethods,
   campaignEngineMethods,
+  headToHeadEngineMethods,
   // Routing dispatches across every mode above, so it is applied last.
   modeRouterEngineMethods,
 );

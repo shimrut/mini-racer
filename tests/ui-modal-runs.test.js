@@ -1359,7 +1359,7 @@ describe('Daily finish share chooser', () => {
         [...dom.window.document.querySelectorAll('.result-share-panel button')][1].click();
         expect(startShare).toHaveBeenCalledWith({
             ...request,
-            kind: 'campaign-challenge',
+            kind: 'head-to-head',
             source: 'daily',
         }, shell.combinedPlaylistBtn, shell.modalCombinedView);
 
@@ -1475,5 +1475,186 @@ describe('combined finish next race button', () => {
 
         context._syncCombinedNextRace(null);
         expect(context.setCombinedNextRaceEnabled(true)).toBe(false);
+    });
+});
+
+describe('combined finish head to head win actions', () => {
+    function winSheetDom() {
+        return new JSDOM(`
+            <div id="modal">
+                <div id="modal-main-view"></div>
+                <div id="modal-runs-view"></div>
+                <div id="modal-combined-view">
+                    <div id="combined-stats-right-group"></div>
+                    <div id="combined-hero-medal"></div>
+                    <div class="combined-actions">
+                        <button id="combined-restart-btn" class="combined-action-btn combined-action-btn--primary"><span class="combined-action-btn-label">RETRY</span></button>
+                        <button id="combined-playlist-btn" class="combined-action-btn"><span class="combined-action-btn-label">SHARE TIME</span></button>
+                        <p id="combined-mode-shortcuts-label" hidden>Try other modes</p>
+                        <button id="combined-more-btn" class="combined-action-btn" hidden style="display: none;"><span class="combined-action-btn-label">MORE</span></button>
+                        <button id="combined-garage-btn"></button>
+                        <button id="combined-menu-btn" class="combined-action-btn"><span class="combined-action-btn-label">HOME</span></button>
+                        <button id="combined-next-btn" hidden style="display: none;"></button>
+                        <button id="combined-settings-btn"></button>
+                    </div>
+                </div>
+            </div>
+        `, { url: 'http://localhost' });
+    }
+
+    function withWinSheet(run) {
+        const originalDocument = global.document;
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        const dom = winSheetDom();
+        global.document = dom.window.document;
+        global.requestAnimationFrame = (callback) => callback();
+        const shell = new ModalShell({
+            content: { renderCombinedResults: vi.fn() },
+            getCurrentTrackKey: () => 'number-zero',
+        });
+        shell.activateModalFocusTrap = vi.fn();
+        shell.resetMenuKeyboardNav = vi.fn();
+        try {
+            run(shell, dom.window.document);
+        } finally {
+            global.document = originalDocument;
+            global.requestAnimationFrame = originalRequestAnimationFrame;
+        }
+    }
+
+    const byId = (doc, id) => doc.getElementById(id);
+    const isAccented = (button) => button.classList.contains('combined-action-btn--primary');
+
+    it('keeps the mode shortcuts out of an ordinary finish sheet', () => {
+        withWinSheet((shell, doc) => {
+            shell.showCombinedResults(
+                { lapTime: 12.345, bestTime: 12.345, trackKey: 'number-zero' },
+                { restartAction: vi.fn() },
+            );
+
+            const more = byId(doc, 'combined-more-btn');
+            expect(more.hidden).toBe(true);
+            expect(more.style.display).toBe('none');
+            expect(more.onclick).toBe(null);
+            expect(byId(doc, 'combined-mode-shortcuts-label').hidden).toBe(true);
+            expect(byId(doc, 'combined-menu-btn').textContent.trim()).toBe('HOME');
+            expect(byId(doc, 'combined-restart-btn').hidden).toBe(false);
+            expect(isAccented(byId(doc, 'combined-restart-btn'))).toBe(true);
+            expect(isAccented(byId(doc, 'combined-playlist-btn'))).toBe(false);
+        });
+    });
+
+    it('trades Improve for the other modes once the duel is won', () => {
+        withWinSheet((shell, doc) => {
+            const daily = vi.fn();
+            const campaign = vi.fn();
+            shell.showCombinedResults(
+                { lapTime: 7.5, bestTime: 8, trackKey: 'number-zero', challengeFinish: true },
+                { restartAction: vi.fn(), secondaryAction: vi.fn() },
+            );
+
+            expect(shell.setChallengeWinActions({
+                dailyAction: daily,
+                campaignAction: campaign,
+            })).toBe(true);
+
+            const improve = byId(doc, 'combined-restart-btn');
+            expect(improve.hidden).toBe(true);
+            expect(improve.style.display).toBe('none');
+            expect(improve.onclick).toBe(null);
+            expect(isAccented(improve)).toBe(false);
+            // Brag is what the win just unlocked, so it takes the accent Improve gave up.
+            expect(isAccented(byId(doc, 'combined-playlist-btn'))).toBe(true);
+
+            // The pair is captioned as what it is: the way on to another mode.
+            expect(byId(doc, 'combined-mode-shortcuts-label').hidden).toBe(false);
+
+            const dailyBtn = byId(doc, 'combined-more-btn');
+            const campaignBtn = byId(doc, 'combined-menu-btn');
+            expect(dailyBtn.hidden).toBe(false);
+            expect(dailyBtn.textContent.trim()).toBe('THE DAILY');
+            expect(campaignBtn.textContent.trim()).toBe('CAMPAIGN');
+
+            // Both leave the duel, so both ask before they act.
+            dailyBtn.onclick();
+            expect(daily).not.toHaveBeenCalled();
+            const panel = doc.querySelector('.result-share-panel');
+            expect(panel.textContent).toContain('This will leave the head to head.');
+
+            const [confirmBtn, cancelBtn] = panel.querySelectorAll('.result-share-panel__button');
+            expect(confirmBtn.textContent).toBe('OK');
+            expect(cancelBtn.textContent).toBe('Cancel');
+
+            // Cancel puts the racer back on the finish with nothing changed.
+            cancelBtn.onclick();
+            expect(daily).not.toHaveBeenCalled();
+            expect(doc.querySelector('.result-share-panel')).toBe(null);
+            expect(dailyBtn.disabled).toBe(false);
+
+            dailyBtn.onclick();
+            doc.querySelector('.result-share-panel__button--primary').onclick();
+            expect(daily).toHaveBeenCalledTimes(1);
+            expect(doc.querySelector('.result-share-panel')).toBe(null);
+
+            campaignBtn.onclick();
+            expect(campaign).not.toHaveBeenCalled();
+            doc.querySelector('.result-share-panel__button--primary').onclick();
+            expect(campaign).toHaveBeenCalledTimes(1);
+            expect(shell.resetMenuKeyboardNav).toHaveBeenCalled();
+        });
+    });
+
+    it('hands Home back when the server takes the win away', () => {
+        withWinSheet((shell, doc) => {
+            const secondaryAction = vi.fn();
+            shell.showCombinedResults(
+                { lapTime: 7.5, bestTime: 8, trackKey: 'number-zero', challengeFinish: true },
+                { restartAction: vi.fn(), secondaryAction },
+            );
+            shell.setChallengeWinActions({
+                dailyAction: vi.fn(),
+                campaignAction: vi.fn(),
+            });
+
+            shell.clearChallengeWinActions({ restartAction: vi.fn() });
+
+            const menu = byId(doc, 'combined-menu-btn');
+            expect(menu.textContent.trim()).toBe('HOME');
+            expect(byId(doc, 'combined-mode-shortcuts-label').hidden).toBe(true);
+            expect(byId(doc, 'combined-more-btn').hidden).toBe(true);
+            menu.onclick();
+            expect(secondaryAction).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('does not leak a won duel\'s shortcuts into the next finish sheet', () => {
+        withWinSheet((shell, doc) => {
+            shell.showCombinedResults(
+                { lapTime: 7.5, bestTime: 8, trackKey: 'number-zero', challengeFinish: true },
+                { restartAction: vi.fn() },
+            );
+            shell.setChallengeWinActions({
+                dailyAction: vi.fn(),
+                campaignAction: vi.fn(),
+            });
+
+            shell.showCombinedResults(
+                { lapTime: 12.345, bestTime: 12.345, trackKey: 'number-zero' },
+                { restartAction: vi.fn() },
+            );
+
+            expect(byId(doc, 'combined-more-btn').hidden).toBe(true);
+            expect(byId(doc, 'combined-mode-shortcuts-label').hidden).toBe(true);
+            expect(byId(doc, 'combined-menu-btn').textContent.trim()).toBe('HOME');
+            expect(byId(doc, 'combined-restart-btn').hidden).toBe(false);
+            expect(isAccented(byId(doc, 'combined-restart-btn'))).toBe(true);
+            expect(isAccented(byId(doc, 'combined-playlist-btn'))).toBe(false);
+        });
+    });
+
+    it('refuses to rewrite the actions when the finish sheet is not on screen', () => {
+        withWinSheet((shell) => {
+            expect(shell.setChallengeWinActions({ dailyAction: vi.fn() })).toBe(false);
+        });
     });
 });

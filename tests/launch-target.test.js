@@ -50,21 +50,29 @@ describe('game launch target', () => {
 
     it('gives immutable challenge post data precedence over a stale stored target', () => {
         const root = createRoot({
-            postData: { postType: 'campaign-challenge', challengeId: 'challenge-1' },
+            postData: { postType: 'head-to-head', challengeId: 'challenge-1' },
         });
         requestGameLaunchTarget('daily', { root });
         expect(resolveGameLaunchTarget(root))
             .toEqual({ mode: 'challenge', challengeId: 'challenge-1' });
     });
 
-    it('lets an explicit stored campaign target override a challenge post', () => {
-        const root = createRoot({
-            postData: { postType: 'campaign-challenge', challengeId: 'challenge-1' },
+    it('lets an explicit stored campaign or home target override a challenge post', () => {
+        const rootCampaign = createRoot({
+            postData: { postType: 'head-to-head', challengeId: 'challenge-1' },
         });
-        requestGameLaunchTarget('campaign', { root });
-        expect(resolveGameLaunchTarget(root))
+        requestGameLaunchTarget('campaign', { root: rootCampaign });
+        expect(resolveGameLaunchTarget(rootCampaign))
             .toEqual({ mode: 'campaign', challengeId: null });
-        expect(root.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
+        expect(rootCampaign.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
+
+        const rootHome = createRoot({
+            postData: { postType: 'head-to-head', challengeId: 'challenge-1' },
+        });
+        requestGameLaunchTarget('home', { root: rootHome });
+        expect(resolveGameLaunchTarget(rootHome))
+            .toEqual({ mode: 'home', challengeId: null });
+        expect(rootHome.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
     });
 
     it('consumes a valid one-use launch target', () => {

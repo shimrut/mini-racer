@@ -196,6 +196,35 @@
     box-sizing: border-box;
 }
 
+/* A won duel's two exits are a different offer from Brag above them, so a ruled
+   caption separates the pair rather than a fourth button's worth of gap. */
+#modal-combined-view .combined-mode-shortcuts-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 0 0 auto;
+    width: 100%;
+    margin: 0.4rem 0;
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+#modal-combined-view .combined-mode-shortcuts-label::before,
+#modal-combined-view .combined-mode-shortcuts-label::after {
+    content: "";
+    flex: 1 1 0;
+    height: 1px;
+    background: rgba(148, 163, 184, 0.28);
+}
+
+#modal-combined-view .combined-mode-shortcuts-label[hidden] {
+    display: none;
+}
+
 #modal-combined-view .combined-action-btn {
     width: 100%;
     border-radius: var(--radius-full);
@@ -217,7 +246,8 @@
     flex-flow: row wrap;
 }
 
-#modal-combined-view .combined-actions--with-next > .combined-action-btn {
+#modal-combined-view .combined-actions--with-next > .combined-action-btn,
+#modal-combined-view .combined-actions--with-next > .combined-mode-shortcuts-label {
     flex: 0 0 100%;
 }
 

@@ -12,7 +12,7 @@ export const modeRouterEngineMethods = {
         }
         this.activeRaceMode = 'home';
         this.activeCampaignStage = null;
-        this.activeCampaignChallenge = null;
+        this.activeHeadToHead = null;
         this.clearDailyChallengeRun();
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.lobbyUi.showHome();
@@ -29,7 +29,7 @@ export const modeRouterEngineMethods = {
         }
         this.activeRaceMode = 'daily';
         this.activeCampaignStage = null;
-        this.activeCampaignChallenge = null;
+        this.activeHeadToHead = null;
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.lobbyUi.showDaily();
         if (this.dailyCarousel?.isEmpty?.()) {
@@ -66,7 +66,7 @@ export const modeRouterEngineMethods = {
             return;
         }
         if (this.activeRaceMode === 'challenge') {
-            void this.handleCampaignChallengeWin(winData);
+            void this.handleHeadToHeadWin(winData);
             return;
         }
         this.handleDailyChallengeWin(winData);
@@ -86,7 +86,7 @@ export const modeRouterEngineMethods = {
     returnToActiveLobby() {
         if (this.activeRaceMode === 'campaign') return this.showCampaignLobby();
         if (this.activeRaceMode === 'challenge') {
-            return this.loadChallengeLobby(this.activeCampaignChallenge?.challengeId);
+            return this.loadChallengeLobby(this.activeHeadToHead?.challengeId);
         }
         // Capture this before showDailyLobby resets the completed run. Scroll
         // position is presentation state; the race record is the authority for

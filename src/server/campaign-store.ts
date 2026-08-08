@@ -479,7 +479,7 @@ export async function getServerCampaignPbGhost({
     };
 }
 
-export async function getServerCampaignChallengeSource({
+export async function getServerHeadToHeadSource({
     raceId,
     playerId,
     redditUsername,

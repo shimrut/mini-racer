@@ -53,7 +53,7 @@ import { registerInternalRoutes } from './routes/internal-routes.js';
 import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 import { registerPodiumRoutes } from './routes/podium-routes.js';
 import { registerCampaignRoutes } from './routes/campaign-routes.js';
-import { registerCampaignChallengeRoutes } from './routes/campaign-challenge-routes.js';
+import { registerHeadToHeadRoutes } from './routes/head-to-head-routes.js';
 import { registerLeaderboardRaceRoutes } from './routes/leaderboard-race-routes.js';
 import {
     getServerCampaignBootstrap,
@@ -62,21 +62,21 @@ import {
     startServerCampaignRace,
     submitServerCampaignRun,
 } from './campaign-store.js';
-import { createCampaignChallengeService } from './campaign-challenge-service.js';
+import { createHeadToHeadService } from './head-to-head-service.js';
 import {
-    confirmCampaignChallengeBrag,
-    previewCampaignChallengeBrag,
-} from './campaign-challenge-brag.js';
+    confirmHeadToHeadBrag,
+    previewHeadToHeadBrag,
+} from './head-to-head-brag.js';
 import {
-    resolveCampaignChallengeSource,
-    validateCampaignChallengeReplay,
-} from './campaign-challenge-runtime.js';
+    resolveHeadToHeadSource,
+    validateHeadToHeadReplay,
+} from './head-to-head-runtime.js';
 import { resolveLegacyDailyGpPodiumAvatars } from './daily-podium-avatar-backfill.js';
 import { prepareServerLeaderboardRace } from './leaderboard-race-service.js';
 
-const campaignChallengeService = createCampaignChallengeService({
-    resolveSource: resolveCampaignChallengeSource,
-    validateReplay: validateCampaignChallengeReplay,
+const headToHeadService = createHeadToHeadService({
+    resolveSource: resolveHeadToHeadSource,
+    validateReplay: validateHeadToHeadReplay,
 });
 
 function registerProductionRoutes(app: express.Application): void {
@@ -105,8 +105,8 @@ function registerProductionRoutes(app: express.Application): void {
         submitServerCampaignRun: (input) => submitServerCampaignRun(input),
         getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
     });
-    registerCampaignChallengeRoutes(app, {
-        getCampaignChallengeRequestContext: () => ({
+    registerHeadToHeadRoutes(app, {
+        getHeadToHeadRequestContext: () => ({
             username: getRequestUsername(),
             subredditName: readContextSubredditName(),
             appSlug: getRequestAppSlug(),
@@ -114,12 +114,12 @@ function registerProductionRoutes(app: express.Application): void {
             postData: readContextPostData(),
         }),
         readContextPostData,
-        previewCampaignChallenge: campaignChallengeService.preview,
-        createCampaignChallenge: campaignChallengeService.create,
-        getCampaignChallenge: campaignChallengeService.get,
-        submitCampaignChallenge: campaignChallengeService.submit,
-        previewCampaignChallengeBrag,
-        confirmCampaignChallengeBrag,
+        previewHeadToHead: headToHeadService.preview,
+        createHeadToHead: headToHeadService.create,
+        getHeadToHead: headToHeadService.get,
+        submitHeadToHead: headToHeadService.submit,
+        previewHeadToHeadBrag,
+        confirmHeadToHeadBrag,
     });
     registerLeaderboardRaceRoutes(app, {
         getRequestUsername,

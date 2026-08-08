@@ -57,19 +57,19 @@ vi.mock('@devvit/web/server', () => ({ reddit }));
 
 const {
     formatChallengeBragComment,
-    previewCampaignChallengeBrag,
-    confirmCampaignChallengeBrag,
-} = await import('../src/server/campaign-challenge-brag.ts');
-const { writeCampaignChallengeResult } = await import(
-    '../src/server/campaign-challenge-store.ts'
+    previewHeadToHeadBrag,
+    confirmHeadToHeadBrag,
+} = await import('../src/server/head-to-head-brag.ts');
+const { writeHeadToHeadAccept } = await import(
+    '../src/server/head-to-head-store.ts'
 );
 const {
-    encodeCampaignChallengeReplay,
-    formatCampaignChallengeTextFallback,
-} = await import('../src/server/campaign-challenge-replay.ts');
+    encodeHeadToHeadReplay,
+    formatHeadToHeadTextFallback,
+} = await import('../src/server/head-to-head-replay.ts');
 
 const challenge = {
-    postType: 'campaign-challenge',
+    postType: 'head-to-head',
     challengeId: 'challenge-1',
     campaignId: 'numbered-v1',
     raceId: 'numbered-v1-01',
@@ -94,6 +94,7 @@ function installChallengePost() {
     const postData = {
         postType: challenge.postType,
         challengeId: challenge.challengeId,
+        origin: { mode: 'campaign', campaignId: challenge.campaignId, raceId: challenge.raceId },
         campaignId: challenge.campaignId,
         raceId: challenge.raceId,
         challengerUsername: challenge.challengerUsername,
@@ -106,18 +107,18 @@ function installChallengePost() {
         trackFingerprint: challenge.trackFingerprint,
         createdAt: challenge.createdAt,
     };
-    const replay = encodeCampaignChallengeReplay(postData, challenge.frozenGhost);
+    const replay = encodeHeadToHeadReplay(postData, challenge.frozenGhost);
     const immutablePostData = { ...postData, replayDataHash: replay.hash };
     challengePost = {
         id: challenge.postId,
         url: challenge.postUrl,
         subredditName: challenge.subredditName,
-        body: formatCampaignChallengeTextFallback(immutablePostData, challenge.frozenGhost),
+        body: formatHeadToHeadTextFallback(immutablePostData, challenge.frozenGhost),
         getPostData: vi.fn(async () => immutablePostData),
     };
 }
 
-describe('campaign challenge brag', () => {
+describe('head-to-head brag', () => {
     beforeEach(() => {
         strings.clear();
         hashes.clear();
@@ -132,16 +133,18 @@ describe('campaign challenge brag', () => {
     });
 
     it('rejects brag when the viewer has not beaten the challenge', async () => {
-        await writeCampaignChallengeResult({
+        await writeHeadToHeadAccept('token-losing', {
             challengeId: 'challenge-1',
-            viewerUsername: 'OtherRacer',
+            postId: 't3_challenge1',
+            playerId: 'reddit:otherracer',
+            username: 'OtherRacer',
             bestTimeMs: 11_000,
+            targetTimeMs: 10_000,
             medal: null,
-            ghost: {},
-            verifiedAt: '2026-07-23T12:01:00.000Z',
+            commentText: formatChallengeBragComment(11_000, 'numberOne'),
         });
-        const preview = await previewCampaignChallengeBrag(
-            { challengeId: 'challenge-1' },
+        const preview = await previewHeadToHeadBrag(
+            { acceptToken: 'token-losing' },
             { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(preview.status).toBe(404);
@@ -149,8 +152,18 @@ describe('campaign challenge brag', () => {
     });
 
     it('rejects brag on your own challenge', async () => {
-        const preview = await previewCampaignChallengeBrag(
-            { challengeId: 'challenge-1' },
+        await writeHeadToHeadAccept('token-own', {
+            challengeId: 'challenge-1',
+            postId: 't3_challenge1',
+            playerId: 'reddit:racefan',
+            username: 'RaceFan',
+            bestTimeMs: 9_000,
+            targetTimeMs: 10_000,
+            medal: 'gold',
+            commentText: formatChallengeBragComment(9_000, 'numberOne'),
+        });
+        const preview = await previewHeadToHeadBrag(
+            { acceptToken: 'token-own' },
             { username: 'RaceFan', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(preview.status).toBe(403);
@@ -158,17 +171,19 @@ describe('campaign challenge brag', () => {
     });
 
     it('previews and confirms a brag comment on the challenge post', async () => {
-        await writeCampaignChallengeResult({
+        await writeHeadToHeadAccept('token-winning', {
             challengeId: 'challenge-1',
-            viewerUsername: 'OtherRacer',
+            postId: 't3_challenge1',
+            playerId: 'reddit:otherracer',
+            username: 'OtherRacer',
             bestTimeMs: 9_000,
-            medal: null,
-            ghost: {},
-            verifiedAt: '2026-07-23T12:01:00.000Z',
+            targetTimeMs: 10_000,
+            medal: 'gold',
+            commentText: formatChallengeBragComment(9_000, 'numberOne'),
         });
 
-        const preview = await previewCampaignChallengeBrag(
-            { challengeId: 'challenge-1' },
+        const preview = await previewHeadToHeadBrag(
+            { acceptToken: 'token-winning' },
             { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
         expect(preview.status).toBe(200);
@@ -179,7 +194,7 @@ describe('campaign challenge brag', () => {
         });
         expect(typeof preview.body.shareToken).toBe('string');
 
-        const confirmed = await confirmCampaignChallengeBrag(
+        const confirmed = await confirmHeadToHeadBrag(
             { shareToken: preview.body.shareToken },
             { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
@@ -194,10 +209,11 @@ describe('campaign challenge brag', () => {
             text: preview.body.commentText,
         });
 
-        const again = await previewCampaignChallengeBrag(
-            { challengeId: 'challenge-1' },
+        const again = await previewHeadToHeadBrag(
+            { acceptToken: 'token-winning' },
             { username: 'OtherRacer', subredditName: 'MiniRacer', postId: 't3_challenge1' },
         );
-        expect(again.body.status).toBe('already_shared');
+        expect(again.status).toBe(200);
+        expect(again.body.status).toBe('ready');
     });
 });

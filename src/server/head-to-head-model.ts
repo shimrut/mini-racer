@@ -1,47 +1,51 @@
-export const CAMPAIGN_CHALLENGE_POST_TYPE = 'campaign-challenge';
-export const CAMPAIGN_CHALLENGE_ID = 'numbered-v1';
+import { CAMPAIGN_ID } from '../../game/campaign/manifest.js';
 
-export type CampaignChallengeMedal = 'author' | 'gold' | 'silver' | 'bronze' | null;
-export type CampaignChallengeSourceKind = 'campaign' | 'daily' | 'duel';
+export { CAMPAIGN_ID };
 
-export type CampaignChallengeOrigin = {
+export const HEAD_TO_HEAD_POST_TYPE = 'head-to-head';
+
+export type HeadToHeadMedal = 'author' | 'gold' | 'silver' | 'bronze' | null;
+/** Which feature the run being challenged came from. */
+export type HeadToHeadSourceKind = 'campaign' | 'daily';
+
+export type HeadToHeadOrigin = {
     mode: 'campaign';
-    campaignId: typeof CAMPAIGN_CHALLENGE_ID;
+    campaignId: typeof CAMPAIGN_ID;
     raceId: string;
 } | {
     mode: 'daily';
     challengeId: string;
 };
 
-export type CampaignChallengeSource = {
-    sourceKind: CampaignChallengeSourceKind;
+export type HeadToHeadSource = {
+    sourceKind: HeadToHeadSourceKind;
     sourceId: string;
     /** New posts use origin; legacy source producers may still provide these fields. */
-    origin?: CampaignChallengeOrigin;
-    campaignId?: typeof CAMPAIGN_CHALLENGE_ID;
+    origin?: HeadToHeadOrigin;
+    campaignId?: typeof CAMPAIGN_ID;
     raceId?: string;
     trackKey: string;
     lapCount: 1 | 2 | 3;
     bestTimeMs: number;
-    medal: CampaignChallengeMedal;
+    medal: HeadToHeadMedal;
     rulesRevision: number;
     trackFingerprint: string;
     ghost: unknown;
 };
 
-export type CampaignChallengePostData = {
-    postType: typeof CAMPAIGN_CHALLENGE_POST_TYPE;
+export type HeadToHeadPostData = {
+    postType: typeof HEAD_TO_HEAD_POST_TYPE;
     challengeId: string;
     /** Present on new posts; absent legacy posts are treated as Campaign. */
-    origin?: CampaignChallengeOrigin;
-    campaignId?: typeof CAMPAIGN_CHALLENGE_ID;
+    origin?: HeadToHeadOrigin;
+    campaignId?: typeof CAMPAIGN_ID;
     raceId?: string;
     challengerUsername: string;
     challengerAvatarUrl: string | null;
     trackKey: string;
     lapCount: 1 | 2 | 3;
     targetTimeMs: number;
-    medal: CampaignChallengeMedal;
+    medal: HeadToHeadMedal;
     rulesRevision: number;
     trackFingerprint: string;
     createdAt: string;
@@ -49,9 +53,9 @@ export type CampaignChallengePostData = {
     replayDataHash?: string;
 };
 
-export type CampaignChallengeRecord = CampaignChallengePostData & {
+export type HeadToHeadRecord = HeadToHeadPostData & {
     subredditName: string;
-    sourceKind: CampaignChallengeSourceKind;
+    sourceKind: HeadToHeadSourceKind;
     sourceId: string;
     /** Resolved from the verified Reddit post body; never persisted in Redis. */
     frozenGhost: unknown;
@@ -59,54 +63,43 @@ export type CampaignChallengeRecord = CampaignChallengePostData & {
     postUrl: string | null;
 };
 
-export type CampaignChallengeResult = {
-    challengeId: string;
-    viewerUsername: string;
-    /** Canonical Reddit or guest identity used for persistence and merging. */
-    viewerPlayerId?: string;
-    bestTimeMs: number;
-    medal: CampaignChallengeMedal;
-    ghost: unknown;
-    verifiedAt: string;
-};
-
-export function isCampaignChallengeRaceId(value: unknown): value is string {
+export function isHeadToHeadRaceId(value: unknown): value is string {
     return typeof value === 'string' && /^numbered-v1-(?:0[0-9]|1[0-3])$/.test(value);
 }
 
-export function isCampaignChallengeOrigin(value: unknown): value is CampaignChallengeOrigin {
+export function isHeadToHeadOrigin(value: unknown): value is HeadToHeadOrigin {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const origin = value as Record<string, unknown>;
     if (origin.mode === 'campaign') {
-        return origin.campaignId === CAMPAIGN_CHALLENGE_ID
-            && isCampaignChallengeRaceId(origin.raceId);
+        return origin.campaignId === CAMPAIGN_ID
+            && isHeadToHeadRaceId(origin.raceId);
     }
     return origin.mode === 'daily'
         && typeof origin.challengeId === 'string'
         && /^daily-gp-\d{4}-\d{2}-\d{2}$/.test(origin.challengeId);
 }
 
-export function getCampaignChallengeOrigin(
+export function getHeadToHeadOrigin(
     value: {
         origin?: unknown;
         campaignId?: unknown;
         raceId?: unknown;
     },
-): CampaignChallengeOrigin | null {
-    if (isCampaignChallengeOrigin(value.origin)) return value.origin;
-    if (value.campaignId === CAMPAIGN_CHALLENGE_ID && isCampaignChallengeRaceId(value.raceId)) {
+): HeadToHeadOrigin | null {
+    if (isHeadToHeadOrigin(value.origin)) return value.origin;
+    if (value.campaignId === CAMPAIGN_ID && isHeadToHeadRaceId(value.raceId)) {
         return {
             mode: 'campaign',
-            campaignId: CAMPAIGN_CHALLENGE_ID,
+            campaignId: CAMPAIGN_ID,
             raceId: value.raceId,
         };
     }
     return null;
 }
 
-export function sameCampaignChallengeOrigin(
-    a: CampaignChallengeOrigin | null,
-    b: CampaignChallengeOrigin | null,
+export function sameHeadToHeadOrigin(
+    a: HeadToHeadOrigin | null,
+    b: HeadToHeadOrigin | null,
 ): boolean {
     if (a === b) return true;
     if (!a || !b || a.mode !== b.mode) return false;
@@ -114,7 +107,7 @@ export function sameCampaignChallengeOrigin(
     if (a.mode === 'campaign' && b.mode === 'campaign') return a.campaignId === b.campaignId && a.raceId === b.raceId;
     return false;
 }
-export function isCampaignChallengeMedal(value: unknown): value is CampaignChallengeMedal {
+export function isHeadToHeadMedal(value: unknown): value is HeadToHeadMedal {
     return value === null
         || value === 'author'
         || value === 'gold'
@@ -122,12 +115,12 @@ export function isCampaignChallengeMedal(value: unknown): value is CampaignChall
         || value === 'bronze';
 }
 
-export function toCampaignChallengePostData(
-    record: CampaignChallengeRecord,
-): CampaignChallengePostData {
-    const origin = getCampaignChallengeOrigin(record);
-    const postData: CampaignChallengePostData = {
-        postType: CAMPAIGN_CHALLENGE_POST_TYPE,
+export function toHeadToHeadPostData(
+    record: HeadToHeadRecord,
+): HeadToHeadPostData {
+    const origin = getHeadToHeadOrigin(record);
+    const postData: HeadToHeadPostData = {
+        postType: HEAD_TO_HEAD_POST_TYPE,
         challengeId: record.challengeId,
         challengerUsername: record.challengerUsername,
         challengerAvatarUrl: typeof record.challengerAvatarUrl === 'string'

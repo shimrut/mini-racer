@@ -12,9 +12,9 @@ import {
     rotateGuestPlayerIdentity,
     setGuestPlayerToken,
 } from './game/scoreboard/player-identity.js';
+import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from './game/ui/avatar.js';
 
-const POST_TYPE = 'campaign-challenge';
-const GENERIC_SNOO_URL = 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
+const POST_TYPE = 'head-to-head';
 const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
 
 function cleanText(value) {
@@ -28,36 +28,14 @@ function readChallengePostId(root = globalThis) {
         : '';
 }
 
-export function isRedditAvatarUrl(value) {
-    if (typeof value !== 'string') return false;
-    try {
-        const url = new URL(value);
-        const hostname = url.hostname.toLowerCase();
-        return url.protocol === 'https:' && (
-            hostname === 'redd.it'
-            || hostname.endsWith('.redd.it')
-            || hostname === 'redditmedia.com'
-            || hostname.endsWith('.redditmedia.com')
-            || hostname === 'redditstatic.com'
-            || hostname.endsWith('.redditstatic.com')
-        );
-    } catch {
-        return false;
-    }
-}
-
-export function resolveDisplayAvatarUrl(value) {
-    return isRedditAvatarUrl(value) ? value : GENERIC_SNOO_URL;
-}
-
-export function readCampaignChallengePostData(root = globalThis) {
+export function readHeadToHeadPostData(root = globalThis) {
     const value = root?.devvit?.context?.postData;
     return value && typeof value === 'object' && value.postType === POST_TYPE
         ? value
         : null;
 }
 
-export function normalizeCampaignChallengePostData(value) {
+export function normalizeHeadToHeadPostData(value) {
     const input = value && typeof value === 'object' ? value : {};
     const lapCount = input.lapCount === 2 || input.lapCount === 3 ? input.lapCount : 1;
     const targetTimeMs = Number(input.targetTimeMs);
@@ -96,20 +74,19 @@ export function normalizeCampaignChallengePostData(value) {
     };
 }
 
-export function formatCampaignChallengePreviewTime(timeMs) {
+export function formatHeadToHeadPreviewTime(timeMs) {
     if (!Number.isInteger(timeMs) || timeMs <= 0) return '—';
     return `${Math.floor(timeMs / 1000)}.${String(timeMs % 1000).padStart(3, '0')}`;
 }
 
 function setAvatarImage(img, avatarUrl, label) {
-    if (!img) return;
-    const resolved = resolveDisplayAvatarUrl(avatarUrl);
-    img.src = resolved;
-    img.alt = label ? `${label} avatar` : '';
-    img.classList.toggle('challenge-avatar--generic', resolved === GENERIC_SNOO_URL);
+    applyAvatar(img, avatarUrl, {
+        alt: label ? `${label} avatar` : '',
+        genericClass: 'challenge-avatar--generic',
+    });
 }
 
-export function renderCampaignChallengeAvatars(documentRef, {
+export function renderHeadToHeadAvatars(documentRef, {
     challengerUsername = 'A racer',
     challengerAvatarUrl = null,
     viewerUsername = 'You',
@@ -134,20 +111,20 @@ export function renderCampaignChallengeAvatars(documentRef, {
     );
 }
 
-export function renderCampaignChallenge(documentRef, rawValue) {
-    const value = normalizeCampaignChallengePostData(rawValue);
+export function renderHeadToHead(documentRef, rawValue) {
+    const value = normalizeHeadToHeadPostData(rawValue);
     if (!documentRef) return value;
     const trackName = documentRef.getElementById('challenge-track-name');
     const target = documentRef.getElementById('challenge-target-time');
     const format = documentRef.getElementById('challenge-format');
-    renderCampaignChallengeAvatars(documentRef, {
+    renderHeadToHeadAvatars(documentRef, {
         challengerUsername: value.challengerUsername,
         challengerAvatarUrl: value.challengerAvatarUrl,
     });
     if (trackName) trackName.textContent = value.trackKey
         ? getTrackName(value.trackKey, value.trackKey)
         : value.origin?.mode === 'daily' ? 'Daily race' : 'Campaign race';
-    if (target) target.textContent = formatCampaignChallengePreviewTime(value.targetTimeMs);
+    if (target) target.textContent = formatHeadToHeadPreviewTime(value.targetTimeMs);
     if (format) {
         format.textContent = `${value.lapCount} ${value.lapCount === 1 ? 'LAP' : 'LAPS'}`;
     }
@@ -161,8 +138,13 @@ function renderChallengeTrack(documentRef, trackKey) {
     if (!canvas || !track) return;
     const rect = canvas.getBoundingClientRect();
     const dpr = globalThis.devicePixelRatio || 1;
-    canvas.width = Math.max(320, Math.round(rect.width * dpr));
-    canvas.height = Math.max(240, Math.round(rect.height * dpr));
+    // The canvas is laid out in flow now, so its backing store has to follow the
+    // measured box exactly — a minimum size would stretch the trace instead.
+    const width = Math.round(rect.width * dpr);
+    const height = Math.round(rect.height * dpr);
+    if (width < 2 || height < 2) return;
+    canvas.width = width;
+    canvas.height = height;
     renderTrackPreviewCanvas(canvas, {
         trackGeometry: { outer: track.outer, inner: track.inner },
         presentation: resolveTrackPresentation(trackKey, {
@@ -180,13 +162,13 @@ function renderChallengeTrack(documentRef, trackKey) {
     });
 }
 
-export async function resolveCampaignChallengeAccess(root = globalThis, challengeId = null) {
+export async function resolveHeadToHeadAccess(root = globalThis, challengeId = null) {
     if (typeof root?.fetch !== 'function') {
         return { signedIn: false, canRace: false, ownChallenge: false };
     }
     try {
         const url = new URL(
-            '/api/campaign/challenge',
+            '/api/head-to-head',
             root.location?.origin || 'http://localhost',
         );
         const requestedChallengeId = cleanText(challengeId);
@@ -258,7 +240,7 @@ export async function ensureChallengePlayerIdentity(root = globalThis) {
     return false;
 }
 
-export function showOwnChallengeMessage(documentRef, openCampaign = openCampaignAsRedirect) {
+export function showOwnChallengeMessage(documentRef, openLobby = openHomeAsRedirect) {
     const doc = documentRef || document;
     const existing = doc.getElementById('own-challenge-message');
     if (existing) existing.remove();
@@ -278,7 +260,7 @@ export function showOwnChallengeMessage(documentRef, openCampaign = openCampaign
     button.type = 'button';
     button.textContent = 'OK';
     button.addEventListener('click', async (event) => {
-        await openCampaign(event);
+        await openLobby(event);
     });
 
     overlay.append(message, button);
@@ -289,8 +271,8 @@ export function showOwnChallengeMessage(documentRef, openCampaign = openCampaign
 
 export function bindAcceptChallenge(
     documentRef,
-    openGame = openCampaignChallenge,
-    { ownChallenge = false, openOwnChallenge = openCampaignAsRedirect } = {},
+    openGame = openHeadToHead,
+    { ownChallenge = false, openOwnChallenge = openHomeAsRedirect } = {},
 ) {
     const button = documentRef?.getElementById('accept-challenge');
     if (!button || button.dataset.bound === '1') return button || null;
@@ -298,7 +280,7 @@ export function bindAcceptChallenge(
     button.addEventListener('click', async (event) => {
         if (ownChallenge) {
             event.preventDefault?.();
-            showOwnChallengeMessage(documentRef, openOwnChallenge);
+            await openOwnChallenge(event);
             return;
         }
         await openGame(event);
@@ -306,15 +288,15 @@ export function bindAcceptChallenge(
     return button;
 }
 
-export function applyCampaignChallengeAccessState(button, message, access = {}) {
+export function applyHeadToHeadAccessState(button, message, access = {}) {
     if (!button) return;
     const canRace = access.canRace === true;
     const ownChallenge = access.ownChallenge === true;
     button.disabled = !canRace && !ownChallenge;
     button.textContent = ownChallenge
-        ? 'View Campaign'
+        ? 'Open Mini Racer'
         : canRace
-            ? 'Race Head to Head'
+            ? 'Accept Challenge'
             : 'Challenge Unavailable';
     if (message) {
         message.textContent = ownChallenge
@@ -322,6 +304,16 @@ export function applyCampaignChallengeAccessState(button, message, access = {}) 
             : canRace
                 ? ''
                 : access.body?.error || 'This Head to Head is unavailable right now.';
+    }
+}
+
+export async function openHomeAsRedirect(event) {
+    try {
+        requestGameLaunchTarget('home');
+        const { requestExpandedMode } = await import('@devvit/web/client');
+        await requestExpandedMode(event, 'game');
+    } catch (error) {
+        console.error('Failed to open Mini Racer Lobby:', error);
     }
 }
 
@@ -345,7 +337,7 @@ export async function openDailyAsRedirect(event) {
     }
 }
 
-export async function openCampaignChallenge(event) {
+export async function openHeadToHead(event) {
     try {
         const { requestExpandedMode } = await import('@devvit/web/client');
         await requestExpandedMode(event, 'game');
@@ -369,24 +361,22 @@ function applyAccessAvatars(documentRef, challenge, access) {
         viewerUsername: body.viewerUsername || 'You',
         viewerAvatarUrl: body.viewerAvatarUrl,
     };
-    renderCampaignChallengeAvatars(documentRef, lastAccessAvatars);
+    renderHeadToHeadAvatars(documentRef, lastAccessAvatars);
 }
 
 async function boot() {
-    const challenge = renderCampaignChallenge(document, readCampaignChallengePostData());
+    const challenge = renderHeadToHead(document, readHeadToHeadPostData());
     const message = document.getElementById('challenge-message');
     await ensureChallengePlayerIdentity(globalThis);
-    const access = await resolveCampaignChallengeAccess(globalThis, challenge.challengeId);
+    const access = await resolveHeadToHeadAccess(globalThis, challenge.challengeId);
     applyAccessAvatars(document, challenge, access);
-    const button = bindAcceptChallenge(document, openCampaignChallenge, {
+    const button = bindAcceptChallenge(document, openHeadToHead, {
         ownChallenge: access.ownChallenge === true,
-        openOwnChallenge: challenge.origin?.mode === 'daily'
-            ? openDailyAsRedirect
-            : openCampaignAsRedirect,
+        openOwnChallenge: openHomeAsRedirect,
     });
-    applyCampaignChallengeAccessState(button, message, access);
+    applyHeadToHeadAccessState(button, message, access);
     globalThis.render_game_to_text = () => JSON.stringify({
-        screen: 'campaign-challenge-preview',
+        screen: 'head-to-head-preview',
         challengeId: challenge.challengeId,
         challengerUsername: challenge.challengerUsername,
         trackKey: challenge.trackKey,
@@ -402,9 +392,9 @@ async function boot() {
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', boot);
     globalThis.addEventListener('resize', () => {
-        const challenge = renderCampaignChallenge(document, readCampaignChallengePostData());
+        const challenge = renderHeadToHead(document, readHeadToHeadPostData());
         if (lastAccessAvatars) {
-            renderCampaignChallengeAvatars(document, {
+            renderHeadToHeadAvatars(document, {
                 ...lastAccessAvatars,
                 challengerUsername: lastAccessAvatars.challengerUsername
                     || challenge.challengerUsername,

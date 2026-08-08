@@ -76,13 +76,12 @@ vi.mock('@devvit/redis', () => ({ redis }));
 vi.mock('@devvit/web/server', () => ({ reddit }));
 
 const {
-    createCampaignChallengeService,
-    formatCampaignChallengeTitle,
-} = await import('../src/server/campaign-challenge-service.ts');
+    createHeadToHeadService,
+    formatHeadToHeadTitle,
+} = await import('../src/server/head-to-head-service.ts');
 const {
-    resolveCampaignChallengeRecordResult,
-} = await import('../src/server/campaign-challenge-post.ts');
-const { writeCampaignChallenge } = await import('../src/server/campaign-challenge-store.ts');
+    resolveHeadToHeadRecordResult,
+} = await import('../src/server/head-to-head-post.ts');
 const context = {
     username: 'RaceFan',
     subredditName: 'MiniRacer',
@@ -130,7 +129,7 @@ function makeService({
     sourceKind = 'campaign',
 } = {}) {
     let nextId = 0;
-    return createCampaignChallengeService({
+    return createHeadToHeadService({
         resolveSource: vi.fn(async () => source(bestTimeMs, sourceKind)),
         validateReplay: vi.fn(async () => ({
             ok: true,
@@ -148,7 +147,7 @@ async function createChallenge(service) {
     return service.create({ challengeToken: preview.body.challengeToken }, context);
 }
 
-describe('campaign challenge service', () => {
+describe('head-to-head service', () => {
     beforeEach(() => {
         strings.clear();
         hashes.clear();
@@ -173,9 +172,9 @@ describe('campaign challenge service', () => {
         );
         expect(created.body.status).toBe('created');
         expect(reddit.submitCustomPost).toHaveBeenCalledWith(expect.objectContaining({
-            entry: 'campaign-challenge',
+            entry: 'head-to-head',
             postData: expect.objectContaining({
-                postType: 'campaign-challenge',
+                postType: 'head-to-head',
                 targetTimeMs: 25_640,
                 challengerUsername: 'RaceFan',
                 challengerAvatarUrl: 'https://i.redd.it/RaceFan.png',
@@ -186,7 +185,7 @@ describe('campaign challenge service', () => {
         expect(submitted.postData.replayDataHash).toMatch(/^[a-f0-9]{64}$/);
         expect(submitted.textFallback.text).toContain('Beat **25.640** on **Number Three** (2 laps).');
         expect(submitted.textFallback.text).toContain('Challenge replay data:');
-        expect(submitted.textFallback.text).toContain('MINIRACER-CHALLENGE-REPLAY-V1');
+        expect(submitted.textFallback.text).toContain('MINIRACER-HEAD-TO-HEAD-REPLAY-V1');
         expect([...strings.values()].join('\n')).not.toContain('frozen');
     });
 
@@ -203,7 +202,7 @@ describe('campaign challenge service', () => {
             targetLapNumber: 2,
             inputs: [{ frames: 12, left: false, right: false, relaunchDelay: false }],
         };
-        const service = createCampaignChallengeService({
+        const service = createHeadToHeadService({
             resolveSource,
             validateReplay: vi.fn(),
             now: () => new Date('2026-07-23T12:00:00.000Z'),
@@ -232,7 +231,7 @@ describe('campaign challenge service', () => {
 
     it('loads a newly created Daily challenge when the viewer request has no post context', async () => {
         const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
-        const service = createCampaignChallengeService({
+        const service = createHeadToHeadService({
             resolveSource: vi.fn(async () => dailySource()),
             validateReplay: vi.fn(),
             now: () => new Date('2026-07-23T12:00:00.000Z'),
@@ -342,7 +341,7 @@ describe('campaign challenge service', () => {
             selftext: JSON.stringify({ text: submittedFallback }),
         });
 
-        const resolved = await resolveCampaignChallengeRecordResult(
+        const resolved = await resolveHeadToHeadRecordResult(
             created.body.challengeId,
             context,
         );
@@ -363,7 +362,7 @@ describe('campaign challenge service', () => {
             replayDataHash: '0'.repeat(64),
         }));
 
-        const resolved = await resolveCampaignChallengeRecordResult(
+        const resolved = await resolveHeadToHeadRecordResult(
             created.body.challengeId,
             context,
         );
@@ -380,7 +379,7 @@ describe('campaign challenge service', () => {
         const post = activePosts.get('t3_challenge1');
         post.body = undefined;
 
-        const resolved = await resolveCampaignChallengeRecordResult(
+        const resolved = await resolveHeadToHeadRecordResult(
             created.body.challengeId,
             context,
         );
@@ -403,48 +402,13 @@ describe('campaign challenge service', () => {
         });
         expect(loaded.status).toBe(404);
         expect(loaded.body.status).toBe('challenge_unavailable');
-        expect(warn).toHaveBeenCalledWith('Campaign challenge resolution failed.', {
+        expect(warn).toHaveBeenCalledWith('Head to Head resolution failed.', {
             challengeId: created.body.challengeId,
             postId: 't3_challenge1',
             reason: 'replay_token_not_found',
         });
-        expect(JSON.stringify(warn.mock.calls)).not.toContain('MINIRACER-CHALLENGE-REPLAY-V1');
+        expect(JSON.stringify(warn.mock.calls)).not.toContain('MINIRACER-HEAD-TO-HEAD-REPLAY-V1');
         warn.mockRestore();
-    });
-
-    it('keeps legacy Campaign posts playable from their matching stored record', async () => {
-        const service = makeService();
-        const created = await createChallenge(service);
-        const post = activePosts.get('t3_challenge1');
-        const postData = await post.getPostData();
-        await writeCampaignChallenge({
-            ...postData,
-            replayDataHash: undefined,
-            subredditName: context.subredditName,
-            sourceKind: 'campaign',
-            sourceId: 'numbered-v1-03',
-            frozenGhost: source().ghost,
-            postId: 't3_challenge1',
-            postUrl: post.url,
-        });
-        const legacyPostData = { ...postData };
-        delete legacyPostData.origin;
-        delete legacyPostData.replayDataHash;
-        post.getPostData = vi.fn(async () => legacyPostData);
-        post.body = '# Head to Head · RaceFan\n\nBeat **25.640** on **Number Three** (2 laps).';
-
-        const loaded = await service.get(created.body.challengeId, {
-            ...context,
-            username: 'OtherRacer',
-        });
-
-        expect(loaded).toMatchObject({
-            status: 200,
-            body: {
-                status: 'ready',
-                opponentGhost: source().ghost,
-            },
-        });
     });
 
     it('uses the stored Reddit post identity when an older client omits post context', async () => {
@@ -461,59 +425,6 @@ describe('campaign challenge service', () => {
             body: {
                 status: 'ready',
                 opponentGhost: source().ghost,
-            },
-        });
-    });
-
-    it('keeps a legacy Daily post playable from its matching stored record', async () => {
-        const service = createCampaignChallengeService({
-            resolveSource: vi.fn(async () => dailySource()),
-            validateReplay: vi.fn(async () => ({
-                ok: true,
-                bestTimeMs: 18_000,
-                medal: 'gold',
-                ghost: { schemaVersion: 2, samples: ['viewer'] },
-            })),
-            now: () => new Date('2026-07-23T12:00:00.000Z'),
-            createId: () => 'daily-challenge-post',
-        });
-        const replay = { inputs: [{ frames: 12 }] };
-        const preview = await service.preview({
-            source: 'daily',
-            challengeId: 'daily-gp-2026-07-23',
-            replay,
-        }, context);
-        const created = await service.create({
-            challengeToken: preview.body.challengeToken,
-            replay,
-        }, context);
-        const post = activePosts.get('t3_challenge1');
-        const postData = await post.getPostData();
-        await writeCampaignChallenge({
-            ...postData,
-            replayDataHash: undefined,
-            subredditName: context.subredditName,
-            sourceKind: 'daily',
-            sourceId: 'daily-gp-2026-07-23',
-            frozenGhost: dailySource().ghost,
-            postId: 't3_challenge1',
-            postUrl: post.url,
-        });
-        const legacyPostData = { ...postData };
-        delete legacyPostData.replayDataHash;
-        post.getPostData = vi.fn(async () => legacyPostData);
-        post.body = '# Head to Head · RaceFan\n\nBeat **18.240** on **Number Three** (2 laps).';
-
-        const loaded = await service.get(created.body.challengeId, {
-            ...context,
-            username: 'OtherRacer',
-        });
-
-        expect(loaded).toMatchObject({
-            status: 200,
-            body: {
-                status: 'ready',
-                opponentGhost: dailySource().ghost,
             },
         });
     });
@@ -564,21 +475,20 @@ describe('campaign challenge service', () => {
         const win = await service.submit({ challengeId, replay: {} }, acceptor);
         expect(win.body).toMatchObject({
             accepted: true,
-            improved: true,
             outcome: 'won',
             resultLabel: 'Challenge Won',
             differenceMs: -640,
         });
+        expect(typeof win.body.acceptToken).toBe('string');
 
         const slowerService = makeService({ validatedTimeMs: 26_000 });
         const loss = await slowerService.submit({ challengeId, replay: {} }, acceptor);
         expect(loss.body).toMatchObject({
-            improved: false,
             outcome: 'lost',
             resultLabel: 'Challenge Lost',
             differenceMs: 360,
+            acceptToken: null,
         });
-        expect(loss.body.bestResult.bestTimeMs).toBe(25_000);
 
         const tieService = makeService({ validatedTimeMs: 25_640 });
         const tie = await tieService.submit(
@@ -586,10 +496,10 @@ describe('campaign challenge service', () => {
             { ...context, username: 'OtherRacer' },
         );
         expect(tie.body).toMatchObject({
-            improved: true,
             outcome: 'tie',
             resultLabel: 'Tie',
             differenceMs: 0,
+            acceptToken: null,
         });
     });
 
@@ -622,7 +532,7 @@ describe('campaign challenge service', () => {
             status: 200,
             body: {
                 accepted: true,
-                bestResult: { viewerUsername: 'Guest racer', bestTimeMs: 25_000 },
+                acceptToken: expect.any(String),
             },
         });
     });
@@ -667,8 +577,8 @@ describe('campaign challenge service', () => {
         expect(otherGet.body.status).toBe('ready');
     });
 
-    it('keeps challenge results isolated from campaign writes and supports duel-result chaining', async () => {
-        const service = makeService({ sourceKind: 'duel' });
+    it('keeps challenge results isolated from campaign writes', async () => {
+        const service = makeService();
         const created = await createChallenge(service);
         const loaded = await service.get(
             created.body.challengeId,
@@ -679,13 +589,13 @@ describe('campaign challenge service', () => {
             raceId: 'numbered-v1-03',
             targetTimeMs: 25_640,
         });
-        expect(loaded.body.opponentGhost).toEqual(source(25_640, 'duel').ghost);
-        expect(loaded.body.bestResult).toBeNull();
+        expect(loaded.body.opponentGhost).toEqual(source(25_640, 'campaign').ghost);
+        expect(loaded.body.bestResult).toBeUndefined();
     });
 });
-describe('campaign challenge formatting', () => {
+describe('head-to-head formatting', () => {
     it('formats exact verified milliseconds', () => {
-        expect(formatCampaignChallengeTitle('RaceFan', 9_005, 'numberZero'))
+        expect(formatHeadToHeadTitle('RaceFan', 9_005, 'numberZero'))
             .toBe('u/RaceFan · Head to Head: beat 9.005 on Number Zero');
     });
 });

@@ -2,50 +2,50 @@ import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { getTrackName } from '../../game/track/catalog.js';
 import {
-    getCampaignChallengeOrigin,
-    isCampaignChallengeOrigin,
-    sameCampaignChallengeOrigin,
-    type CampaignChallengePostData,
-    type CampaignChallengeOrigin,
-} from './campaign-challenge-model.js';
+    getHeadToHeadOrigin,
+    isHeadToHeadOrigin,
+    sameHeadToHeadOrigin,
+    type HeadToHeadPostData,
+    type HeadToHeadOrigin,
+} from './head-to-head-model.js';
 
-export const CAMPAIGN_CHALLENGE_REPLAY_MARKER = 'Challenge replay data:';
-export const CAMPAIGN_CHALLENGE_REPLAY_FORMAT = 'MINIRACER-CHALLENGE-REPLAY-V1';
+export const HEAD_TO_HEAD_REPLAY_MARKER = 'Challenge replay data:';
+export const HEAD_TO_HEAD_REPLAY_FORMAT = 'MINIRACER-HEAD-TO-HEAD-REPLAY-V1';
 
 const COMPRESSED_PREFIX = '__gz:b64url__:';
 const MAX_FALLBACK_CHARS = 40_000;
 const MAX_PAYLOAD_CHARS = MAX_FALLBACK_CHARS;
 const MAX_DECOMPRESSED_BYTES = 128 * 1024;
 
-export type CampaignChallengeReplayEnvelope = {
-    format: typeof CAMPAIGN_CHALLENGE_REPLAY_FORMAT;
+export type HeadToHeadReplayEnvelope = {
+    format: typeof HEAD_TO_HEAD_REPLAY_FORMAT;
     challengeId: string;
     campaignId?: string;
     raceId?: string;
-    origin?: CampaignChallengeOrigin;
+    origin?: HeadToHeadOrigin;
     trackKey: string;
     lapCount: 1 | 2 | 3;
     targetTimeMs: number;
-    medal: CampaignChallengePostData['medal'];
+    medal: HeadToHeadPostData['medal'];
     rulesRevision: number;
     trackFingerprint: string;
     createdAt: string;
     ghost: unknown;
 };
 
-export type EncodedCampaignChallengeReplay = {
-    envelope: CampaignChallengeReplayEnvelope;
+export type EncodedHeadToHeadReplay = {
+    envelope: HeadToHeadReplayEnvelope;
     token: string;
     hash: string;
 };
 
-export type DecodedCampaignChallengeReplay = EncodedCampaignChallengeReplay;
+export type DecodedHeadToHeadReplay = EncodedHeadToHeadReplay;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isMedal(value: unknown): value is CampaignChallengePostData['medal'] {
+function isMedal(value: unknown): value is HeadToHeadPostData['medal'] {
     return value === null
         || value === 'author'
         || value === 'gold'
@@ -62,11 +62,11 @@ function sha256(value: string): string {
 }
 
 function createEnvelope(
-    postData: CampaignChallengePostData,
+    postData: HeadToHeadPostData,
     ghost: unknown,
-): CampaignChallengeReplayEnvelope {
-    const envelope: CampaignChallengeReplayEnvelope = {
-        format: CAMPAIGN_CHALLENGE_REPLAY_FORMAT,
+): HeadToHeadReplayEnvelope {
+    const envelope: HeadToHeadReplayEnvelope = {
+        format: HEAD_TO_HEAD_REPLAY_FORMAT,
         challengeId: postData.challengeId,
         trackKey: postData.trackKey,
         lapCount: postData.lapCount,
@@ -79,39 +79,39 @@ function createEnvelope(
     };
     if (postData.campaignId) envelope.campaignId = postData.campaignId;
     if (postData.raceId) envelope.raceId = postData.raceId;
-    const origin = getCampaignChallengeOrigin(postData);
+    const origin = getHeadToHeadOrigin(postData);
     if (origin) envelope.origin = origin;
     return envelope;
 }
 
-function encodeEnvelope(envelope: CampaignChallengeReplayEnvelope): string {
+function encodeEnvelope(envelope: HeadToHeadReplayEnvelope): string {
     const json = JSON.stringify(envelope);
-    if (!json) throw new Error('Campaign challenge replay could not be serialized.');
+    if (!json) throw new Error('Head to Head replay could not be serialized.');
     const compressed = gzipSync(Buffer.from(json, 'utf8'), { level: 9 });
-    return `${CAMPAIGN_CHALLENGE_REPLAY_FORMAT}\n${COMPRESSED_PREFIX}${compressed.toString('base64url')}`;
+    return `${HEAD_TO_HEAD_REPLAY_FORMAT}\n${COMPRESSED_PREFIX}${compressed.toString('base64url')}`;
 }
 
-export function encodeCampaignChallengeReplay(
-    postData: CampaignChallengePostData,
+export function encodeHeadToHeadReplay(
+    postData: HeadToHeadPostData,
     ghost: unknown,
-): EncodedCampaignChallengeReplay {
+): EncodedHeadToHeadReplay {
     const envelope = createEnvelope(postData, ghost);
     const token = encodeEnvelope(envelope);
     if (token.length > MAX_PAYLOAD_CHARS) {
-        throw new Error('Campaign challenge replay exceeds the Reddit text fallback limit.');
+        throw new Error('Head to Head replay exceeds the Reddit text fallback limit.');
     }
     return { envelope, token, hash: sha256(token) };
 }
 
-export function isCampaignChallengeReplayEnvelope(
+export function isHeadToHeadReplayEnvelope(
     value: unknown,
-): value is CampaignChallengeReplayEnvelope {
+): value is HeadToHeadReplayEnvelope {
     if (!isRecord(value)) return false;
-    return value.format === CAMPAIGN_CHALLENGE_REPLAY_FORMAT
+    return value.format === HEAD_TO_HEAD_REPLAY_FORMAT
         && typeof value.challengeId === 'string'
         && Boolean(value.challengeId)
         && (
-            isCampaignChallengeOrigin(value.origin)
+            isHeadToHeadOrigin(value.origin)
             || (
                 typeof value.campaignId === 'string'
                 && Boolean(value.campaignId)
@@ -135,13 +135,13 @@ export function isCampaignChallengeReplayEnvelope(
 }
 
 function sameContract(
-    envelope: CampaignChallengeReplayEnvelope,
-    postData: CampaignChallengePostData,
+    envelope: HeadToHeadReplayEnvelope,
+    postData: HeadToHeadPostData,
 ): boolean {
-    const expectedOrigin = getCampaignChallengeOrigin(postData);
-    const envelopeOrigin = getCampaignChallengeOrigin(envelope);
+    const expectedOrigin = getHeadToHeadOrigin(postData);
+    const envelopeOrigin = getHeadToHeadOrigin(envelope);
     return envelope.challengeId === postData.challengeId
-        && sameCampaignChallengeOrigin(envelopeOrigin, expectedOrigin)
+        && sameHeadToHeadOrigin(envelopeOrigin, expectedOrigin)
         && envelope.campaignId === postData.campaignId
         && envelope.raceId === postData.raceId
         && envelope.trackKey === postData.trackKey
@@ -154,14 +154,14 @@ function sameContract(
 }
 
 function contractDiff(
-    envelope: CampaignChallengeReplayEnvelope,
-    postData: CampaignChallengePostData,
+    envelope: HeadToHeadReplayEnvelope,
+    postData: HeadToHeadPostData,
 ): Record<string, { envelope: unknown; postData: unknown }> {
-    const expectedOrigin = getCampaignChallengeOrigin(postData);
-    const envelopeOrigin = getCampaignChallengeOrigin(envelope);
+    const expectedOrigin = getHeadToHeadOrigin(postData);
+    const envelopeOrigin = getHeadToHeadOrigin(envelope);
     const fields: [string, unknown, unknown][] = [
         ['challengeId', envelope.challengeId, postData.challengeId],
-        ['origin', !sameCampaignChallengeOrigin(envelopeOrigin, expectedOrigin) ? JSON.stringify(envelopeOrigin) : null, !sameCampaignChallengeOrigin(envelopeOrigin, expectedOrigin) ? JSON.stringify(expectedOrigin) : null],
+        ['origin', !sameHeadToHeadOrigin(envelopeOrigin, expectedOrigin) ? JSON.stringify(envelopeOrigin) : null, !sameHeadToHeadOrigin(envelopeOrigin, expectedOrigin) ? JSON.stringify(expectedOrigin) : null],
         ['campaignId', envelope.campaignId, postData.campaignId],
         ['raceId', envelope.raceId, postData.raceId],
         ['trackKey', envelope.trackKey, postData.trackKey],
@@ -181,20 +181,20 @@ function contractDiff(
 
 function extractToken(text: string): string | null {
     if (typeof text !== 'string' || text.length > MAX_FALLBACK_CHARS) return null;
-    const markerIndex = text.indexOf(CAMPAIGN_CHALLENGE_REPLAY_MARKER);
+    const markerIndex = text.indexOf(HEAD_TO_HEAD_REPLAY_MARKER);
     if (markerIndex < 0) return null;
-    const payload = text.slice(markerIndex + CAMPAIGN_CHALLENGE_REPLAY_MARKER.length);
+    const payload = text.slice(markerIndex + HEAD_TO_HEAD_REPLAY_MARKER.length);
     const tokenPattern = new RegExp(
-        `${CAMPAIGN_CHALLENGE_REPLAY_FORMAT}\\s*\\r?\\n(${COMPRESSED_PREFIX}[A-Za-z0-9_-]+)`,
+        `${HEAD_TO_HEAD_REPLAY_FORMAT}\\s*\\r?\\n(${COMPRESSED_PREFIX}[A-Za-z0-9_-]+)`,
     );
     const compressedToken = payload.match(tokenPattern)?.[1] ?? null;
-    return compressedToken ? `${CAMPAIGN_CHALLENGE_REPLAY_FORMAT}\n${compressedToken}` : null;
+    return compressedToken ? `${HEAD_TO_HEAD_REPLAY_FORMAT}\n${compressedToken}` : null;
 }
 
-export function decodeCampaignChallengeReplay(
+export function decodeHeadToHeadReplay(
     text: string,
-    expectedPostData: CampaignChallengePostData | null = null,
-): { decoded: DecodedCampaignChallengeReplay | null; reason?: string; diff?: Record<string, unknown> } {
+    expectedPostData: HeadToHeadPostData | null = null,
+): { decoded: DecodedHeadToHeadReplay | null; reason?: string; diff?: Record<string, unknown> } {
     const token = extractToken(text);
     if (!token || token.length > MAX_PAYLOAD_CHARS) return { decoded: null, reason: 'replay_token_not_found' };
     if (
@@ -208,7 +208,7 @@ export function decodeCampaignChallengeReplay(
         const json = gunzipSync(compressed, { maxOutputLength: MAX_DECOMPRESSED_BYTES })
             .toString('utf8');
         const parsed = JSON.parse(json);
-        if (!isCampaignChallengeReplayEnvelope(parsed)) return { decoded: null, reason: 'replay_envelope_invalid' };
+        if (!isHeadToHeadReplayEnvelope(parsed)) return { decoded: null, reason: 'replay_envelope_invalid' };
         if (expectedPostData && !sameContract(parsed, expectedPostData)) {
             const diff = contractDiff(parsed, expectedPostData);
             return { decoded: null, reason: 'replay_contract_mismatch', diff };
@@ -225,35 +225,35 @@ export function decodeCampaignChallengeReplay(
     }
 }
 
-export function formatCampaignChallengeTextFallback(
-    postData: CampaignChallengePostData,
+export function formatHeadToHeadTextFallback(
+    postData: HeadToHeadPostData,
     ghost: unknown,
 ): string {
     const laps = postData.lapCount === 1 ? '1 lap' : `${postData.lapCount} laps`;
-    const replay = encodeCampaignChallengeReplay(postData, ghost);
+    const replay = encodeHeadToHeadReplay(postData, ghost);
     if (postData.replayDataHash && postData.replayDataHash !== replay.hash) {
-        throw new Error('Campaign challenge replay hash does not match post data.');
+        throw new Error('Head to Head replay hash does not match post data.');
     }
     const text = [
         `# Head to Head · ${postData.challengerUsername}`,
         '',
-        `Beat **${formatCampaignChallengeTime(postData.targetTimeMs)}** on **${getTrackName(postData.trackKey, postData.trackKey)}** (${laps}).`,
+        `Beat **${formatHeadToHeadTime(postData.targetTimeMs)}** on **${getTrackName(postData.trackKey, postData.trackKey)}** (${laps}).`,
         '',
         'Open Mini Racer and race the frozen verified ghost.',
         '',
-        CAMPAIGN_CHALLENGE_REPLAY_MARKER,
+        HEAD_TO_HEAD_REPLAY_MARKER,
         '',
         '```text',
         replay.token,
         '```',
     ].join('\n');
     if (text.length > MAX_FALLBACK_CHARS) {
-        throw new Error('Campaign challenge text fallback exceeds the Reddit limit.');
+        throw new Error('Head to Head text fallback exceeds the Reddit limit.');
     }
     return text;
 }
 
-function formatCampaignChallengeTime(timeMs: number): string {
+function formatHeadToHeadTime(timeMs: number): string {
     const seconds = Math.floor(timeMs / 1000);
     const milliseconds = timeMs % 1000;
     return `${seconds}.${String(milliseconds).padStart(3, '0')}`;

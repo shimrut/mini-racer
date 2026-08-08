@@ -1,50 +1,50 @@
 import type { Application } from 'express';
 import type {
-    CampaignChallengeRequestContext,
-    CampaignChallengeServiceResult,
-} from '../campaign-challenge-service.js';
+    HeadToHeadRequestContext,
+    HeadToHeadServiceResult,
+} from '../head-to-head-service.js';
 
-export type CampaignChallengeRouteDependencies = {
-    getCampaignChallengeRequestContext(): Promise<CampaignChallengeRequestContext>
-        | CampaignChallengeRequestContext;
+export type HeadToHeadRouteDependencies = {
+    getHeadToHeadRequestContext(): Promise<HeadToHeadRequestContext>
+        | HeadToHeadRequestContext;
     readContextPostData(): Record<string, unknown> | null;
-    previewCampaignChallenge(
+    previewHeadToHead(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult>;
-    createCampaignChallenge(
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
+    createHeadToHead(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult>;
-    getCampaignChallenge(
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
+    getHeadToHead(
         challengeId: string | null,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult>;
-    submitCampaignChallenge(
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
+    submitHeadToHead(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult>;
-    previewCampaignChallengeBrag(
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
+    previewHeadToHeadBrag(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult>;
-    confirmCampaignChallengeBrag(
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
+    confirmHeadToHeadBrag(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult>;
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
 };
 
 function postChallengeId(postData: Record<string, unknown> | null): string | null {
-    return postData?.postType === 'campaign-challenge'
+    return postData?.postType === 'head-to-head'
         && typeof postData.challengeId === 'string'
         ? postData.challengeId
         : null;
 }
 
 function withRequestIdentity(
-    context: CampaignChallengeRequestContext,
+    context: HeadToHeadRequestContext,
     input: Record<string, unknown> | null | undefined,
-): CampaignChallengeRequestContext {
+): HeadToHeadRequestContext {
     const requestedPostId = typeof input?.postId === 'string'
         && input.postId.startsWith('t3_')
         ? input.postId
@@ -56,59 +56,59 @@ function withRequestIdentity(
         guestToken: typeof input?.guestToken === 'string' ? input.guestToken : null,
     };
 }
-export function registerCampaignChallengeRoutes(
+export function registerHeadToHeadRoutes(
     app: Application,
-    dependencies: CampaignChallengeRouteDependencies,
+    dependencies: HeadToHeadRouteDependencies,
 ): void {
-    app.post('/api/campaign/challenge/preview', async (req, res) => {
+    app.post('/api/head-to-head/preview', async (req, res) => {
         try {
-            const result = await dependencies.previewCampaignChallenge(
+            const result = await dependencies.previewHeadToHead(
                 req.body ?? {},
-                await dependencies.getCampaignChallengeRequestContext(),
+                await dependencies.getHeadToHeadRequestContext(),
             );
             res.status(result.status).json(result.body);
         } catch (error) {
-            console.error('Failed to preview Mini Racer campaign challenge:', error);
+            console.error('Failed to preview Mini Racer head-to-head:', error);
             res.status(500).json({ status: 'challenge_failed', error: 'Could not prepare this challenge.' });
         }
     });
 
-    app.post('/api/campaign/challenge/create', async (req, res) => {
+    app.post('/api/head-to-head/create', async (req, res) => {
         try {
-            const result = await dependencies.createCampaignChallenge(
+            const result = await dependencies.createHeadToHead(
                 req.body ?? {},
-                await dependencies.getCampaignChallengeRequestContext(),
+                await dependencies.getHeadToHeadRequestContext(),
             );
             res.status(result.status).json(result.body);
         } catch (error) {
-            console.error('Failed to create Mini Racer campaign challenge:', error);
+            console.error('Failed to create Mini Racer head-to-head:', error);
             res.status(500).json({ status: 'challenge_failed', error: 'Could not create this challenge.' });
         }
     });
 
-    app.get('/api/campaign/challenge', async (req, res) => {
+    app.get('/api/head-to-head', async (req, res) => {
         try {
             const queryId = typeof req.query?.challengeId === 'string'
                 ? req.query.challengeId
                 : null;
-            const result = await dependencies.getCampaignChallenge(
+            const result = await dependencies.getHeadToHead(
                 queryId || postChallengeId(dependencies.readContextPostData()),
                 withRequestIdentity(
-                    await dependencies.getCampaignChallengeRequestContext(),
+                    await dependencies.getHeadToHeadRequestContext(),
                     req.query as Record<string, unknown>,
                 ),
             );
             res.status(result.status).json(result.body);
         } catch (error) {
-            console.error('Failed to load Mini Racer campaign challenge:', error);
+            console.error('Failed to load Mini Racer head-to-head:', error);
             res.status(500).json({ status: 'challenge_failed', error: 'Could not load this challenge.' });
         }
     });
 
-    app.post('/api/campaign/challenge/submit', async (req, res) => {
+    app.post('/api/head-to-head/submit', async (req, res) => {
         try {
             const body = req.body ?? {};
-            const result = await dependencies.submitCampaignChallenge(
+            const result = await dependencies.submitHeadToHead(
                 {
                     ...body,
                     challengeId: typeof body.challengeId === 'string'
@@ -116,23 +116,23 @@ export function registerCampaignChallengeRoutes(
                         : postChallengeId(dependencies.readContextPostData()),
                 },
                 withRequestIdentity(
-                    await dependencies.getCampaignChallengeRequestContext(),
+                    await dependencies.getHeadToHeadRequestContext(),
                     body,
                 ),
             );
             res.status(result.status).json(result.body);
         } catch (error) {
-            console.error('Failed to submit Mini Racer campaign challenge:', error);
+            console.error('Failed to submit Mini Racer head-to-head:', error);
             res.status(500).json({ accepted: false, status: 'challenge_failed', error: 'Could not verify this challenge run.' });
         }
     });
 
-    app.post('/api/campaign/challenge/brag/preview', async (req, res) => {
+    app.post('/api/head-to-head/brag/preview', async (req, res) => {
         try {
-            const result = await dependencies.previewCampaignChallengeBrag(
+            const result = await dependencies.previewHeadToHeadBrag(
                 req.body ?? {},
                 withRequestIdentity(
-                    await dependencies.getCampaignChallengeRequestContext(),
+                    await dependencies.getHeadToHeadRequestContext(),
                     req.body ?? {},
                 ),
             );
@@ -143,11 +143,11 @@ export function registerCampaignChallengeRoutes(
         }
     });
 
-    app.post('/api/campaign/challenge/brag/confirm', async (req, res) => {
+    app.post('/api/head-to-head/brag/confirm', async (req, res) => {
         try {
-            const result = await dependencies.confirmCampaignChallengeBrag(
+            const result = await dependencies.confirmHeadToHeadBrag(
                 req.body ?? {},
-                await dependencies.getCampaignChallengeRequestContext(),
+                await dependencies.getHeadToHeadRequestContext(),
             );
             res.status(result.status).json(result.body);
         } catch (error) {

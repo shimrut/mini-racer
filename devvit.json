@@ -32,9 +32,9 @@
         "height": "tall",
         "entry": "campaign.html"
       },
-      "campaign-challenge": {
+      "head-to-head": {
         "height": "tall",
-        "entry": "campaign-challenge.html"
+        "entry": "head-to-head.html"
       },
       "podium": {
         "height": "tall",

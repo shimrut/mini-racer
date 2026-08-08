@@ -3,11 +3,11 @@ import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
 import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
 import { requestFeaturedDailyChallengeStart } from './game/daily-challenge/service.js';
+import { applyAvatar, GENERIC_SNOO_URL, resolveAvatarUrl } from './game/ui/avatar.js';
 
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
 const EMPTY_TIME = '—';
-const GENERIC_SNOO_URL = 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
 
 export function readPodiumPostData(root = globalThis) {
     const postData = root?.devvit?.context?.postData;
@@ -72,7 +72,7 @@ function normalizePosition(position, rank) {
         identityType,
         formattedTime,
         avatarUrl: identityType === 'reddit'
-            ? normalizeAvatarUrl(position.avatarUrl)
+            ? resolveAvatarUrl(position.avatarUrl)
             : GENERIC_SNOO_URL,
     };
 }
@@ -94,20 +94,14 @@ function renderPosition(row, position) {
     const avatar = row.querySelector('.podium-row__avatar');
 
     if (name) name.textContent = position.displayName;
-    if (avatar) {
-        avatar.src = position.avatarUrl;
-        avatar.alt = position.identityType === 'reddit'
+    applyAvatar(avatar, position.avatarUrl, {
+        alt: position.identityType === 'reddit'
             ? `${position.displayName} Reddit avatar`
             : position.identityType === 'private'
                 ? 'Official Reddit default Snoo avatar'
-                : '';
-        avatar.classList.toggle('podium-row__avatar--generic', position.avatarUrl === GENERIC_SNOO_URL);
-        avatar.onerror = () => {
-            avatar.onerror = null;
-            avatar.src = GENERIC_SNOO_URL;
-            avatar.classList.add('podium-row__avatar--generic');
-        };
-    }
+                : '',
+        genericClass: 'podium-row__avatar--generic',
+    });
     if (time) {
         time.textContent = position.formattedTime;
         time.setAttribute(
@@ -116,16 +110,6 @@ function renderPosition(row, position) {
         );
     }
     row.classList.toggle('podium-row--empty', position.identityType === 'empty');
-}
-
-function normalizeAvatarUrl(value) {
-    if (typeof value !== 'string') return GENERIC_SNOO_URL;
-    try {
-        const url = new URL(value);
-        return url.protocol === 'https:' ? url.href : GENERIC_SNOO_URL;
-    } catch {
-        return GENERIC_SNOO_URL;
-    }
 }
 
 function formatRedditName(value) {
@@ -146,7 +130,7 @@ export async function hydrateMissingRedditAvatars(root, podium) {
         const avatarsByRank = new Map(
             (Array.isArray(payload?.positions) ? payload.positions : [])
                 .filter((position) => Number.isInteger(position?.rank))
-                .map((position) => [position.rank, normalizeAvatarUrl(position.avatarUrl)])
+                .map((position) => [position.rank, resolveAvatarUrl(position.avatarUrl)])
         );
         return {
             ...podium,

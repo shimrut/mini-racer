@@ -472,5 +472,59 @@
     "gold": 10.35,
     "silver": 10.79,
     "bronze": 11.22
+  },
+  "felineFace": {
+    "author": 10.85,
+    "gold": 11.12,
+    "silver": 11.53,
+    "bronze": 11.99
+  },
+  "appleStrudel": {
+    "author": 11.15,
+    "gold": 11.45,
+    "silver": 11.94,
+    "bronze": 12.49
+  },
+  "heavyMetal": {
+    "author": 13.62,
+    "gold": 13.98,
+    "silver": 14.37,
+    "bronze": 14.81
+  },
+  "knifesEdge": {
+    "author": 12.03,
+    "gold": 12.39,
+    "silver": 12.74,
+    "bronze": 13.09
+  },
+  "pocketRun": {
+    "author": 8.06,
+    "gold": 8.31,
+    "silver": 8.62,
+    "bronze": 9.11
+  },
+  "crossCurrent": {
+    "author": 8.33,
+    "gold": 8.76,
+    "silver": 9.05,
+    "bronze": 9.39
+  },
+  "squareDeal": {
+    "author": 7.40,
+    "gold": 7.79,
+    "silver": 8.01,
+    "bronze": 8.28
+  },
+  "doubleHook": {
+    "author": 12.66,
+    "gold": 12.99,
+    "silver": 13.44,
+    "bronze": 13.88
+  },
+  "doubleCrest": {
+    "author": 9.70,
+    "gold": 10.05,
+    "silver": 10.49,
+    "bronze": 10.94
   }
 }

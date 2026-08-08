@@ -6,25 +6,25 @@ const mockDailyChallenge = vi.hoisted(() => vi.fn());
 const mockValidateReplay = vi.hoisted(() => vi.fn());
 
 vi.mock('../src/server/campaign-store.js', () => ({
-    getServerCampaignChallengeSource: vi.fn(),
+    getServerHeadToHeadSource: vi.fn(),
 }));
 vi.mock('../src/server/daily-gp-store.js', () => ({
     getServerDailyGpPlayableChallenge: mockDailyChallenge,
 }));
-vi.mock('../src/server/campaign-challenge-post.js', () => ({
-    resolveCampaignChallengeRecord: vi.fn(),
+vi.mock('../src/server/head-to-head-post.js', () => ({
+    resolveHeadToHeadRecord: vi.fn(),
 }));
-vi.mock('../src/server/campaign-challenge-store.js', () => ({
-    readCampaignChallengeResult: vi.fn(),
+vi.mock('../src/server/head-to-head-store.js', () => ({
+    readHeadToHeadResult: vi.fn(),
 }));
 vi.mock('../src/server/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateReplay,
 }));
 
 const {
-    resolveCampaignChallengeSource,
-    validateCampaignChallengeReplay,
-} = await import('../src/server/campaign-challenge-runtime.ts');
+    resolveHeadToHeadSource,
+    validateHeadToHeadReplay,
+} = await import('../src/server/head-to-head-runtime.ts');
 
 const trackKey = 'numberZero';
 const trackFingerprint = createTrackFingerprint(TRACKS[trackKey]);
@@ -42,7 +42,7 @@ const dailyChallenge = {
     skin: 'default',
 };
 
-describe('campaign challenge runtime', () => {
+describe('head-to-head runtime', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockDailyChallenge.mockResolvedValue(dailyChallenge);
@@ -63,7 +63,7 @@ describe('campaign challenge runtime', () => {
             targetLapNumber: 1,
             inputs: [{ frames: 240, left: false, right: false, relaunchDelay: false }],
         };
-        const source = await resolveCampaignChallengeSource({
+        const source = await resolveHeadToHeadSource({
             source: 'daily',
             challengeId: dailyChallenge.id,
             replay,
@@ -86,7 +86,7 @@ describe('campaign challenge runtime', () => {
 
     it('validates an embedded Daily challenge after its normal window expires', () => {
         const challenge = {
-            postType: 'campaign-challenge',
+            postType: 'head-to-head',
             challengeId: 'daily-challenge-post',
             origin: { mode: 'daily', challengeId: dailyChallenge.id },
             challengerUsername: 'RaceFan',
@@ -106,7 +106,7 @@ describe('campaign challenge runtime', () => {
             postUrl: 'https://reddit.com/r/miniracer/challenge-post',
         };
 
-        const result = validateCampaignChallengeReplay(challenge, {
+        const result = validateHeadToHeadReplay(challenge, {
             rulesRevision: 1,
             targetLapNumber: 1,
             inputs: [{ frames: 240, left: false, right: false, relaunchDelay: false }],

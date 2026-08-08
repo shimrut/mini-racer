@@ -39,7 +39,7 @@ function readExplicitPostTarget(root) {
 function readPostTarget(root) {
     const postData = root?.devvit?.context?.postData;
     if (!postData || typeof postData !== 'object') return null;
-    if (postData.postType === 'campaign-challenge' && postData.challengeId) {
+    if (postData.postType === 'head-to-head' && postData.challengeId) {
         return { mode: 'challenge', challengeId: String(postData.challengeId) };
     }
     if (postData.challenge || postData.challengeId) {
@@ -91,7 +91,7 @@ export function requestGameLaunchTarget(mode, {
     }
 }
 
-function peekStoredCampaignTarget(root) {
+function peekStoredRedirectTarget(root) {
     const storage = root?.localStorage;
     if (!storage) return null;
     try {
@@ -100,9 +100,10 @@ function peekStoredCampaignTarget(root) {
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') return null;
         if (!Number.isFinite(parsed.expiresAt) || Date.now() > parsed.expiresAt) return null;
-        if (normalizeTarget(parsed.mode) !== 'campaign') return null;
+        const mode = normalizeTarget(parsed.mode);
+        if (mode !== 'campaign' && mode !== 'home') return null;
         storage.removeItem(LAUNCH_TARGET_KEY);
-        return { mode: 'campaign', challengeId: null };
+        return { mode, challengeId: null };
     } catch {
         return null;
     }
@@ -117,9 +118,10 @@ export function resolveGameLaunchTarget(root = globalThis) {
     const explicitPostTarget = readExplicitPostTarget(root);
     if (explicitPostTarget) return explicitPostTarget;
 
-    // Own-challenge Accept stores campaign; that must beat challenge post data.
-    const storedCampaign = peekStoredCampaignTarget(root);
-    if (storedCampaign) return storedCampaign;
+    // Own-challenge redirects and explicit launcher buttons store targets like 'home' or 'campaign'.
+    // These must take precedence over challenge post data.
+    const storedRedirect = peekStoredRedirectTarget(root);
+    if (storedRedirect) return storedRedirect;
 
     const postTarget = readPostTarget(root);
     if (postTarget?.mode === 'challenge') return postTarget;

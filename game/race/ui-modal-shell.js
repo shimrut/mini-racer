@@ -339,10 +339,15 @@ export class ModalShell {
     }
 
     getMenuPreferredIndex(buttons) {
+        // Improve is the win sheet's usual landing spot, but a won duel hides it and
+        // hands the accent — and the focus — to Brag.
+        const winPreferred = this.combinedRestartBtn?.hidden
+            ? this.combinedPlaylistBtn
+            : this.combinedRestartBtn;
         const preferred = this._modalKind === 'pause'
             ? this.modalResumeBtn
             : this._modalKind === 'win'
-                ? this.combinedRestartBtn
+                ? winPreferred
                 : null;
         if (!preferred || !buttons?.length) return null;
         const preferredIndex = buttons.indexOf(preferred);
@@ -496,6 +501,10 @@ export class ModalShell {
     get combinedGarageBtn() { return document.getElementById('combined-garage-btn'); }
     get combinedPlaylistBtn() { return document.getElementById('combined-playlist-btn'); }
     get combinedRestartBtn() { return document.getElementById('combined-restart-btn'); }
+    get combinedMoreBtn() { return document.getElementById('combined-more-btn'); }
+    get combinedModeShortcutsLabel() {
+        return document.getElementById('combined-mode-shortcuts-label');
+    }
     cancelPendingModalClose() {
         if (!this.modal) return;
 
@@ -570,6 +579,179 @@ export class ModalShell {
             'combined-action-btn--primary',
             !enabled,
         );
+        return true;
+    }
+
+    /** Every finish sheet starts without the mode shortcuts; only a won duel asks for them. */
+    _hideCombinedModeShortcuts() {
+        const label = this.combinedModeShortcutsLabel;
+        if (label) label.hidden = true;
+        // Home is the sheet's own button in every other mode, so a won duel's
+        // relabelling has to be handed back with the shortcuts.
+        const menu = this.combinedMenuBtn;
+        if (menu) {
+            this._setShareButtonLabel(menu, 'Home');
+            menu.setAttribute('aria-label', 'Home');
+            menu.disabled = false;
+            this._bindClickAction(menu, this._combinedMenuAction);
+        }
+        const button = this.combinedMoreBtn;
+        if (!button) return;
+        button.hidden = true;
+        button.style.display = 'none';
+        this._bindClickAction(button, null);
+    }
+
+    /**
+     * A won duel has no rerun, so Improve gives way to Brag and the two modes
+     * waiting outside this one. Both of those leave the head to head, so both
+     * ask first — the duel's own poster is no longer on the way out.
+     */
+    setChallengeWinActions({
+        dailyAction = null,
+        campaignAction = null,
+    } = {}) {
+        if (!this.modalCombinedView?.classList.contains('active-view')) return false;
+
+        const improve = this.combinedRestartBtn;
+        if (improve) {
+            improve.hidden = true;
+            improve.style.display = 'none';
+            improve.classList?.remove?.('combined-action-btn--primary');
+            this._bindClickAction(improve, null);
+        }
+        this.combinedPlaylistBtn?.classList?.add?.('combined-action-btn--primary');
+
+        const label = this.combinedModeShortcutsLabel;
+        if (label) label.hidden = false;
+
+        const bindModeShortcut = (button, { label: buttonLabel, ariaLabel, action }) => {
+            if (!button) return;
+            this._setShareButtonLabel(button, buttonLabel);
+            button.setAttribute('aria-label', ariaLabel);
+            button.disabled = typeof action !== 'function';
+            this._bindClickAction(
+                button,
+                typeof action === 'function'
+                    ? () => this._confirmInSheet({
+                        title: buttonLabel,
+                        message: 'This will leave the head to head.',
+                        confirmLabel: 'OK',
+                        triggerButton: button,
+                        onConfirm: () => action(),
+                    })
+                    : null,
+            );
+        };
+
+        const daily = this.combinedMoreBtn;
+        if (daily) {
+            daily.hidden = false;
+            daily.style.display = '';
+        }
+        bindModeShortcut(daily, {
+            label: 'The Daily',
+            ariaLabel: 'Leave this head to head for the Daily',
+            action: dailyAction,
+        });
+        bindModeShortcut(this.combinedMenuBtn, {
+            label: 'Campaign',
+            ariaLabel: 'Leave this head to head for the Campaign',
+            action: campaignAction,
+        });
+
+        this.resetMenuKeyboardNav?.();
+        return true;
+    }
+
+    /**
+     * Asks before an action that ends the run the sheet is reporting on, in the
+     * sheet's own panel — the same card the share flow uses, so a question and a
+     * choice look the same wherever the finish asks one.
+     */
+    _confirmInSheet({
+        title = '',
+        message = '',
+        confirmLabel = 'OK',
+        onConfirm = null,
+        triggerButton = null,
+    } = {}) {
+        const hostView = this.modalCombinedView;
+        if (!hostView || typeof onConfirm !== 'function') return false;
+
+        this._closeSharePanel?.({ restoreScroll: false });
+        const scrim = document.createElement('section');
+        scrim.className = 'result-share-panel';
+        scrim.setAttribute('role', 'dialog');
+        scrim.setAttribute('aria-label', title || 'Confirm');
+        scrim.dataset.savedScrollTop = String(this.modalLapTimes?.scrollTop || 0);
+
+        const panel = document.createElement('div');
+        panel.className = 'result-share-panel__card';
+        scrim.appendChild(panel);
+
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'result-share-panel__title';
+        titleEl.textContent = title;
+
+        const messageEl = document.createElement('p');
+        messageEl.className = 'result-share-panel__status';
+        messageEl.textContent = message;
+
+        const actions = document.createElement('div');
+        actions.className = 'result-share-panel__actions';
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'result-share-panel__button';
+        cancel.textContent = 'Cancel';
+        cancel.onclick = () => {
+            if (triggerButton) triggerButton.disabled = false;
+            this._closeSharePanel();
+        };
+
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = 'result-share-panel__button result-share-panel__button--primary';
+        confirm.textContent = confirmLabel;
+        confirm.onclick = () => {
+            this._closeSharePanel({ restoreScroll: false });
+            onConfirm();
+        };
+
+        actions.append(confirm, cancel);
+        panel.append(titleEl, messageEl, actions);
+        hostView.appendChild(scrim);
+        if (triggerButton) triggerButton.disabled = true;
+        this.clearFinishMenuKeyboardCue();
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [confirm, cancel], {
+            preferredIndex: 0,
+            container: actions,
+            focusPreferred: true,
+        });
+        return true;
+    }
+
+    /** Puts Improve back when the server takes back a win the sheet opened on. */
+    clearChallengeWinActions({ restartAction = null } = {}) {
+        if (!this.modalCombinedView?.classList.contains('active-view')) return false;
+
+        this._hideCombinedModeShortcuts();
+        this.combinedPlaylistBtn?.classList?.remove?.('combined-action-btn--primary');
+
+        const improve = this.combinedRestartBtn;
+        if (improve && typeof restartAction === 'function') {
+            improve.hidden = false;
+            improve.style.display = '';
+            improve.classList?.add?.('combined-action-btn--primary');
+            this.setCombinedPrimaryAction({
+                label: 'IMPROVE',
+                ariaLabel: 'Improve time',
+                action: () => restartAction(),
+            });
+        }
+
+        this.resetMenuKeyboardNav?.();
         return true;
     }
 
@@ -678,7 +860,7 @@ export class ModalShell {
         challenge.textContent = 'Issue Challenge';
         challenge.onclick = () => this._startShare({
             ...request,
-            kind: 'campaign-challenge',
+            kind: 'head-to-head',
             source: 'daily',
         }, triggerButton, hostView);
         actions.append(comment, challenge, cancel);
@@ -695,7 +877,7 @@ export class ModalShell {
 
     async _startShare(request, triggerButton, hostView) {
         if (!triggerButton || !hostView) return;
-        const isChallenge = request?.kind === 'campaign-challenge';
+        const isChallenge = request?.kind === 'head-to-head';
         const isBrag = request?.kind === 'challenge-brag';
         const isDailyShare = isChallenge
             ? request?.source === 'daily'
@@ -782,7 +964,7 @@ export class ModalShell {
             const copy = document.createElement('blockquote');
             copy.className = 'result-share-panel__copy';
             copy.textContent = isChallenge
-                ? (body.title || 'Create a verified Campaign challenge.')
+                ? (body.title || 'Create a verified Head to Head.')
                 : body.commentText;
             const actions = document.createElement('div');
             actions.className = 'result-share-panel__actions';
@@ -947,6 +1129,8 @@ export class ModalShell {
             challengeConfirmPhase: lapData.challengeConfirmPhase ?? null,
             challengeConfirmStatus: lapData.challengeConfirmStatus ?? null,
             challengeConfirmError: lapData.challengeConfirmError ?? null,
+            challengeViewerAvatarUrl: lapData.challengeViewerAvatarUrl ?? null,
+            challengeVerdict: lapData.challengeVerdict ?? null,
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
@@ -962,6 +1146,10 @@ export class ModalShell {
 
         if (lapData.challengeFinish || lapData.challengeConfirmPhase) {
             this._challengeFinishShareRequest = options.shareRequest || null;
+            this._challengeFinishPhase = lapData.challengeConfirmPhase
+                ?? (lapData.lapMedal === 'challenge' ? 'won' : 'pending');
+        } else {
+            this._challengeFinishPhase = null;
         }
 
         const finishResultModal = (fn) => {
@@ -970,14 +1158,19 @@ export class ModalShell {
         };
 
         const shareKind = options.shareRequest?.kind;
-        const isChallengeShare = shareKind === 'campaign-challenge';
+        const isChallengeShare = shareKind === 'head-to-head';
         const isChallengeBrag = shareKind === 'challenge-brag';
         const isDailyShare = !shareKind && options.shareRequest?.source === 'finish';
+
+        // The action row is shared by every mode; a previous win must not leak into it.
+        this._hideCombinedModeShortcuts();
+        this.combinedPlaylistBtn?.classList?.remove?.('combined-action-btn--primary');
 
         if (this.combinedRestartBtn) {
             const canImprove = typeof (options.restartAction || options.primaryAction) === 'function';
             this.combinedRestartBtn.style.display = canImprove ? '' : 'none';
             this.combinedRestartBtn.hidden = !canImprove;
+            this.combinedRestartBtn.classList?.toggle?.('combined-action-btn--primary', canImprove);
             const labelSpan = this.combinedRestartBtn.querySelector('.combined-action-btn-label');
             if (labelSpan) labelSpan.textContent = 'IMPROVE';
             this.combinedRestartBtn.setAttribute(
@@ -1008,7 +1201,10 @@ export class ModalShell {
 
         this._syncCombinedNextRace(options.nextRace || null);
 
-        this._bindClickAction(this.combinedMenuBtn, finishResultModal(options.secondaryAction));
+        // Held so a won duel's Campaign shortcut can hand Home back if the server
+        // takes the win away again.
+        this._combinedMenuAction = finishResultModal(options.secondaryAction);
+        this._bindClickAction(this.combinedMenuBtn, this._combinedMenuAction);
         this._bindClickAction(this.combinedSettingsBtn, options.settingsAction);
         this._bindCombinedGarageBtn(this.combinedGarageBtn);
         this._bindClickAction(
@@ -1116,11 +1312,38 @@ export class ModalShell {
         statusText = null,
         error = null,
         shareRequest = undefined,
+        verdict = undefined,
     } = {}) {
         if (!this.modalCombinedView?.classList.contains('active-view')) return;
 
         const heroMedalEl = this.modalCombinedView.querySelector('#combined-hero-medal');
-        renderChallengeFinishHero(heroMedalEl, { phase, statusText, error });
+        const lapData = this._combinedResultsLapData;
+        // The sheet may already have opened on this phase — a finish that beat the
+        // target opens won and only waits for the server to agree. Repainting it
+        // would replay the medal's entrance for a hero that never changed, so only
+        // a new phase or a margin the server corrected earns a repaint.
+        // A call that only carries a share request leaves the hero alone.
+        const phaseUnchanged = phase === undefined || phase === this._challengeFinishPhase;
+        const marginUnchanged = verdict === undefined
+            || verdict?.deltaSec === lapData?.challengeVerdict?.deltaSec;
+        if (!phaseUnchanged || !marginUnchanged) {
+            const nextPhase = phase ?? this._challengeFinishPhase;
+            const nextVerdict = verdict === undefined
+                ? (lapData?.challengeVerdict ?? null)
+                : verdict;
+            renderChallengeFinishHero(heroMedalEl, {
+                phase: nextPhase,
+                statusText,
+                error,
+                avatarUrl: lapData?.challengeViewerAvatarUrl ?? null,
+                verdict: nextVerdict,
+            });
+            this._challengeFinishPhase = nextPhase;
+            if (lapData) {
+                lapData.challengeConfirmPhase = nextPhase;
+                lapData.challengeVerdict = nextVerdict;
+            }
+        }
 
         if (shareRequest !== undefined) {
             this._challengeFinishShareRequest = shareRequest;
@@ -1150,7 +1373,7 @@ export class ModalShell {
             );
         }
 
-        if (phase === 'won') {
+        if (phase === 'won' && !phaseUnchanged) {
             const shouldCelebrateTier = (tier) => tier === 'challenge';
             const playUnlockSound = (tier) => {
                 if (tier !== 'challenge') return;

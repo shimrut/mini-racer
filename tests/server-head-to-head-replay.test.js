@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-    CAMPAIGN_CHALLENGE_REPLAY_FORMAT,
-    CAMPAIGN_CHALLENGE_REPLAY_MARKER,
-    decodeCampaignChallengeReplay,
-    encodeCampaignChallengeReplay,
-    formatCampaignChallengeTextFallback,
-} from '../src/server/campaign-challenge-replay.ts';
+    HEAD_TO_HEAD_REPLAY_FORMAT,
+    HEAD_TO_HEAD_REPLAY_MARKER,
+    decodeHeadToHeadReplay,
+    encodeHeadToHeadReplay,
+    formatHeadToHeadTextFallback,
+} from '../src/server/head-to-head-replay.ts';
 
 const postData = {
-    postType: 'campaign-challenge',
+    postType: 'head-to-head',
     challengeId: 'challenge-1',
     campaignId: 'numbered-v1',
     raceId: 'numbered-v1-01',
@@ -31,19 +31,19 @@ const ghost = {
     deltas: [1, 2, 3, -1, 0, 2],
 };
 
-describe('campaign challenge replay body', () => {
+describe('head-to-head replay body', () => {
     it('keeps the human copy first and round-trips the compressed replay payload', () => {
-        const encoded = encodeCampaignChallengeReplay(postData, ghost);
+        const encoded = encodeHeadToHeadReplay(postData, ghost);
         const immutablePostData = { ...postData, replayDataHash: encoded.hash };
-        const text = formatCampaignChallengeTextFallback(immutablePostData, ghost);
+        const text = formatHeadToHeadTextFallback(immutablePostData, ghost);
 
         expect(text.indexOf('# Head to Head · RaceFan')).toBeLessThan(
-            text.indexOf(CAMPAIGN_CHALLENGE_REPLAY_MARKER),
+            text.indexOf(HEAD_TO_HEAD_REPLAY_MARKER),
         );
         expect(text).toContain('Beat **25.640** on **Number One** (2 laps).');
-        expect(text).toContain(CAMPAIGN_CHALLENGE_REPLAY_FORMAT);
+        expect(text).toContain(HEAD_TO_HEAD_REPLAY_FORMAT);
         expect(text.length).toBeLessThan(40_000);
-        expect(decodeCampaignChallengeReplay(text, immutablePostData)).toMatchObject({
+        expect(decodeHeadToHeadReplay(text, immutablePostData).decoded).toMatchObject({
             hash: encoded.hash,
             envelope: {
                 challengeId: 'challenge-1',
@@ -54,28 +54,28 @@ describe('campaign challenge replay body', () => {
     });
 
     it('fails closed when the body or immutable post data is changed', () => {
-        const encoded = encodeCampaignChallengeReplay(postData, ghost);
+        const encoded = encodeHeadToHeadReplay(postData, ghost);
         const immutablePostData = { ...postData, replayDataHash: encoded.hash };
-        const text = formatCampaignChallengeTextFallback(immutablePostData, ghost);
+        const text = formatHeadToHeadTextFallback(immutablePostData, ghost);
         const last = encoded.token.at(-1);
         const tamperedToken = `${encoded.token.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`;
 
-        expect(decodeCampaignChallengeReplay(
+        expect(decodeHeadToHeadReplay(
             text.replace(encoded.token, tamperedToken),
             immutablePostData,
-        )).toBeNull();
-        expect(decodeCampaignChallengeReplay(
+        ).decoded).toBeNull();
+        expect(decodeHeadToHeadReplay(
             text.replace('25.640', '25.641'),
             immutablePostData,
-        )).not.toBeNull();
-        expect(decodeCampaignChallengeReplay(
+        ).decoded).not.toBeNull();
+        expect(decodeHeadToHeadReplay(
             text,
             { ...immutablePostData, targetTimeMs: 25_641 },
-        )).toBeNull();
-        expect(decodeCampaignChallengeReplay(
-            text.replace(CAMPAIGN_CHALLENGE_REPLAY_FORMAT, 'MINIRACER-CHALLENGE-REPLAY-V0'),
+        ).decoded).toBeNull();
+        expect(decodeHeadToHeadReplay(
+            text.replace(HEAD_TO_HEAD_REPLAY_FORMAT, 'MINIRACER-HEAD-TO-HEAD-REPLAY-V0'),
             immutablePostData,
-        )).toBeNull();
+        ).decoded).toBeNull();
     });
 
     it('round-trips a Daily origin without Campaign fields', () => {
@@ -89,21 +89,21 @@ describe('campaign challenge replay body', () => {
                 challengeId: 'daily-gp-2026-07-23',
             },
         };
-        const encoded = encodeCampaignChallengeReplay(dailyPostData, ghost);
+        const encoded = encodeHeadToHeadReplay(dailyPostData, ghost);
         const immutablePostData = { ...dailyPostData, replayDataHash: encoded.hash };
-        const decoded = decodeCampaignChallengeReplay(
-            formatCampaignChallengeTextFallback(immutablePostData, ghost),
+        const decoded = decodeHeadToHeadReplay(
+            formatHeadToHeadTextFallback(immutablePostData, ghost),
             immutablePostData,
         );
 
-        expect(decoded?.envelope).toMatchObject({
+        expect(decoded?.decoded?.envelope).toMatchObject({
             challengeId: 'daily-gp-2026-07-23',
             origin: {
                 mode: 'daily',
                 challengeId: 'daily-gp-2026-07-23',
             },
         });
-        expect(decoded?.envelope).not.toHaveProperty('campaignId');
-        expect(decoded?.envelope).not.toHaveProperty('raceId');
+        expect(decoded?.decoded?.envelope).not.toHaveProperty('campaignId');
+        expect(decoded?.decoded?.envelope).not.toHaveProperty('raceId');
     });
 });

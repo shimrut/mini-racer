@@ -127,6 +127,7 @@ body[data-lobby-mode="campaign"] .lobby-title__racer {
     letter-spacing: -0.02em;
 }
 
+body[data-lobby-mode="challenge"] .lobby-mode-toolbar,
 body[data-lobby-mode="daily"] .lobby-mode-toolbar,
 body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     position: absolute;
@@ -137,6 +138,12 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     justify-content: flex-end;
     gap: 1rem;
     width: auto;
+}
+
+/* A duel has one track and one time; there is no table to stand in. Garage and
+   Settings still travel with the player, so only Standings steps out. */
+body[data-lobby-mode="challenge"] #lobby-mode-standings-btn {
+    display: none;
 }
 
 body[data-lobby-mode="challenge"] .lobby-subhead,
@@ -430,10 +437,19 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     object-fit: cover;
 }
 
-.challenge-avatar--empty {
-    padding: 0.4rem;
+/* The default Snoo is drawn edge to edge, so it gets the inset and the tinted
+   plate the poster gives it rather than filling the circle like a real avatar. */
+.challenge-avatar--generic {
+    padding: 12%;
+    background: color-mix(in srgb, var(--accent-color) 10%, #10151e);
     object-fit: contain;
-    opacity: 0.55;
+}
+
+/* Snoos look to the right, so the challenger on the left of the poster foot
+   already faces the middle and the viewer on the right is mirrored: the pair
+   face each other. The won hero stands alone and keeps its natural pose. */
+#challenge-viewer-avatar {
+    transform: scaleX(-1);
 }
 
 .challenge-racer__label {
@@ -457,12 +473,94 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     white-space: nowrap;
 }
 
+/* The pane is a grid of auto rows, so nothing here can rely on leftover space —
+   the hero has to fit the short viewport on its own terms. */
+.challenge-won-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.5rem, 2vh, 1rem);
+    min-height: 0;
+    text-align: center;
+}
+
+.challenge-won-hero__portrait {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.challenge-avatar--hero {
+    width: clamp(3.5rem, min(24vw, 16vh), 6.5rem);
+    height: clamp(3.5rem, min(24vw, 16vh), 6.5rem);
+    border-color: var(--accent-color);
+}
+
+.challenge-won-hero__medal {
+    position: absolute;
+    right: -4%;
+    bottom: -4%;
+    width: 38%;
+}
+
+.challenge-won-hero__medal .medal-svg--hero {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+}
+
+.challenge-won-hero__title {
+    margin: 0;
+    font-size: clamp(1.15rem, min(6.5vw, 4vh), 1.9rem);
+    font-family: var(--header-font);
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+}
+
+.challenge-won-hero__summary {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-wrap: balance;
+}
+
 .challenge-sign-in-message {
     margin: 0;
     color: var(--warning);
     font-size: 0.78rem;
     font-weight: 700;
     text-align: center;
+}
+
+.challenge-won-cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+    margin-top: clamp(0.75rem, 4vh, 2rem);
+    text-align: center;
+}
+
+/* One rule sizes both, at the same scale every other primary action uses. */
+.challenge-won-cta .main-menu__item {
+    justify-content: center;
+    flex-direction: row;
+    padding: 1.25rem;
+}
+
+/* Full size everywhere it fits; the longest label only steps down on narrow screens. */
+.challenge-won-cta .main-menu__item .main-menu__label {
+    font-size: clamp(1.05rem, 6vw, 1.5rem);
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    line-height: 0.9;
+}
+
+.challenge-won-cta .main-menu__item:not(.main-menu__item--primary) {
+    background: var(--bg-surface);
 }
 
 @media (max-width: 430px) {

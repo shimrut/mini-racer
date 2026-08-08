@@ -3,37 +3,35 @@ import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
 import { getTrackName } from '../../game/track/catalog.js';
 import {
-    CAMPAIGN_CHALLENGE_ID,
-    CAMPAIGN_CHALLENGE_POST_TYPE,
-    getCampaignChallengeOrigin,
-    isCampaignChallengeMedal,
-    toCampaignChallengePostData,
-    type CampaignChallengeMedal,
-    type CampaignChallengeOrigin,
-    type CampaignChallengePostData,
-    type CampaignChallengeRecord,
-    type CampaignChallengeResult,
-    type CampaignChallengeSource,
-} from './campaign-challenge-model.js';
+    CAMPAIGN_ID,
+    HEAD_TO_HEAD_POST_TYPE,
+    getHeadToHeadOrigin,
+    isHeadToHeadMedal,
+    toHeadToHeadPostData,
+    type HeadToHeadMedal,
+    type HeadToHeadOrigin,
+    type HeadToHeadPostData,
+    type HeadToHeadRecord,
+    type HeadToHeadSource,
+} from './head-to-head-model.js';
 import {
-    acquireCampaignChallengeCreationLock,
-    acquireCampaignChallengeResultLock,
-    deleteCampaignChallengePostIdentity,
-    readCampaignChallengePostIdentity,
-    readCampaignChallengePostIdentityByChallengeId,
-    readCampaignChallengeResult,
-    releaseCampaignChallengeCreationLock,
-    releaseCampaignChallengePostSlot,
-    reserveCampaignChallengePostSlot,
-    writeCampaignChallengePostIdentity,
-    writeCampaignChallengePostIdentityByChallengeId,
-    writeCampaignChallengeResult,
-} from './campaign-challenge-store.js';
-import { resolveCampaignChallengeRecord, resolveCampaignChallengeRecordResult } from './campaign-challenge-post.js';
+    acquireHeadToHeadCreationLock,
+    deleteHeadToHeadPostIdentity,
+    readHeadToHeadPostIdentity,
+    readHeadToHeadPostIdentityByChallengeId,
+    releaseHeadToHeadCreationLock,
+    releaseHeadToHeadPostSlot,
+    reserveHeadToHeadPostSlot,
+    writeHeadToHeadAccept,
+    writeHeadToHeadPostIdentity,
+    writeHeadToHeadPostIdentityByChallengeId,
+} from './head-to-head-store.js';
+import { formatChallengeBragComment } from './head-to-head-brag.js';
+import { resolveHeadToHeadRecord, resolveHeadToHeadRecordResult } from './head-to-head-post.js';
 import {
-    encodeCampaignChallengeReplay,
-    formatCampaignChallengeTextFallback as formatReplayTextFallback,
-} from './campaign-challenge-replay.js';
+    encodeHeadToHeadReplay,
+    formatHeadToHeadTextFallback as formatReplayTextFallback,
+} from './head-to-head-replay.js';
 import {
     getCarUnlockSnapshot,
     recordCompletedRace,
@@ -50,7 +48,7 @@ import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 
-export type CampaignChallengeRequestContext = {
+export type HeadToHeadRequestContext = {
     username?: string | null;
     subredditName?: string | null;
     appSlug?: string | null;
@@ -60,31 +58,31 @@ export type CampaignChallengeRequestContext = {
     guestToken?: string | null;
 };
 
-export type CampaignChallengeServiceResult = {
+export type HeadToHeadServiceResult = {
     status: number;
     body: Record<string, unknown>;
 };
 
-export type CampaignChallengeReplayResult = {
+export type HeadToHeadReplayResult = {
     ok: true;
     bestTimeMs: number;
-    medal: CampaignChallengeMedal;
+    medal: HeadToHeadMedal;
     ghost: unknown;
 } | {
     ok: false;
     reason?: string;
 };
 
-export type CampaignChallengeServiceDependencies = {
+export type HeadToHeadServiceDependencies = {
     resolveSource(
         input: Record<string, unknown>,
         username: string,
-        context?: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeSource | null>;
+        context?: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadSource | null>;
     validateReplay(
-        challenge: CampaignChallengeRecord,
+        challenge: HeadToHeadRecord,
         replay: unknown,
-    ): Promise<CampaignChallengeReplayResult> | CampaignChallengeReplayResult;
+    ): Promise<HeadToHeadReplayResult> | HeadToHeadReplayResult;
     now?: () => Date;
     createId?: () => string;
 };
@@ -92,7 +90,7 @@ export type CampaignChallengeServiceDependencies = {
 type PreviewRecord = {
     username: string;
     subredditName: string;
-    source: CampaignChallengeSource;
+    source: HeadToHeadSource;
     challengeId: string;
     title: string;
     createdAt: string;
@@ -101,16 +99,16 @@ type PreviewRecord = {
 type PreviewTokenRecord = Omit<PreviewRecord, 'source'> & {
     sourceInput: Record<string, unknown>;
     sourceContract: {
-        sourceKind: CampaignChallengeSource['sourceKind'];
+        sourceKind: HeadToHeadSource['sourceKind'];
         sourceId: string;
-        originMode: CampaignChallengeOrigin['mode'];
+        originMode: HeadToHeadOrigin['mode'];
         originId: string;
-        campaignId?: typeof CAMPAIGN_CHALLENGE_ID;
+        campaignId?: typeof CAMPAIGN_ID;
         raceId?: string;
         trackKey: string;
         lapCount: 1 | 2 | 3;
         bestTimeMs: number;
-        medal: CampaignChallengeMedal;
+        medal: HeadToHeadMedal;
         rulesRevision: number;
         trackFingerprint: string;
         ghostHash: string;
@@ -133,7 +131,7 @@ type ChallengeViewer = {
     signedIn: boolean;
 };
 
-async function resolveChallengeViewer(context: CampaignChallengeRequestContext): Promise<ChallengeViewer> {
+async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promise<ChallengeViewer> {
     const username = typeof context.username === 'string' && context.username.trim()
         ? context.username.trim()
         : null;
@@ -162,7 +160,7 @@ async function recordChallengePostUnlock(playerId: string, trackKey: string) {
     return readChallengeCarUnlocks(playerId);
 }
 
-function signedContext(context: CampaignChallengeRequestContext): {
+function signedContext(context: HeadToHeadRequestContext): {
     username: string;
     subredditName: string;
 } | null {
@@ -173,7 +171,7 @@ function signedContext(context: CampaignChallengeRequestContext): {
     return username && subredditName ? { username, subredditName } : null;
 }
 
-function creationContext(context: CampaignChallengeRequestContext): {
+function creationContext(context: HeadToHeadRequestContext): {
     username: string;
     subredditName: string;
     appSlug: string;
@@ -183,19 +181,13 @@ function creationContext(context: CampaignChallengeRequestContext): {
     return signed && appSlug ? { ...signed, appSlug } : null;
 }
 
-function challengeContext(context: CampaignChallengeRequestContext): {
+function challengeContext(context: HeadToHeadRequestContext): {
     subredditName: string;
 } | null {
     const subredditName = typeof context.subredditName === 'string'
         ? context.subredditName.trim()
         : '';
     return subredditName ? { subredditName } : null;
-}
-
-function publicChallengeResult(result: CampaignChallengeResult | null) {
-    if (!result) return null;
-    const { viewerPlayerId: _viewerPlayerId, ...publicResult } = result;
-    return publicResult;
 }
 
 /**
@@ -207,33 +199,33 @@ function publicChallengeResult(result: CampaignChallengeResult | null) {
  */
 async function resolveChallengeRecord(
     challengeId: string | null,
-    context: CampaignChallengeRequestContext,
-): Promise<{ record: CampaignChallengeRecord | null; reason?: string; diff?: Record<string, unknown> }> {
-    const result = await resolveCampaignChallengeRecordResult(challengeId, context);
+    context: HeadToHeadRequestContext,
+): Promise<{ record: HeadToHeadRecord | null; reason?: string; diff?: Record<string, unknown> }> {
+    const result = await resolveHeadToHeadRecordResult(challengeId, context);
     if (result.ok) return { record: result.record };
     const diff = !result.ok ? result.diff : undefined;
     if (result.reason !== 'challenge_id_missing' && result.reason !== 'post_id_missing') {
-        console.warn('Campaign challenge resolution failed.', {
+        console.warn('Head to Head resolution failed.', {
             challengeId: challengeId || null,
             postId: context.postId || null,
             reason: result.reason,
         });
     }
     if (context.postId || !challengeId) return { record: null, reason: result.reason, diff };
-    const identity = await readCampaignChallengePostIdentityByChallengeId(challengeId);
+    const identity = await readHeadToHeadPostIdentityByChallengeId(challengeId);
     if (!identity) return { record: null, reason: result.reason, diff };
-    const fallback = await resolveCampaignChallengeRecord(challengeId, {
+    const fallback = await resolveHeadToHeadRecord(challengeId, {
         ...context,
         postId: identity.postId,
     });
     return fallback ? { record: fallback } : { record: null, reason: result.reason, diff };
 }
 
-function isValidSource(source: CampaignChallengeSource | null): source is CampaignChallengeSource {
-    const origin = source ? getCampaignChallengeOrigin(source) : null;
+function isValidSource(source: HeadToHeadSource | null): source is HeadToHeadSource {
+    const origin = source ? getHeadToHeadOrigin(source) : null;
     return Boolean(
         source
-        && (source.sourceKind === 'campaign' || source.sourceKind === 'daily' || source.sourceKind === 'duel')
+        && (source.sourceKind === 'campaign' || source.sourceKind === 'daily')
         && typeof source.sourceId === 'string'
         && source.sourceId
         && origin
@@ -244,7 +236,7 @@ function isValidSource(source: CampaignChallengeSource | null): source is Campai
         && (source.lapCount === 1 || source.lapCount === 2 || source.lapCount === 3)
         && Number.isInteger(source.bestTimeMs)
         && source.bestTimeMs > 0
-        && isCampaignChallengeMedal(source.medal)
+        && isHeadToHeadMedal(source.medal)
         && Number.isInteger(source.rulesRevision)
         && source.rulesRevision >= 0
         && typeof source.trackFingerprint === 'string'
@@ -254,43 +246,43 @@ function isValidSource(source: CampaignChallengeSource | null): source is Campai
 }
 
 function sourceRaceId(source: {
-    origin?: CampaignChallengeOrigin;
+    origin?: HeadToHeadOrigin;
     raceId?: string;
     sourceId: string;
 }): string {
-    const origin = getCampaignChallengeOrigin(source);
+    const origin = getHeadToHeadOrigin(source);
     return source.raceId
         || (origin?.mode === 'daily' ? origin.challengeId : origin?.raceId)
         || source.sourceId;
 }
 
-function originContract(source: CampaignChallengeSource): {
-    originMode: CampaignChallengeOrigin['mode'];
+function originContract(source: HeadToHeadSource): {
+    originMode: HeadToHeadOrigin['mode'];
     originId: string;
 } | null {
-    const origin = getCampaignChallengeOrigin(source);
+    const origin = getHeadToHeadOrigin(source);
     if (!origin) return null;
     return origin.mode === 'campaign'
         ? { originMode: origin.mode, originId: origin.raceId }
         : { originMode: origin.mode, originId: origin.challengeId };
 }
 
-export function formatCampaignChallengeTime(timeMs: number): string {
+export function formatHeadToHeadTime(timeMs: number): string {
     const seconds = Math.floor(timeMs / 1000);
     const milliseconds = timeMs % 1000;
     return `${seconds}.${String(milliseconds).padStart(3, '0')}`;
 }
 
-export function formatCampaignChallengeTitle(
+export function formatHeadToHeadTitle(
     username: string,
     timeMs: number,
     trackKey: string,
 ): string {
-    return `u/${username} · Head to Head: beat ${formatCampaignChallengeTime(timeMs)} on ${getTrackName(trackKey, trackKey)}`;
+    return `u/${username} · Head to Head: beat ${formatHeadToHeadTime(timeMs)} on ${getTrackName(trackKey, trackKey)}`;
 }
 
-export function formatCampaignChallengeTextFallback(
-    postData: CampaignChallengePostData,
+export function formatHeadToHeadTextFallback(
+    postData: HeadToHeadPostData,
     ghost: unknown,
 ): string {
     return formatReplayTextFallback(postData, ghost);
@@ -306,7 +298,7 @@ function jsonHash(value: unknown): string {
     return createHash('sha256').update(json, 'utf8').digest('hex');
 }
 
-function sourceContract(source: CampaignChallengeSource): PreviewTokenRecord['sourceContract'] {
+function sourceContract(source: HeadToHeadSource): PreviewTokenRecord['sourceContract'] {
     const origin = originContract(source);
     if (!origin) throw new Error('Challenge source has no immutable origin.');
     return {
@@ -326,7 +318,7 @@ function sourceContract(source: CampaignChallengeSource): PreviewTokenRecord['so
 }
 
 function sameSourceContract(
-    source: CampaignChallengeSource,
+    source: HeadToHeadSource,
     expected: PreviewTokenRecord['sourceContract'],
 ): boolean {
     const actual = sourceContract(source);
@@ -336,7 +328,7 @@ function sameSourceContract(
 }
 
 function previewKey(token: string): string {
-    return `miniracer:campaign-challenge:preview:${token}`;
+    return `miniracer:head-to-head:preview:${token}`;
 }
 
 function parsePreview(raw: string | null): PreviewTokenRecord | null {
@@ -358,8 +350,7 @@ function parsePreview(raw: string | null): PreviewTokenRecord | null {
                 && typeof value.sourceContract.originId === 'string'
             )
             || !(value.sourceContract.sourceKind === 'campaign'
-                || value.sourceContract.sourceKind === 'daily'
-                || value.sourceContract.sourceKind === 'duel')
+                || value.sourceContract.sourceKind === 'daily')
             || typeof value.sourceContract.sourceId !== 'string'
             || typeof value.sourceContract.trackKey !== 'string'
             || (value.sourceContract.lapCount !== 1
@@ -367,7 +358,7 @@ function parsePreview(raw: string | null): PreviewTokenRecord | null {
                 && value.sourceContract.lapCount !== 3)
             || !Number.isSafeInteger(value.sourceContract.bestTimeMs)
             || value.sourceContract.bestTimeMs <= 0
-            || !isCampaignChallengeMedal(value.sourceContract.medal)
+            || !isHeadToHeadMedal(value.sourceContract.medal)
             || !Number.isSafeInteger(value.sourceContract.rulesRevision)
             || value.sourceContract.rulesRevision < 0
             || typeof value.sourceContract.trackFingerprint !== 'string'
@@ -391,11 +382,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function buildRecord(
     preview: PreviewRecord,
     challengerAvatarUrl: string | null = null,
-): CampaignChallengeRecord {
-    const origin = getCampaignChallengeOrigin(preview.source);
+): HeadToHeadRecord {
+    const origin = getHeadToHeadOrigin(preview.source);
     if (!origin) throw new Error('Challenge source has no immutable origin.');
     return {
-        postType: CAMPAIGN_CHALLENGE_POST_TYPE,
+        postType: HEAD_TO_HEAD_POST_TYPE,
         challengeId: preview.challengeId,
         origin,
         ...(origin.mode === 'campaign'
@@ -419,9 +410,9 @@ function buildRecord(
     };
 }
 
-function buildPublicPostData(record: CampaignChallengeRecord): CampaignChallengePostData {
-    const postData = toCampaignChallengePostData(record);
-    const replay = encodeCampaignChallengeReplay(postData, record.frozenGhost);
+function buildPublicPostData(record: HeadToHeadRecord): HeadToHeadPostData {
+    const postData = toHeadToHeadPostData(record);
+    const replay = encodeHeadToHeadReplay(postData, record.frozenGhost);
     return { ...postData, replayDataHash: replay.hash };
 }
 
@@ -469,7 +460,7 @@ async function recoverPost(
         try {
             const data = await post.getPostData();
             if (
-                data?.postType === CAMPAIGN_CHALLENGE_POST_TYPE
+                data?.postType === HEAD_TO_HEAD_POST_TYPE
                 && data?.challengeId === preview.challengeId
                 && typeof post.id === 'string'
                 && post.id.startsWith('t3_')
@@ -486,15 +477,15 @@ async function recoverPost(
 }
 
 async function savePost(
-    record: CampaignChallengeRecord,
+    record: HeadToHeadRecord,
     post: { postId: `t3_${string}`; postUrl: string },
-): Promise<CampaignChallengeRecord> {
+): Promise<HeadToHeadRecord> {
     const saved = { ...record, ...post };
-    await writeCampaignChallengePostIdentityByChallengeId({
+    await writeHeadToHeadPostIdentityByChallengeId({
         challengeId: record.challengeId,
         ...post,
     });
-    await writeCampaignChallengePostIdentity(
+    await writeHeadToHeadPostIdentity(
         record.subredditName,
         record.challengerUsername,
         sourceRaceId(record),
@@ -504,16 +495,16 @@ async function savePost(
     return saved;
 }
 
-export function createCampaignChallengeService(
-    dependencies: CampaignChallengeServiceDependencies,
+export function createHeadToHeadService(
+    dependencies: HeadToHeadServiceDependencies,
 ) {
     const now = dependencies.now ?? (() => new Date());
     const createId = dependencies.createId ?? randomUUID;
 
     async function preview(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult> {
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult> {
         const request = signedContext(context);
         if (!request) {
             return { status: 401, body: { status: 'signed_in_required', error: 'Sign in to Reddit to challenge other players.' } };
@@ -524,7 +515,7 @@ export function createCampaignChallengeService(
         }
         const challengeId = createId();
         const createdAt = now().toISOString();
-        const title = formatCampaignChallengeTitle(request.username, source.bestTimeMs, source.trackKey);
+        const title = formatHeadToHeadTitle(request.username, source.bestTimeMs, source.trackKey);
         const challengerAvatarUrl = await resolveRedditAvatarUrl(request.username);
         const record: PreviewRecord = {
             username: request.username,
@@ -567,8 +558,8 @@ export function createCampaignChallengeService(
 
     async function create(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult> {
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult> {
         const request = creationContext(context);
         if (!request) {
             return {
@@ -616,7 +607,7 @@ export function createCampaignChallengeService(
         }
         const preparedRecord: PreviewRecord = { ...prepared, source };
         const sourceId = sourceRaceId(source);
-        const lock = await acquireCampaignChallengeCreationLock(
+        const lock = await acquireHeadToHeadCreationLock(
             request.subredditName,
             request.username,
             sourceId,
@@ -627,7 +618,7 @@ export function createCampaignChallengeService(
         }
         let reservedAt: Date | null = null;
         try {
-            const identity = await readCampaignChallengePostIdentity(
+            const identity = await readHeadToHeadPostIdentity(
                 request.subredditName,
                 request.username,
                 sourceId,
@@ -635,7 +626,7 @@ export function createCampaignChallengeService(
             );
             const existing = await activePost(identity);
             if (existing) {
-                await writeCampaignChallengePostIdentityByChallengeId(existing);
+                await writeHeadToHeadPostIdentityByChallengeId(existing);
                 const carUnlocks = await recordChallengePostUnlock(
                     playerIdForUsername(request.username),
                     source.trackKey,
@@ -652,7 +643,7 @@ export function createCampaignChallengeService(
                 };
             }
             if (identity) {
-                await deleteCampaignChallengePostIdentity(
+                await deleteHeadToHeadPostIdentity(
                     request.subredditName,
                     request.username,
                     sourceId,
@@ -681,7 +672,7 @@ export function createCampaignChallengeService(
             }
 
             reservedAt = now();
-            if (!await reserveCampaignChallengePostSlot(
+            if (!await reserveHeadToHeadPostSlot(
                 request.subredditName,
                 request.username,
                 reservedAt,
@@ -701,9 +692,9 @@ export function createCampaignChallengeService(
             const post = await reddit.submitCustomPost({
                 subredditName: request.subredditName,
                 title: preparedRecord.title,
-                entry: CAMPAIGN_CHALLENGE_POST_TYPE,
+                entry: HEAD_TO_HEAD_POST_TYPE,
                 postData,
-                textFallback: { text: formatCampaignChallengeTextFallback(postData, record.frozenGhost) },
+                textFallback: { text: formatHeadToHeadTextFallback(postData, record.frozenGhost) },
             });
             if (
                 typeof post?.id !== 'string'
@@ -711,7 +702,7 @@ export function createCampaignChallengeService(
                 || typeof post?.url !== 'string'
                 || !post.url
             ) {
-                throw new Error('Reddit did not return the campaign challenge post identity.');
+                throw new Error('Reddit did not return the head-to-head post identity.');
             }
             const saved = await savePost(record, {
                 postId: post.id as `t3_${string}`,
@@ -734,7 +725,7 @@ export function createCampaignChallengeService(
                 };
         } catch (error) {
             if (reservedAt) {
-                await releaseCampaignChallengePostSlot(
+                await releaseHeadToHeadPostSlot(
                     request.subredditName,
                     request.username,
                     reservedAt,
@@ -742,14 +733,14 @@ export function createCampaignChallengeService(
             }
             throw error;
         } finally {
-            await releaseCampaignChallengeCreationLock(lock);
+            await releaseHeadToHeadCreationLock(lock);
         }
     }
 
     async function get(
         challengeId: string | null,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult> {
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult> {
         const request = challengeContext(context);
         if (!request) {
             return { status: 401, body: { status: 'challenge_context_required', error: 'This challenge is unavailable outside Reddit.' } };
@@ -776,16 +767,13 @@ export function createCampaignChallengeService(
                 },
             };
         }
-        const result = viewer.playerId
-            ? await readCampaignChallengeResult(record.challengeId, viewer.playerId)
-            : null;
         const avatars = await resolveChallengeAvatars(
             record.challengerUsername,
             viewer.username,
             record.challengerAvatarUrl,
         );
         const challenge = {
-            ...toCampaignChallengePostData(record),
+            ...toHeadToHeadPostData(record),
             challengerAvatarUrl: avatars.challengerAvatarUrl,
         };
         return {
@@ -794,7 +782,6 @@ export function createCampaignChallengeService(
                 status: 'ready',
                 challenge,
                 opponentGhost: record.frozenGhost,
-                bestResult: publicChallengeResult(result),
                 viewerUsername: viewer.displayName,
                 viewerAvatarUrl: avatars.viewerAvatarUrl,
                 viewerType: viewer.signedIn
@@ -808,8 +795,8 @@ export function createCampaignChallengeService(
 
     async function submit(
         input: Record<string, unknown>,
-        context: CampaignChallengeRequestContext,
-    ): Promise<CampaignChallengeServiceResult> {
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult> {
         const request = challengeContext(context);
         const viewer = await resolveChallengeViewer(context);
         if (!request || !viewer.playerId) {
@@ -840,59 +827,57 @@ export function createCampaignChallengeService(
             !verified.ok
             || !Number.isInteger(verified.bestTimeMs)
             || verified.bestTimeMs <= 0
-            || !isCampaignChallengeMedal(verified.medal)
+            || !isHeadToHeadMedal(verified.medal)
             || verified.ghost == null
         ) {
             return { status: 422, body: { status: 'invalid_replay', error: 'This challenge run could not be verified.' } };
         }
-        const lock = await acquireCampaignChallengeResultLock(challengeId, viewer.playerId);
-        if (!lock) {
-            return { status: 409, body: { status: 'submission_in_progress', error: 'This challenge run is already being submitted.' } };
+        const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
+        const outcome = differenceMs < 0 ? 'won' : differenceMs === 0 ? 'tie' : 'lost';
+        await recordCompletedRace(viewer.playerId);
+        if (outcome === 'won') {
+            await recordHeadToHeadWin(viewer.playerId, challengeId);
         }
-        try {
-            const previous = await readCampaignChallengeResult(challengeId, viewer.playerId);
-            const improved = !previous || verified.bestTimeMs < previous.bestTimeMs;
-            const bestResult: CampaignChallengeResult = improved
-                ? {
-                    challengeId,
-                    viewerUsername: viewer.username || 'Guest racer',
-                    viewerPlayerId: viewer.playerId,
-                    bestTimeMs: verified.bestTimeMs,
-                    medal: verified.medal,
-                    ghost: verified.ghost,
-                    verifiedAt: now().toISOString(),
-                }
-                : previous;
-            if (improved) await writeCampaignChallengeResult(bestResult);
 
-            const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
-            const outcome = differenceMs < 0 ? 'won' : differenceMs === 0 ? 'tie' : 'lost';
-            await recordCompletedRace(viewer.playerId);
-            if (outcome === 'won') {
-                await recordHeadToHeadWin(viewer.playerId, challengeId);
-            }
-            return {
-                status: 200,
-                body: {
-                    status: 'accepted',
-                    accepted: true,
-                    improved,
-                    outcome,
-                    resultLabel: outcome === 'won'
-                        ? 'Challenge Won'
-                        : outcome === 'tie'
-                            ? 'Tie'
-                            : 'Challenge Lost',
-                    bestTimeMs: verified.bestTimeMs,
-                    targetTimeMs: challenge.targetTimeMs,
-                    differenceMs,
-                    bestResult: publicChallengeResult(bestResult),
-                    carUnlocks: await readChallengeCarUnlocks(viewer.playerId),
-                },
-            };
-        } finally {
-            await releaseRedisLock(lock, redis);
+        // The run is the only thing that proves this win, and nothing about a
+        // Head to Head is kept past its post. A short-lived receipt carries the
+        // verified time to the brag comment it earns and then expires, so the
+        // comment quotes this run rather than anything read back later.
+        let acceptToken: string | null = null;
+        if (challenge.postId && outcome === 'won') {
+            acceptToken = createId();
+            await writeHeadToHeadAccept(acceptToken, {
+                challengeId,
+                postId: challenge.postId,
+                playerId: viewer.playerId,
+                username: viewer.username || 'Guest racer',
+                bestTimeMs: verified.bestTimeMs,
+                targetTimeMs: challenge.targetTimeMs,
+                medal: verified.medal,
+                commentText: formatChallengeBragComment(
+                    verified.bestTimeMs,
+                    challenge.trackKey,
+                ),
+            });
         }
+        return {
+            status: 200,
+            body: {
+                status: 'accepted',
+                accepted: true,
+                outcome,
+                resultLabel: outcome === 'won'
+                    ? 'Challenge Won'
+                    : outcome === 'tie'
+                        ? 'Tie'
+                        : 'Challenge Lost',
+                bestTimeMs: verified.bestTimeMs,
+                targetTimeMs: challenge.targetTimeMs,
+                differenceMs,
+                acceptToken,
+                carUnlocks: await readChallengeCarUnlocks(viewer.playerId),
+            },
+        };
     }
 
     return { preview, create, get, submit };

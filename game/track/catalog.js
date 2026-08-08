@@ -81,6 +81,12 @@ export const TRACK_CATALOG = {
     darkMatter: { name: "Dark Matter" },
     appleStrudel: { name: "Apple Strudel" },
     heavyMetal: { name: "Heavy Metal" },
+    knifesEdge: { name: "Knife's Edge" },
+    pocketRun: { name: "Pocket Run" },
+    crossCurrent: { name: "Cross Current" },
+    squareDeal: { name: "Square Deal" },
+    doubleHook: { name: "Double Hook" },
+    doubleCrest: { name: "Double Crest" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -152,6 +158,12 @@ export const TRACK_SCHEDULE_KEYS = [
     'darkMatter',
     'appleStrudel',
     'heavyMetal',
+    'knifesEdge',
+    'pocketRun',
+    'crossCurrent',
+    'squareDeal',
+    'doubleHook',
+    'doubleCrest',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

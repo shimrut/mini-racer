@@ -824,38 +824,6 @@ describe('Campaign server store', () => {
         })).resolves.toEqual({ merged: false, mergedRaceIds: [] });
     });
 
-    it('moves a guest Head to Head result onto the account at sign-in', async () => {
-        const {
-            mergeGuestCampaignChallengeResults,
-            readCampaignChallengeResult,
-            writeCampaignChallengeResult,
-        } = await import('../src/server/campaign-challenge-store.ts');
-
-        await writeCampaignChallengeResult({
-            challengeId: 'challenge-guest-1',
-            viewerUsername: 'Guest racer',
-            viewerPlayerId: 'guest:guest-h2h',
-            bestTimeMs: 12_345,
-            medal: 'gold',
-            ghost: { finishTimeMs: 12_345 },
-            verifiedAt: '2026-07-27T10:00:00.000Z',
-        });
-
-        await expect(mergeGuestCampaignChallengeResults({
-            guestPlayerId: 'guest:guest-h2h',
-            redditPlayerId: 'reddit:claimed-h2h',
-        })).resolves.toBe(true);
-        await expect(readCampaignChallengeResult(
-            'challenge-guest-1',
-            'reddit:claimed-h2h',
-        )).resolves.toMatchObject({
-            viewerUsername: 'claimed-h2h',
-            viewerPlayerId: 'reddit:claimed-h2h',
-            bestTimeMs: 12_345,
-        });
-        expect(hashes.size).toBe(1);
-    });
-
     it('refuses to trade a verified account time down for a slower guest one', async () => {
         const { mergeGuestCampaignProgress, parseCampaignProgress } = await import('../src/server/campaign-store.ts');
         const progressKeyFor = (playerId) => `campaign:numbered-v1:progress:${

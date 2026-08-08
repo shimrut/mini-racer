@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     CAMPAIGN_REQUEST_TIMEOUT_MS,
     deriveCampaignProgress,
-    getCampaignChallenge,
-    submitCampaignChallengeRun,
     submitCampaignRun,
 } from '../game/campaign/service.js';
 
@@ -68,33 +66,5 @@ describe('campaign client progress', () => {
 
         await vi.advanceTimersByTimeAsync(CAMPAIGN_REQUEST_TIMEOUT_MS);
         await rejection;
-    });
-
-    it('binds Head to Head reads and submissions to the current Reddit post', async () => {
-        const originalLocation = globalThis.location;
-        const originalDevvit = globalThis.devvit;
-        globalThis.location = { origin: 'https://miniracer.example' };
-        globalThis.devvit = { context: { postId: 't3_challenge1' } };
-        globalThis.fetch = vi.fn(async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({ status: 'ready' }),
-        }));
-
-        try {
-            await getCampaignChallenge('challenge-1');
-            const getUrl = new URL(globalThis.fetch.mock.calls[0][0]);
-            expect(getUrl.searchParams.get('postId')).toBe('t3_challenge1');
-
-            await submitCampaignChallengeRun({
-                challengeId: 'challenge-1',
-                replay: { inputs: [] },
-            });
-            const submitBody = JSON.parse(globalThis.fetch.mock.calls[1][1].body);
-            expect(submitBody.postId).toBe('t3_challenge1');
-        } finally {
-            globalThis.location = originalLocation;
-            globalThis.devvit = originalDevvit;
-        }
     });
 });

@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const campaignServiceMocks = vi.hoisted(() => ({
     getCampaignBootstrap: vi.fn(),
-    getCampaignChallenge: vi.fn(),
+    getHeadToHead: vi.fn(),
     getCampaignPbGhost: vi.fn(),
     getCampaignSnapshot: vi.fn(),
     startServerCampaignRace: vi.fn(),
-    submitCampaignChallengeRun: vi.fn(),
+    submitHeadToHeadRun: vi.fn(),
     submitCampaignRun: vi.fn(),
 }));
 
@@ -16,14 +16,14 @@ const campaignServiceMocks = vi.hoisted(() => ({
 // new export here cannot silently go missing from the mock.
 vi.mock('../game/campaign/service.js', async (importOriginal) => ({
     ...(await importOriginal()),
-    createCampaignChallenge: vi.fn(),
-    previewCampaignChallenge: vi.fn(),
+    createHeadToHead: vi.fn(),
+    previewHeadToHead: vi.fn(),
     getCampaignBootstrap: campaignServiceMocks.getCampaignBootstrap,
-    getCampaignChallenge: campaignServiceMocks.getCampaignChallenge,
+    getHeadToHead: campaignServiceMocks.getHeadToHead,
     getCampaignPbGhost: campaignServiceMocks.getCampaignPbGhost,
     getCampaignSnapshot: campaignServiceMocks.getCampaignSnapshot,
     startServerCampaignRace: campaignServiceMocks.startServerCampaignRace,
-    submitCampaignChallengeRun: campaignServiceMocks.submitCampaignChallengeRun,
+    submitHeadToHeadRun: campaignServiceMocks.submitHeadToHeadRun,
     submitCampaignRun: campaignServiceMocks.submitCampaignRun,
 }));
 
@@ -207,11 +207,11 @@ afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     campaignServiceMocks.getCampaignBootstrap.mockReset();
-    campaignServiceMocks.getCampaignChallenge.mockReset();
+    campaignServiceMocks.getHeadToHead.mockReset();
     campaignServiceMocks.getCampaignPbGhost.mockReset();
     campaignServiceMocks.getCampaignSnapshot.mockReset();
     campaignServiceMocks.startServerCampaignRace.mockReset();
-    campaignServiceMocks.submitCampaignChallengeRun.mockReset();
+    campaignServiceMocks.submitHeadToHeadRun.mockReset();
     campaignServiceMocks.submitCampaignRun.mockReset();
 });
 
@@ -413,7 +413,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect.objectContaining({
                 modalKind: 'win',
                 shareRequest: {
-                    kind: 'campaign-challenge',
+                    kind: 'head-to-head',
                     source: 'campaign',
                     raceId: 'numbered-v1-00',
                 },
@@ -474,7 +474,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             }),
             expect.objectContaining({
                 shareRequest: {
-                    kind: 'campaign-challenge',
+                    kind: 'head-to-head',
                     source: 'campaign',
                     raceId: 'numbered-v1-00',
                 },
@@ -845,199 +845,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
-    it('does not strand a Campaign challenge finish when confirmation fails', async () => {
-        const modalMsg = { style: {}, textContent: '' };
-        const updateChallengeFinishHero = vi.fn();
-        const context = {
-            activeCampaignChallenge: {
-                challengeId: 'challenge-1',
-                trackKey: 'numberZero',
-                lapCount: 1,
-                targetTimeMs: 8_000,
-            },
-            journeys: { endAttempt: vi.fn() },
-            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
-            modal: {
-                modalMsg,
-                showModal: vi.fn(),
-                updateChallengeFinishHero,
-            },
-            restartActiveRace: vi.fn(),
-            loadChallengeLobby: vi.fn(),
-            settings: { openSettings: vi.fn() },
-        };
-        campaignServiceMocks.submitCampaignChallengeRun.mockRejectedValue(
-            new Error('response interrupted'),
-        );
-        vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        await campaignEngineMethods.handleCampaignChallengeWin.call(
-            context,
-            { lapTime: 8.25 },
-        );
-
-        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
-        expect(context.modal.showModal).toHaveBeenCalledWith(
-            'Challenge complete',
-            null,
-            expect.objectContaining({
-                lapTime: 8.25,
-                lapMedal: null,
-                challengeFinish: true,
-                challengeConfirmPhase: 'pending',
-            }),
-            expect.objectContaining({
-                modalKind: 'win',
-                shareRequest: {
-                    kind: 'challenge-brag',
-                    challengeId: 'challenge-1',
-                },
-                shareEnabled: false,
-                restartAction: expect.any(Function),
-            }),
-        );
-        await vi.waitFor(() => {
-            expect(updateChallengeFinishHero).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    phase: 'error',
-                    error: 'Race finished, but the challenge result could not be confirmed.',
-                }),
-            );
-        });
-        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
-    });
-
-    it('patches medal hero in place: pending then won/lost/tie; Brag only after verified win', async () => {
-        const modalMsg = { style: {}, textContent: '' };
-        const baseContext = {
-            activeCampaignChallenge: {
-                challengeId: 'challenge-1',
-                trackKey: 'numberZero',
-                lapCount: 1,
-                targetTimeMs: 8_000,
-            },
-            journeys: { endAttempt: vi.fn() },
-            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
-            restartActiveRace: vi.fn(),
-            loadChallengeLobby: vi.fn(),
-            settings: { openSettings: vi.fn() },
-        };
-
-        const pendingLap = expect.objectContaining({
-            lapMedal: null,
-            challengeFinish: true,
-            challengeConfirmPhase: 'pending',
-            showGlobalLeaderboard: false,
-        });
-        const pendingOptions = expect.objectContaining({
-            shareRequest: {
-                kind: 'challenge-brag',
-                challengeId: 'challenge-1',
-            },
-            shareEnabled: false,
-            restartAction: expect.any(Function),
-        });
-
-        const winShowModal = vi.fn();
-        const winUpdateHero = vi.fn();
-        campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
-            ok: true,
-            body: {
-                accepted: true,
-                outcome: 'won',
-                resultLabel: 'Challenge Won',
-                differenceMs: -500,
-            },
-        });
-        await campaignEngineMethods.handleCampaignChallengeWin.call(
-            {
-                ...baseContext,
-                modal: {
-                    modalMsg,
-                    showModal: winShowModal,
-                    updateChallengeFinishHero: winUpdateHero,
-                },
-            },
-            { lapTime: 7.5 },
-        );
-        expect(winShowModal).toHaveBeenCalledTimes(1);
-        expect(winShowModal).toHaveBeenCalledWith(
-            'Challenge complete',
-            null,
-            pendingLap,
-            pendingOptions,
-        );
-        await vi.waitFor(() => {
-            expect(winUpdateHero).toHaveBeenCalledWith({ phase: 'won' });
-        });
-        expect(winUpdateHero).toHaveBeenCalledWith(
-            expect.objectContaining({ phase: 'pending', statusText: expect.any(String) }),
-        );
-        expect(winShowModal).toHaveBeenCalledTimes(1);
-
-        const lossShowModal = vi.fn();
-        const lossUpdateHero = vi.fn();
-        campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
-            ok: true,
-            body: {
-                accepted: true,
-                outcome: 'lost',
-                resultLabel: 'Challenge Lost',
-                differenceMs: 400,
-            },
-        });
-        await campaignEngineMethods.handleCampaignChallengeWin.call(
-            {
-                ...baseContext,
-                modal: {
-                    modalMsg,
-                    showModal: lossShowModal,
-                    updateChallengeFinishHero: lossUpdateHero,
-                },
-            },
-            { lapTime: 8.4 },
-        );
-        expect(lossShowModal).toHaveBeenCalledTimes(1);
-        expect(lossShowModal).toHaveBeenCalledWith(
-            'Challenge complete',
-            null,
-            pendingLap,
-            pendingOptions,
-        );
-        await vi.waitFor(() => {
-            expect(lossUpdateHero).toHaveBeenCalledWith({ phase: 'lost' });
-        });
-        expect(lossShowModal).toHaveBeenCalledTimes(1);
-
-        const tieShowModal = vi.fn();
-        const tieUpdateHero = vi.fn();
-        campaignServiceMocks.submitCampaignChallengeRun.mockResolvedValue({
-            ok: true,
-            body: {
-                accepted: true,
-                outcome: 'tie',
-                resultLabel: 'Tie',
-                differenceMs: 0,
-            },
-        });
-        await campaignEngineMethods.handleCampaignChallengeWin.call(
-            {
-                ...baseContext,
-                modal: {
-                    modalMsg,
-                    showModal: tieShowModal,
-                    updateChallengeFinishHero: tieUpdateHero,
-                },
-            },
-            { lapTime: 8 },
-        );
-        expect(tieShowModal).toHaveBeenCalledTimes(1);
-        await vi.waitFor(() => {
-            expect(tieUpdateHero).toHaveBeenCalledWith({ phase: 'tie' });
-        });
-        expect(tieShowModal).toHaveBeenCalledTimes(1);
-    });
-
     it('places navigation and utilities in the header with a full-width Start Race', () => {
         const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
@@ -1066,7 +873,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(html).not.toContain('id="lobby-daily-garage-btn"');
         expect(html).not.toContain('id="lobby-campaign-back-btn"');
         expect(html).not.toContain('id="lobby-campaign-garage-btn"');
-        expect(html).toMatch(/id="challenge-accept-btn"[\s\S]*main-menu__label">Accept</);
+        expect(html).toMatch(/id="challenge-accept-btn"[\s\S]*main-menu__label">Start Challenge</);
         expect(html).toMatch(
             /id="daily-challenge-start-btn"[\s\S]*main-menu__label">Start Race<\/span>[\s\S]*class="main-menu__race-brief"/,
         );
@@ -1344,7 +1151,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             body,
             getElementById: (id) => {
                 if (id === 'start-overlay') return overlay;
-                const match = id.match(/^lobby-(home|daily|campaign|challenge)-pane$/);
+                const match = id.match(/^lobby-(home|daily|challenge|campaign)-pane$/);
                 return match ? panes[match[1]] : null;
             },
             querySelector: (selector) => ({
@@ -1452,7 +1259,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             body,
             getElementById: (id) => {
                 if (id === 'start-overlay') return overlay;
-                const match = id.match(/^lobby-(home|daily|campaign|challenge)-pane$/);
+                const match = id.match(/^lobby-(home|daily|challenge|campaign)-pane$/);
                 return match ? panes[match[1]] : null;
             },
             querySelector: (selector) => {
@@ -1518,13 +1325,14 @@ describe('Campaign lobby and shared modal adapters', () => {
             medal: 'gold',
         });
         // Challenge bills itself on the same line every mode screen uses: what
-        // this is on the left, who it is against on the right.
+        // this is on the left, the track it is raced on to the right. The
+        // opponent is named on the poster, over the time they set.
         expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Challenge');
         expect(track.hidden).toBe(true);
         expect(rule.hidden).toBe(false);
         expect(selection.hidden).toBe(false);
-        expect(selection.textContent).toBe('u/shimroot');
+        expect(selection.textContent).toBe('Number One');
         expect(body.dataset.lobbyMode).toBe('challenge');
 
         lobby.showHome();
@@ -2058,72 +1866,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
-    it('bounces own challenges to the Campaign lobby without showing Accept', async () => {
-        campaignServiceMocks.getCampaignChallenge.mockResolvedValue({
-            ok: false,
-            status: 403,
-            body: {
-                status: 'own_challenge',
-                error: "You can't accept your own challenge.",
-            },
-        });
-        const showCampaignLobby = vi.fn(async () => undefined);
-        const context = {
-            status: 'ready',
-            currentChallengeRun: null,
-            activeCampaignChallenge: { challengeId: 'stale' },
-            hasAnyData: true,
-            isReturningPlayer: false,
-            startOverlay: { showStartOverlay: vi.fn() },
-            lobbyUi: { showChallenge: vi.fn() },
-            reset: vi.fn(),
-            showCampaignLobby,
-        };
-
-        await campaignEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
-
-        expect(context.activeCampaignChallenge).toBeNull();
-        expect(showCampaignLobby).toHaveBeenCalledTimes(1);
-        expect(context.lobbyUi.showChallenge).not.toHaveBeenCalled();
-        expect(context.startOverlay.showStartOverlay).not.toHaveBeenCalled();
-    });
-
-    it('keeps an anonymous ready challenge raceable for guest entry', async () => {
-        campaignServiceMocks.getCampaignChallenge.mockResolvedValue({
-            ok: true,
-            status: 200,
-            body: {
-                status: 'ready',
-                viewerType: 'anonymous',
-                challenge: {
-                    challengeId: 'challenge-1',
-                    challengerUsername: 'RaceFan',
-                    trackKey: 'numberThree',
-                    lapCount: 2,
-                    targetTimeMs: 25_640,
-                    medal: 'gold',
-                },
-            },
-        });
-        const showChallenge = vi.fn();
-        const context = {
-            status: 'ready',
-            currentChallengeRun: null,
-            activeCampaignChallenge: null,
-            hasAnyData: false,
-            isReturningPlayer: false,
-            startOverlay: { showStartOverlay: vi.fn() },
-            lobbyUi: { showChallenge },
-        };
-
-        await campaignEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
-
-        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
-            signedIn: false,
-            canRace: true,
-            available: true,
-        }));
-    });
 
     it('paints the Campaign lobby before bootstrap resolves', async () => {
         const frameCallbacks = [];

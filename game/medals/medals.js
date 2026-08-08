@@ -1,4 +1,6 @@
 import { createMedalIconSvg } from './medal-icon.js';
+import { createAvatarImage } from '../ui/avatar.js';
+import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 import {
     STANDARD_MEDAL_TIER_RANK,
     allStandardMedalsUnlocked,
@@ -236,11 +238,17 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
 
 /**
  * Challenge finish hero: pending placeholder, won medal, loss/tie label, or error.
+ *
+ * A settled duel stacks into three ranks — medal, who was raced, the margin —
+ * so each reads on its own line and the margin keeps the sheet's timing-screen
+ * grammar: the same signed delta the split times use.
  * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
  * @param {{
  *   phase?: 'pending'|'won'|'lost'|'tie'|'error',
  *   statusText?: string|null,
  *   error?: string|null,
+ *   avatarUrl?: string|null,
+ *   verdict?: { opponentName?: string|null, deltaSec?: number|null }|null,
  * }} [params]
  */
 export function renderChallengeFinishHero(
@@ -249,6 +257,8 @@ export function renderChallengeFinishHero(
         phase = 'pending',
         statusText = null,
         error = null,
+        avatarUrl = null,
+        verdict = null,
     } = {},
 ) {
     if (!overlayEl) return;
@@ -276,6 +286,11 @@ export function renderChallengeFinishHero(
     const label = document.createElement('p');
     label.className = 'combined-medal-challenge-label';
 
+    const opponentName = typeof verdict?.opponentName === 'string' && verdict.opponentName.trim()
+        ? verdict.opponentName.trim()
+        : null;
+    const margin = formatSplitTimeDeltaSec(verdict?.deltaSec ?? null);
+
     if (phase === 'won') {
         root.setAttribute('role', 'group');
         root.setAttribute('aria-label', 'Challenge beaten');
@@ -288,13 +303,31 @@ export function renderChallengeFinishHero(
         const slot = document.createElement('div');
         slot.className = 'combined-medal-row-slot';
         slot.dataset.tier = 'challenge';
-        slot.appendChild(createMedalIconSvg('challenge', {
+        const medal = createMedalIconSvg('challenge', {
             className: 'medal-svg--hero medal-pile-icon--deferred',
-        }));
+        });
+        // The winner wears the medal here exactly as they do on the lobby's win
+        // screen — same portrait, same pinned medal, so the finish and the poster
+        // it lands on are one picture. The portrait is unconditional: a racer
+        // with no Snoovatar gets the default Snoo, not a medal floating where
+        // their face should be.
+        const portrait = document.createElement('div');
+        portrait.className = 'challenge-won-hero__portrait';
+        const avatar = createAvatarImage(document, avatarUrl, {
+            className: 'challenge-avatar challenge-avatar--hero',
+            genericClass: 'challenge-avatar--generic',
+            hidden: true,
+        });
+        const medalMount = document.createElement('span');
+        medalMount.className = 'challenge-won-hero__medal';
+        medalMount.appendChild(medal);
+        portrait.appendChild(avatar);
+        portrait.appendChild(medalMount);
+        slot.appendChild(portrait);
         row.appendChild(slot);
         centerWrap.appendChild(row);
 
-        label.textContent = 'Challenge beaten';
+        label.textContent = opponentName ? `Beat ${opponentName}` : 'Challenge beaten';
         label.classList.add('combined-medal-challenge-label--won');
     } else if (phase === 'pending') {
         const pendingLabel = statusText || 'Submitting...';
@@ -305,7 +338,9 @@ export function renderChallengeFinishHero(
         label.textContent = pendingLabel;
         label.classList.add('combined-medal-challenge-label--pending');
     } else if (phase === 'lost' || phase === 'tie') {
-        const outcomeLabel = phase === 'tie' ? 'Tie' : 'Challenge Lost';
+        const outcomeLabel = opponentName
+            ? (phase === 'tie' ? `Tied with ${opponentName}` : `Lost to ${opponentName}`)
+            : (phase === 'tie' ? 'Tie' : 'Challenge Lost');
         root.setAttribute('role', 'status');
         root.setAttribute('aria-label', outcomeLabel);
         appendPlaceholderMedal();
@@ -320,8 +355,27 @@ export function renderChallengeFinishHero(
         label.classList.add('combined-medal-challenge-label--error');
     }
 
-    centerWrap.appendChild(label);
+    // Medal, then who was raced, then by how much: one rank per line, so nothing
+    // reads as a caption pinned to the medal.
     root.appendChild(centerWrap);
+    root.appendChild(label);
+
+    // A tie is 0.000 by definition, so the sentence says it and the margin line
+    // stays out — it only ever reports time gained or lost.
+    const settled = phase === 'won' || phase === 'lost' || phase === 'tie';
+    if (settled && (margin?.isGain || margin?.isLoss)) {
+        const marginEl = document.createElement('p');
+        marginEl.className = 'combined-medal-challenge-margin';
+        marginEl.textContent = `${margin.text}s`;
+        if (margin.isGain) marginEl.classList.add('is-gain');
+        if (margin.isLoss) marginEl.classList.add('is-loss');
+        root.appendChild(marginEl);
+        root.setAttribute(
+            'aria-label',
+            `${label.textContent} by ${Math.abs(Number(verdict.deltaSec)).toFixed(3)} seconds`,
+        );
+    }
+
     overlayEl.appendChild(root);
 }
 
@@ -329,7 +383,7 @@ export function renderChallengeFinishHero(
  * Win combined overlay: horizontal row of all medal tiers for this track.
  * Challenge finishes use {@link renderChallengeFinishHero} instead of the campaign stack.
  * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
- * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|'challenge'|null, challengeFinish?: boolean, challengeConfirmPhase?: 'pending'|'won'|'lost'|'tie'|'error'|null, challengeConfirmStatus?: string|null, challengeConfirmError?: string|null, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
+ * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|'challenge'|null, challengeFinish?: boolean, challengeConfirmPhase?: 'pending'|'won'|'lost'|'tie'|'error'|null, challengeConfirmStatus?: string|null, challengeConfirmError?: string|null, challengeViewerAvatarUrl?: string|null, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
  */
 export function renderWinCombinedMedalOverlay(
     overlayEl,
@@ -340,6 +394,8 @@ export function renderWinCombinedMedalOverlay(
         challengeConfirmPhase = null,
         challengeConfirmStatus = null,
         challengeConfirmError = null,
+        challengeViewerAvatarUrl = null,
+        challengeVerdict = null,
         previousTrackMedal = null,
         lapCount = 1,
     } = {},
@@ -354,12 +410,18 @@ export function renderWinCombinedMedalOverlay(
             phase,
             statusText: challengeConfirmStatus,
             error: challengeConfirmError,
+            avatarUrl: challengeViewerAvatarUrl,
+            verdict: challengeVerdict,
         });
         return;
     }
 
     if (lapMedal === 'challenge') {
-        renderChallengeFinishHero(overlayEl, { phase: 'won' });
+        renderChallengeFinishHero(overlayEl, {
+            phase: 'won',
+            avatarUrl: challengeViewerAvatarUrl,
+            verdict: challengeVerdict,
+        });
         return;
     }
 
@@ -399,8 +461,10 @@ export function playCombinedMedalRowEntrance(
     { baseDelayMs = 0, reduced = false, shouldCelebrateTier = null, playUnlockSound = null, firstUnlockHoldMs = FIRST_UNLOCK_MEDAL_HOLD_MS } = {},
 ) {
     if (!rowEl) return;
+    // Descendant, not child: a challenge win mounts its medal inside the
+    // winner's portrait, one level below the slot.
     const icons = rowEl.querySelectorAll(
-        ':scope > .combined-medal-row-slot:not(.combined-medal-row-slot--locked) > .medal-svg',
+        ':scope > .combined-medal-row-slot:not(.combined-medal-row-slot--locked) .medal-svg',
     );
     if (baseDelayMs > 0) {
         setTimeout(() => {

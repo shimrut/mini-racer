@@ -29,12 +29,12 @@ export const API_ROUTES = Object.freeze({
     campaignSnapshotUrl: `${API_BASE_URL}/campaign/snapshot`,
     campaignSubmitUrl: `${API_BASE_URL}/campaign/submit`,
     campaignPbGhostUrl: `${API_BASE_URL}/campaign/pb-ghost`,
-    campaignChallengePreviewUrl: `${API_BASE_URL}/campaign/challenge/preview`,
-    campaignChallengeCreateUrl: `${API_BASE_URL}/campaign/challenge/create`,
-    campaignChallengeUrl: `${API_BASE_URL}/campaign/challenge`,
-    campaignChallengeSubmitUrl: `${API_BASE_URL}/campaign/challenge/submit`,
-    campaignChallengeBragPreviewUrl: `${API_BASE_URL}/campaign/challenge/brag/preview`,
-    campaignChallengeBragConfirmUrl: `${API_BASE_URL}/campaign/challenge/brag/confirm`,
+    headToHeadPreviewUrl: `${API_BASE_URL}/head-to-head/preview`,
+    headToHeadCreateUrl: `${API_BASE_URL}/head-to-head/create`,
+    headToHeadUrl: `${API_BASE_URL}/head-to-head`,
+    headToHeadSubmitUrl: `${API_BASE_URL}/head-to-head/submit`,
+    headToHeadBragPreviewUrl: `${API_BASE_URL}/head-to-head/brag/preview`,
+    headToHeadBragConfirmUrl: `${API_BASE_URL}/head-to-head/brag/confirm`,
 });
 
 export function clampRequestLimit(limit, { defaultLimit, maxLimit = 100 } = {}) {

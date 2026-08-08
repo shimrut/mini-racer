@@ -1,31 +1,29 @@
-import { CAMPAIGN_ID, getCampaignStage } from '../../game/campaign/manifest.js';
+import { getCampaignStage } from '../../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../../game/medals/medal-timing.js';
 import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import {
-    getServerCampaignChallengeSource,
+    getServerHeadToHeadSource,
 } from './campaign-store.js';
 import {
     getServerDailyGpPlayableChallenge,
 } from './daily-gp-store.js';
 import {
-    getCampaignChallengeOrigin,
-    type CampaignChallengeRecord,
-    type CampaignChallengeSource,
-} from './campaign-challenge-model.js';
-import type { CampaignChallengePostContext } from './campaign-challenge-post.js';
-import { resolveCampaignChallengeRecord } from './campaign-challenge-post.js';
-import { readCampaignChallengeResult } from './campaign-challenge-store.js';
+    getHeadToHeadOrigin,
+    type HeadToHeadRecord,
+    type HeadToHeadSource,
+} from './head-to-head-model.js';
+import type { HeadToHeadPostContext } from './head-to-head-post.js';
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 
-export async function resolveCampaignChallengeSource(
+export async function resolveHeadToHeadSource(
     input: Record<string, unknown>,
     username: string,
-    context: CampaignChallengePostContext = {},
-): Promise<CampaignChallengeSource | null> {
+    context: HeadToHeadPostContext = {},
+): Promise<HeadToHeadSource | null> {
     if (input.source === 'campaign' && typeof input.raceId === 'string') {
-        return getServerCampaignChallengeSource({
+        return getServerHeadToHeadSource({
             raceId: input.raceId,
             redditUsername: username,
         });
@@ -59,36 +57,17 @@ export async function resolveCampaignChallengeSource(
             ghost: validation.run.ghost,
         };
     }
-    if (input.source !== 'duel' || typeof input.challengeId !== 'string') return null;
-    const [challenge, result] = await Promise.all([
-        resolveCampaignChallengeRecord(input.challengeId, context),
-        readCampaignChallengeResult(input.challengeId, username),
-    ]);
-    if (!challenge || !result?.ghost) return null;
-    const origin = getCampaignChallengeOrigin(challenge);
-    if (!origin) return null;
-    return {
-        sourceKind: 'duel',
-        sourceId: challenge.challengeId,
-        origin,
-        ...(origin.mode === 'campaign'
-            ? { campaignId: CAMPAIGN_ID, raceId: origin.raceId }
-            : {}),
-        trackKey: challenge.trackKey,
-        lapCount: challenge.lapCount,
-        bestTimeMs: result.bestTimeMs,
-        medal: result.medal,
-        rulesRevision: challenge.rulesRevision,
-        trackFingerprint: challenge.trackFingerprint,
-        ghost: result.ghost,
-    };
+    // A Head to Head can only be issued from a Campaign stage or a Daily run.
+    // It is never issued from another Head to Head, because that would need a
+    // stored result and nothing about a Head to Head outlives its post.
+    return null;
 }
 
-export function validateCampaignChallengeReplay(
-    challenge: CampaignChallengeRecord,
+export function validateHeadToHeadReplay(
+    challenge: HeadToHeadRecord,
     replay: unknown,
 ) {
-    const origin = getCampaignChallengeOrigin(challenge);
+    const origin = getHeadToHeadOrigin(challenge);
     const track = TRACKS[challenge.trackKey];
     const stage = origin?.mode === 'campaign'
         ? getCampaignStage(origin.raceId)

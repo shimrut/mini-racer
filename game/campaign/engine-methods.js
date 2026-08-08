@@ -9,27 +9,18 @@ import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
 import {
     clearPendingCampaignResult,
-    createCampaignChallenge,
     deriveCampaignProgress,
     mergePendingCampaignResults,
     recordPendingCampaignResult,
     getCampaignBootstrap,
-    getCampaignChallenge,
     getCampaignPbGhost,
     getCampaignSnapshot,
-    previewCampaignChallenge,
-    previewCampaignChallengeBrag,
-    confirmCampaignChallengeBrag,
     startServerCampaignRace,
-    submitCampaignChallengeRun,
     submitCampaignRun,
 } from './service.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
 import { buildCampaignCarouselCards } from './carousel-model.js';
-import {
-    cancelDeferredLobbyWork,
-    deferLobbyWorkUntilAfterPaint,
-} from '../lobby/deferred-work.js';
+import { deferLobbyWorkUntilAfterPaint } from '../lobby/deferred-work.js';
 import {
     clearCampaignVerification,
     createVerificationSnapshot,
@@ -40,10 +31,10 @@ import {
     markCampaignVerificationPending,
 } from '../scoreboard/verification-queue.js';
 
-function toRaceChallenge(stage, mode = 'campaign') {
+function toRaceChallenge(stage) {
     return {
         id: stage.raceId,
-        challengeDate: stage.challengeDate || (mode === 'challenge' ? 'Head to Head' : 'Campaign'),
+        challengeDate: stage.challengeDate || 'Campaign',
         trackKey: stage.trackKey,
         startsAt: '1970-01-01T00:00:00.000Z',
         endsAt: '9999-12-31T23:59:59.999Z',
@@ -53,7 +44,7 @@ function toRaceChallenge(stage, mode = 'campaign') {
         objectiveType: objectiveTypeForLapCount(stage.lapCount),
         objectiveParams: { lapCount: stage.lapCount },
         skin: 'default',
-        mode,
+        mode: 'campaign',
     };
 }
 
@@ -406,7 +397,7 @@ export const campaignEngineMethods = {
     showCampaignLobby({ refresh = true } = {}) {
         this._campaignCarouselPaintReady = false;
         this.activeCampaignStage = null;
-        this.activeCampaignChallenge = null;
+        this.activeHeadToHead = null;
         const hadReadyBootstrap = Boolean(
             this._campaignBootstrapReady && this.campaignBootstrap
         );
@@ -509,7 +500,7 @@ export const campaignEngineMethods = {
 
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
-            this.activeCampaignChallenge = null;
+            this.activeHeadToHead = null;
             if (replacesCurrentRun && stage.trackKey === this.currentTrackKey) {
                 this.reset(false, {
                     preserveRaceComparisonTarget,
@@ -661,96 +652,6 @@ export const campaignEngineMethods = {
         this.bestLapTime = bestTime;
         this.syncTrackMedalFromChallengeBest?.(this.activeDailyChallenge, bestTime);
         this.syncChallengeHudPrimaryStats?.();
-    },
-
-    async loadChallengeLobby(challengeId = null) {
-        cancelDeferredLobbyWork(this);
-        if (this.status !== 'ready' || this.currentChallengeRun) {
-            this.reset(false, { showStartOverlay: false });
-        }
-        const response = await getCampaignChallenge(challengeId);
-        const contextual = globalThis.devvit?.context?.postData;
-        if (response.body?.status === 'own_challenge') {
-            this.activeCampaignChallenge = null;
-            const ownOrigin = response.body?.challenge?.origin
-                || contextual?.origin;
-            if (ownOrigin?.mode === 'daily') {
-                this.showDailyLobby?.();
-            } else {
-                await this.showCampaignLobby();
-            }
-            return;
-        }
-        const challenge = response.body?.challenge
-            || (contextual?.postType === 'campaign-challenge' ? contextual : null);
-        this.activeRaceMode = 'challenge';
-        this.activeCampaignChallenge = response.ok ? {
-            ...challenge,
-            frozenGhost: response.body?.opponentGhost ?? null,
-        } : null;
-        const challengeReady = response.ok
-            && response.body?.status === 'ready'
-            && Boolean(challenge);
-        this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-        this.lobbyUi.showChallenge({
-            signedIn: response.body?.viewerType === 'reddit',
-            canRace: challengeReady,
-            available: challengeReady,
-            challengerName: challenge?.challengerUsername,
-            challengerAvatarUrl: challenge?.challengerAvatarUrl,
-            viewerAvatarUrl: response.body?.viewerAvatarUrl,
-            trackKey: challenge?.trackKey,
-            trackName: getTrackName(challenge?.trackKey, challenge?.trackKey || ''),
-            laps: challenge?.lapCount,
-            targetTimeMs: challenge?.targetTimeMs,
-            medal: challenge?.medal,
-            statusMessage: response.body?.error || '',
-        });
-    },
-
-    async startCampaignChallenge() {
-        const challenge = this.activeCampaignChallenge;
-        if (!challenge || this.startButtonPending) return;
-        this.startButtonPending = true;
-        try {
-            const origin = challenge.origin?.mode === 'daily'
-                ? challenge.origin
-                : null;
-            const stage = {
-                raceId: origin?.challengeId || challenge.raceId,
-                challengeDate: origin?.challengeId || 'Campaign',
-                trackKey: challenge.trackKey,
-                lapCount: challenge.lapCount,
-                rulesRevision: challenge.rulesRevision,
-            };
-            this.activeRaceMode = 'challenge';
-            // A Challenge race owns the ghost slot, so any leaderboard
-            // opponent from a previous start has to go first.
-            this.clearRaceComparisonTarget?.();
-            this.pbGhost.clearTrack();
-            if (stage.trackKey !== this.currentTrackKey) {
-                await this.loadTrack(stage.trackKey, {
-                    loadPlayerProgress: false,
-                    preserveDailyChallengeContext: true,
-                    showStartOverlayOnReset: false,
-                });
-            }
-            if (challenge.frozenGhost) {
-                const prepareGhost = this.pbGhost.prepareOpponent || this.pbGhost.prepare;
-                prepareGhost?.call(this.pbGhost, {
-                    bestTimeMs: challenge.targetTimeMs,
-                    ghost: challenge.frozenGhost,
-                });
-            }
-            delete this.trackPersonalBestByTrackKey[stage.raceId];
-            this.bestLapTime = null;
-            this.applyDailyChallenge(toRaceChallenge(stage, 'challenge'));
-            this.activeRaceMode = 'challenge';
-            void this.journeys?.startAttempt?.({ reason: 'initial_start' });
-            this.startSequence();
-        } finally {
-            this.startButtonPending = false;
-        }
     },
 
     handleInvalidCampaignWin(reason = 'Finish could not be verified.') {
@@ -918,7 +819,7 @@ export const campaignEngineMethods = {
                 medal,
                 previousMedal,
                 shareRequest: {
-                    kind: 'campaign-challenge',
+                    kind: 'head-to-head',
                     source: 'campaign',
                     raceId: stage.raceId,
                 },
@@ -976,7 +877,7 @@ export const campaignEngineMethods = {
             medal,
             previousMedal,
             shareRequest: {
-                kind: 'campaign-challenge',
+                kind: 'head-to-head',
                 source: 'campaign',
                 raceId: stage.raceId,
             },
@@ -1151,126 +1052,6 @@ export const campaignEngineMethods = {
             console.warn('Campaign result screen opened without refreshed progress:', refreshError);
         }
     },
-
-    async handleCampaignChallengeWin(winData) {
-        const challenge = this.activeCampaignChallenge;
-        if (!challenge) return;
-        this.status = 'won';
-        void this.journeys?.endAttempt?.({ complete: true });
-        const finalTime = Number(winData?.lapTime);
-        const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
-        const submittingStatus = createVerificationSnapshot({
-            verificationState: 'pending',
-            isLoading: true,
-            submissionStage: 'submitting',
-        }).statusText || 'Submitting...';
-        const verifyingStatus = createVerificationSnapshot({
-            verificationState: 'pending',
-            isLoading: true,
-            submissionStage: 'verifying',
-        }).statusText || 'Verifying...';
-
-        const openPendingFinish = () => {
-            this.modal.showModal(
-                'Challenge complete',
-                null,
-                {
-                    lapTime: finalTime,
-                    bestTime: challenge.targetTimeMs / 1000,
-                    completedLaps: challenge.lapCount,
-                    requiredLaps: challenge.lapCount,
-                    primaryStatLabel: 'Race Time',
-                    lapMedal: null,
-                    challengeFinish: true,
-                    challengeConfirmPhase: 'pending',
-                    challengeConfirmStatus: submittingStatus,
-                    trackKey: challenge.trackKey,
-                    showGlobalLeaderboard: false,
-                },
-                {
-                    ...createModalActions({
-                        modalKind: 'win',
-                        primaryActionLabel: 'Retry',
-                        secondaryActionLabel: 'Home',
-                        secondaryAction: () => this.loadChallengeLobby(challenge.challengeId),
-                    }),
-                    restartAction: () => this.restartActiveRace(),
-                    settingsAction: () => this.settings.openSettings(),
-                    shareRequest: { kind: 'challenge-brag', challengeId: challenge.challengeId },
-                    shareEnabled: false,
-                },
-            );
-        };
-
-        const stillOnThisFinish = () => (
-            this.status === 'won'
-            && this.activeCampaignChallenge?.challengeId === challenge.challengeId
-        );
-
-        if (!replay) {
-            openPendingFinish();
-            this.modal.updateChallengeFinishHero?.({
-                phase: 'error',
-                error: 'This run could not be verified.',
-            });
-            return;
-        }
-
-        openPendingFinish();
-
-        void (async () => {
-            if (!stillOnThisFinish()) return;
-            this.modal.updateChallengeFinishHero?.({
-                phase: 'pending',
-                statusText: verifyingStatus,
-            });
-
-            let confirmationFailed = false;
-            let response = { ok: false, body: { error: 'This run could not be verified.' } };
-            try {
-                response = await submitCampaignChallengeRun({
-                    challengeId: challenge.challengeId,
-                    replay,
-                });
-            } catch (submitError) {
-                confirmationFailed = true;
-                response = {
-                    ok: false,
-                    body: {
-                        error: 'Race finished, but the challenge result could not be confirmed.',
-                    },
-                };
-                console.error('Could not confirm Campaign challenge result:', submitError);
-            }
-
-            if (!stillOnThisFinish()) return;
-
-            const accepted = response.ok && response.body?.accepted === true;
-            const outcome = accepted ? response.body?.outcome : null;
-
-            if (!accepted) {
-                this.modal.updateChallengeFinishHero?.({
-                    phase: 'error',
-                    error: confirmationFailed
-                        ? (response.body?.error || 'Race finished, but the challenge result could not be confirmed.')
-                        : (response.body?.error || 'This run could not be verified.'),
-                });
-                return;
-            }
-            this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
-
-            if (outcome === 'won') {
-                this.modal.updateChallengeFinishHero?.({ phase: 'won' });
-                return;
-            }
-            if (outcome === 'tie') {
-                this.modal.updateChallengeFinishHero?.({ phase: 'tie' });
-                return;
-            }
-            this.modal.updateChallengeFinishHero?.({ phase: 'lost' });
-        })();
-    },
-
     async openCampaignStandings(stageLike = null, {
         returnMode = 'close',
         refreshSession: providedRefreshSession = null,
@@ -1413,25 +1194,5 @@ export const campaignEngineMethods = {
                 this.modal.updateModalScoreboardSnapshot(currentSnapshot);
             }
         }
-    },
-
-    previewCampaignChallenge(request) {
-        return previewCampaignChallenge(request);
-    },
-
-    async confirmCampaignChallenge(token, request = null) {
-        const response = await createCampaignChallenge(token, request?.source === 'daily'
-            ? { replay: request.replay }
-            : {});
-        if (response?.ok) this.applyCarUnlockSnapshot?.(response.body?.carUnlocks);
-        return response;
-    },
-
-    previewCampaignChallengeBrag(request) {
-        return previewCampaignChallengeBrag(request);
-    },
-
-    confirmCampaignChallengeBrag(token) {
-        return confirmCampaignChallengeBrag(token);
     },
 };

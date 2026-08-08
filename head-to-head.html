@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer Head to Head</title>
+    <link rel="stylesheet" href="head-to-head.css">
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <script type="module" src="head-to-head.js"></script>
+</head>
+
+<body>
+    <main class="challenge-shell" aria-labelledby="challenge-track-name">
+        <header class="challenge-brand" aria-label="Mini Racer Head to Head">
+            <span class="challenge-brand__mini">Mini</span>
+            <span class="challenge-brand__racer">Racer</span>
+        </header>
+
+        <section class="challenge-copy">
+            <div class="challenge-duel" aria-label="Head to Head racers">
+                <div class="challenge-duel__racer">
+                    <img id="challenger-avatar" class="challenge-avatar challenge-avatar--generic" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png" alt="">
+                    <span id="challenger-name" class="challenge-duel__name">A racer</span>
+                </div>
+
+                <span class="challenge-duel__helmets" aria-hidden="true">
+                    <svg class="challenge-helmet challenge-helmet--challenger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 12.2a10 10 0 1 0-19.4 3.2c.2.5.8 1.1 1.3 1.3l13.2 5.1c.5.2 1.2 0 1.6-.3l2.6-2.6c.4-.4.7-1.2.7-1.7Z" />
+                        <path d="m21.8 18-10.5-4a2 2.06 0 0 1 .7-4h9.8" />
+                    </svg>
+                    <svg class="challenge-helmet challenge-helmet--viewer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 12.2a10 10 0 1 0-19.4 3.2c.2.5.8 1.1 1.3 1.3l13.2 5.1c.5.2 1.2 0 1.6-.3l2.6-2.6c.4-.4.7-1.2.7-1.7Z" />
+                        <path d="m21.8 18-10.5-4a2 2.06 0 0 1 .7-4h9.8" />
+                    </svg>
+                </span>
+
+                <div class="challenge-duel__racer">
+                    <img id="viewer-avatar" class="challenge-avatar challenge-avatar--generic" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png" alt="">
+                    <span id="viewer-name" class="challenge-duel__name">You</span>
+                </div>
+            </div>
+
+            <div class="challenge-headline">
+                <span class="challenge-headline__label">Time to beat</span>
+                <strong id="challenge-target-time" class="challenge-headline__time">—</strong>
+                <div class="challenge-headline__meta">
+                    <h1 id="challenge-track-name" class="challenge-track-name">Campaign race</h1>
+                    <p id="challenge-format" class="challenge-format">1 LAP</p>
+                </div>
+            </div>
+        </section>
+
+        <canvas id="challenge-track" class="challenge-track" aria-hidden="true"></canvas>
+
+        <footer class="challenge-actions">
+            <p id="challenge-message" role="status" aria-live="polite"></p>
+            <button id="accept-challenge" type="button">Accept Challenge</button>
+        </footer>
+    </main>
+</body>
+
+</html>

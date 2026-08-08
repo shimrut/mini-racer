@@ -260,19 +260,19 @@ export const raceEngineMethods = {
   getPbGhostSizeRunMetadata() {
     const challenge = this.activeDailyChallenge;
     const campaignStage = this.activeCampaignStage;
-    const campaignChallenge = this.activeCampaignChallenge;
+    const headToHead = this.activeHeadToHead;
     const rulesRevision = Number.isInteger(challenge?.rulesRevision)
       ? challenge.rulesRevision
       : Number.isInteger(campaignStage?.rulesRevision)
         ? campaignStage.rulesRevision
-        : Number.isInteger(campaignChallenge?.rulesRevision)
-          ? campaignChallenge.rulesRevision
+        : Number.isInteger(headToHead?.rulesRevision)
+          ? headToHead.rulesRevision
           : Number.isInteger(this.currentRunPolicy?.rulesRevision)
             ? this.currentRunPolicy.rulesRevision
             : 0;
     const challengeId = challenge?.id
       || campaignStage?.raceId
-      || campaignChallenge?.challengeId
+      || headToHead?.challengeId
       || null;
 
     return {

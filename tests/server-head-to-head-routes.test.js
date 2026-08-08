@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { registerCampaignChallengeRoutes } from '../src/server/routes/campaign-challenge-routes.ts';
+import { registerHeadToHeadRoutes } from '../src/server/routes/head-to-head-routes.ts';
 
 function routeHandlers(dependencies) {
     const handlers = { get: {}, post: {} };
@@ -7,7 +7,7 @@ function routeHandlers(dependencies) {
         get: (path, handler) => { handlers.get[path] = handler; },
         post: (path, handler) => { handlers.post[path] = handler; },
     };
-    registerCampaignChallengeRoutes(app, dependencies);
+    registerHeadToHeadRoutes(app, dependencies);
     return handlers;
 }
 
@@ -27,36 +27,36 @@ function responseRecorder() {
     return response;
 }
 
-describe('Campaign challenge route identity forwarding', () => {
+describe('Head to Head route identity forwarding', () => {
     it('forwards guest identity on challenge reads and submissions', async () => {
         const context = {
             username: null,
             subredditName: 'MiniRacer',
             postId: null,
-            postData: { postType: 'campaign-challenge', challengeId: 'challenge-1' },
+            postData: { postType: 'head-to-head', challengeId: 'challenge-1' },
         };
-        const getCampaignChallenge = vi.fn(async (challengeId, requestContext) => ({
+        const getHeadToHead = vi.fn(async (challengeId, requestContext) => ({
             status: 200,
             body: { challengeId, requestContext },
         }));
-        const submitCampaignChallenge = vi.fn(async (input, requestContext) => ({
+        const submitHeadToHead = vi.fn(async (input, requestContext) => ({
             status: 200,
             body: { input, requestContext },
         }));
         const dependencies = {
-            getCampaignChallengeRequestContext: () => context,
+            getHeadToHeadRequestContext: () => context,
             readContextPostData: () => context.postData,
-            previewCampaignChallenge: vi.fn(),
-            createCampaignChallenge: vi.fn(),
-            getCampaignChallenge,
-            submitCampaignChallenge,
-            previewCampaignChallengeBrag: vi.fn(),
-            confirmCampaignChallengeBrag: vi.fn(),
+            previewHeadToHead: vi.fn(),
+            createHeadToHead: vi.fn(),
+            getHeadToHead,
+            submitHeadToHead,
+            previewHeadToHeadBrag: vi.fn(),
+            confirmHeadToHeadBrag: vi.fn(),
         };
         const handlers = routeHandlers(dependencies);
 
         const readResponse = responseRecorder();
-        await handlers.get['/api/campaign/challenge']({
+        await handlers.get['/api/head-to-head']({
             query: {
                 postId: 't3_challenge1',
                 playerId: 'guest-1',
@@ -64,7 +64,7 @@ describe('Campaign challenge route identity forwarding', () => {
             },
         }, readResponse);
         expect(readResponse.statusCode).toBe(200);
-        expect(getCampaignChallenge).toHaveBeenCalledWith('challenge-1', {
+        expect(getHeadToHead).toHaveBeenCalledWith('challenge-1', {
             ...context,
             postId: 't3_challenge1',
             playerId: 'guest-1',
@@ -72,7 +72,7 @@ describe('Campaign challenge route identity forwarding', () => {
         });
 
         const submitResponse = responseRecorder();
-        await handlers.post['/api/campaign/challenge/submit']({
+        await handlers.post['/api/head-to-head/submit']({
             body: {
                 replay: { inputs: [] },
                 postId: 't3_challenge1',
@@ -81,7 +81,7 @@ describe('Campaign challenge route identity forwarding', () => {
             },
         }, submitResponse);
         expect(submitResponse.statusCode).toBe(200);
-        expect(submitCampaignChallenge).toHaveBeenCalledWith({
+        expect(submitHeadToHead).toHaveBeenCalledWith({
             replay: { inputs: [] },
             postId: 't3_challenge1',
             playerId: 'guest-1',

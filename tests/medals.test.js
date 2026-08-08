@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TRACK_CATALOG } from '../game/track/catalog.js';
+import { GENERIC_SNOO_URL } from '../game/ui/avatar.js';
 import {
     TRACK_MEDAL_THRESHOLDS,
     getAuthorMedalSeconds,
@@ -384,6 +385,13 @@ describe('medals', () => {
                             this.classes.add(cls);
                             el.className = Array.from(this.classes).join(' ');
                         },
+                        toggle(cls, force) {
+                            const on = force === undefined ? !this.classes.has(cls) : force;
+                            if (on) this.classes.add(cls);
+                            else this.classes.delete(cls);
+                            el.className = Array.from(this.classes).join(' ');
+                            return on;
+                        },
                     },
                     children: [],
                     dataset: {},
@@ -406,28 +414,86 @@ describe('medals', () => {
                 statusText: 'Submitting...',
             });
             expect(children[0].dataset.challengePhase).toBe('pending');
-            expect(children[0].children[0].children.some(
+            // Medal, then the line about it: the hero stacks, so nothing reads
+            // as a caption pinned beside the medal.
+            expect(children[0].children.some(
                 (c) => c.textContent === 'Submitting...',
             )).toBe(true);
 
             renderChallengeFinishHero(overlay, { phase: 'won' });
             expect(children[0].dataset.challengePhase).toBe('won');
-            expect(children[0].children[0].children.some(
+            expect(children[0].children.some(
                 (c) => c.textContent === 'Challenge beaten',
             )).toBe(true);
+
+            // A settled duel names who was raced and prints the margin as the
+            // signed delta the split times use.
+            renderChallengeFinishHero(overlay, {
+                phase: 'won',
+                verdict: { opponentName: 'shimroot', deltaSec: -0.305 },
+            });
+            expect(children[0].children.some(
+                (c) => c.textContent === 'Beat shimroot',
+            )).toBe(true);
+            // The margin is the last rank in the stack.
+            const wonMargin = children[0].children.at(-1);
+            expect(wonMargin.textContent).toBe('-0.305s');
+            expect(wonMargin.classList.classes.has('is-gain')).toBe(true);
+
+            renderChallengeFinishHero(overlay, {
+                phase: 'lost',
+                verdict: { opponentName: 'shimroot', deltaSec: 0.546 },
+            });
+            expect(children[0].children.some(
+                (c) => c.textContent === 'Lost to shimroot',
+            )).toBe(true);
+            const lostMargin = children[0].children.at(-1);
+            expect(lostMargin.textContent).toBe('+0.546s');
+            expect(lostMargin.classList.classes.has('is-loss')).toBe(true);
+
+            // A win with a face wears the medal on the winner's portrait — the
+            // same composition the challenge lobby lands on — and reads its
+            // title underneath rather than beside it.
+            renderChallengeFinishHero(overlay, {
+                phase: 'won',
+                avatarUrl: 'https://i.redd.it/snoo.png',
+            });
+            const wonRoot = children[0];
+            const portrait = wonRoot.children[0].children[0].children[0]
+                .children.find((c) => c.className?.includes?.('challenge-won-hero__portrait'));
+            expect(portrait).toBeTruthy();
+            expect(portrait.children[0].src).toBe('https://i.redd.it/snoo.png');
+            expect(portrait.children[1].className)
+                .toContain('challenge-won-hero__medal');
+            expect(wonRoot.children.some(
+                (c) => c.textContent === 'Challenge beaten',
+            )).toBe(true);
+
+            // A winner with no Snoovatar still gets a face: the default Snoo,
+            // wearing the medal in the same composition rather than a bare medal
+            // floating where the portrait should be.
+            renderChallengeFinishHero(overlay, { phase: 'won' });
+            const facelessPortrait = children[0].children[0].children[0].children[0]
+                .children.find((c) => c.className?.includes?.('challenge-won-hero__portrait'));
+            expect(facelessPortrait).toBeTruthy();
+            expect(facelessPortrait.children[0].src).toBe(GENERIC_SNOO_URL);
+            expect(facelessPortrait.children[0].classList.classes.has('challenge-avatar--generic'))
+                .toBe(true);
+            expect(facelessPortrait.children[1].className)
+                .toContain('challenge-won-hero__medal');
 
             renderChallengeFinishHero(overlay, {
                 phase: 'error',
                 error: 'Could not confirm.',
             });
             expect(children[0].dataset.challengePhase).toBe('error');
-            expect(children[0].children[0].children.some(
+            expect(children[0].children.some(
                 (c) => c.textContent === 'Could not confirm.',
             )).toBe(true);
 
             renderChallengeFinishHero(overlay, { phase: 'lost' });
             expect(children[0].dataset.challengePhase).toBe('lost');
-            expect(children[0].children[0].children.some(
+            expect(children[0].children.some(
                 (c) => c.textContent === 'Challenge Lost',
             )).toBe(true);
             expect(children[0].children[0].children.some(

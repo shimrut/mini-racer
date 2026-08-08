@@ -6,7 +6,7 @@
 an ordered manifest whose imports are bundled into the production `game.css`.
 
 Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
-`campaign-challenge.css`)
+`head-to-head.css`)
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the
@@ -14,7 +14,7 @@ verified track trace remains an open hero on the right, and the CTA anchors belo
 that trace. Its brand uses the shared stacked Mini/Racer lockup, and its format
 line carries the lap count without adding ghost-status copy. Keep the existing
 `challenge-*` IDs stable because
-`campaign-challenge.js` hydrates them from immutable Reddit post data and
+`head-to-head.js` hydrates them from immutable Reddit post data and
 authenticated access responses.
 
 The split is structural. Its first priority is preserving the original cascade:

@@ -136,6 +136,16 @@ describe('track runtime integrity', () => {
             'infinitePie',
             'centralDrop',
             'goldenRatio',
+            'fedoraHat',
+            'infinityIsle',
+            'kangarooKyle',
+            'quarterlyQuestion',
+            'romanianRhapsody',
+            'fairyLand',
+            'felineFace',
+            'darkMatter',
+            'appleStrudel',
+            'heavyMetal',
         ]);
 
         const intentionallyReviewedKeys = new Set([
@@ -166,6 +176,16 @@ describe('track runtime integrity', () => {
             'infinitePie',
             'centralDrop',
             'goldenRatio',
+            'fedoraHat',
+            'infinityIsle',
+            'kangarooKyle',
+            'quarterlyQuestion',
+            'romanianRhapsody',
+            'fairyLand',
+            'felineFace',
+            'darkMatter',
+            'appleStrudel',
+            'heavyMetal',
         ]);
         const unchangedTrackRegistry = Object.fromEntries(
             Object.entries(TRACKS)
@@ -184,7 +204,7 @@ describe('track runtime integrity', () => {
             '0ddcb5069d55ce590d2d304ee54b6a1a3be145d325bb33ceddda5a4d7fa7139e',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'b145742569739bc989c3a66ee3fc5e1f2700193d0d9bd6cdf923c24baaf71cbc',
+            '3b66b4ff09bb36075fde602984b52a135e0010ef398cfa7c80d0d2b60bdbdd2d',
         );
     });
 

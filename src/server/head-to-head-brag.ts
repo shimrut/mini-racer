@@ -1,17 +1,16 @@
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
 import { getTrackName } from '../../game/track/catalog.js';
 import { formatRaceTime } from './format-race-time.js';
 import type {
-    CampaignChallengeRequestContext,
-    CampaignChallengeServiceResult,
-} from './campaign-challenge-service.js';
-import { resolveCampaignChallengeRecord } from './campaign-challenge-post.js';
-import { readCampaignChallengeResult } from './campaign-challenge-store.js';
+    HeadToHeadRequestContext,
+    HeadToHeadServiceResult,
+} from './head-to-head-service.js';
+import { resolveHeadToHeadRecord } from './head-to-head-post.js';
+import { readHeadToHeadAccept } from './head-to-head-store.js';
 import {
     acquireRedisLock,
-    beginOwnedRedisLockTransaction,
     releaseRedisLock,
     startRedisLockLeaseRenewal,
 } from './redis-lock.js';
@@ -19,8 +18,7 @@ import {
 const BRAG_PREVIEW_TTL_SECONDS = 10 * 60;
 const BRAG_LOCK_TTL_MS = 30_000;
 const BRAG_LOCK_RENEWAL_INTERVAL_MS = 10_000;
-const BRAG_RECORD_TTL_SECONDS = 45 * 24 * 60 * 60;
-const PREFIX = 'miniracer:campaign-challenge:brag';
+const PREFIX = 'miniracer:head-to-head:brag';
 
 type BragPreviewRecord = {
     username: string;
@@ -32,19 +30,11 @@ type BragPreviewRecord = {
     createdAt: string;
 };
 
-type BragSharedRecord = {
-    commentId: `t1_${string}`;
-    commentUrl: string;
-    commentText: string;
-    username: string;
-    createdAt: string;
-};
-
 function normalizeName(value: string): string {
     return value.trim().toLowerCase();
 }
 
-function signedContext(context: CampaignChallengeRequestContext): {
+function signedContext(context: HeadToHeadRequestContext): {
     username: string;
     subredditName: string;
 } | null {
@@ -57,13 +47,6 @@ function signedContext(context: CampaignChallengeRequestContext): {
 
 function previewKey(token: string): string {
     return `${PREFIX}:preview:${token}`;
-}
-
-function sharedKey(challengeId: string, username: string): string {
-    const viewerHash = createHash('sha256')
-        .update(username.trim().toLowerCase())
-        .digest('hex');
-    return `${PREFIX}:shared:${challengeId}:${viewerHash}`;
 }
 
 export function formatChallengeBragComment(
@@ -96,25 +79,6 @@ function parsePreview(raw: string | null): BragPreviewRecord | null {
     }
 }
 
-function parseShared(raw: string | null): BragSharedRecord | null {
-    if (!raw) return null;
-    try {
-        const parsed = JSON.parse(raw) as Partial<BragSharedRecord>;
-        if (
-            typeof parsed?.commentId !== 'string'
-            || !parsed.commentId.startsWith('t1_')
-            || typeof parsed?.commentUrl !== 'string'
-            || typeof parsed?.commentText !== 'string'
-            || typeof parsed?.username !== 'string'
-        ) {
-            return null;
-        }
-        return parsed as BragSharedRecord;
-    } catch {
-        return null;
-    }
-}
-
 async function deleteCommentBestEffort(comment: { delete?: () => Promise<unknown> } | null): Promise<void> {
     try {
         await comment?.delete?.();
@@ -123,19 +87,10 @@ async function deleteCommentBestEffort(comment: { delete?: () => Promise<unknown
     }
 }
 
-function alreadySharedBody(shared: BragSharedRecord): Record<string, unknown> {
-    return {
-        status: 'already_shared',
-        commentText: shared.commentText,
-        commentUrl: shared.commentUrl,
-        commentId: shared.commentId,
-    };
-}
-
-export async function previewCampaignChallengeBrag(
+export async function previewHeadToHeadBrag(
     input: Record<string, unknown>,
-    context: CampaignChallengeRequestContext,
-): Promise<CampaignChallengeServiceResult> {
+    context: HeadToHeadRequestContext,
+): Promise<HeadToHeadServiceResult> {
     const request = signedContext(context);
     if (!request) {
         return {
@@ -143,8 +98,33 @@ export async function previewCampaignChallengeBrag(
             body: { status: 'signed_in_required', error: 'Sign in to Reddit to brag about this win.' },
         };
     }
-    const challengeId = typeof input.challengeId === 'string' ? input.challengeId : '';
-    const challenge = await resolveCampaignChallengeRecord(challengeId, context);
+    const acceptToken = typeof input.acceptToken === 'string' ? input.acceptToken : '';
+    if (!acceptToken) {
+        return {
+            status: 404,
+            body: { status: 'result_unavailable', error: 'Beat this challenge before you can brag.' },
+        };
+    }
+    const acceptRecord = await readHeadToHeadAccept(acceptToken);
+    if (!acceptRecord) {
+        return {
+            status: 404,
+            body: { status: 'result_unavailable', error: 'Beat this challenge before you can brag.' },
+        };
+    }
+    if (acceptRecord.bestTimeMs >= acceptRecord.targetTimeMs) {
+        return {
+            status: 404,
+            body: { status: 'result_unavailable', error: 'Beat this challenge before you can brag.' },
+        };
+    }
+    if (normalizeName(acceptRecord.username) !== normalizeName(request.username)) {
+        return {
+            status: 403,
+            body: { status: 'share_forbidden', error: 'This brag preview belongs to another Reddit account.' },
+        };
+    }
+    const challenge = await resolveHeadToHeadRecord(acceptRecord.challengeId, context);
     if (!challenge || normalizeName(challenge.subredditName) !== normalizeName(request.subredditName)) {
         return {
             status: 404,
@@ -163,26 +143,20 @@ export async function previewCampaignChallengeBrag(
             body: { status: 'post_unavailable', error: 'The challenge post is unavailable.' },
         };
     }
-    const result = await readCampaignChallengeResult(challenge.challengeId, request.username);
-    if (!result || result.bestTimeMs >= challenge.targetTimeMs) {
+    if (challenge.postId !== acceptRecord.postId) {
         return {
             status: 404,
-            body: { status: 'result_unavailable', error: 'Beat this challenge before you can brag.' },
+            body: { status: 'challenge_unavailable', error: 'This challenge is unavailable.' },
         };
     }
-    const sharedRaw = await redis.get(sharedKey(challenge.challengeId, request.username));
-    const shared = parseShared(sharedRaw);
-    if (shared) {
-        return { status: 200, body: alreadySharedBody(shared) };
-    }
 
-    const commentText = formatChallengeBragComment(result.bestTimeMs, challenge.trackKey);
+    const commentText = acceptRecord.commentText;
     const preview: BragPreviewRecord = {
         username: request.username,
         subredditName: request.subredditName,
         challengeId: challenge.challengeId,
         postId: challenge.postId,
-        bestTimeMs: result.bestTimeMs,
+        bestTimeMs: acceptRecord.bestTimeMs,
         commentText,
         createdAt: new Date().toISOString(),
     };
@@ -201,10 +175,10 @@ export async function previewCampaignChallengeBrag(
     };
 }
 
-export async function confirmCampaignChallengeBrag(
+export async function confirmHeadToHeadBrag(
     input: Record<string, unknown>,
-    context: CampaignChallengeRequestContext,
-): Promise<CampaignChallengeServiceResult> {
+    context: HeadToHeadRequestContext,
+): Promise<HeadToHeadServiceResult> {
     const request = signedContext(context);
     if (!request) {
         return {
@@ -232,7 +206,7 @@ export async function confirmCampaignChallengeBrag(
     }
 
     const lock = await acquireRedisLock(
-        `${sharedKey(preview.challengeId, preview.username)}:lock`,
+        `${tokenKey}:lock`,
         BRAG_LOCK_TTL_MS,
         redis,
     );
@@ -244,12 +218,6 @@ export async function confirmCampaignChallengeBrag(
     }
     const lease = startRedisLockLeaseRenewal(lock, BRAG_LOCK_RENEWAL_INTERVAL_MS, redis);
     try {
-        const existing = parseShared(await redis.get(sharedKey(preview.challengeId, preview.username)));
-        if (existing) {
-            await redis.del(tokenKey);
-            return { status: 200, body: alreadySharedBody(existing) };
-        }
-
         const post = await reddit.getPostById(preview.postId);
         if (!post) {
             return {
@@ -276,41 +244,16 @@ export async function confirmCampaignChallengeBrag(
             await deleteCommentBestEffort(comment as { delete?: () => Promise<unknown> });
             throw new Error('Reddit did not return a brag comment ID.');
         }
-        const saved: BragSharedRecord = {
-            commentId: commentId as `t1_${string}`,
-            commentUrl: typeof (comment as { url?: string })?.url === 'string'
-                ? (comment as { url: string }).url
-                : (typeof (post as { url?: string })?.url === 'string' ? (post as { url: string }).url : ''),
-            commentText: preview.commentText,
-            username: preview.username,
-            createdAt: new Date().toISOString(),
-        };
-        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
-        if (!transaction) {
-            await deleteCommentBestEffort(comment as { delete?: () => Promise<unknown> });
-            return {
-                status: 409,
-                body: { status: 'share_in_progress', error: 'This brag is already being posted.' },
-            };
-        }
-        await transaction.set(sharedKey(preview.challengeId, preview.username), JSON.stringify(saved));
-        await transaction.expire(sharedKey(preview.challengeId, preview.username), BRAG_RECORD_TTL_SECONDS);
-        await transaction.del(tokenKey);
-        const results = await transaction.exec();
-        if (!Array.isArray(results) || results.length === 0) {
-            await deleteCommentBestEffort(comment as { delete?: () => Promise<unknown> });
-            return {
-                status: 409,
-                body: { status: 'share_in_progress', error: 'This brag is already being posted.' },
-            };
-        }
+        await redis.del(tokenKey);
         return {
             status: 200,
             body: {
                 status: 'shared',
-                commentText: saved.commentText,
-                commentUrl: saved.commentUrl,
-                commentId: saved.commentId,
+                commentText: preview.commentText,
+                commentUrl: typeof (comment as { url?: string })?.url === 'string'
+                    ? (comment as { url: string }).url
+                    : (typeof (post as { url?: string })?.url === 'string' ? (post as { url: string }).url : ''),
+                commentId: commentId as `t1_${string}`,
             },
         };
     } finally {

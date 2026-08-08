@@ -10,7 +10,8 @@ import {
     normalizeCampaignLobbyState,
     normalizeChallengeLobbyState,
 } from './service.js';
-import { AVATAR_PLACEHOLDER_SRC } from '../ui/avatar-placeholder.js';
+import { applyAvatar } from '../ui/avatar.js';
+import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
@@ -25,31 +26,9 @@ function setText(element, value) {
     if (element) element.textContent = value;
 }
 
-/**
- * A seat in the duel. An empty seat keeps its place with the default Snoo —
- * the viewer's side is empty for exactly the stranger this screen invites.
- */
+/** A seat in the duel. */
 function setAvatar(element, url, label) {
-    if (!element) return;
-    const empty = () => {
-        element.src = AVATAR_PLACEHOLDER_SRC;
-        element.alt = '';
-        element.classList?.add?.('challenge-avatar--empty');
-        element.setAttribute?.('aria-hidden', 'true');
-    };
-    if (!url) {
-        element.onerror = null;
-        empty();
-        return;
-    }
-    element.onerror = () => {
-        element.onerror = null;
-        empty();
-    };
-    element.src = url;
-    element.alt = label;
-    element.classList?.remove?.('challenge-avatar--empty');
-    element.setAttribute?.('aria-hidden', 'false');
+    applyAvatar(element, url, { alt: label, genericClass: 'challenge-avatar--generic' });
 }
 
 function setRaceBriefText(element, trackName, laps) {
@@ -149,6 +128,10 @@ export class LobbyUi {
         document.getElementById('lobby-home-campaign-btn')
             ?.addEventListener('click', () => this.onSelectCampaign?.());
         document.getElementById('lobby-switch-campaign-btn')
+            ?.addEventListener('click', () => this.onSelectCampaign?.());
+        document.getElementById('challenge-won-daily-btn')
+            ?.addEventListener('click', () => this.onSelectDaily?.());
+        document.getElementById('challenge-won-campaign-btn')
             ?.addEventListener('click', () => this.onSelectCampaign?.());
         document.querySelectorAll?.('[data-lobby-back]')?.forEach((button) => {
             button.addEventListener('click', () => this.onBack?.(this.mode));
@@ -284,7 +267,7 @@ export class LobbyUi {
             if (subhead) subhead.hidden = false;
             if (toggle) toggle.hidden = true;
             label.hidden = false;
-            label.textContent = 'Challenge';
+            label.textContent = this.challengeState?.beaten ? 'Beaten' : 'Challenge';
             this.syncLobbySubheadDetail();
             return;
         }
@@ -297,8 +280,9 @@ export class LobbyUi {
 
     /**
      * Every mode screen bills itself on one line: what this is on the left, who
-     * or when it is for on the right. Challenge names its opponent there, the
-     * way Daily names its day and Campaign its stage.
+     * or when it is for on the right. Challenge names its track there, the
+     * way Daily names its day and Campaign its stage — the opponent is billed
+     * on the poster, over the time they set.
      */
     syncLobbySubheadDetail() {
         const querySelector = document.querySelector?.bind(document);
@@ -314,7 +298,7 @@ export class LobbyUi {
             : this.mode === 'campaign'
                 ? this._campaignSelectedBillingLabel
                 : this.mode === 'challenge'
-                    ? this.challengeState?.challengerName?.trim() || null
+                    ? this.challengeState?.trackName?.trim() || null
                     : null;
         if (this.mode === 'home') {
             if (rule) rule.hidden = true;
@@ -550,6 +534,31 @@ export class LobbyUi {
         this.onRenderChallengePreview?.(canvas, { trackKey, skin: null }, { force });
     }
 
+    /** The winner, wearing the same medal the finish sheet just handed them. */
+    renderChallengeWin(beaten) {
+        const hero = document.getElementById('challenge-won-hero');
+        if (!hero) return;
+        hero.hidden = !beaten;
+        if (!beaten) return;
+
+        setAvatar(
+            document.getElementById('challenge-won-avatar'),
+            this.challengeState.viewerAvatarUrl,
+            'Your avatar',
+        );
+        const medal = document.getElementById('challenge-won-medal');
+        if (medal && !medal.firstChild) {
+            medal.appendChild(createMedalIconSvg('challenge', { className: 'medal-svg--hero' }));
+        }
+        const margin = this.challengeState.winMarginLabel;
+        setText(
+            document.getElementById('challenge-won-summary'),
+            margin
+                ? `You beat ${this.challengeState.challengerName} by ${margin}s.`
+                : `You beat ${this.challengeState.challengerName}.`,
+        );
+    }
+
     renderChallenge() {
         setRaceBriefText(
             this.challengeAcceptBtn?.querySelector('.main-menu__race-brief'),
@@ -557,6 +566,12 @@ export class LobbyUi {
             this.challengeState.laps,
         );
         setText(document.getElementById('challenge-target-time'), this.challengeState.targetTimeLabel);
+        // The poster names its challenger over the time they set; the subhead
+        // carries the track, so neither line repeats the other.
+        setText(
+            document.getElementById('challenge-challenger-name'),
+            this.challengeState.challengerName,
+        );
         setAvatar(
             document.getElementById('challenge-challenger-avatar'),
             this.challengeState.challengerAvatarUrl,
@@ -567,17 +582,25 @@ export class LobbyUi {
             this.challengeState.viewerAvatarUrl,
             'Your avatar',
         );
-        this.renderChallengePreview();
+        const beaten = Boolean(this.challengeState.beaten);
+        // A won duel puts the winner where the track poster was.
+        const poster = document.getElementById('challenge-poster');
+        if (poster) poster.hidden = beaten;
+        if (!beaten) this.renderChallengePreview();
+        this.renderChallengeWin(beaten);
+        const wonCta = document.getElementById('challenge-won-cta');
+        if (wonCta) wonCta.hidden = !beaten;
         const message = document.getElementById('challenge-sign-in-message');
         if (message) {
-            message.hidden = !this.challengeState.statusMessage;
+            message.hidden = beaten || !this.challengeState.statusMessage;
             message.textContent = this.challengeState.statusMessage;
         }
         if (this.challengeAcceptBtn) {
+            this.challengeAcceptBtn.hidden = beaten;
             this.challengeAcceptBtn.disabled = !this.challengeState.canAccept;
             setText(
                 this.challengeAcceptBtn.querySelector('.main-menu__label'),
-                this.challengeState.canRace ? 'Accept' : 'Unavailable',
+                this.challengeState.canRace ? 'Start Challenge' : 'Unavailable',
             );
         }
         if (this.mode === 'challenge') this.syncLobbySubheadDetail();

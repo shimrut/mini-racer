@@ -678,6 +678,8 @@ export class ModalContentUi {
         challengeConfirmPhase = null,
         challengeConfirmStatus = null,
         challengeConfirmError = null,
+        challengeViewerAvatarUrl = null,
+        challengeVerdict = null,
         previousPersonalBestSec = undefined,
         deltaToPersonalBest = undefined,
         previousTrackMedal = null,
@@ -711,12 +713,30 @@ export class ModalContentUi {
             challengeConfirmPhase,
             challengeConfirmStatus,
             challengeConfirmError,
+            challengeViewerAvatarUrl,
+            challengeVerdict,
             previousPersonalBestSec,
             previousTrackMedal,
             lapCount,
         });
         
-        if (label2El) {
+        // A duel is settled by the hero — its verdict is the whole story, so the
+        // best-lap stat stays out of it rather than reporting "no lap times yet".
+        const isChallengeHero = Boolean(
+            challengeFinish || challengeConfirmPhase || lapMedal === 'challenge',
+        );
+        const bestLapStatEl = bestLapEl?.closest?.('.stat-floating-item') || null;
+        if (bestLapStatEl) {
+            bestLapStatEl.hidden = isChallengeHero;
+            if (isChallengeHero) {
+                bestLapStatEl.setAttribute('hidden', '');
+                bestLapStatEl.setAttribute('aria-hidden', 'true');
+            } else {
+                bestLapStatEl.removeAttribute('hidden');
+                bestLapStatEl.removeAttribute('aria-hidden');
+            }
+        }
+        if (label2El && !isChallengeHero) {
             label2El.hidden = false;
             label2El.removeAttribute('hidden');
             label2El.removeAttribute('aria-hidden');
