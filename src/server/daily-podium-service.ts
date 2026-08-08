@@ -18,9 +18,12 @@ import {
     writeDailyGpPodiumPendingSnapshot,
 } from './daily-podium-post-store.js';
 import { getRequestAppSlug } from './request-context.js';
+import { cacheSharedJson } from './shared-cache.js';
 
 const EMPTY_FINISH_LABEL = 'No verified finish';
 const PODIUM_RETRY_WINDOW_MS = 6 * 60 * 60 * 1000;
+const SNOOVATAR_CACHE_TTL_SECONDS = 60 * 60;
+const SNOOVATAR_CACHE_KEY_PREFIX = 'mini-racer:snoovatar:v1:';
 const SHORT_MONTH_NAMES = Object.freeze([
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -137,10 +140,18 @@ export function sanitizeDailyGpPodiumForPost(
 }
 
 export async function resolveRedditAvatarUrl(displayName: string): Promise<string | null> {
-    const username = displayName.replace(/^u\//i, '');
+    const username = displayName.trim().replace(/^u\//i, '').trim();
+    const cacheUsername = username.toLowerCase();
+    if (!cacheUsername) return null;
+
     try {
-        const avatarUrl = await reddit.getSnoovatarUrl(username);
-        return isRedditAvatarUrl(avatarUrl) ? avatarUrl : null;
+        return await cacheSharedJson(async () => {
+            const avatarUrl = await reddit.getSnoovatarUrl(username);
+            return isRedditAvatarUrl(avatarUrl) ? avatarUrl : null;
+        }, {
+            key: `${SNOOVATAR_CACHE_KEY_PREFIX}${encodeURIComponent(cacheUsername)}`,
+            ttl: SNOOVATAR_CACHE_TTL_SECONDS,
+        });
     } catch {
         return null;
     }

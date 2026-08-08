@@ -17,6 +17,7 @@ vi.mock('@devvit/redis', () => ({
 
 const {
     CAMPAIGN_GUEST_TTL_SECONDS,
+    createSharedStandingsCacheKey,
     toCampaignCompetition,
     toDailyCompetition,
 } = await import('../src/server/competition.ts');
@@ -130,5 +131,25 @@ describe('toCampaignCompetition', () => {
         });
         expect(competition.ttlSeconds).toBe(CAMPAIGN_GUEST_TTL_SECONDS);
         expect(CAMPAIGN_GUEST_TTL_SECONDS).toBeGreaterThan(7 * 24 * 60 * 60);
+    });
+});
+
+describe('shared standings cache keys', () => {
+    it('separates Daily and Campaign pages by immutable race contract and revision', () => {
+        const daily = toDailyCompetition(dailyChallenge());
+        const campaign = toCampaignCompetition('numbered-v1', campaignStage);
+
+        expect(createSharedStandingsCacheKey(daily, 0, 50, 3)).toBe(
+            'mini-racer:standings-page:v1:daily:daily-gp-2026-07-29:sunlitTemple:laps-1:rules-1:offset-0:limit-50:revision-3',
+        );
+        expect(createSharedStandingsCacheKey(campaign, 0, 50, 3)).not.toBe(
+            createSharedStandingsCacheKey(daily, 0, 50, 3),
+        );
+        expect(createSharedStandingsCacheKey(daily, 50, 50, 3)).not.toBe(
+            createSharedStandingsCacheKey(daily, 0, 50, 3),
+        );
+        expect(createSharedStandingsCacheKey(daily, 0, 50, 4)).not.toBe(
+            createSharedStandingsCacheKey(daily, 0, 50, 3),
+        );
     });
 });

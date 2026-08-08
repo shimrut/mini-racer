@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockReddit, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted(() => ({
+const {
+    mockReddit,
+    mockAutopostStore,
+    mockPostStore,
+    mockContext,
+    mockSharedCache,
+    mockSharedCacheValues,
+} = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
         getPostById: vi.fn(),
@@ -21,12 +28,15 @@ const { mockReddit, mockAutopostStore, mockPostStore, mockContext } = vi.hoisted
         writeDailyGpPodiumPendingSnapshot: vi.fn(),
     },
     mockContext: { getRequestAppSlug: vi.fn() },
+    mockSharedCache: vi.fn(),
+    mockSharedCacheValues: new Map(),
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
 vi.mock('../src/server/daily-podium-autopost-store.js', () => mockAutopostStore);
 vi.mock('../src/server/daily-podium-post-store.js', () => mockPostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
+vi.mock('../src/server/shared-cache.js', () => ({ cacheSharedJson: mockSharedCache }));
 
 const {
     enableDailyPodiumAutopost,
@@ -72,6 +82,7 @@ const podium = {
 describe('daily podium post workflow', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockSharedCacheValues.clear();
         vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-17T00:01:00.000Z'));
         mockPostStore.readDailyGpPodiumPostRecord.mockResolvedValue(null);
         mockPostStore.readDailyGpPodiumPendingSnapshot.mockResolvedValue(null);
@@ -95,6 +106,14 @@ describe('daily podium post workflow', () => {
         mockReddit.getPostsByUser.mockReturnValue({ all: vi.fn(async () => []) });
         mockReddit.getSnoovatarUrl.mockResolvedValue('https://styles.redditmedia.com/avatar.png');
         mockContext.getRequestAppSlug.mockReturnValue('mini-racer');
+        mockSharedCache.mockImplementation(async (source, options) => {
+            if (mockSharedCacheValues.has(options.key)) {
+                return mockSharedCacheValues.get(options.key);
+            }
+            const value = await source();
+            mockSharedCacheValues.set(options.key, value);
+            return value;
+        });
     });
 
     it('enables podium automation while retaining its post history', async () => {
@@ -458,7 +477,55 @@ describe('daily podium post workflow', () => {
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
 
         mockReddit.getSnoovatarUrl.mockResolvedValue('https://evil.com/avatar.png');
-        await expect(resolveRedditAvatarUrl('RaceFan')).resolves.toBeNull();
+        await expect(resolveRedditAvatarUrl('DifferentFan')).resolves.toBeNull();
+    });
+
+    it('uses one normalized shared-cache key for equivalent Snoovatar lookups', async () => {
+        mockReddit.getSnoovatarUrl.mockResolvedValue('https://i.redd.it/avatar.png');
+        await resolveRedditAvatarUrl('  u/RaceFan  ');
+        await resolveRedditAvatarUrl('racefan');
+
+        expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledOnce();
+        expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
+        expect(mockSharedCache).toHaveBeenCalledTimes(2);
+        expect(mockSharedCache.mock.calls.map(([, options]) => options)).toEqual([
+            {
+                key: 'mini-racer:snoovatar:v1:racefan',
+                ttl: 60 * 60,
+            },
+            {
+                key: 'mini-racer:snoovatar:v1:racefan',
+                ttl: 60 * 60,
+            },
+        ]);
+    });
+
+    it('caches valid and absent Snoovatar results while preserving transient-error fallback', async () => {
+        mockReddit.getSnoovatarUrl.mockResolvedValueOnce('https://i.redd.it/avatar.png');
+        await expect(resolveRedditAvatarUrl('RaceFan')).resolves.toBe('https://i.redd.it/avatar.png');
+        await expect(resolveRedditAvatarUrl('racefan')).resolves.toBe('https://i.redd.it/avatar.png');
+
+        mockReddit.getSnoovatarUrl.mockResolvedValueOnce(null);
+        await expect(resolveRedditAvatarUrl('NoAvatar')).resolves.toBeNull();
+        await expect(resolveRedditAvatarUrl('noavatar')).resolves.toBeNull();
+
+        mockReddit.getSnoovatarUrl.mockRejectedValueOnce(new Error('Reddit unavailable'));
+        await expect(resolveRedditAvatarUrl('RetryLater')).resolves.toBeNull();
+        mockReddit.getSnoovatarUrl.mockResolvedValueOnce('https://i.redd.it/retried.png');
+        await expect(resolveRedditAvatarUrl('retrylater')).resolves.toBe(
+            'https://i.redd.it/retried.png',
+        );
+
+        expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledTimes(4);
+        expect(mockSharedCache).toHaveBeenCalledTimes(6);
+        expect(mockSharedCache.mock.calls.map(([, options]) => options.key)).toEqual([
+            'mini-racer:snoovatar:v1:racefan',
+            'mini-racer:snoovatar:v1:racefan',
+            'mini-racer:snoovatar:v1:noavatar',
+            'mini-racer:snoovatar:v1:noavatar',
+            'mini-racer:snoovatar:v1:retrylater',
+            'mini-racer:snoovatar:v1:retrylater',
+        ]);
     });
 
     it('enables podium automation with a fresh enabledAt when no history exists', async () => {
@@ -1082,7 +1149,7 @@ describe('daily podium post workflow', () => {
         expect(isRedditAvatarUrl(undefined)).toBe(false);
     });
 
-    it('strips only a leading u/ prefix when resolving reddit avatars', async () => {
+    it('normalizes a leading u/ prefix while preserving non-prefix text', async () => {
         mockReddit.getSnoovatarUrl.mockResolvedValue('https://i.redd.it/avatar.png');
         await resolveRedditAvatarUrl('prefix/u/RaceFan');
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('prefix/u/RaceFan');

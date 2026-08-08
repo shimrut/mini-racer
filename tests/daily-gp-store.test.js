@@ -202,6 +202,9 @@ class RedisTestDouble {
       zAdd: async (...args) => {
         commands.push(() => this.zAdd(...args));
       },
+      incrBy: async (...args) => {
+        commands.push(() => this.incrBy(...args));
+      },
       expire: async (...args) => {
         commands.push(() => this.expire(...args));
       },

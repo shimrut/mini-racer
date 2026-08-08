@@ -5,7 +5,12 @@ const { mockReddit, mockRedis } = vi.hoisted(() => ({
     mockRedis: { get: vi.fn(), set: vi.fn() },
 }));
 
-vi.mock('@devvit/web/server', () => ({ reddit: mockReddit, redis: mockRedis }));
+vi.mock('@devvit/web/server', () => ({
+    reddit: mockReddit,
+    redis: mockRedis,
+    cache: vi.fn(),
+    context: undefined,
+}));
 vi.mock('../src/server/daily-podium-autopost-store.js', () => ({
     readDailyPodiumAutopostSubscription: vi.fn(),
     upsertDailyPodiumAutopostSubscription: vi.fn(),

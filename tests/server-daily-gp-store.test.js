@@ -84,6 +84,9 @@ function createMockTransaction(options = {}) {
             hasLeaderboardWrite = true;
             commands.push(() => mockRedis.zAdd(...args));
         }),
+        incrBy: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.incrBy(...args));
+        }),
         expire: vi.fn(async (...args) => {
             commands.push(() => mockRedis.expire(...args));
         }),
@@ -3555,6 +3558,9 @@ describe('server daily gp store submissions', () => {
             const challenge = await getServerDailyGpChallenge();
             mockRedis.incrBy
                 .mockResolvedValueOnce(1)
+                // An improved entry advances its separate standings revision
+                // inside the same Redis transaction.
+                .mockResolvedValueOnce(1)
                 .mockResolvedValueOnce(2);
             mockRedis.expire.mockClear();
 
@@ -3574,7 +3580,7 @@ describe('server daily gp store submissions', () => {
             expect(first.status).toBe(200);
             expect(second.status).toBe(200);
             const rateLimitExpires = mockRedis.expire.mock.calls.filter(([key]) => (
-                String(key).includes('rate-limit')
+                String(key).startsWith('dailygp:submit-rate-limit:')
             ));
             expect(rateLimitExpires).toHaveLength(1);
         });
