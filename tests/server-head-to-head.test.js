@@ -73,7 +73,11 @@ const reddit = {
 };
 
 vi.mock('@devvit/redis', () => ({ redis }));
-vi.mock('@devvit/web/server', () => ({ reddit }));
+vi.mock('@devvit/web/server', () => ({
+    reddit,
+    cache: vi.fn(),
+    context: undefined,
+}));
 
 const {
     createHeadToHeadService,

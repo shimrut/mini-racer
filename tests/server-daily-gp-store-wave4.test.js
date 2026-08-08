@@ -113,15 +113,6 @@ describe('server daily gp store wave4', () => {
         mockVerifyGuestPlayerToken.mockResolvedValue(null);
     });
 
-    it('caps community totals at one million members (L387-L391)', async () => {
-        const { normalizeCommunityMemberTotal } = await import('../src/server/daily-gp-store.ts');
-
-        expect(normalizeCommunityMemberTotal(1_000_000)).toBe(1_000_000);
-        expect(normalizeCommunityMemberTotal(1_000_000.9)).toBe(1_000_000);
-        expect(normalizeCommunityMemberTotal(1_000_001)).toBe(1_000_000);
-        expect(normalizeCommunityMemberTotal('2500000')).toBe(1_000_000);
-    });
-
     it('rejects stored challenges when any schedule timestamp is non-finite (L157-L159)', async () => {
         const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
         const base = {

@@ -84,6 +84,9 @@ function createMockTransaction(options = {}) {
             hasLeaderboardWrite = true;
             commands.push(() => mockRedis.zAdd(...args));
         }),
+        incrBy: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.incrBy(...args));
+        }),
         expire: vi.fn(async (...args) => {
             commands.push(() => mockRedis.expire(...args));
         }),
@@ -1062,7 +1065,6 @@ describe('server daily gp store submissions', () => {
         const snapshot = await getServerDailyGpSnapshot({
             challengeId: challenge.id,
             playerId: 'browser-player-id',
-            communityMemberTotal: 1,
         });
 
         expect(snapshot.topRows).toEqual([]);
@@ -1105,6 +1107,7 @@ describe('server daily gp store submissions', () => {
             pageLimit: 50,
             hasMore: true,
             nextOffset: 150,
+            totalCount: 180,
             leaderboardEntryCount: 180,
         });
     });
@@ -1581,28 +1584,6 @@ describe('server daily gp store submissions', () => {
     });
 
     describe('snapshot numeric normalization', () => {
-        it.each([
-            [0, 0],
-            [-5, 0],
-            ['not-a-number', 0],
-            [Number.NaN, 0],
-            [0.4, 0],
-            [1, 1],
-            [1.9, 1],
-            [1_000_000, 1_000_000],
-            [2_000_000, 1_000_000],
-        ])('normalizes communityMemberTotal %j into totalCount %j', async (input, expectedTotalCount) => {
-            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
-            const challenge = await getServerDailyGpChallenge();
-
-            const snapshot = await getServerDailyGpSnapshot({
-                challengeId: challenge.id,
-                communityMemberTotal: input,
-            });
-
-            expect(snapshot.totalCount).toBe(expectedTotalCount);
-        });
-
         it.each([
             [undefined, 10],
             ['not-a-number', 10],
@@ -2441,7 +2422,7 @@ describe('server daily gp store submissions', () => {
             });
         }
 
-        it('returns an empty snapshot when the leaderboard and community floor are both zero', async () => {
+        it('returns an empty snapshot when the leaderboard is zero', async () => {
             const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
             const challenge = await getServerDailyGpChallenge();
             mockRedis.zCard.mockResolvedValue(0);
@@ -2460,21 +2441,6 @@ describe('server daily gp store submissions', () => {
                 nextOffset: null,
                 objectiveType: challenge.objectiveType,
             });
-        });
-
-        it('uses the community floor as totalCount when the timed leaderboard is empty', async () => {
-            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
-            const challenge = await getServerDailyGpChallenge();
-            mockRedis.zCard.mockResolvedValue(0);
-
-            const snapshot = await getServerDailyGpSnapshot({
-                challengeId: challenge.id,
-                communityMemberTotal: 250,
-            });
-
-            expect(snapshot.totalCount).toBe(250);
-            expect(snapshot.leaderboardEntryCount).toBe(0);
-            expect(snapshot.topRows).toEqual([]);
         });
 
         it('returns the active challenge objective when a requested challenge is not playable', async () => {
@@ -3477,30 +3443,6 @@ describe('server daily gp store submissions', () => {
             expect(snapshot.topRows).toEqual([]);
         });
 
-        it('uses the community floor even when the leaderboard already has more entries', async () => {
-            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
-            const challenge = await getServerDailyGpChallenge();
-            mockRedis.zCard.mockResolvedValue(3);
-            mockRedis.zRange.mockResolvedValue([
-                { member: 'reddit:a', score: 1000 },
-                { member: 'reddit:b', score: 2000 },
-                { member: 'reddit:c', score: 3000 },
-            ]);
-            mockRedis.hMGet.mockResolvedValue([
-                JSON.stringify({ playerId: 'reddit:a', trackKey: challenge.trackKey, bestTimeMs: 1000, updatedAt: '2026-01-01T00:00:00.000Z' }),
-                JSON.stringify({ playerId: 'reddit:b', trackKey: challenge.trackKey, bestTimeMs: 2000, updatedAt: '2026-01-01T00:00:00.000Z' }),
-                JSON.stringify({ playerId: 'reddit:c', trackKey: challenge.trackKey, bestTimeMs: 3000, updatedAt: '2026-01-01T00:00:00.000Z' }),
-            ]);
-
-            const snapshot = await getServerDailyGpSnapshot({
-                challengeId: challenge.id,
-                communityMemberTotal: 500,
-            });
-
-            expect(snapshot.totalCount).toBe(500);
-            expect(snapshot.leaderboardEntryCount).toBe(3);
-        });
-
         it('returns null for getServerDailyGpChallengeById when challengeId is empty', async () => {
             const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
 
@@ -3616,6 +3558,9 @@ describe('server daily gp store submissions', () => {
             const challenge = await getServerDailyGpChallenge();
             mockRedis.incrBy
                 .mockResolvedValueOnce(1)
+                // An improved entry advances its separate standings revision
+                // inside the same Redis transaction.
+                .mockResolvedValueOnce(1)
                 .mockResolvedValueOnce(2);
             mockRedis.expire.mockClear();
 
@@ -3635,7 +3580,7 @@ describe('server daily gp store submissions', () => {
             expect(first.status).toBe(200);
             expect(second.status).toBe(200);
             const rateLimitExpires = mockRedis.expire.mock.calls.filter(([key]) => (
-                String(key).includes('rate-limit')
+                String(key).startsWith('dailygp:submit-rate-limit:')
             ));
             expect(rateLimitExpires).toHaveLength(1);
         });

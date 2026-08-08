@@ -82,15 +82,6 @@ describe('server daily gp store wave5', () => {
         }))).toBeNull();
     });
 
-    it('returns null for non-finite community totals (L387-L391)', async () => {
-        const { normalizeCommunityMemberTotal } = await import('../src/server/daily-gp-store.ts');
-
-        expect(normalizeCommunityMemberTotal(-1)).toBeNull();
-        expect(normalizeCommunityMemberTotal('not-a-number')).toBeNull();
-        expect(normalizeCommunityMemberTotal(Number.NaN)).toBeNull();
-        expect(normalizeCommunityMemberTotal(42)).toBe(42);
-    });
-
     it('preserves strict-replay metadata on stored leaderboard entries (L450-L455)', async () => {
         const { parseStoredEntry } = await import('../src/server/daily-gp-store.ts');
         const base = {

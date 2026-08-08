@@ -194,10 +194,8 @@ export function applyCombinedRankValue({
         rankValueEl.textContent = rankText;
     }
 
-    // The racers who actually posted a time, never `totalCount` — that carries
-    // Daily's community floor and would report the whole subreddit. `??` keeps
-    // a real 0 meaning "no racers" while still reading older payloads that
-    // only ever sent `totalCount`.
+    // Prefer the accepted racer count. `??` keeps a real 0 meaning "no racers"
+    // while still reading older Daily payloads that only ever sent `totalCount`.
     const totalRaw = Number(
         scoreboardSnapshot?.leaderboardEntryCount ?? scoreboardSnapshot?.totalCount,
     );
@@ -232,7 +230,7 @@ export function getCombinedRankNumber(scoreboardSnapshot) {
     return null;
 }
 
-/** Rank line for the race-complete combined header: "3 out of 120" when totalCount is known. */
+/** Rank line for the race-complete combined header when the racer count is known. */
 export function formatCombinedRankOutOf(scoreboardSnapshot) {
     if (!scoreboardSnapshot || typeof scoreboardSnapshot !== 'object') return '--';
     if (scoreboardSnapshot.isLoading) return '--';

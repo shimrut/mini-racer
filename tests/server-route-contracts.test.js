@@ -280,7 +280,6 @@ describe('server route contracts', () => {
             getRequestUsername: () => 'pm-user',
             getRequestRateLimitIdentity: () => 'request-id',
             getPostBoundDailyGpChallenge: vi.fn(async () => null),
-            getCommunityMemberTotalForLeaderboard: vi.fn(async () => 100),
             getServerDailyGpChallenge: vi.fn(async () => activeChallenge),
             getServerDailyGpPlaylist: vi.fn(async () => []),
             getServerDailyGpSnapshot: vi.fn(),
@@ -342,7 +341,6 @@ describe('server route contracts', () => {
             getRequestUsername: () => 'RaceFan',
             getRequestRateLimitIdentity: () => 'request-id',
             getPostBoundDailyGpChallenge: vi.fn(async () => postChallenge),
-            getCommunityMemberTotalForLeaderboard: vi.fn(async () => 321),
             getServerDailyGpChallenge: vi.fn(async () => activeChallenge),
             getServerDailyGpPlaylist: vi.fn(async () => [activeChallenge, postChallenge]),
             getServerDailyGpSnapshot,
@@ -373,7 +371,6 @@ describe('server route contracts', () => {
             redditUsername: 'RaceFan',
             limit: 50,
             offset: 100,
-            communityMemberTotal: 321,
         });
 
         const scoreboardSnapshot = await fetch(

@@ -159,8 +159,8 @@ describe('ui modal content helpers', () => {
             playerRankLabel: null,
         }, 'daily', 'circuit');
 
-        // Nobody has posted a time, so the board is empty rather than padded
-        // out to the 5 community members with placeholder rows.
+        // Nobody has posted a time, so the board is empty even for an older
+        // payload whose totalCount was padded beyond the accepted entries.
         expect(container.querySelectorAll('.combined-row-rank')).toHaveLength(0);
         expect(container.textContent).toContain('No scores recorded yet.');
         expect(container.textContent).not.toContain('You');
@@ -176,8 +176,8 @@ describe('ui modal content helpers', () => {
         const container = dom.window.document.getElementById('leaderboard');
         const component = new ModalContentUi();
 
-        // `totalCount` is padded by the subreddit member floor. Only the 2
-        // racers with times get rows; the other 3 members are not the board's
+        // An older payload may have a padded `totalCount`. Only the 2 racers
+        // with accepted times get rows; the other slots are not the board's
         // business.
         component.renderScoreboardList(container, {
             topRows: [
@@ -416,8 +416,8 @@ describe('ui modal content helpers', () => {
         const container = dom.window.document.getElementById('combined');
         const component = new ModalContentUi();
 
-        // `totalCount` is padded by the subreddit member floor, so ranking "of
-        // 40" out of 3 actual racers is the bug this pins shut.
+        // An older payload may have a padded `totalCount`; ranking "of 40" out
+        // of 3 actual racers is the bug this pins shut.
         component.renderCombinedResults(container, {
             time: 12.34,
             bestLap: 12.34,

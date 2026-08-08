@@ -250,39 +250,6 @@ describe('server daily gp store wave 2', () => {
         expect(challenge.trackKey).toBe(TRACK_SCHEDULE_KEYS[0]);
     });
 
-    it('uses community totals only when they are at least one', async () => {
-        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
-        const challenge = await getServerDailyGpChallenge();
-        mockRedis.zCard.mockResolvedValue(0);
-        mockRedis.zRange.mockResolvedValue([]);
-
-        const rejected = await getServerDailyGpSnapshot({
-            challengeId: challenge.id,
-            communityMemberTotal: 0,
-        });
-        const accepted = await getServerDailyGpSnapshot({
-            challengeId: challenge.id,
-            communityMemberTotal: 1,
-        });
-
-        expect(rejected.totalCount).toBe(0);
-        expect(accepted.totalCount).toBe(1);
-    });
-
-    it('treats communityMemberTotal string values as numbers when positive', async () => {
-        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
-        const challenge = await getServerDailyGpChallenge();
-        mockRedis.zCard.mockResolvedValue(3);
-
-        const snapshot = await getServerDailyGpSnapshot({
-            challengeId: challenge.id,
-            communityMemberTotal: '12',
-        });
-
-        expect(snapshot.totalCount).toBe(12);
-        expect(snapshot.leaderboardEntryCount).toBe(3);
-    });
-
     it('returns hasMore false when the page exactly fills the leaderboard', async () => {
         const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();

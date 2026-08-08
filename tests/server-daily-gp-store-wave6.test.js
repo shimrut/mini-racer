@@ -125,15 +125,6 @@ describe('server daily gp store wave6', () => {
         }))).toBeNull();
     });
 
-    it('accepts community totals at the lower bound of one member (L387-L391)', async () => {
-        const { normalizeCommunityMemberTotal } = await import('../src/server/daily-gp-store.ts');
-
-        expect(normalizeCommunityMemberTotal(1)).toBe(1);
-        expect(normalizeCommunityMemberTotal('1')).toBe(1);
-        expect(normalizeCommunityMemberTotal(0)).toBeNull();
-        expect(normalizeCommunityMemberTotal(0.9)).toBeNull();
-    });
-
     it('rejects stored entries missing required player fields (L418-L425)', async () => {
         const { parseStoredEntry } = await import('../src/server/daily-gp-store.ts');
 
@@ -228,33 +219,6 @@ describe('server daily gp store wave6', () => {
         expect(podium?.positions[1].formattedTime).toBeNull();
     });
 
-    it('uses the community floor when it exceeds the leaderboard entry count (L1384-L1387)', async () => {
-        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
-        const challenge = await getServerDailyGpChallenge();
-        mockRedis.zCard.mockResolvedValueOnce(3);
-        mockRedis.zRange.mockResolvedValueOnce([
-            { member: 'reddit:one', score: 10000 },
-            { member: 'reddit:two', score: 11000 },
-            { member: 'reddit:three', score: 12000 },
-        ]);
-        mockRedis.hMGet.mockResolvedValueOnce([
-            JSON.stringify(buildStoredEntry({ playerId: 'reddit:one', bestTimeMs: 10000 })),
-            JSON.stringify(buildStoredEntry({ playerId: 'reddit:two', bestTimeMs: 11000 })),
-            JSON.stringify(buildStoredEntry({ playerId: 'reddit:three', bestTimeMs: 12000 })),
-        ]);
-        mockRedis.mGet.mockResolvedValue([]);
-
-        const snapshot = await getServerDailyGpSnapshot({
-            challengeId: challenge.id,
-            communityMemberTotal: 500,
-            limit: 10,
-            offset: 0,
-        });
-
-        expect(snapshot.totalCount).toBe(500);
-        expect(snapshot.leaderboardEntryCount).toBe(3);
-    });
-
     it('returns empty nearby rows when the player is already in the top page (L1427-L1430)', async () => {
         const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
@@ -268,6 +232,12 @@ describe('server daily gp store wave6', () => {
             playerId: member.member,
             bestTimeMs: 10000 + index,
         }))));
+        // The shared page supplies public rows, while the current player's
+        // authoritative row is re-read live before it is overlaid.
+        mockRedis.hGet.mockResolvedValue(JSON.stringify(buildStoredEntry({
+            playerId: 'reddit:rank-2',
+            bestTimeMs: 10001,
+        })));
         mockRedis.zRank.mockResolvedValueOnce(1);
         mockRedis.mGet.mockResolvedValue([]);
 

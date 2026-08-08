@@ -27,11 +27,40 @@ export type Competition = {
     objectiveType: 'single_lap_fastest' | 'multi_lap_total';
     leaderboardKey: string;
     entryHashKey: string;
+    /** Increments with each improved entry so shared standings pages miss immediately. */
+    standingsRevisionKey: string;
     pbHashKey: string;
     /** null means the competition is permanent and its keys never expire. */
     ttlSeconds: number | null;
     allowGuests: boolean;
 };
+
+const SHARED_STANDINGS_CACHE_VERSION = 'v1';
+
+/**
+ * Only immutable competition contract and the atomically bumped board revision
+ * participate in a shared standings-page key. Viewer identity is deliberately
+ * absent because it is overlaid after the public page is read.
+ */
+export function createSharedStandingsCacheKey(
+    competition: Competition,
+    offset: number,
+    limit: number,
+    revision: number,
+): string {
+    return [
+        'mini-racer:standings-page',
+        SHARED_STANDINGS_CACHE_VERSION,
+        competition.mode,
+        encodeURIComponent(competition.id),
+        encodeURIComponent(competition.trackKey),
+        `laps-${competition.lapCount}`,
+        `rules-${competition.rulesRevision}`,
+        `offset-${offset}`,
+        `limit-${limit}`,
+        `revision-${revision}`,
+    ].join(':');
+}
 
 function normalizeLapCount(value: unknown): DailyGpLapCount {
     return value === 2 || value === 3 ? value : 1;
@@ -56,6 +85,7 @@ export function toDailyCompetition(
         objectiveType: challenge.objectiveType,
         leaderboardKey: createRedisChallengeLeaderboardKey(challenge.id),
         entryHashKey: createRedisChallengeEntryHashKey(challenge.id),
+        standingsRevisionKey: `${createRedisChallengeLeaderboardKey(challenge.id)}:standings-revision`,
         pbHashKey: challengeCollectionKey(challenge.id),
         ttlSeconds: getDailyGpCompetitionTtlSeconds(challenge, now),
         allowGuests: true,
@@ -93,6 +123,7 @@ export function toCampaignCompetition(
         objectiveType: objectiveTypeForLapCount(lapCount),
         leaderboardKey: `campaign:${campaignId}:leaderboard:${stage.raceId}`,
         entryHashKey: `campaign:${campaignId}:leaderboard:${stage.raceId}:entries`,
+        standingsRevisionKey: `campaign:${campaignId}:leaderboard:${stage.raceId}:standings-revision`,
         pbHashKey: `campaign:${campaignId}:pbs:${stage.raceId}`,
         ttlSeconds: isGuest ? CAMPAIGN_GUEST_TTL_SECONDS : null,
         allowGuests: true,

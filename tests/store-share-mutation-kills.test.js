@@ -220,17 +220,6 @@ describe('daily-gp-store mutation kills', () => {
         });
     });
 
-    describe('normalizeCommunityMemberTotal boundaries', () => {
-        it('accepts exactly one member and rejects fractional values below one', async () => {
-            const { normalizeCommunityMemberTotal } = await import('../src/server/daily-gp-store.ts');
-
-            expect(normalizeCommunityMemberTotal(1)).toBe(1);
-            expect(normalizeCommunityMemberTotal('1')).toBe(1);
-            expect(normalizeCommunityMemberTotal(0.99)).toBeNull();
-            expect(normalizeCommunityMemberTotal('0.9')).toBeNull();
-        });
-    });
-
     describe('getServerDailyGpChallengeById input guards', () => {
         it('returns null for non-string and empty challenge ids without touching Redis', async () => {
             const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
@@ -301,26 +290,6 @@ describe('daily-gp-store mutation kills', () => {
             expect(partial.nextOffset).toBe(9);
         });
 
-        it('keeps community totals when the timed leaderboard is empty but the floor is positive', async () => {
-            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
-            const challenge = await getServerDailyGpChallenge();
-            mockRedis.zCard.mockResolvedValue(0);
-
-            const snapshot = await getServerDailyGpSnapshot({
-                challengeId: challenge.id,
-                communityMemberTotal: 42,
-            });
-
-            expect(snapshot).toMatchObject({
-                totalCount: 42,
-                leaderboardEntryCount: 0,
-                topRows: [],
-                nearbyRows: [],
-                objectiveType: challenge.objectiveType,
-                hasMore: false,
-                nextOffset: null,
-            });
-        });
     });
 
     describe('submitServerDailyGpRun improvement guard', () => {

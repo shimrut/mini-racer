@@ -26,7 +26,6 @@ import {
     readContextSubredditName,
 } from './request-context.js';
 import { getPostBoundDailyGpChallenge } from './post-bound-challenge.js';
-import { getCommunityMemberTotalForLeaderboard } from './community-context.js';
 import {
     enableDailyAutopost,
     ensureDailyMiniRacerPostForSubreddit,
@@ -130,7 +129,6 @@ function registerProductionRoutes(app: express.Application): void {
         getRequestUsername,
         getRequestRateLimitIdentity,
         getPostBoundDailyGpChallenge,
-        getCommunityMemberTotalForLeaderboard,
         getServerDailyGpChallenge,
         getServerDailyGpPlaylist,
         getServerDailyGpSnapshot: (input) => getServerDailyGpSnapshot(input),

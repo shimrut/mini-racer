@@ -573,6 +573,10 @@ export async function mergeGuestCampaignProgress({
                 member: redditPlayerId,
                 score: guestEntry.bestTimeMs,
             });
+            // Guest-to-account promotion writes directly to the account's
+            // permanent board, so advance the same generation used by the
+            // shared standings-page cache as part of that promotion.
+            await redis.incrBy(redditCompetition.standingsRevisionKey, 1);
         }
         const guestPb = await redisCompressed.hGet(
             guestCompetition.pbHashKey,

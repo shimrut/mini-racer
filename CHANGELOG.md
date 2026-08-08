@@ -1,5 +1,8 @@
 # Changelog
 
+- Removed the unused subreddit subscriber-count lookup and five-minute Redis
+  cache from leaderboard snapshots. `totalCount` remains in the response for
+  compatibility and now matches the accepted racer count.
 - Fixed Head to Head post entry for guests and signed-in viewers. A ready
   challenge no longer gets a sign-in-only CTA, the post retries once with a
   fresh guest identity when a stored token is stale, and unavailable responses

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 import { TRACKS } from '../game/track/tracks.js';
 import { createTrackFingerprint } from '../src/server/pb-ghost-trace.ts';
 
@@ -51,6 +52,15 @@ const mockRedis = {
 };
 const mockValidateDailyGpReplayDetailed = vi.fn();
 
+function decodeCompressedValue(value) {
+    if (typeof value !== 'string' || !value.startsWith('__gz:b64__:')) return value;
+    try {
+        return gunzipSync(Buffer.from(value.slice('__gz:b64__:'.length), 'base64')).toString('utf8');
+    } catch (_error) {
+        return value;
+    }
+}
+
 /**
  * Display names come from the player profile now, not from a name frozen into
  * the leaderboard row, so a board that should show a name needs a profile.
@@ -79,6 +89,7 @@ function createTransaction() {
         set: vi.fn(async (...args) => commands.push(() => mockRedis.set(...args))),
         hSet: vi.fn(async (...args) => commands.push(() => mockRedis.hSet(...args))),
         zAdd: vi.fn(async (...args) => commands.push(() => mockRedis.zAdd(...args))),
+        incrBy: vi.fn(async (...args) => commands.push(() => mockRedis.incrBy(...args))),
         expire: vi.fn(async (...args) => commands.push(() => mockRedis.expire(...args))),
         exec: vi.fn(async () => {
             const results = [];
@@ -112,7 +123,9 @@ describe('Campaign server store', () => {
             hashes.delete(key);
             return 1;
         });
-        mockRedis.hGet.mockImplementation(async (key, field) => hashes.get(key)?.get(field) ?? null);
+        mockRedis.hGet.mockImplementation(async (key, field) => (
+            decodeCompressedValue(hashes.get(key)?.get(field) ?? null)
+        ));
         mockRedis.hGetAll.mockImplementation(async (key) => Object.fromEntries(hashes.get(key) ?? []));
         mockRedis.hMGet.mockImplementation(async (key, fields) => (
             fields.map((field) => hashes.get(key)?.get(field) ?? null)
@@ -798,11 +811,16 @@ describe('Campaign server store', () => {
             guestToken,
         });
 
+        mockRedis.incrBy.mockClear();
         const merged = await mergeGuestCampaignProgress({
             guestPlayerId: 'guest:guest-merge',
             redditPlayerId: 'reddit:claimed',
         });
         expect(merged).toEqual({ merged: true, mergedRaceIds: ['numbered-v1-00'] });
+        expect(mockRedis.incrBy).toHaveBeenCalledWith(
+            'campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision',
+            1,
+        );
 
         // The account now owns the unlock the guest earned...
         await expect(getServerCampaignBootstrap({ redditUsername: 'Claimed' }))

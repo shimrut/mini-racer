@@ -12,12 +12,15 @@ import {
     type DailyGpLeaderboardEntry,
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
-import type { Competition } from './competition.js';
+import { createSharedStandingsCacheKey, type Competition } from './competition.js';
 import { readPlayerProfileMap } from './competition-identity.js';
 import { getPlayerTrackPbRecord, type PlayerTrackPbRecord } from './pb-ghost-store.js';
 import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
 import { resolveLeaderboardDisplayName } from '../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../game/track/tracks.js';
+import { cacheSharedJson } from './shared-cache.js';
+
+const SHARED_STANDINGS_PAGE_TTL_SECONDS = 10;
 
 export type SnapshotRow = {
     rank: number;
@@ -157,6 +160,15 @@ export async function readRowsByRankRange(
     }
 
     const rankedMembers = await redis.zRange(competition.leaderboardKey, start, stop);
+    return readRowsForRankedMembers(competition, rankedMembers, start, currentPlayerId);
+}
+
+async function readRowsForRankedMembers(
+    competition: Competition,
+    rankedMembers: Array<{ member: string }>,
+    start: number,
+    currentPlayerId: string | null,
+): Promise<SnapshotRow[]> {
     if (!rankedMembers.length) {
         return [];
     }
@@ -213,6 +225,7 @@ export async function writeEntry(
     transaction: {
         hSet(key: string, values: Record<string, string>): Promise<unknown>;
         zAdd(key: string, member: { member: string; score: number }): Promise<unknown>;
+        incrBy(key: string, value: number): Promise<unknown>;
         expire(key: string, seconds: number): Promise<unknown>;
     },
 ): Promise<void> {
@@ -223,9 +236,13 @@ export async function writeEntry(
         member: playerId,
         score: encodeDailyGpLeaderboardScore(entry.bestTimeMs),
     });
+    // This is intentionally in the same transaction as the ranked write: a
+    // snapshot can never use a pre-write cache generation after this succeeds.
+    await transaction.incrBy(competition.standingsRevisionKey, 1);
     if (competition.ttlSeconds != null) {
         await transaction.expire(competition.leaderboardKey, competition.ttlSeconds);
         await transaction.expire(competition.entryHashKey, competition.ttlSeconds);
+        await transaction.expire(competition.standingsRevisionKey, competition.ttlSeconds);
     }
 }
 
@@ -264,64 +281,119 @@ export function createEmptySnapshot(
     };
 }
 
-/**
- * `communityFloor` lets Daily report a rank out of the whole subreddit rather
- * than out of the players who happened to post a time. It is a Daily framing,
- * so Campaign simply omits it.
- */
+type SharedStandingsRow = {
+    playerId: string;
+    row: SnapshotRow;
+};
+
+type SharedStandingsPage = {
+    leaderboardEntryCount: number;
+    rows: SharedStandingsRow[];
+};
+
+function isSharedStandingsPage(value: unknown): value is SharedStandingsPage {
+    if (!value || typeof value !== 'object') return false;
+    const page = value as { leaderboardEntryCount?: unknown; rows?: unknown };
+    if (!Number.isInteger(page.leaderboardEntryCount) || page.leaderboardEntryCount! < 0) {
+        return false;
+    }
+    return Array.isArray(page.rows) && page.rows.every((entry) => {
+        if (!entry || typeof entry !== 'object') return false;
+        const candidate = entry as { playerId?: unknown; row?: unknown };
+        return typeof candidate.playerId === 'string'
+            && Boolean(candidate.playerId)
+            && isSnapshotRow(candidate.row);
+    });
+}
+
+function isSnapshotRow(value: unknown): value is SnapshotRow {
+    if (!value || typeof value !== 'object') return false;
+    const row = value as Partial<SnapshotRow>;
+    return Number.isInteger(row.rank)
+        && typeof row.rankLabel === 'string'
+        && typeof row.displayName === 'string'
+        && Number.isFinite(row.bestTime)
+        && Number.isFinite(row.bestTimeMs)
+        && typeof row.updatedAt === 'string'
+        && typeof row.isCurrentPlayer === 'boolean'
+        && (row.completedLaps === null || row.completedLaps === 1 || row.completedLaps === 2 || row.completedLaps === 3)
+        && (row.checkpointTimesSec === null || (
+            Array.isArray(row.checkpointTimesSec)
+            && row.checkpointTimesSec.every((time) => Number.isFinite(time))
+        ))
+        && typeof row.opponentRaceAvailable === 'boolean';
+}
+
+async function readSharedStandingsPageSource(
+    competition: Competition,
+    offset: number,
+    limit: number,
+): Promise<SharedStandingsPage> {
+    const leaderboardEntryCount = await redis.zCard(competition.leaderboardKey);
+    if (leaderboardEntryCount === 0) {
+        return { leaderboardEntryCount: 0, rows: [] };
+    }
+    const rankedMembers = await redis.zRange(
+        competition.leaderboardKey,
+        offset,
+        offset + limit - 1,
+    );
+    const rows = await readRowsForRankedMembers(competition, rankedMembers, offset, null);
+    return {
+        leaderboardEntryCount,
+        // Redis' sorted-set response is the authority for row ownership. Invalid
+        // stored entries are omitted from rows just as they were before caching.
+        rows: rows.map((row) => ({
+            playerId: rankedMembers[row.rank - offset - 1]?.member ?? '',
+            row: { ...row, isCurrentPlayer: false },
+        })).filter((entry) => Boolean(entry.playerId)),
+    };
+}
+
+async function readSharedStandingsPage(
+    competition: Competition,
+    offset: number,
+    limit: number,
+): Promise<SharedStandingsPage> {
+    const rawRevision = await redis.get(competition.standingsRevisionKey);
+    const revision = Number.isSafeInteger(Number(rawRevision)) && Number(rawRevision) >= 0
+        ? Number(rawRevision)
+        : 0;
+    const cached = await cacheSharedJson(
+        async () => readSharedStandingsPageSource(competition, offset, limit) as never,
+        {
+            key: createSharedStandingsCacheKey(competition, offset, limit, revision),
+            ttl: SHARED_STANDINGS_PAGE_TTL_SECONDS,
+        },
+    );
+    return isSharedStandingsPage(cached)
+        ? cached
+        : readSharedStandingsPageSource(competition, offset, limit);
+}
+
 export async function readSnapshot({
     competition,
     playerId,
     limit,
     offset,
-    communityFloor = null,
 }: {
     competition: Competition;
     playerId: string | null;
     limit: number;
     offset: number;
-    communityFloor?: number | null;
 }): Promise<SnapshotPayload> {
-    const leaderboardEntryCount = await redis.zCard(competition.leaderboardKey);
-    const totalCount = communityFloor != null
-        ? Math.max(leaderboardEntryCount, communityFloor)
-        : leaderboardEntryCount;
+    const sharedPage = await readSharedStandingsPage(competition, offset, limit);
+    const { leaderboardEntryCount } = sharedPage;
+    const totalCount = leaderboardEntryCount;
 
-    if (leaderboardEntryCount === 0 && totalCount === 0) {
+    if (leaderboardEntryCount === 0) {
         return createEmptySnapshot(competition, limit);
     }
 
-    const topRows = leaderboardEntryCount
-        ? await readRowsByRankRange(competition, offset, offset + limit - 1, playerId)
-        : [];
+    let topRows = sharedPage.rows.map(({ row }) => ({ ...row, isCurrentPlayer: false }));
     const playerRank = leaderboardEntryCount
         ? await readPlayerRank(competition, playerId)
         : null;
-
-    const playerInTop = playerId
-        ? topRows.find((row) => row.isCurrentPlayer) || null
-        : null;
-
-    const paging = {
-        pageOffset: offset,
-        pageLimit: limit,
-        hasMore: offset + limit < leaderboardEntryCount,
-        nextOffset: offset + limit < leaderboardEntryCount ? offset + limit : null,
-    };
-
-    if (playerInTop) {
-        return {
-            topRows,
-            nearbyRows: [],
-            currentPlayerRow: { ...playerInTop, isCurrentPlayer: true },
-            totalCount,
-            leaderboardEntryCount,
-            objectiveType: competition.objectiveType,
-            playerRank,
-            playerRankLabel: formatRankLabel(playerRank),
-            ...paging,
-        };
-    }
 
     let currentPlayerRow: SnapshotRow | null = null;
     if (playerId && playerRank) {
@@ -330,7 +402,32 @@ export async function readSnapshot({
             const profileMap = await readPlayerProfileMap([playerId]);
             currentPlayerRow = toSnapshotRow(storedEntry, playerRank, playerId, profileMap);
             currentPlayerRow.isCurrentPlayer = true;
+            const playerRowIndex = sharedPage.rows.findIndex((row) => row.playerId === playerId);
+            if (playerRowIndex >= 0) {
+                topRows[playerRowIndex] = { ...currentPlayerRow };
+            }
         }
+    }
+
+    const paging = {
+        pageOffset: offset,
+        pageLimit: limit,
+        hasMore: offset + limit < leaderboardEntryCount,
+        nextOffset: offset + limit < leaderboardEntryCount ? offset + limit : null,
+    };
+
+    if (currentPlayerRow && sharedPage.rows.some((row) => row.playerId === playerId)) {
+        return {
+            topRows,
+            nearbyRows: [],
+            currentPlayerRow,
+            totalCount,
+            leaderboardEntryCount,
+            objectiveType: competition.objectiveType,
+            playerRank,
+            playerRankLabel: formatRankLabel(playerRank),
+            ...paging,
+        };
     }
 
     let nearbyRows: SnapshotRow[] = [];
