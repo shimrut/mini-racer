@@ -101,7 +101,9 @@
       "Bash(git merge *)",
       "Bash(node --check game/race/result-flow.js)",
       "Bash(npx jest *)",
-      "Bash(node -e \"const r=require\\('./unused-css-report.json'\\); for \\(const [k,v] of Object.entries\\(r\\)\\) { console.log\\(k, JSON.stringify\\(v.unusedClasses ?? v.unused ?? [], null, 1\\)\\); }\")"
+      "Bash(node -e \"const r=require\\('./unused-css-report.json'\\); for \\(const [k,v] of Object.entries\\(r\\)\\) { console.log\\(k, JSON.stringify\\(v.unusedClasses ?? v.unused ?? [], null, 1\\)\\); }\")",
+      "Bash(git restore *)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.local.json','utf8'\\)\\); console.log\\('valid JSON'\\)\")"
     ]
   }
 }
