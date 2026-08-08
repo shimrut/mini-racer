@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-    normalizeCommunityMemberTotal,
     normalizeLimit,
     normalizeOffset,
     normalizePlayerPreferences,
@@ -248,20 +247,6 @@ describe('wave7 store parse helpers — direct coercion', () => {
         }))).toMatchObject({
             preferences: null,
         });
-    });
-
-    it('normalizeCommunityMemberTotal rejects sub-one values and caps large totals', () => {
-        expect(normalizeCommunityMemberTotal(null)).toBeNull();
-        expect(normalizeCommunityMemberTotal(undefined)).toBeNull();
-        expect(normalizeCommunityMemberTotal(NaN)).toBeNull();
-        expect(normalizeCommunityMemberTotal(Infinity)).toBeNull();
-        expect(normalizeCommunityMemberTotal(0)).toBeNull();
-        expect(normalizeCommunityMemberTotal(-1)).toBeNull();
-        expect(normalizeCommunityMemberTotal('0.5')).toBeNull();
-        expect(normalizeCommunityMemberTotal(1)).toBe(1);
-        expect(normalizeCommunityMemberTotal('42')).toBe(42);
-        expect(normalizeCommunityMemberTotal(1_000_000.9)).toBe(1_000_000);
-        expect(normalizeCommunityMemberTotal(2_000_000)).toBe(1_000_000);
     });
 
     it('normalizeLimit and normalizeOffset clamp pagination inputs', () => {

@@ -29,7 +29,6 @@ vi.mock('../src/server/replay-validator.js', () => ({
 }));
 
 const {
-    normalizeCommunityMemberTotal,
     parseStoredChallenge,
     parseStoredEntry,
     parseStoredPlayerProfile,
@@ -184,14 +183,4 @@ describe('daily-gp-store parse boundaries', () => {
         });
     });
 
-    describe('normalizeCommunityMemberTotal', () => {
-        it('accepts numeric strings and rejects non-positive values', () => {
-            expect(normalizeCommunityMemberTotal('12')).toBe(12);
-            expect(normalizeCommunityMemberTotal('12.9')).toBe(12);
-            expect(normalizeCommunityMemberTotal('abc')).toBeNull();
-            expect(normalizeCommunityMemberTotal(0)).toBeNull();
-            expect(normalizeCommunityMemberTotal(-1)).toBeNull();
-            expect(normalizeCommunityMemberTotal(2_000_000)).toBe(1_000_000);
-        });
-    });
 });

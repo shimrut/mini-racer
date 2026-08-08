@@ -403,14 +403,6 @@ export async function persistServerDailyGpChallenge(
     return reread ?? challenge;
 }
 
-export function normalizeCommunityMemberTotal(value: unknown): number | null {
-    const n = typeof value === 'number' ? value : Number(value);
-    if (!Number.isFinite(n) || n < 1) {
-        return null;
-    }
-    return Math.min(Math.trunc(n), 1_000_000);
-}
-
 export function normalizeLimit(limit: unknown): number {
     if (!Number.isFinite(limit)) {
         return DAILY_GP_DEFAULT_LIMIT;
@@ -1005,7 +997,6 @@ export async function getServerDailyGpSnapshot({
     guestToken,
     limit = DAILY_GP_DEFAULT_LIMIT,
     offset = 0,
-    communityMemberTotal,
 }: {
     challengeId?: string | null;
     playerId?: string | null;
@@ -1014,8 +1005,6 @@ export async function getServerDailyGpSnapshot({
     guestToken?: unknown;
     limit?: unknown;
     offset?: unknown;
-    /** Subreddit subscriber count (or similar) for rank denominator and unfilled leaderboard slots. */
-    communityMemberTotal?: unknown;
 } = {}): Promise<SnapshotPayload> {
     const activeChallenge = await getServerDailyGpChallenge();
     const challenge = challengeId
@@ -1045,7 +1034,6 @@ export async function getServerDailyGpSnapshot({
         playerId: normalizedPlayerId,
         limit: normalizeLimit(limit),
         offset: normalizeOffset(offset),
-        communityFloor: normalizeCommunityMemberTotal(communityMemberTotal),
     });
 }
 

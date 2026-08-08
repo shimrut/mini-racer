@@ -10,7 +10,6 @@ export type CompetitionRouteDependencies = {
     getRequestUsername(): string | null;
     getRequestRateLimitIdentity(): string | null;
     getPostBoundDailyGpChallenge(): Promise<DailyGpChallenge | null>;
-    getCommunityMemberTotalForLeaderboard(): Promise<number | undefined>;
     getServerDailyGpChallenge(): Promise<DailyGpChallenge>;
     getServerDailyGpPlaylist(): Promise<DailyGpChallenge[]>;
     getServerDailyGpSnapshot(input: Record<string, unknown>): Promise<unknown>;
@@ -52,7 +51,6 @@ export function registerCompetitionRoutes(
                 return;
             }
 
-            const communityMemberTotal = await dependencies.getCommunityMemberTotalForLeaderboard();
             const snapshot = await dependencies.getServerDailyGpSnapshot({
                 challengeId: challenge.id,
                 playerId,
@@ -60,7 +58,6 @@ export function registerCompetitionRoutes(
                 redditUsername: dependencies.getRequestUsername(),
                 limit: parseOptionalInteger(limit),
                 offset: parseOptionalInteger(offset),
-                communityMemberTotal,
             });
             res.status(200).json(snapshot);
         } catch (error) {
@@ -96,7 +93,6 @@ export function registerCompetitionRoutes(
     app.get('/api/daily/snapshot', async (req, res) => {
         try {
             const { challengeId, playerId, guestToken, limit, offset } = req.query ?? {};
-            const communityMemberTotal = await dependencies.getCommunityMemberTotalForLeaderboard();
             const snapshot = await dependencies.getServerDailyGpSnapshot({
                 challengeId,
                 playerId,
@@ -104,7 +100,6 @@ export function registerCompetitionRoutes(
                 redditUsername: dependencies.getRequestUsername(),
                 limit: parseOptionalInteger(limit),
                 offset: parseOptionalInteger(offset),
-                communityMemberTotal,
             });
             res.status(200).json(snapshot);
         } catch (error) {

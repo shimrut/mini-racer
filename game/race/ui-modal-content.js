@@ -462,9 +462,9 @@ export class ModalContentUi {
     const objectiveType = typeof scoreboardSnapshot?.objectiveType === 'string'
         ? scoreboardSnapshot.objectiveType
         : null;
-    // Only racers who actually posted a time reach this list. `totalCount` is
-    // padded by Daily's subreddit member floor, so it is a fallback for old
-    // payloads that lack an entry count, never a row count to render up to.
+    // Only racers who actually posted a time reach this list. Keep `totalCount`
+    // as a fallback for older Daily payloads that lack an entry count; it is
+    // never a row count to render up to.
     const rawEntry = scoreboardSnapshot?.leaderboardEntryCount;
     const leaderboardEntryCount = rawEntry != null && Number.isFinite(Number(rawEntry))
         ? Math.max(0, Math.trunc(Number(rawEntry)))

@@ -264,30 +264,21 @@ export function createEmptySnapshot(
     };
 }
 
-/**
- * `communityFloor` lets Daily report a rank out of the whole subreddit rather
- * than out of the players who happened to post a time. It is a Daily framing,
- * so Campaign simply omits it.
- */
 export async function readSnapshot({
     competition,
     playerId,
     limit,
     offset,
-    communityFloor = null,
 }: {
     competition: Competition;
     playerId: string | null;
     limit: number;
     offset: number;
-    communityFloor?: number | null;
 }): Promise<SnapshotPayload> {
     const leaderboardEntryCount = await redis.zCard(competition.leaderboardKey);
-    const totalCount = communityFloor != null
-        ? Math.max(leaderboardEntryCount, communityFloor)
-        : leaderboardEntryCount;
+    const totalCount = leaderboardEntryCount;
 
-    if (leaderboardEntryCount === 0 && totalCount === 0) {
+    if (leaderboardEntryCount === 0) {
         return createEmptySnapshot(competition, limit);
     }
 

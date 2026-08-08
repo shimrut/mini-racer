@@ -19,11 +19,6 @@ export function getRequestAppSlug(): string | null {
     return typeof appSlug === 'string' && appSlug.trim() ? appSlug.trim() : null;
 }
 
-export function readContextSubredditId(): string | null {
-    const id = (context as { subredditId?: unknown }).subredditId;
-    return typeof id === 'string' && id.startsWith('t5_') ? id : null;
-}
-
 export function readContextSubredditName(): string | null {
     const name = (context as { subredditName?: unknown }).subredditName;
     return typeof name === 'string' && name.trim() ? name.trim() : null;
