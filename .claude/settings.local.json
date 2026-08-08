@@ -98,7 +98,10 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8000/head-to-head.html)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8000/head-to-head.html)",
       "Bash(git reset *)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(node --check game/race/result-flow.js)",
+      "Bash(npx jest *)",
+      "Bash(node -e \"const r=require\\('./unused-css-report.json'\\); for \\(const [k,v] of Object.entries\\(r\\)\\) { console.log\\(k, JSON.stringify\\(v.unusedClasses ?? v.unused ?? [], null, 1\\)\\); }\")"
     ]
   }
 }
