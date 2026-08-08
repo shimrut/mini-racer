@@ -68,7 +68,9 @@ export function deriveLapCompletionTimesSecFromGhost(record, track, lapCount) {
 }
 
 export function createPersonalBestPaceBaseline(record, track, lapCount) {
-  const finishTimeSec = Number(record?.bestTimeMs) / 1000;
+  const finishTimeSec = Number.isFinite(record?.finishTimeSec)
+    ? record.finishTimeSec
+    : Number(record?.bestTimeMs) / 1000;
   if (!Number.isFinite(finishTimeSec) || finishTimeSec <= 0) return null;
 
   const checkpointTimesSec = normalizeCheckpointTimesSec(
