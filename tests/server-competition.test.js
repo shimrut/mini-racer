@@ -125,11 +125,13 @@ describe('toCampaignCompetition', () => {
         expect(competition.ttlSeconds).toBeNull();
     });
 
-    it('gives a guest a long window so unlocks outlive the guest profile', () => {
+    it('keeps shared guest collections permanent and records per-player retention', () => {
         const competition = toCampaignCompetition('numbered-v1', campaignStage, {
             playerId: 'guest:abc123',
         });
-        expect(competition.ttlSeconds).toBe(CAMPAIGN_GUEST_TTL_SECONDS);
+        expect(competition.ttlSeconds).toBeNull();
+        expect(competition.guestExpiryKey).toBe('campaign:numbered-v1:guest-expiry');
+        expect(competition.guestRetentionSeconds).toBe(CAMPAIGN_GUEST_TTL_SECONDS);
         expect(CAMPAIGN_GUEST_TTL_SECONDS).toBeGreaterThan(7 * 24 * 60 * 60);
     });
 });

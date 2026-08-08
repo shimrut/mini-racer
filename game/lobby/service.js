@@ -233,6 +233,8 @@ export function normalizeChallengeLobbyState(state = {}) {
         : 'A racer';
     // A spent duel stops offering Accept and becomes the win's landing screen.
     const beaten = state.outcome === 'won';
+    const canRetry = Boolean(state.canRetry) && !beaten;
+    const challengeLoading = Boolean(state.challengeLoading);
     const bestTimeMs = toFiniteNumber(state.bestTimeMs);
     const gapMs = beaten && bestTimeMs !== null && available
         ? Math.round(bestTimeMs) - Math.round(targetTimeMs)
@@ -248,7 +250,9 @@ export function normalizeChallengeLobbyState(state = {}) {
         gapMs,
         gapLabel: formatLobbyGap(gapMs),
         winMarginLabel: gapMs === null ? null : formatLobbyGap(gapMs).slice(1),
-        canAccept: canRace && available && !beaten,
+        canAccept: canRace && available && !beaten && !challengeLoading,
+        canRetry,
+        challengeLoading,
         challengerName,
         trackKey: typeof state.trackKey === 'string' && state.trackKey.trim()
             ? state.trackKey.trim()
@@ -267,8 +271,10 @@ export function normalizeChallengeLobbyState(state = {}) {
             : null,
         challengerAvatarUrl: normalizeAvatarUrl(state.challengerAvatarUrl),
         viewerAvatarUrl: normalizeAvatarUrl(state.viewerAvatarUrl),
-        statusMessage: !available
-            ? 'This challenge is unavailable.'
-            : (!canRace ? 'This challenge is unavailable right now.' : ''),
+        statusMessage: typeof state.statusMessage === 'string' && state.statusMessage.trim()
+            ? state.statusMessage.trim()
+            : (!available
+                ? 'This challenge is unavailable.'
+                : (!canRace ? 'This challenge is unavailable right now.' : '')),
     };
 }

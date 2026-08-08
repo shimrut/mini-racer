@@ -85,6 +85,7 @@ export class LobbyUi {
         onStartDaily = null,
         onStartCampaign = null,
         onAcceptChallenge = null,
+        onRetryChallenge = null,
         onRenderChallengePreview = null,
     } = {}) {
         this.onSelectDaily = onSelectDaily;
@@ -95,6 +96,7 @@ export class LobbyUi {
         this.onStartDaily = onStartDaily;
         this.onStartCampaign = onStartCampaign;
         this.onAcceptChallenge = onAcceptChallenge;
+        this.onRetryChallenge = onRetryChallenge;
         this.onRenderChallengePreview = onRenderChallengePreview;
         this.mode = 'home';
         this.campaignState = normalizeCampaignLobbyState();
@@ -147,6 +149,11 @@ export class LobbyUi {
             this.onStartCampaign?.();
         });
         this.challengeAcceptBtn?.addEventListener('click', () => {
+            if (this.challengeState.canRetry) {
+                if (this.challengeState.challengeLoading) return;
+                this.onRetryChallenge?.(this.challengeState);
+                return;
+            }
             if (!this.challengeState.canAccept) return;
             this.onAcceptChallenge?.(this.challengeState);
         });
@@ -597,10 +604,19 @@ export class LobbyUi {
         }
         if (this.challengeAcceptBtn) {
             this.challengeAcceptBtn.hidden = beaten;
-            this.challengeAcceptBtn.disabled = !this.challengeState.canAccept;
+            this.challengeAcceptBtn.disabled = (
+                !this.challengeState.canAccept
+                && !this.challengeState.canRetry
+            ) || this.challengeState.challengeLoading;
             setText(
                 this.challengeAcceptBtn.querySelector('.main-menu__label'),
-                this.challengeState.canRace ? 'Start Challenge' : 'Unavailable',
+                this.challengeState.challengeLoading
+                    ? 'Loading…'
+                    : this.challengeState.canRetry
+                        ? 'Retry'
+                        : this.challengeState.canRace
+                            ? 'Start Challenge'
+                            : 'Unavailable',
             );
         }
         if (this.mode === 'challenge') this.syncLobbySubheadDetail();

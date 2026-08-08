@@ -27,7 +27,7 @@ function rateLimitKey(competition: Competition, identity: string): string {
     return `${competition.mode === 'daily' ? 'dailygp' : 'campaign'}:submit-rate-limit:${competition.id}:${identity}`;
 }
 
-function lockKey(competition: Competition, playerId: string): string {
+export function competitionSubmissionLockKey(competition: Competition, playerId: string): string {
     return `${competition.mode === 'daily' ? 'dailygp' : 'campaign'}:submit-lock:${competition.id}:${playerId}`;
 }
 
@@ -148,7 +148,7 @@ export async function submitCompetitionRun({
     ) ?? strictReplayOutcome.run.checkpointTimesSec ?? null;
 
     const submissionLock = await acquireRedisLock(
-        lockKey(competition, playerId),
+        competitionSubmissionLockKey(competition, playerId),
         SUBMISSION_LOCK_TTL_MS,
         redis,
     );

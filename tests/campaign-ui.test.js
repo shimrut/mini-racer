@@ -1965,6 +1965,125 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(requestCount);
     });
 
+    it('loads the visible Campaign lobby with exactly one forced bootstrap request', async () => {
+        campaignServiceMocks.getCampaignBootstrap.mockResolvedValue({
+            availability: 'available',
+            authoritative: true,
+            campaignId: 'numbered-v1',
+            ranked: true,
+            signedIn: false,
+            stages: [],
+            progress: {
+                resultsByRaceId: {},
+                unlockedRaceIds: ['numbered-v1-00'],
+                complete: false,
+            },
+        });
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            hasAnyData: true,
+            isReturningPlayer: false,
+            activeRaceMode: 'home',
+            campaignBootstrap: null,
+            campaignLobbyState: null,
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: {
+                showCampaign: vi.fn(),
+                getMode: vi.fn(() => 'campaign'),
+                setCampaignPrimaryLoading: vi.fn(),
+            },
+            campaignCarousel: { isEmpty: vi.fn(() => false) },
+            reset: vi.fn(),
+            paintCampaignCarousel: vi.fn(),
+            applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,
+            paintCampaignLobby: campaignEngineMethods.paintCampaignLobby,
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+            showCampaignLobby: campaignEngineMethods.showCampaignLobby,
+            loadCampaignLobby: campaignEngineMethods.loadCampaignLobby,
+        };
+
+        await context.loadCampaignLobby({ show: true });
+
+        expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(1);
+    });
+
+    it('deduplicates concurrent forced Campaign bootstrap refreshes', async () => {
+        let resolveBootstrap;
+        campaignServiceMocks.getCampaignBootstrap.mockReturnValue(new Promise((resolve) => {
+            resolveBootstrap = resolve;
+        }));
+        const context = {
+            campaignBootstrap: null,
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            applyCampaignLobbyBootstrap: vi.fn(),
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+        };
+
+        const first = context.ensureCampaignBootstrap({ forceRefresh: true });
+        const second = context.ensureCampaignBootstrap({ forceRefresh: true });
+        expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(1);
+
+        resolveBootstrap({ availability: 'available', authoritative: true });
+        await Promise.all([first, second]);
+        expect(context.applyCampaignLobbyBootstrap).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps authoritative Campaign state when a refresh is unavailable', async () => {
+        const authoritative = {
+            availability: 'available',
+            authoritative: true,
+            progress: { resultsByRaceId: { 'numbered-v1-00': { bestTimeMs: 7000 } } },
+        };
+        campaignServiceMocks.getCampaignBootstrap.mockResolvedValue({
+            availability: 'unavailable',
+            authoritative: false,
+            progress: { resultsByRaceId: {} },
+        });
+        const context = {
+            campaignBootstrap: authoritative,
+            _campaignBootstrapReady: true,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            applyCampaignLobbyBootstrap: vi.fn(),
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+        };
+
+        await expect(context.ensureCampaignBootstrap({ forceRefresh: true }))
+            .resolves.toBe(authoritative);
+        expect(context.campaignBootstrap).toBe(authoritative);
+        expect(context.applyCampaignLobbyBootstrap).not.toHaveBeenCalled();
+    });
+
+    it('applies an initial unavailable Campaign bootstrap so startup resolves', async () => {
+        const unavailable = {
+            availability: 'unavailable',
+            authoritative: false,
+            progress: { resultsByRaceId: {} },
+        };
+        campaignServiceMocks.getCampaignBootstrap.mockResolvedValue(unavailable);
+        const context = {
+            campaignBootstrap: null,
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            applyCampaignLobbyBootstrap: vi.fn(),
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+        };
+
+        await expect(context.ensureCampaignBootstrap({ forceRefresh: true }))
+            .resolves.toBe(unavailable);
+        expect(context.applyCampaignLobbyBootstrap).toHaveBeenCalledWith(
+            unavailable,
+            { paint: true },
+        );
+    });
+
     it('leaves the primary spinner to a start that is already running', async () => {
         const lobbyUi = {
             showCampaign: vi.fn(),

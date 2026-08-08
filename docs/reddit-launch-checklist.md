@@ -93,7 +93,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
   verified finish updates the normal Daily rank.
 - [ ] In Campaign standings, select an unlocked stage and opponent, verify the
   normal Campaign submission/progression path remains active, and confirm a
-  guest result stays local until the existing sign-in claim revalidation.
+  guest result is ranked server-side, retained for 90 days of inactivity, and
+  merged into the Reddit account on sign-in with the faster result preserved.
 - [ ] Opponent loss/tie retries the same frozen ghost; a win offers the nearest
   raceable racer above the refreshed position, skipping unavailable ghosts,
   while first place falls back to normal Beat Your PB behavior.
@@ -118,6 +119,13 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Open a Head to Head with no Reddit session and with a stale stored guest
   token; verify the post refreshes the guest identity once, enables Race Head to
   Head, and never shows a sign-in requirement for a ready challenge.
+- [ ] Interrupt or time out a Head to Head load and verify the global loader
+  dismisses, the challenge pane offers Retry, and a successful retry enables
+  Race Head to Head without a sign-in prompt.
+- [ ] Exercise more than twelve Head to Head submission attempts in one minute
+  for one identity and verify the 429 response is actionable, expensive post
+  resolution is skipped for throttled attempts, and normal submission resumes
+  after the window expires.
 - [ ] Challenge-post reuse and the three-new-posts per
   player/subreddit/UTC-day limit are confirmed with real Reddit context.
 

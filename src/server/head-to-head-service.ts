@@ -47,6 +47,8 @@ import {
 import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
+export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
+export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 
 export type HeadToHeadRequestContext = {
     username?: string | null;
@@ -56,6 +58,7 @@ export type HeadToHeadRequestContext = {
     postData?: Record<string, unknown> | null;
     playerId?: string | null;
     guestToken?: string | null;
+    requestRateLimitIdentity?: string | null;
 };
 
 export type HeadToHeadServiceResult = {
@@ -145,6 +148,39 @@ async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promis
         username,
         displayName: username || (identity.canonicalPlayerId ? 'Guest racer' : 'You'),
         signedIn: Boolean(username),
+    };
+}
+
+function submissionRateLimitIdentity(
+    viewer: ChallengeViewer,
+    context: HeadToHeadRequestContext,
+): string {
+    const requestIdentity = typeof context.requestRateLimitIdentity === 'string'
+        && context.requestRateLimitIdentity.trim()
+        ? context.requestRateLimitIdentity.trim()
+        : null;
+    return viewer.signedIn || !requestIdentity
+        ? viewer.playerId as string
+        : `request:${requestIdentity}`;
+}
+
+async function checkHeadToHeadSubmissionRateLimit(
+    identity: string,
+): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number }> {
+    const key = `miniracer:head-to-head:submit-rate-limit:${encodeURIComponent(identity)}`;
+    const attemptCount = await redis.incrBy(key, 1);
+    if (attemptCount === 1) {
+        await redis.expire(key, HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
+    }
+    if (attemptCount <= HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS) {
+        return { allowed: true };
+    }
+    const expiresAt = await redis.expireTime(key);
+    return {
+        allowed: false,
+        retryAfterSeconds: Number.isFinite(expiresAt) && expiresAt > 0
+            ? Math.max(1, expiresAt - Math.floor(Date.now() / 1000))
+            : HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
     };
 }
 
@@ -805,6 +841,20 @@ export function createHeadToHeadService(
                 body: {
                     status: 'player_identity_required',
                     error: 'Guest identity unavailable. Reload the challenge to continue.',
+                },
+            };
+        }
+        const rateLimit = await checkHeadToHeadSubmissionRateLimit(
+            submissionRateLimitIdentity(viewer, context),
+        );
+        if (!rateLimit.allowed) {
+            return {
+                status: 429,
+                body: {
+                    accepted: false,
+                    status: 'rate_limited',
+                    error: 'Too many submission attempts. Try again soon.',
+                    retryAfterSeconds: rateLimit.retryAfterSeconds,
                 },
             };
         }

@@ -43,4 +43,22 @@ describe('head to head client service', () => {
             globalThis.devvit = originalDevvit;
         }
     });
+
+    it('aborts a challenge read after the shared request timeout', async () => {
+        vi.useFakeTimers();
+        let aborted = false;
+        globalThis.fetch = vi.fn(async (_url, options) => new Promise((_, reject) => {
+            options.signal.addEventListener('abort', () => {
+                aborted = true;
+                reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+        }));
+
+        const request = getHeadToHead('challenge-1');
+        const rejection = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        await rejection;
+        expect(aborted).toBe(true);
+    });
 });

@@ -34,6 +34,7 @@ describe('Head to Head route identity forwarding', () => {
             subredditName: 'MiniRacer',
             postId: null,
             postData: { postType: 'head-to-head', challengeId: 'challenge-1' },
+            requestRateLimitIdentity: 'server-request-hash',
         };
         const getHeadToHead = vi.fn(async (challengeId, requestContext) => ({
             status: 200,

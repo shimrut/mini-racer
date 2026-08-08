@@ -630,6 +630,90 @@ describe('Head to Head lobby and finish', () => {
             available: true,
         }));
     });
+
+    it('turns a failed challenge load into a retryable lobby state', async () => {
+        const showChallenge = vi.fn();
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            activeHeadToHead: { challengeId: 'stale' },
+            hasAnyData: false,
+            isReturningPlayer: false,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: { showChallenge },
+        };
+        headToHeadServiceMocks.getHeadToHead.mockRejectedValue(new Error('offline'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await headToHeadEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
+
+        expect(context.activeHeadToHead).toBeNull();
+        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
+            canRace: false,
+            canRetry: true,
+            statusMessage: 'Could not load this challenge. Check your connection and try again.',
+        }));
+    });
+
+    it('keeps a permanent challenge error unavailable instead of offering Retry', async () => {
+        const showChallenge = vi.fn();
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            activeHeadToHead: null,
+            hasAnyData: true,
+            isReturningPlayer: true,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: { showChallenge },
+        };
+        headToHeadServiceMocks.getHeadToHead.mockResolvedValue({
+            ok: false,
+            status: 404,
+            body: {
+                status: 'challenge_unavailable',
+                error: 'This challenge is unavailable.',
+            },
+        });
+
+        await headToHeadEngineMethods.loadChallengeLobby.call(context, 'expired-challenge');
+
+        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
+            canRace: false,
+            canRetry: false,
+            available: false,
+            statusMessage: 'This challenge is unavailable.',
+        }));
+    });
+
+    it('retries a failed challenge load without issuing duplicate requests', async () => {
+        const loadChallengeLobby = vi.fn(async () => undefined);
+        const showChallenge = vi.fn();
+        const context = {
+            headToHeadChallengeId: 'challenge-1',
+            headToHeadLoadPending: false,
+            lobbyUi: {
+                challengeState: {
+                    canRetry: true,
+                    available: false,
+                    statusMessage: 'Could not load this challenge. Try again.',
+                },
+                showChallenge,
+            },
+            loadChallengeLobby,
+        };
+
+        const firstRetry = headToHeadEngineMethods.retryHeadToHead.call(context);
+        const secondRetry = headToHeadEngineMethods.retryHeadToHead.call(context);
+        await Promise.all([firstRetry, secondRetry]);
+
+        expect(loadChallengeLobby).toHaveBeenCalledTimes(1);
+        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
+            canRetry: true,
+            challengeLoading: true,
+            statusMessage: 'Retrying challenge…',
+        }));
+        expect(context.headToHeadLoadPending).toBe(false);
+    });
 });
 
 describe('Head to Head poster after the duel is beaten', () => {
@@ -662,6 +746,38 @@ describe('Head to Head poster after the duel is beaten', () => {
         }
         return dom.window.document;
     }
+
+    it('makes a transient failure actionable with the existing Retry button', () => {
+        const originalDocument = global.document;
+        const originalRaf = global.requestAnimationFrame;
+        const dom = challengePaneDom();
+        const onRetryChallenge = vi.fn();
+        global.document = dom.window.document;
+        global.requestAnimationFrame = (callback) => callback();
+        const lobby = new LobbyUi({ onRetryChallenge });
+        lobby.mode = 'challenge';
+        lobby.renderChallengePreview = vi.fn();
+        lobby.syncLobbySubheadDetail = vi.fn();
+        lobby.focus = vi.fn();
+        try {
+            lobby.bind();
+            lobby.showChallenge({
+                available: false,
+                canRace: false,
+                canRetry: true,
+                statusMessage: 'Could not load this challenge. Try again.',
+            });
+
+            const button = dom.window.document.getElementById('challenge-accept-btn');
+            expect(button.disabled).toBe(false);
+            expect(button.querySelector('.main-menu__label').textContent).toBe('Retry');
+            button.click();
+            expect(onRetryChallenge).toHaveBeenCalledTimes(1);
+        } finally {
+            global.document = originalDocument;
+            global.requestAnimationFrame = originalRaf;
+        }
+    });
 
     it('puts the winner and their medal where the track poster was', () => {
         const doc = renderPane({ ...readyState, outcome: 'won', bestTimeMs: 25_168 });

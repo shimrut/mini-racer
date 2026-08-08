@@ -52,12 +52,15 @@ signed-in profile data expires after 30 inactive days.
 - Shared results go to the post's pinned **score thread**, as a comment from your Reddit account after you confirm
 - Sharing the same result again reuses the existing comment instead of posting a duplicate
 
-Campaign has a separate permanent leaderboard for each stage. Guests can
-practice Campaign locally, but Reddit sign-in is required for permanent
-Campaign competition and for creating challenge posts. Guests can still open,
-race, and submit Head to Head challenges; their challenge results are kept on
-their guest identity and merge when they sign in. The Head to Head post itself
-does not require Reddit sign-in; stale guest tokens are refreshed automatically.
+Campaign has a separate permanent leaderboard for each stage. Guests are ranked
+server-side, with their Campaign progress, bests, and PB ghosts retained on a
+rolling 90-day inactivity window; the shared stage leaderboards themselves do
+not expire. Signing in merges verified guest results into the Reddit account,
+keeping the faster result for each stage. Reddit sign-in is still required to
+create challenge posts. Guests can open, race, and submit Head to Head
+challenges; their challenge results stay on their guest identity and merge when
+they sign in. The Head to Head post itself does not require Reddit sign-in;
+stale guest tokens are refreshed automatically.
 Challenge duels are isolated:
 they do not unlock Campaign stages or change Daily/Campaign standings or PBs.
 

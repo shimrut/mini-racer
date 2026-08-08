@@ -255,6 +255,8 @@ function revokePendingCampaignResult(engine, raceId, bestTime) {
 
 function buildProvisionalCampaignBootstrap(previous = null) {
     return {
+        availability: 'loading',
+        authoritative: false,
         campaignId: CAMPAIGN_ID,
         ranked: previous?.ranked === true,
         signedIn: previous?.signedIn === true,
@@ -358,10 +360,18 @@ export const campaignEngineMethods = {
     },
 
     async ensureCampaignBootstrap({ forceRefresh = false } = {}) {
-        if (!forceRefresh && this._campaignBootstrapReady && this.campaignBootstrap) {
+        const hasUsableBootstrap = Boolean(
+            this._campaignBootstrapReady
+            && this.campaignBootstrap
+            && this.campaignBootstrap.authoritative !== false
+            && this.campaignBootstrap.availability !== 'unavailable'
+        );
+        if (!forceRefresh && hasUsableBootstrap) {
             return this.campaignBootstrap;
         }
-        if (!forceRefresh && this._campaignBootstrapPromise) {
+        // Force refresh bypasses a completed cache, not a request already in
+        // flight. Every caller shares one bootstrap generation at a time.
+        if (this._campaignBootstrapPromise) {
             return this._campaignBootstrapPromise;
         }
 
@@ -370,6 +380,15 @@ export const campaignEngineMethods = {
         const promise = getCampaignBootstrap()
             .then((bootstrap) => {
                 if (requestId !== this._campaignBootstrapRequestId) {
+                    return this.campaignBootstrap;
+                }
+                const hasAuthoritativeBootstrap = Boolean(
+                    this._campaignBootstrapReady
+                    && this.campaignBootstrap
+                    && this.campaignBootstrap.authoritative !== false
+                    && this.campaignBootstrap.availability !== 'unavailable'
+                );
+                if (bootstrap?.authoritative === false && hasAuthoritativeBootstrap) {
                     return this.campaignBootstrap;
                 }
                 this.applyCampaignLobbyBootstrap(bootstrap, { paint: true });
@@ -386,7 +405,7 @@ export const campaignEngineMethods = {
 
     async loadCampaignLobby({ show = true } = {}) {
         if (show) {
-            this.showCampaignLobby();
+            this.showCampaignLobby({ refresh: false });
             await this.ensureCampaignBootstrap({ forceRefresh: true });
             return this.campaignLobbyState;
         }
@@ -422,7 +441,7 @@ export const campaignEngineMethods = {
             this._campaignCarouselPaintReady = true;
             this.paintCampaignCarousel();
         });
-        if (refresh || !hadReadyBootstrap) {
+        if (refresh) {
             void this.ensureCampaignBootstrap({ forceRefresh: true });
         }
     },

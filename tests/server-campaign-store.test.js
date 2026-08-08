@@ -47,6 +47,7 @@ const mockRedis = {
     zAdd: vi.fn(async () => 1),
     zCard: vi.fn(async () => 0),
     zRange: vi.fn(async () => []),
+    zScore: vi.fn(async () => undefined),
     zRank: vi.fn(async () => undefined),
     watch: vi.fn(),
 };
@@ -88,9 +89,12 @@ function createTransaction() {
         del: vi.fn(async (...args) => commands.push(() => mockRedis.del(...args))),
         set: vi.fn(async (...args) => commands.push(() => mockRedis.set(...args))),
         hSet: vi.fn(async (...args) => commands.push(() => mockRedis.hSet(...args))),
+        hDel: vi.fn(async (...args) => commands.push(() => mockRedis.hDel(...args))),
         zAdd: vi.fn(async (...args) => commands.push(() => mockRedis.zAdd(...args))),
+        zRem: vi.fn(async (...args) => commands.push(() => mockRedis.zRem(...args))),
         incrBy: vi.fn(async (...args) => commands.push(() => mockRedis.incrBy(...args))),
         expire: vi.fn(async (...args) => commands.push(() => mockRedis.expire(...args))),
+        discard: vi.fn(async () => {}),
         exec: vi.fn(async () => {
             const results = [];
             for (const command of commands) results.push(await command());
@@ -149,6 +153,7 @@ describe('Campaign server store', () => {
         mockRedis.zAdd.mockResolvedValue(1);
         mockRedis.zCard.mockResolvedValue(0);
         mockRedis.zRange.mockResolvedValue([]);
+        mockRedis.zScore.mockResolvedValue(undefined);
         mockRedis.zRank.mockResolvedValue(undefined);
         mockRedis.watch.mockImplementation(() => createTransaction());
         mockValidateDailyGpReplayDetailed.mockReturnValue({
@@ -737,7 +742,7 @@ describe('Campaign server store', () => {
         );
     });
 
-    it('keeps a guest Campaign standing bounded but well past the guest profile', async () => {
+    it('keeps shared Campaign collections permanent and expires only guest-owned progress', async () => {
         const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
         const guestToken = await mintGuestPlayerToken('guest-ttl');
         const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
@@ -753,12 +758,91 @@ describe('Campaign server store', () => {
         const boardExpiries = mockRedis.expire.mock.calls
             .filter(([key]) => String(key).startsWith('campaign:') && !String(key).includes('rate-limit'))
             .map(([, seconds]) => seconds);
-        expect(boardExpiries.length).toBeGreaterThan(0);
-        // Long enough that returning after the 7-day guest profile lapses does
-        // not cost the unlocks they earned.
-        for (const seconds of boardExpiries) {
-            expect(seconds).toBeGreaterThan(7 * 24 * 60 * 60);
-        }
+        expect(boardExpiries).toEqual([]);
+        const progressSet = mockRedis.set.mock.calls.find(([key]) => String(key).includes(':progress:'));
+        expect(progressSet?.[2]?.expiration).toBeInstanceOf(Date);
+        expect(progressSet[2].expiration.getTime() - Date.now())
+            .toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
+        expect(mockRedis.zAdd).toHaveBeenCalledWith(
+            'campaign:numbered-v1:guest-expiry',
+            expect.objectContaining({ member: 'guest:guest-ttl' }),
+        );
+    });
+
+    it('prunes an expired guest from every Campaign collection in one watched transaction', async () => {
+        const nowMs = Date.now();
+        const guestPlayerId = 'guest:expired';
+        const guestField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
+        const { CAMPAIGN_GUEST_EXPIRY_KEY, cleanupExpiredCampaignGuests } = await import(
+            '../src/server/campaign-store.ts'
+        );
+        mockRedis.zRange.mockResolvedValue([{
+            member: guestPlayerId,
+            score: nowMs - 1,
+        }]);
+        mockRedis.zScore.mockResolvedValue(nowMs - 1);
+
+        await expect(cleanupExpiredCampaignGuests(nowMs)).resolves.toBe(1);
+
+        expect(mockRedis.watch).toHaveBeenCalledWith(
+            CAMPAIGN_GUEST_EXPIRY_KEY,
+            expect.stringContaining(':progress-lock:'),
+        );
+        expect(mockRedis.del).toHaveBeenCalledWith(
+            `campaign:numbered-v1:progress:${guestField}`,
+        );
+        expect(mockRedis.zRem).toHaveBeenCalledWith(
+            CAMPAIGN_GUEST_EXPIRY_KEY,
+            [guestPlayerId],
+        );
+        expect(mockRedis.hDel).toHaveBeenCalledWith(
+            'campaign:numbered-v1:leaderboard:numbered-v1-00:entries',
+            [guestPlayerId],
+        );
+        expect(mockRedis.hDel).toHaveBeenCalledWith(
+            'campaign:numbered-v1:pbs:numbered-v1-00',
+            [guestField],
+        );
+        expect(mockRedis.incrBy).toHaveBeenCalledWith(
+            'campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision',
+            1,
+        );
+    });
+
+    it('does not delete a guest whose expiry was refreshed while cleanup was reading', async () => {
+        const nowMs = Date.now();
+        const guestPlayerId = 'guest:returning';
+        const { cleanupExpiredCampaignGuests } = await import('../src/server/campaign-store.ts');
+        mockRedis.zRange.mockResolvedValue([{
+            member: guestPlayerId,
+            score: nowMs - 1,
+        }]);
+        mockRedis.zScore.mockResolvedValue(nowMs + 90_000);
+
+        await expect(cleanupExpiredCampaignGuests(nowMs)).resolves.toBe(0);
+
+        expect(mockRedis.del).not.toHaveBeenCalled();
+        expect(mockRedis.zRem).not.toHaveBeenCalled();
+    });
+
+    it('aborts cleanup while a guest progress update owns its lock', async () => {
+        const nowMs = Date.now();
+        const guestPlayerId = 'guest:locked';
+        const guestField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
+        const { cleanupExpiredCampaignGuests } = await import('../src/server/campaign-store.ts');
+        strings.set(`campaign:numbered-v1:progress-lock:${guestField}`, 'active');
+        mockRedis.zRange.mockResolvedValue([{
+            member: guestPlayerId,
+            score: nowMs - 1,
+        }]);
+        mockRedis.zScore.mockResolvedValue(nowMs - 1);
+
+        await expect(cleanupExpiredCampaignGuests(nowMs)).resolves.toBe(0);
+
+        expect(mockRedis.del).not.toHaveBeenCalledWith(
+            `campaign:numbered-v1:progress:${guestField}`,
+        );
+        expect(mockRedis.zRem).not.toHaveBeenCalled();
     });
 
     it('never expires a signed-in player Campaign standing', async () => {
@@ -773,6 +857,155 @@ describe('Campaign server store', () => {
         const campaignExpiries = mockRedis.expire.mock.calls
             .filter(([key]) => String(key).startsWith('campaign:') && !String(key).includes('rate-limit'));
         expect(campaignExpiries).toEqual([]);
+    });
+
+    it('repairs missing progress when an accepted retry is no longer a board improvement', async () => {
+        const playerId = 'reddit:repair';
+        const entryKey = 'campaign:numbered-v1:leaderboard:numbered-v1-00:entries';
+        hashes.set(entryKey, new Map([[
+            playerId,
+            JSON.stringify({
+                playerId,
+                trackKey: 'numberZero',
+                bestTimeMs: 12_345,
+                updatedAt: '2026-07-27T10:00:00.000Z',
+                completedLaps: 2,
+                checkpointTimesSec: [4.2, 9.8],
+                validationMethod: 'strict-replay',
+            }),
+        ]]));
+        const { submitServerCampaignRun, getServerCampaignBootstrap } = await import(
+            '../src/server/campaign-store.ts'
+        );
+
+        const result = await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { inputs: [] },
+            redditUsername: 'Repair',
+        });
+
+        expect(result).toMatchObject({ status: 200, body: { accepted: true, improved: false } });
+        await expect(getServerCampaignBootstrap({ redditUsername: 'Repair' }))
+            .resolves.toMatchObject({
+                body: {
+                    progress: {
+                        resultsByRaceId: {
+                            'numbered-v1-00': { bestTimeMs: 12_345 },
+                        },
+                    },
+                },
+            });
+    });
+
+    it('never lets a slower accepted retry overwrite a faster Campaign result', async () => {
+        const playerId = 'reddit:faster';
+        const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        strings.set(`campaign:numbered-v1:progress:${playerHash}`, JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: {
+                'numbered-v1-00': {
+                    raceId: 'numbered-v1-00',
+                    trackKey: 'numberZero',
+                    lapCount: 2,
+                    rulesRevision: 1,
+                    bestTimeMs: 1_000,
+                    medal: 'author',
+                    checkpointTimesSec: [0.4, 0.8],
+                    updatedAt: '2026-07-27T10:00:00.000Z',
+                },
+            },
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        }));
+        hashes.set('campaign:numbered-v1:leaderboard:numbered-v1-00:entries', new Map([[
+            playerId,
+            JSON.stringify({
+                playerId,
+                trackKey: 'numberZero',
+                bestTimeMs: 1_000,
+                updatedAt: '2026-07-27T10:00:00.000Z',
+                completedLaps: 2,
+                checkpointTimesSec: [0.4, 0.8],
+                validationMethod: 'strict-replay',
+            }),
+        ]]));
+        const { submitServerCampaignRun, getServerCampaignBootstrap } = await import(
+            '../src/server/campaign-store.ts'
+        );
+
+        const result = await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { inputs: [] },
+            redditUsername: 'Faster',
+        });
+
+        expect(result).toMatchObject({ status: 200, body: { accepted: true, improved: false } });
+        await expect(getServerCampaignBootstrap({ redditUsername: 'Faster' }))
+            .resolves.toMatchObject({
+                body: {
+                    progress: {
+                        resultsByRaceId: {
+                            'numbered-v1-00': { bestTimeMs: 1_000, medal: 'author' },
+                        },
+                    },
+                },
+            });
+    });
+
+    it('preserves both stages when different Campaign submissions overlap', async () => {
+        const playerId = 'reddit:overlap';
+        const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        strings.set(`campaign:numbered-v1:progress:${playerHash}`, JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: {
+                'numbered-v1-00': {
+                    raceId: 'numbered-v1-00',
+                    trackKey: 'numberZero',
+                    lapCount: 2,
+                    rulesRevision: 1,
+                    bestTimeMs: 20_000,
+                    medal: 'author',
+                    checkpointTimesSec: null,
+                    updatedAt: '2026-07-27T10:00:00.000Z',
+                },
+            },
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        }));
+        const { getServerCampaignBootstrap, submitServerCampaignRun } = await import(
+            '../src/server/campaign-store.ts'
+        );
+
+        const [first, second] = await Promise.all([
+            submitServerCampaignRun({
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                replay: { inputs: [] },
+                redditUsername: 'Overlap',
+            }),
+            submitServerCampaignRun({
+                raceId: 'numbered-v1-01',
+                trackKey: 'numberOne',
+                replay: { inputs: [] },
+                redditUsername: 'Overlap',
+            }),
+        ]);
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        await expect(getServerCampaignBootstrap({ redditUsername: 'Overlap' }))
+            .resolves.toMatchObject({
+                body: {
+                    progress: {
+                        resultsByRaceId: {
+                            'numbered-v1-00': { bestTimeMs: 12_345 },
+                            'numbered-v1-01': { bestTimeMs: 12_345 },
+                        },
+                    },
+                },
+            });
     });
 
     it('moves a guest Campaign standing onto the account at sign-in, keeping the better time', async () => {
@@ -842,8 +1075,59 @@ describe('Campaign server store', () => {
         })).resolves.toEqual({ merged: false, mergedRaceIds: [] });
     });
 
+    it('keeps guest data for a retry when an account promotion write fails', async () => {
+        const guestPlayerId = 'guest:partial-merge';
+        const redditPlayerId = 'reddit:partial-merge';
+        const progressKeyFor = (playerId) => `campaign:numbered-v1:progress:${
+            createHash('sha256').update(playerId, 'utf8').digest('base64url')
+        }`;
+        const result = {
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            lapCount: 2,
+            rulesRevision: 1,
+            bestTimeMs: 1_000,
+            medal: 'author',
+            checkpointTimesSec: null,
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        };
+        strings.set(progressKeyFor(guestPlayerId), JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: { 'numbered-v1-00': result },
+            updatedAt: result.updatedAt,
+        }));
+        const guestEntryKey = 'campaign:numbered-v1:leaderboard:numbered-v1-00:entries';
+        hashes.set(guestEntryKey, new Map([[
+            guestPlayerId,
+            JSON.stringify({ ...result, playerId: guestPlayerId }),
+        ]]));
+        const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+        const defaultHSet = mockRedis.hSet.getMockImplementation();
+        mockRedis.hSet.mockImplementation(async (key, entries) => {
+            if (String(key) === guestEntryKey && Object.hasOwn(entries, redditPlayerId)) {
+                throw new Error('account board unavailable');
+            }
+            return defaultHSet(key, entries);
+        });
+
+        await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
+            .rejects.toThrow('account board unavailable');
+        expect(strings.has(progressKeyFor(guestPlayerId))).toBe(true);
+        expect(hashes.get(guestEntryKey)?.has(guestPlayerId)).toBe(true);
+
+        mockRedis.hSet.mockImplementation(defaultHSet);
+        await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
+            .resolves.toEqual({ merged: true, mergedRaceIds: ['numbered-v1-00'] });
+        expect(strings.has(progressKeyFor(guestPlayerId))).toBe(false);
+    });
+
     it('refuses to trade a verified account time down for a slower guest one', async () => {
-        const { mergeGuestCampaignProgress, parseCampaignProgress } = await import('../src/server/campaign-store.ts');
+        const {
+            getServerCampaignPbGhost,
+            mergeGuestCampaignProgress,
+            parseCampaignProgress,
+        } = await import('../src/server/campaign-store.ts');
         const progressKeyFor = (playerId) => `campaign:numbered-v1:progress:${
             createHash('sha256').update(playerId, 'utf8').digest('base64url')
         }`;
@@ -869,6 +1153,24 @@ describe('Campaign server store', () => {
             resultsByRaceId: { 'numbered-v1-00': stageResult(1000, 'author') },
             updatedAt: '2026-07-27T10:00:00.000Z',
         }));
+        const pbRecord = (bestTimeMs) => JSON.stringify({
+            schemaVersion: 2,
+            trackKey: 'numberZero',
+            trackFingerprint: createTrackFingerprint(TRACKS.numberZero),
+            simulationRevision: 1,
+            rulesRevision: 1,
+            lapCount: 2,
+            bestTimeMs,
+            checkpointTimesSec: null,
+            lapCompletionTimesSec: null,
+            ghost: null,
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        });
+        const pbKey = 'campaign:numbered-v1:pbs:numbered-v1-00';
+        hashes.set(pbKey, new Map([
+            [createHash('sha256').update('guest:slower', 'utf8').digest('base64url'), pbRecord(9000)],
+            [createHash('sha256').update('reddit:faster', 'utf8').digest('base64url'), pbRecord(1000)],
+        ]));
 
         await expect(mergeGuestCampaignProgress({
             guestPlayerId: 'guest:slower',
@@ -879,6 +1181,13 @@ describe('Campaign server store', () => {
         expect(kept.resultsByRaceId['numbered-v1-00']).toMatchObject({
             bestTimeMs: 1000,
             medal: 'author',
+        });
+        await expect(getServerCampaignPbGhost({
+            raceId: 'numbered-v1-00',
+            redditUsername: 'Faster',
+        })).resolves.toMatchObject({
+            status: 200,
+            body: { personalBest: { bestTimeMs: 1000 } },
         });
     });
 });

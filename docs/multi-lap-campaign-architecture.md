@@ -17,14 +17,14 @@ leaderboard, and retention rules.
   Euler's Number, and Golden Ratio.
 - Fixed lap counts: `2, 2, 1, 1, 2, 1, 1, 3, 2, 1, 3, 1, 2, 2`.
 - Unlock rule: Gold or Author on the immediately preceding stage.
-- Signed-in starts, progress, per-stage bests, PB ghosts, and leaderboards are
-  permanent Campaign records. Guest progress is local practice data only.
-- Guest finishes store their replay alongside the local result. Signing in
-  replays each stored run through the normal validated submission, lowest stage
-  first, so the server re-derives every time and medal rather than trusting the
-  guest record. A stage the server refuses ends the claim, because every stage
-  above it is still locked. A verified server result is never replaced by a
-  slower guest one.
+- Campaign starts, progress, per-stage bests, PB ghosts, and leaderboards are
+  server records for guests and signed-in players. Shared stage leaderboards
+  are permanent. Signed-in progress is permanent; guest progress, bests, and PB
+  ghosts use a rolling 90-day inactivity window.
+- Guest finishes are replay-verified through the normal Campaign submission
+  path and ranked under the guest identity. Signing in merges those verified
+  results into the Reddit account, keeping the faster result for each stage. A
+  slower guest result never replaces a faster signed-in result.
 - Campaign result posts freeze a verified result and ghost. Signed-in viewers
   may race that ghost even when the corresponding Campaign stage is locked;
   duel results never write Campaign progression, leaderboards, or PBs.
@@ -224,8 +224,9 @@ browser and server. The server must validate the exact stored specification;
 it must never trust a lap count sent only by the browser.
 
 Daily GP adds dates, availability, posts, sharing, podiums, and expiring
-competition records around this spec. Campaign adds order, unlock
-requirements, permanent progress, and permanent per-race leaderboards.
+competition records around this spec. Campaign adds order, unlock requirements,
+server-backed progress with rolling guest retention, and permanent per-race
+leaderboards.
 
 Do not turn all persistence into one generic framework. Keep separate Daily
 and Campaign stores and routes, but make both call the same race-spec,
@@ -443,7 +444,8 @@ Automated coverage must include:
 - client/server replay parity and replay-size boundaries;
 - PB/ghost separation across lap counts and modes;
 - Daily and Campaign leaderboard isolation;
-- permanent campaign progress and unlock derivation;
+- Campaign progress and unlock derivation for ranked guests (rolling 90-day
+  inactivity) and signed-in players (permanent);
 - campaign rules/track fingerprint migration behavior;
 - old Daily sharing and podium behavior.
 
@@ -468,9 +470,10 @@ leaderboards.
 6. Decide how campaign rule changes work after launch: immutable campaign
    version (recommended) or in-place migration.
 7. ~~Define campaign progress retention for guests and whether guest progress can
-   be claimed by a later signed-in account.~~ **Resolved.** Guests stay
-   local-only while signed out; signing in claims their stored replays through
-   server validation. See the implemented contract above.
+   be claimed by a later signed-in account.~~ **Resolved.** Guests are ranked
+   server-side with rolling 90-day inactivity retention. Signing in merges their
+   verified results and keeps the faster result per stage. See the implemented
+   contract above.
 
 The Gold-or-Author unlock gate on every stage was reviewed and confirmed
 deliberate: ten Golds are required to finish the Campaign. Medal targets still

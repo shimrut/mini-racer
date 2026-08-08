@@ -172,9 +172,13 @@ export function normalizeCampaignStandings(value) {
     return standings;
 }
 
-/** Progress is whatever the server says, for guests and signed-in players alike; an unreachable server reports nothing rather than inventing a local ladder that could disagree with it. */
+/** Progress is server-authoritative for guests and signed-in players alike; an
+ * unreachable server returns a marked, non-authoritative fallback so the
+ * engine can finish startup without replacing a verified ladder. */
 function unavailableCampaignBootstrap() {
     return {
+        availability: 'unavailable',
+        authoritative: false,
         campaignId: CAMPAIGN_ID,
         ranked: false,
         signedIn: false,
@@ -194,6 +198,8 @@ export async function getCampaignBootstrap() {
         const response = await requestJson(campaignUrl(API_ROUTES.campaignBootstrapUrl).toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
         return {
+            availability: 'available',
+            authoritative: true,
             campaignId: CAMPAIGN_ID,
             ranked: response.body.ranked === true,
             signedIn: response.body.signedIn === true,

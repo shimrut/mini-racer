@@ -32,6 +32,9 @@ export type Competition = {
     pbHashKey: string;
     /** null means the competition is permanent and its keys never expire. */
     ttlSeconds: number | null;
+    /** Optional per-player guest retention ledger; shared collection keys stay permanent. */
+    guestExpiryKey: string | null;
+    guestRetentionSeconds: number | null;
     allowGuests: boolean;
 };
 
@@ -88,6 +91,8 @@ export function toDailyCompetition(
         standingsRevisionKey: `${createRedisChallengeLeaderboardKey(challenge.id)}:standings-revision`,
         pbHashKey: challengeCollectionKey(challenge.id),
         ttlSeconds: getDailyGpCompetitionTtlSeconds(challenge, now),
+        guestExpiryKey: null,
+        guestRetentionSeconds: null,
         allowGuests: true,
     };
 }
@@ -100,10 +105,9 @@ export type CampaignStageLike = {
 };
 
 /**
- * Campaign progression is permanent for a signed-in player, so those keys carry
- * no expiry. A guest's keys do: their progress must outlive the 7-day guest
- * profile (losing unlocks would be a regression) without accumulating forever,
- * so it gets a long window refreshed on every submit.
+ * Guest Campaign data gets a rolling inactivity window. Shared stage
+ * collections are permanent; guest rows are removed individually from the
+ * expiry ledger so one guest can never expire everybody else's standings.
  */
 export const CAMPAIGN_GUEST_TTL_SECONDS = 90 * 24 * 60 * 60;
 
@@ -113,7 +117,6 @@ export function toCampaignCompetition(
     { playerId = null }: { playerId?: string | null } = {},
 ): Competition {
     const lapCount = normalizeLapCount(stage.lapCount);
-    const isGuest = typeof playerId === 'string' && playerId.startsWith('guest:');
     return {
         id: stage.raceId,
         mode: 'campaign',
@@ -125,7 +128,9 @@ export function toCampaignCompetition(
         entryHashKey: `campaign:${campaignId}:leaderboard:${stage.raceId}:entries`,
         standingsRevisionKey: `campaign:${campaignId}:leaderboard:${stage.raceId}:standings-revision`,
         pbHashKey: `campaign:${campaignId}:pbs:${stage.raceId}`,
-        ttlSeconds: isGuest ? CAMPAIGN_GUEST_TTL_SECONDS : null,
+        ttlSeconds: null,
+        guestExpiryKey: `campaign:${campaignId}:guest-expiry`,
+        guestRetentionSeconds: CAMPAIGN_GUEST_TTL_SECONDS,
         allowGuests: true,
     };
 }

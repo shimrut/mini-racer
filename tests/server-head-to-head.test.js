@@ -11,6 +11,7 @@ const redis = {
     }),
     del: vi.fn(async (key) => strings.delete(key)),
     expire: vi.fn(async () => true),
+    expireTime: vi.fn(async () => Math.floor(Date.now() / 1000) + 60),
     incrBy: vi.fn(async (key, amount) => {
         const next = Number(strings.get(key) || 0) + amount;
         strings.set(key, String(next));
@@ -82,6 +83,7 @@ vi.mock('@devvit/web/server', () => ({
 const {
     createHeadToHeadService,
     formatHeadToHeadTitle,
+    HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS,
 } = await import('../src/server/head-to-head-service.ts');
 const {
     resolveHeadToHeadRecordResult,
@@ -131,11 +133,12 @@ function makeService({
     bestTimeMs = 25_640,
     validatedTimeMs = 25_000,
     sourceKind = 'campaign',
+    validateReplay = null,
 } = {}) {
     let nextId = 0;
     return createHeadToHeadService({
         resolveSource: vi.fn(async () => source(bestTimeMs, sourceKind)),
-        validateReplay: vi.fn(async () => ({
+        validateReplay: validateReplay || vi.fn(async () => ({
             ok: true,
             bestTimeMs: validatedTimeMs,
             medal: 'gold',
@@ -539,6 +542,96 @@ describe('head-to-head service', () => {
                 acceptToken: expect.any(String),
             },
         });
+    });
+
+    it('limits signed-in Head to Head submissions globally before post lookup and replay validation', async () => {
+        const validateReplay = vi.fn(async () => ({
+            ok: true,
+            bestTimeMs: 26_000,
+            medal: 'gold',
+            ghost: { schemaVersion: 2, samples: ['viewer'] },
+        }));
+        const service = makeService({ validateReplay });
+        const created = await createChallenge(service);
+        const submitContext = {
+            ...context,
+            username: 'RateRacer',
+            requestRateLimitIdentity: 'ignored-for-signed-in-player',
+        };
+
+        for (let attempt = 0; attempt < HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS; attempt += 1) {
+            await expect(service.submit({
+                challengeId: created.body.challengeId,
+                replay: {},
+            }, submitContext)).resolves.toMatchObject({ status: 200 });
+        }
+
+        reddit.getPostById.mockClear();
+        validateReplay.mockClear();
+        const blocked = await service.submit({
+            challengeId: created.body.challengeId,
+            replay: {},
+        }, submitContext);
+
+        expect(blocked).toMatchObject({
+            status: 429,
+            body: {
+                accepted: false,
+                status: 'rate_limited',
+                retryAfterSeconds: expect.any(Number),
+            },
+        });
+        expect(blocked.body.retryAfterSeconds).toBeGreaterThan(0);
+        expect(reddit.getPostById).not.toHaveBeenCalled();
+        expect(validateReplay).not.toHaveBeenCalled();
+        expect(strings.get(
+            'miniracer:head-to-head:submit-rate-limit:reddit%3Arateracer',
+        )).toBe(String(HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS + 1));
+    });
+
+    it('uses the server-derived request identity so rotating guest IDs cannot reset the limit', async () => {
+        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const validateReplay = vi.fn(async () => ({
+            ok: true,
+            bestTimeMs: 26_000,
+            medal: 'gold',
+            ghost: { schemaVersion: 2, samples: ['viewer'] },
+        }));
+        const service = makeService({ validateReplay });
+        const created = await createChallenge(service);
+        const guestIds = ['guest:h2h-rate-a', 'guest:h2h-rate-b'];
+        const guestTokens = await Promise.all(guestIds.map((playerId) => (
+            mintGuestPlayerToken(playerId.slice('guest:'.length))
+        )));
+        const submitContext = (index) => ({
+            subredditName: context.subredditName,
+            postId: context.postId,
+            playerId: guestIds[index].slice('guest:'.length),
+            guestToken: guestTokens[index],
+            requestRateLimitIdentity: 'stable-guest-request',
+        });
+
+        for (let attempt = 0; attempt < HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS; attempt += 1) {
+            await expect(service.submit({
+                challengeId: created.body.challengeId,
+                replay: {},
+            }, submitContext(attempt % 2))).resolves.toMatchObject({ status: 200 });
+        }
+
+        reddit.getPostById.mockClear();
+        validateReplay.mockClear();
+        const blocked = await service.submit({
+            challengeId: created.body.challengeId,
+            replay: {},
+        }, submitContext(1));
+
+        expect(blocked.status).toBe(429);
+        expect(blocked.body.retryAfterSeconds).toBeGreaterThan(0);
+        expect(reddit.getPostById).not.toHaveBeenCalled();
+        expect(validateReplay).not.toHaveBeenCalled();
+        expect(strings.get(
+            'miniracer:head-to-head:submit-rate-limit:request%3Astable-guest-request',
+        )).toBe(String(HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS + 1));
     });
 
     it('reports missing guest identity without telling the player to sign in', async () => {

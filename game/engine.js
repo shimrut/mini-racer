@@ -143,6 +143,8 @@ export class RealTimeRacer {
     this.activeRaceMode = "home";
     this.activeCampaignStage = null;
     this.activeHeadToHead = null;
+    this.headToHeadChallengeId = null;
+    this.headToHeadLoadPending = false;
     this.campaignBootstrap = null;
     this.campaignLobbyState = null;
     this._campaignBootstrapReady = false;
@@ -325,6 +327,7 @@ export class RealTimeRacer {
         this.campaignCarousel.getSelectedChallenge(),
       ),
       onAcceptChallenge: () => void this.startHeadToHead(),
+      onRetryChallenge: () => void this.retryHeadToHead(),
       onRenderChallengePreview: (canvas, card, options) => {
         // The single poster hugs its circuit, so a portrait track in a short
         // landscape window keeps its own measure instead of stranding.
@@ -551,23 +554,55 @@ export class RealTimeRacer {
     );
     Promise.allSettled(startupPromises).finally(async () => {
       this.loadingScreen.update(95, "Displaying Lobby...");
-
-      this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-      if (this.launchTarget.mode === "daily") {
-        this.showDailyLobby();
-      } else if (this.launchTarget.mode === "campaign") {
-        this.showCampaignLobby({ refresh: false });
-      } else if (this.launchTarget.mode === "challenge") {
-        await this.loadChallengeLobby(this.launchTarget.challengeId);
-      } else {
-        this.showHomeLobby();
+      try {
+        this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
+        if (this.launchTarget.mode === "daily") {
+          this.showDailyLobby();
+        } else if (this.launchTarget.mode === "campaign") {
+          this.showCampaignLobby({ refresh: false });
+        } else if (this.launchTarget.mode === "challenge") {
+          await this.loadChallengeLobby(this.launchTarget.challengeId);
+        } else {
+          this.showHomeLobby();
+        }
+      } catch (error) {
+        // A mode-specific lobby failure must not own the global loading gate.
+        // The Head-to-Head loader handles expected request failures itself;
+        // this guard covers unexpected integration errors as well.
+        console.error("Error displaying initial lobby:", error);
+        try {
+          this.activeHeadToHead = null;
+          this.showHomeLobby();
+        } catch (fallbackError) {
+          console.error("Error displaying fallback lobby:", fallbackError);
+        }
+      } finally {
+        try {
+          this.startOverlay.setReady(true);
+        } catch (error) {
+          console.error("Error marking lobby ready:", error);
+        }
+        try {
+          await this.loadingScreen.dismiss();
+        } catch (error) {
+          console.error("Error dismissing loading screen:", error);
+        }
+        try {
+          this.startOverlay.setInteractive(true);
+        } catch (error) {
+          console.error("Error enabling lobby interaction:", error);
+        }
+        try {
+          void this.journeys.appReady();
+        } catch (error) {
+          console.error("Error reporting app readiness:", error);
+        }
+        try {
+          this.loadSecondaryStartupData();
+        } catch (error) {
+          console.error("Error loading secondary startup data:", error);
+        }
       }
-      this.startOverlay.setReady(true);
-
-      await this.loadingScreen.dismiss();
-      this.startOverlay.setInteractive(true);
-      void this.journeys.appReady();
-      this.loadSecondaryStartupData();
     });
 
     new ResizeObserver(() => this.scheduleResizeCommit()).observe(

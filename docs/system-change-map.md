@@ -191,7 +191,16 @@ flowchart LR
   the race chrome has appeared.
   Standings resolves the carousel's currently centred track at click time.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
-  full-width Accept action. Desktop responsive rules must not target the generic
+  full-width Accept action. A timeout, network failure, or server 5xx during
+  challenge loading is contained in the challenge pane: the global loader is
+  dismissed, contextual post details remain presentation-only, and the action
+  becomes an in-place Retry until authoritative challenge data and the frozen
+  ghost arrive. Permanent 4xx responses remain unavailable, and own challenges
+  still return Home. Head-to-Head submissions use the server-derived request
+  identity for guests and the canonical player identity for signed-in users;
+  twelve attempts per minute are allowed across all challenges before Reddit
+  post resolution or replay simulation, with a retryable 429 response after
+  the limit. Desktop responsive rules must not target the generic
   `header` element because that would override these mode-specific stacks. The
   Mini Racer wordmark animates on the first Home reveal only; returning from a
   mode restores its final visible state without replaying the hidden keyframe.
@@ -241,14 +250,18 @@ flowchart LR
   owns only the Campaign `startedAt` stamp; it must not replace progress results,
   because its pre-race snapshot can arrive after a finish and erase the new
   medal from the selector. Campaign client requests abort after 20 seconds so a stalled
-  WebView request is terminal. Guest Campaign progress is browser-local.
+  WebView request is terminal. Guests are ranked server-side; guest Campaign
+  progress, bests, and PB ghosts use a rolling 90-day inactivity window, while
+  shared stage leaderboards remain permanent. Signing in merges verified guest
+  results into the Reddit account and keeps the faster result per stage.
   Campaign uses the same compact lobby actions and modal shells as Daily:
   Standings selects among unlocked stage-specific leaderboards, while Tracks
   renders permanent stage progress and starts any unlocked stage.
-- `src/server/campaign-store.ts` owns signed-in Campaign start state,
-  permanent progress, one permanent leaderboard and PB ghost hash per stage,
-  replay validation, and server-derived medals. Campaign records do not share
-  Daily keys or expiry policy.
+- `src/server/campaign-store.ts` owns Campaign start state and progress, one
+  permanent leaderboard and PB ghost hash per stage, replay validation,
+  server-derived medals, rolling guest inactivity retention, and verified guest
+  result merge on sign-in. Signed-in progress is permanent. Campaign records do
+  not share Daily keys or expiry policy.
 - `src/server/head-to-head-*` owns verified-result source resolution,
   isolated duel results, custom-post idempotency, and the three-new-posts per
   player/subreddit/UTC-day limit. The immutable challenge target and ghost are

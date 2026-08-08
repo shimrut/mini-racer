@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     CAMPAIGN_REQUEST_TIMEOUT_MS,
     deriveCampaignProgress,
+    getCampaignBootstrap,
     submitCampaignRun,
 } from '../game/campaign/service.js';
 
@@ -66,5 +67,35 @@ describe('campaign client progress', () => {
 
         await vi.advanceTimersByTimeAsync(CAMPAIGN_REQUEST_TIMEOUT_MS);
         await rejection;
+    });
+
+    it('marks a successful Campaign bootstrap as authoritative', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: vi.fn().mockResolvedValue({
+                ranked: true,
+                signedIn: false,
+                stages: [],
+                progress: { resultsByRaceId: {} },
+                standingsByRaceId: {},
+            }),
+        });
+
+        await expect(getCampaignBootstrap()).resolves.toMatchObject({
+            availability: 'available',
+            authoritative: true,
+            ranked: true,
+        });
+    });
+
+    it('marks an unavailable Campaign bootstrap as non-authoritative', async () => {
+        globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+
+        await expect(getCampaignBootstrap()).resolves.toMatchObject({
+            availability: 'unavailable',
+            authoritative: false,
+            ranked: false,
+        });
     });
 });

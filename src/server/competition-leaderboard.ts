@@ -239,6 +239,16 @@ export async function writeEntry(
     // This is intentionally in the same transaction as the ranked write: a
     // snapshot can never use a pre-write cache generation after this succeeds.
     await transaction.incrBy(competition.standingsRevisionKey, 1);
+    if (
+        playerId.startsWith('guest:')
+        && competition.guestExpiryKey
+        && competition.guestRetentionSeconds
+    ) {
+        await transaction.zAdd(competition.guestExpiryKey, {
+            member: playerId,
+            score: Date.now() + competition.guestRetentionSeconds * 1000,
+        });
+    }
     if (competition.ttlSeconds != null) {
         await transaction.expire(competition.leaderboardKey, competition.ttlSeconds);
         await transaction.expire(competition.entryHashKey, competition.ttlSeconds);

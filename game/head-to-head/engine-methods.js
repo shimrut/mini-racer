@@ -39,11 +39,28 @@ export const headToHeadEngineMethods = {
     // The challenge record keeps no per-viewer result, so the finish sheet hands its own
     // verdict over. Reopening the post falls back to the stored win until it expires.
     async loadChallengeLobby(challengeId = null, { outcome = null, bestTimeMs = null } = {}) {
+        this.headToHeadChallengeId = challengeId;
         cancelDeferredLobbyWork(this);
         if (this.status !== 'ready' || this.currentChallengeRun) {
             this.reset(false, { showStartOverlay: false });
         }
-        const response = await getHeadToHead(challengeId);
+        let response;
+        try {
+            response = await getHeadToHead(challengeId);
+        } catch (error) {
+            // A challenge post can outlive a slow WebView connection. Keep the
+            // failure inside the lobby flow so startup can always hand control
+            // to the player instead of leaving the global loader up forever.
+            console.error('Failed to load Head to Head challenge:', error);
+            response = {
+                ok: false,
+                status: 0,
+                body: {
+                    status: 'challenge_failed',
+                    error: 'Could not load this challenge. Check your connection and try again.',
+                },
+            };
+        }
         const contextual = globalThis.devvit?.context?.postData;
         if (response.body?.status === 'own_challenge') {
             this.activeHeadToHead = null;
@@ -53,7 +70,7 @@ export const headToHeadEngineMethods = {
         const challenge = response.body?.challenge
             || (contextual?.postType === 'head-to-head' ? contextual : null);
         this.activeRaceMode = 'challenge';
-        this.activeHeadToHead = response.ok ? {
+        this.activeHeadToHead = response.ok && challenge ? {
             ...challenge,
             frozenGhost: response.body?.opponentGhost ?? null,
             // The finish sheet crowns the viewer with their own face, so the duel
@@ -63,6 +80,8 @@ export const headToHeadEngineMethods = {
         const challengeReady = response.ok
             && response.body?.status === 'ready'
             && Boolean(challenge);
+        const retryable = !response.ok
+            && (response.status === 0 || response.status >= 500);
         const remembered = outcome
             ? null
             : readHeadToHeadWin(challenge?.challengeId || challengeId);
@@ -70,7 +89,11 @@ export const headToHeadEngineMethods = {
         this.lobbyUi.showChallenge({
             signedIn: response.body?.viewerType === 'reddit',
             canRace: challengeReady,
-            available: challengeReady,
+            // Contextual post data is presentation-only until the server has
+            // returned the authoritative frozen challenge and ghost. It is
+            // still useful while a transient request is waiting for Retry.
+            available: challengeReady || Boolean(challenge),
+            canRetry: retryable,
             challengerName: challenge?.challengerUsername,
             challengerAvatarUrl: challenge?.challengerAvatarUrl,
             viewerAvatarUrl: response.body?.viewerAvatarUrl,
@@ -81,8 +104,30 @@ export const headToHeadEngineMethods = {
             medal: challenge?.medal,
             outcome: outcome || remembered?.outcome || null,
             bestTimeMs: outcome ? bestTimeMs : (remembered?.bestTimeMs ?? null),
-            statusMessage: response.body?.error || '',
+            statusMessage: response.body?.error || (retryable
+                ? 'Could not load this challenge. Try again.'
+                : ''),
         });
+    },
+
+    async retryHeadToHead() {
+        const challengeId = this.headToHeadChallengeId
+            || this.launchTarget?.challengeId
+            || null;
+        if (!challengeId || this.headToHeadLoadPending) return;
+        this.headToHeadLoadPending = true;
+        const currentState = this.lobbyUi?.challengeState || {};
+        this.lobbyUi?.showChallenge({
+            ...currentState,
+            canRetry: true,
+            challengeLoading: true,
+            statusMessage: 'Retrying challenge…',
+        });
+        try {
+            await this.loadChallengeLobby(challengeId);
+        } finally {
+            this.headToHeadLoadPending = false;
+        }
     },
 
     async startHeadToHead() {

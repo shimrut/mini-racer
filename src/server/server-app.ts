@@ -111,6 +111,7 @@ function registerProductionRoutes(app: express.Application): void {
             appSlug: getRequestAppSlug(),
             postId: readContextPostId(),
             postData: readContextPostData(),
+            requestRateLimitIdentity: getRequestRateLimitIdentity(),
         }),
         readContextPostData,
         previewHeadToHead: headToHeadService.preview,
