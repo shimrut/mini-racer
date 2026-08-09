@@ -76,6 +76,7 @@ import {
     PB_GHOST_MAX_SAMPLES,
     PB_GHOST_SAMPLE_INTERVAL_MS,
     PB_GHOST_SAMPLE_RATE_HZ,
+    PB_GHOST_SIMULATION_REVISION,
 } from '../src/server/pb-ghost-trace.ts';
 import {
     getPlayerTrackPbRecord,
@@ -283,6 +284,65 @@ describe('PB ghost trace and storage', () => {
             `dailygp:challenge-pbs:${CHALLENGE.id}`,
             getDailyGpCompetitionTtlSeconds(CHALLENGE),
         );
+    });
+
+    it('keeps a pre-slip revision-1 PB and ghost until current handling beats it', async () => {
+        expect(PB_GHOST_SIMULATION_REVISION).toBe(1);
+        const playerId = 'reddit:pre-slip-racer';
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const field = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        redis.hashes.set(collectionKey, new Map([[field, JSON.stringify({
+            schemaVersion: 2,
+            trackKey: CHALLENGE.trackKey,
+            trackFingerprint: createTrackFingerprint(TRACK),
+            simulationRevision: 1,
+            rulesRevision: 0,
+            lapCount: 1,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            lapCompletionTimesSec: null,
+            ghost: GHOST,
+            updatedAt: '2026-08-08T00:00:00.000Z',
+        })]]));
+
+        expect(await getPlayerTrackPbRecord({
+            playerId,
+            competition: toDailyCompetition(CHALLENGE),
+            track: TRACK,
+        })).toMatchObject({ bestTimeMs: 12_000, ghost: GHOST });
+
+        const slower = await upsertPlayerTrackPersonalBest({
+            playerId,
+            competition: toDailyCompetition(CHALLENGE),
+            track: TRACK,
+            bestTimeMs: 12_100,
+            checkpointTimesSec: [4.1, 8.1],
+            ghost: {
+                ...GHOST,
+                origin: [10, -100, 0],
+            },
+        });
+        expect(slower).toMatchObject({
+            improved: false,
+            record: { bestTimeMs: 12_000, ghost: GHOST },
+        });
+
+        const replacementGhost = {
+            ...GHOST,
+            origin: [20, -100, 0],
+        };
+        const faster = await upsertPlayerTrackPersonalBest({
+            playerId,
+            competition: toDailyCompetition(CHALLENGE),
+            track: TRACK,
+            bestTimeMs: 11_900,
+            checkpointTimesSec: [3.9, 7.9],
+            ghost: replacementGhost,
+        });
+        expect(faster).toMatchObject({
+            improved: true,
+            record: { bestTimeMs: 11_900, ghost: replacementGhost },
+        });
     });
 
     it('selects a retained strict daily best and the current verified ghost under one lock', async () => {

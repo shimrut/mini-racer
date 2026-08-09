@@ -10,6 +10,7 @@ import {
     getPbGhostTraceSampleCount,
     isValidPbGhostTrace,
 } from '../src/server/pb-ghost-trace.ts';
+import { TRACKS } from '../game/track/tracks.js';
 
 function validTrace(overrides = {}) {
     return {
@@ -633,6 +634,13 @@ describe('pb-ghost-trace validation and recording edges', () => {
             ...base,
             startAngle: 1,
         })).not.toBe(createTrackFingerprint(base));
+    });
+
+    it('keeps published Daily geometry fingerprints stable for PB continuity', () => {
+        expect(createTrackFingerprint(TRACKS.pretzelArena))
+            .toBe('y3lf9P0rGLuJ4-Lj3_TJvTTvW2sjdIGqj4PMyQjhV_8');
+        expect(createTrackFingerprint(TRACKS.cobaltRun))
+            .toBe('rJDsRof10WuAqb4gIPB5cKn0hSlKeb9dqMWqmLoJOSg');
     });
 
     it('rejects quantized poses with null position or missing coordinates', () => {

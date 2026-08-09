@@ -149,8 +149,6 @@ describe('track runtime integrity', () => {
         ]);
 
         const intentionallyReviewedKeys = new Set([
-            'pretzelArena',
-            'cobaltRun',
             'lunarLimbo',
             'furiousFast',
             'blackstoneRun',
@@ -192,7 +190,7 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !intentionallyReviewedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(unchangedTrackRegistry)).toBe(
-            '5cec3840798ec34708048929b1d96c5b84f65fb4b5df350638c68dbacc5f03ea',
+            'd25f3efc0cfff9b0cc53ba69d861d9efea6d5f8d294a6243e887bd9a1b393a2e',
         );
 
         const existingTrackRegistry = Object.fromEntries(
@@ -201,10 +199,10 @@ describe('track runtime integrity', () => {
                 .map((trackKey) => [trackKey, TRACKS[trackKey]]),
         );
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
-            '0ddcb5069d55ce590d2d304ee54b6a1a3be145d325bb33ceddda5a4d7fa7139e',
+            '80b83be273da4ec14b3c597cadeb49f14c0bd476fc1925232825d6418bc29bfc',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '3b66b4ff09bb36075fde602984b52a135e0010ef398cfa7c80d0d2b60bdbdd2d',
+            '4fea6728474eab8a31a7b147a706cbbf2e1cab8f2da10b0735a4f9ba22c7fb2c',
         );
     });
 
