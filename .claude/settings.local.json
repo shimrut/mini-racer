@@ -103,7 +103,8 @@
       "Bash(npx jest *)",
       "Bash(node -e \"const r=require\\('./unused-css-report.json'\\); for \\(const [k,v] of Object.entries\\(r\\)\\) { console.log\\(k, JSON.stringify\\(v.unusedClasses ?? v.unused ?? [], null, 1\\)\\); }\")",
       "Bash(git restore *)",
-      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.local.json','utf8'\\)\\); console.log\\('valid JSON'\\)\")"
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.local.json','utf8'\\)\\); console.log\\('valid JSON'\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/game.html)"
     ]
   }
 }
