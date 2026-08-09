@@ -107,68 +107,6 @@ describe('simulation mutation kills wave2 — steering and slip gates', () => {
         expect(Math.abs(trimmed.angularVelocity)).toBeLessThan(Math.abs(untrimmed.angularVelocity));
     });
 
-    it('activates the slip speed gate once slip reaches 0.11 (L637-L640)', () => {
-        const dt = 1 / 60;
-        const state = createTestSimState({
-            pos: { x: 5, y: 0 },
-            prevPos: { x: 5, y: 0 },
-            velocity: { x: 8, y: 1.2 },
-            angle: 0,
-            keys: { left: true, right: false },
-            slipSpeedGateClamp: false,
-        });
-        const currentSpeed = Math.hypot(state.velocity.x, state.velocity.y);
-        const slipRatio = Math.abs(state.velocity.y) / currentSpeed;
-
-        expect(slipRatio).toBeGreaterThanOrEqual(0.11);
-
-        updateSimulation(
-            state,
-            dt,
-            {
-                ...CONFIG,
-                accel: 50,
-                grip: 0,
-                downforceGrip: 0,
-                maxSpeed: 10,
-                turnRate: 6,
-                steerGripScale: 0.05,
-            },
-            OPEN_TRACK,
-            [],
-        );
-
-        expect(state.slipSpeedGateClamp).toBe(true);
-        expect(Math.hypot(state.velocity.x, state.velocity.y)).toBeLessThanOrEqual(currentSpeed + 1e-6);
-    });
-
-    it('clears the slip speed gate when steering input returns to zero (L647-L648)', () => {
-        const state = createTestSimState({
-            pos: { x: 5, y: 0 },
-            prevPos: { x: 5, y: 0 },
-            velocity: { x: 4, y: 0 },
-            angle: 0,
-            keys: { left: false, right: false },
-            slipSpeedGateClamp: true,
-        });
-
-        updateSimulation(
-            state,
-            1 / 60,
-            {
-                ...CONFIG,
-                accel: 0,
-                grip: 0,
-                downforceGrip: 0,
-                maxSpeed: 50,
-            },
-            OPEN_TRACK,
-            [],
-        );
-
-        expect(state.slipSpeedGateClamp).toBe(false);
-    });
-
     it('skips forward thrust once currentSpeed reaches safeMaxSpeed (L598)', () => {
         const dt = 1 / 60;
         const safeMaxSpeed = 10 / KPH_PER_WORLD_UNIT;

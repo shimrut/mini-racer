@@ -283,37 +283,6 @@ describe('simulation survivor kills wave3 — slip gate and scrape severity', ()
         vi.restoreAllMocks();
     });
 
-    it('turns the slip clamp on above 0.11 and off below 0.055 (L633-L638)', () => {
-        const config = {
-            ...CONFIG,
-            accel: 0,
-            grip: 0,
-            downforceGrip: 0,
-            turnRate: 0,
-            highSpeedSteerTrim: 0,
-        };
-        const onState = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 10, y: 1.2 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false,
-        });
-        const offState = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 10, y: 0.5 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: true,
-        });
-
-        updateSimulation(onState, 0.01, config, OPEN_TRACK, []);
-        updateSimulation(offState, 0.01, config, OPEN_TRACK, []);
-
-        expect(onState.slipSpeedGateClamp).toBe(true);
-        expect(offState.slipSpeedGateClamp).toBe(false);
-    });
-
     it('reports scrape severity between speed-only and max-depth bounds (L427-L437)', () => {
         const carRadius = 0.275;
         const referenceImpactKph = 150;

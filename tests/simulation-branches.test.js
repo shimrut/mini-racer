@@ -326,44 +326,6 @@ describe('updateSimulation — driving physics branches', () => {
         expect(Math.abs(steering.velocity.x)).toBeGreaterThan(Math.abs(coasting.velocity.x));
     });
 
-    it('clamps speed growth while steering through the slip-speed gate hysteresis', () => {
-        const state = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 6, y: 14 },
-            angle: 0.8,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false
-        });
-        const speedBefore = Math.hypot(state.velocity.x, state.velocity.y);
-        const config = {
-            ...CONFIG,
-            accel: 200,
-            grip: 0.2,
-            highSpeedSteerTrim: 0,
-            downforceGrip: 0,
-            maxSpeed: 310
-        };
-
-        updateSimulation(state, 1 / 60, config, OPEN_TRACK, []);
-
-        expect(state.slipSpeedGateClamp).toBe(true);
-        expect(state.cachedSpeed).toBeLessThanOrEqual(speedBefore + 1e-6);
-    });
-
-    it('clears slip-speed gate clamp when steering stops', () => {
-        const state = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 0, y: 10 },
-            angle: 0,
-            keys: { left: false, right: false },
-            slipSpeedGateClamp: true
-        });
-
-        updateSimulation(state, 0.05, { ...CONFIG, accel: 0, grip: 0 }, OPEN_TRACK, []);
-
-        expect(state.slipSpeedGateClamp).toBe(false);
-    });
-
     it('initializes non-finite angular velocity and decays spin when not steering', () => {
         const state = createTestSimState({
             pos: { x: 0, y: 0 },
@@ -982,56 +944,6 @@ describe('updateSimulation — acceleration and slip-gate branches', () => {
         expect(thrustAllowed.cachedSpeed).toBeGreaterThan(0);
     });
 
-    it('initializes slipSpeedGateClamp and keeps it latched inside the hysteresis band', () => {
-        const latched = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 1.2, y: 10 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: 'stale'
-        });
-        const speedBefore = Math.hypot(latched.velocity.x, latched.velocity.y);
-
-        updateSimulation(latched, 1 / 60, { ...CONFIG, accel: 200, grip: 0.2, downforceGrip: 0 }, OPEN_TRACK, []);
-
-        expect(typeof latched.slipSpeedGateClamp).toBe('boolean');
-        expect(latched.slipSpeedGateClamp).toBe(true);
-        expect(latched.cachedSpeed).toBeLessThanOrEqual(speedBefore + 1e-6);
-    });
-
-    it('turns slip-speed clamp on above the on threshold and off below the off threshold', () => {
-        const turnOn = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 8, y: 1.2 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false
-        });
-        const stayOff = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 8, y: 0.4 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false
-        });
-        const turnOff = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 8, y: 0.4 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: true
-        });
-        const config = { ...CONFIG, accel: 0, grip: 0 };
-
-        updateSimulation(turnOn, 0.01, config, OPEN_TRACK, []);
-        updateSimulation(stayOff, 0.01, config, OPEN_TRACK, []);
-        updateSimulation(turnOff, 0.01, config, OPEN_TRACK, []);
-
-        expect(turnOn.slipSpeedGateClamp).toBe(true);
-        expect(stayOff.slipSpeedGateClamp).toBe(false);
-        expect(turnOff.slipSpeedGateClamp).toBe(false);
-    });
-
     it('reports zero slip ratio at near-zero speed and skips skid marks below thresholds', () => {
         const stopped = createTestSimState({
             angle: 0,
@@ -1250,13 +1162,13 @@ describe('updateSimulation — wall scrape config and contact resolution', () =>
         expect(state.pos.x).toBeLessThan(5);
     });
 
-    it('scales velocity down when steering exceeds the slip-gated speed ceiling', () => {
+    it('scales velocity down to the configured max speed when it is exceeded', () => {
+        const safeMax = CONFIG.maxSpeed / KPH_PER_WORLD_UNIT;
         const state = createTestSimState({
             pos: { x: 0, y: 0 },
-            velocity: { x: 6, y: 14 },
+            velocity: { x: safeMax, y: safeMax },
             angle: 0.8,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: true
+            keys: { left: false, right: true }
         });
         const speedBefore = Math.hypot(state.velocity.x, state.velocity.y);
 
@@ -1268,8 +1180,8 @@ describe('updateSimulation — wall scrape config and contact resolution', () =>
             highSpeedSteerTrim: 0
         }, OPEN_TRACK, []);
 
-        expect(state.cachedSpeed).toBeLessThanOrEqual(speedBefore + 1e-6);
-        expect(state.velocity.x).not.toBeCloseTo(6);
+        expect(speedBefore).toBeGreaterThan(safeMax);
+        expect(state.cachedSpeed).toBeLessThanOrEqual(safeMax + 1e-9);
     });
 
     it('suppresses inward center velocity during active contact even without cooldown', () => {
@@ -1520,61 +1432,12 @@ describe('updateSimulation — mutation-survivor precision', () => {
         expect(Math.abs(steering.velocity.y)).toBeLessThan(8);
     });
 
-    it('initializes non-boolean slipSpeedGateClamp before hysteresis checks (L614)', () => {
-        const state = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 9.939, y: 1.1 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: 'stale'
-        });
-
-        updateSimulation(state, 0.01, { ...noGripConfig, turnRate: 0, highSpeedSteerTrim: 0 }, OPEN_TRACK, []);
-
-        expect(typeof state.slipSpeedGateClamp).toBe('boolean');
-        expect(state.slipSpeedGateClamp).toBe(true);
-    });
-
-    it('uses inclusive slip-gate on/off thresholds while steering (L619, L621)', () => {
-        const turnConfig = { ...noGripConfig, turnRate: 0, highSpeedSteerTrim: 0 };
-        const turnOn = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 9.939, y: 1.1 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false
-        });
-        const stayOff = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 9.95, y: 1.05 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false
-        });
-        const turnOff = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: Math.sqrt(100 - 0.54 * 0.54), y: 0.54 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: true
-        });
-
-        updateSimulation(turnOn, 0.01, turnConfig, OPEN_TRACK, []);
-        updateSimulation(stayOff, 0.01, turnConfig, OPEN_TRACK, []);
-        updateSimulation(turnOff, 0.01, turnConfig, OPEN_TRACK, []);
-
-        expect(turnOn.slipSpeedGateClamp).toBe(true);
-        expect(stayOff.slipSpeedGateClamp).toBe(false);
-        expect(turnOff.slipSpeedGateClamp).toBe(false);
-    });
-
-    it('does not rescale velocity when cached speed already equals the allowed cap (L630)', () => {
+    it('does not rescale velocity while cached speed stays under the max-speed cap', () => {
         const state = createTestSimState({
             pos: { x: 0, y: 0 },
             velocity: { x: 3, y: 4 },
             angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: true
+            keys: { left: false, right: true }
         });
 
         updateSimulation(state, dt, {

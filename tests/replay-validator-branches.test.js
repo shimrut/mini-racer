@@ -95,7 +95,6 @@ describe('server replay validator branch coverage', () => {
         expect(mockUpdateSimulation.mock.calls[0][0].keys).toEqual({ left: true, right: false });
         expect(mockUpdateSimulation.mock.calls[0][0]).toMatchObject({
             wallContactActive: false,
-            slipSpeedGateClamp: false,
             activeRunId: 'server-replay-validation',
             currentModeKey: 'daily',
             velocity: { x: 0, y: 0 },

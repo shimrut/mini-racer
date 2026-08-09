@@ -545,61 +545,11 @@ describe('simulation survivor kills wave6 — thrust and grip formulas', () => {
         expect(state.cachedSpeed).toBeCloseTo(safeMax, 10);
     });
 
-    it('treats tractionSlipRatio as zero when speed is at or below 0.001 (L587)', () => {
-        const state = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 0.001, y: 0 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false,
-        });
-
-        updateSimulation(
-            state,
-            0.01,
-            { ...CONFIG, accel: 0, grip: 0, downforceGrip: 0, turnRate: 0, highSpeedSteerTrim: 0 },
-            OPEN_TRACK,
-            [],
-        );
-
-        expect(state.slipSpeedGateClamp).toBe(false);
-    });
 });
 
 describe('simulation survivor kills wave6 — slip gate and steer trim', () => {
     afterEach(() => {
         vi.restoreAllMocks();
-    });
-
-    it('activates slip clamp at slip exactly 0.11 and clears at 0.055 (L639, L641)', () => {
-        const config = {
-            ...CONFIG,
-            accel: 0,
-            grip: 0,
-            downforceGrip: 0,
-            turnRate: 0,
-            highSpeedSteerTrim: 0,
-        };
-        const onState = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 9.939, y: 1.1 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: false,
-        });
-        const offState = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 9.985, y: 0.55 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: true,
-        });
-
-        updateSimulation(onState, 0.01, config, OPEN_TRACK, []);
-        updateSimulation(offState, 0.01, config, OPEN_TRACK, []);
-
-        expect(onState.slipSpeedGateClamp).toBe(true);
-        expect(offState.slipSpeedGateClamp).toBe(false);
     });
 
     it('applies steer trim only when highSpeedSteerTrim is strictly positive (L558)', () => {

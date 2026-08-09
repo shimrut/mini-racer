@@ -599,9 +599,6 @@ export function updateSimulation(
                 state.velocity.x * sideX
                 + state.velocity.y * sideY
             );
-            const tractionSlipRatio = currentSpeed > 0.001
-                ? clamp(Math.abs(lateralSpeed) / currentSpeed, 0, 1)
-                : 0;
             const latBeforeGrip = lateralSpeed;
             const absLatForTotalCap = Math.min(Math.abs(latBeforeGrip), safeMaxSpeed);
             const longitudinalLimit = Math.sqrt(Math.max(
@@ -642,19 +639,12 @@ export function updateSimulation(
             state.velocity.y = (headingY * forwardSpeed) + (sideY * lateralSpeed);
 
             // The configured max speed is authoritative and caps the total car speed.
+            // Slip costs speed through the grip model above: the exponential decay of
+            // lateralSpeed shortens the velocity vector, and longitudinalLimit keeps
+            // thrust inside the friction circle. An extra slip-based ceiling here only
+            // duplicated that, so there is no penalty term — just the configured cap.
             state.cachedSpeed = Math.sqrt(state.velocity.x ** 2 + state.velocity.y ** 2);
-            let allowedSpeed = safeMaxSpeed;
-            // Apply a continuous speed penalty curve based on tire slip.
-            // This replaces the binary slipSpeedGateClamp to ensure all steering inputs
-            // (analog sticks and digital taps) are penalized fairly and smoothly.
-            const slipPenaltyFactor = 1.08;
-            const slipPenalty = Math.min(1, (tractionSlipRatio ** 2) * slipPenaltyFactor);
-            allowedSpeed = safeMaxSpeed * (1 - slipPenalty);
-            
-            // Clean up old state property to prevent any residual bugs
-            if (typeof state.slipSpeedGateClamp !== 'undefined') {
-                delete state.slipSpeedGateClamp;
-            }
+            const allowedSpeed = safeMaxSpeed;
             if (state.cachedSpeed > allowedSpeed) {
                 const speedScale = allowedSpeed / state.cachedSpeed;
                 state.velocity.x *= speedScale;

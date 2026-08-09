@@ -231,53 +231,6 @@ describe('simulation boundary kills — steer trim and downforce gates', () => {
     });
 });
 
-describe('simulation boundary kills — slip gate init (L614)', () => {
-    afterEach(() => {
-        vi.restoreAllMocks();
-    });
-
-    it('coerces empty-string slipSpeedGateClamp to a boolean before hysteresis', () => {
-        const state = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 9.939, y: 1.1 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: ''
-        });
-
-        updateSimulation(
-            state,
-            0.01,
-            { ...CONFIG, accel: 0, grip: 0, downforceGrip: 0, turnRate: 0, highSpeedSteerTrim: 0 },
-            OPEN_TRACK,
-            []
-        );
-
-        expect(typeof state.slipSpeedGateClamp).toBe('boolean');
-        expect(state.slipSpeedGateClamp).toBe(true);
-    });
-
-    it('initializes non-boolean clamp to false and keeps it false in the dead band (L614)', () => {
-        const state = createTestSimState({
-            pos: { x: 0, y: 0 },
-            velocity: { x: 10, y: 0.8 },
-            angle: 0,
-            keys: { left: false, right: true },
-            slipSpeedGateClamp: 'stale'
-        });
-
-        updateSimulation(
-            state,
-            0.01,
-            { ...CONFIG, accel: 0, grip: 0, downforceGrip: 0, turnRate: 0, highSpeedSteerTrim: 0 },
-            OPEN_TRACK,
-            []
-        );
-
-        expect(state.slipSpeedGateClamp).toBe(false);
-    });
-});
-
 describe('simulation boundary kills — swept half-length (L255)', () => {
     afterEach(() => {
         vi.restoreAllMocks();

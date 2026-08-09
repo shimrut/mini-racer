@@ -152,7 +152,6 @@ function createSimulationState(
         skidMarks: createWriteOnlyBuffer(),
         routeTrace: createWriteOnlyBuffer(),
         runHistory: createWriteOnlyBuffer(),
-        slipSpeedGateClamp: false,
     };
 
     return { state, collisionSegments: collisionRuntime.collisionSegments };
