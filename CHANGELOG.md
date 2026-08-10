@@ -1,5 +1,10 @@
 # Changelog
 
+- Limited Devvit release contents to the compiled game client, server, source
+  maps, and required build inputs. Tests, docs, internal notes, generated review
+  artwork, unrelated tooling, and macOS metadata are no longer sent in the
+  publish source or WebView asset archives.
+
 - Renamed the Campaign launcher's `Permanent Series` eyebrow to `The Numbers`.
 
 - Reframed Head to Head post titles as a direct challenge —

@@ -4,6 +4,27 @@
   "marketingAssets": {
     "icon": "assets/icon.png"
   },
+  "sourceIgnores": [
+    "**/.DS_Store",
+    ".claude/",
+    ".gitignore",
+    "CHANGELOG.md",
+    "FAQ.md",
+    "IGNORE SUPABASE",
+    "LP/",
+    "README.md",
+    "assets/share/",
+    "docs/",
+    "ok-let-s-plan-for-fluttering-horizon.md",
+    "stryker.config.mjs",
+    "tests/",
+    "tools/*",
+    "!tools/bust-client-asset-cache.js",
+    "!tools/generate-player-car-assets.js",
+    "!tools/generate-share-images.js",
+    "vite.mapmaker.config.js",
+    "vitest.config.js"
+  ],
   "permissions": {
     "journeys": true,
     "reddit": {

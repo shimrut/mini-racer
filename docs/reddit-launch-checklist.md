@@ -200,6 +200,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [x] `README.md` still matches the shipped product and moderator flow.
 - [x] `CHANGELOG.md` reflects the main launchable changes.
 - [x] `npm test` passes on the version being published.
+- [x] The WebView upload contains only compiled game assets (including source maps), with no macOS metadata.
+- [x] The publish source archive excludes tests, docs, internal notes, generated review artwork, and non-build tooling; only the three scripts required by `npm run build` remain.
 - [x] The `1.0.0` upload and remote build succeeded.
 - [x] `devvit publish --version 1.0.0` submitted the intended unlisted release.
 

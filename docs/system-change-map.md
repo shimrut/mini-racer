@@ -493,6 +493,14 @@ The browser-side API route table is `game/scoreboard/api-client.js`; player ID /
 | `vitest` | Test runner | `vitest.config.js`, `npm test` |
 | `@stryker-mutator/*` | Mutation testing | `stryker.config.mjs` |
 
+`devvit.json` is also the release-content boundary. Its `sourceIgnores` policy
+keeps tests, documentation, internal notes, generated review artwork, and
+unrelated tools out of the review source archive while retaining game/server
+source and the three generator/cache-busting scripts required by `npm run
+build`. The compiled client and server uploads still include their source maps.
+Vite's `public/` directory is part of the WebView upload, so it must remain free
+of local metadata such as `.DS_Store`.
+
 ## Change Impact Matrix
 
 Use this table when scoping work. "Primary files" are the places most likely to change. "Review too" means likely ripple checks even if no edit is needed.

@@ -10,9 +10,10 @@ Vite copies everything under `public/` into `dist/client`, even when no page or 
 
 - Tracked and unreferenced: `public/car_sprite.png` plus the three `public/assets/medals/medal_line*.png` files (about 1.5 MB total).
 - Local draft logos under ignored `public/assets/logo/` are also copied by local deploy builds (about 8.3 MB in the reviewed checkout).
-- `.DS_Store` files under `public/` are copied as well.
+- `.DS_Store` files under `public/` are copied as well, so the release-pipeline
+  test now fails if any reappear.
 
-The unused tracked assets were removed. Local draft logos and the duplicate medal draft were preserved under ignored `local-assets/`, outside Vite's public copy path. Stray `.DS_Store` files were removed from the shipped asset tree.
+The unused tracked assets were removed. Local draft logos and the duplicate medal draft were preserved under ignored `local-assets/`, outside Vite's public copy path. Stray `.DS_Store` files were removed from the shipped asset tree. Devvit's publish source archive separately excludes tests, docs, internal notes, generated review artwork, and non-build tooling through `devvit.json`; the three scripts invoked by the production build remain included.
 
 ### 2. No-op HTML entrypoint rewrite
 
