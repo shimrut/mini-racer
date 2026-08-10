@@ -33,9 +33,11 @@ leaderboard, and retention rules.
 - Campaign result posts freeze a verified result and ghost. Signed-in viewers
   may race that ghost even when the corresponding Campaign stage is locked;
   duel results never write Campaign progression, leaderboards, or PBs.
-- Signed-in players can create a Head to Head post from a verified Campaign or
-  Daily result. A signed-in player who beats someone else's challenge can post
-  a Brag comment; guests can race and submit but cannot create posts or Brag.
+- Signed-in players can author a Head to Head post from a verified Campaign or
+  Daily result. The returned Reddit post must be attributed to that player; an
+  app-authored fallback is rejected and does not award the post unlock. A
+  signed-in player who beats someone else's challenge can post a Brag comment;
+  guests can race and submit but cannot create posts or Brag.
   Head to Head outcomes remain temporary and do not merge into player history.
 - Plain expanded-game startup opens Home. Daily, Campaign, and challenge posts
   can launch directly into their respective lobby. Direct Campaign startup

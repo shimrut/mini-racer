@@ -63,10 +63,14 @@ const reddit = {
         const post = {
             id: `t3_challenge${postNumber}`,
             url: `https://reddit.com/r/miniracer/challenge${postNumber}`,
+            authorName: 'RaceFan',
             subredditName: input.subredditName,
             removed: false,
             body: input.textFallback?.text || '',
             getPostData: vi.fn(async () => input.postData),
+            delete: vi.fn(async () => {
+                post.removed = true;
+            }),
         };
         activePosts.set(post.id, post);
         return post;
@@ -95,13 +99,13 @@ const context = {
     postId: 't3_challenge1',
 };
 
-function source(bestTimeMs = 25_640, sourceKind = 'campaign') {
+function source(bestTimeMs = 25_640, sourceKind = 'campaign', trackKey = 'numberThree') {
     return {
         sourceKind,
         sourceId: sourceKind === 'campaign' ? 'numbered-v1-03' : 'duel-result-1',
         campaignId: 'numbered-v1',
         raceId: 'numbered-v1-03',
-        trackKey: 'numberThree',
+        trackKey,
         lapCount: 2,
         bestTimeMs,
         medal: 'gold',
@@ -133,11 +137,12 @@ function makeService({
     bestTimeMs = 25_640,
     validatedTimeMs = 25_000,
     sourceKind = 'campaign',
+    trackKey = 'numberThree',
     validateReplay = null,
 } = {}) {
     let nextId = 0;
     return createHeadToHeadService({
-        resolveSource: vi.fn(async () => source(bestTimeMs, sourceKind)),
+        resolveSource: vi.fn(async () => source(bestTimeMs, sourceKind, trackKey)),
         validateReplay: validateReplay || vi.fn(async () => ({
             ok: true,
             bestTimeMs: validatedTimeMs,
@@ -180,6 +185,10 @@ describe('head-to-head service', () => {
         expect(created.body.status).toBe('created');
         expect(reddit.submitCustomPost).toHaveBeenCalledWith(expect.objectContaining({
             entry: 'head-to-head',
+            runAs: 'USER',
+            userGeneratedContent: {
+                text: 'u/RaceFan · Head to Head: beat 25.640 on Number Three',
+            },
             postData: expect.objectContaining({
                 postType: 'head-to-head',
                 targetTimeMs: 25_640,
@@ -462,7 +471,90 @@ describe('head-to-head service', () => {
         expect(reddit.submitCustomPost).toHaveBeenCalledTimes(1);
     });
 
-    it('allows only three distinct new posts per user, subreddit, and UTC day', async () => {
+    it('does not recognize or reuse an app-authored challenge post', async () => {
+        const service = makeService();
+        const first = await createChallenge(service);
+        activePosts.get('t3_challenge1').authorName = 'mini-racer';
+
+        const loaded = await service.get(first.body.challengeId, {
+            ...context,
+            username: 'OtherRacer',
+        });
+        const second = await createChallenge(service);
+
+        expect(loaded).toMatchObject({
+            status: 404,
+            body: { status: 'challenge_unavailable', reason: 'post_author_mismatch' },
+        });
+        expect(second.body.status).toBe('created');
+        expect(second.body.challengeId).not.toBe(first.body.challengeId);
+        expect(reddit.getPostsByUser).toHaveBeenCalledWith(expect.objectContaining({
+            username: 'RaceFan',
+        }));
+        expect(reddit.submitCustomPost).toHaveBeenCalledTimes(2);
+    });
+
+    it('recovers only a challenger-authored post after creation storage is interrupted', async () => {
+        const service = makeService();
+        const preview = await service.preview({ sourceKind: 'campaign' }, context);
+        const recoveredPost = {
+            id: 't3_recovered',
+            url: 'https://reddit.com/r/miniracer/recovered',
+            authorName: 'racefan',
+            subredditName: 'MiniRacer',
+            removed: false,
+            getPostData: vi.fn(async () => ({
+                postType: 'head-to-head',
+                challengeId: preview.body.preview.challengeId,
+            })),
+        };
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => [recoveredPost] });
+
+        const recovered = await service.create({
+            challengeToken: preview.body.challengeToken,
+        }, context);
+
+        expect(reddit.getPostsByUser).toHaveBeenCalledWith(expect.objectContaining({
+            username: 'RaceFan',
+        }));
+        expect(recovered).toMatchObject({
+            status: 200,
+            body: {
+                status: 'already_created',
+                postUrl: recoveredPost.url,
+            },
+        });
+        expect(reddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
+    it('fails closed and releases the slot when Reddit falls back to the app author', async () => {
+        const fallbackPost = {
+            id: 't3_app_fallback',
+            url: 'https://reddit.com/r/miniracer/app-fallback',
+            authorName: 'mini-racer',
+            removed: false,
+            delete: vi.fn(async () => undefined),
+        };
+        reddit.submitCustomPost.mockResolvedValueOnce(fallbackPost);
+
+        const result = await createChallenge(makeService());
+
+        expect(result).toEqual({
+            status: 409,
+            body: {
+                status: 'user_action_unavailable',
+                error: 'Reddit user-attributed posting is not available for this app version.',
+            },
+        });
+        expect(fallbackPost.delete).toHaveBeenCalledOnce();
+        expect(result.body).not.toHaveProperty('carUnlocks');
+        expect([...hashes.values()].every((hash) => !hash.has('post:track:numberThree'))).toBe(true);
+        expect(strings.get(
+            'miniracer:head-to-head:create-count:miniracer:racefan:numberthree:2026-07-23',
+        )).toBe('0');
+    });
+
+    it('allows three distinct new posts per track, user, subreddit, and UTC day', async () => {
         for (const time of [20_001, 20_002, 20_003]) {
             const created = await createChallenge(makeService({ bestTimeMs: time }));
             expect(created.body.status).toBe('created');
@@ -470,7 +562,31 @@ describe('head-to-head service', () => {
         const blocked = await createChallenge(makeService({ bestTimeMs: 20_004 }));
         expect(blocked.status).toBe(429);
         expect(blocked.body.status).toBe('daily_limit_reached');
-        expect(reddit.submitCustomPost).toHaveBeenCalledTimes(3);
+        expect(blocked.body.error).toContain('per track');
+
+        const otherTrack = await createChallenge(makeService({
+            bestTimeMs: 20_004,
+            trackKey: 'circuit',
+        }));
+        expect(otherTrack.body.status).toBe('created');
+        expect(reddit.submitCustomPost).toHaveBeenCalledTimes(4);
+    });
+
+    it('keeps the per-track slot after a valid user post when identity storage fails', async () => {
+        const defaultSet = redis.set.getMockImplementation();
+        redis.set.mockImplementation(async (key, value, options = {}) => {
+            if (key.startsWith('miniracer:head-to-head:post-identity:')) {
+                throw new Error('identity storage unavailable');
+            }
+            return defaultSet(key, value, options);
+        });
+
+        await expect(createChallenge(makeService())).rejects.toThrow('identity storage unavailable');
+        redis.set.mockImplementation(defaultSet);
+
+        expect(strings.get(
+            'miniracer:head-to-head:create-count:miniracer:racefan:numberthree:2026-07-23',
+        )).toBe('1');
     });
 
     it('stores only the viewer best duel and reports win, tie, and loss precisely', async () => {

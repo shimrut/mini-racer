@@ -110,8 +110,11 @@ Mini Racer is a **game**, so the most important launch requirements are:
   accepted, rejected, timed-out, and interrupted-response paths all end on an
   actionable result sheet, including when PB ghost or lobby refresh fails.
 - [ ] A signed-in Campaign or Daily result creates a reusable custom challenge
-  post; guests can open, race, and submit Head to Head challenges but cannot
-  create posts.
+  post authored by that signed-in Reddit user; guests can open, race, and
+  submit Head to Head challenges but cannot create posts. Confirm the app has
+  `SUBMIT_POST`, the request runs as `USER` with user-generated content, and an
+  app-authored fallback is deleted and reported as unavailable without awarding
+  the post unlock.
 - [ ] The Head to Head post makes the challenger, viewer, track name, target
   time, lap count, and Race Head to Head action legible without
   inline scrolling on desktop or compact Reddit WebView widths.
@@ -135,8 +138,11 @@ Mini Racer is a **game**, so the most important launch requirements are:
   for one identity and verify the 429 response is actionable, expensive post
   resolution is skipped for throttled attempts, and normal submission resumes
   after the window expires.
-- [ ] Challenge-post reuse and the three-new-posts per
-  player/subreddit/UTC-day limit are confirmed with real Reddit context.
+- [ ] Challenge-post reuse accepts only posts authored by the challenger;
+  app-authored pre-launch posts are unavailable and are neither reused nor
+  recovered. Confirm the three-new-posts per track/player/subreddit/UTC-day
+  limit with real Reddit context, including that a fourth overall post on
+  another track is allowed.
 
 ### Reddit-specific setup
 

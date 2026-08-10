@@ -276,7 +276,14 @@ flowchart LR
   not share Daily keys or expiry policy.
 - `src/server/head-to-head-*` owns verified-result source resolution,
   isolated duel results, custom-post idempotency, and the three-new-posts per
-  player/subreddit/UTC-day limit. The immutable challenge target and ghost are
+  track/player/subreddit/UTC-day limit. New custom posts run as the signed-in
+  challenger with Devvit's required user-generated-content declaration. The
+  returned Reddit author must match that challenger before the post is saved or
+  an unlock is awarded; an app-account fallback is deleted best-effort and
+  fails closed. Stored identities and interrupted-creation recovery likewise
+  accept only challenger-authored posts, and recovery scans only that Reddit
+  user's posts. Old app-authored challenge posts are not recognized as live.
+  The immutable challenge target and ghost are
   encoded in the Reddit custom post's text fallback after the human-readable
   copy under `Challenge replay data:`. The payload is a versioned gzip/base64url
   envelope with a SHA-256 hash carried in `postData`; challenge reads and
@@ -290,8 +297,7 @@ flowchart LR
   New challenge creation also stores only the
   Reddit post identity by challenge ID, so a client without post context can
   locate that post and the server can still read the replay from its body.
-  Post-bound validation remains preferred whenever context is supplied. Legacy
-  challenge posts may use a matching stored record during migration. Redis
+  Post-bound validation remains preferred whenever context is supplied. Redis
   retains the post identity alongside the separate operational challenge
   indexes, locks, limits, and five-minute verified-win/Brag receipts; it does
   not store the new frozen replay. Signed-in Reddit users create posts; guests

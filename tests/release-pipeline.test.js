@@ -13,6 +13,13 @@ function devvitReleaseCommands(script) {
 }
 
 describe('release pipeline', () => {
+    it('keeps Reddit user attribution enabled for result comments and challenge posts', () => {
+        expect(devvitConfig.permissions.reddit.asUser).toEqual(expect.arrayContaining([
+            'SUBMIT_COMMENT',
+            'SUBMIT_POST',
+        ]));
+    });
+
     it('keeps the cache-busting production build authoritative for Devvit releases', () => {
         const buildScript = packageJson.scripts.build;
         const viteBuildIndex = buildScript.indexOf('vite build');

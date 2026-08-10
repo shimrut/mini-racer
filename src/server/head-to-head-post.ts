@@ -30,6 +30,7 @@ export type HeadToHeadResolutionFailureReason =
     | 'replay_decompress_failed'
     | 'replay_envelope_invalid'
     | 'replay_contract_mismatch'
+    | 'post_author_mismatch'
     | 'post_identity_invalid';
 
 export type HeadToHeadResolution = {
@@ -216,6 +217,13 @@ export async function resolveHeadToHeadRecordResult(
         };
     }
     const rawPostData = postDataResult.data;
+    if (
+        typeof (post as any)?.authorName !== 'string'
+        || (post as any).authorName.trim().toLowerCase()
+            !== rawPostData.challengerUsername.trim().toLowerCase()
+    ) {
+        return { ok: false, reason: 'post_author_mismatch' };
+    }
     const fallbackTexts = postFallbackTexts(post);
     let lastReplayReason: HeadToHeadResolutionFailureReason | undefined;
     let lastReplayDiff: Record<string, unknown> | undefined;

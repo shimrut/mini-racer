@@ -213,16 +213,6 @@ function signedContext(context: HeadToHeadRequestContext): {
     return username && subredditName ? { username, subredditName } : null;
 }
 
-function creationContext(context: HeadToHeadRequestContext): {
-    username: string;
-    subredditName: string;
-    appSlug: string;
-} | null {
-    const signed = signedContext(context);
-    const appSlug = typeof context.appSlug === 'string' ? context.appSlug.trim() : '';
-    return signed && appSlug ? { ...signed, appSlug } : null;
-}
-
 function challengeContext(context: HeadToHeadRequestContext): {
     subredditName: string;
 } | null {
@@ -468,11 +458,14 @@ async function activePost(identity: {
     challengeId: string;
     postId: `t3_${string}`;
     postUrl: string;
-} | null): Promise<typeof identity> {
+} | null, challengerUsername: string): Promise<typeof identity> {
     if (!identity) return null;
     try {
         const post = await reddit.getPostById(identity.postId);
-        return (post as any)?.removed ? null : identity;
+        return (post as any)?.removed
+            || normalizeName((post as any)?.authorName || '') !== normalizeName(challengerUsername)
+            ? null
+            : identity;
     } catch {
         return null;
     }
@@ -480,10 +473,9 @@ async function activePost(identity: {
 
 async function recoverPost(
     preview: PreviewRecord,
-    appSlug: string,
 ): Promise<{ postId: `t3_${string}`; postUrl: string } | null> {
     const listing = await (reddit as any).getPostsByUser({
-        username: appSlug,
+        username: preview.username,
         sort: 'new',
         timeframe: 'month',
         limit: 100,
@@ -497,6 +489,7 @@ async function recoverPost(
             if (
                 data?.postType === HEAD_TO_HEAD_POST_TYPE
                 && data?.challengeId === preview.challengeId
+                && normalizeName(post?.authorName || '') === normalizeName(preview.username)
                 && typeof post.id === 'string'
                 && post.id.startsWith('t3_')
                 && typeof post.url === 'string'
@@ -508,6 +501,15 @@ async function recoverPost(
         }
     }
     return null;
+}
+
+async function deletePostBestEffort(post: unknown): Promise<void> {
+    try {
+        if (post && typeof (post as { delete?: unknown }).delete === 'function') {
+            await (post as { delete: () => Promise<unknown> }).delete();
+        }
+    } catch {
+    }
 }
 
 async function savePost(
@@ -594,7 +596,7 @@ export function createHeadToHeadService(
         input: Record<string, unknown>,
         context: HeadToHeadRequestContext,
     ): Promise<HeadToHeadServiceResult> {
-        const request = creationContext(context);
+        const request = signedContext(context);
         if (!request) {
             return {
                 status: 401,
@@ -658,7 +660,7 @@ export function createHeadToHeadService(
                 sourceId,
                 source.bestTimeMs,
             );
-            const existing = await activePost(identity);
+            const existing = await activePost(identity, request.username);
             if (existing) {
                 await writeHeadToHeadPostIdentityByChallengeId(existing);
                 const carUnlocks = await recordChallengePostUnlock(
@@ -685,7 +687,7 @@ export function createHeadToHeadService(
                 );
             }
 
-            const recovered = await recoverPost(preparedRecord, request.appSlug);
+            const recovered = await recoverPost(preparedRecord);
             if (recovered) {
                 const challengerAvatarUrl = await resolveRedditAvatarUrl(preparedRecord.username);
                 const saved = await savePost(buildRecord(preparedRecord, challengerAvatarUrl), recovered);
@@ -709,13 +711,14 @@ export function createHeadToHeadService(
             if (!await reserveHeadToHeadPostSlot(
                 request.subredditName,
                 request.username,
+                source.trackKey,
                 reservedAt,
             )) {
                 return {
                     status: 429,
                     body: {
                         status: 'daily_limit_reached',
-                        error: 'You can create up to three new Head to Head posts per community each UTC day.',
+                        error: 'You can create up to three new Head to Head posts per track in each community each UTC day.',
                     },
                 };
             }
@@ -729,7 +732,26 @@ export function createHeadToHeadService(
                 entry: HEAD_TO_HEAD_POST_TYPE,
                 postData,
                 textFallback: { text: formatHeadToHeadTextFallback(postData, record.frozenGhost) },
+                runAs: 'USER',
+                userGeneratedContent: { text: preparedRecord.title },
             });
+            if (normalizeName((post as any)?.authorName || '') !== normalizeName(request.username)) {
+                await deletePostBestEffort(post);
+                await releaseHeadToHeadPostSlot(
+                    request.subredditName,
+                    request.username,
+                    source.trackKey,
+                    reservedAt,
+                );
+                reservedAt = null;
+                return {
+                    status: 409,
+                    body: {
+                        status: 'user_action_unavailable',
+                        error: 'Reddit user-attributed posting is not available for this app version.',
+                    },
+                };
+            }
             if (
                 typeof post?.id !== 'string'
                 || !post.id.startsWith('t3_')
@@ -738,6 +760,9 @@ export function createHeadToHeadService(
             ) {
                 throw new Error('Reddit did not return the head-to-head post identity.');
             }
+            // Reddit has accepted a valid user-authored post. Keep the quota slot even if
+            // a later identity or unlock write fails; recovery will find this exact post.
+            reservedAt = null;
             const saved = await savePost(record, {
                 postId: post.id as `t3_${string}`,
                 postUrl: post.url,
@@ -746,7 +771,6 @@ export function createHeadToHeadService(
                 playerIdForUsername(request.username),
                 saved.trackKey,
             );
-            reservedAt = null;
             await redis.del(previewKey(token));
             return {
                 status: 200,
@@ -762,6 +786,7 @@ export function createHeadToHeadService(
                 await releaseHeadToHeadPostSlot(
                     request.subredditName,
                     request.username,
+                    source.trackKey,
                     reservedAt,
                 );
             }

@@ -112,6 +112,7 @@ function installChallengePost() {
     challengePost = {
         id: challenge.postId,
         url: challenge.postUrl,
+        authorName: challenge.challengerUsername,
         subredditName: challenge.subredditName,
         body: formatHeadToHeadTextFallback(immutablePostData, challenge.frozenGhost),
         getPostData: vi.fn(async () => immutablePostData),

@@ -50,12 +50,16 @@ Dead code, verified by reference count:
 `…:post-identity:<challengeId>` and `…:post:<sub>:<user>:<raceId>:<ms>` only matter inside the creation window. Give both the existing `PREVIEW_TTL_SECONDS` (10 min) rather than deleting them:
 
 - The identity index is the third fallback for `postId`, which `resolveHeadToHeadRecordResult` hard-requires (`head-to-head-post.ts:233`). The client sends it (`game/campaign/service.js:153`) and the server reads its own (`server-app.ts:113`); the index only covers WebView requests where both are missing.
-- The dedup key is a fast path in front of `recoverPost()` (`head-to-head-service.ts:455`), which already dedups by scanning the app's recent posts with no redis.
+- The dedup key is a fast path in front of `recoverPost()`, which dedups only by
+  scanning the challenger's recent posts. Both stored-identity reuse and
+  recovery require the Reddit post author to match that challenger; old
+  app-authored posts are not live candidates.
 
 ### Keep unchanged
 
 - `…:preview:<token>` and `…:brag:preview:<token>` — already 10 min.
-- `…:create-count:*` — rate limit, not challenge data, expires at UTC midnight.
+- `…:create-count:<subreddit>:<user>:<track>:<UTC-day>` — three-new-posts-per-track
+  rate limit, not challenge data, expires at UTC midnight.
 - Creation and result locks.
 - **Car unlocks** (`recordHeadToHeadPost` / `recordHeadToHeadWin`, `car-unlock-store.ts:60`, `:76`) — decision: keep as-is. Progression, same bucket as Campaign; the challengeId is a dedup key so one win can't count twice.
 

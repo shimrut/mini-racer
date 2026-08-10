@@ -46,8 +46,13 @@ function acceptKey(token: string): string {
     return `${PREFIX}:accept:${token}`;
 }
 
-function createCountKey(subredditName: string, username: string, utcDate: string): string {
-    return `${PREFIX}:create-count:${keyPart(subredditName)}:${keyPart(username)}:${utcDate}`;
+function createCountKey(
+    subredditName: string,
+    username: string,
+    trackKey: string,
+    utcDate: string,
+): string {
+    return `${PREFIX}:create-count:${keyPart(subredditName)}:${keyPart(username)}:${keyPart(trackKey)}:${utcDate}`;
 }
 
 function createLockKey(
@@ -167,10 +172,11 @@ export async function releaseHeadToHeadCreationLock(lock: RedisLock | null): Pro
 export async function reserveHeadToHeadPostSlot(
     subredditName: string,
     username: string,
+    trackKey: string,
     now: Date,
 ): Promise<boolean> {
     const utcDate = now.toISOString().slice(0, 10);
-    const key = createCountKey(subredditName, username, utcDate);
+    const key = createCountKey(subredditName, username, trackKey, utcDate);
     const count = await redis.incrBy(key, 1);
     if (count === 1) {
         const nextUtcDay = Date.UTC(
@@ -188,10 +194,11 @@ export async function reserveHeadToHeadPostSlot(
 export async function releaseHeadToHeadPostSlot(
     subredditName: string,
     username: string,
+    trackKey: string,
     now: Date,
 ): Promise<void> {
     const utcDate = now.toISOString().slice(0, 10);
-    const key = createCountKey(subredditName, username, utcDate);
+    const key = createCountKey(subredditName, username, trackKey, utcDate);
     const count = await redis.incrBy(key, -1);
     if (count < 0) await redis.set(key, '0');
 }
