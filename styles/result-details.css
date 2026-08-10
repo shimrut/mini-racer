@@ -12,11 +12,10 @@
     transform: none;
 }
 
-/* Backdrop Popover Overlay */
 .combined-medal-times-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(2, 6, 23, 0.9); /* Solid high-contrast opaque dark overlay */
+    background: rgba(2, 6, 23, 0.9);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -31,10 +30,9 @@
     opacity: 1;
 }
 
-/* Modal dialog container */
 .combined-medal-times-modal {
-    background: var(--bg-surface); /* Pure solid slate dark matching other modals */
-    border: 2px solid #334155;     /* Sleek solid slate-700 border */
+    background: var(--bg-surface);
+    border: 2px solid #334155;
     border-radius: 12px;
     padding: 1.25rem 1rem;
     width: min(280px, 85vw);
@@ -48,7 +46,6 @@
     transform: scale(1) translateY(0);
 }
 
-/* Header Container */
 .combined-medal-times-header {
     display: flex;
     align-items: center;
@@ -58,7 +55,6 @@
     padding-left: 0.65rem;
 }
 
-/* Sports italic styled title */
 .combined-medal-times-title {
     margin: 0;
     font-size: 0.95rem;
@@ -68,7 +64,6 @@
     color: var(--text-color);
 }
 
-/* Simple flat close button */
 .combined-medal-times-close {
     background: none;
     border: none;
@@ -93,7 +88,6 @@
     gap: 0.6rem;
 }
 
-/* Row entry */
 .combined-medal-times-row {
     display: flex;
     align-items: center;
@@ -152,7 +146,6 @@
     color: #f87171;
 }
 
-/* Interactive Rank Value: point cursor and hover scale/shine */
 .combined-stats-right-group--interactive {
     cursor: pointer;
     user-select: none;
@@ -171,9 +164,6 @@
     color: var(--text-color) !important;
 }
 
-/* ==========================================================================
-   Finish Screen Refactored Layout
-   ========================================================================== */
 #modal-combined-view .modal-card-section {
     background: transparent;
     border: none;
@@ -196,8 +186,6 @@
     box-sizing: border-box;
 }
 
-/* A won duel's two exits are a different offer from Brag above them, so a ruled
-   caption separates the pair rather than a fourth button's worth of gap. */
 #modal-combined-view .combined-mode-shortcuts-label {
     display: flex;
     align-items: center;
@@ -234,14 +222,10 @@
     letter-spacing: 0.1em;
 }
 
-/* Whichever button is not carrying the accent is the quiet option, and on a
-   Campaign finish the accent moves to Next once that stage is open. */
 #modal-combined-view .combined-action-btn:not(.combined-action-btn--primary) {
     background: rgba(51, 65, 85, 0.8);
 }
 
-/* Campaign's forward exit shares one row with Home rather than adding a fifth
-   full-width button to a sheet that is already the height of the screen. */
 #modal-combined-view .combined-actions--with-next {
     flex-flow: row wrap;
 }
@@ -325,11 +309,7 @@
     gap: 0.5rem;
 }
 
-/* ==========================================================================
-   Responsive Compact Layout for Small Windows / iFrames (<640px height)
-   ========================================================================== */
 @media (max-height: 640px) {
-    /* 1. Leaderboard Modal */
     .leaderboard-summary__value {
         font-size: 1.1rem;
     }
@@ -340,16 +320,13 @@
         padding: 0.25rem 0.2rem 0.35rem;
     }
 
-    /* 2. Daily Playlist Modal */
     #daily-playlist-modal .modal-card-section--sheet {
         gap: 0.4rem;
     }
 
-    /* 3. Finish Screen */
     #modal.modal--win #modal-combined-view .combined-rank-value {
         font-size: clamp(2rem, 8vw, 2.5rem);
     }
-    /* 4. Global Modals & Buttons */
     .modal .modal-card {
         padding: 0.8rem;
     }

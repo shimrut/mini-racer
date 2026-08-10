@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     applyHeadToHeadAccessState,
     bindAcceptChallenge,
     ensureChallengePlayerIdentity,
     formatHeadToHeadPreviewTime,
+    HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS,
     normalizeHeadToHeadPostData,
     openCampaignAsRedirect,
     openHomeAsRedirect,
@@ -15,7 +17,19 @@ import {
 import { getGuestPlayerToken, setGuestPlayerToken } from '../game/scoreboard/player-identity.js';
 import { LAUNCH_TARGET_KEY } from '../game/modes/launch-target.js';
 
+afterEach(() => {
+    vi.useRealTimers();
+    setGuestPlayerToken(null);
+});
+
 describe('head-to-head custom-post preview', () => {
+    it('ships a disabled loading CTA until access has been resolved', () => {
+        const html = readFileSync(new URL('../head-to-head.html', import.meta.url), 'utf8');
+        expect(html).toMatch(
+            /<button id="accept-challenge" type="button" disabled>Checking Challenge…<\/button>/,
+        );
+    });
+
     it('reads only the dedicated immutable post type', () => {
         const postData = { postType: 'head-to-head', challengeId: 'challenge-1' };
         expect(readHeadToHeadPostData({ devvit: { context: { postData } } })).toBe(postData);
@@ -140,7 +154,56 @@ describe('head-to-head custom-post preview', () => {
         });
     });
 
-    it('rotates a stale guest identity once and keeps the refreshed token', async () => {
+    it('bounds a stalled challenge access request and returns unavailable state', async () => {
+        vi.useFakeTimers();
+        let aborted = false;
+        const accessPromise = resolveHeadToHeadAccess({
+            location: { origin: 'https://miniracer.example' },
+            fetch: vi.fn((_url, options) => new Promise((_, reject) => {
+                options.signal.addEventListener('abort', () => {
+                    aborted = true;
+                    const error = new Error('aborted');
+                    error.name = 'AbortError';
+                    reject(error);
+                });
+            })),
+        }, 'challenge-1');
+
+        await vi.advanceTimersByTimeAsync(HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS);
+
+        await expect(accessPromise).resolves.toEqual({
+            signedIn: false,
+            canRace: false,
+            ownChallenge: false,
+        });
+        expect(aborted).toBe(true);
+    });
+
+    it('bounds a stalled preview bootstrap without replacing the guest identity', async () => {
+        vi.useFakeTimers();
+        setGuestPlayerToken('existing-token');
+        let aborted = false;
+        const bootstrapPromise = ensureChallengePlayerIdentity({
+            location: { origin: 'https://miniracer.example' },
+            fetch: vi.fn((_url, options) => new Promise((_, reject) => {
+                options.signal.addEventListener('abort', () => {
+                    aborted = true;
+                    const error = new Error('aborted');
+                    error.name = 'AbortError';
+                    reject(error);
+                });
+            })),
+        });
+
+        await vi.advanceTimersByTimeAsync(HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS);
+
+        await expect(bootstrapPromise).resolves.toBe(false);
+        expect(aborted).toBe(true);
+        expect(getGuestPlayerToken()).toBe('existing-token');
+        setGuestPlayerToken(null);
+    });
+
+    it('drops a stale guest token once, keeps the player id, and stores the reissued token', async () => {
         setGuestPlayerToken('stale-token');
         const fetch = vi.fn()
             .mockResolvedValueOnce({

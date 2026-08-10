@@ -36,10 +36,7 @@ export class InteractionsUi {
         }
     }
 
-    /**
-     * Mobile / WebKit often leaves :focus on the first-tapped action while another looks “active”.
-     * Blur siblings on pointerdown (capture) so only the pressed control keeps focus + focus ring.
-     */
+    /** Mobile/WebKit can leave :focus on the first-tapped action, so blur siblings on pointerdown. */
     bindModalActionRowPointerFocus() {
         const row = document.getElementById('modal')?.querySelector(".modal-action-row");
         if (!row) return;

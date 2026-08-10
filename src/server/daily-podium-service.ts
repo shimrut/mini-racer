@@ -298,7 +298,6 @@ async function recoverDailyGpPodiumPost({
                 matches.push(post);
             }
         } catch (_error) {
-            // Ignore unrelated or unavailable posts while recovering the canonical podium.
         }
     }
     if (!matches.length) return null;
@@ -336,7 +335,6 @@ export async function resolveDailyGpPodiumPostRecord({
             await reddit.getPostById(stored.postId);
             return stored;
         } catch (_error) {
-            // Recover a matching app-authored podium when the stored record is stale.
         }
     }
     return recoverDailyGpPodiumPost({

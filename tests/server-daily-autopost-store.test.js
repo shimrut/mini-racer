@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockRedis } = vi.hoisted(() => ({
+const { mockRedis, mockLocking, mockState } = vi.hoisted(() => ({
+    mockState: { raw: null },
     mockRedis: {
         hGet: vi.fn(),
         hGetAll: vi.fn(),
         hSet: vi.fn(),
         hDel: vi.fn(),
     },
+    mockLocking: {
+        held: new Map(),
+        acquireRedisLock: vi.fn(),
+        beginOwnedRedisLockTransaction: vi.fn(),
+        releaseRedisLock: vi.fn(),
+    },
 }));
 
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis }));
+vi.mock('../src/server/redis-lock.js', () => mockLocking);
 
 const {
     deleteDailyAutopostSubscription,
@@ -22,10 +30,42 @@ const {
 describe('daily autopost store', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockRedis.hGet.mockResolvedValue(null);
+        mockLocking.held.clear();
+        mockState.raw = null;
+        mockRedis.hGet.mockImplementation(async () => mockState.raw);
         mockRedis.hGetAll.mockResolvedValue({});
-        mockRedis.hSet.mockResolvedValue(1);
-        mockRedis.hDel.mockResolvedValue(1);
+        mockRedis.hSet.mockImplementation(async (_key, values) => {
+            mockState.raw = Object.values(values)[0];
+            return 1;
+        });
+        mockRedis.hDel.mockImplementation(async () => {
+            mockState.raw = null;
+            return 1;
+        });
+        mockLocking.acquireRedisLock.mockImplementation(async (key, ttlMs) => {
+            if (mockLocking.held.has(key)) return null;
+            const lock = { key, value: `owner-${mockLocking.acquireRedisLock.mock.calls.length}`, ttlMs };
+            mockLocking.held.set(key, lock.value);
+            return lock;
+        });
+        mockLocking.beginOwnedRedisLockTransaction.mockImplementation(async (lock) => {
+            if (mockLocking.held.get(lock.key) !== lock.value) return null;
+            const commands = [];
+            return {
+                async hSet(...args) { commands.push(() => mockRedis.hSet(...args)); },
+                async hDel(...args) { commands.push(() => mockRedis.hDel(...args)); },
+                async exec() {
+                    const results = [];
+                    for (const command of commands) results.push(await command());
+                    return results;
+                },
+            };
+        });
+        mockLocking.releaseRedisLock.mockImplementation(async (lock) => {
+            if (!lock || mockLocking.held.get(lock.key) !== lock.value) return false;
+            mockLocking.held.delete(lock.key);
+            return true;
+        });
     });
 
     it('preserves the existing record defaults and rejects malformed JSON', () => {
@@ -86,6 +126,74 @@ describe('daily autopost store', () => {
             'dailygp:autopost:subreddits',
             ['MiniRacer'],
         );
+    });
+
+    it('keeps a concurrent disable final when a scheduler update acquired the lock first', async () => {
+        const existing = JSON.stringify({
+            subredditName: 'MiniRacer',
+            enabled: true,
+            enabledAt: '2026-07-15T00:00:00.000Z',
+        });
+        mockState.raw = existing;
+        let continueRead;
+        let announceRead;
+        const readStarted = new Promise((resolve) => { announceRead = resolve; });
+        mockRedis.hGet.mockImplementationOnce(async () => {
+            announceRead();
+            await new Promise((resolve) => { continueRead = resolve; });
+            return existing;
+        });
+
+        const schedulerUpdate = upsertDailyAutopostSubscription('MiniRacer', (previous) => ({
+            subredditName: 'MiniRacer',
+            enabled: previous?.enabled ?? false,
+            enabledAt: previous?.enabledAt ?? null,
+            updatedAt: '2026-07-16T00:00:00.000Z',
+            lastPostedChallengeId: 'daily-gp-2026-07-16',
+            lastPostedAt: '2026-07-16T00:01:00.000Z',
+            lastPostUrl: 'https://reddit.com/post',
+        }));
+        await readStarted;
+        const disable = deleteDailyAutopostSubscription('MiniRacer');
+        await vi.waitFor(() => {
+            expect(mockLocking.acquireRedisLock).toHaveBeenCalledTimes(2);
+        });
+        continueRead();
+
+        await Promise.all([schedulerUpdate, disable]);
+        expect(mockState.raw).toBeNull();
+    });
+
+    it('keeps a scheduler update disabled when a concurrent disable acquired the lock first', async () => {
+        mockState.raw = JSON.stringify({ subredditName: 'MiniRacer', enabled: true });
+        let continueDelete;
+        let announceDelete;
+        const deleteStarted = new Promise((resolve) => { announceDelete = resolve; });
+        mockRedis.hDel.mockImplementationOnce(async () => {
+            announceDelete();
+            await new Promise((resolve) => { continueDelete = resolve; });
+            mockState.raw = null;
+            return 1;
+        });
+
+        const disable = deleteDailyAutopostSubscription('MiniRacer');
+        await deleteStarted;
+        const schedulerUpdate = upsertDailyAutopostSubscription('MiniRacer', (previous) => ({
+            subredditName: 'MiniRacer',
+            enabled: previous?.enabled ?? false,
+            enabledAt: previous?.enabledAt ?? null,
+            updatedAt: '2026-07-16T00:00:00.000Z',
+            lastPostedChallengeId: 'daily-gp-2026-07-16',
+            lastPostedAt: '2026-07-16T00:01:00.000Z',
+            lastPostUrl: 'https://reddit.com/post',
+        }));
+        await vi.waitFor(() => {
+            expect(mockLocking.acquireRedisLock).toHaveBeenCalledTimes(2);
+        });
+        continueDelete();
+
+        await Promise.all([disable, schedulerUpdate]);
+        expect(JSON.parse(mockState.raw)).toMatchObject({ enabled: false });
     });
 
     it('keeps string fields only when they are non-empty strings', () => {

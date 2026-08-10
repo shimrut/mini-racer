@@ -141,7 +141,6 @@ function clearCombinedRankTotal(rankTotalEl) {
     rankTotalEl.setAttribute('hidden', '');
 }
 
-/** Paint combined finish-screen RANK value (first paint + live scoreboard updates). */
 export function applyCombinedRankValue({
     rankValueEl,
     rankTotalEl = null,
@@ -194,8 +193,7 @@ export function applyCombinedRankValue({
         rankValueEl.textContent = rankText;
     }
 
-    // Prefer the accepted racer count. `??` keeps a real 0 meaning "no racers"
-    // while still reading older Daily payloads that only ever sent `totalCount`.
+    // `??` keeps a real 0 meaning "no racers" while still reading older payloads that only sent `totalCount`.
     const totalRaw = Number(
         scoreboardSnapshot?.leaderboardEntryCount ?? scoreboardSnapshot?.totalCount,
     );
@@ -210,7 +208,6 @@ export function applyCombinedRankValue({
     clearCombinedRankTotal(rankTotalEl);
 }
 
-/** Leaderboard place for medal labels and stats (null while loading or unknown). */
 export function getCombinedRankNumber(scoreboardSnapshot) {
     if (!scoreboardSnapshot || typeof scoreboardSnapshot !== 'object') return null;
     if (scoreboardSnapshot.isLoading) return null;
@@ -230,7 +227,6 @@ export function getCombinedRankNumber(scoreboardSnapshot) {
     return null;
 }
 
-/** Rank line for the race-complete combined header when the racer count is known. */
 export function formatCombinedRankOutOf(scoreboardSnapshot) {
     if (!scoreboardSnapshot || typeof scoreboardSnapshot !== 'object') return '--';
     if (scoreboardSnapshot.isLoading) return '--';

@@ -5,7 +5,6 @@ export { CAMPAIGN_ID };
 export const HEAD_TO_HEAD_POST_TYPE = 'head-to-head';
 
 export type HeadToHeadMedal = 'author' | 'gold' | 'silver' | 'bronze' | null;
-/** Which feature the run being challenged came from. */
 export type HeadToHeadSourceKind = 'campaign' | 'daily';
 
 export type HeadToHeadOrigin = {
@@ -20,7 +19,6 @@ export type HeadToHeadOrigin = {
 export type HeadToHeadSource = {
     sourceKind: HeadToHeadSourceKind;
     sourceId: string;
-    /** New posts use origin; legacy source producers may still provide these fields. */
     origin?: HeadToHeadOrigin;
     campaignId?: typeof CAMPAIGN_ID;
     raceId?: string;
@@ -36,7 +34,6 @@ export type HeadToHeadSource = {
 export type HeadToHeadPostData = {
     postType: typeof HEAD_TO_HEAD_POST_TYPE;
     challengeId: string;
-    /** Present on new posts; absent legacy posts are treated as Campaign. */
     origin?: HeadToHeadOrigin;
     campaignId?: typeof CAMPAIGN_ID;
     raceId?: string;
@@ -49,7 +46,6 @@ export type HeadToHeadPostData = {
     rulesRevision: number;
     trackFingerprint: string;
     createdAt: string;
-    /** SHA-256 of the versioned replay token in the text fallback. */
     replayDataHash?: string;
 };
 
@@ -57,7 +53,6 @@ export type HeadToHeadRecord = HeadToHeadPostData & {
     subredditName: string;
     sourceKind: HeadToHeadSourceKind;
     sourceId: string;
-    /** Resolved from the verified Reddit post body; never persisted in Redis. */
     frozenGhost: unknown;
     postId: `t3_${string}` | null;
     postUrl: string | null;

@@ -9,13 +9,42 @@ import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 import {
     getGuestPlayerToken,
     getOrCreatePlayerId,
-    rotateGuestPlayerIdentity,
     setGuestPlayerToken,
 } from './game/scoreboard/player-identity.js';
 import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from './game/ui/avatar.js';
 
 const POST_TYPE = 'head-to-head';
 const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
+export const HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS = 20_000;
+
+function createPreviewTimeoutError() {
+    const error = new Error('Head to Head preview request timed out.');
+    error.name = 'AbortError';
+    return error;
+}
+
+async function fetchPreviewWithTimeout(root, url, options = {}) {
+    const AbortControllerClass = root?.AbortController || globalThis.AbortController;
+    const controller = typeof AbortControllerClass === 'function' && !options.signal
+        ? new AbortControllerClass()
+        : null;
+    let timeoutId = null;
+    const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            controller?.abort();
+            reject(createPreviewTimeoutError());
+        }, HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS);
+    });
+    const request = Promise.resolve().then(() => root.fetch(
+        url,
+        controller ? { ...options, signal: controller.signal } : options,
+    ));
+    try {
+        return await Promise.race([request, timeout]);
+    } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+    }
+}
 
 function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
@@ -138,8 +167,6 @@ function renderChallengeTrack(documentRef, trackKey) {
     if (!canvas || !track) return;
     const rect = canvas.getBoundingClientRect();
     const dpr = globalThis.devicePixelRatio || 1;
-    // The canvas is laid out in flow now, so its backing store has to follow the
-    // measured box exactly — a minimum size would stretch the trace instead.
     const width = Math.round(rect.width * dpr);
     const height = Math.round(rect.height * dpr);
     if (width < 2 || height < 2) return;
@@ -180,7 +207,7 @@ export async function resolveHeadToHeadAccess(root = globalThis, challengeId = n
         url.searchParams.set('playerId', getOrCreatePlayerId('challenge preview'));
         const guestToken = getGuestPlayerToken();
         if (guestToken) url.searchParams.set('guestToken', guestToken);
-        const response = await root.fetch(url.toString());
+        const response = await fetchPreviewWithTimeout(root, url.toString());
         const body = await response?.json?.().catch?.(() => null) ?? null;
         if (body?.status === 'own_challenge') {
             return { signedIn: true, canRace: false, ownChallenge: true, body };
@@ -188,9 +215,6 @@ export async function resolveHeadToHeadAccess(root = globalThis, challengeId = n
         if (!response?.ok) return { signedIn: false, canRace: false, ownChallenge: false, body };
         return {
             signedIn: body?.viewerType === 'reddit',
-            // A ready post is public. Guest identity is established separately
-            // and the expanded game can finish the bootstrap if this preview
-            // was opened before the identity response arrived.
             canRace: body?.status === 'ready',
             ownChallenge: false,
             body,
@@ -212,12 +236,10 @@ export async function ensureChallengePlayerIdentity(root = globalThis) {
             url.searchParams.set('playerId', getOrCreatePlayerId('challenge preview'));
             const guestToken = getGuestPlayerToken();
             if (guestToken) url.searchParams.set('guestToken', guestToken);
-            const response = await root.fetch(url.toString(), { method: 'GET' });
+            const response = await fetchPreviewWithTimeout(root, url.toString(), { method: 'GET' });
             if (response?.status === 401 && attempt === 0) {
-                // A stored guest id cannot be reclaimed without its old token.
-                // Start a fresh guest identity once, matching the main game
-                // bootstrap recovery path, then retry the request.
-                rotateGuestPlayerIdentity();
+                // Drop the rejected token and re-present the id: the server re-authorizes a guest profile it already holds.
+                setGuestPlayerToken(null);
                 continue;
             }
             if (!response?.ok) return false;
@@ -228,11 +250,9 @@ export async function ensureChallengePlayerIdentity(root = globalThis) {
             return Boolean(body?.playerId);
         } catch (error) {
             if (error?.status === 401 && attempt === 0) {
-                rotateGuestPlayerIdentity();
+                setGuestPlayerToken(null);
                 continue;
             }
-            // The expanded game can retry bootstrap; the post preview should
-            // still render and let the challenge endpoint report its status.
             return false;
         }
     }

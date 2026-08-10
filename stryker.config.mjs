@@ -1,6 +1,3 @@
-/**
- * @type {import('@stryker-mutator/api/core').StrykerOptions}
- */
 export default {
     testRunner: 'vitest',
     packageManager: 'npm',
@@ -17,7 +14,6 @@ export default {
         related: true
     },
     mutate: [
-        // Client race / scoreboard core
         'game/race/run-policy.js',
         'game/race/result-flow.js',
         'game/race/ring-buffer.js',
@@ -33,10 +29,8 @@ export default {
         'game/scoreboard/snapshot.js',
         'game/shared/checkpoint-times.js',
 
-        // Shared client identity helpers used by store/share
         'game/shared/leaderboard-identity.js',
 
-        // Server integrity / auth / Redis
         'src/server/daily-gp-store.ts',
         'src/server/replay-validator.ts',
         'src/server/player-token.ts',
@@ -48,7 +42,6 @@ export default {
         'src/server/post-bound-challenge.ts',
         'src/server/moderator-access.ts',
 
-        // Redis ownership + post/podium publication integrity
         'src/server/redis-lock.ts',
         'src/server/redis-compressed-value.ts',
         'src/server/daily-gp-post-store.ts',

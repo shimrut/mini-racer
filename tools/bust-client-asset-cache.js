@@ -1,8 +1,5 @@
 #!/usr/bin/env node
-/**
- * Append content hashes to dist/client asset URLs so phones cannot keep a stale
- * game.css / game.js after a local rebuild.
- */
+// Appends content hashes to dist/client asset URLs so phones cannot keep a stale game.css / game.js.
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

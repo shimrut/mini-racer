@@ -5,7 +5,6 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
 export const DAILY_GP_RULES_REVISION = 1;
 export const DAILY_GP_LEGACY_RULES_REVISION = 0;
-/** Retained for a future Daily three-lap publication policy. */
 export const DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS = 10.95;
 
 export type DailyGpLapCount = 1 | 2 | 3;
@@ -23,8 +22,9 @@ export const DAILY_GP_MAX_TIME_SECONDS = 60 * 60;
 export const DAILY_GP_NEARBY_RADIUS = 2;
 export const DAILY_GP_DEFAULT_LIMIT = 10;
 export const DAILY_GP_REDIS_TTL_SECONDS = 45 * 24 * 60 * 60;
-export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 7 * 24 * 60 * 60;
-export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = 30 * 24 * 60 * 60;
+/** Matches `CAMPAIGN_GUEST_TTL_SECONDS`: a profile must outlive the progress it names. `tests/reddit-daily-gp-model.test.js` holds the two together. */
+export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 90 * 24 * 60 * 60;
+export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = null;
 export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const DAILY_GP_PLAYLIST_DAYS = 7;
 export const DAILY_GP_COMPETITION_GRACE_MS = 6 * 60 * 60 * 1000;
@@ -37,7 +37,6 @@ export type DailyGpChallenge = {
     endsAt: string;
     availableUntil: string;
     status: 'active';
-    /** 0 denotes a persisted pre-multi-lap challenge. */
     rulesRevision: DailyGpRulesRevision;
     objectiveType: typeof DEFAULT_OBJECTIVE_TYPE | 'multi_lap_total';
     objectiveParams: { lapCount: DailyGpLapCount };
@@ -48,11 +47,7 @@ export function isDailyGpLapCount(value: unknown): value is DailyGpLapCount {
     return Number.isInteger(value) && value >= 1 && value <= 3;
 }
 
-/**
- * Old persisted challenges did not have a race contract. They remain exactly
- * one lap under revision 0. Revision 1 is intentionally strict so malformed
- * new records cannot silently become a different competition.
- */
+/** Revision 0 predates the race contract and is always one lap; revision 1 is strict so a malformed record cannot become a different competition. */
 export function normalizeDailyGpRaceContract(value: unknown): DailyGpRaceContract | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const record = value as Record<string, unknown>;
@@ -170,11 +165,6 @@ export function createDailyChallengeId(challengeDate: string): string {
     return `daily-gp-${challengeDate}`;
 }
 
-/**
- * A stable non-cryptographic hash is sufficient here: the chosen lap count is
- * persisted by the challenge ledger and this merely makes first generation
- * deterministic across server instances.
- */
 function deterministicSeedIndex(seed: string, length: number): number {
     let hash = 0x811c9dc5;
     for (let index = 0; index < seed.length; index += 1) {
@@ -184,11 +174,7 @@ function deterministicSeedIndex(seed: string, length: number): number {
     return (hash >>> 0) % length;
 }
 
-/**
- * New Daily challenges intentionally publish only one or two laps. Keep the
- * persisted contract validator at 1–3 so historical Daily records and
- * Campaign races remain compatible if three-lap publication returns later.
- */
+/** Publication is one or two laps; the persisted validator stays 1-3 so historical Daily records and Campaign races still read. */
 export function getDailyGpEligibleLapCounts(trackKey: string): readonly DailyGpLapCount[] {
     const authorTime = getAuthorMedalSeconds(trackKey);
     if (!Number.isFinite(authorTime)) return [1];
@@ -244,10 +230,6 @@ export function isDailyGpChallengePlayable(challenge: DailyGpChallenge, now = ne
         && nowMs < availableUntilMs;
 }
 
-/**
- * PBs, ghosts and leaderboard data share one fixed deadline. Redis only offers
- * relative expiry, so callers recompute the remaining duration on every write.
- */
 export function getDailyGpCompetitionDeadlineMs(challenge: DailyGpChallenge): number {
     return Date.parse(challenge.availableUntil) + DAILY_GP_COMPETITION_GRACE_MS;
 }

@@ -3,6 +3,7 @@ import { scoreboardEngineMethods } from "../game/scoreboard/engine-methods.js";
 import {
   enqueueDailyChallengeVerification,
   getDailyChallengeVerificationEntry,
+  MAX_TRACK_PB_RETRY_ATTEMPTS,
   resetVerificationQueueForTests,
 } from "../game/scoreboard/verification-queue.js";
 import {
@@ -397,7 +398,7 @@ describe("scoreboard engine verification retries", () => {
     expect(prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
   });
 
-  it("marks the previous ghost unavailable when PB persistence fails", async () => {
+  it("keeps the replay queued and retries when PB persistence fails", async () => {
     const challengeId = "daily-pb-unavailable";
     enqueueDailyChallengeVerification({
       challengeId,
@@ -418,8 +419,7 @@ describe("scoreboard engine verification retries", () => {
         updateModalScoreboardSnapshot: vi.fn(),
       },
     };
-
-    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(engine, entry, {
+    const acceptedWithoutPb = {
       ok: true,
       status: 200,
       body: {
@@ -429,8 +429,64 @@ describe("scoreboard engine verification retries", () => {
         trackPbPersistenceStatus: "unavailable",
         trackPersonalBest: null,
       },
-    });
+    };
 
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(
+      engine,
+      entry,
+      acceptedWithoutPb,
+    );
+
+    const queued = getDailyChallengeVerificationEntry(challengeId);
+    expect(queued).not.toBeNull();
+    expect(queued.replay).toEqual(REPLAY);
+    expect(queued.trackPbRetryCount).toBe(1);
+    expect(markTrackPersonalBestGhostUnavailable).not.toHaveBeenCalled();
+  });
+
+  it("gives up on the ghost only after the retries are spent", async () => {
+    const challengeId = "daily-pb-unavailable-exhausted";
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 42,
+      replay: REPLAY,
+      objectiveType: "single_lap_fastest",
+      trackKey: "circuit",
+    });
+    const markTrackPersonalBestGhostUnavailable = vi.fn();
+    const engine = {
+      markTrackPersonalBestGhostUnavailable,
+      resolveTrackPersonalBestGhostPending: vi.fn(),
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: { refreshDailyChallengeAfterAcceptedSubmission: vi.fn() },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => false),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+    const acceptedWithoutPb = {
+      ok: true,
+      status: 200,
+      body: {
+        accepted: true,
+        improved: false,
+        bestTimeMs: 42_000,
+        trackPbPersistenceStatus: "unavailable",
+        trackPersonalBest: null,
+      },
+    };
+
+    for (let attempt = 0; attempt <= MAX_TRACK_PB_RETRY_ATTEMPTS; attempt += 1) {
+      const entry = getDailyChallengeVerificationEntry(challengeId);
+      if (!entry) break;
+      await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(
+        engine,
+        entry,
+        acceptedWithoutPb,
+      );
+    }
+
+    expect(getDailyChallengeVerificationEntry(challengeId)).toBeNull();
     expect(markTrackPersonalBestGhostUnavailable).toHaveBeenCalledWith(
       expect.objectContaining({ id: challengeId, trackKey: "circuit" }),
     );

@@ -24,15 +24,24 @@ leaderboard, and retention rules.
 - Guest finishes are replay-verified through the normal Campaign submission
   path and ranked under the guest identity. Signing in merges those verified
   results into the Reddit account, keeping the faster result for each stage. A
-  slower guest result never replaces a faster signed-in result.
+  slower guest result never replaces a faster signed-in result. Promotion scans
+  all stages before cleanup and can reconstruct a missing progress result from
+  its strict-replay leaderboard entry, covering a finish whose leaderboard/PB
+  committed before its progress write failed. A verified guest token is retained
+  until both Campaign and car-unlock promotion succeed, so failures remain
+  retryable on the next bootstrap.
 - Campaign result posts freeze a verified result and ghost. Signed-in viewers
   may race that ghost even when the corresponding Campaign stage is locked;
   duel results never write Campaign progression, leaderboards, or PBs.
-- Any verified duel outcome can create another challenge. Exact result posts
-  are reused, while new challenge posts are limited to three per player,
-  subreddit, and UTC day.
+- Signed-in players can create a Head to Head post from a verified Campaign or
+  Daily result. A signed-in player who beats someone else's challenge can post
+  a Brag comment; guests can race and submit but cannot create posts or Brag.
+  Head to Head outcomes remain temporary and do not merge into player history.
 - Plain expanded-game startup opens Home. Daily, Campaign, and challenge posts
-  can launch directly into their respective lobby.
+  can launch directly into their respective lobby. Direct Campaign startup
+  retries one non-authoritative identity response after player bootstrap;
+  direct Head to Head starts its bounded challenge request immediately and does
+  not wait for unrelated Daily/profile startup work.
 
 ## Product Summary
 

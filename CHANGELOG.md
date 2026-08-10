@@ -1,5 +1,24 @@
 # Changelog
 
+- Upgraded the Devvit toolchain to 0.13.11 using the supported CLI dependency
+  synchronizer. All direct Devvit packages and the lockfile now stay on
+  0.13.11; hosted playtest validation remains required before publishing.
+
+- Moved Daily and Campaign Previous/Next controls into a dedicated row below
+  the track preview and added a centered `current / total` track counter.
+- Bounded the global startup wait so a stalled profile, Daily, ghost, image, or
+  track-worker dependency cannot leave Head to Head behind the loading screen.
+- Direct Head to Head launches now start their challenge request immediately
+  and gate only on challenge-critical assets, so unrelated Daily/profile work
+  cannot add a second 20-second wait or replace the duel track and ghost.
+- Guest-to-Reddit promotion now retains the verified guest credential until
+  Campaign and car-unlock migration both succeed. Campaign promotion inventories
+  every stage and repairs missing progress from verified leaderboard results
+  before deleting guest records.
+- Direct Campaign startup now treats unranked or promotion-pending responses as
+  non-authoritative and retries once after player identity repair, preventing an
+  empty first response from replacing real progress.
+- Fixed Head to Head Brag comments to request Reddit user attribution.
 - Removed the unused subreddit subscriber-count lookup and five-minute Redis
   cache from leaderboard snapshots. `totalCount` remains in the response for
   compatibility and now matches the accepted racer count.

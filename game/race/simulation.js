@@ -6,7 +6,6 @@ import {
     resolveRunPolicy
 } from './run-policy.js';
 
-/** End-of-step clock is `currentTime`; crossing happened `fraction` through this `dt`. */
 export function crossingTimeSec(currentTime, dt, fraction) {
     const t = Math.min(1, Math.max(0, Number(fraction)));
     if (!Number.isFinite(t) || !Number.isFinite(currentTime) || !Number.isFinite(dt)) {
@@ -514,7 +513,6 @@ function getCollisionCandidates(p1, p2, collisionData, collisionExtent) {
 const SKID_MARK_MIN_SLIP_RATIO = 0.28;
 const SKID_MARK_MIN_SPEED = 2.5;
 
-/** World-space rear axle (skid / trail anchor) from car center `pos` and `angle`. */
 export {
     CONTACT_EPSILON,
     createSegment,
@@ -605,12 +603,7 @@ export function updateSimulation(
                 0,
                 safeMaxSpeed * safeMaxSpeed - absLatForTotalCap * absLatForTotalCap
             ));
-            // Forward-speed drag (cornering feel), but only while forward component has
-            // room under the total-speed ceiling — avoids forward-only "boost" at max |v|.
             if (accel > 0 && currentSpeed < safeMaxSpeed && forwardSpeed < longitudinalLimit) {
-                // Taper acceleration from total speed (not forward/longLim). Steering yaws the
-                // heading before this split, which lowers forward projection even when |v| is
-                // already near max — forward/denom drag was reopening full thrust in corners.
                 const dragFactor = 1 - speedRatio ** 2;
                 forwardSpeed += ((accel / KPH_PER_WORLD_UNIT) * dragFactor) * dt;
             }
@@ -638,11 +631,7 @@ export function updateSimulation(
             state.velocity.x = (headingX * forwardSpeed) + (sideX * lateralSpeed);
             state.velocity.y = (headingY * forwardSpeed) + (sideY * lateralSpeed);
 
-            // The configured max speed is authoritative and caps the total car speed.
-            // Slip costs speed through the grip model above: the exponential decay of
-            // lateralSpeed shortens the velocity vector, and longitudinalLimit keeps
-            // thrust inside the friction circle. An extra slip-based ceiling here only
-            // duplicated that, so there is no penalty term — just the configured cap.
+            // The configured max speed is the only cap: slip already costs speed through the grip model above.
             state.cachedSpeed = Math.sqrt(state.velocity.x ** 2 + state.velocity.y ** 2);
             const allowedSpeed = safeMaxSpeed;
             if (state.cachedSpeed > allowedSpeed) {
@@ -730,7 +719,6 @@ export function updateSimulation(
                     padding
                 });
                 if (state.status === 'won') {
-                    // A valid finish takes precedence over collision penalties and feedback.
                 } else {
                     const suppressRepeat = Boolean(state.wallContactActive)
                         || Number(state.wallImpactCooldownRemaining) > 0;

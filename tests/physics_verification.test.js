@@ -4,7 +4,7 @@ import { simulateStraightLine } from '../game/car/handling.js';
 describe('Physics Realistic Model', () => {
     it('should reach ~94 km/h in 2 seconds with accel=50, maxSpeed=220', () => {
         const config = { accel: 50, maxSpeed: 220 };
-        const targetSpeed = 93.6; // Calculated tanh benchmark
+        const targetSpeed = 93.6;
         const result = simulateStraightLine(config, { targetSpeed });
         expect(result.time).toBeCloseTo(2.0, 1);
     });
@@ -23,7 +23,6 @@ describe('Physics Realistic Model', () => {
         const res1 = simulateStraightLine(config1, { maxTime: 20 });
         const res2 = simulateStraightLine(config2, { maxTime: 20 });
 
-        // Both should reach close to 220
         expect(res1.speed * 20).toBeGreaterThan(215);
         expect(res2.speed * 20).toBeGreaterThan(215);
         expect(res1.speed * 20).toBeLessThanOrEqual(220);
@@ -33,16 +32,13 @@ describe('Physics Realistic Model', () => {
     it('should accelerate slower as speed increases (drag)', () => {
         const config = { accel: 50, maxSpeed: 220 };
 
-        // Speed after 1s
         const v1 = simulateStraightLine(config, { maxTime: 1.0 }).speed;
-        // Speed after 2s
         const v2 = simulateStraightLine(config, { maxTime: 2.0 }).speed;
-        // Speed after 3s
         const v3 = simulateStraightLine(config, { maxTime: 3.0 }).speed;
 
-        const dv1 = v1; // 0 to 1s
-        const dv2 = v2 - v1; // 1s to 2s
-        const dv3 = v3 - v2; // 2s to 3s
+        const dv1 = v1;
+        const dv2 = v2 - v1;
+        const dv3 = v3 - v2;
 
         expect(dv2).toBeLessThan(dv1);
         expect(dv3).toBeLessThan(dv2);

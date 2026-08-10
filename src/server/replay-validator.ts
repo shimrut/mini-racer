@@ -269,10 +269,7 @@ export function validateDailyGpReplayDetailed({
             state.keys.left = segment.left;
             state.keys.right = segment.right;
             if (segment.relaunchDelay) {
-                // Set exactly fixedDt so updateSimulation decrements it to exactly 0 in
-                // one step (fixedDt - fixedDt === 0 in IEEE 754). A residual here would
-                // freeze one extra frame after the client's launch delay ends, shifting
-                // every subsequent steering input by one frame and diverging the replay.
+                // Exactly fixedDt so the step decrements it to 0; a residual freezes one extra frame and shifts every later input.
                 state.relaunchDelayRemaining = fixedDt;
             }
 

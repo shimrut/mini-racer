@@ -1,11 +1,5 @@
 const LAP_FINISH_TOLERANCE_SEC = 0.002;
 
-/**
- * Normalizes cumulative lap-completion timestamps for one verified race.
- *
- * The last boundary is the race finish, so it must agree with the canonical
- * finish time. Old PB records may omit this field entirely.
- */
 export function normalizeLapCompletionTimesSec(finishTimeSec, raw, lapCount) {
   const expectedLapCount = Math.trunc(Number(lapCount));
   if (

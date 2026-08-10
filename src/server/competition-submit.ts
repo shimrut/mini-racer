@@ -1,9 +1,3 @@
-/**
- * One path from "a player finished" to "the player is ranked": match track,
- * rate limit, validate replay, normalise splits, lock, keep only if better,
- * persist PB + ghost. Daily and Campaign each had their own copy of this;
- * the response shape is Daily's, unchanged, since it's the one with clients.
- */
 import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';
 import { writeEntry, readEntryByPlayerId } from './competition-leaderboard.js';
@@ -44,19 +38,17 @@ export async function checkSubmissionRateLimit(
         return { allowed: true };
     }
     const expiresAt = await redis.expireTime(key);
-    return {
-        allowed: false,
-        retryAfterSeconds: Number.isFinite(expiresAt) && expiresAt > 0
-            ? Math.max(1, expiresAt - Math.floor(Date.now() / 1000))
-            : SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
-    };
+    if (Number.isFinite(expiresAt) && expiresAt > 0) {
+        return {
+            allowed: false,
+            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
+        };
+    }
+    // Repair a counter left without a TTL by a gap between incr and expire, or this identity is locked out for good.
+    await redis.expire(key, SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
+    return { allowed: false, retryAfterSeconds: SUBMISSION_RATE_LIMIT_WINDOW_SECONDS };
 }
 
-/**
- * A guest can mint a fresh player id at will, so their attempts are counted
- * against the request identity instead. A signed-in player cannot, so their own
- * id is the fairer bucket.
- */
 function resolveRateLimitIdentity(
     playerId: string,
     redditUsername: unknown,

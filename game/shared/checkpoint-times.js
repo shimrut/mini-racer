@@ -1,10 +1,5 @@
 const MAX_CHECKPOINT_SPLITS = 32;
 
-/**
- * @param {number} bestTimeSec
- * @param {unknown} raw
- * @returns {number[] | null}
- */
 export function normalizeCheckpointTimesSec(bestTimeSec, raw) {
     if (raw == null) {
         return null;

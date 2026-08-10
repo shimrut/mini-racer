@@ -5,8 +5,6 @@ const LOCK_ICON_PATH = 'M128 96l0 64 128 0 0-64c0-35.3-28.7-64-64-64s-64 28.7-64
 export function createLockIconSvg(className = '') {
     const lock = document.createElementNS(SVG_NS, 'svg');
     if (className) lock.setAttribute('class', className);
-    // The supplied path reaches 32 units above zero; include that cap so the
-    // shackle stays intact when the icon is shown at Campaign scale.
     lock.setAttribute('viewBox', '0 -32 384 544');
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('fill', 'currentColor');

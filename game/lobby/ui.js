@@ -26,7 +26,6 @@ function setText(element, value) {
     if (element) element.textContent = value;
 }
 
-/** A seat in the duel. */
 function setAvatar(element, url, label) {
     applyAvatar(element, url, { alt: label, genericClass: 'challenge-avatar--generic' });
 }
@@ -59,14 +58,11 @@ function setRaceBriefText(element, trackName, laps) {
         return;
     }
 
-    // Keep a safe fallback for partial/legacy DOM fixtures while the shipped
-    // markup uses the styled track and lap elements above.
     const brief = [safeTrackName, lapsLabel].filter(Boolean).join(' · ');
     element.hidden = !brief;
     element.textContent = brief;
 }
 
-/** Fades the label on real text changes only — the button re-renders on every carousel step, and fading identical text would flicker while just browsing. The layout read forces the class off for a frame so the animation can restart. */
 function setSwappingText(element, value) {
     if (!element || element.textContent === value) return;
     element.textContent = value;
@@ -145,7 +141,6 @@ export class LobbyUi {
         document.getElementById('daily-challenge-start-btn')
             ?.addEventListener('click', () => this.onStartDaily?.());
         this.campaignPrimaryBtn?.addEventListener('click', () => {
-            // Resolve the stage after bootstrap is ready — do not pass a stale one.
             this.onStartCampaign?.();
         });
         this.challengeAcceptBtn?.addEventListener('click', () => {
@@ -232,14 +227,12 @@ export class LobbyUi {
             this.resetKeyboardNav();
             requestAnimationFrame(() => {
                 this.focus();
-                // The poster can only be measured once its pane is on screen.
                 if (this.mode === 'challenge') this.renderChallengePreview();
             });
         };
 
         if (document.startViewTransition && previousMode !== mode && previousMode !== 'home') {
             document.documentElement.classList.add('is-lobby-view-transition');
-            // Force layout recalculation to ensure the class is applied before capturing the old state
             void document.documentElement.offsetHeight;
             const transition = document.startViewTransition(() => updateDom());
             transition.finished.finally(() => {
@@ -285,12 +278,6 @@ export class LobbyUi {
         this.syncLobbySubheadDetail();
     }
 
-    /**
-     * Every mode screen bills itself on one line: what this is on the left, who
-     * or when it is for on the right. Challenge names its track there, the
-     * way Daily names its day and Campaign its stage — the opponent is billed
-     * on the poster, over the time they set.
-     */
     syncLobbySubheadDetail() {
         const querySelector = document.querySelector?.bind(document);
         const track = querySelector?.('[data-lobby-mode-track]') || null;
@@ -329,8 +316,6 @@ export class LobbyUi {
     syncModeToolbarState() {
         const standings = document.getElementById('lobby-mode-standings-btn');
         if (!standings) return;
-        // Standings are readable for every Campaign stage. Unlock state only
-        // gates starting/submitting a race, not viewing its leaderboard.
         standings.disabled = false;
     }
 
@@ -398,8 +383,6 @@ export class LobbyUi {
             this.onBack?.(this.mode);
             return;
         }
-        // The picker panes own the horizontal axis: A/D and the arrows drive the
-        // track carousel, so they must not be spent on spatial menu navigation.
         if (this.handleCarouselKeydown(event)) return;
         handleMenuListKeydown(event, {
             buttons: this.getVisibleActions(),
@@ -433,7 +416,6 @@ export class LobbyUi {
         });
     }
 
-    /** The Daily carousel drives the lap sublabel on the primary action. */
     setDailySelectedChallenge(challenge = null, card = null) {
         this._dailySelectedTrackName = typeof card?.trackName === 'string'
             ? card.trackName
@@ -458,18 +440,12 @@ export class LobbyUi {
 
     setCampaignSelectedStage(stage = null) {
         this._campaignSelectedStage = stage;
-        // Keep the header identity on the same selected-stage source as the
-        // Start Race brief below it.
         this._campaignSelectedBillingLabel = this.getCampaignPrimaryTrackName();
         this.syncLobbySubheadDetail();
         this.renderCampaign();
         this.syncModeToolbarState();
     }
 
-    /**
-     * The button races whatever the carousel has centred, so it says only
-     * whether that stage can be raced — never where the campaign as a whole is.
-     */
     getCampaignPrimaryLabel() {
         const stage = this._campaignSelectedStage;
         if (stage) return stage.unlocked ? 'Start Race' : 'Locked';
@@ -495,8 +471,6 @@ export class LobbyUi {
             ? false
             : (stage
                 ? !stage.unlocked
-                // No selection yet, so the button can only go on whether the
-                // campaign has anything raceable in it at all.
                 : !this.campaignState.stages?.some((entry) => entry.unlocked));
         setSwappingText(
             this.campaignPrimaryBtn.querySelector('.main-menu__label'),
@@ -533,7 +507,6 @@ export class LobbyUi {
         }
     }
 
-    /** The duel's poster: the circuit it is raced on, drawn the way every other lobby track is. */
     renderChallengePreview({ force = false } = {}) {
         const canvas = document.getElementById('challenge-track-preview');
         const trackKey = this.challengeState.trackKey;
@@ -541,7 +514,6 @@ export class LobbyUi {
         this.onRenderChallengePreview?.(canvas, { trackKey, skin: null }, { force });
     }
 
-    /** The winner, wearing the same medal the finish sheet just handed them. */
     renderChallengeWin(beaten) {
         const hero = document.getElementById('challenge-won-hero');
         if (!hero) return;
@@ -573,8 +545,6 @@ export class LobbyUi {
             this.challengeState.laps,
         );
         setText(document.getElementById('challenge-target-time'), this.challengeState.targetTimeLabel);
-        // The poster names its challenger over the time they set; the subhead
-        // carries the track, so neither line repeats the other.
         setText(
             document.getElementById('challenge-challenger-name'),
             this.challengeState.challengerName,
@@ -590,7 +560,6 @@ export class LobbyUi {
             'Your avatar',
         );
         const beaten = Boolean(this.challengeState.beaten);
-        // A won duel puts the winner where the track poster was.
         const poster = document.getElementById('challenge-poster');
         if (poster) poster.hidden = beaten;
         if (!beaten) this.renderChallengePreview();

@@ -15,12 +15,6 @@ function enrichTarget(mode, competitionId, target) {
     };
 }
 
-/**
- * The ordinary finish action: with no rival left to chase, the run to beat is
- * the player's own, so this reads and behaves exactly like a normal race.
- * Starting the competition fresh drops the beaten opponent and restores the
- * player's own PB ghost.
- */
 function improvePrimaryAction(engine, mode, race) {
     return {
         label: 'Improve',
@@ -141,10 +135,6 @@ export const opponentRaceEngineMethods = {
             benchmarkTimeMs: Math.round(Number(finalTime) * 1000),
             outcome: comparison.outcome,
         };
-        // Nothing is known about a next rival until the lookup answers, and a
-        // promised rematch that resolves into something else reads as a bug.
-        // Winning therefore holds the ordinary Improve and upgrades to a named
-        // rival only once one is confirmed raceable.
         this.modal?.setCombinedPrimaryAction?.(
             comparison.outcome === 'won'
                 ? improvePrimaryAction(this, mode, race)
@@ -187,9 +177,6 @@ export const opponentRaceEngineMethods = {
                 : '';
             this.modal?.setCombinedPrimaryAction?.({
                 label: 'Next rival',
-                // The button stays short, so who it starts belongs in the
-                // accessible name — led by the visible label so voice control
-                // can still address it.
                 ariaLabel: `Next rival: ${rank}${name}`,
                 action: () => this.startPreparedLeaderboardOpponent(prepared),
             });
@@ -202,8 +189,6 @@ export const opponentRaceEngineMethods = {
             return true;
         }
 
-        // A failed lookup says nothing about the standings, so the finish keeps
-        // the action it already has rather than inventing a different one.
         return false;
     },
 };

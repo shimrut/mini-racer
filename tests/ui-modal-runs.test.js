@@ -1421,7 +1421,6 @@ describe('combined finish next race button', () => {
         button.onclick();
         expect(action).toHaveBeenCalledTimes(1);
 
-        // The forward move takes the accent; Improve drops back to plain.
         expect(isAccented(button)).toBe(true);
         expect(isAccented(context.combinedRestartBtn)).toBe(false);
     });
@@ -1443,7 +1442,6 @@ describe('combined finish next race button', () => {
         expect(button.disabled).toBe(true);
         expect(button.getAttribute('aria-label')).toBe('One more medal needed');
         expect(button.onclick).toBe(null);
-        // Nothing to go forward to, so Improve keeps the accent.
         expect(isAccented(button)).toBe(false);
         expect(isAccented(context.combinedRestartBtn)).toBe(true);
     });
@@ -1563,10 +1561,8 @@ describe('combined finish head to head win actions', () => {
             expect(improve.style.display).toBe('none');
             expect(improve.onclick).toBe(null);
             expect(isAccented(improve)).toBe(false);
-            // Brag is what the win just unlocked, so it takes the accent Improve gave up.
             expect(isAccented(byId(doc, 'combined-playlist-btn'))).toBe(true);
 
-            // The pair is captioned as what it is: the way on to another mode.
             expect(byId(doc, 'combined-mode-shortcuts-label').hidden).toBe(false);
 
             const dailyBtn = byId(doc, 'combined-more-btn');
@@ -1575,7 +1571,6 @@ describe('combined finish head to head win actions', () => {
             expect(dailyBtn.textContent.trim()).toBe('THE DAILY');
             expect(campaignBtn.textContent.trim()).toBe('CAMPAIGN');
 
-            // Both leave the duel, so both ask before they act.
             dailyBtn.onclick();
             expect(daily).not.toHaveBeenCalled();
             const panel = doc.querySelector('.result-share-panel');
@@ -1585,7 +1580,6 @@ describe('combined finish head to head win actions', () => {
             expect(confirmBtn.textContent).toBe('OK');
             expect(cancelBtn.textContent).toBe('Cancel');
 
-            // Cancel puts the racer back on the finish with nothing changed.
             cancelBtn.onclick();
             expect(daily).not.toHaveBeenCalled();
             expect(doc.querySelector('.result-share-panel')).toBe(null);

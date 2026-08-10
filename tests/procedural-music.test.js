@@ -73,7 +73,6 @@ describe('procedural music engine', () => {
         expect(typeof music.prepareOnUserGesture).toBe('function');
         expect(typeof music.stop).toBe('function');
 
-        // Clean up interval
         music.stop();
     });
 
@@ -117,7 +116,6 @@ describe('procedural music engine', () => {
         });
         const music = createProceduralMusic(mockCtx, {});
 
-        // Unlock the graph so syncFrame can run (graphBuilt gate).
         music.prepareOnUserGesture();
         await mockCtx.resume.mock.results[0].value;
         expect(setIntervalSpy).not.toHaveBeenCalled();

@@ -2,8 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { drawOuterDebris, getTrackCanvasPadding } from '../game/track/canvas.js';
 import { CONFIG } from '../game/config.js';
 
-// The kettleRun desert event skin — the only presentation that paints debris,
-// and so the one that sets the widest padding.
+// The kettleRun desert event skin is the widest painted-padding case.
 const DESERT_DEBRIS_PRESENTATION = {
     key: 'event:daily-challenge:kettleRun:desert',
     showCurbs: false,
@@ -20,7 +19,6 @@ const DESERT_DEBRIS_PRESENTATION = {
     debrisStretchMax: 1.35
 };
 
-/** Records every coordinate the debris pass puts on the canvas. */
 function createRecordingContext(points) {
     const record = (x, y) => points.push([x, y]);
     return {
@@ -39,7 +37,6 @@ function createRecordingContext(points) {
     };
 }
 
-/** A closed ring of `count` points, which is what a track boundary looks like. */
 function ring(count, radius) {
     return Array.from({ length: count }, (_, i) => {
         const angle = (Math.PI * 2 * i) / count;
@@ -48,15 +45,10 @@ function ring(count, radius) {
 }
 
 describe('track canvas padding', () => {
-    // The padding is derived rather than a flat reserve, so the thing worth
-    // guarding is the invariant it exists for: nothing drawn may fall outside
-    // the canvas it sizes. Debris is thrown furthest, so it is the binding case.
     it('contains every debris mark inside the canvas it sizes', () => {
         const gs = CONFIG.gridSize;
         const padding = getTrackCanvasPadding(DESERT_DEBRIS_PRESENTATION);
 
-        // Vary the point count: the debris seed is derived from it, so each
-        // ring is an independent sample of the scatter.
         for (const pointCount of [8, 17, 24, 33, 48]) {
             const outer = ring(pointCount, 14);
             const xs = outer.map((p) => p.x * gs);
@@ -96,8 +88,6 @@ describe('track canvas padding', () => {
 
         expect(bare).toBeLessThan(withTireWalls);
         expect(withTireWalls).toBeLessThan(withDebris);
-        // Every case has to stay well inside the flat five cells this replaced,
-        // or the change has not bought anything.
         expect(withDebris).toBeLessThan(CONFIG.gridSize * 5);
     });
 
@@ -109,7 +99,6 @@ describe('track canvas padding', () => {
             debrisStretchMax: 2.5
         });
 
-        // Derived, not a constant that happens to fit today's skin.
         expect(bigger).toBeGreaterThan(base);
     });
 

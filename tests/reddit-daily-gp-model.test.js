@@ -6,6 +6,7 @@ import {
 } from '../game/track/catalog.js';
 import { PUBLISHED_DAILY_GP_TRACKS_BY_DATE } from '../game/shared/daily-gp-history-backfill.js';
 import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-backfill.ts';
+import { CAMPAIGN_GUEST_TTL_SECONDS } from '../src/server/competition.ts';
 import {
     buildDailyGpChallengeForDayIndexWithTrack,
     createDailyChallengeId,
@@ -44,11 +45,17 @@ describe('reddit daily gp model', () => {
         expect(DAILY_GP_NEARBY_RADIUS).toBe(2);
         expect(DAILY_GP_DEFAULT_LIMIT).toBe(10);
         expect(DAILY_GP_REDIS_TTL_SECONDS).toBe(3_888_000);
-        expect(DAILY_GP_GUEST_PROFILE_TTL_SECONDS).toBe(604_800);
-        expect(DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS).toBe(2_592_000);
+        expect(DAILY_GP_GUEST_PROFILE_TTL_SECONDS).toBe(7_776_000);
+        expect(DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS).toBe(null);
         expect(DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS).toBe(2_592_000);
         expect(DAILY_GP_PLAYLIST_DAYS).toBe(7);
         expect(DAILY_GP_COMPETITION_GRACE_MS).toBe(21_600_000);
+    });
+
+    it('keeps a profile alive at least as long as the data it names', () => {
+        expect(DAILY_GP_GUEST_PROFILE_TTL_SECONDS)
+            .toBeGreaterThanOrEqual(CAMPAIGN_GUEST_TTL_SECONDS);
+        expect(DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS).toBe(null);
     });
 
     it('builds a deterministic UTC-scoped challenge payload', () => {

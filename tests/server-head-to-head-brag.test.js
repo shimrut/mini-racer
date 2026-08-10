@@ -207,6 +207,7 @@ describe('head-to-head brag', () => {
         expect(reddit.submitComment).toHaveBeenCalledWith({
             id: 't3_challenge1',
             text: preview.body.commentText,
+            runAs: 'USER',
         });
 
         const again = await previewHeadToHeadBrag(

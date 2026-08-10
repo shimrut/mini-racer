@@ -242,7 +242,6 @@
     }
 }
 
-/* Combined results: horizontal medal row (bronze → author) */
 .combined-medal-row {
     display: flex;
     flex-direction: row;
@@ -448,7 +447,6 @@
     color: #fecdd3;
 }
 
-/* The duel's margin, in the timing-screen grammar the split times already use. */
 .combined-medal-challenge-margin {
     margin: 0.15rem 0 0;
     text-align: center;

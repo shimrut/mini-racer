@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const campaignServiceMocks = vi.hoisted(() => ({
     getCampaignBootstrap: vi.fn(),
@@ -11,9 +11,6 @@ const campaignServiceMocks = vi.hoisted(() => ({
     submitCampaignRun: vi.fn(),
 }));
 
-// Only the calls that go to the server are faked. Everything else — deriving
-// progress, holding an unconfirmed finish — is the real implementation, so a
-// new export here cannot silently go missing from the mock.
 vi.mock('../game/campaign/service.js', async (importOriginal) => ({
     ...(await importOriginal()),
     createHeadToHead: vi.fn(),
@@ -33,6 +30,12 @@ import {
     normalizeCampaignLeaderboardSnapshot,
 } from '../game/campaign/engine-methods.js';
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import {
+    clearCampaignVerification,
+    enqueueCampaignVerification,
+    getCampaignVerificationEntry,
+    markCampaignVerificationError,
+} from '../game/scoreboard/verification-queue.js';
 import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GarageUi } from '../game/settings/garage-ui.js';
@@ -101,7 +104,6 @@ function createElement(tagName = 'div') {
             return null;
         },
         remove() {
-            // no-op for detached spinner stubs
         },
     };
     return element;
@@ -203,6 +205,17 @@ function campaignStandingsSnapshot(displayName, bestTimeMs = 12_000) {
     };
 }
 
+beforeEach(() => {
+    const values = new Map();
+    vi.stubGlobal('window', {
+        localStorage: {
+            getItem: (key) => values.get(key) ?? null,
+            setItem: (key, value) => values.set(key, String(value)),
+            removeItem: (key) => values.delete(key),
+        },
+    });
+});
+
 afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -263,9 +276,6 @@ describe('Campaign lobby and shared modal adapters', () => {
     }
 
     it('still awards the medal and queues the run when the bootstrap never answered', () => {
-        // An unreachable bootstrap reports nothing rankable. That says nothing
-        // about this run: the medal comes from the track's own table, and the
-        // durable queue is what a dropped connection is for.
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
         });
@@ -276,9 +286,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             'Campaign race complete',
             null,
             expect.objectContaining({
-                // Number Zero's own table decides the tier, so this moves
-                // whenever `medal-times.json` does: 7.3s is inside the 7.58
-                // gold target.
                 lapMedal: 'gold',
                 scoreboardSnapshot: expect.objectContaining({
                     submissionStage: 'submitting',
@@ -295,7 +302,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             applyCampaignLobbyBootstrap: vi.fn(),
         });
 
-        // Author on stage 00 is what gates stage 01.
         context.handleCampaignWin({ lapTime: 7.0 });
 
         const progress = context.campaignBootstrap.progress;
@@ -338,7 +344,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
 
-        // Outside Number Zero's bronze target, so the stage stays shut.
         context.handleCampaignWin({ lapTime: 10.5 });
 
         const { nextRace } = context.modal.showModal.mock.calls[0][3];
@@ -350,8 +355,6 @@ describe('Campaign lobby and shared modal adapters', () => {
 
     it('offers nothing after the last stage of the campaign', () => {
         const context = createCampaignFinishContext();
-        // Whatever the ladder ends on today, not a stage number that moves when
-        // the campaign grows.
         const lastStage = CAMPAIGN_STAGES.at(-1);
         const finalStage = {
             raceId: lastStage.raceId,
@@ -389,7 +392,6 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(context.campaignBootstrap.progress.unlockedRaceIds)
             .not.toContain('numbered-v1-01');
-        // The sheet is still open, so the button it offered has to close too.
         expect(context.modal.setCombinedNextRaceEnabled).toHaveBeenCalledWith(false);
     });
 
@@ -420,7 +422,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             }),
         );
         expect(context.modal.modalMsg.textContent).toBe('Number Zero · 1 lap');
-        // The queue owns the submission now, so the finish path never calls it directly.
         expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
         expect(context.processVerificationQueue).toHaveBeenCalled();
     });
@@ -638,8 +639,6 @@ describe('Campaign lobby and shared modal adapters', () => {
                 },
             },
         });
-        // Verification writes this finish into progress, so a late read would
-        // hand back this run's own medal and skip its celebration.
 
         context.handleCampaignWin({ lapTime: 8.25 });
 
@@ -684,8 +683,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         context.activePersonalBestPaceBaseline =
             context.personalBestPaceBaselineByRaceId[stage.raceId];
 
-        // A verification/PB refresh after GO may prepare the next retry, but it
-        // cannot rewrite the comparison already frozen for this run.
         context.applyCampaignPersonalBest(stage, {
             bestTimeMs: 7_500,
             medal: null,
@@ -771,7 +768,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             playerRankLabel: '#1',
             totalCount: 3,
         });
-        // The already-open finish sheet is patched in place, never remounted.
         expect(context.modal.showModal).not.toHaveBeenCalled();
     });
 
@@ -820,7 +816,6 @@ describe('Campaign lobby and shared modal adapters', () => {
                 statusText: 'Campaign race was not completed.',
             }),
         );
-        // No progression was written, so the sheet must not still show a medal.
         expect(context.modal.setCombinedWinMedal).toHaveBeenCalledWith(null);
     });
 
@@ -843,6 +838,98 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(
             expect.objectContaining({ submissionStage: 'retrying' }),
         );
+    });
+
+    function queueCampaignRun(bestTime) {
+        enqueueCampaignVerification({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime,
+            lapCount: 1,
+            rulesRevision: 1,
+            replay: { revision: 1, segments: [] },
+        });
+        return getCampaignVerificationEntry('numbered-v1-00');
+    }
+
+    it('leaves a faster queued run alone when the slower attempt answers late', async () => {
+        const context = createCampaignFinishContext();
+        let resolveSubmit;
+        campaignServiceMocks.submitCampaignRun.mockReturnValue(
+            new Promise((resolve) => { resolveSubmit = resolve; }),
+        );
+
+        const slower = queueCampaignRun(8.25);
+        const processing = context.processCampaignVerificationEntry(slower);
+        queueCampaignRun(7.1);
+
+        resolveSubmit({ ok: true, body: { accepted: true, progress: {} } });
+        await processing;
+
+        expect(getCampaignVerificationEntry('numbered-v1-00')?.bestTime).toBe(7.1);
+    });
+
+    it('does not strand a faster queued run behind the slower attempt it replaced', async () => {
+        const context = createCampaignFinishContext();
+        let rejectSubmit;
+        campaignServiceMocks.submitCampaignRun.mockReturnValue(
+            new Promise((_resolve, reject) => { rejectSubmit = reject; }),
+        );
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const slower = queueCampaignRun(8.25);
+        const processing = context.processCampaignVerificationEntry(slower);
+        queueCampaignRun(7.1);
+
+        rejectSubmit(new Error('response interrupted'));
+        await processing;
+
+        const queued = getCampaignVerificationEntry('numbered-v1-00');
+        expect(queued?.bestTime).toBe(7.1);
+        expect(queued?.submissionStage).not.toBe('retrying');
+    });
+
+    it('does not open the next stage when the finish never reached the queue', () => {
+        const context = createCampaignFinishContext();
+        window.localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        context.handleCampaignWin({ lapTime: 7.3 });
+
+        expect(context.campaignBootstrap.progress?.resultsByRaceId ?? {}).toEqual({});
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Campaign race complete',
+            null,
+            expect.objectContaining({
+                scoreboardSnapshot: expect.objectContaining({
+                    verificationState: 'error',
+                }),
+            }),
+            expect.anything(),
+        );
+    });
+
+    it('reports a settled Campaign verification and gives up on one that is stuck', async () => {
+        const context = createCampaignFinishContext();
+
+        await expect(context.awaitCampaignVerificationSettled(null)).resolves.toBe(true);
+        await expect(
+            context.awaitCampaignVerificationSettled('numbered-v1-00'),
+        ).resolves.toBe(true);
+
+        queueCampaignRun(8.25);
+        markCampaignVerificationError('numbered-v1-00', 'Campaign race was not completed.');
+        await expect(
+            context.awaitCampaignVerificationSettled('numbered-v1-00'),
+        ).resolves.toBe(false);
+
+        queueCampaignRun(7.1);
+        await expect(
+            context.awaitCampaignVerificationSettled('numbered-v1-00', {
+                timeoutMs: 0,
+                pollMs: 0,
+            }),
+        ).resolves.toBe(false);
     });
 
     it('places navigation and utilities in the header with a full-width Start Race', () => {
@@ -883,6 +970,16 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(html).toMatch(
             /class="main-menu__race-brief"[\s\S]*class="main-menu__race-brief-track"[\s\S]*class="main-menu__race-brief-separator"[\s\S]*class="main-menu__race-brief-laps"/,
         );
+        for (const prefix of ['daily', 'campaign']) {
+            expect(html).toContain(
+                `id="${prefix}-carousel" class="track-carousel track-carousel--lobby"`,
+            );
+            expect(html).toMatch(
+                new RegExp(
+                    `id="${prefix}-carousel-prev"[\\s\\S]*id="${prefix}-carousel-count"[\\s\\S]*id="${prefix}-carousel-next"`,
+                ),
+            );
+        }
         expect(lobbyCss).toMatch(
             /\.main-menu__item--primary \.main-menu__race-brief\s*\{[^}]*font-family:\s*var\(--header-font\);/s,
         );
@@ -938,8 +1035,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).toMatch(
             /\.lobby-mode-toolbar__back svg\s*\{[^}]*width:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);[^}]*height:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);/s,
         );
-        // All panes share one measured grid cell; the transition veil covers the
-        // synchronous hidden/mode swap so the old screen cannot bleed through.
         expect(css).toMatch(
             /\.lobby-panes\s*\{[^}]*display:\s*grid;/s,
         );
@@ -966,7 +1061,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).toMatch(
             /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn var\(--dur-base\) var\(--ease-settle\) both;/s,
         );
-        // The picker rises into its lane; the veil handles the outgoing screen.
         const paneEntrance = css.match(/@keyframes lobbyPaneIn\s*\{[\s\S]*?\n\}/)?.[0];
         expect(paneEntrance).toMatch(/opacity:\s*0;[\s\S]*opacity:\s*1;/);
         expect(paneEntrance).toMatch(/translate:\s*0 var\(--lobby-pane-travel\);[\s\S]*translate:\s*0 0;/);
@@ -976,7 +1070,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).toMatch(
             /\.lobby-pane\[hidden\]\s*\{[^}]*display:\s*none !important;[^}]*animation:\s*none;/s,
         );
-        // Reduced motion keeps the swap instant.
         expect(css).toMatch(
             /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.lobby-pane\s*\{[^}]*animation:\s*none;[^}]*transition:\s*none;/,
         );
@@ -1277,8 +1370,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         lobby.focus = vi.fn();
         vi.stubGlobal('requestAnimationFrame', (cb) => cb());
 
-        // The wordmark is the real header, and only the selected day occupies
-        // the right-hand end of the fixed billing line.
         lobby.showDaily();
         expect(subhead.hidden).toBe(false);
         expect(label.hidden).toBe(true);
@@ -1324,9 +1415,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             targetTimeMs: 9478,
             medal: 'gold',
         });
-        // Challenge bills itself on the same line every mode screen uses: what
-        // this is on the left, the track it is raced on to the right. The
-        // opponent is named on the poster, over the time they set.
         expect(subhead.hidden).toBe(false);
         expect(label.textContent).toBe('Challenge');
         expect(track.hidden).toBe(true);
@@ -1386,7 +1474,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             ],
         });
 
-        // Every unlocked stage reads the same: the button races what is centred.
         lobby.setCampaignSelectedStage({
             id: 'numbered-v1-00',
             trackName: 'Number Zero',
@@ -1413,7 +1500,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(laps.attributes['aria-label']).toBe('3 Laps');
         expect(primary.disabled).toBe(false);
 
-        // A locked stage cannot be started.
         lobby.setCampaignSelectedStage({
             id: 'numbered-v1-02',
             trackName: 'Number Two',
@@ -1440,11 +1526,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
-    /**
-     * The label fades when the campaign answers, but the button re-renders on
-     * every carousel step. Replaying the fade on a word that did not change
-     * would flicker it while the player is only browsing stages.
-     */
     it('replays the primary label fade only when the word actually changes', () => {
         const originalDocument = global.document;
         const label = createElement('span');
@@ -1473,13 +1554,11 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(label.textContent).toBe('Start Race');
         expect(label.classList.contains('is-swapping')).toBe(true);
 
-        // Stepping between two unlocked stages reads the same both times.
         label.classList.remove('is-swapping');
         lobby.setCampaignSelectedStage({ id: 'numbered-v1-01', unlocked: true });
         expect(label.textContent).toBe('Start Race');
         expect(label.classList.contains('is-swapping')).toBe(false);
 
-        // Reaching a locked stage does change the word.
         lobby.setCampaignSelectedStage({ id: 'numbered-v1-02', unlocked: false });
         expect(label.textContent).toBe('Locked');
         expect(label.classList.contains('is-swapping')).toBe(true);
@@ -1738,7 +1817,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
 
         expect(modal.showRunsModal.mock.calls[0][3]).toBe('back');
-        // Switching stages from that screen must not lose the way back.
         const { onSelectLeaderboardDay } = modal.showRunsModal.mock.calls[0][4];
         onSelectLeaderboardDay('numbered-v1-01');
         await vi.waitFor(() => {
@@ -1910,7 +1988,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context._campaignBootstrapReady).toBe(false);
         expect(campaignServiceMocks.getCampaignBootstrap).toHaveBeenCalledTimes(1);
         expect(context.paintCampaignCarousel).not.toHaveBeenCalled();
-        // The provisional paint must not name a primary action it cannot know.
         expect(lobbyUi.showCampaign.mock.calls[0][0].primaryLabel).toBeNull();
         expect(lobbyUi.setCampaignPrimaryLoading).toHaveBeenLastCalledWith(true);
 
@@ -2093,7 +2170,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         const context = {
             ...campaignEngineMethods,
             activeRaceMode: 'campaign',
-            // A press is mid-flight: it owns the spinner until its own start ends.
             startButtonPending: true,
             lobbyUi,
         };
@@ -2176,6 +2252,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
             confirmCampaignRaceStart: campaignEngineMethods.confirmCampaignRaceStart,
             applyCampaignPersonalBest: campaignEngineMethods.applyCampaignPersonalBest,
+            awaitCampaignVerificationSettled:
+                campaignEngineMethods.awaitCampaignVerificationSettled,
         };
 
         const startPromise = campaignEngineMethods.startCampaignStage.call(context);
@@ -2283,7 +2361,6 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         await context.startCampaignStage();
 
-        // Both requests are already on the wire, and neither held up the race.
         expect(campaignServiceMocks.startServerCampaignRace).toHaveBeenCalledWith('numbered-v1-00');
         expect(campaignServiceMocks.getCampaignPbGhost).toHaveBeenCalledWith('numbered-v1-00');
         expect(context.startSequence).toHaveBeenCalledTimes(1);
@@ -2302,7 +2379,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
 
-        // The ghost still lands in time to race against, and the HUD catches up.
         await vi.waitFor(() => {
             expect(context.pbGhost.prepare).toHaveBeenCalled();
         });
@@ -2412,9 +2488,46 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
     });
 
+    it('holds the next stage start stamp until the run that opened it lands', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+        const nextStage = CAMPAIGN_STAGES[1];
+        const context = createStartContext({
+            status: 'won',
+            activeCampaignStage: CAMPAIGN_STAGES[0],
+            campaignLobbyState: {
+                complete: false,
+                nextStage: { id: nextStage.raceId },
+                stages: [{ id: nextStage.raceId, unlocked: true }],
+            },
+            reset: vi.fn(),
+        });
+        enqueueCampaignVerification({
+            raceId: CAMPAIGN_STAGES[0].raceId,
+            trackKey: CAMPAIGN_STAGES[0].trackKey,
+            bestTime: 7.3,
+            lapCount: 1,
+            rulesRevision: 1,
+            replay: { revision: 1, segments: [] },
+        });
+
+        await context.startCampaignNextStage(nextStage);
+
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(campaignServiceMocks.startServerCampaignRace).not.toHaveBeenCalled();
+
+        clearCampaignVerification(CAMPAIGN_STAGES[0].raceId);
+        await vi.waitFor(() => {
+            expect(campaignServiceMocks.startServerCampaignRace)
+                .toHaveBeenCalledWith(nextStage.raceId);
+        });
+        expect(context.loadCampaignLobby).not.toHaveBeenCalled();
+    });
+
     it('keeps racing when the start stamp is refused for a reason that is not the stage', async () => {
-        // Unidentified, rate limited, server error: none of these say the stage
-        // is unplayable, and the player is already in the countdown.
         campaignServiceMocks.startServerCampaignRace.mockResolvedValue({
             ok: false,
             status: 401,
@@ -2442,7 +2555,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         await Promise.resolve();
         await Promise.resolve();
 
-        // Bookkeeping is not the gate — submission re-validates the unlock.
         expect(context.startSequence).toHaveBeenCalledTimes(1);
         expect(context.loadCampaignLobby).not.toHaveBeenCalled();
     });

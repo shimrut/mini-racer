@@ -1,4 +1,3 @@
-/** Defers carousel construction to a second animation frame, so the browser gets one complete paint of the lightweight pane state first (queuing in the first frame still runs before it paints). */
 export function deferLobbyWorkUntilAfterPaint(engine, expectedMode, work) {
     if (!engine || typeof work !== 'function') return null;
     const token = (engine._deferredLobbyWorkToken || 0) + 1;

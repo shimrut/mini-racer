@@ -31,12 +31,23 @@ export type PlayerTrackPbRecord = {
 };
 
 const PB_LOCK_TTL_MS = 30_000;
+const PB_LOCK_ACQUIRE_ATTEMPTS = 5;
+const PB_LOCK_ACQUIRE_RETRY_MS = 20;
 
-/**
- * A record is only interchangeable with another run of the same race, so the
- * stored rules revision and lap count are what a reader checks before trusting
- * one. Revision 0 predates multi-lap and is always a single lap.
- */
+/** Losing this lock costs the player their ghost permanently — the browser drops the replay once the run is accepted — so contention is waited out. */
+async function acquirePersonalBestLock(lockKey: string): Promise<RedisLock | null> {
+    for (let attempt = 0; attempt < PB_LOCK_ACQUIRE_ATTEMPTS; attempt += 1) {
+        const lock = await acquireRedisLock(lockKey, PB_LOCK_TTL_MS, redis);
+        if (lock) return lock;
+        if (attempt < PB_LOCK_ACQUIRE_ATTEMPTS - 1) {
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, PB_LOCK_ACQUIRE_RETRY_MS);
+            });
+        }
+    }
+    return null;
+}
+
 function getCompetitionRaceIdentity(competition: Competition): {
     rulesRevision: 0 | 1;
     lapCount: 1 | 2 | 3;
@@ -173,15 +184,14 @@ export async function upsertPlayerTrackPersonalBest({
     updatedAt?: string;
 }): Promise<{ record: PlayerTrackPbRecord; improved: boolean }> {
     const trackKey = competition.trackKey;
-    // A permanent competition has no deadline to miss. A time-boxed one still
-    // does, and writing a PB no reader would ever accept is worse than failing.
+    // A time-boxed competition still has a deadline: writing a PB no reader would accept is worse than failing.
     const ttlSeconds = competition.ttlSeconds;
     if (ttlSeconds != null && ttlSeconds <= 0) {
         throw new Error('Personal best retention deadline has passed.');
     }
 
     const lockKey = playerChallengeLockKey(competition.id, playerId);
-    const lock = await acquireRedisLock(lockKey, PB_LOCK_TTL_MS, redis);
+    const lock = await acquirePersonalBestLock(lockKey);
     if (!lock) {
         throw new Error('Personal best update already in progress.');
     }

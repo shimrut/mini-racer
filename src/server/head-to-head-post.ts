@@ -113,7 +113,6 @@ function collectFallbackTexts(value: unknown, texts: string[], depth = 0): void 
             try {
                 collectFallbackTexts(JSON.parse(value), texts, depth + 1);
             } catch {
-                // Ordinary Markdown is the expected shape, not JSON.
             }
         }
         return;
@@ -138,7 +137,6 @@ function postFallbackTexts(post: unknown): string[] {
         try {
             collectFallbackTexts((post.toJSON as () => unknown)(), texts);
         } catch {
-            // Direct Post fields remain authoritative when serialization is unavailable.
         }
     }
     return texts;
@@ -196,11 +194,6 @@ function toChallengeRecord(
     };
 }
 
-/**
- * Resolves the immutable challenge contract from the Reddit custom post.
- * Posts created before replay data was embedded may use their matching stored
- * record during migration. New posts remain fully post-bound.
- */
 export async function resolveHeadToHeadRecordResult(
     challengeId: string | null,
     context: HeadToHeadPostContext = {},
@@ -243,9 +236,7 @@ export async function resolveHeadToHeadRecordResult(
             ? { ok: true, record }
             : { ok: false, reason: 'post_identity_invalid' as const };
     }
-    // The post body is the only source of the frozen replay. There is no
-    // stored record to fall back on, so a post that cannot produce its own
-    // replay is unusable.
+    // The post body is the only source of the frozen replay, so a post that cannot produce one is unusable.
     return {
         ok: false,
         reason: fallbackTexts.length > 0

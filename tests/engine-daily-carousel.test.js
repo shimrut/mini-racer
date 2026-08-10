@@ -177,7 +177,6 @@ describe('daily carousel engine wiring', () => {
         engine._dailyCarouselRenderToken += 1;
         await stale;
 
-        // Only the synchronous cache paint got through.
         expect(render).toHaveBeenCalledTimes(1);
     });
 
@@ -204,13 +203,18 @@ describe('daily carousel engine wiring', () => {
         expect(engine.setDailyChallengeLobbySummary).toHaveBeenCalledWith(CHALLENGES[2]);
     });
 
-    it('ignores a selection without a challenge behind it', () => {
-        const { engine } = createEngine({ selectedDailyChallengeId: 'daily-1' });
+    it('clears the lobby summary when the rail goes empty', () => {
+        const setDailySelectedChallenge = vi.fn();
+        const { engine } = createEngine({
+            selectedDailyChallengeId: 'daily-1',
+            lobbyUi: { setDailySelectedChallenge },
+        });
 
         dailyChallengeEngineMethods.handleDailyCarouselSelect.call(engine, null);
 
-        expect(engine.selectedDailyChallengeId).toBe('daily-1');
-        expect(engine.setDailyChallengeLobbySummary).not.toHaveBeenCalled();
+        expect(engine.selectedDailyChallengeId).toBeNull();
+        expect(setDailySelectedChallenge).toHaveBeenCalledWith(null, null);
+        expect(engine.setDailyChallengeLobbySummary).toHaveBeenCalledWith(null);
     });
 
     it('lands on the day the standings were left on, not the one opened', () => {

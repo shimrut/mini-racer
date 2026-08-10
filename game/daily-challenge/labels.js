@@ -1,8 +1,5 @@
-/** Pure daily-challenge copy / status helpers (no fetch or localStorage). */
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The only lap counts supported by the persisted Daily challenge contract. */
 export function isDailyChallengeLapCount(value) {
     return Number.isInteger(value) && value >= 1 && value <= 3;
 }
@@ -37,7 +34,6 @@ export function getDailyChallengeObjectiveLabel(challenge) {
     return '1 lap';
 }
 
-/** Short line for the mode-select daily challenge row (track name • …). */
 export function getDailyChallengeModeSelectObjectiveLine(challenge) {
     return getDailyChallengeCopyLabels(challenge).modeSelectLine;
 }

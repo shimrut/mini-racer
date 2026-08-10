@@ -1,24 +1,15 @@
 import { configureCanvasViewport } from "./canvas-resolution.js";
 import { drawViewportPresentationBackground } from "./canvas.js";
 
-/** Two-canvas track-layer renderer: OffscreenCanvas on a worker thread when available (so the main thread never blocks on large blits), else a main-thread 2D context fallback. The engine holds one instance. */
 export class TrackLayerRenderer {
   constructor(canvas) {
-    /** The DOM trackLayerCanvas element. */
     this.canvas = canvas;
-    /** Main-thread 2D context used when the worker path is unavailable. */
     this.ctx = null;
-    /** OffscreenCanvas worker (null when running main-thread fallback). */
     this.worker = null;
-    /** True once the worker has been successfully initialised. */
     this.workerReady = false;
-    /** True once the worker has confirmed initialization. */
     this.workerActive = false;
-    /** Monotonically-increasing counter; used to discard stale bitmaps. */
     this.bitmapVersion = 0;
-    /** The current in-flight createImageBitmap promise (or null). */
     this.bitmapPromise = null;
-    /** Callback for when the worker has received the track bitmap. */
     this.onTrackReady = null;
     this.renderMessage = {
       type: "render",
@@ -32,13 +23,6 @@ export class TrackLayerRenderer {
     };
   }
 
-  /**
-   * Initialises the renderer — either spawns an OffscreenCanvas worker or
-   * falls back to a regular 2D context on the main thread.
-   * Must be called once during engine construction.
-   *
-   * @param {{allowWorker?: boolean}} [options]
-   */
   setup({ allowWorker = true } = {}) {
     const canUseOffscreenWorker = Boolean(
       allowWorker &&
@@ -71,7 +55,7 @@ export class TrackLayerRenderer {
       this.worker.onmessage = (event) => {
         if (event.data?.type === "init-complete") {
           this.workerActive = true;
-          this.onTrackReady?.(); // Resolve if already waiting
+          this.onTrackReady?.();
         }
         if (event.data?.type === "track-ready") {
           this.onTrackReady?.();
@@ -97,13 +81,6 @@ export class TrackLayerRenderer {
     }
   }
 
-  /**
-   * Resizes the main-thread canvas to match the container. No-op for
-   * worker-backed renderers — draw() updates the viewport inline so clear
-   * and repaint land as one visible update.
-   * @param {HTMLElement} container - The game container element.
-   * @param {number} devicePixelRatio
-   */
   updateViewportSize(container, devicePixelRatio) {
     if (this.workerReady && this.worker) return;
     if (this.canvas && this.ctx) {
@@ -117,19 +94,6 @@ export class TrackLayerRenderer {
     }
   }
 
-  /**
-   * Creates an ImageBitmap from the pre-rendered track canvas and transfers it
-   * to the worker. Aborts silently if the trackLoadRequestId no longer matches
-   * (another track started loading while the bitmap was being created).
-   *
-   * @param {object} options
-   * @param {HTMLCanvasElement} options.trackCanvas
-   * @param {{x:number,y:number}} options.trackCanvasOrigin
-   * @param {string} options.offTrackColor
-   * @param {object|null} options.presentation
-   * @param {number} options.trackLoadRequestId - ID of the load that produced trackCanvas.
-   * @param {number} options.currentTrackLoadRequestId - Engine's current load ID (stale-check).
-   */
   async syncBitmap({
     trackCanvas,
     trackCanvasOrigin,
@@ -180,28 +144,6 @@ export class TrackLayerRenderer {
     }
   }
 
-  /**
-   * Draws the visible portion of the track for one frame.
-   *
-   * Worker path: posts a render message so the worker composites the bitmap
-   * at the right viewport offset.
-   *
-   * Main-thread path: blits the visible source rect from the pre-rendered
-   * track canvas, preceded by a background fill for off-track areas.
-   *
-   * @param {object} options
-   * @param {{x:number,y:number}} options.camera
-   * @param {number} options.zoom
-   * @param {number} options.viewportWidth  - CSS-pixel viewport width.
-   * @param {number} options.viewportHeight - CSS-pixel viewport height.
-   * @param {number} options.devicePixelRatio
-   * @param {HTMLCanvasElement|null} options.trackCanvas
-   * @param {{x:number,y:number}} options.trackCanvasOrigin
-   * @param {object|null} options.presentation
-   * @param {HTMLElement} options.container
-   * @param {number} [options.fallbackWidth=0]  - Game canvas width; used when viewport dims are 0.
-   * @param {number} [options.fallbackHeight=0] - Game canvas height; used when viewport dims are 0.
-   */
   draw({
     camera,
     zoom,

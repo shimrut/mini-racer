@@ -58,9 +58,11 @@ rolling 90-day inactivity window; the shared stage leaderboards themselves do
 not expire. Signing in merges verified guest results into the Reddit account,
 keeping the faster result for each stage. Reddit sign-in is still required to
 create challenge posts. Guests can open, race, and submit Head to Head
-challenges; their challenge results stay on their guest identity and merge when
-they sign in. The Head to Head post itself does not require Reddit sign-in;
-stale guest tokens are refreshed automatically.
+challenges. A verified Head to Head win is retained for five minutes to keep
+the beaten-post state and, for a signed-in winner, authorize Brag. Head to Head
+results are not durable player history and do not merge when a guest signs in.
+The Head to Head post itself does not require Reddit sign-in; stale guest tokens
+are refreshed automatically.
 Challenge duels are isolated:
 they do not unlock Campaign stages or change Daily/Campaign standings or PBs.
 

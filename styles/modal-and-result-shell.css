@@ -25,7 +25,6 @@
     transition: none;
 }
 
-/* Bottom sheet modals: pause and win */
 #modal.modal--pause:not(.modal--win),
 #modal.modal--win {
     align-items: center;
@@ -65,7 +64,6 @@
 }
 
 @media (max-width: 768px) {
-    /* Full-width modals: outer + section padding stacked badly on narrow viewports */
     .modal {
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
@@ -80,7 +78,6 @@
 
     .result-modal .modal-card-section--runs,
     .result-modal .modal-card-section--sheet {
-        /* Padding is now handled by inner elements */
     }
 
     #garage-modal .garage-tab {
@@ -148,7 +145,6 @@
     max-width: min(92vw, 26rem);
 }
 
-/* Win overlay: horizontal medal row */
 .win-combined-medal-overlay {
     display: flex;
     flex-direction: column;

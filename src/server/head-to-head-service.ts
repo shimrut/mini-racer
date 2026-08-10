@@ -176,11 +176,17 @@ async function checkHeadToHeadSubmissionRateLimit(
         return { allowed: true };
     }
     const expiresAt = await redis.expireTime(key);
+    if (Number.isFinite(expiresAt) && expiresAt > 0) {
+        return {
+            allowed: false,
+            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
+        };
+    }
+    // Repair a counter left without a TTL, or this identity stays rate-limited permanently.
+    await redis.expire(key, HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
     return {
         allowed: false,
-        retryAfterSeconds: Number.isFinite(expiresAt) && expiresAt > 0
-            ? Math.max(1, expiresAt - Math.floor(Date.now() / 1000))
-            : HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
+        retryAfterSeconds: HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
     };
 }
 
@@ -226,13 +232,6 @@ function challengeContext(context: HeadToHeadRequestContext): {
     return subredditName ? { subredditName } : null;
 }
 
-/**
- * New requests resolve the immutable contract and frozen replay from the
- * Reddit post. If the client cannot provide post context, the challenge ID
- * resolves only to the stored Reddit post identity; the post body is still
- * fetched and validated. A supplied post context must pass post-bound
- * validation and is never silently replaced by another post.
- */
 async function resolveChallengeRecord(
     challengeId: string | null,
     context: HeadToHeadRequestContext,
@@ -506,7 +505,6 @@ async function recoverPost(
                 return { postId: post.id as `t3_${string}`, postUrl: post.url };
             }
         } catch {
-            // Ignore unrelated or unavailable posts.
         }
     }
     return null;
@@ -889,10 +887,7 @@ export function createHeadToHeadService(
             await recordHeadToHeadWin(viewer.playerId, challengeId);
         }
 
-        // The run is the only thing that proves this win, and nothing about a
-        // Head to Head is kept past its post. A short-lived receipt carries the
-        // verified time to the brag comment it earns and then expires, so the
-        // comment quotes this run rather than anything read back later.
+        // Nothing about a Head to Head outlives its post, so a short-lived receipt carries the verified time to the brag comment it earns.
         let acceptToken: string | null = null;
         if (challenge.postId && outcome === 'won') {
             acceptToken = createId();

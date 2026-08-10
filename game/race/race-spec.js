@@ -6,11 +6,6 @@ export const RACE_OBJECTIVE_MULTI_LAP = 'multi_lap_total';
 
 const SUPPORTED_MODES = new Set(['daily', 'campaign', 'challenge']);
 
-/**
- * The objective a lap count implies. Only the lap count drives scoring — the
- * objective type is the label the run policy and the leaderboard report — so
- * the two must never be chosen independently.
- */
 export function objectiveTypeForLapCount(lapCount) {
     return Number(lapCount) === 1
         ? RACE_OBJECTIVE_SINGLE_LAP

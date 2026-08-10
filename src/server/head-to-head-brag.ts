@@ -83,7 +83,6 @@ async function deleteCommentBestEffort(comment: { delete?: () => Promise<unknown
     try {
         await comment?.delete?.();
     } catch {
-        // Best effort.
     }
 }
 
@@ -228,6 +227,7 @@ export async function confirmHeadToHeadBrag(
         const comment = await reddit.submitComment({
             id: preview.postId,
             text: preview.commentText,
+            runAs: 'USER',
         });
         if (normalizeName((comment as { authorName?: string })?.authorName || '') !== normalizeName(preview.username)) {
             await deleteCommentBestEffort(comment as { delete?: () => Promise<unknown> });

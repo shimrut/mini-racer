@@ -2234,11 +2234,6 @@ function drawSafeZoneOverlay(ctx, width, height, aspect) {
     ctx.restore();
 }
 
-/* ============================================================================
- * TEMPLATE RENDERERS — each produces a visually distinct asset.
- * Dispatched from renderFrame() when state.templateStyle !== 'classic'.
- * ========================================================================= */
-
 function getTemplateRenderer(styleId) {
     switch (styleId) {
         case 'arcade-crt': return renderArcadeCRT;
@@ -2288,7 +2283,6 @@ function drawPolyline(ctx, points, close = true) {
     if (close) ctx.closePath();
 }
 
-/* -------- A · ARCADE CRT ---------------------------------------------------- */
 function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     const intro = easeOutCubic(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
@@ -2296,11 +2290,9 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     const preset = getActivePreset();
     const track = TRACKS[state.trackKey];
 
-    // Solid retro arcade background
     ctx.fillStyle = '#070012';
     ctx.fillRect(0, 0, width, height);
 
-    // Perspective "tron" floor receding to horizon
     const horizonY = height * 0.48;
     const scroll = (timeMs * 0.16) % 60;
     ctx.save();
@@ -2327,7 +2319,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Sun / rising disc behind horizon
     const sunR = Math.min(width, height) * 0.22;
     const sunGrad = ctx.createLinearGradient(0, horizonY - sunR, 0, horizonY + sunR * 0.2);
     sunGrad.addColorStop(0, '#ffe66d');
@@ -2341,7 +2332,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     ctx.beginPath();
     ctx.arc(width / 2, horizonY + sunR * 0.25, sunR, 0, Math.PI * 2);
     ctx.fill();
-    // horizontal "cut" stripes across the sun
     ctx.fillStyle = '#070012';
     for (let i = 0; i < 8; i += 1) {
         const y = horizonY - sunR * 0.1 - i * 14;
@@ -2349,7 +2339,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Stars
     ctx.save();
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 60; i += 1) {
@@ -2361,7 +2350,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Big pixel-styled title plate at top — "HIGH SCORE"
     const plateY = 40;
     const plateH = 110;
     ctx.save();
@@ -2373,7 +2361,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     ctx.textBaseline = 'top';
     ctx.fillText('►►  HIGH  SCORE  ◄◄', width / 2, plateY);
 
-    // Chunky monospace digits for lap time
     const lapStr = state.lapTime.toFixed(2);
     ctx.fillStyle = '#ffe66d';
     ctx.font = `900 ${Math.min(width * 0.22, height * 0.13)}px "JetBrains Mono", monospace`;
@@ -2383,7 +2370,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     ctx.shadowBlur = 0;
     ctx.restore();
 
-    // Track as chunky pixel tiles
     const trackRectY = horizonY + 40;
     const trackRectH = height * 0.32;
     const outlinePoints = fitPointsToRect(
@@ -2391,7 +2377,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
         { x: width * 0.12, y: trackRectY, width: width * 0.76, height: trackRectH },
         12
     );
-    // Draw "pixelated" track: snap each point to a grid and draw chunky rects
     const grid = Math.max(10, Math.round(width / 110));
     ctx.save();
     const pixCount = Math.floor(outlinePoints.length * clamp(action * 1.2, 0.05, 1));
@@ -2404,7 +2389,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // 8-bit car sprite along track
     if (pixCount > 4) {
         const carIdx = (pixCount - 1) % outlinePoints.length;
         const carP = outlinePoints[carIdx];
@@ -2419,7 +2403,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
         ctx.restore();
     }
 
-    // Headline — pixel style all caps
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -2435,7 +2418,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     });
     ctx.restore();
 
-    // "INSERT COIN" flashing
     ctx.save();
     const flash = (Math.floor(timeMs / 400) % 2) === 0 ? 1 : 0.25;
     ctx.globalAlpha = flash * Math.min(1, outro * 1.2 + 0.5);
@@ -2449,7 +2431,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(`${state.handle.toUpperCase()}  ·  ${track.name.toUpperCase()}`, width / 2, height - 70);
     ctx.restore();
 
-    // Scanlines
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -2458,14 +2439,12 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // CRT vignette
     const vig = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.4, width / 2, height / 2, Math.max(width, height) * 0.7);
     vig.addColorStop(0, 'rgba(0,0,0,0)');
     vig.addColorStop(1, 'rgba(0,0,0,0.7)');
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, width, height);
 
-    // Curved corner glow
     ctx.save();
     ctx.strokeStyle = 'rgba(0, 246, 255, 0.25)';
     ctx.lineWidth = 6;
@@ -2474,7 +2453,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     ctx.restore();
 }
 
-/* -------- B · MAGAZINE EDITORIAL -------------------------------------------- */
 function renderMagazine(ctx, width, height, timeMs, scene, options) {
     const intro = easeOutCubic(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
@@ -2485,7 +2463,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     const ink = '#18120b';
     const cream = '#f3ecd9';
 
-    // Cream paper background with subtle grain
     ctx.fillStyle = cream;
     ctx.fillRect(0, 0, width, height);
     ctx.save();
@@ -2498,13 +2475,11 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Margins
     const mL = width * 0.08;
     const mR = width * 0.08;
     const mT = height * 0.06;
     const contentW = width - mL - mR;
 
-    // Masthead: thin rule + small caps
     ctx.save();
     ctx.strokeStyle = ink;
     ctx.lineWidth = 2;
@@ -2532,7 +2507,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     ctx.stroke();
     ctx.restore();
 
-    // Big italic serif "LAP TIME" huge number
     const lapStr = state.lapTime.toFixed(2);
     const numTop = mT + 100;
     ctx.save();
@@ -2545,7 +2519,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     ctx.font = `900 ${lapFont}px Georgia, "Times New Roman", serif`;
     ctx.globalAlpha = Math.min(1, intro * 1.4);
     ctx.fillText(lapStr, mL - 8, numTop + 60);
-    // Tiny "seconds" annotation beside number
     ctx.font = `italic 400 ${Math.min(width * 0.028, 28)}px Georgia, serif`;
     ctx.fillStyle = red;
     const lapWidth = ctx.measureText(lapStr).width;
@@ -2554,7 +2527,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     ctx.fillText('seconds', mL + lapWidth * 0.3 + 16, numTop + 60 + lapFont * 0.88);
     ctx.restore();
 
-    // Engraved track illustration on the right
     const illuX = mL + contentW * 0.55;
     const illuY = numTop + 80;
     const illuW = contentW * 0.45;
@@ -2562,7 +2534,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     const outline = getTemplateTrackOutline();
     const fitted = fitPointsToRect(outline, { x: illuX, y: illuY, width: illuW, height: illuH }, 8);
     ctx.save();
-    // Crosshatch fill within the track silhouette
     ctx.beginPath();
     drawPolyline(ctx, fitted, true);
     ctx.lineWidth = Math.max(6, width * 0.008);
@@ -2583,14 +2554,12 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Tiny arrow caption for track
     ctx.fillStyle = ink;
     ctx.font = `italic 400 ${Math.min(width * 0.022, 22)}px Georgia, serif`;
     ctx.textAlign = 'center';
     ctx.fillText(`fig. 1 — ${track.name.toLowerCase()}`, illuX + illuW / 2, illuY + illuH + 6);
     ctx.restore();
 
-    // Spec data table on the left under the big number
     const tableY = numTop + Math.min(width * 0.38, height * 0.24) + 120;
     const stats = [
         ['Top speed', '214 km/h'],
@@ -2624,7 +2593,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
         ctx.font = `700 ${Math.min(width * 0.024, 24)}px Georgia, serif`;
         ctx.fillText(val, mL + contentW * 0.5, rowY);
         ctx.textAlign = 'left';
-        // Dot leader
         ctx.fillStyle = 'rgba(24,18,11,0.4)';
         ctx.font = `400 ${Math.min(width * 0.024, 24)}px Georgia, serif`;
         let dotsX = mL + ctx.measureText(key).width + 8;
@@ -2636,7 +2604,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Drop-capped paragraph on the right
     ctx.save();
     ctx.fillStyle = ink;
     ctx.textBaseline = 'top';
@@ -2658,7 +2625,6 @@ function renderMagazine(ctx, width, height, timeMs, scene, options) {
     });
     ctx.restore();
 
-    // Bottom: red bar CTA
     const barH = 72;
     const barY = height - barH - mT * 0.4;
     ctx.save();
@@ -2682,7 +2648,6 @@ function hashStr(s) {
     return h | 0;
 }
 
-/* -------- C · STICKER COLLAGE ----------------------------------------------- */
 function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     const intro = easeOutBack(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
@@ -2700,11 +2665,9 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     };
     const bgColor = moods[preset.mood] || '#ff3da8';
 
-    // Solid bright background
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
 
-    // Zigzag background pattern as stripes
     ctx.save();
     ctx.globalAlpha = 0.12;
     ctx.fillStyle = '#000';
@@ -2717,7 +2680,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Big comic headline with thick stroke + white fill + offset shadow
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -2733,22 +2695,18 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
         ctx.translate(width / 2, y);
         ctx.rotate(rotation);
         ctx.globalAlpha = Math.min(1, intro * 1.2);
-        // Shadow layer
         ctx.fillStyle = '#000';
         ctx.fillText(line, 6, 8);
-        // Stroke
         ctx.lineWidth = Math.max(8, hlFont * 0.07);
         ctx.strokeStyle = '#000';
         ctx.lineJoin = 'round';
         ctx.strokeText(line, 0, 0);
-        // Fill
         ctx.fillStyle = '#fff';
         ctx.fillText(line, 0, 0);
         ctx.restore();
     });
     ctx.restore();
 
-    // Polaroid with track inside, tilted
     const polW = Math.min(width * 0.55, 420);
     const polH = polW * 1.08;
     const polX = width / 2 - polW / 2;
@@ -2757,24 +2715,20 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     ctx.translate(polX + polW / 2, polY + polH / 2);
     ctx.rotate(-0.08);
     ctx.translate(-(polX + polW / 2), -(polY + polH / 2));
-    // Torn edge / irregular shadow
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fillRect(polX + 8, polY + 14, polW, polH);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(polX, polY, polW, polH);
-    // Track image area
     const imgPadding = 18;
     const imgRect = { x: polX + imgPadding, y: polY + imgPadding, width: polW - imgPadding * 2, height: polH - imgPadding * 2 - 70 };
     ctx.fillStyle = '#f0ede4';
     ctx.fillRect(imgRect.x, imgRect.y, imgRect.width, imgRect.height);
-    // Draw track inside
     const fitted = fitPointsToRect(getTemplateTrackOutline(), imgRect, 18);
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 5;
     ctx.lineJoin = 'round';
     drawPolyline(ctx, fitted, true);
     ctx.stroke();
-    // Caption under image
     ctx.fillStyle = '#000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -2782,7 +2736,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(`${track.name} ♡`, polX + polW / 2, polY + polH - 36);
     ctx.restore();
 
-    // Tape strips on the polaroid corners
     const tape = (cx, cy, angle) => {
         ctx.save();
         ctx.translate(cx, cy);
@@ -2797,7 +2750,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     tape(polX + 16, polY + 10, -0.4);
     tape(polX + polW - 16, polY + 10, 0.35);
 
-    // Starburst "NEW PB!" sticker in top-right
     const starX = width - Math.min(width * 0.22, 180);
     const starY = Math.min(height * 0.25, 220);
     const starR = Math.min(width * 0.13, 130);
@@ -2833,7 +2785,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(`${state.lapTime.toFixed(2)}s`, 0, starR * 0.12);
     ctx.restore();
 
-    // Handwritten arrow pointing to lap time
     ctx.save();
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 6;
@@ -2843,7 +2794,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     ctx.moveTo(starX - starR * 1.1, starY + starR * 1.1);
     ctx.quadraticCurveTo(starX - starR * 2, starY + starR * 2.5, starX - starR * 2.2, starY + starR * 3.2);
     ctx.stroke();
-    // Arrowhead
     ctx.beginPath();
     ctx.moveTo(starX - starR * 2.2, starY + starR * 3.2);
     ctx.lineTo(starX - starR * 1.95, starY + starR * 2.9);
@@ -2852,7 +2802,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     ctx.stroke();
     ctx.restore();
 
-    // Bottom "CTA" sticker-bar with flag icon
     const ctaY = height - 150;
     const ctaH = 100;
     ctx.save();
@@ -2867,7 +2816,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 5;
     ctx.strokeRect(width * 0.08, ctaY, width * 0.84, ctaH);
-    // Flag checker icon on left
     const flagX = width * 0.12;
     const flagSize = 40;
     const cells = 4;
@@ -2878,7 +2826,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
             ctx.fillRect(flagX + cx * cell, ctaY + ctaH / 2 - flagSize / 2 + cy * cell, cell, cell);
         }
     }
-    // CTA text
     ctx.fillStyle = '#000';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -2890,7 +2837,6 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
     ctx.restore();
 }
 
-/* -------- D · TELEMETRY PRINTOUT -------------------------------------------- */
 function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     const intro = easeOutCubic(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
@@ -2900,7 +2846,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     const red = '#c01d1d';
     const ink = '#111';
 
-    // Off-white paper
     ctx.fillStyle = '#fbfaf4';
     ctx.fillRect(0, 0, width, height);
     ctx.save();
@@ -2916,7 +2861,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     const mT = height * 0.06;
     const contentW = width - mL - mR;
 
-    // Dashed border around printout
     ctx.save();
     ctx.strokeStyle = ink;
     ctx.lineWidth = 2;
@@ -2925,7 +2869,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     ctx.setLineDash([]);
     ctx.restore();
 
-    // Header
     ctx.save();
     ctx.fillStyle = ink;
     ctx.textAlign = 'left';
@@ -2942,7 +2885,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(`SESSION .... TIME TRIAL`, mL, mT + 60);
     ctx.fillText(`DRIVER ..... ${state.handle}`, mL, mT + 86);
     ctx.fillText(`CIRCUIT .... ${track.name.toUpperCase()}`, mL, mT + 112);
-    // Dashed separator
     ctx.setLineDash([5, 4]);
     ctx.strokeStyle = ink;
     ctx.lineWidth = 1.5;
@@ -2953,7 +2895,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     ctx.setLineDash([]);
     ctx.restore();
 
-    // Sector time table
     const tableY = mT + 170;
     const rows = [
         ['SECTOR 01', '09.12s', '+0.00'],
@@ -2994,7 +2935,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Tiny track line drawing
     const trackRect = { x: mL, y: tableY + 8 * rowH + 24, width: contentW * 0.55, height: height * 0.18 };
     ctx.save();
     ctx.strokeStyle = ink;
@@ -3002,14 +2942,12 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     const fitted = fitPointsToRect(getTemplateTrackOutline(), trackRect, 6);
     drawPolyline(ctx, fitted, true);
     ctx.stroke();
-    // small label
     ctx.fillStyle = ink;
     ctx.textAlign = 'left';
     ctx.font = `400 ${Math.min(width * 0.02, 18)}px "JetBrains Mono", monospace`;
     ctx.fillText(`┌─ CIRCUIT MAP`, trackRect.x, trackRect.y - 22);
     ctx.restore();
 
-    // NEW RECORD stamp on the right
     ctx.save();
     const stampX = width - mR - 60;
     const stampY = tableY + 3 * rowH + 20;
@@ -3027,7 +2965,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     ctx.fillText('NEW RECORD', 0, 0);
     ctx.restore();
 
-    // Barcode at bottom
     ctx.save();
     const barY = height - 120;
     const barH = 50;
@@ -3041,7 +2978,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Barcode caption + footer
     ctx.save();
     ctx.fillStyle = ink;
     ctx.textAlign = 'center';
@@ -3052,7 +2988,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
     ctx.restore();
 }
 
-/* -------- E · TRADING CARD -------------------------------------------------- */
 function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     const intro = easeOutBack(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
@@ -3060,7 +2995,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     const preset = getActivePreset();
     const track = TRACKS[state.trackKey];
 
-    // Background deep navy with subtle gradient
     const bg = ctx.createLinearGradient(0, 0, width, height);
     bg.addColorStop(0, '#0a0420');
     bg.addColorStop(0.5, '#1a0a3a');
@@ -3068,14 +3002,12 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, width, height);
 
-    // Card rect centered
     const cardPad = Math.min(width * 0.07, 54);
     const cardW = width - cardPad * 2;
     const cardH = height - cardPad * 2;
     const cardX = cardPad;
     const cardY = cardPad;
 
-    // Foil border with gold gradient
     ctx.save();
     const foil = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
     foil.addColorStop(0, '#b78a2a');
@@ -3088,7 +3020,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     ctx.fill();
     ctx.restore();
 
-    // Inner card dark
     const innerX = cardX + 18;
     const innerY = cardY + 18;
     const innerW = cardW - 36;
@@ -3102,7 +3033,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     ctx.fill();
     ctx.restore();
 
-    // Holographic nameplate at top
     const plateY = innerY + 22;
     const plateH = 76;
     ctx.save();
@@ -3120,7 +3050,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(track.name.toUpperCase(), width / 2, plateY + plateH / 2);
     ctx.restore();
 
-    // Rarity stars
     ctx.save();
     ctx.fillStyle = '#ffd97a';
     ctx.strokeStyle = '#5a3d0c';
@@ -3137,23 +3066,19 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Track illustration window
     const winPad = 36;
     const winX = innerX + winPad;
     const winY = starY + 44;
     const winW = innerW - winPad * 2;
     const winH = innerH * 0.38;
     ctx.save();
-    // window frame gold
     ctx.strokeStyle = '#e6c35e';
     ctx.lineWidth = 5;
     roundRectPath(ctx, winX, winY, winW, winH, 12);
     ctx.stroke();
-    // window bg
     roundRectPath(ctx, winX + 3, winY + 3, winW - 6, winH - 6, 10);
     ctx.fillStyle = '#0d0624';
     ctx.fill();
-    // track in window
     const fitted = fitPointsToRect(getTemplateTrackOutline(), { x: winX + 12, y: winY + 12, width: winW - 24, height: winH - 24 }, 8);
     ctx.save();
     ctx.shadowColor = "transparent";
@@ -3163,7 +3088,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     drawPolyline(ctx, fitted, true);
     ctx.stroke();
     ctx.restore();
-    // Corner ornament
     const orn = (ox, oy) => {
         ctx.save();
         ctx.translate(ox, oy);
@@ -3179,7 +3103,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     orn(winX + winW - 10, winY + winH - 10);
     ctx.restore();
 
-    // Stat bars
     const statsY = winY + winH + 28;
     const statRowH = 38;
     const stats = [
@@ -3210,7 +3133,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     });
     ctx.restore();
 
-    // Big centered lap time at bottom of card
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -3227,7 +3149,6 @@ function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     ctx.shadowBlur = 0;
     ctx.restore();
 
-    // Footer plate: LEGENDARY LAP · 01/∞
     const footY = innerY + innerH - 54;
     ctx.save();
     ctx.fillStyle = 'rgba(230, 195, 94, 0.14)';
@@ -3256,7 +3177,6 @@ function drawStar(ctx, cx, cy, outerR, points) {
     ctx.closePath();
 }
 
-/* -------- F · COCKPIT POV --------------------------------------------------- */
 function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     const intro = easeOutCubic(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
@@ -3264,7 +3184,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     const preset = getActivePreset();
     const track = TRACKS[state.trackKey];
 
-    // Sky gradient (dusk)
     const horizonY = height * 0.42;
     const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
     sky.addColorStop(0, '#1b1047');
@@ -3273,14 +3192,12 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, width, horizonY);
 
-    // Ground
     const ground = ctx.createLinearGradient(0, horizonY, 0, height);
     ground.addColorStop(0, '#2a1c4a');
     ground.addColorStop(1, '#06030f');
     ctx.fillStyle = ground;
     ctx.fillRect(0, horizonY, width, height - horizonY);
 
-    // Distant mountains silhouette
     ctx.save();
     ctx.fillStyle = 'rgba(10, 4, 32, 0.72)';
     ctx.beginPath();
@@ -3294,7 +3211,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.fill();
     ctx.restore();
 
-    // Sun on horizon
     ctx.save();
     ctx.fillStyle = 'rgba(255, 210, 110, 0.9)';
     ctx.beginPath();
@@ -3302,7 +3218,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.fill();
     ctx.restore();
 
-    // Perspective road (trapezoidal) + lane markers scrolling
     const roadCenterX = width / 2;
     const roadFarW = width * 0.1;
     const roadNearW = width * 1.1;
@@ -3316,7 +3231,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.closePath();
     ctx.fill();
 
-    // Edge stripes red/white
     const rumbleCount = 18;
     const scroll = (timeMs * 0.0014) % 1;
     for (let i = 0; i < rumbleCount; i += 1) {
@@ -3329,7 +3243,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
         const nx0 = roadCenterX + (roadFarW + (roadNearW - roadFarW) * (t0 * t0)) / 2;
         const nx1 = roadCenterX + (roadFarW + (roadNearW - roadFarW) * (t1 * t1)) / 2;
         ctx.fillStyle = i % 2 === 0 ? '#dc2626' : '#f5f5f5';
-        // left rumble
         ctx.beginPath();
         ctx.moveTo(fx0, ty0);
         ctx.lineTo(fx0 - 18, ty0);
@@ -3337,7 +3250,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
         ctx.lineTo(fx1, ty1);
         ctx.closePath();
         ctx.fill();
-        // right rumble
         ctx.beginPath();
         ctx.moveTo(nx0, ty0);
         ctx.lineTo(nx0 + 18, ty0);
@@ -3345,7 +3257,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
         ctx.lineTo(nx1, ty1);
         ctx.closePath();
         ctx.fill();
-        // middle dashed markers
         if (i % 2 === 0) {
             ctx.fillStyle = '#f5f5f5';
             const cx0 = roadCenterX;
@@ -3362,7 +3273,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Rear-view mirror at top showing small track map
     const mirrorW = width * 0.3;
     const mirrorH = height * 0.08;
     const mirrorX = width / 2 - mirrorW / 2;
@@ -3374,7 +3284,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 4;
     ctx.stroke();
-    // small track
     const mirrorFitted = fitPointsToRect(getTemplateTrackOutline(), { x: mirrorX + 10, y: mirrorY + 6, width: mirrorW - 20, height: mirrorH - 12 }, 4);
     ctx.strokeStyle = '#9ae6b4';
     ctx.lineWidth = 2;
@@ -3387,7 +3296,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(track.name.toUpperCase(), mirrorX + mirrorW - 14, mirrorY + mirrorH / 2);
     ctx.restore();
 
-    // HUD Lap time at top-left floating
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(width * 0.04, height * 0.04, width * 0.2, height * 0.08);
@@ -3403,7 +3311,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(`${state.lapTime.toFixed(2)}s`, width * 0.055, height * 0.075);
     ctx.restore();
 
-    // Rain drops on windscreen
     ctx.save();
     ctx.fillStyle = 'rgba(200, 220, 255, 0.5)';
     for (let i = 0; i < 36; i += 1) {
@@ -3415,7 +3322,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Cockpit overlay: dashboard bottom
     const dashY = height * 0.78;
     const dashGrad = ctx.createLinearGradient(0, dashY - 20, 0, height);
     dashGrad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -3424,12 +3330,10 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.fillStyle = dashGrad;
     ctx.fillRect(0, dashY - 20, width, height - dashY + 20);
 
-    // Steering wheel
     const wheelCx = width / 2;
     const wheelCy = height + height * 0.12;
     const wheelR = Math.min(width * 0.45, height * 0.36);
     ctx.save();
-    // outer rim
     ctx.strokeStyle = '#2a2a2e';
     ctx.lineWidth = 42;
     ctx.beginPath();
@@ -3440,7 +3344,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.beginPath();
     ctx.arc(wheelCx, wheelCy, wheelR, 0, Math.PI * 2);
     ctx.stroke();
-    // spokes
     ctx.strokeStyle = '#1a1a20';
     ctx.lineWidth = 22;
     const spokeAngles = [-2.1, -1, Math.PI / 2];
@@ -3450,7 +3353,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
         ctx.lineTo(wheelCx + Math.cos(a) * wheelR, wheelCy + Math.sin(a) * wheelR);
         ctx.stroke();
     });
-    // center boss
     ctx.fillStyle = '#111';
     ctx.beginPath();
     ctx.arc(wheelCx, wheelCy, 72, 0, Math.PI * 2);
@@ -3460,7 +3362,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('VGP', wheelCx, wheelCy - 4);
-    // wheel hud leds
     const leds = 12;
     const speedPct = 0.5 + 0.45 * Math.sin(timeMs * 0.004);
     for (let i = 0; i < leds; i += 1) {
@@ -3476,7 +3377,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     }
     ctx.restore();
 
-    // Dashboard gauges left/right of steering wheel
     const gaugeY = height - 120;
     const drawGauge = (cx, cy, r, pct, label, color) => {
         ctx.save();
@@ -3499,7 +3399,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     drawGauge(width * 0.15, gaugeY, 54, speedPct, `${Math.round(speedPct * 360)} km/h`, '#38bdf8');
     drawGauge(width * 0.85, gaugeY, 54, 0.8 + 0.1 * Math.sin(timeMs * 0.003), '9850 RPM', '#ef4444');
 
-    // Big CTA slab across bottom above wheel
     ctx.save();
     ctx.globalAlpha = Math.min(1, outro * 1.3 + 0.3);
     const ctaY = height - 76;
@@ -3512,7 +3411,6 @@ function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
     ctx.fillText(`${state.cta.toUpperCase()}   ·   ${state.handle}`, width / 2, ctaY + 19);
     ctx.restore();
 
-    // Top headline kicker
     ctx.save();
     const hl = (state.headline || preset.headline).toUpperCase();
     ctx.fillStyle = '#fff';
@@ -4604,7 +4502,6 @@ async function exportThumbnailPack() {
     const savedStyle = state.templateStyle;
     updateStatusUi('Rendering thumbnail pack…');
     const theme = THEMES.find((candidate) => candidate.id === state.themeId) ?? THEMES[0];
-    // Each of the 6 template styles as a static frame × each aspect.
     const templateStyleIds = ['arcade-crt', 'magazine', 'sticker', 'telemetry', 'trading-card', 'cockpit'];
     try {
         let count = 0;

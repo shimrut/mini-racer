@@ -1,32 +1,14 @@
-/* Every pane sits in the same single grid cell, so changing `hidden` cannot
- * change the shell's measured height. The transition veil on #start-overlay
- * covers the one-frame swap; the pane itself only animates its arrival. */
+/* Every pane sits in the same single grid cell, so toggling `hidden` cannot change the shell's measured height. */
 .lobby-panes {
     display: grid;
     grid-template-rows: 1fr;
     grid-template-columns: 1fr;
     flex: 1 1 auto;
     min-height: 0;
-    /* The travel starts below the lane, and an untrimmed pane hanging over the
-       edge counts as content: it grew this box's scrollable height by exactly
-       the travel for as long as the entrance ran, which pushed the flex column
-       above and lifted the header 8px until the animation ended, then dropped
-       it back. `clip` and not `hidden` — the lane must not become a scroll
-       container, which would change how the carousel measures inside it. */
+    /* Untrimmed travel counts as scrollable content and lifts the header while the entrance runs. */
     overflow: clip;
 }
 
-/* The picker rises into its lane. A mode swap is covered by the overlay veil, so
- * the old pane can leave the layout immediately and the arriving pane does not
- * need a fragile discrete `display` transition. This also avoids a blank delay
- * before the new screen starts moving.
- *
- * The arrival is a keyframe because an animation replays by itself every time
- * the pane goes from `display: none` to rendered — the case that has to survive
- * the lobby being built inside an overlay that is not shown yet.
- *
- * `both` keeps the pane at its from-state until the animation owns it, then
- * leaves it at rest without a second transition to fight the veil. */
 .lobby-pane {
     grid-row: 1;
     grid-column: 1;
@@ -50,21 +32,15 @@
     }
 }
 
-/* One bottom pin — same personality as main: title top, actions bottom. */
 .lobby-pane.main-menu {
     margin-top: auto;
 }
 
-/* Hidden panes leave immediately. The veil owns the outgoing-screen fade, so a
- * hidden pane never remains painted underneath a new pane or relies on
- * discrete-display support in an embedded WebView. */
 .lobby-pane[hidden] {
     display: none !important;
     opacity: 0;
     translate: 0 var(--lobby-pane-travel);
     z-index: 0;
-    /* Cancel an interrupted entrance so rapid Back / mode taps cannot replay a
-       stale pane over the newly selected screen. */
     animation: none;
     pointer-events: none;
 }
@@ -73,26 +49,17 @@
     display: none;
 }
 
-/* The wordmark entrance belongs to the first Home reveal. Returning from a
-   mode must not replay its zero-opacity keyframe after the title was hidden. */
 body[data-lobby-home-returned="true"] #start-overlay.is-ready .lobby-title__mini,
 body[data-lobby-home-returned="true"] #start-overlay.is-ready .lobby-title__racer {
     opacity: 1;
     animation: none;
 }
 
-/* The header changes with the panes, but the transition veil covers the
- * synchronous `display` swap. The wordmark and billing line stay in this
- * header, outside the horizontal rail, so carousel movement cannot move them. */
 body[data-lobby-home-returned="true"] .lobby-title,
 .lobby-mode-toolbar {
     animation: lobbyPaneIn var(--dur-base) var(--ease-settle) both;
 }
 
-/* Home and Challenge keep their established headers. Daily and Campaign keep
-   the complete header in flow: the toolbar is pinned to its upper-right, while
-   the wordmark and the mode/date billing row reserve their own space above the
-   carousel. */
 body[data-lobby-mode="challenge"] .lobby-header,
 body[data-lobby-mode="daily"] .lobby-header,
 body[data-lobby-mode="campaign"] .lobby-header {
@@ -101,9 +68,6 @@ body[data-lobby-mode="campaign"] .lobby-header {
     display: flex;
 }
 
-/* Daily/Campaign keep the compact printed masthead that previously lived on
-   each carousel card. Home owns the larger display treatment; the fixed mode
-   header must not inherit that scale. */
 body[data-lobby-mode="challenge"] .lobby-title,
 body[data-lobby-mode="daily"] .lobby-title,
 body[data-lobby-mode="campaign"] .lobby-title {
@@ -140,8 +104,6 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     width: auto;
 }
 
-/* A duel has one track and one time; there is no table to stand in. Garage and
-   Settings still travel with the player, so only Standings steps out. */
 body[data-lobby-mode="challenge"] #lobby-mode-standings-btn {
     display: none;
 }
@@ -437,17 +399,12 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     object-fit: cover;
 }
 
-/* The default Snoo is drawn edge to edge, so it gets the inset and the tinted
-   plate the poster gives it rather than filling the circle like a real avatar. */
 .challenge-avatar--generic {
     padding: 12%;
     background: color-mix(in srgb, var(--accent-color) 10%, #10151e);
     object-fit: contain;
 }
 
-/* Snoos look to the right, so the challenger on the left of the poster foot
-   already faces the middle and the viewer on the right is mirrored: the pair
-   face each other. The won hero stands alone and keeps its natural pose. */
 #challenge-viewer-avatar {
     transform: scaleX(-1);
 }
@@ -473,8 +430,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     white-space: nowrap;
 }
 
-/* The pane is a grid of auto rows, so nothing here can rely on leftover space —
-   the hero has to fit the short viewport on its own terms. */
 .challenge-won-hero {
     display: flex;
     flex-direction: column;
@@ -543,14 +498,12 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     text-align: center;
 }
 
-/* One rule sizes both, at the same scale every other primary action uses. */
 .challenge-won-cta .main-menu__item {
     justify-content: center;
     flex-direction: row;
     padding: 1.25rem;
 }
 
-/* Full size everywhere it fits; the longest label only steps down on narrow screens. */
 .challenge-won-cta .main-menu__item .main-menu__label {
     font-size: clamp(1.05rem, 6vw, 1.5rem);
     font-style: italic;
@@ -589,7 +542,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 html.is-lobby-view-transition {
     view-transition-name: none;
 }
-/* Bulletproof fallback: explicitly hide the root transition if the browser still creates it */
 html.is-lobby-view-transition::view-transition-group(root),
 html.is-lobby-view-transition::view-transition-old(root),
 html.is-lobby-view-transition::view-transition-new(root) {

@@ -1,9 +1,3 @@
-/**
- * Card models for the Daily lobby track carousel.
- *
- * Kept free of DOM so the ordering, labelling and rank/medal rules can be
- * tested on their own — the carousel view only paints what this returns.
- */
 import { getDailyChallengeRequiredLaps } from './labels.js';
 import { getDailyChallengeTrackName } from './service.js';
 import {
@@ -29,10 +23,6 @@ export function getDailyChallengeDateKey(challenge) {
     return toDateKey(Date.parse(challenge?.startsAt || ''));
 }
 
-/**
- * The carousel is read as a run of days, so the day is the card's headline.
- * "Today" and "Yesterday" carry further than a date does at a glance.
- */
 export function formatDailyCarouselDayLabel(challenge, nowMs = Date.now()) {
     const dateKey = getDailyChallengeDateKey(challenge);
     if (!dateKey) return 'Daily';
@@ -65,8 +55,6 @@ export function buildDailyCarouselCards(challenges = [], {
         const bestTime = Number(challenge.trackPersonalBest?.bestTime);
         const hasBestTime = Number.isFinite(bestTime) && bestTime > 0;
         const snapshot = getSnapshot(challenge.id) || null;
-        // '--' is the placeholder a snapshot uses for "no rank here"; showing it
-        // raw reads as a broken value rather than as a track never raced.
         const rawRankLabel = typeof snapshot?.playerRankLabel === 'string'
             ? snapshot.playerRankLabel.trim()
             : '';
@@ -76,8 +64,6 @@ export function buildDailyCarouselCards(challenges = [], {
             : null;
         const dayLabel = formatDailyCarouselDayLabel(challenge, nowMs);
         const lapsLabel = formatLapsLabel(requiredLaps);
-        // No unit: the card's meta line is uppercased, and "18.00S" reads as a
-        // typo. Matches how the campaign card states a best.
         const bestLabel = hasBestTime ? bestTime.toFixed(3) : null;
 
         cards.push({
@@ -96,8 +82,6 @@ export function buildDailyCarouselCards(challenges = [], {
             medal,
             medalTiers: getCombinedMedalStackTiers(challenge.trackKey, medal),
             rankLabel,
-            // No snapshot yet means the rank is still in flight, which reads very
-            // differently from a snapshot that says the player has no time here.
             rankPending: !snapshot,
             locked: false,
         });

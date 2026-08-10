@@ -47,8 +47,7 @@ export async function beginOwnedRedisLockTransaction(
 ): Promise<TxClientLike | null> {
     const transaction = await client.watch(lock.key);
     try {
-        // @devvit/redis 0.13 queues transaction-client reads, so read through
-        // the base client after WATCH and let EXEC detect any intervening change.
+        // @devvit/redis 0.13 queues transaction-client reads, so read through the base client after WATCH and let EXEC catch any change.
         if (!await isRedisLockOwned(lock, client)) {
             await safelyUnwatch(transaction);
             return null;

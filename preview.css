@@ -3,7 +3,6 @@
 :root {
     color-scheme: dark;
 
-    /* Colors */
     --bg-color: #02061740;
     --bg-color-darker: #010410;
     --bg-surface: #0f172a;
@@ -12,16 +11,13 @@
     --accent-color: #ef4444;
     --accent-hover: #f87171;
 
-    /* Typography */
     --header-font: "Outfit", sans-serif;
     --mono-font: "JetBrains Mono", monospace;
 
-    /* Spacing */
     --space-sm: 0.5rem;
     --space-md: 1rem;
     --space-lg: 1.5rem;
 
-    /* Border Radius */
     --radius-sm: 0.5rem;
     --radius-md: 1rem;
     --radius-full: 999px;
@@ -44,8 +40,6 @@ body {
     overflow: hidden;
 }
 
-/* ─── Shell ─────────────────────────────────────────── */
-
 .preview-shell {
     width: 100%;
     height: 100vh;
@@ -58,8 +52,6 @@ body {
     box-sizing: border-box;
 }
 
-/* ─── Card ───────────────────────────────────────────── */
-
 .start-daily-card {
     position: relative;
     width: 100%;
@@ -69,8 +61,6 @@ body {
     flex-direction: column-reverse;
     gap: var(--space-md);
 }
-
-/* ─── Top bar: game title + availability dots ─────────── */
 
 .card-topbar {
     display: flex;
@@ -147,8 +137,6 @@ body {
     color: var(--text-color);
 }
 
-/* ─── Track canvas ────────────────────────────────────── */
-
 .track-visual-container {
     flex: 1;
     min-height: 0;
@@ -163,10 +151,6 @@ body {
     height: 100%;
     display: block;
 }
-
-/* ─── Info row: track name + time to beat ─────────────── */
-
-/* ─── HUD Styles (Same as gameplay HUD) ──────────────── */
 
 .hud-stats {
     display: flex;
@@ -257,8 +241,6 @@ body {
     line-height: 1;
 }
 
-/* ─── Play button ─────────────────────────────────────── */
-
 .preview-play {
     display: inline-flex;
     align-items: center;
@@ -327,8 +309,6 @@ body {
     text-transform: uppercase;
     cursor: pointer;
 }
-
-/* ─── Responsive ──────────────────────────────────────── */
 
 @media (max-width: 480px) {
     .preview-shell {

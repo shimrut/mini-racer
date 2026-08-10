@@ -145,14 +145,6 @@ export class SettingsUi {
         this.refreshCollisionRestartDelayPanel();
     }
 
-    /**
-     * @param {object} opts
-     * @param {() => boolean} opts.getValue
-     * @param {HTMLInputElement|null|undefined} opts.switchEl
-     * @param {HTMLElement|null|undefined} opts.headingEl
-     * @param {HTMLElement|null|undefined} [opts.descEl]
-     * @param {string} opts.title Shown as "{title}: On" / "{title}: Off"
-     */
     _syncBooleanSettingRow({ getValue, switchEl, headingEl, descEl, title }) {
         const on = getValue();
         if (switchEl) {

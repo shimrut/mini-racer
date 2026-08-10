@@ -424,7 +424,6 @@ export const dailyChallengeEngineMethods = {
     const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
     const ghostExpected = this.pbGhost?.enabled === true
       && Number.isFinite(trackPersonalBest?.bestTime);
-    // Show after GO clears — not while GO is still on screen.
     const noticeNeeded = ghostExpected
       && !ghostActive
       && typeof this.hud?.showGhostUnavailableNotice === 'function';
@@ -499,8 +498,6 @@ export const dailyChallengeEngineMethods = {
     this._dailyPlaylistTrackPrewarmId = prewarmId;
     const queue = (Array.isArray(challenges) ? challenges : [])
       .filter((challenge) => challenge?.trackKey && TRACKS[challenge.trackKey]);
-    // The lobby carousel prewarms without a modal on screen; the tracks modal
-    // still stops the moment it closes.
     const isSurfaceOpen = () => (
       !requireModal || this.dailyChallengeUi.isPlaylistModalOpen?.()
     );
@@ -556,7 +553,11 @@ export const dailyChallengeEngineMethods = {
         ? challenge.trackKey
         : DEFAULT_TRACK_KEY;
 
-    if (this.status !== "ready" || !targetTrackKey) {
+    if (
+      this.status !== "ready"
+      || this.activeRaceMode === "challenge"
+      || !targetTrackKey
+    ) {
       return;
     }
 
@@ -1009,12 +1010,6 @@ export const dailyChallengeEngineMethods = {
     }
   },
 
-  /**
-   * The Daily pane's carousel *is* the track picker, so it paints from whatever
-   * is already cached and then repaints as the playlist, personal bests and
-   * per-day snapshots land. A render token drops late work once the player has
-   * moved on.
-   */
   async refreshDailyCarousel({ selectChallengeId = null } = {}) {
     const carousel = this.dailyCarousel;
     if (!carousel) return;
@@ -1049,8 +1044,6 @@ export const dailyChallengeEngineMethods = {
       if (isStale()) return;
     }
 
-    // Nothing below changes the run of days, only what each card can say about
-    // it, so the selection is left alone from here on.
     try {
       await this.refreshTrackPersonalBestSummaries(challenges);
       if (isStale()) return;
@@ -1086,13 +1079,17 @@ export const dailyChallengeEngineMethods = {
   },
 
   handleDailyCarouselSelect(challenge, card = null) {
-    if (!challenge?.id) return;
+    if (!challenge?.id) {
+      this.selectedDailyChallengeId = null;
+      this.lobbyUi?.setDailySelectedChallenge?.(null, null);
+      this.setDailyChallengeLobbySummary(null);
+      return;
+    }
     this.selectedDailyChallengeId = challenge.id;
     this.lobbyUi?.setDailySelectedChallenge?.(challenge, card);
     this.setDailyChallengeLobbySummary(challenge);
   },
 
-  /** Warm the centred track so Start does not pay for the build. */
   handleDailyCarouselSettled(card) {
     const challenge = card?.challenge;
     if (!challenge?.trackKey || !TRACKS[challenge.trackKey]) return;
@@ -1107,8 +1104,6 @@ export const dailyChallengeEngineMethods = {
       challenge,
       "close",
       {
-        // Closing the standings lands on whichever day was last on screen, so
-        // browsing back through the week is not undone by dismissing it.
         onClose: () => {
           const viewedId = this.leaderboards?.getLastViewedDailyChallengeId?.()
             || challenge.id;
@@ -1528,9 +1523,6 @@ export const dailyChallengeEngineMethods = {
       preserveRaceComparisonTarget: true,
       startSource: "leaderboard_opponent",
     });
-    // A start that never reached this challenge — a press already in flight, or
-    // a day that expired and rolled forward — must not leave the opponent
-    // installed for whatever the player races next.
     if (this.activeDailyChallenge?.id !== challenge.id) {
       this.clearRaceComparisonTarget?.();
       return false;

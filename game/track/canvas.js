@@ -373,19 +373,12 @@ function findCheckpointBoundaryPlacement(points, checkpointStart, checkpointEnd,
     return best || findClosestBoundaryPlacement(points, target);
 }
 
-// Half the curb stroke, which is centred on the boundary path.
+// Decoration extents keep every painted effect inside the track bitmap.
 const CURB_OUTWARD_EXTENT = 3;
-// Furthest ink of a tire barrier from its anchor: the outermost tire sits at
-// offset 12 with an x radius of 7.5, and the stacked pair sit 2 below centre
-// with a y radius of 6. The 1px inner stroke is centred on that edge.
 const TIRE_BARRIER_OUTWARD_EXTENT = Math.hypot(12 + 7.5, 2 + 6) + 0.5;
-// Debris is thrown out along the boundary normal by up to 18 + 54, and slid
-// along the tangent by up to half of 26.
 const DEBRIS_MAX_NORMAL_OFFSET = 72;
 const DEBRIS_MAX_TANGENT_OFFSET = 13;
-// Each vertex of a debris shape sits at up to 1.06 of its major radius.
 const DEBRIS_VERTEX_REACH = 1.06;
-// Absorbs rounding in the shapes above rather than reserving whole cells.
 const TRACK_CANVAS_PADDING_SAFETY = 4;
 
 function getDebrisOutwardExtent(presentation) {
@@ -402,14 +395,6 @@ function getDebrisOutwardExtent(presentation) {
         + strokeWidth / 2;
 }
 
-/**
- * How far past the track polygons this presentation actually paints.
- *
- * The canvas has to cover the boundary paths plus every decoration that sits
- * outside them, and nothing else — it is sized in world pixels, so slack here
- * is paid for across the whole bounding box. Only the decorations the
- * presentation switches on contribute.
- */
 export function getTrackCanvasPadding(presentation = {}) {
     let extent = 0;
 
@@ -468,11 +453,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     canvas.width = Math.ceil((maxX - minX) + padding * 2);
     canvas.height = Math.ceil((maxY - minY) + padding * 2);
 
-    // Off-track area is left transparent for every presentation. The draw path
-    // paints the same background across the viewport each frame before blitting
-    // this bitmap over it, so baking a copy in here only stored millions of
-    // pixels of one flat colour — on a typical track the ribbon covers barely a
-    // fifth of the bounding box.
+    // Off-track stays transparent: the draw path repaints the background every frame, so baking it in here only stored megabytes of flat colour.
     const ctx = canvas.getContext('2d', { alpha: true });
     const offsetX = -origin.x;
     const offsetY = -origin.y;

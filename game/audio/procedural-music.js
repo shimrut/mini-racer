@@ -6,55 +6,52 @@ function midiToFreq(note) {
     return 440 * Math.pow(2, (note - 69) / 12);
 }
 
-// 1. High-energy dark-synthwave chord progression in A minor (for racing)
 const RACE_CHORDS = [
     {
         name: 'A minor',
-        root: 33, // A1
-        notes: [45, 57, 60, 64, 69, 72, 76, 81] // A2, A3, C4, E4, A4, C5, E5, A5
+        root: 33,
+        notes: [45, 57, 60, 64, 69, 72, 76, 81]
     },
     {
         name: 'F Major',
-        root: 29, // F1
-        notes: [41, 53, 57, 60, 65, 69, 72, 77] // F2, F3, A3, C4, F4, A4, C5, F5
+        root: 29,
+        notes: [41, 53, 57, 60, 65, 69, 72, 77]
     },
     {
         name: 'G Major',
-        root: 31, // G1
-        notes: [43, 55, 59, 62, 67, 71, 74, 79] // G2, G3, B3, D4, G4, B4, D5, G5
+        root: 31,
+        notes: [43, 55, 59, 62, 67, 71, 74, 79]
     },
     {
         name: 'E minor',
-        root: 28, // E1
-        notes: [40, 52, 55, 59, 64, 67, 71, 76] // E2, E3, G3, B3, E4, G4, B4, E5
+        root: 28,
+        notes: [40, 52, 55, 59, 64, 67, 71, 76]
     }
 ];
 
-// 2. Luxurious, warm ambient chill-out progression in C Major (for lobby)
 const LOBBY_CHORDS = [
     {
         name: 'C Major 7th',
-        root: 36, // C2
-        notes: [60, 62, 64, 67, 71, 72, 76, 79] // C4, D4, E4, G4, B4, C5, E5, G5
+        root: 36,
+        notes: [60, 62, 64, 67, 71, 72, 76, 79]
     },
     {
         name: 'F Major 7th',
-        root: 41, // F2
-        notes: [57, 60, 64, 65, 69, 72, 76, 77] // A3, C4, E4, F4, A4, C5, E5, F5
+        root: 41,
+        notes: [57, 60, 64, 65, 69, 72, 76, 77]
     },
     {
         name: 'G Major 6th',
-        root: 43, // G2
-        notes: [59, 62, 64, 67, 71, 74, 76, 79] // B3, D4, E4, G4, B4, D5, E5, G5
+        root: 43,
+        notes: [59, 62, 64, 67, 71, 74, 76, 79]
     },
     {
         name: 'A minor 7th',
-        root: 45, // A2
-        notes: [57, 60, 64, 67, 69, 72, 76, 79] // A3, C4, E4, G4, A4, C5, E5, G5
+        root: 45,
+        notes: [57, 60, 64, 67, 69, 72, 76, 79]
     }
 ];
 
-/** Both progressions use the same length so the shared measure counter stays in sync. */
 const CHORD_PROGRESSION_LENGTH = RACE_CHORDS.length;
 
 let registeredApi = null;
@@ -78,28 +75,25 @@ export function createProceduralMusic(externalCtx, externalOutput) {
     let lastFrameSyncTime = -Infinity;
     let lastFrameStateKey = '';
 
-    // State parameters (only what scheduling / filter use)
     const gameState = {
         status: 'ready',
         speed: 0,
         maxSpeedKph: 220,
     };
 
-    // Scheduler state
     let schedulerIntervalId = null;
     let nextStepTime = 0.0;
-    const scheduleAheadTime = 0.18; // Schedule 180ms ahead
-    const lookaheadInterval = 60;   // Check every 60ms
+    const scheduleAheadTime = 0.18;
+    const lookaheadInterval = 60;
 
-    // Musical clock
     const bpm = 122;
     const secondsPerBeat = 60.0 / bpm;
-    const secondsPerStep = secondsPerBeat / 4.0; // 16th note steps
+    const secondsPerStep = secondsPerBeat / 4.0;
 
-    let currentStep = 0;      // 0-15 steps per measure
-    let currentMeasure = 0;   // 0-3 measures per chord
-    let chordIndex = 0;       // 0-3 chord index in progression
-    let lastPluckIndex = 3;   // For smooth melodic random walks
+    let currentStep = 0;
+    let currentMeasure = 0;
+    let chordIndex = 0;
+    let lastPluckIndex = 3;
 
     function buildGraph() {
         if (graphBuilt) return;
@@ -118,31 +112,27 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         musicGain = ctx.createGain();
         musicGain.gain.setValueAtTime(0, ctx.currentTime);
 
-        // Interactive master lowpass filter (e.g. for pause menu/crashes)
         musicFilter = ctx.createBiquadFilter();
         musicFilter.type = 'lowpass';
         musicFilter.frequency.setValueAtTime(15000, ctx.currentTime);
         musicFilter.Q.value = 1.0;
 
-        // Connect graph
         musicGain.connect(musicFilter);
         musicFilter.connect(externalOutput || ctx.destination);
 
-        // Feedback Delay line for ambient depth
         delayNode = ctx.createDelay(1.0);
         delayFeedback = ctx.createGain();
         delayVolume = ctx.createGain();
 
-        delayNode.delayTime.setValueAtTime(0.246, ctx.currentTime); // 122 BPM echo
-        delayFeedback.gain.setValueAtTime(0.38, ctx.currentTime);   // High echo feedback for lush tail
-        delayVolume.gain.setValueAtTime(0.24, ctx.currentTime);     // Soft echo level
+        delayNode.delayTime.setValueAtTime(0.246, ctx.currentTime);
+        delayFeedback.gain.setValueAtTime(0.38, ctx.currentTime);
+        delayVolume.gain.setValueAtTime(0.24, ctx.currentTime);
 
         delayNode.connect(delayFeedback);
         delayFeedback.connect(delayNode);
         delayNode.connect(delayVolume);
         delayVolume.connect(musicFilter);
 
-        // Generate a simple reusable noise buffer for snare and hi-hats
         const noiseLength = ctx.sampleRate * 0.15;
         noiseBuffer = ctx.createBuffer(1, noiseLength, ctx.sampleRate);
         const noiseData = noiseBuffer.getChannelData(0);
@@ -153,7 +143,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         graphBuilt = true;
     }
 
-    // 1. Driving Synthwave Octave Bassline
     function playBass(time, pitch, velocity = 0.28, duration = 0.12) {
         if (!ctx) return;
 
@@ -181,7 +170,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         osc.stop(time + duration + 0.05);
     }
 
-    // 2. Punchy Synthwave Kick Drum
     function playKick(time, velocity = 0.42) {
         if (!ctx) return;
 
@@ -208,7 +196,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         osc.stop(time + 0.13);
     }
 
-    // 3. Crisp Synthwave Snare/Clap
     function playSnare(time, velocity = 0.28) {
         if (!ctx || !noiseBuffer) return;
 
@@ -248,7 +235,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         bodyOsc.stop(time + 0.1);
     }
 
-    // 4. Snappy Upbeat Hi-Hat
     function playHihat(time, velocity = 0.09) {
         if (!ctx || !noiseBuffer) return;
 
@@ -272,7 +258,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         source.stop(time + 0.05);
     }
 
-    // 5. Mesmerizing Detuned Arpeggiator Lead
     function playArp(time, pitch, velocity = 0.15, duration = 0.1, openFilterAmount = 0.5) {
         if (!ctx) return;
 
@@ -314,26 +299,21 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         osc2.stop(time + duration + 0.05);
     }
 
-    // Schedule the notes for the given step
     function scheduleStep(step, time) {
         const status = gameState.status;
         const isLobby = status === 'ready';
         const isPlaying = status === 'playing';
         const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
 
-        // Load the appropriate chord progression
         const chordList = isLobby ? LOBBY_CHORDS : RACE_CHORDS;
         const chord = chordList[chordIndex];
 
-        // 1. Bassline (Decoupled Lobby Whole notes vs Race Octave gallops)
         if (isLobby) {
-            // Lush, warm, long sustaining whole-note bass roots for the lobby menu
             if (step === 0) {
                 const bassPitch = midiToFreq(chord.root);
                 playBass(time, bassPitch, 0.22, secondsPerBeat * 3.5);
             }
         } else {
-            // High-octane driving galloping octave bassline for the race
             if (step % 2 === 0) {
                 const isOctaveStep = step === 2 || step === 6 || step === 10 || step === 14;
                 const bassMidi = chord.root + (isOctaveStep ? 12 : 0);
@@ -347,29 +327,24 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             }
         }
 
-        // 2. Drums (Decoupled chill lobby rhythm vs racing driving build)
         if (isLobby) {
-            // Super soft lo-fi organic tick for the lobby
             if (step === 0) {
-                playKick(time, 0.18); // Soft kick pulse on beat 1
+                playKick(time, 0.18);
             }
             if (step === 8) {
-                playHihat(time, 0.035); // Soft ticking upbeat
+                playHihat(time, 0.035);
             }
         } else if (isPlaying) {
-            // A. KICK: Four-on-the-floor
             if (step === 0 || step === 4 || step === 8 || step === 12) {
                 if (speedNorm > 0.02) {
                     playKick(time, 0.42 + speedNorm * 0.08);
                 }
             }
-            // B. SNARE: Beats 2 & 4
             if (step === 4 || step === 12) {
                 if (speedNorm > 0.25) {
                     playSnare(time, 0.26 + speedNorm * 0.06);
                 }
             }
-            // C. HI-HAT: Upbeat offbeats
             if (step === 2 || step === 6 || step === 10 || step === 14) {
                 if (speedNorm > 0.10) {
                     playHihat(time, 0.08 + speedNorm * 0.04);
@@ -377,25 +352,20 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             }
         }
 
-        // 3. Lead & Melody (Decoupled slow lobby bell melody vs fast racing arps)
         if (isLobby) {
-            // Slow, warm, crystalline drifting pentatonic melody
             const is8thStep = step % 2 === 0;
             if (is8thStep && Math.random() < 0.32) {
                 const scale = chord.notes;
                 
-                // Algorithmic melody walk
-                const walkOffset = Math.floor(Math.random() * 3) - 1; // -1, 0, or +1 step
+                const walkOffset = Math.floor(Math.random() * 3) - 1;
                 lastPluckIndex = clamp(lastPluckIndex + walkOffset, 0, scale.length - 1);
                 
                 const noteMidi = scale[lastPluckIndex];
                 const pitch = midiToFreq(noteMidi);
                 
-                // Plays warm, deeply reverberated soft plucks
                 playArp(time, pitch, 0.12, 0.22, 0.14);
             }
         } else if (status !== 'starting') {
-            // Fast continuous 16th-note driving synth lead for racing
             const arpIndexPattern = [0, 2, 4, 2, 5, 4, 2, 3, 1, 3, 5, 4, 6, 5, 4, 2];
             const noteIndex = arpIndexPattern[step % arpIndexPattern.length];
             const noteMidi = chord.notes[noteIndex];
@@ -494,7 +464,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         } else if (status === 'starting') {
             cutoff = 600;
         } else if (status === 'ready') {
-            cutoff = 1600; // Keep the lobby music warm and smooth, not overly buzzy
+            cutoff = 1600;
         } else if (status === 'playing') {
             const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
             cutoff = 2000 + speedNorm * 6500;
@@ -547,8 +517,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             buildGraph();
             if (!ctx) return;
             if (!enabledCache) return;
-            // Resume on the gesture even when not yet starting/playing so iOS
-            // unlocks the context; ensureSchedulerRunning starts once eligible.
+            // Resume on the gesture even before playback starts so iOS unlocks the context.
             if (ctx.state === 'suspended') {
                 void ctx.resume().then(() => {
                     ensureSchedulerRunning();

@@ -1,11 +1,3 @@
-/**
- * Campaign: a fixed, permanent ladder of races whose stages unlock on medals.
- *
- * The racing itself — validating a replay, ranking the time, keeping a personal
- * best and its ghost, picking an opponent — is the shared competition pipeline.
- * What lives here is the part that is genuinely Campaign's own: per-player
- * progress, and the medal gate that decides which stage a player may enter.
- */
 import { redis } from '@devvit/redis';
 import { createHash } from 'node:crypto';
 import {
@@ -22,6 +14,7 @@ import {
     toCampaignCompetition,
     type Competition,
 } from './competition.js';
+import type { DailyGpLeaderboardEntry } from './daily-gp-model.js';
 import {
     readEntryByPlayerId,
     readPlayerRank,
@@ -81,11 +74,6 @@ function playerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
 }
 
-/**
- * Progress is per player, with permanent signed-in records and rolling guest
- * retention, so it gets its own key rather than a field in one campaign-wide
- * hash that would grow without bound.
- */
 function progressKey(playerId: string): string {
     return `campaign:${CAMPAIGN_ID}:progress:${playerField(playerId)}`;
 }
@@ -149,6 +137,45 @@ function parseBestResult(value: unknown, expectedRaceId?: string): CampaignBestR
             : null,
         updatedAt: row.updatedAt,
     };
+}
+
+function campaignResultFromEntry(
+    stage: (typeof CAMPAIGN_STAGES)[number],
+    entry: DailyGpLeaderboardEntry | null,
+    expectedPlayerId: string,
+): CampaignBestResult | null {
+    if (
+        !entry
+        || entry.playerId !== expectedPlayerId
+        || entry.trackKey !== stage.trackKey
+        || !Number.isSafeInteger(entry.bestTimeMs)
+        || entry.bestTimeMs <= 0
+        || entry.completedLaps !== stage.lapCount
+        || entry.validationMethod !== 'strict-replay'
+    ) return null;
+    return {
+        raceId: stage.raceId,
+        trackKey: stage.trackKey,
+        lapCount: stage.lapCount,
+        rulesRevision: stage.rulesRevision,
+        bestTimeMs: Math.round(entry.bestTimeMs),
+        medal: getMedalForRaceTime(
+            stage.trackKey,
+            entry.bestTimeMs / 1000,
+            stage.lapCount,
+        ),
+        checkpointTimesSec: entry.checkpointTimesSec ?? null,
+        updatedAt: entry.updatedAt,
+    };
+}
+
+function fasterCampaignResult(
+    first: CampaignBestResult | null | undefined,
+    second: CampaignBestResult | null | undefined,
+): CampaignBestResult | null {
+    if (!first) return second ?? null;
+    if (!second) return first;
+    return second.bestTimeMs < first.bestTimeMs ? second : first;
 }
 
 export function parseCampaignProgress(raw: string | null | undefined): CampaignProgress {
@@ -228,11 +255,6 @@ async function mutateProgress(
     }
 }
 
-/**
- * Removes a small batch of inactive guests before Campaign reads. WATCHing the
- * global ledger makes a concurrent activity refresh cancel the cleanup rather
- * than delete a returning player's rows.
- */
 export async function cleanupExpiredCampaignGuests(nowMs = Date.now()): Promise<number> {
     const candidates = await redis.zRange(CAMPAIGN_GUEST_EXPIRY_KEY, 0, nowMs, {
         by: 'score',
@@ -332,11 +354,6 @@ function identityRequired() {
     };
 }
 
-/**
- * Where the player sits on every stage's board, in one pass. The lobby shows a
- * rank per stage, and a zRank each is far cheaper than a snapshot request per
- * stage from the client.
- */
 async function readCampaignStandingsByRaceId(playerId: string | null) {
     const entries = await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
         const competition = competitionFor(stage, playerId);
@@ -360,28 +377,31 @@ export async function getServerCampaignBootstrap({
 } = {}) {
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     const canonicalPlayerId = identity.canonicalPlayerId;
+    let guestPromotionPending = false;
+    let campaignProgressPromotionPending = false;
     await cleanupExpiredCampaignGuestsBestEffort();
 
-    // Signing in is the moment a guest's ladder would otherwise be stranded, so
-    // it is claimed here, before the bootstrap reports what they own.
     if (canonicalPlayerId?.startsWith('reddit:')) {
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
         if (guestPlayerId) {
-            try {
-                await Promise.all([
-                    mergeGuestCampaignProgress({
-                        guestPlayerId: `guest:${guestPlayerId}`,
-                        redditPlayerId: canonicalPlayerId,
-                    }),
-                    mergeGuestCarUnlockProgress({
-                        guestPlayerId: `guest:${guestPlayerId}`,
-                        redditPlayerId: canonicalPlayerId,
-                    }),
-                ]);
-            } catch (error) {
-                // A failed claim must not cost the player their bootstrap; the
-                // guest keys survive, so the next load tries again.
-                console.error('Campaign guest progress claim failed:', error);
+            const [campaignPromotion, carUnlockPromotion] = await Promise.allSettled([
+                mergeGuestCampaignProgress({
+                    guestPlayerId: `guest:${guestPlayerId}`,
+                    redditPlayerId: canonicalPlayerId,
+                }),
+                mergeGuestCarUnlockProgress({
+                    guestPlayerId: `guest:${guestPlayerId}`,
+                    redditPlayerId: canonicalPlayerId,
+                }),
+            ]);
+            campaignProgressPromotionPending = campaignPromotion.status === 'rejected';
+            guestPromotionPending = campaignProgressPromotionPending
+                || carUnlockPromotion.status === 'rejected';
+            for (const promotion of [campaignPromotion, carUnlockPromotion]) {
+                if (promotion.status !== 'rejected') continue;
+                guestPromotionPending = true;
+                // A failed claim must not cost the player their bootstrap; the guest keys survive for the next load.
+                console.error('Campaign guest progress claim failed:', promotion.reason);
             }
         }
     }
@@ -397,11 +417,10 @@ export async function getServerCampaignBootstrap({
         status: 200,
         body: {
             campaignId: CAMPAIGN_ID,
-            // Whether the player is ranked is what gates racing; being signed in
-            // with Reddit is now only about how they are named and whether their
-            // progress is permanent. Guests are ranked too.
             ranked: Boolean(canonicalPlayerId),
             signedIn: Boolean(canonicalPlayerId?.startsWith('reddit:')),
+            guestPromotionPending,
+            campaignProgressPromotionPending,
             stages: CAMPAIGN_STAGES,
             progress: publicProgress(progress),
             standingsByRaceId,
@@ -545,8 +564,6 @@ export async function submitServerCampaignRun({
 
     const canonicalPlayerId = identity.canonicalPlayerId;
     const progress = await readProgress(canonicalPlayerId);
-    // The medal gate is Campaign's own rule, so it is checked before the run
-    // reaches the shared pipeline rather than inside it.
     if (!isCampaignStageUnlocked(stage.raceId, progress.resultsByRaceId)) {
         return { status: 403, body: { accepted: false, error: 'Campaign race is locked.' } };
     }
@@ -583,8 +600,6 @@ export async function submitServerCampaignRun({
     };
     let savedProgress: CampaignProgress;
     try {
-        // Reconcile every accepted response, including an unchanged board. A
-        // retry can therefore repair progress after an earlier partial save.
         savedProgress = await mutateProgress(canonicalPlayerId, (freshProgress) => {
             const previous = freshProgress.resultsByRaceId[stage.raceId] ?? null;
             if (previous && previous.bestTimeMs <= body.bestTimeMs) return freshProgress;
@@ -691,14 +706,6 @@ export async function getServerHeadToHeadSource({
     };
 }
 
-/**
- * Moves a guest's Campaign standing onto their Reddit account at sign-in —
- * unlike Daily, Campaign progress gates stage entry, so it cannot be stranded
- * on the guest id. Per stage the better time wins, and its progress entry,
- * leaderboard row, and PB+ghost move independently when each source is better.
- * Guest keys are dropped only after every copy succeeds, so a repeated call is
- * a safe retry.
- */
 export async function mergeGuestCampaignProgress({
     guestPlayerId,
     redditPlayerId,
@@ -719,8 +726,7 @@ export async function mergeGuestCampaignProgress({
         }
     };
     try {
-        // Match submission's lock order: stage writes finish before either
-        // progress record is claimed, so a concurrent finish cannot be deleted.
+        // Match submission's lock order: stage writes finish before either progress record is claimed.
         await acquireAll(CAMPAIGN_STAGES.flatMap((stage) => {
             const competition = competitionFor(stage, null);
             return [
@@ -739,14 +745,13 @@ export async function mergeGuestCampaignProgress({
             readProgress(guestPlayerId),
             readProgress(redditPlayerId),
         ]);
-        const guestResults = Object.values(guestProgress.resultsByRaceId);
-        if (!guestResults.length) return { merged: false, mergedRaceIds: [] };
-
         const mergedResults = { ...redditProgress.resultsByRaceId };
         const mergedRaceIds: string[] = [];
-        for (const guestResult of guestResults) {
-            const stage = getCampaignStage(guestResult.raceId);
-            if (!stage) continue;
+        let hasGuestEvidence = Boolean(
+            guestProgress.startedAt
+            || Object.keys(guestProgress.resultsByRaceId).length > 0
+        );
+        for (const stage of CAMPAIGN_STAGES) {
             const guestCompetition = competitionFor(stage, guestPlayerId);
             const redditCompetition = competitionFor(stage, redditPlayerId);
             const [guestEntry, redditEntry, guestPb, redditPb] = await Promise.all([
@@ -763,33 +768,44 @@ export async function mergeGuestCampaignProgress({
                     track: TRACKS[stage.trackKey],
                 }),
             ]);
-            let existingResult = mergedResults[guestResult.raceId];
-            if (redditEntry && (!existingResult || redditEntry.bestTimeMs < existingResult.bestTimeMs)) {
-                existingResult = {
-                    raceId: stage.raceId,
-                    trackKey: stage.trackKey,
-                    lapCount: stage.lapCount,
-                    rulesRevision: stage.rulesRevision,
-                    bestTimeMs: redditEntry.bestTimeMs,
-                    medal: getMedalForRaceTime(
-                        stage.trackKey,
-                        redditEntry.bestTimeMs / 1000,
-                        stage.lapCount,
-                    ),
-                    checkpointTimesSec: redditEntry.checkpointTimesSec ?? null,
-                    updatedAt: redditEntry.updatedAt,
-                };
-                mergedResults[guestResult.raceId] = existingResult;
-            }
-            const guestWins = !existingResult || guestResult.bestTimeMs < existingResult.bestTimeMs;
+            const guestEntryResult = campaignResultFromEntry(
+                stage,
+                guestEntry,
+                guestPlayerId,
+            );
+            const redditEntryResult = campaignResultFromEntry(
+                stage,
+                redditEntry,
+                redditPlayerId,
+            );
+            hasGuestEvidence ||= Boolean(guestEntryResult || guestPb);
+            const guestResult = fasterCampaignResult(
+                guestProgress.resultsByRaceId[stage.raceId],
+                guestEntryResult,
+            );
+            const redditResult = fasterCampaignResult(
+                redditProgress.resultsByRaceId[stage.raceId],
+                redditEntryResult,
+            );
+            const guestWins = Boolean(
+                guestResult
+                && (!redditResult || guestResult.bestTimeMs < redditResult.bestTimeMs),
+            );
             const guestCanSupplyWinningPb = Boolean(
                 guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
             );
-            if (guestWins) {
-                mergedResults[guestResult.raceId] = guestResult;
-                mergedRaceIds.push(guestResult.raceId);
+            const bestResult = fasterCampaignResult(redditResult, guestResult);
+            if (bestResult) {
+                mergedResults[stage.raceId] = bestResult;
             }
-            if (guestEntry && (!redditEntry || guestEntry.bestTimeMs < redditEntry.bestTimeMs)) {
+            if (guestWins && guestResult) {
+                mergedRaceIds.push(stage.raceId);
+            }
+            if (
+                guestEntry
+                && guestEntryResult
+                && (!redditEntryResult || guestEntry.bestTimeMs < redditEntryResult.bestTimeMs)
+            ) {
                 await redis.hSet(redditCompetition.entryHashKey, {
                     [redditPlayerId]: JSON.stringify({ ...guestEntry, playerId: redditPlayerId }),
                 });
@@ -804,13 +820,16 @@ export async function mergeGuestCampaignProgress({
                     guestCompetition.pbHashKey,
                     playerField(guestPlayerId),
                 );
-                if (rawGuestPb) {
-                    await redisCompressed.hSet(redditCompetition.pbHashKey, {
-                        [playerField(redditPlayerId)]: rawGuestPb,
-                    });
+                if (!rawGuestPb) {
+                    throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                 }
+                await redisCompressed.hSet(redditCompetition.pbHashKey, {
+                    [playerField(redditPlayerId)]: rawGuestPb,
+                });
             }
         }
+
+        if (!hasGuestEvidence) return { merged: false, mergedRaceIds: [] };
 
         const nowIso = new Date().toISOString();
         await writeProgressWithOwnedLock(redditPlayerId, {
@@ -820,8 +839,7 @@ export async function mergeGuestCampaignProgress({
             updatedAt: nowIso,
         }, redditProgressLock);
 
-        // Delete the guest only after every copy and the account progress save
-        // succeeded. Any earlier failure leaves a complete retry source.
+        // Delete the guest only after every copy succeeded, so an earlier failure leaves a complete retry source.
         const cleanup = await beginOwnedRedisLockTransaction(guestProgressLock, redis);
         if (!cleanup) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
         for (const stage of CAMPAIGN_STAGES) {

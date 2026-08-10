@@ -44,6 +44,7 @@ import {
     type SnapshotPayload,
 } from './competition-leaderboard.js';
 import {
+    adoptExistingGuestPlayerProfile,
     claimNewGuestPlayerProfile,
     normalizePlayerPreferences,
     readPlayerProfile,
@@ -78,12 +79,11 @@ import {
 } from '../../game/car/car-unlock-policy.js';
 import { verifyGuestPlayerToken } from './player-token.js';
 
-// Identity, profiles and the leaderboard itself are shared across every ranked
-// mode now. Re-exported here so the paths callers and tests already import from
-// keep resolving.
+// Re-exported here so the paths callers and tests already import from keep resolving.
 export {
     normalizePlayerPreferences,
     parseStoredPlayerProfile,
+    salvagePlayerPreferences,
 } from './competition-identity.js';
 export { parseStoredEntry } from './competition-leaderboard.js';
 
@@ -240,7 +240,6 @@ async function maintainChallengeHistory(now = new Date()): Promise<void> {
             String(page.cursor),
         );
     } catch (error) {
-        // Retention cleanup is best-effort and must not prevent challenge publication.
         console.error('Daily GP challenge history maintenance failed:', error);
     }
 }
@@ -284,13 +283,6 @@ async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
     return entries;
 }
 
-/**
- * Walks TRACK_SCHEDULE_KEYS one track per day, wrapping at the end. The
- * playhead is the most recent ledger entry before today; tomorrow plays the
- * next key after it. Editing the schedule only affects unwritten days — past
- * days stay frozen in the ledger — and falls back to the catalog default if
- * the playhead track is no longer scheduled or the ledger is empty.
- */
 async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
     const pool = TRACK_SCHEDULE_KEYS;
     if (pool.length === 0) {
@@ -322,10 +314,6 @@ function getTodayChallengeId(): string {
     return createDailyChallengeId(formatUtcChallengeDate(startsAt));
 }
 
-/**
- * Resolve today's challenge without writing it. Used by callers that only need
- * to inspect/playability-check today's track without committing it to the ledger.
- */
 async function pickTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     const dayIndex = getUtcDayIndex(new Date());
     const startsAt = getUtcDayStart(dayIndex);
@@ -340,11 +328,6 @@ async function pickTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     return buildDailyGpChallengeForDayIndexWithTrack(dayIndex, trackKey);
 }
 
-/**
- * Resolve today's challenge, creating it via the append-only ledger if it does
- * not exist yet. First-writer-wins via hSetNX so concurrent requests and the
- * 00:05 UTC scheduler cannot create duplicate entries for the same day.
- */
 async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     const dayIndex = getUtcDayIndex(new Date());
     const startsAt = getUtcDayStart(dayIndex);
@@ -369,16 +352,10 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
         return challenge;
     }
 
-    // Lost the race to another request/scheduler: return the winning entry.
     const reread = await readStoredDailyGpChallenge(challengeId);
     return reread ?? challenge;
 }
 
-/**
- * Seed a challenge into the append-only ledger (e.g. from post-bound data).
- * First-writer-wins via hSetNX: an existing day is never overwritten, even when
- * the incoming payload disagrees on track or timing.
- */
 export async function persistServerDailyGpChallenge(
     challenge: DailyGpChallenge,
 ): Promise<DailyGpChallenge> {
@@ -398,7 +375,6 @@ export async function persistServerDailyGpChallenge(
         return challenge;
     }
 
-    // Lost the race to another writer: return the winning entry.
     const reread = await readStoredDailyGpChallenge(challenge.id);
     return reread ?? challenge;
 }
@@ -481,12 +457,17 @@ async function checkSubmissionRateLimit(
     }
 
     const expiresAt = await redis.expireTime(rateLimitKey);
-    const retryAfterSeconds = Number.isFinite(expiresAt) && expiresAt > 0
-        ? Math.max(1, expiresAt - Math.floor(Date.now() / 1000))
-        : DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS;
+    if (Number.isFinite(expiresAt) && expiresAt > 0) {
+        return {
+            allowed: false,
+            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
+        };
+    }
+    // A counter left without a TTL only ever climbs, so repair the window rather than report a retry time that never arrives.
+    await redis.expire(rateLimitKey, DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
     return {
         allowed: false,
-        retryAfterSeconds,
+        retryAfterSeconds: DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
     };
 }
 
@@ -630,15 +611,21 @@ async function readOrSeedTrackPersonalBest({
         return null;
     }
 
-    const seeded = await seedPlayerTrackPersonalBest({
-        playerId,
-        competition,
-        track,
-        bestTimeMs: retainedEntry.bestTimeMs,
-        checkpointTimesSec: retainedEntry.checkpointTimesSec,
-        updatedAt: retainedEntry.updatedAt,
-    });
-    return seeded.record;
+    try {
+        const seeded = await seedPlayerTrackPersonalBest({
+            playerId,
+            competition,
+            track,
+            bestTimeMs: retainedEntry.bestTimeMs,
+            checkpointTimesSec: retainedEntry.checkpointTimesSec,
+            updatedAt: retainedEntry.updatedAt,
+        });
+        return seeded.record;
+    } catch (error) {
+        // Opportunistic backfill takes the same lock a live submission needs; losing that race must not fail the request.
+        console.error('Challenge PB seed from a retained leaderboard entry failed:', error);
+        return null;
+    }
 }
 
 export async function getServerPlayerTrackPbSummaries({
@@ -800,6 +787,7 @@ export async function getServerPlayerBootstrap({
     let previousProfile: DailyGpPlayerProfile | null = null;
     let profile: DailyGpPlayerProfile | null = null;
 
+    // A player id with no token is either a first visit or a guest whose token was lost: claiming covers the first, adopting the second.
     if (!identity.canonicalPlayerId && !safeRequestRedditUsername && !suppliedGuestToken) {
         const claimedGuest = await claimNewGuestPlayerProfile({
             playerId,
@@ -812,6 +800,16 @@ export async function getServerPlayerBootstrap({
                 guestToken: claimedGuest.guestToken,
             };
             profile = claimedGuest.profile;
+        } else {
+            const adoptedGuest = await adoptExistingGuestPlayerProfile({ playerId });
+            if (adoptedGuest) {
+                identity = {
+                    canonicalPlayerId: adoptedGuest.canonicalPlayerId,
+                    guestPlayerId: adoptedGuest.guestPlayerId,
+                    guestToken: adoptedGuest.guestToken,
+                };
+                previousProfile = adoptedGuest.profile;
+            }
         }
     }
 
@@ -832,22 +830,32 @@ export async function getServerPlayerBootstrap({
 
     if (identity.canonicalPlayerId.startsWith('reddit:')) {
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
+        let guestPromotionComplete = true;
         if (guestPlayerId) {
-            await Promise.all([
-                mergeGuestCampaignProgress({
-                    guestPlayerId: `guest:${guestPlayerId}`,
-                    redditPlayerId: identity.canonicalPlayerId,
-                }),
-                mergeGuestCarUnlockProgress({
-                    guestPlayerId: `guest:${guestPlayerId}`,
-                    redditPlayerId: identity.canonicalPlayerId,
-                }),
-            ]);
+            try {
+                await Promise.all([
+                    mergeGuestCampaignProgress({
+                        guestPlayerId: `guest:${guestPlayerId}`,
+                        redditPlayerId: identity.canonicalPlayerId,
+                    }),
+                    mergeGuestCarUnlockProgress({
+                        guestPlayerId: `guest:${guestPlayerId}`,
+                        redditPlayerId: identity.canonicalPlayerId,
+                    }),
+                ]);
+            } catch (error) {
+                // Campaign's bootstrap claims the same guest progress and the merge refuses to run twice; losing that race must not cost this bootstrap.
+                guestPromotionComplete = false;
+                console.error('Player guest progress claim failed:', error);
+            }
+        }
+        if (guestPlayerId && !guestPromotionComplete) {
+            identity.guestToken = typeof guestToken === 'string' ? guestToken.trim() : null;
         }
     }
 
     if (!profile) {
-        previousProfile = await readPlayerProfile(identity.canonicalPlayerId);
+        previousProfile ??= await readPlayerProfile(identity.canonicalPlayerId);
         profile = await upsertPlayerProfile({
             playerId: identity.canonicalPlayerId,
             leaderboardIdentity,
@@ -864,8 +872,6 @@ export async function getServerPlayerBootstrap({
         try {
             await recordCompletedRace(identity.canonicalPlayerId);
         } catch (error) {
-            // Existing accepted-race history is enough to unlock Crimson for
-            // this response; a later bootstrap can retry the permanent marker.
             console.error('Completed-race unlock backfill failed:', error);
         }
     }

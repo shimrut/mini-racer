@@ -2,7 +2,6 @@ import { TRACK_MODE_DAILY_GP } from '../config.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { isStandardMedalTier } from '../medals/medal-timing.js';
 
-/** Speed readout: cap DOM writes (lap timer updates every frame when milliseconds change). */
 const HUD_SPEED_MIN_MS = 1000 / 15;
 
 export class RaceHud {
@@ -97,8 +96,6 @@ export class RaceHud {
         const hudBar = this.hudBar;
         if (!hudBar) return;
 
-        // The lobby header lives inside the fading start overlay and collapses
-        // when that overlay is hidden. It is not a stable race HUD anchor.
         hudBar.style.top = '12px';
         this._hudAnchorResizeObserver?.disconnect?.();
         this._hudAnchorResizeObserver = null;
@@ -109,7 +106,6 @@ export class RaceHud {
             if (!container || typeof document.createElement !== 'function') return [];
             container.innerHTML = '';
             const ticks = [];
-            // Create a single continuous sequence of ticks
             for (let t = 0; t < 20; t++) {
                 const tick = document.createElement('div');
                 tick.className = 'speedometer-tick';
@@ -159,7 +155,6 @@ export class RaceHud {
 
     updateSpeedTicks(speedKph) {
         const totalTicks = 20;
-        // Scaling: we use the car's actual max speed for precise filling.
         const maxSpeed = this._maxSpeed || 240; 
         const activeTicks = Math.min(totalTicks, Math.ceil((speedKph / maxSpeed) * totalTicks));
         if (activeTicks === this._lastActiveSpeedTicks) return;

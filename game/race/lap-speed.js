@@ -1,6 +1,3 @@
-/**
- * @param {number | null | undefined} deltaSec positive = slower than best
- */
 export function formatSplitTimeDeltaSec(deltaSec) {
     if (deltaSec === null || deltaSec === undefined || !Number.isFinite(deltaSec)) {
         return null;

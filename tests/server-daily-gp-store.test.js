@@ -61,7 +61,6 @@ function findWrittenPlayerProfile(playerId) {
                 return { key, profile, options };
             }
         } catch (_error) {
-            // Ignore non-profile Redis values.
         }
     }
     return null;
@@ -1360,9 +1359,8 @@ describe('server daily gp store submissions', () => {
         expect(bootstrap.playerPreferences).toEqual(playerPreferences);
     });
 
-    it('gives signed-in profiles an independent 30-day inactivity expiration', async () => {
+    it('keeps signed-in profiles for as long as the data they name', async () => {
         const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-        const beforeWrite = Date.now();
 
         await getServerPlayerBootstrap({ redditUsername: 'Player-One' });
         await getServerPlayerBootstrap({ redditUsername: 'Player-Two' });
@@ -1370,15 +1368,12 @@ describe('server daily gp store submissions', () => {
         const first = findWrittenPlayerProfile('reddit:player-one');
         const second = findWrittenPlayerProfile('reddit:player-two');
         expect(first.key).not.toBe(second.key);
-        expect(first.options.expiration).toBeInstanceOf(Date);
-        expect(second.options.expiration).toBeInstanceOf(Date);
-        const minimumExpectedExpiry = beforeWrite + (29 * 24 * 60 * 60 * 1000);
-        expect(first.options.expiration.getTime()).toBeGreaterThan(minimumExpectedExpiry);
-        expect(second.options.expiration.getTime()).toBeGreaterThan(minimumExpectedExpiry);
+        expect(first.options?.expiration).toBeUndefined();
+        expect(second.options?.expiration).toBeUndefined();
         expect(mockRedis.expire).not.toHaveBeenCalledWith('dailygp:player-profiles', expect.anything());
     });
 
-    it('gives guest profiles a 7-day inactivity expiration', async () => {
+    it('gives guest profiles the Campaign guest retention window', async () => {
         const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
         const beforeWrite = Date.now();
 
@@ -1387,10 +1382,10 @@ describe('server daily gp store submissions', () => {
         const guest = findWrittenPlayerProfile('guest:new-guest');
         expect(guest.options.expiration).toBeInstanceOf(Date);
         expect(guest.options.expiration.getTime()).toBeGreaterThan(
-            beforeWrite + (6 * 24 * 60 * 60 * 1000),
+            beforeWrite + (89 * 24 * 60 * 60 * 1000),
         );
         expect(guest.options.expiration.getTime()).toBeLessThanOrEqual(
-            beforeWrite + (7 * 24 * 60 * 60 * 1000) + 1000,
+            beforeWrite + (90 * 24 * 60 * 60 * 1000) + 1000,
         );
     });
 
@@ -3115,6 +3110,39 @@ describe('server daily gp store submissions', () => {
             });
         });
 
+        it('still returns a bootstrap when a concurrent Campaign claim holds the merge lock', async () => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const defaultGet = mockRedis.get.getMockImplementation();
+            mockRedis.get.mockImplementation(async (key) => (
+                key === 'dailygp:guest-player-token-secret'
+                    ? 'merge-race-secret'
+                    : defaultGet(key)
+            ));
+            const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+            const guestToken = await mintGuestPlayerToken('merge-race-guest');
+
+            const defaultSet = mockRedis.set.getMockImplementation();
+            mockRedis.set.mockImplementation(async (key, value, options = {}) => {
+                if (options.nx && String(key).includes('campaign:submit-lock')) return '';
+                return defaultSet(key, value, options);
+            });
+
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+            const payload = await getServerPlayerBootstrap({
+                playerId: 'merge-race-guest',
+                guestToken,
+                redditUsername: 'MergeRacer',
+            });
+
+            expect(payload.playerId).toBe('reddit:mergeracer');
+            expect(payload.guestToken).toBe(guestToken);
+            expect(consoleError).toHaveBeenCalledWith(
+                'Player guest progress claim failed:',
+                expect.objectContaining({ message: 'Campaign merge is already in progress.' }),
+            );
+            consoleError.mockRestore();
+        });
+
         it('rejects bootstrap when a supplied guest token cannot be verified', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
 
@@ -3558,8 +3586,6 @@ describe('server daily gp store submissions', () => {
             const challenge = await getServerDailyGpChallenge();
             mockRedis.incrBy
                 .mockResolvedValueOnce(1)
-                // An improved entry advances its separate standings revision
-                // inside the same Redis transaction.
                 .mockResolvedValueOnce(1)
                 .mockResolvedValueOnce(2);
             mockRedis.expire.mockClear();
@@ -3737,8 +3763,6 @@ describe('server daily gp store submissions', () => {
                 origin: [0, 0, 0],
                 deltas: [0, 0, 0, 0, 0, 0],
             },
-            // The submission wrote this record on its own clock, so it lands a
-            // few milliseconds after the leaderboard entry it belongs to.
             updatedAt: '2026-07-27T09:59:59.812Z',
         };
         const pbField = createHash('sha256').update(playerId, 'utf8').digest('base64url');

@@ -1,10 +1,4 @@
-/**
- * Build constant-width outer/inner walls from a centerline.
- *
- * Tight bends (radius < halfWidth) are inflated first so the inner offset
- * cannot loop through itself. Sharp corners are filleted at halfWidth, then
- * every sample is offset by ±halfWidth.
- */
+// Constant-width walls from a centerline: tight bends inflate first so the inner offset cannot loop through itself, corners fillet at halfWidth, then every sample offsets by ±halfWidth.
 
 const STRAIGHT_DOT = 0.985;
 const MERGE_DISTANCE = 0.04;
@@ -123,10 +117,6 @@ function deltaAngle(start, end, ccw) {
     return sweep;
 }
 
-/**
- * Push tight bends outward until local radius >= minRadius.
- * Handles freehand hairpins (including ~180° turns) without arc-fit math.
- */
 export function inflateTightBends(points, minRadius) {
     if (!points || points.length < 3 || !(minRadius > 0)) {
         return (points || []).map(clonePoint);
@@ -164,10 +154,6 @@ export function inflateTightBends(points, minRadius) {
     return result;
 }
 
-/**
- * Fillet sharp corners of a closed centerline with radius `filletRadius`.
- * Returns dense samples with local tangents for offsetting.
- */
 export function filletCenterline(points, filletRadius) {
     if (!points || points.length < 3 || !(filletRadius > 0)) {
         return (points || []).map((point) => ({
@@ -282,11 +268,6 @@ export function filletCenterline(points, filletRadius) {
     return samples;
 }
 
-/**
- * @param {{x:number,y:number}[]} centerline closed loop sample points
- * @param {number} halfWidth half of lane width
- * @returns {{ outer: {x:number,y:number}[], inner: {x:number,y:number}[] } | null}
- */
 export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
     if (!centerline || centerline.length < 3 || !(halfWidth > 0)) {
         return null;
@@ -317,8 +298,7 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
         const turningInward =
             (loopCcw && frame.turnAngle > 0) || (!loopCcw && frame.turnAngle < 0);
 
-        // If the centerline bends tighter than the lane half-width, a normal
-        // inward offset loops through itself. Snap to the bend center instead.
+        // A bend tighter than the lane half-width would loop the inward offset through itself; snap to the bend center.
         if (turningInward && bendRadius <= halfWidth * 1.05) {
             const center = circumcenter(prev.point, curr.point, next.point);
             pushUnique(inner, center || add(curr.point, scale(towardInner, halfWidth)));
@@ -334,7 +314,6 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
         inner.pop();
     }
 
-    // Tiny collapsed apex clusters → one point.
     collapsePointClusters(inner, halfWidth * 0.15);
 
     if (outer.length < 3 || inner.length < 3) {
@@ -350,7 +329,6 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
     return { outer, inner };
 }
 
-/** Merge consecutive points that sit in a tight cluster into their centroid. */
 function collapsePointClusters(points, radius) {
     if (!points || points.length < 3 || !(radius > 0)) {
         return;
@@ -365,7 +343,6 @@ function collapsePointClusters(points, radius) {
             if (distance(a, b) > radius) {
                 continue;
             }
-            // Grow cluster of consecutive close points.
             let end = index;
             let count = 1;
             let sumX = a.x;
@@ -390,7 +367,6 @@ function collapsePointClusters(points, radius) {
             if (end >= index) {
                 points.splice(index, count, centroid);
             } else {
-                // Cluster wrapped past 0.
                 const tail = points.length - index;
                 points.splice(index, tail);
                 points.splice(0, end + 1);

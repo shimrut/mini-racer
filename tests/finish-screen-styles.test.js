@@ -18,7 +18,7 @@ describe('finish screen styles', () => {
             /#modal-combined-view \.combined-actions--with-next\s*\{\s*flex-flow:\s*row wrap;\s*\}/,
         );
         expect(styles).toMatch(
-            /#modal-combined-view \.combined-actions--with-next > \.combined-action-btn\s*\{\s*flex:\s*0 0 100%;\s*\}/,
+            /#modal-combined-view \.combined-actions--with-next > \.combined-action-btn[^{]*\{\s*flex:\s*0 0 100%;\s*\}/,
         );
         expect(styles).toMatch(
             /#modal-combined-view \.combined-actions--with-next > #combined-menu-btn,\s*#modal-combined-view \.combined-actions--with-next > #combined-next-btn\s*\{[^}]*flex:\s*1 1 0;/s,
@@ -29,7 +29,6 @@ describe('finish screen styles', () => {
         expect(styles).toMatch(
             /#modal-combined-view \.combined-action-btn:not\(\.combined-action-btn--primary\)\s*\{\s*background:\s*rgba\(51, 65, 85, 0\.8\);\s*\}/,
         );
-        // A per-id background would outrank the accent and strand Next in grey.
         expect(styles).not.toMatch(
             /#modal-combined-view #combined-(next|menu|playlist)-btn[^{]*\{[^}]*background:/s,
         );

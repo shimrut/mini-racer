@@ -55,7 +55,6 @@ describe('mode router', () => {
         daily.handleActiveRaceWin(winData);
         expect(daily.handleDailyChallengeWin).toHaveBeenCalledWith(winData);
 
-        // Home has no race of its own; a stray finish falls back to Daily.
         const home = createEngine({ activeRaceMode: 'home' });
         home.handleActiveRaceWin(winData);
         expect(home.handleDailyChallengeWin).toHaveBeenCalledWith(winData);
@@ -121,9 +120,6 @@ describe('mode router', () => {
     });
 
     it("puts the day's track back behind Home after racing something else", () => {
-        // Home draws the featured track behind the menu. Racing a campaign
-        // stage, or any day but today, leaves the engine pointing at that track;
-        // only the boot path used to set the background, so it never came back.
         const engine = createEngine({
             activeRaceMode: 'campaign',
             currentDailyChallenge: { id: 'daily-today', trackKey: 'ardennesRidge' },

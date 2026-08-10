@@ -1,4 +1,3 @@
-/** Lobby track carousel — the picker both Daily and Campaign use. Card content comes from a per-mode builder; this file is the plate that renders it. */
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { TRACKS } from '../track/tracks.js';
@@ -26,8 +25,6 @@ function createUnlockMedalMeter(meter) {
         className: 'track-carousel__unlock-medal medal-svg--row-placeholder',
         outline: true,
         rowPlaceholder: true,
-        // The sentence says what is needed; the medal placeholder carries the
-        // exact remaining count without turning the footer into a number string.
         centerText: meter.remainingMedals,
         showEmblem: false,
     });
@@ -77,10 +74,7 @@ function createPersonalBestIcon() {
     const icon = document.createElementNS(SVG_NS, 'svg');
     icon.classList.add('track-carousel__spec-icon');
     icon.setAttribute('viewBox', '0 0 448 512');
-    // Keep intrinsic dimensions on the SVG as a fallback for embedded clients
-    // that serve a stale/partial stylesheet during an asset refresh. Without
-    // them, this flex item can collapse to 0x0 even though the icon is in the
-    // DOM.
+    // Intrinsic dimensions as a fallback: with a stale stylesheet this flex item can collapse to 0x0.
     icon.setAttribute('width', '16');
     icon.setAttribute('height', '16');
     icon.setAttribute('role', 'img');
@@ -108,7 +102,6 @@ function createStandingsIcon() {
     return icon;
 }
 
-/** One timing-row reading: a text label or icon with its figure beside it. `element` lets the rank cell be a button without looking different from its neighbours. */
 function createSpecCell(label, element = 'span') {
     const cell = document.createElement(element);
     cell.className = 'track-carousel__spec';
@@ -124,11 +117,6 @@ function createSpecCell(label, element = 'span') {
     return [cell, valueEl, labelEl];
 }
 
-/**
- * A circuit's own width-to-height ratio. A single poster can hug the drawing
- * with it, so a portrait track in a short landscape window sits in its own
- * measure instead of stranding inside a full-width band.
- */
 export function getTrackAspectRatio(trackKey) {
     const track = TRACKS[trackKey];
     const points = track?.outer;
@@ -146,16 +134,10 @@ export function getTrackAspectRatio(trackKey) {
     return width / height;
 }
 
-/** Bitmap pixels per CSS pixel a schematic is drawn at. */
 export function trackPreviewPixelScale() {
     return Math.min(2, Math.max(1, Math.round(globalThis.devicePixelRatio || 1)));
 }
 
-/**
- * Draws one track schematic the way the lobby draws every other one. The
- * carousel and the Challenge poster both go through here, so a card and a
- * duel show the same circuit in the same hand.
- */
 export function renderTrackPreviewCanvas(canvas, card, {
     cacheNamespace = 'track-preview',
     carImage = null,
@@ -210,10 +192,6 @@ export function renderTrackPreviewCanvas(canvas, card, {
     });
 }
 
-/**
- * Matches a schematic's bitmap to the box it is painted in, then redraws when
- * that box changed. Returns whether anything was drawn.
- */
 export function fitTrackPreviewCanvas(canvas, card, options = {}) {
     const host = canvas?.parentElement;
     if (!canvas || !host?.offsetWidth || !host?.offsetHeight) return false;
@@ -274,6 +252,8 @@ export class TrackCarousel {
     get rail() { return this.element('rail'); }
     get prevBtn() { return this.element('prev'); }
     get nextBtn() { return this.element('next'); }
+    get navigation() { return this.element('navigation'); }
+    get countLabel() { return this.element('count'); }
     get status() { return this.element('status'); }
 
     bind() {
@@ -290,8 +270,6 @@ export class TrackCarousel {
         this.prevBtn?.addEventListener('click', () => this.step(-1));
         this.nextBtn?.addEventListener('click', () => this.step(1));
         viewport.addEventListener('scroll', () => this.handleScroll(), { passive: true });
-        // A grab mid-scroll takes selection immediately, or the visible card and
-        // Start target disagree until a fixed suppression window expires.
         const takeScrollControl = () => this.handleUserScrollIntent();
         viewport.addEventListener('pointerdown', takeScrollControl, { passive: true });
         viewport.addEventListener('touchstart', takeScrollControl, { passive: true });
@@ -328,7 +306,6 @@ export class TrackCarousel {
         return this._cards.length === 0;
     }
 
-    /** Repaints the rail. Cards rebuild only when the run of tracks changes; a late rank/medal patches the existing card so scroll position and any in-flight swipe survive. */
     render(cards = [], {
         selectedChallengeId = this.getSelectedChallengeId(),
         loading = false,
@@ -336,8 +313,7 @@ export class TrackCarousel {
         const rail = this.rail;
         if (!rail) return;
 
-        // Card width must be set before cards exist, or the first one lays out
-        // and paints once at the wrong width before a scroll pass corrects it.
+        // Card width must be set before cards exist, or the first one paints once at the wrong width.
         this.syncCardWidth();
 
         const previousCards = this._cards;
@@ -353,6 +329,7 @@ export class TrackCarousel {
             this._elements = [];
             this._selectedIndex = -1;
             this.syncNavButtons();
+            this.onSelect?.(null, null);
             return;
         }
 
@@ -374,9 +351,7 @@ export class TrackCarousel {
         this._selectedIndex = nextIndex;
         this.applySelectionClasses();
         this.syncNavButtons();
-        // Never animated: a render is a repaint, not a navigation. The rail's
-        // scrollLeft is clamped to 0 while its display:none overlay is hidden
-        // during a race, so animating here glided across the whole rail.
+        // Never animated: scrollLeft is clamped to 0 while the overlay is hidden, so animating glided across the whole rail.
         this.scrollToSelected({ animate: false });
         if (typeof requestAnimationFrame === 'function') {
             requestAnimationFrame(() => this.fitPreviews());
@@ -408,7 +383,6 @@ export class TrackCarousel {
         status.textContent = loading ? 'Loading tracks' : 'No tracks available';
     }
 
-    /** Built from the tracks-sheet hero-row parts, so a card looks like a track card wherever it's shown. */
     buildCard(card, index) {
         const element = document.createElement('div');
         element.className = 'daily-playlist-entry--hero';
@@ -425,9 +399,6 @@ export class TrackCarousel {
         canvas.width = PREVIEW_WIDTH;
         canvas.height = PREVIEW_HEIGHT;
         canvas.setAttribute('aria-hidden', 'true');
-        // The lock remains on the drawing, while the instruction gets its own
-        // fixed status footer. Putting a sentence on the track competes with
-        // the schematic; putting it beside the title breaks the identity block.
         const gate = document.createElement('div');
         gate.className = 'track-carousel__gate';
         gate.hidden = true;
@@ -484,16 +455,12 @@ export class TrackCarousel {
                 this.onOpenLeaderboard?.(current.challenge, current);
             }
         });
-        // A locked stage has no Best/Rank. The medal host moves into the total
-        // requirement row, where it carries the exact remaining count.
         const rankMedal = document.createElement('span');
         rankMedal.className = 'track-carousel__unlock-medal-host';
         rankMedal.hidden = true;
         requirement.append(requirementList);
         meta.append(bestCell, rank);
 
-        // The ladder data remains available, but a locked card hides this
-        // reward preview until its gate opens.
         const medal = document.createElement('div');
         medal.className = 'daily-playlist-hero-medal';
         medal.setAttribute('aria-hidden', 'true');
@@ -620,20 +587,14 @@ export class TrackCarousel {
         }));
     }
 
-    // Footer paint is now handled in paintFoot
-
-    /** Bitmap pixels per CSS pixel the previews are drawn at. */
     previewPixelScale() {
         return trackPreviewPixelScale();
     }
 
     fitPreviews() {
-        // Device resolution: a 1x bitmap stretched this far reads as smeared.
         const scale = this.previewPixelScale();
         for (const element of this._elements) {
             const canvas = element?._parts?.canvas;
-            // Layout box, not the painted (scaled-down peek) box, or the
-            // bitmap is sized for the smaller peek and stretches at centre.
             const host = canvas?.parentElement;
             if (!canvas || !host?.offsetWidth || !host?.offsetHeight) continue;
             const width = Math.round(host.offsetWidth * scale);
@@ -673,7 +634,6 @@ export class TrackCarousel {
         this.select(this._selectedIndex + delta);
     }
 
-    /** Arrow/WASD from the lobby. Returns true when the carousel consumed it. */
     handleNavDirection(direction) {
         if (!this._cards.length) return false;
         if (direction === 'left') {
@@ -725,11 +685,9 @@ export class TrackCarousel {
         this.updateProximity();
     }
 
-    /** Distance-to-centre per card, 0 to 1, published as `--card-proximity` for fade/scale/detail-reveal. Tied to distance rather than `is-carousel-selected` so details arrive gradually with the card instead of snapping in mid-swipe. */
     updateProximity() {
         const viewport = this.viewport;
         const width = viewport?.clientWidth || 0;
-        // No geometry before the pane is visible; fall back to selection.
         const measurements = this._elements.map((element) => ({
             left: element?.offsetLeft || 0,
             width: element?.offsetWidth || 0,
@@ -737,8 +695,7 @@ export class TrackCarousel {
         const measurable = width > 0 && measurements.some(({ width: cardWidth }) => cardWidth > 0);
         const center = measurable ? viewport.scrollLeft + (width / 2) : 0;
 
-        // All layout reads complete before any style write below, or mixing
-        // the two forces a fresh layout per card on every scroll frame.
+        // Every layout read happens before any style write, or each card forces a fresh layout per scroll frame.
         const proximities = measurements.map(({ left, width: cardWidth }, index) => {
             if (!measurable || !(cardWidth > 0)) {
                 return index === this._selectedIndex ? 1 : 0;
@@ -756,6 +713,20 @@ export class TrackCarousel {
         const count = this._cards.length;
         const prev = this.prevBtn;
         const next = this.nextBtn;
+        const navigation = this.navigation;
+        const countLabel = this.countLabel;
+        const selectedIndex = count > 0
+            ? Math.min(Math.max(this._selectedIndex, 0), count - 1)
+            : -1;
+        if (navigation) navigation.hidden = count === 0;
+        if (countLabel) {
+            countLabel.textContent = count > 0 ? `${selectedIndex + 1} / ${count}` : '';
+            if (count > 0) {
+                countLabel.setAttribute('aria-label', `Track ${selectedIndex + 1} of ${count}`);
+            } else {
+                countLabel.removeAttribute('aria-label');
+            }
+        }
         if (prev) {
             prev.disabled = count === 0 || this._selectedIndex <= 0;
             prev.hidden = count < 2;
@@ -772,8 +743,7 @@ export class TrackCarousel {
         if (!viewport || !element) return;
 
         const apply = () => {
-            // Hidden panes report zero geometry in retained mobile WebViews;
-            // don't treat that as a real selection change.
+            // Hidden panes report zero geometry in retained mobile WebViews; that is not a real selection change.
             if (!(viewport.clientWidth > 0) || !(element.offsetWidth > 0)) return;
             this.syncEdgeSpacing(element);
             const left = element.offsetLeft
@@ -803,11 +773,8 @@ export class TrackCarousel {
         }
     }
 
-    /** One card's width, published to CSS in pixels — the lobby shell's own measure, read rather than restated, so Home and both mode screens stay the same width. */
     syncCardWidth() {
         const viewport = this.viewport;
-        // Published on the root, not the rail: the peek on either side is a
-        // fraction of this measure, and includes the rail's own gap.
         const host = this.root || this.rail;
         const width = viewport?.clientWidth || 0;
         if (!host || !(width > 0)) return false;
@@ -868,8 +835,6 @@ export class TrackCarousel {
     }
 
     handleUserScrollIntent() {
-        // Interrupts our bookkeeping too, so the next scroll event adopts
-        // whatever card the user's gesture left under viewport centre.
         this.cancelProgrammaticScroll();
         if (this._settleTimer !== null) {
             clearTimeout(this._settleTimer);
@@ -900,7 +865,6 @@ export class TrackCarousel {
             : (callback) => setTimeout(callback, 16);
         this._scrollFrame = schedule(() => {
             this._scrollFrame = null;
-            // Selection must not move during a programmatic (button) scroll.
             this.updateProximity();
             if (!this._suppressScrollSync) this.syncSelectionFromScroll();
         });

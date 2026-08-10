@@ -2,7 +2,6 @@ export const Point = (x, y) => ({ x, y });
 
 const SEGMENT_EPSILON = 1e-9;
 
-/** Shared line-segment intersection params; avoids allocating a point on miss. */
 function segmentIntersectionParams(A, B, C, D) {
     const tTop = (D.x - C.x) * (A.y - C.y) - (D.y - C.y) * (A.x - C.x);
     const uTop = (C.y - A.y) * (A.x - B.x) - (C.x - A.x) * (A.y - B.y);
@@ -26,7 +25,6 @@ export function segmentsIntersect(A, B, C, D) {
     return segmentIntersectionParams(A, B, C, D) !== null;
 }
 
-/** Path fraction along A→B where A→B crosses C→D, clamped to [0, 1]; null if no hit. */
 export function getCrossingFraction(A, B, C, D) {
     const params = segmentIntersectionParams(A, B, C, D);
     if (!params) return null;

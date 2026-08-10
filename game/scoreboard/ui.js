@@ -236,11 +236,6 @@ export class LeaderboardsUi {
         this._lastViewedDailyChallengeId = null;
     }
 
-    /**
-     * The day the standings were showing when they were dismissed — day
-     * navigation moves it, so callers can land back on what the player was
-     * actually looking at rather than what they opened.
-     */
     getLastViewedDailyChallengeId() {
         return this._lastViewedDailyChallengeId;
     }
@@ -532,7 +527,6 @@ export class LeaderboardsUi {
         };
     }
 
-    /** A snapshot landing is a content change, not a new screen — re-running the whole modal show would replay every row's entrance and reinstall stale day options. */
     publishDailyChallengeLeaderboardSnapshot(scoreboardSnapshot) {
         this.updateModalScoreboardSnapshot(scoreboardSnapshot);
     }

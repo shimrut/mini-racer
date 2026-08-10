@@ -33,11 +33,6 @@ describe('lobby service', () => {
         });
     });
 
-    /**
-     * A normalized stage carried a Gold and an Author target, a flag for each,
-     * and the gap to both — all of it to feed one row on the card that no longer
-     * exists. What a stage still owes is the medal stack, which needs none of it.
-     */
     it('carries no medal target times on a stage', () => {
         const stage = normalizeCampaignStage({
             trackKey: 'numberFive',
@@ -59,7 +54,6 @@ describe('lobby service', () => {
     it('prices a locked row against the medals the player has banked', () => {
         const state = normalizeCampaignLobbyState({
             stages: [
-                // Author and Silver: four medals plus two.
                 { id: 'a', trackName: 'Number Five', unlocked: true, medal: 'Author' },
                 { id: 'b', trackName: 'Number Six', unlocked: true, medal: 'Silver' },
                 {
@@ -74,7 +68,6 @@ describe('lobby service', () => {
 
         expect(state.stages[0].unlockRequirementLabel).toBeNull();
         expect(state.stages[1].unlockRequirementLabel).toBeNull();
-        // The stage before it is medalled, so the total is what is left to do.
         expect(state.stages[2].unlockRequirementLabel).toBe('4 more medals needed');
         expect(state.stages[2].unlockRequirements).toEqual([
             {
@@ -91,8 +84,6 @@ describe('lobby service', () => {
                 remainingMedals: 4,
             },
         ]);
-        // No unlock metadata, and the row above it is locked too: say it needs
-        // more without inventing a number or pointing at an unreachable track.
         expect(state.stages[3].unlockRequirementLabel).toBe('More medals to unlock');
     });
 
@@ -100,7 +91,6 @@ describe('lobby service', () => {
         const state = normalizeCampaignLobbyState({
             stages: [
                 { id: 'a', trackName: 'Number Five', unlocked: true, medal: 'Author' },
-                // Raced, banked, but nothing earned — one run from fixing.
                 { id: 'b', trackName: 'Number Six', unlocked: true, medal: null },
                 {
                     id: 'c',
@@ -108,8 +98,6 @@ describe('lobby service', () => {
                     unlocked: false,
                     unlock: { type: 'medal_total', requiredMedals: 3, previousRaceId: 'b' },
                 },
-                // Two rows out: naming Number Seven would point at a track that
-                // cannot be raced yet, so this one quotes the total.
                 {
                     id: 'd',
                     trackName: 'Number Eight',
@@ -119,8 +107,6 @@ describe('lobby service', () => {
             ],
         });
 
-        // Four medals already clears the price of 3, so naming the total would
-        // read as though nothing were owed.
         expect(state.stages[2].unlockRequirementLabel).toBe('Earn any medal on Number Six');
         expect(state.stages[3].unlockRequirementLabel).toBe('5 more medals needed');
         expect(state.stages[2].unlockRequirements).toEqual([
@@ -170,7 +156,6 @@ describe('lobby service', () => {
         expect(state.stages.filter((stage) => stage.isNext)).toHaveLength(1);
         expect(state.stages[1].isNext).toBe(true);
         expect(state.nextStage.id).toBe('one');
-        // Re-normalizing a painted state must not leave two stages claiming it.
         expect(normalizeCampaignLobbyState(state).stages.filter((s) => s.isNext)).toHaveLength(1);
     });
 
@@ -195,7 +180,6 @@ describe('lobby service', () => {
             stages: [{ id: 'zero', unlocked: true }],
         });
 
-        // Guessing here is what made the button flash before the real state.
         expect(pending.resolved).toBe(false);
         expect(pending.primaryLabel).toBeNull();
         expect(pending.nextStage.id).toBe('zero');
@@ -216,11 +200,8 @@ describe('lobby service', () => {
         });
 
         expect(state.complete).toBe(true);
-        // A finished campaign is asking for nothing, so no stage may claim to be
-        // the live one — that is what made Stage 00 look re-activated.
         expect(state.nextStage).toBeNull();
         expect(state.stages.some((stage) => stage.isNext)).toBe(false);
-        // Finishing the campaign does not stop any of its stages being raceable.
         expect(state.primaryLabel).toBe('Start Race');
         expect(state.progressLabel).toBe('2 / 2 Gold');
         expect(normalizeCampaignLobbyState(state).primaryLabel).toBe('Start Race');
@@ -254,7 +235,6 @@ describe('lobby service', () => {
         expect(guest.signedIn).toBe(false);
         expect(player.canAccept).toBe(true);
         expect(player.statusMessage).toBe('');
-        // Nothing was won here, so neither viewer is looking at a spent duel.
         expect(guest.beaten).toBe(false);
         expect(player.beaten).toBe(false);
     });
@@ -277,24 +257,19 @@ describe('lobby service', () => {
         expect(beaten).toMatchObject({
             beaten: true,
             canAccept: false,
-            // The poster keeps everything it was showing; only the ask changes.
             available: true,
             canRace: true,
             targetTimeLabel: '0:25.640',
-            // The win is a margin against the time that had to be beaten.
             gapMs: -472,
             gapLabel: '−0.472',
         });
 
-        // A win with no time behind it states no margin rather than a wrong one.
         expect(normalizeChallengeLobbyState({ ...base, outcome: 'won' })).toMatchObject({
             beaten: true,
             gapMs: null,
             gapLabel: null,
         });
 
-        // A duel that was raced and not won is still there to be accepted again, and
-        // states no margin — there was none.
         for (const outcome of ['lost', 'tie', null, undefined]) {
             const state = normalizeChallengeLobbyState({ ...base, outcome, bestTimeMs: 26000 });
             expect(state.beaten).toBe(false);

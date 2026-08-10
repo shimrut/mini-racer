@@ -212,6 +212,9 @@ flowchart LR
 - `game/ui/track-carousel.js` keeps first preview painting out of the card-build
   task and batches carousel geometry reads before proximity style writes, so
   mode entry and horizontal swipes do not force a layout per card.
+- Daily and Campaign navigation controls occupy a dedicated row between the
+  track schematic and status footer; the shared carousel also exposes the
+  selected `current / total` track count between Previous and Next.
 - Daily and Campaign selector surfaces show the full bronze-to-author medal ladder
   whenever height permits.
   The inline medal SVGs may shrink vertically inside the preview on Reddit's
@@ -253,7 +256,16 @@ flowchart LR
   WebView request is terminal. Guests are ranked server-side; guest Campaign
   progress, bests, and PB ghosts use a rolling 90-day inactivity window, while
   shared stage leaderboards remain permanent. Signing in merges verified guest
-  results into the Reddit account and keeps the faster result per stage.
+  results into the Reddit account and keeps the faster result per stage. The
+  merge inventories every Campaign stage under the existing submission and
+  progress locks, repairs a missing progress row from a strict-replay leaderboard
+  entry, copies a better PB, and only then removes guest records. If any Campaign
+  or car-unlock promotion step fails, player bootstrap returns the still-verified
+  guest token so the next bootstrap can retry instead of stranding that source.
+  A direct Campaign launch keeps its first Campaign request parallel with player
+  bootstrap, but an unranked or promotion-pending response is non-authoritative
+  and receives one retry after identity repair; it cannot become cached empty
+  progress.
   Campaign uses the same compact lobby actions and modal shells as Daily:
   Standings selects among unlocked stage-specific leaderboards, while Tracks
   renders permanent stage progress and starts any unlocked stage.
@@ -281,12 +293,12 @@ flowchart LR
   Post-bound validation remains preferred whenever context is supplied. Legacy
   challenge posts may use a matching stored record during migration. Redis
   retains the post identity alongside the separate operational challenge
-  indexes, locks, limits, and viewer results; it does not store the new frozen
-  replay. Signed-in
-  Reddit users create posts; guests can load, race, and submit against them
-  using the existing guest identity/token, and their isolated results merge at
-  sign-in. A Daily-origin post keeps its embedded race contract after the
-  normal Daily window, while regular Daily mode remains expiry-scoped. The
+  indexes, locks, limits, and five-minute verified-win/Brag receipts; it does
+  not store the new frozen replay. Signed-in Reddit users create posts; guests
+  can load, race, and submit against them using the existing guest
+  identity/token. Head to Head outcomes are not durable player history and do
+  not merge at sign-in. A Daily-origin post keeps its embedded race contract
+  after the normal Daily window, while regular Daily mode remains expiry-scoped. The
   standalone post and expanded game both forward the current Reddit `postId`
   with challenge reads and submissions; the server accepts that explicit
   context only as a validated `t3_` post ID before re-reading the Reddit post.
@@ -309,6 +321,11 @@ flowchart LR
   challenger and viewer avatars (generic Snoo while signed out), and labels
   the mode Head to Head. Unavailable responses remain disabled but are not
   presented as a sign-in requirement.
+- Expanded-game Head to Head startup begins the duel request immediately and
+  gates the initial screen only on that bounded request plus car and track-layer
+  readiness. Profile, Daily, and Daily PB work continue in the background and
+  cannot add another timeout, take track ownership from challenge mode, or
+  replace the frozen opponent ghost.
 - `head-to-head.css` owns the standalone post's race-poster visual: the
   duel and target time remain the primary reading path, the circuit stays open as
   the right-side hero, and the single Race Head to Head CTA anchors beneath it.
@@ -389,7 +406,7 @@ flowchart LR
   These workflows use the existing Daily GP stores and sharing services without
   changing their Redis keys or public contracts.
 - `src/server/daily-gp-model.ts` defines the challenge schedule, IDs, playable window, and Redis key model.
-- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. The existing combined profile/preferences JSON remains in derived per-player keys, with rolling inactivity expiry of 7 days for guests and 30 days for signed-in players. Permanent car-unlock events live separately in `src/server/car-unlock-store.ts`, are merged from an authorized guest identity at Reddit sign-in, and have no rolling expiry. A new guest profile is claimed once with an atomic Redis write; every later bootstrap, preference update, identity update, personalized snapshot, and submission requires the matching signed guest token. Public snapshots remain available without a token but do not expose or refresh player-specific state. Published challenge history is pruned in bounded batches after 30 days.
+- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. The existing combined profile/preferences JSON remains in derived per-player keys. A profile outlives everything it names, because it carries both the player's settings and the name their ranked rows display: guests get the 90-day Campaign guest window, and signed-in profiles never expire, matching the permanent Campaign progress, car unlocks and Campaign standings they describe. Permanent car-unlock events live separately in `src/server/car-unlock-store.ts`, are merged from an authorized guest identity at Reddit sign-in, and have no rolling expiry. A new guest profile is claimed once with an atomic Redis write, and a bootstrap presenting a player id whose profile already exists re-issues a token for it rather than refusing — the id is the only handle on that guest's progress. Every later preference update, identity update, personalized snapshot, and submission requires the matching signed guest token. Stored preferences are repaired field by field on read: a value this build cannot parse costs that one setting its stored value, never the whole set. Public snapshots remain available without a token but do not expose or refresh player-specific state. Published challenge history is pruned in bounded batches after 30 days.
 - `src/server/pb-ghost-store.ts` persists compressed challenge-scoped PB records in one hash per challenge, with hashed player fields. The whole hash expires at `availableUntil + 6 hours` for guests and signed-in players alike. Daily leaderboard keys and payloads are unchanged and receive the same fixed deadline on writes. A track-geometry fingerprint plus simulation revision still invalidates incompatible ghosts.
 - The continuous slip-speed adjustment is intentionally continuity-compatible with simulation revision 1. Existing verified PB times and schema-v2 pose-trace ghosts remain eligible when track geometry, rules revision, and lap count are unchanged. New submissions are still replay-validated with current physics: a slower run under the adjusted handling keeps the stored time and ghost, while a strictly faster verified run replaces both. Physics changes that materially alter attainable results must still increment the simulation revision rather than reuse this exception.
 - Shared Redis locks are token-owned: renewal and release use short watched transactions, so an expired owner cannot extend or delete a successor's lease. Submission and PB locks use 30-second leases; the PB token check and compressed write share one watched transaction. Daily and podium post-creation claims retain their 15-minute crash-recovery TTL and use the same ownership-safe release behavior.
@@ -490,7 +507,7 @@ Use this table when scoping work. "Primary files" are the places most likely to 
 | Leaderboard opponent races | `game/scoreboard/opponent-race-service.js`, `game/scoreboard/opponent-race-engine-methods.js`, `src/server/leaderboard-race-service.ts`, `src/server/routes/leaderboard-race-routes.ts` | Daily/Campaign stores, standings UI, PB ghost, HUD, result sheet, verification queues | A selected row is only a lookup key: the server must re-resolve its current verified replay and the normal competition submission path must remain authoritative |
 | Result sharing or score-thread behavior | `game/race/ui-modal-shell.js`, `game/daily-challenge/service.js`, `src/server/daily-gp-share.ts`, `src/server/daily-gp-post-store.ts` | `src/server/daily-post-service.ts`, `src/server/routes/share-routes.ts`, `devvit.json`, finish and standings tests | The same confirmation contract serves finish and standings; Reddit user-action permission and post/comment identity are server-enforced |
 | Head to Head guests or Daily-origin challenges | `head-to-head.js`, `game/head-to-head/service.js`, `game/head-to-head/engine-methods.js`, `src/server/head-to-head-post.ts`, `src/server/head-to-head-runtime.ts`, `src/server/head-to-head-store.ts` | `src/server/competition-identity.ts`, `src/server/daily-gp-store.ts`, challenge replay/service/route tests | Guest identity is authorized separately from Reddit identity; embedded Daily challenge data bypasses only Daily expiry for the isolated Head to Head path |
-| What a beaten Head to Head offers next | `game/head-to-head/engine-methods.js`, `game/race/ui-modal-shell.js`, `game/lobby/service.js`, `game/lobby/ui.js`, `game.html`, `styles/lobby-modes.css` | Daily and Campaign lobby entry (`game/modes/engine-methods.js`, `game/campaign/engine-methods.js`), finish-sheet action row shared by every mode | A duel is spent once won: only a verified `outcome === 'won'` trades Improve for Daily/Campaign and marks the poster beaten, so lost/tie/unverified finishes keep their retry. The win is session state carried by hand into `loadChallengeLobby` (`outcome` plus the server-verified `bestTimeMs`), not a per-viewer server record. The poster states the win as a margin in its empty second seat rather than a headline, so the gap must stay derived from the two verified times in `normalizeChallengeLobbyState`. The finish sheet's action row is shared by every mode and must be reset on every other finish |
+| What a beaten Head to Head offers next | `game/head-to-head/engine-methods.js`, `game/race/ui-modal-shell.js`, `game/lobby/service.js`, `game/lobby/ui.js`, `game.html`, `styles/lobby-modes.css` | Daily and Campaign lobby entry (`game/modes/engine-methods.js`, `game/campaign/engine-methods.js`), finish-sheet action row shared by every mode | A duel is spent once won: only a verified `outcome === 'won'` trades Improve for Daily/Campaign and marks the poster beaten, so lost/tie/unverified finishes keep their retry. The UI carries the server-verified `outcome` and `bestTimeMs` locally for five minutes; the server keeps only the matching five-minute win receipt needed to authorize Brag, not durable result history. The poster states the win as a margin in its empty second seat rather than a headline, so the gap must stay derived from the two verified times in `normalizeChallengeLobbyState`. The finish sheet's action row is shared by every mode and must be reset on every other finish |
 | Modal redesign or modal flow changes | `game.html`, `styles.css`, `game/race/ui-modal-shell.js`, `game/race/ui-modal-content.js` | `game/ui/reusable-modal.js`, `game/ui/modal-handoff.js`, `game/settings/ui.js`, `game/settings/garage-ui.js`, `game/daily-challenge/ui.js` | There is one shared modal language, even though multiple features use it differently |
 | Settings changes | `game/settings/ui.js`, specific `game/settings/*.js` preference files, `game/player/preferences.js` | `game/storage.js`, `src/server/daily-gp-store.ts`, `game.html`, `styles.css` | Settings use browser storage as a cache and the independently expiring Reddit Redis player profile as the durable source |
 | Audio changes | `game/audio/*`, `game/settings/car-audio-preference.js`, `game/settings/music-preference.js` | `game/engine.js`, `game/settings/ui.js` | Audio lifecycle is tied to user gesture handling and settings state |

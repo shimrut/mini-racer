@@ -1,7 +1,4 @@
-/**
- * Paste the post URLs you want these buttons to open.
- * Leave a value empty to keep that button disabled.
- */
+// Paste the post URLs these buttons open; an empty value keeps a button disabled.
 window.LP_LINKS = {
     daily: '',
     campaign: '',

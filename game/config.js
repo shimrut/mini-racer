@@ -1,17 +1,13 @@
 import { DEFAULT_PHYSICS_TUNING } from './car/handling.js';
 
-// --- Mode Constants ---
 export const TRACK_MODE_DAILY_GP = 'daily';
 
-// --- Game Config ---
 export const CONFIG = {
     gridSize: 40,
 
-    // Environment Colors
-    offTrackColor: '#0f172a', // Deep Blue/Grey for runoff areas
-    trackColor: '#334155',    // Lighter Slate for Asphalt
+    offTrackColor: '#0f172a',
+    trackColor: '#334155',
 
-    // Style Colors
     curbRed: '#dc5a5a',
     curbWhite: '#f8fafc',
     carColor: '#dc2626',
@@ -26,7 +22,6 @@ export const CONFIG = {
     finishLineDarkColor: '#020617',
     finishLineBorderColor: 'rgba(248, 250, 252, 0.45)',
 
-    // Physics Constants
     fixedDt: 1 / 60,
     ...DEFAULT_PHYSICS_TUNING,
     wallScrapeReferenceImpactKph: 150,
@@ -39,24 +34,20 @@ export const CONFIG = {
     wallImpactCooldownSec: 0.12,
     wallContactReleaseSec: 0.12,
     wallContactPadding: 0.001,
-    resumeRelaunchDelay: 0.5, // Brief buffer before throttle resumes after unpausing
-    crashRelaunchDelay: 0.5, // Brief buffer before throttle resumes after crash reset
+    resumeRelaunchDelay: 0.5,
+    crashRelaunchDelay: 0.5,
     minLapTime: 2.0,
 
-    // Oriented capsule collision body. Radius covers the car width; the axis
-    // extends toward the nose and rear so visible body orientation matters.
+    // Capsule body: radius covers the width, the axis runs nose to rear so orientation matters.
     carRadius: 0.275,
     carCollisionHalfLength: 0.34,
 
-    /** Grid units from car center to rear axle along heading — skid marks, route trail, run history. */
     carRearAxleOffset: 0.32,
 
-    /** Soft shadow under the car sprite so it reads on asphalt-toned track surfaces. */
     carSpriteShadowColor: 'rgba(0, 0, 0, 0.75)',
     carSpriteShadowBlur: 2,
     carSpriteShadowOffsetX: 0,
     carSpriteShadowOffsetY: 0,
 
-    /** Multiplier on `carSpriteDrawWidth` / `carSpriteDrawHeight` when painting the car (1 = full size). */
     carSpriteRenderScale: 1
 };

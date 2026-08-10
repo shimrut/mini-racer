@@ -9,13 +9,6 @@ import {
 const PREFIX = 'miniracer:head-to-head';
 const CREATE_LOCK_TTL_MS = 15 * 60_000;
 
-/**
- * A Head to Head is readable entirely from the post that carries it, so this
- * store owns nothing that outlives that post. Every key here expires: the post
- * identity only bridges creation, the accept receipt only bridges a verified
- * run and the brag comment it earns, and the create count is a daily rate
- * limit rather than challenge data.
- */
 const IDENTITY_TTL_SECONDS = 10 * 60;
 const ACCEPT_TTL_SECONDS = 5 * 60;
 
@@ -25,7 +18,6 @@ export type HeadToHeadPostIdentity = {
     postUrl: string;
 };
 
-/** The receipt a verified run trades for the right to brag about it. */
 export type HeadToHeadAcceptRecord = {
     challengeId: string;
     postId: `t3_${string}`;
@@ -86,7 +78,6 @@ function challengePostIdentityKey(challengeId: string): string {
     return `${PREFIX}:post-identity:${challengeId}`;
 }
 
-/** Stores only the Reddit post identity; the replay remains in the post body. */
 export async function readHeadToHeadPostIdentityByChallengeId(
     challengeId: string,
 ): Promise<HeadToHeadPostIdentity | null> {

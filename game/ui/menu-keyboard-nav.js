@@ -8,7 +8,6 @@ function isEditableTarget(target) {
     if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
     if (tag === 'INPUT') {
         const type = String(target.type || 'text').toLowerCase();
-        // Checkboxes are settings toggles and must stay keyboard-navigable.
         if (type === 'checkbox' || type === 'radio' || type === 'button' || type === 'submit') {
             return false;
         }
@@ -62,7 +61,6 @@ export function clearMenuSelection(buttons, container = null) {
     container?.classList?.remove?.(MENU_KEYBOARD_CUE_CLASS);
 }
 
-/** Hide the keyboard selection outline after mouse movement. */
 export function dismissMenuKeyboardCue(state, buttons = [], {
     container = null,
     preferredIndex = null,
@@ -153,8 +151,7 @@ function getDirectionalDistance(from, to, direction) {
                 ? Math.max(0, from.top - to.bottom)
                 : Math.max(0, to.top - from.bottom);
 
-    // Overlapping edges count as aligned. This lets a wide button below a
-    // narrow right-aligned item remain a valid "down" target.
+    // Overlapping edges count as aligned, so a wide button below a narrow right-aligned item stays a valid "down" target.
     if (primaryCenterDistance <= 0 || primaryCenterDistance < perpendicularGap) return null;
     return primaryEdgeGap + (perpendicularGap * 2) + (primaryCenterDistance * 0.01);
 }
@@ -179,12 +176,6 @@ export function findSpatialMenuIndex(items, currentIndex, direction) {
     return bestIndex;
 }
 
-/**
- * Spatial menu keyboard nav: arrows/WASD move toward the nearest control,
- * Enter activates.
- * Selection cue appears only after the first move key.
- * @returns {boolean} true when the event was handled
- */
 export function handleMenuListKeydown(event, {
     buttons,
     state,

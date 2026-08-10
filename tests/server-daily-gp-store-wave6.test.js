@@ -232,8 +232,6 @@ describe('server daily gp store wave6', () => {
             playerId: member.member,
             bestTimeMs: 10000 + index,
         }))));
-        // The shared page supplies public rows, while the current player's
-        // authoritative row is re-read live before it is overlaid.
         mockRedis.hGet.mockResolvedValue(JSON.stringify(buildStoredEntry({
             playerId: 'reddit:rank-2',
             bestTimeMs: 10001,

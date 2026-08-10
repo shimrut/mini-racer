@@ -12,7 +12,6 @@ describe('ui race hud helpers', () => {
         const hudBarNode = { style: {} };
         vi.stubGlobal('document', {
             getElementById: vi.fn((id) => {
-                // Return an object that mimics a DOM element
                 return {
                     textContent: '',
                     style: {},

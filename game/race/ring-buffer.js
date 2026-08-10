@@ -21,25 +21,21 @@ export class RingBuffer {
         return this._items[idx];
     }
 
-    /** Get item at logical index i (0 = oldest). */
     get(i) {
         return this._items[(this._head + i) % this.capacity];
     }
 
-    /** Get the most recently written item, or null if empty. */
     last() {
         if (this.length === 0) return null;
         return this._items[(this._head + this.length - 1) % this.capacity];
     }
 
-    /** Reset to empty without deallocating slots. */
     clear() {
         this.length = 0;
         this._head = 0;
         this.version++;
     }
 
-    /** Create a plain-object snapshot array (for serialization/share — NOT hot path). */
     toArray() {
         const out = new Array(this.length);
         for (let i = 0; i < this.length; i++) {

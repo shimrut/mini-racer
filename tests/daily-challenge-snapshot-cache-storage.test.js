@@ -7,10 +7,7 @@ import {
 } from '../game/daily-challenge/service.js';
 import { getDailyChallengeData } from '../game/daily-challenge/storage.js';
 
-// This file gets its own fresh module graph, so the snapshot cache has never
-// been hydrated from storage yet. The very first call that touches the
-// snapshot cache in this file determines what hydration reads, so keep this
-// file focused on that one scenario.
+// Fresh module graph: the very first snapshot-cache touch here decides what hydration reads, so keep this file to that one scenario.
 
 function createMemoryLocalStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
@@ -90,8 +87,7 @@ describe('daily-challenge snapshot cache storage', () => {
     });
 
     it('syncs a cached snapshot player row into daily challenge storage when the playlist knows the challenge', async () => {
-        // Pinned: the challenge window below is fixed, so a real clock past
-        // availableUntil would prune it from the playlist and skip the sync.
+        // Pinned: the challenge window below is fixed, so a real clock past it would prune it from the playlist.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const challenge = {

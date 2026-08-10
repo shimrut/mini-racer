@@ -6,6 +6,7 @@ import {
   getDailyChallengeVerificationEntry,
   getNextVerificationAttemptAt,
   getVerificationRetryDelayMs,
+  markDailyChallengeTrackPbRetry,
   markDailyChallengeVerificationPending,
   markDailyChallengeVerificationError,
   createVerificationSnapshot,
@@ -270,7 +271,18 @@ export const scoreboardEngineMethods = {
           ? body.checkpointTimesSec
           : entry.checkpointTimesSec,
       );
-      clearDailyChallengeVerification(entry.challengeId);
+
+      const trackPbUnavailable = body.trackPbPersistenceStatus === "unavailable";
+      let trackPbRetryPending = false;
+      if (trackPbUnavailable) {
+        const { exhausted } = markDailyChallengeTrackPbRetry(
+          entry.challengeId,
+          Date.now() + getVerificationRetryDelayMs(),
+        );
+        trackPbRetryPending = !exhausted;
+      } else {
+        clearDailyChallengeVerification(entry.challengeId);
+      }
 
       const existingTrackBest = this.trackPersonalBestResult;
       const existingTrackBestTimeMs = Number.isFinite(existingTrackBest?.bestTime)
@@ -288,7 +300,7 @@ export const scoreboardEngineMethods = {
           challenge,
           canonicalTrackPersonalBest,
         );
-      } else if (body.trackPbPersistenceStatus === "unavailable") {
+      } else if (trackPbUnavailable && !trackPbRetryPending) {
         this.markTrackPersonalBestGhostUnavailable?.(challenge);
       } else if (!hasCanonicalTrackPbContract && Number.isFinite(body.trackBestTimeMs)) {
         this.applyVerifiedTrackPersonalBest?.(challenge, {

@@ -23,11 +23,6 @@ import { normalizeLapCompletionTimesSec } from "../shared/lap-completion-times.j
 
 const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;
-// How fast the look-ahead may rotate. The direction of travel can swing at over
-// 3 rad/s in a hard corner, and the camera whipping around with it reads as a
-// burst of speed the speedometer never shows. Only the bearing is limited -
-// the offset distance, and so the car's framing, is never affected.
-const LOOK_AHEAD_MAX_TURN_RAD_PER_S = 2.2;
 const SKID_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
 const COMPARISON_TIE_EPSILON_SEC = 0.005;
 
@@ -107,49 +102,6 @@ function lerpAngle(a, b, t) {
   while (delta > Math.PI) delta -= 2 * Math.PI;
   while (delta < -Math.PI) delta += 2 * Math.PI;
   return a + delta * t;
-}
-
-/**
- * Eases the camera look-ahead toward `desired` in polar form.
- *
- * Magnitude is what holds the car at its framing distance from centre, so it is
- * eased on its own and never touched by a direction change. Interpolating x and
- * y together would cut the chord across a turn and shorten the offset, pulling
- * the car toward the middle of the screen and back out again.
- *
- * Only the angle is rate limited. That damps the swing when the direction of
- * travel snaps around without ever moving the car off its framing distance.
- */
-export function stepLookAhead(current, desired, lerpFactor, maxAngleStep) {
-  const currentMagnitude = Math.hypot(current.x, current.y);
-  const desiredMagnitude = Math.hypot(desired.x, desired.y);
-  const magnitude = currentMagnitude
-    + (desiredMagnitude - currentMagnitude) * lerpFactor;
-
-  if (!(magnitude > 0)) return { x: 0, y: 0 };
-  // With no offset yet there is no meaningful heading to rotate away from, so
-  // adopt the target's immediately rather than sweeping an arc up from zero.
-  if (!(currentMagnitude > 0)) {
-    if (!(desiredMagnitude > 0)) return { x: 0, y: 0 };
-    const adopted = Math.atan2(desired.y, desired.x);
-    return { x: Math.cos(adopted) * magnitude, y: Math.sin(adopted) * magnitude };
-  }
-
-  const currentAngle = Math.atan2(current.y, current.x);
-  const targetAngle = desiredMagnitude > 0
-    ? Math.atan2(desired.y, desired.x)
-    : currentAngle;
-
-  let delta = targetAngle - currentAngle;
-  while (delta > Math.PI) delta -= 2 * Math.PI;
-  while (delta < -Math.PI) delta += 2 * Math.PI;
-
-  let step = delta * lerpFactor;
-  if (step > maxAngleStep) step = maxAngleStep;
-  else if (step < -maxAngleStep) step = -maxAngleStep;
-
-  const angle = currentAngle + step;
-  return { x: Math.cos(angle) * magnitude, y: Math.sin(angle) * magnitude };
 }
 
 function getSkidMarkStartIndex(skidMarks, frameSkip) {
@@ -966,14 +918,8 @@ export const raceEngineMethods = {
       dt > 0 ? Math.min(Math.max(dt, CAMERA_DT_MIN_S), CAMERA_DT_MAX_S) : 0;
     const lerpFactor = cameraDt > 0 ? 1 - Math.exp(-cameraDt * smoothSpeed) : 0;
 
-    const nextLookAhead = stepLookAhead(
-      { x: this._lookAheadX, y: this._lookAheadY },
-      desiredLookAhead,
-      lerpFactor,
-      LOOK_AHEAD_MAX_TURN_RAD_PER_S * cameraDt,
-    );
-    this._lookAheadX = nextLookAhead.x;
-    this._lookAheadY = nextLookAhead.y;
+    this._lookAheadX += (desiredLookAhead.x - this._lookAheadX) * lerpFactor;
+    this._lookAheadY += (desiredLookAhead.y - this._lookAheadY) * lerpFactor;
 
     this.camera.x = displayPos.x * gs + this._lookAheadX - cw / 2 / this.zoom;
     this.camera.y = displayPos.y * gs + this._lookAheadY - ch / 2 / this.zoom;

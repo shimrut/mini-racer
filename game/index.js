@@ -56,5 +56,3 @@ function setupMobileViewportGuards() {
 setupVisibleViewportHeight();
 setupMobileViewportGuards();
 new RealTimeRacer();
-// Local-only debug/test hooks are exposed on window.__RACER_DEBUG__ and the
-// standard render_game_to_text / advanceTime browser-game test contract.

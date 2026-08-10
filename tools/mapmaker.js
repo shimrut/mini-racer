@@ -271,7 +271,6 @@ function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) 
         });
     }
 
-    // Walls are no longer index-paired; place start from the centerline.
     const startTangent = normalizeVector(
         centerline[nextIndex].x - centerline[startIndex].x,
         centerline[nextIndex].y - centerline[startIndex].y
@@ -410,8 +409,6 @@ class MapmakerApp {
                 zoom: 1,
                 panX: 0,
                 panY: 0,
-                // Snapshot of content bounds while dragging a handle so extreme
-                // points do not recenter/rescale the camera mid-drag.
                 frozenBounds: null
             }
         };
@@ -794,7 +791,6 @@ class MapmakerApp {
         if (SCHEDULED_TRACK_KEYS.has(trackKey)) {
             return 'daily';
         }
-        // Brand-new editor tracks default to Daily Challenge.
         if (!originalTrackKey) {
             return 'daily';
         }
@@ -985,7 +981,6 @@ class MapmakerApp {
         if (handle.kind === 'startPos') {
             return this.track.startPos;
         }
-        // Start lines and checkpoints are whole-line selections, not endpoints.
         return null;
     }
 
@@ -1812,9 +1807,7 @@ class MapmakerApp {
             return;
         }
 
-        // Pixel-mode two-finger trackpad scrolls pan in both axes (including
-        // vertical-only moves where deltaX is 0). Mouse wheels usually report
-        // line/page mode and fall through to stepped zoom below.
+        // Pixel-mode two-finger trackpad scrolls pan; mouse wheels report line/page mode and fall through to stepped zoom below.
         if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL) {
             this.state.view.panX -= event.deltaX * deltaModeScale;
             this.state.view.panY -= event.deltaY * deltaModeScale;
@@ -2487,7 +2480,6 @@ class MapmakerApp {
 
         if (this.hasTrackGeometry()) {
             this.drawRaceTrackPreview(viewport);
-            // Faint sharp construction walls so authors can still see editable corners.
             this.drawPolygon(
                 this.track.outer,
                 viewport,

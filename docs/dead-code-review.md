@@ -180,3 +180,25 @@ Validation after removal:
   output contained only the expected missing Devvit API requests from static
   hosting.
 - `git diff --check`: passed.
+
+## Comment cleanup: August 10, 2026
+
+The existing comment-trimming work was extended across the remaining shipped
+JavaScript, TypeScript, CSS, HTML, tools, and tests. Removed comments were
+section labels, line-by-line explanations of readable code, stale helper
+documentation, and multi-line narration. Remaining comments are limited to
+legal attributions, type/tooling directives, and non-obvious compatibility,
+security, persistence, rendering, or algorithm contracts.
+
+Generated car-asset metadata now uses one line and the generator emits the
+same format, so the next test or build cannot restore the removed block.
+
+Validation:
+
+- The code comment scan found no multi-line comments in JavaScript, TypeScript,
+  CSS, HTML, tools, or tests.
+- `npm test`: 2,239 of 2,240 tests passed; the one failure is the existing
+  `track-runtime-integrity` registry fingerprint mismatch from the dirty track
+  data, not this comment-only cleanup.
+- `npm run build`: passed.
+- `git diff --check`: passed.

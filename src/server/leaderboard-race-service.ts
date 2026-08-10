@@ -26,12 +26,15 @@ async function checkPrepareRateLimit(competitionId: string, identity: string) {
     if (count === 1) await redis.expire(key, PREPARE_RATE_LIMIT_WINDOW_SECONDS);
     if (count <= PREPARE_RATE_LIMIT_MAX_REQUESTS) return { allowed: true as const };
     const expiresAt = await redis.expireTime(key);
-    return {
-        allowed: false as const,
-        retryAfterSeconds: Number.isFinite(expiresAt) && expiresAt > 0
-            ? Math.max(1, expiresAt - Math.floor(Date.now() / 1000))
-            : PREPARE_RATE_LIMIT_WINDOW_SECONDS,
-    };
+    if (Number.isFinite(expiresAt) && expiresAt > 0) {
+        return {
+            allowed: false as const,
+            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
+        };
+    }
+    // Repair a counter left without a TTL, or this identity can never prepare a race again.
+    await redis.expire(key, PREPARE_RATE_LIMIT_WINDOW_SECONDS);
+    return { allowed: false as const, retryAfterSeconds: PREPARE_RATE_LIMIT_WINDOW_SECONDS };
 }
 
 export async function prepareServerLeaderboardRace(

@@ -32,7 +32,6 @@ export function formatLobbyTime(milliseconds) {
     return `${minutes}:${String(seconds).padStart(2, '0')}.${String(remainder).padStart(3, '0')}`;
 }
 
-/** A race margin: signed, in seconds, against the time that had to be beaten. */
 export function formatLobbyGap(milliseconds) {
     const safeMilliseconds = toFiniteNumber(milliseconds);
     if (safeMilliseconds === null) return null;
@@ -61,7 +60,6 @@ function formatRemainingMedalsLabel(medalTotal, requiredMedals) {
     return null;
 }
 
-/** Gold is what counts a stage as cleared: Author clears it too, nothing below does. */
 export function isCampaignGoldMedal(medal) {
     const rank = STANDARD_MEDAL_TIER_RANK[normalizeMedalName(medal)];
     return rank !== undefined && rank >= STANDARD_MEDAL_TIER_RANK.gold;
@@ -97,7 +95,6 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
         bestTimeMs,
         bestTimeLabel: bestTimeMs === null ? 'No time' : formatLobbyTime(bestTimeMs),
         medal,
-        // Kept so a re-normalized state can still state what this stage costs.
         unlock: stage.unlock ?? null,
         standingsAvailable: Boolean(stage.standingsAvailable ?? stage.unlocked),
         playerRank: Number.isInteger(stage.playerRank) && stage.playerRank > 0
@@ -112,11 +109,6 @@ export function normalizeCampaignLobbyState(state = {}) {
         ? state.stages
         : Array.from({ length: 10 }, (_, index) => ({ index, unlocked: index === 0 }));
     const normalized = sourceStages.map(normalizeCampaignStage);
-    // A locked row that only says "Locked" hides the whole rule. Every Campaign
-    // gate has two independent requirements, so preserve both as structured
-    // copy: a medal on the previous stage and the campaign-wide medal total.
-    // `unlockRequirementLabel` remains the first unmet sentence for legacy
-    // callers, while the carousel renders the complete checklist.
     const medalTotal = normalized.reduce(
         (total, stage) => total + getCampaignStageMedalCount(normalizeMedalName(stage.medal)),
         0,
@@ -177,8 +169,6 @@ export function normalizeCampaignLobbyState(state = {}) {
             ...stage,
             unlockRequirementLabel: label,
             unlockRequirements,
-            // The card's visual ring uses the total requirement, while the
-            // checklist keeps both gates readable in words.
             unlockProgress: hasPrice
                 ? {
                     medalTotal,
@@ -191,15 +181,9 @@ export function normalizeCampaignLobbyState(state = {}) {
     const completed = Boolean(state.complete)
         || (stages.length > 0 && stages.every((stage) => isCampaignGoldMedal(stage.medal)));
     const goldCount = stages.filter((stage) => isCampaignGoldMedal(stage.medal)).length;
-    // Strictly the stage the campaign is still asking for. Falling back to the
-    // first unlocked stage once every one of them is Gold marked Stage 00 as the
-    // live stage of a finished campaign, which is the one thing it is not.
     const nextStage = stages.find((stage) => stage.unlocked && !isCampaignGoldMedal(stage.medal))
         || null;
     for (const stage of stages) stage.isNext = stage === nextStage;
-    // A provisional paint knows the stage list but not whose progress it is, so
-    // it cannot say yet whether the centred stage is playable. Leaving the label
-    // unset lets the lobby show its pending state instead of guessing.
     const resolved = state.resolved !== false;
 
     return {
@@ -211,9 +195,6 @@ export function normalizeCampaignLobbyState(state = {}) {
         progressLabel: typeof state.progressLabel === 'string'
             ? state.progressLabel
             : `${goldCount} / ${stages.length} Gold`,
-        // The button races the stage the carousel has centred, so it names that
-        // act and nothing else: campaign-level wording read as a claim about the
-        // centred stage that was wrong on every stage but one.
         primaryLabel: resolved ? 'Start Race' : null,
         nextStage,
     };
@@ -231,7 +212,6 @@ export function normalizeChallengeLobbyState(state = {}) {
     const challengerName = rawName
         ? (rawName.startsWith('u/') ? rawName : `u/${rawName}`)
         : 'A racer';
-    // A spent duel stops offering Accept and becomes the win's landing screen.
     const beaten = state.outcome === 'won';
     const canRetry = Boolean(state.canRetry) && !beaten;
     const challengeLoading = Boolean(state.challengeLoading);
@@ -239,8 +219,6 @@ export function normalizeChallengeLobbyState(state = {}) {
     const gapMs = beaten && bestTimeMs !== null && available
         ? Math.round(bestTimeMs) - Math.round(targetTimeMs)
         : null;
-    // A stranger arriving on the post has no avatar to show yet, so the duel
-    // keeps both seats and fills the empty one with the default Snoo.
     return {
         ...state,
         signedIn,

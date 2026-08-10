@@ -183,8 +183,7 @@ describe('pb-ghost-trace validation and recording edges', () => {
             angle: 0,
         });
         expect(trace).not.toBeNull();
-        // progress at 50ms between 33.3ms (x=1) and 66.7ms (x=3):
-        // (0.05 - 1/30) / (1/15) = 0.5 → x = 2
+        // At 50ms, between 33.3ms (x=1) and 66.7ms (x=3): (0.05 - 1/30) / (1/15) = 0.5 → x = 2.
         expect(trace.origin).toEqual([0, 0, 0]);
         expect(trace.deltas[0]).toBe(200);
         expect(trace.deltas[1]).toBe(0);

@@ -10,7 +10,6 @@ import {
 import {
   getGuestPlayerToken,
   getOrCreatePlayerId,
-  rotateGuestPlayerIdentity,
   setGuestPlayerToken,
 } from "./scoreboard/player-identity.js";
 import { isLocalEnvironment } from "./track/environment.js";
@@ -93,7 +92,8 @@ export async function getPlayerProgressState() {
       if (error?.status !== 401) {
         throw error;
       }
-      rotateGuestPlayerIdentity();
+      // Keep the player id and drop only the token: the id is the only handle on this guest's progress, and the server re-issues a token for it.
+      setGuestPlayerToken(null);
       remoteState = await fetchRemotePlayerProgressState();
     }
     if (remoteState) {

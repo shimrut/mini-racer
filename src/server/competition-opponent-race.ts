@@ -1,10 +1,3 @@
-/**
- * Picks a rival off a leaderboard and hands back their ghost, shared across
- * modes (Daily and Campaign previously kept identical copies). A `row`
- * selection must still match its named standings row exactly — a board that
- * moved under the player is refused rather than silently racing someone
- * else. A `next-faster` selection walks up to the closest rival above them.
- */
 import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';
 import {
@@ -82,7 +75,6 @@ export async function prepareCompetitionOpponentRace({
 }: {
     competition: Competition;
     playerId: string | null;
-    /** Echoed back to the client as the race to start. */
     race: unknown;
     selection?: unknown;
 }) {

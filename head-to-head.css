@@ -41,13 +41,6 @@ body {
         linear-gradient(145deg, #0f172a, var(--bg-color-darker) 68%);
 }
 
-/* The post is rendered at whatever size the feed hands us, so every size below
-   is a multiple of one unit that tracks the card's own dimensions. Ratios come
-   from the design: the track name and the time are the only large elements,
-   everything else is a small supporting label.
-
-   Narrow stacks the post: brand, duel, race, trace, action. Wide splits the
-   same order into a copy column and a trace column with the CTA underneath. */
 .challenge-shell {
     --u: clamp(8px, 0.5vw + 0.75vh, 16px);
 
@@ -119,9 +112,6 @@ body {
     margin-bottom: var(--space-block);
 }
 
-/* Each side is exactly as wide as its avatar, whatever the name under it is:
-   the duel's geometry has to be settled before the names arrive, or the pair
-   slides sideways the moment a "You" placeholder becomes a real username. */
 .challenge-duel__racer {
     display: flex;
     flex: none;
@@ -131,7 +121,6 @@ body {
     width: var(--size-avatar);
 }
 
-/* A fixed box, so the circle never resizes as the image behind it resolves. */
 .challenge-avatar {
     display: block;
     flex: none;
@@ -150,15 +139,10 @@ body {
     object-fit: contain;
 }
 
-/* Snoos look to the right, so the challenger already faces the middle and the
-   viewer is mirrored: the pair face each other, the same way their helmets do. */
 #viewer-avatar {
     transform: scaleX(-1);
 }
 
-/* A name may run a little wider than its avatar — it overhangs the fixed column
-   evenly on both sides, so a longer name never nudges the composition — and
-   ellipsises before it can reach the helmets. */
 .challenge-duel__name {
     max-width: calc(var(--size-avatar) * 1.3);
     overflow: hidden;
@@ -172,9 +156,6 @@ body {
     white-space: nowrap;
 }
 
-/* The pair face each other across the duel: the challenger's helmet is mirrored
-   so both visors point at the middle. The row is top-aligned, so the helmets
-   drop to the avatars' centre line rather than the taller name column's. */
 .challenge-duel__helmets {
     display: flex;
     align-items: center;
@@ -197,8 +178,6 @@ body {
     transform: scaleX(-1);
 }
 
-/* The time is the headline; the label caps it and the track/lap line sits on
-   its baseline width, so the block reads as one unit. */
 .challenge-headline {
     display: flex;
     flex-direction: column;
@@ -209,8 +188,6 @@ body {
     text-transform: uppercase;
 }
 
-/* The label caps the time block rather than floating over it, so it follows the
-   column's own alignment: centred when the post stacks, left when it splits. */
 .challenge-headline__label {
     color: var(--text-dim);
     font-size: var(--type-label);
@@ -278,9 +255,6 @@ h1.challenge-track-name,
     gap: var(--space-block);
 }
 
-/* The status line is empty until the access check answers. It keeps its line
-   box either way, so the copy above it does not re-centre when a message
-   finally lands. */
 #challenge-message {
     margin: 0;
     min-height: 1lh;
@@ -367,8 +341,6 @@ h1.challenge-track-name,
     cursor: pointer;
 }
 
-/* Wide, or short enough that stacking would crop the trace: copy left, trace
-   right, CTA across the bottom. */
 @media (min-width: 821px), (max-height: 620px) and (min-width: 420px) {
     .challenge-shell {
         grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
@@ -402,16 +374,12 @@ h1.challenge-track-name,
     }
 }
 
-/* Short posts split into columns below the wide breakpoint too, and there the
-   time — not the trace — sets the floor, so the copy takes the wider share. */
 @media (max-width: 820px) and (max-height: 620px) and (min-width: 420px) {
     .challenge-shell {
         grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     }
 }
 
-/* Narrower still: the full-size duel and time outgrow that column, so both
-   step down rather than spill across the trace. */
 @media (max-width: 620px) and (max-height: 620px) and (min-width: 420px) {
     .challenge-shell {
         --size-avatar: calc(var(--u) * 7);
@@ -424,8 +392,6 @@ h1.challenge-track-name,
     }
 }
 
-/* A small phone with a short post has no room to spare: step the whole scale
-   down so the trace still gets a usable box under the time. */
 @media (max-width: 419px) and (max-height: 700px) {
     .challenge-shell {
         --u: clamp(6.25px, 0.42vw + 0.8vh, 10px);

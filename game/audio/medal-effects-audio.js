@@ -34,7 +34,7 @@ export function createMedalEffectsAudio(externalCtx, externalOutput) {
         }
 
         masterGain = ctx.createGain();
-        masterGain.gain.value = 1.0; // The master volume level of medal effect gains themselves
+        masterGain.gain.value = 1.0;
         masterGain.connect(externalOutput || ctx.destination);
 
         graphBuilt = true;
@@ -62,7 +62,6 @@ export function createMedalEffectsAudio(externalCtx, externalOutput) {
             buildGraph();
             if (!ctx || !masterGain) return;
 
-            // Ensure AudioContext is running
             if (ctx.state === 'suspended') {
                 void ctx.resume();
             }
@@ -71,13 +70,12 @@ export function createMedalEffectsAudio(externalCtx, externalOutput) {
             const isAuthor = tier === 'author';
             const isGold = tier === 'gold';
             
-            // Tier-based pitches (Clear harmonic steps)
-            let freq = 329.63; // Bronze (E4)
-            if (tier === 'silver') freq = 440.00; // Silver (A4)
-            if (tier === 'gold') freq = 659.25; // Gold (E5)
-            if (tier === 'author') freq = 880.00; // Author (A5)
-            if (tier === 'personal-best') freq = 523.25; // Personal best (C5)
-            if (tier === 'challenge') freq = 698.46; // Challenge beaten (F5)
+            let freq = 329.63;
+            if (tier === 'silver') freq = 440.00;
+            if (tier === 'gold') freq = 659.25;
+            if (tier === 'author') freq = 880.00;
+            if (tier === 'personal-best') freq = 523.25;
+            if (tier === 'challenge') freq = 698.46;
 
             const osc = ctx.createOscillator();
             osc.type = 'triangle';
@@ -95,7 +93,6 @@ export function createMedalEffectsAudio(externalCtx, externalOutput) {
             osc.start(t);
             osc.stop(t + 1.0);
 
-            // Add a high "chime" for gold and author
             if (isGold || isAuthor) {
                 const chime = ctx.createOscillator();
                 chime.type = 'sine';

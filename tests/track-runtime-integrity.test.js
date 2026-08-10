@@ -61,12 +61,6 @@ function distanceToPolygon(point, polygon) {
     return nearest;
 }
 
-/**
- * How far a car center could travel past a gate endpoint while still on the
- * drivable surface. An endpoint buried in the inner island or beyond the outer
- * wall is sealed (0); one sitting inside the corridor leaks by its clearance to
- * the nearest boundary.
- */
 function gateEndpointLeak(point, geometry) {
     const onDrivableSurface = pointInPolygon(point, geometry.outer)
         && !pointInPolygon(point, geometry.inner);
@@ -109,17 +103,10 @@ describe('track runtime integrity', () => {
 
     it('preserves existing track data while intentionally extending the registry', () => {
         const catalogKeys = Object.keys(TRACK_CATALOG);
-        const firstNewTrackIndex = catalogKeys.indexOf('numberZero');
+        const firstNewTrackIndex = catalogKeys.indexOf('mistfallCircuit');
         expect(firstNewTrackIndex).toBeGreaterThan(0);
         expect(catalogKeys.slice(firstNewTrackIndex)).toEqual([
-            'numberZero',
-            'numberOne',
-            'numberTwo',
-            'numberThree',
-            'numberFour',
-            'numberFive',
-            'numberSix',
-            'numberSeven',
+            'mistfallCircuit',
             'numberEight',
             'numberNine',
             'analogAudio',
@@ -128,7 +115,6 @@ describe('track runtime integrity', () => {
             'roadRage',
             'yellowYard',
             'lunarLimbo',
-            'furiousFast',
             'blackstoneRun',
             'titanTown',
             'eulersNumber',
@@ -146,14 +132,19 @@ describe('track runtime integrity', () => {
             'darkMatter',
             'appleStrudel',
             'heavyMetal',
+            'knifesEdge',
+            'pocketRun',
+            'crossCurrent',
+            'squareDeal',
+            'doubleHook',
+            'doubleCrest',
         ]);
+        expect(TRACK_SCHEDULE_KEYS.slice(0, firstNewTrackIndex)).toEqual(
+            catalogKeys.slice(0, firstNewTrackIndex),
+        );
 
         const intentionallyReviewedKeys = new Set([
-            'lunarLimbo',
-            'furiousFast',
-            'blackstoneRun',
-            'titanTown',
-            'mistfallCircuit',
+            ...catalogKeys.slice(firstNewTrackIndex),
             'numberZero',
             'numberOne',
             'numberTwo',
@@ -162,35 +153,13 @@ describe('track runtime integrity', () => {
             'numberFive',
             'numberSix',
             'numberSeven',
-            'numberEight',
-            'numberNine',
-            'analogAudio',
-            'hardHitter',
-            'roadRage',
-            'yellowYard',
-            'sundayMarket',
-            'eulersNumber',
-            'imaginaryNumber',
-            'infinitePie',
-            'centralDrop',
-            'goldenRatio',
-            'fedoraHat',
-            'infinityIsle',
-            'kangarooKyle',
-            'quarterlyQuestion',
-            'romanianRhapsody',
-            'fairyLand',
-            'felineFace',
-            'darkMatter',
-            'appleStrudel',
-            'heavyMetal',
         ]);
         const unchangedTrackRegistry = Object.fromEntries(
             Object.entries(TRACKS)
                 .filter(([trackKey]) => !intentionallyReviewedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(unchangedTrackRegistry)).toBe(
-            'd25f3efc0cfff9b0cc53ba69d861d9efea6d5f8d294a6243e887bd9a1b393a2e',
+            'a3c5cc6c6e84afd239e1eb05a325da97d9a6499ff0085b27d5e5b44a95f6a462',
         );
 
         const existingTrackRegistry = Object.fromEntries(
@@ -199,10 +168,10 @@ describe('track runtime integrity', () => {
                 .map((trackKey) => [trackKey, TRACKS[trackKey]]),
         );
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
-            '80b83be273da4ec14b3c597cadeb49f14c0bd476fc1925232825d6418bc29bfc',
+            '2a272e53a4cc50320fc07daff2784898aef5c761c5301cb684aefd9d1cabb270',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '4fea6728474eab8a31a7b147a706cbbf2e1cab8f2da10b0735a4f9ba22c7fb2c',
+            '898bbf20672156e102d49500e778ba6b2245544135ad9f10d71c767c493b575f',
         );
     });
 
@@ -276,9 +245,6 @@ describe('track runtime integrity', () => {
     });
 
     it('keeps every lap gate sealed across the drivable corridor', () => {
-        // Lap progress is tested against the car *center* path (see
-        // game/race/simulation.js), so a gate that stops short of either wall by
-        // more than the car radius lets a player skip it and never complete a lap.
         const carRadius = CONFIG.carRadius;
         expect(Number.isFinite(carRadius)).toBe(true);
 

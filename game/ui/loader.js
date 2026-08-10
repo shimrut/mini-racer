@@ -1,7 +1,3 @@
-/**
- * Manages the global game loading screen.
- * Synchronizes the progress bar, status text, and the final reveal transition.
- */
 export class LoadingScreen {
   constructor() {
     this.element = document.getElementById("loading-screen");
@@ -12,11 +8,6 @@ export class LoadingScreen {
     this.highestProgress = 0;
   }
 
-  /**
-   * Updates the visual state of the loader.
-   * @param {number} percent - 0 to 100
-   * @param {string} status - Human-readable status message
-   */
   update(percent, status) {
     if (this.isComplete) return;
 
@@ -37,21 +28,15 @@ export class LoadingScreen {
     }
   }
 
-  /**
-   * Dismisses the loader with a smooth transition.
-   * Ensures the final frame is painted before the element is removed from view.
-   */
   async dismiss() {
     if (this.isComplete) return;
     this.update(100, "Ready!");
     this.isComplete = true;
 
-    // Double frame wait to ensure browser has painted the lobby behind the loader
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     document.body.classList.remove(this.activeClass);
     
-    // Optional: wait for CSS transition to finish before doing any heavy logic
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }

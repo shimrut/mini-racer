@@ -138,7 +138,7 @@ describe('server daily gp store wave5', () => {
         expect(podium.positions[1].formattedTime).toBeNull();
     });
 
-    it('drops invalid preference payloads while keeping the player profile shell (L472-L487)', async () => {
+    it('repairs one unreadable stored preference while keeping the rest (L472-L487)', async () => {
         const { parseStoredPlayerProfile } = await import('../src/server/daily-gp-store.ts');
 
         expect(parseStoredPlayerProfile(JSON.stringify({
@@ -151,7 +151,11 @@ describe('server daily gp store wave5', () => {
                 crashAutoRestartEnabled: true,
                 crashRestartDelaySec: 1.1,
             },
-        }))?.preferences).toBeNull();
+        }))?.preferences).toMatchObject({
+            carSkin: 'default',
+            trailId: 'basic',
+            crashRestartDelaySec: 0.5,
+        });
 
         const profile = parseStoredPlayerProfile(JSON.stringify({
             playerId: 'guest:wave5',

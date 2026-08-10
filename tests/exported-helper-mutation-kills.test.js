@@ -344,15 +344,12 @@ describe('exported simulation helpers — scrape and collision hash', () => {
             angularVelocity: -3,
             cachedSpeed: 0,
         };
-        // bodyOffset × normal → rotationalNormalVelocity = ω * (ox*ny - oy*nx)
-        // With normal (1,0) and bodyOffset (0,1): ω * (0 - 1*1) = -ω. Negative ω stays negative → cleared.
         suppressInwardContactMotion(state, [{
             normal: { x: 1, y: 0 },
             bodyOffset: { x: 0, y: 1 },
         }]);
         expect(state.velocity.x).toBeGreaterThanOrEqual(0);
         // rotationalNormalVelocity = -3 * (0*0 - 1*1) = -3 * -1 = +3 > 0, so angular is kept.
-        // Use a geometry that makes rotationalNormalVelocity negative:
         const spinning = {
             velocity: { x: 0, y: 0 },
             angularVelocity: 2,

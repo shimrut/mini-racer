@@ -79,6 +79,11 @@ maintaining mode-specific card layouts:
   fixed `4rem` status band and the artwork is clipped to the card itself. The
   personal-best icon, standings value, and medal ladder remain present for open cards,
   while locked cards replace that context with a two-item prerequisite checklist.
+- The Daily/Campaign carousel adds a compact navigation row between the
+  schematic and its status footer. Previous and Next stay in normal grid flow,
+  while the centered `current / total` counter is updated by
+  `game/ui/track-carousel.js`; the challenge poster keeps its original two-row
+  layout.
 - The Daily/Campaign header remains in normal flow above the rail. The actual
   `.lobby-title` is the fixed Mini Racer wordmark, and `.lobby-subhead` owns the
   mode label, divider, and right-side Daily date or Campaign track selection.

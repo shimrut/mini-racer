@@ -23,9 +23,7 @@ describe('avatar seating', () => {
 
         expect(isRedditAvatarUrl('http://i.redd.it/a.png')).toBe(false);
         expect(isRedditAvatarUrl('https://example.com/leak.png')).toBe(false);
-        // reddit.com itself is not a media host and the server does not admit it.
         expect(isRedditAvatarUrl('https://reddit.com/a.png')).toBe(false);
-        // A lookalike host must not pass on a suffix match alone.
         expect(isRedditAvatarUrl('https://evil-redd.it.example.com/a.png')).toBe(false);
         expect(isRedditAvatarUrl('javascript:alert(1)')).toBe(false);
         expect(isRedditAvatarUrl(null)).toBe(false);
@@ -63,8 +61,6 @@ describe('avatar seating', () => {
         expect(img.classList.contains('challenge-avatar--generic')).toBe(false);
     });
 
-    // The whole reason this module exists: one ladder, so no surface can invent
-    // its own idea of what a faceless racer looks like.
     it('falls from a broken avatar to the Snoo, then to the local silhouette', () => {
         const img = imageIn(dom);
         applyAvatar(img, 'https://i.redd.it/gone.png', {
@@ -74,13 +70,11 @@ describe('avatar seating', () => {
 
         img.onerror();
         expect(img.src).toBe(GENERIC_SNOO_URL);
-        // The plate arrives with the Snoo rather than being left behind.
         expect(img.classList.contains('podium-row__avatar--generic')).toBe(true);
 
         img.onerror();
         expect(img.src).toBe(AVATAR_PLACEHOLDER_SRC);
         expect(img.classList.contains('podium-row__avatar--generic')).toBe(false);
-        // The silhouette is a data URI and always paints, so the ladder stops.
         expect(img.onerror).toBe(null);
     });
 

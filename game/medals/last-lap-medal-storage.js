@@ -23,14 +23,9 @@ function writeMap(map) {
     try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
     } catch {
-        /* ignore quota */
     }
 }
 
-/**
- * Best medal earned on this track in the browser (persists across runs; never downgrades).
- * @returns {'author'|'gold'|'silver'|'bronze'|null} null = never stored or unknown → show white icon
- */
 export function readTrackLastLapMedal(trackKey) {
     if (!trackKey) return null;
     const v = readMap()[trackKey];
@@ -38,10 +33,6 @@ export function readTrackLastLapMedal(trackKey) {
     return null;
 }
 
-/**
- * Merges this finish into stored best tier (worse laps or no medal do not remove a better medal).
- * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} medal
- */
 export function writeTrackLastLapMedal(trackKey, medal) {
     if (!trackKey) return;
     const map = readMap();

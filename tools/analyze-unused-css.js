@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { readCssBundle } from '../tests/helpers/read-css-bundle.js';
 
-// Recursively find files with given extensions
 function getFiles(dir, exts) {
     let results = [];
     if (!fs.existsSync(dir)) return results;
@@ -23,20 +22,16 @@ function getFiles(dir, exts) {
     return results;
 }
 
-// Strip CSS comments and media query headers to avoid matching non-selectors
 function cleanCSS(cssText) {
-    // Remove comments
     let clean = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
     return clean;
 }
 
-// Extract classes and IDs from CSS
 function extractSelectors(cssText) {
     const clean = cleanCSS(cssText);
     const classes = new Set();
     const ids = new Set();
 
-    // Regex to match selectors before {
     let depth = 0;
     let currentSelectorText = '';
 
@@ -46,12 +41,10 @@ function extractSelectors(cssText) {
             if (depth === 0) {
                 const selectors = currentSelectorText.split(',');
                 selectors.forEach(sel => {
-                    // Find class names
                     const classMatches = sel.match(/\.[_a-zA-Z0-9-]+/g);
                     if (classMatches) {
                         classMatches.forEach(m => classes.add(m.substring(1)));
                     }
-                    // Find ID names
                     const idMatches = sel.match(/#[_a-zA-Z0-9-]+/g);
                     if (idMatches) {
                         idMatches.forEach(m => ids.add(m.substring(1)));
@@ -80,7 +73,6 @@ function analyzeCSS(cssFileName, contentFiles, dynamicPrefixes = []) {
     const cssContent = readCssBundle(cssPath);
     const { classes, ids } = extractSelectors(cssContent);
 
-    // Read all contents
     const fileContents = contentFiles.map(file => {
         return {
             path: file,
@@ -155,7 +147,6 @@ function analyzeCSS(cssFileName, contentFiles, dynamicPrefixes = []) {
 function runAll() {
     const reports = {};
 
-    // 1. styles.css -> game
     console.log('Analyzing styles.css...');
     const gameFiles = [
         path.resolve('game.html'),
@@ -172,7 +163,6 @@ function runAll() {
         'track-carousel__edge--'
     ]);
 
-    // 2. preview.css -> preview page
     console.log('Analyzing preview.css...');
     const previewFiles = [
         path.resolve('preview.html'),
@@ -183,7 +173,6 @@ function runAll() {
         'challenge-status--'
     ]);
 
-    // Print summary table
     console.log('\n========================================================================');
     console.log('CSS FILE          | TOTAL CLS | USED CLS | UNUSED CLS | DYN CLS | UNUSED IDS');
     console.log('------------------------------------------------------------------------');
@@ -201,7 +190,6 @@ function runAll() {
     }
     console.log('========================================================================');
 
-    // Save report to JSON
     fs.writeFileSync('unused-css-report.json', JSON.stringify(reports, null, 2));
     console.log('\nDetailed reports written to unused-css-report.json');
 }

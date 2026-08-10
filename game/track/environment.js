@@ -1,8 +1,3 @@
-/**
- * Runtime environment detection utilities.
- * Used to gate debug hooks, auto-retry behaviour, and device pixel ratio reads.
- */
-
 export function isLocalEnvironment() {
   if (typeof window === "undefined") return false;
 
@@ -26,11 +21,7 @@ export function shouldAutoRetryVerificationQueue() {
   return !isLocalEnvironment();
 }
 
-/**
- * Android's embedded Reddit WebView can advertise OffscreenCanvas support
- * without reliably presenting the worker-rendered canvas. Keep that client on
- * the main-thread track renderer; iOS and web clients retain the worker path.
- */
+/** Android's embedded Reddit WebView advertises OffscreenCanvas but does not reliably present it, so it stays on the main-thread renderer. */
 export function shouldUseTrackLayerWorker(
   clientName = globalThis.devvit?.context?.client?.name,
 ) {
@@ -42,12 +33,7 @@ export function readCanvasDevicePixelRatio() {
   return window.devicePixelRatio || 1;
 }
 
-/**
- * Measures canvas fill-rect throughput to estimate low-end rendering capacity.
- *
- * Returns 1 (low quality) or 0 (high quality). Called once at engine startup
- * before the first track load.
- */
+/** Measures canvas fill-rect throughput once at startup: 1 = low quality, 0 = high. */
 export function detectDevicePerformance() {
   const testCanvas = document.createElement("canvas");
   testCanvas.width = 100;
@@ -62,5 +48,5 @@ export function detectDevicePerformance() {
 
   const isLowEnd = elapsed > 1;
 
-  return isLowEnd ? 1 : 0; // 1 = low quality, 0 = high quality
+  return isLowEnd ? 1 : 0;
 }

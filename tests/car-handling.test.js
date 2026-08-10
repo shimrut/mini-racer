@@ -65,7 +65,6 @@ describe('car handling helpers', () => {
     });
 
     it('rejects array configs the same as non-object primitives for field copies', () => {
-        // Arrays are typeof 'object', so fields are only applied when finite numbers exist.
         expect(normalizePhysicsConfig([])).toEqual({ ...DEFAULT_PHYSICS_TUNING });
         expect(normalizePhysicsConfig('config')).toEqual({ ...DEFAULT_PHYSICS_TUNING });
         expect(normalizePhysicsConfig(true)).toEqual({ ...DEFAULT_PHYSICS_TUNING });

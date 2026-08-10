@@ -18,18 +18,11 @@ function hasServerRequestContext(): boolean {
     try {
         return Boolean(context?.subredditId);
     } catch (_error) {
-        // Devvit's context proxy throws when imported by standalone tests or
-        // local tools instead of returning undefined.
+        // Devvit's context proxy throws in standalone tests and local tools instead of returning undefined.
         return false;
     }
 }
 
-/**
- * Runs a shared Devvit cache lookup when a Reddit request context exists.
- * Standalone unit tests and local non-Devvit requests use the source directly.
- * If cache storage fails after the source has returned, preserve that source
- * value rather than turning a successful request into a cache failure.
- */
 export async function cacheSharedJson<T extends JsonValue>(
     source: () => Promise<T>,
     options: SharedCacheOptions,

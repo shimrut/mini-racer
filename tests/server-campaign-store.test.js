@@ -62,10 +62,6 @@ function decodeCompressedValue(value) {
     }
 }
 
-/**
- * Display names come from the player profile now, not from a name frozen into
- * the leaderboard row, so a board that should show a name needs a profile.
- */
 function seedPlayerProfile(playerId, redditUsername) {
     const playerKey = createHash('sha256').update(playerId, 'utf8').digest('base64url');
     strings.set(`dailygp:player-profile:${playerKey}`, JSON.stringify({
@@ -207,7 +203,6 @@ describe('Campaign server store', () => {
         const progressKeys = [...strings.keys()].filter((key) => key.includes(':progress'));
         expect(progressKeys).toHaveLength(2);
         expect(new Set(progressKeys).size).toBe(2);
-        // Progress must never be a field inside one shared, unbounded hash.
         expect([...hashes.keys()].some((key) => key.endsWith(':progress'))).toBe(false);
 
         const first = await getServerCampaignBootstrap({ redditUsername: 'RaceFan' });
@@ -306,8 +301,6 @@ describe('Campaign server store', () => {
                 bestTimeMs: 1000,
                 trackPbPersistenceStatus: 'stored',
                 progress: {
-                    // One Author is four medals, past stage 02's price of 3 — but
-                    // the ladder still opens only the stage after the one raced.
                     unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
                     resultsByRaceId: {
                         'numbered-v1-00': { bestTimeMs: 1000, medal: 'author' },
@@ -598,8 +591,6 @@ describe('Campaign server store', () => {
             body: { target: { rank: 1, displayName: 'Opponent', bestTimeMs: 100 } },
         });
 
-        // Once the player owns the top time there is nobody left to chase, and
-        // the finish falls back to Improve on the strength of this answer.
         ranked.reverse();
         entries.set(playerId, JSON.stringify({
             ...baseResult,
@@ -649,7 +640,6 @@ describe('Campaign server store', () => {
             pbField,
             JSON.stringify({
                 ...result,
-                // Written by its own clock before the two writes shared one.
                 updatedAt: '2026-07-27T09:59:59.812Z',
                 schemaVersion: 2,
                 simulationRevision: 1,
@@ -686,8 +676,6 @@ describe('Campaign server store', () => {
             body: { target: { ghost: { finishTimeMs: 100 } } },
         });
 
-        // The best time is what pins the ghost to the row, so a record left
-        // behind by a faster entry is still refused.
         hashes.get(pbKey).set(pbField, JSON.stringify({
             ...result,
             bestTimeMs: 140,
@@ -1017,7 +1005,6 @@ describe('Campaign server store', () => {
             submitServerCampaignRun,
         } = await import('../src/server/campaign-store.ts');
 
-        // The guest earns Author on stage 00, which unlocks stage 01.
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: true,
             run: {
@@ -1055,7 +1042,6 @@ describe('Campaign server store', () => {
             1,
         );
 
-        // The account now owns the unlock the guest earned...
         await expect(getServerCampaignBootstrap({ redditUsername: 'Claimed' }))
             .resolves.toMatchObject({
                 status: 200,
@@ -1068,11 +1054,74 @@ describe('Campaign server store', () => {
                     },
                 },
             });
-        // ...and the guest keeps nothing, so a second call changes nothing.
         await expect(mergeGuestCampaignProgress({
             guestPlayerId: 'guest:guest-merge',
             redditPlayerId: 'reddit:claimed',
         })).resolves.toEqual({ merged: false, mergedRaceIds: [] });
+    });
+
+    it('recovers a verified guest standing when the Campaign progress write was missed', async () => {
+        const guestPlayerId = 'guest:orphan-standing';
+        const redditPlayerId = 'reddit:orphan-standing';
+        const raceId = 'numbered-v1-01';
+        const guestEntryKey = `campaign:numbered-v1:leaderboard:${raceId}:entries`;
+        const pbKey = `campaign:numbered-v1:pbs:${raceId}`;
+        const guestPbField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
+        const redditPbField = createHash('sha256').update(redditPlayerId, 'utf8').digest('base64url');
+        const updatedAt = '2026-07-27T10:00:00.000Z';
+        hashes.set(guestEntryKey, new Map([[
+            guestPlayerId,
+            JSON.stringify({
+                playerId: guestPlayerId,
+                trackKey: 'numberOne',
+                bestTimeMs: 9_000,
+                updatedAt,
+                completedLaps: 2,
+                checkpointTimesSec: [4.5],
+                validationMethod: 'strict-replay',
+                strictReplayFailureReason: null,
+            }),
+        ]]));
+        hashes.set(pbKey, new Map([[
+            guestPbField,
+            JSON.stringify({
+                schemaVersion: 2,
+                trackKey: 'numberOne',
+                trackFingerprint: createTrackFingerprint(TRACKS.numberOne),
+                simulationRevision: 1,
+                rulesRevision: 1,
+                lapCount: 2,
+                bestTimeMs: 9_000,
+                checkpointTimesSec: [4.5],
+                lapCompletionTimesSec: [4.5, 9],
+                ghost: null,
+                updatedAt,
+            }),
+        ]]));
+        const {
+            getServerCampaignBootstrap,
+            mergeGuestCampaignProgress,
+        } = await import('../src/server/campaign-store.ts');
+
+        await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
+            .resolves.toEqual({ merged: true, mergedRaceIds: [raceId] });
+        await expect(getServerCampaignBootstrap({ redditUsername: 'Orphan-Standing' }))
+            .resolves.toMatchObject({
+                body: {
+                    progress: {
+                        resultsByRaceId: {
+                            [raceId]: {
+                                bestTimeMs: 9_000,
+                                checkpointTimesSec: [4.5],
+                            },
+                        },
+                    },
+                },
+            });
+        expect(hashes.get(guestEntryKey)?.has(guestPlayerId)).toBe(false);
+        expect(hashes.get(guestEntryKey)?.has(redditPlayerId)).toBe(true);
+        expect(hashes.get(pbKey)?.has(guestPbField)).toBe(false);
+        expect(hashes.get(pbKey)?.has(redditPbField)).toBe(true);
     });
 
     it('keeps guest data for a retry when an account promotion write fails', async () => {
@@ -1100,7 +1149,12 @@ describe('Campaign server store', () => {
         const guestEntryKey = 'campaign:numbered-v1:leaderboard:numbered-v1-00:entries';
         hashes.set(guestEntryKey, new Map([[
             guestPlayerId,
-            JSON.stringify({ ...result, playerId: guestPlayerId }),
+            JSON.stringify({
+                ...result,
+                playerId: guestPlayerId,
+                completedLaps: 2,
+                validationMethod: 'strict-replay',
+            }),
         ]]));
         const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
         const defaultHSet = mockRedis.hSet.getMockImplementation();

@@ -1,8 +1,4 @@
-/**
- * Creates missing per-track Open Graph share JPGs under `assets/share/`.
- * Existing files are left alone. Run: `npm run generate:share-images`
- * (also runs before `npm test` / `npm run build` / `npm run predev`).
- */
+// Creates missing per-track share JPGs under `assets/share/`; existing files are left alone. Run: `npm run generate:share-images`
 import { existsSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -34,13 +30,6 @@ export function getShareImageAbsolutePath(trackKey, assetsRoot = join(repoRoot, 
     return join(assetsRoot, 'share', `${trackKey}.jpg`);
 }
 
-/**
- * @param {object} options
- * @param {string} [options.assetsRoot]
- * @param {string[]} [options.trackKeys]
- * @param {boolean} [options.force]
- * @returns {{ generated: string[], skipped: string[] }}
- */
 export function generateMissingShareImages(options = {}) {
     ensurePath2D();
 
@@ -92,7 +81,6 @@ export function renderShareImageJpeg(trackKey, track = TRACKS[trackKey]) {
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT);
 
-    // Soft surface panel behind the track
     const panelX = 48;
     const panelY = 120;
     const panelW = SHARE_IMAGE_WIDTH - 96;

@@ -72,8 +72,7 @@ describe('verification queue', () => {
     });
 
     it('derives legacy expiry from challengeDate or daily-gp challenge ids', () => {
-        // Pinned: the derived expiry below is a fixed date, so a real clock past
-        // it would prune the very entries this test asserts on.
+        // Pinned: the derived expiry below is a fixed date, so a real clock would prune the entries under test.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const playlistMs = 7 * 24 * 60 * 60 * 1000;
@@ -167,7 +166,7 @@ describe('verification queue', () => {
             bestTime: 21.2,
             replay: REPLAY
         })).toMatchObject({
-            enqueued: true,
+            enqueued: false,
             entry: expect.objectContaining({ bestTime: 21.2 })
         });
         expect(consoleError).toHaveBeenCalledWith('Error writing verification queue:', expect.any(Error));
@@ -708,7 +707,6 @@ describe('verification queue', () => {
             { raceId: 'numbered-v1-03', bestTime: 24.5, lapCount: 2 },
         ]);
 
-        // A slower rerun must never displace the queued faster time.
         expect(enqueueCampaignVerification({
             raceId: 'numbered-v1-03',
             trackKey: 'numberThree',

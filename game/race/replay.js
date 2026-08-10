@@ -31,7 +31,6 @@ export class ReplayRecorder {
     this.#overflowed = false;
   }
 
-  /** Clears all recorded data. Call at the start of each race. */
   reset({
     maxFrames = this.#maxFrames,
     targetLapNumber = this.#targetLapNumber,
@@ -86,12 +85,10 @@ export class ReplayRecorder {
     };
   }
 
-  /** Total number of ticks recorded (not number of segments). */
   get frameCount() {
     return this.#frameCount;
   }
 
-  /** True if the buffer exceeded its capacity and the replay was discarded. */
   get overflowed() {
     return this.#overflowed;
   }

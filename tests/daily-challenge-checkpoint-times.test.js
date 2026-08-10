@@ -28,7 +28,6 @@ describe('normalizeCheckpointTimesSec', () => {
         expect(normalizeCheckpointTimesSec(30, [-0.1])).toBe(null);
         expect(normalizeCheckpointTimesSec(30, [31])).toBe(null);
         expect(normalizeCheckpointTimesSec(30, [Number.NaN])).toBe(null);
-        // First split must not compare against an empty previous list.
         expect(normalizeCheckpointTimesSec(30, [0])).toEqual([0]);
     });
 

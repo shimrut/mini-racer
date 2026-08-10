@@ -13,12 +13,6 @@ export const CAMPAIGN_REQUEST_TIMEOUT_MS = 20_000;
 
 const PENDING_RESULTS_KEY = `MiniRacerCampaignPending:${CAMPAIGN_ID}`;
 
-/**
- * Finishes not yet confirmed by the server, held only until it answers for
- * that race (accepted → replaced by verified progress, refused → dropped).
- * Not a second source of truth: ranking and stage entry are still enforced
- * server-side on every submission regardless of what's stored here.
- */
 function readPendingResults(root = globalThis) {
     try {
         const raw = root?.localStorage?.getItem(PENDING_RESULTS_KEY);
@@ -32,7 +26,6 @@ function writePendingResults(results, root = globalThis) {
     try {
         root?.localStorage?.setItem(PENDING_RESULTS_KEY, JSON.stringify(results));
     } catch {
-        // An unconfirmed finish is best-effort browser state.
     }
 }
 
@@ -60,7 +53,6 @@ export function getPendingCampaignResults(root = globalThis) {
     return readPendingResults(root);
 }
 
-/** Verified progress wins wherever it exists; a pending finish only fills gaps. */
 export function mergePendingCampaignResults(serverResults, pendingResults) {
     const merged = { ...normalizeResults(serverResults) };
     for (const [raceId, pending] of Object.entries(normalizeResults(pendingResults))) {
@@ -133,7 +125,6 @@ async function requestJson(url, options = {}) {
     }
 }
 
-/** Every request carries the player identity so guests can be ranked like Daily; signed-in requests get their username attached server-side and ignore these. */
 function withPlayerIdentity(url) {
     url.searchParams.set('playerId', getOrCreatePlayerId('campaign'));
     const guestToken = getGuestPlayerToken();
@@ -155,7 +146,6 @@ function campaignUrl(route) {
     );
 }
 
-/** Rank and field size per stage, as the bootstrap reports them. */
 export function normalizeCampaignStandings(value) {
     const source = value && typeof value === 'object' ? value : {};
     const standings = Object.create(null);
@@ -172,9 +162,6 @@ export function normalizeCampaignStandings(value) {
     return standings;
 }
 
-/** Progress is server-authoritative for guests and signed-in players alike; an
- * unreachable server returns a marked, non-authoritative fallback so the
- * engine can finish startup without replacing a verified ladder. */
 function unavailableCampaignBootstrap() {
     return {
         availability: 'unavailable',
@@ -183,9 +170,6 @@ function unavailableCampaignBootstrap() {
         ranked: false,
         signedIn: false,
         stages: CAMPAIGN_STAGES,
-        // An unreachable server has not revoked anything, so a finish waiting to
-        // be confirmed still counts. Without this, one failed request would shut
-        // a player out of stages they had already opened.
         progress: deriveCampaignProgress(getPendingCampaignResults()),
         standingsByRaceId: normalizeCampaignStandings(null),
         carUnlocks: null,
@@ -197,11 +181,14 @@ export async function getCampaignBootstrap() {
     try {
         const response = await requestJson(campaignUrl(API_ROUTES.campaignBootstrapUrl).toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
+        const ranked = response.body.ranked === true;
+        const authoritative = ranked
+            && response.body.campaignProgressPromotionPending !== true;
         return {
-            availability: 'available',
-            authoritative: true,
+            availability: authoritative ? 'available' : 'unavailable',
+            authoritative,
             campaignId: CAMPAIGN_ID,
-            ranked: response.body.ranked === true,
+            ranked,
             signedIn: response.body.signedIn === true,
             stages: Array.isArray(response.body.stages) ? response.body.stages : CAMPAIGN_STAGES,
             progress: deriveCampaignProgress(

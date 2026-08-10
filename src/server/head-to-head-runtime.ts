@@ -57,9 +57,7 @@ export async function resolveHeadToHeadSource(
             ghost: validation.run.ghost,
         };
     }
-    // A Head to Head can only be issued from a Campaign stage or a Daily run.
-    // It is never issued from another Head to Head, because that would need a
-    // stored result and nothing about a Head to Head outlives its post.
+    // A Head to Head is only ever issued from a Campaign stage or a Daily run: nothing about one outlives its post.
     return null;
 }
 

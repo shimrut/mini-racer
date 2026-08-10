@@ -52,7 +52,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     align-items: flex-start;
     flex-shrink: 0;
     width: 100%;
-    padding-bottom: 2rem;
+    padding-bottom: 1rem;
     background: none;
     box-shadow: none;
     border: none;
@@ -241,7 +241,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     gap: 0.5rem;
     width: 100%;
     margin-top: auto;
-    /* Room for the keyboard selection ring (parents clip overflow). */
     padding: 0.35rem 0.4rem 0.5rem;
     box-sizing: border-box;
 }
@@ -308,10 +307,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     height: 1.1rem;
     border-color: rgba(255, 255, 255, 0.25);
     border-top-color: #ffffff;
-    /* Appended to the button the moment the request goes out, so it arrives
-       with no warning and shoves the label sideways. Fading it in covers the
-       arrival; the spin owns `transform`, so the entrance only has `opacity`
-       to work with and the two compose instead of fighting. */
     animation:
         rankSpinnerSpin .8s linear infinite,
         mainMenuSpinnerIn var(--dur-base) ease-out both;
@@ -327,11 +322,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     }
 }
 
-/*
- * The word under the player's eyes changes when the campaign answers —
- * `Loading` becomes `Start Race`, or `Locked`. The swap is a single frame
- * otherwise, which reads as a glitch rather than an answer.
- */
 .main-menu__item--primary .main-menu__label.is-swapping {
     animation: mainMenuLabelSwap var(--dur-base) ease-out both;
 }

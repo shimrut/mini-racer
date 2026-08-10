@@ -10,7 +10,6 @@ function interpolateTimeSec(before, after, fraction) {
   return beforeSec + (afterSec - beforeSec) * fraction;
 }
 
-/** Recovers cumulative lap-boundary timestamps from an older canonical ghost, using the same checkpoint/start-line gates as simulation; rejects a partial or ambiguous reconstruction rather than inventing a pace delta. */
 export function deriveLapCompletionTimesSecFromGhost(record, track, lapCount) {
   const expectedLaps = Math.trunc(Number(lapCount));
   const normalizedGhost = normalizePbGhostRecord(record);
@@ -54,8 +53,7 @@ export function deriveLapCompletionTimesSecFromGhost(record, track, lapCount) {
     nextCheckpointIndex = 0;
   }
 
-  // The compact trace stores the final finish timestamp exactly, but position
-  // quantization can place its last sample just beside the line.
+  // The trace stores the exact finish timestamp, but quantization can drop its last sample beside the line.
   if (
     boundaries.length === expectedLaps - 1
     && nextCheckpointIndex === checkpoints.length

@@ -267,7 +267,6 @@ function findPlayerProfileEntry(playerId) {
     try {
       if (JSON.parse(value).playerId === playerId) return { key, value };
     } catch (_error) {
-      // Ignore malformed records while locating a known valid profile.
     }
   }
   return null;
@@ -326,23 +325,21 @@ describe("daily-gp-store submission hardening", () => {
     expect(secondBootstrap.playerId).toBe(firstBootstrap.playerId);
   });
 
-  it("atomically issues a guest token only to the first bootstrap claim", async () => {
+  it("creates a guest profile exactly once across concurrent bootstraps", async () => {
     const guestPlayerId = "guest-concurrent-bootstrap";
     const results = await Promise.all([
       getServerPlayerBootstrap({ playerId: guestPlayerId, redditUsername: null }),
       getServerPlayerBootstrap({ playerId: guestPlayerId, redditUsername: null }),
     ]);
-    const successful = results.filter((result) => result.playerId === `guest:${guestPlayerId}`);
-    const rejected = results.filter((result) => result.playerId === null);
 
-    expect(successful).toHaveLength(1);
-    expect(successful[0].guestToken).toBeTruthy();
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0].guestToken).toBeNull();
-    expect(rejected[0].playerPreferences).toBeNull();
+    for (const result of results) {
+      expect(result.playerId).toBe(`guest:${guestPlayerId}`);
+      expect(result.guestToken).toBeTruthy();
+    }
+    expect(results[0].firstSeenAt).toBe(results[1].firstSeenAt);
   });
 
-  it("does not reissue a token or profile data for an existing guest", async () => {
+  it("re-authorizes an existing guest profile instead of stranding it", async () => {
     const guestPlayerId = "guest-existing-bootstrap";
     const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
     await updateServerPlayerPreferences({
@@ -350,17 +347,39 @@ describe("daily-gp-store submission hardening", () => {
       guestToken: bootstrap.guestToken,
       playerPreferences,
     });
-    const storedBefore = findPlayerProfileEntry(`guest:${guestPlayerId}`);
+    const storedBefore = JSON.parse(
+      findPlayerProfileEntry(`guest:${guestPlayerId}`).value,
+    );
 
-    const unauthorized = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const recovered = await getServerPlayerBootstrap({ playerId: guestPlayerId });
 
-    expect(unauthorized).toMatchObject({
-      playerId: null,
-      guestToken: null,
-      playerPreferences: null,
-      hasAnyData: false,
+    expect(recovered.playerId).toBe(`guest:${guestPlayerId}`);
+    expect(recovered.guestToken).toBeTruthy();
+
+    const storedAfter = JSON.parse(
+      findPlayerProfileEntry(`guest:${guestPlayerId}`).value,
+    );
+    expect(storedAfter.firstSeenAt).toBe(storedBefore.firstSeenAt);
+    expect(storedAfter.preferences).toMatchObject({
+      trailId: "gold",
+      musicEnabled: false,
+      crashRestartDelaySec: 0.8,
     });
-    expect(redis.strings.get(storedBefore.key)).toBe(storedBefore.value);
+  });
+
+  it("re-issues a guest token that authorizes later writes", async () => {
+    const guestPlayerId = "guest-reissued-token";
+    await getServerPlayerBootstrap({ playerId: guestPlayerId });
+
+    const recovered = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const reissued = await updateServerPlayerPreferences({
+      playerId: guestPlayerId,
+      guestToken: recovered.guestToken,
+      playerPreferences,
+    });
+
+    expect(reissued.playerId).toBe(`guest:${guestPlayerId}`);
+    expect(reissued.playerPreferences).toMatchObject({ trailId: "gold" });
   });
 
   it("recreates an expired profile when the guest token still verifies", async () => {

@@ -1,9 +1,3 @@
-/**
- * Who is submitting, and the profile that names them on a leaderboard —
- * shared across every ranked mode, moved out of daily-gp-store unchanged so
- * Campaign resolves players the same way. Profile keys, TTLs and the guest
- * token contract are untouched; they address live production rows.
- */
 import { redis } from '@devvit/redis';
 import { createHash } from 'node:crypto';
 import {
@@ -13,6 +7,7 @@ import {
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
 import { mintGuestPlayerToken, verifyGuestPlayerToken } from './player-token.js';
+import { STOCK_CAR_ASSET_NAME } from '../../game/car/car-unlock-policy.js';
 import {
     normalizeLeaderboardIdentityPreference,
     sanitizeRedditUsername,
@@ -24,30 +19,97 @@ export type ResolvedPlayerIdentity = {
     guestToken: string | null;
 };
 
-export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | null {
+const MAX_CAR_SKIN_LENGTH = 160;
+const MAX_TRAIL_ID_LENGTH = 32;
+const MAX_CRASH_RESTART_DELAY_SEC = 1;
+
+const DEFAULT_PLAYER_PREFERENCES: DailyGpPlayerPreferences = {
+    carSkin: STOCK_CAR_ASSET_NAME,
+    trailId: 'sky',
+    musicEnabled: true,
+    carAudioEnabled: true,
+    crashAutoRestartEnabled: false,
+    crashRestartDelaySec: 0.5,
+    pbGhostEnabled: true,
+};
+
+function readCarSkinPreference(value: unknown): string | null {
+    const carSkin = typeof value === 'string' ? value.trim() : '';
+    return carSkin && carSkin.length <= MAX_CAR_SKIN_LENGTH ? carSkin : null;
+}
+
+function readTrailIdPreference(value: unknown): string | null {
+    const trailId = typeof value === 'string' ? value.trim() : '';
+    return trailId && trailId.length <= MAX_TRAIL_ID_LENGTH ? trailId : null;
+}
+
+function readBooleanPreference(value: unknown): boolean | null {
+    return typeof value === 'boolean' ? value : null;
+}
+
+function readCrashRestartDelaySecPreference(value: unknown): number | null {
+    const crashRestartDelaySec = Number(value);
+    if (
+        !Number.isFinite(crashRestartDelaySec)
+        || crashRestartDelaySec < 0
+        || crashRestartDelaySec > MAX_CRASH_RESTART_DELAY_SEC
+    ) {
+        return null;
+    }
+    return Math.round(crashRestartDelaySec * 10) / 10;
+}
+
+function readPbGhostEnabledPreference(value: unknown): boolean | null {
+    if (value === undefined) return DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled;
+    return readBooleanPreference(value);
+}
+
+function readPlayerPreferenceFields(value: unknown): {
+    carSkin: string | null;
+    trailId: string | null;
+    musicEnabled: boolean | null;
+    carAudioEnabled: boolean | null;
+    crashAutoRestartEnabled: boolean | null;
+    crashRestartDelaySec: number | null;
+    pbGhostEnabled: boolean | null;
+} | null {
     if (!value || typeof value !== 'object') {
         return null;
     }
 
     const preferences = value as Record<string, unknown>;
-    const carSkin = typeof preferences.carSkin === 'string' ? preferences.carSkin.trim() : '';
-    const trailId = typeof preferences.trailId === 'string' ? preferences.trailId.trim() : '';
-    const crashRestartDelaySec = Number(preferences.crashRestartDelaySec);
+    return {
+        carSkin: readCarSkinPreference(preferences.carSkin),
+        trailId: readTrailIdPreference(preferences.trailId),
+        musicEnabled: readBooleanPreference(preferences.musicEnabled),
+        carAudioEnabled: readBooleanPreference(preferences.carAudioEnabled),
+        crashAutoRestartEnabled: readBooleanPreference(preferences.crashAutoRestartEnabled),
+        crashRestartDelaySec: readCrashRestartDelaySecPreference(preferences.crashRestartDelaySec),
+        pbGhostEnabled: readPbGhostEnabledPreference(preferences.pbGhostEnabled),
+    };
+}
+
+export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPreferences | null {
+    const fields = readPlayerPreferenceFields(value);
+    if (!fields) return null;
+
+    const {
+        carSkin,
+        trailId,
+        musicEnabled,
+        carAudioEnabled,
+        crashAutoRestartEnabled,
+        crashRestartDelaySec,
+        pbGhostEnabled,
+    } = fields;
     if (
-        !carSkin
-        || carSkin.length > 160
-        || !trailId
-        || trailId.length > 32
-        || typeof preferences.musicEnabled !== 'boolean'
-        || typeof preferences.carAudioEnabled !== 'boolean'
-        || typeof preferences.crashAutoRestartEnabled !== 'boolean'
-        || (
-            preferences.pbGhostEnabled !== undefined
-            && typeof preferences.pbGhostEnabled !== 'boolean'
-        )
-        || !Number.isFinite(crashRestartDelaySec)
-        || crashRestartDelaySec < 0
-        || crashRestartDelaySec > 1
+        carSkin === null
+        || trailId === null
+        || musicEnabled === null
+        || carAudioEnabled === null
+        || crashAutoRestartEnabled === null
+        || crashRestartDelaySec === null
+        || pbGhostEnabled === null
     ) {
         return null;
     }
@@ -55,11 +117,28 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
     return {
         carSkin,
         trailId,
-        musicEnabled: preferences.musicEnabled,
-        carAudioEnabled: preferences.carAudioEnabled,
-        crashAutoRestartEnabled: preferences.crashAutoRestartEnabled,
-        crashRestartDelaySec: Math.round(crashRestartDelaySec * 10) / 10,
-        pbGhostEnabled: preferences.pbGhostEnabled !== false,
+        musicEnabled,
+        carAudioEnabled,
+        crashAutoRestartEnabled,
+        crashRestartDelaySec,
+        pbGhostEnabled,
+    };
+}
+
+export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferences | null {
+    const fields = readPlayerPreferenceFields(value);
+    if (!fields) return null;
+
+    return {
+        carSkin: fields.carSkin ?? DEFAULT_PLAYER_PREFERENCES.carSkin,
+        trailId: fields.trailId ?? DEFAULT_PLAYER_PREFERENCES.trailId,
+        musicEnabled: fields.musicEnabled ?? DEFAULT_PLAYER_PREFERENCES.musicEnabled,
+        carAudioEnabled: fields.carAudioEnabled ?? DEFAULT_PLAYER_PREFERENCES.carAudioEnabled,
+        crashAutoRestartEnabled: fields.crashAutoRestartEnabled
+            ?? DEFAULT_PLAYER_PREFERENCES.crashAutoRestartEnabled,
+        crashRestartDelaySec: fields.crashRestartDelaySec
+            ?? DEFAULT_PLAYER_PREFERENCES.crashRestartDelaySec,
+        pbGhostEnabled: fields.pbGhostEnabled ?? DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled,
     };
 }
 
@@ -76,7 +155,7 @@ export function parseStoredPlayerProfile(raw: string | null | undefined): DailyG
             playerId: parsed.playerId,
             leaderboardIdentity: normalizeLeaderboardIdentityPreference(parsed.leaderboardIdentity),
             redditUsername: sanitizeRedditUsername(parsed.redditUsername),
-            preferences: normalizePlayerPreferences(parsed.preferences),
+            preferences: salvagePlayerPreferences(parsed.preferences),
             hasSeenGame: parsed.hasSeenGame !== false,
             hasAnyData: Boolean(parsed.hasAnyData),
             firstSeenAt: typeof parsed.firstSeenAt === 'string' && parsed.firstSeenAt
@@ -101,18 +180,22 @@ export function createRedisPlayerProfileKey(playerId: string): string {
     return `dailygp:player-profile:${playerKey}`;
 }
 
-function createPlayerProfileExpirationDate(playerId: string): Date {
+function createPlayerProfileExpiration(
+    playerId: string,
+): { expiration: Date } | undefined {
     const ttlSeconds = playerId.startsWith('guest:')
         ? DAILY_GP_GUEST_PROFILE_TTL_SECONDS
         : DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS;
-    return new Date(Date.now() + ttlSeconds * 1000);
+    return ttlSeconds === null
+        ? undefined
+        : { expiration: new Date(Date.now() + ttlSeconds * 1000) };
 }
 
 async function writePlayerProfile(profile: DailyGpPlayerProfile): Promise<void> {
     await redis.set(
         createRedisPlayerProfileKey(profile.playerId),
         JSON.stringify(profile),
-        { expiration: createPlayerProfileExpirationDate(profile.playerId) },
+        createPlayerProfileExpiration(profile.playerId),
     );
 }
 
@@ -255,9 +338,44 @@ export async function claimNewGuestPlayerProfile({
     const claimed = await redis.set(
         createRedisPlayerProfileKey(canonicalPlayerId),
         JSON.stringify(profile),
-        { nx: true, expiration: createPlayerProfileExpirationDate(canonicalPlayerId) },
+        { nx: true, ...createPlayerProfileExpiration(canonicalPlayerId) },
     );
     if (!claimed) {
+        return null;
+    }
+
+    return {
+        canonicalPlayerId,
+        guestPlayerId,
+        guestToken,
+        profile,
+    };
+}
+
+/** A guest whose token is lost keeps their player id; without re-issuing one, every ghost, unlock and stage keyed to that id is unreachable for good. */
+export async function adoptExistingGuestPlayerProfile({
+    playerId,
+}: {
+    playerId?: unknown;
+}): Promise<{
+    canonicalPlayerId: string;
+    guestPlayerId: string;
+    guestToken: string;
+    profile: DailyGpPlayerProfile;
+} | null> {
+    const guestPlayerId = normalizeGuestPlayerId(playerId);
+    if (!guestPlayerId) {
+        return null;
+    }
+
+    const canonicalPlayerId = `guest:${guestPlayerId}`;
+    const profile = await readPlayerProfile(canonicalPlayerId);
+    if (!profile) {
+        return null;
+    }
+
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+    if (!guestToken) {
         return null;
     }
 

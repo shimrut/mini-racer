@@ -8,10 +8,10 @@
     "generate:share-images": "node tools/generate-share-images.js",
     "analyze:css": "node tools/analyze-unused-css.js",
     "build": "npm run generate:car-assets && npm run generate:share-images && vite build && node tools/bust-client-asset-cache.js",
-    "deploy": "npm run test && npm run build && devvit upload",
+    "deploy": "npm run test && devvit upload",
     "dev": "trap 'npm run --silent kill:watchers' EXIT INT TERM; devvit playtest",
     "kill:watchers": "pkill -f \"$PWD/node_modules/.bin/vite build --watch\" 2>/dev/null || true",
-    "launch": "npm run deploy && devvit publish",
+    "launch": "npm run test && devvit publish",
     "login": "devvit login",
     "mapmaker": "vite --config vite.mapmaker.config.js --host 127.0.0.1",
     "predev": "npm run --silent kill:watchers && npm run generate:car-assets && npm run generate:share-images",
@@ -22,9 +22,9 @@
     "mutation:dry-run": "stryker run --dryRunOnly"
   },
   "dependencies": {
-    "@devvit/analytics": "0.13.9",
-    "@devvit/redis": "0.13.9",
-    "@devvit/web": "0.13.9",
+    "@devvit/analytics": "0.13.11",
+    "@devvit/redis": "0.13.11",
+    "@devvit/web": "0.13.11",
     "express": "^5.1.0",
     "fflate": "0.4.8"
   },
@@ -32,11 +32,11 @@
     "node": ">=22.2.0"
   },
   "devDependencies": {
-    "@devvit/start": "0.13.9",
+    "@devvit/start": "0.13.11",
     "@napi-rs/canvas": "^1.0.2",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
-    "devvit": "0.13.9",
+    "devvit": "0.13.11",
     "vite": "7.3.6",
     "vitest": "^3.1.1"
   }

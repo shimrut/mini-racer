@@ -15,10 +15,6 @@ function angleDelta(a, b) {
     return delta;
 }
 
-/**
- * Geometry for a start/finish gate: midpoint plus the two perpendicular
- * along-track headings.
- */
 export function getStartLineAxis(startLine) {
     if (!startLine?.p1 || !startLine?.p2) {
         return null;
@@ -50,17 +46,12 @@ export function pickStartHeading(axis, preferredAngle = null) {
         : angleB;
 }
 
-/**
- * Snap the car onto the start-line center axis, a short fixed distance behind
- * the gate, facing perpendicular with the nose toward the line.
- */
 export function snapStartPose(seedPoint, startLine, options = {}) {
     const axis = getStartLineAxis(startLine);
     if (!axis || !seedPoint) {
         return null;
     }
 
-    // Face toward the gate from the seed side so the nose points at the line.
     const towardLineX = axis.mid.x - seedPoint.x;
     const towardLineY = axis.mid.y - seedPoint.y;
     const towardLineLength = Math.hypot(towardLineX, towardLineY);

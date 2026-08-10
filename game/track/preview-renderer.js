@@ -338,9 +338,7 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // 1. Fill asphalt as outer ring minus infield.
-    // Avoid combined evenodd Path2D fills — they can punch a false wedge hole
-    // on some canvas backends (notably @napi-rs/canvas used for share/LP assets).
+    // Avoid combined evenodd Path2D fills — they punch a false wedge hole on some backends (@napi-rs/canvas).
     ctx.fillStyle = roadColor;
     ctx.fill(outerPath);
     ctx.save();
@@ -348,7 +346,6 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     ctx.fill(innerPath);
     ctx.restore();
 
-    // 2. Start/finish line (clipped to road surface so it doesn't draw over the edges)
     if (startLine) {
         const p1 = mapPoint(startLine.p1);
         const p2 = mapPoint(startLine.p2);
@@ -362,13 +359,11 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
         ctx.restore();
     }
 
-    // 3. Draw track boundary borders
     ctx.strokeStyle = edgeColor;
     ctx.lineWidth = Math.max(2.25, Math.min(width, height) * 0.012);
     ctx.stroke(outerPath);
     ctx.stroke(innerPath);
 
-    // 4. Direction marker
     if (startPos || (moveCarPastStartLine && startLine)) {
         const arrowScale = Math.min(width, height) / 420;
         const markerPosition = getSchematicCarPosition(
@@ -403,10 +398,6 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     ctx.restore();
 }
 
-/**
- * Renders a compact track preview onto a canvas.
- * Used for track selection cards and daily challenge previews.
- */
 export function renderTrackPreviewCanvas(canvas, payload) {
     if (!canvas || !payload) return;
 
@@ -425,7 +416,6 @@ export function renderTrackPreviewCanvas(canvas, payload) {
 
     if (!trackGeometry?.outer || !trackGeometry?.inner) return;
 
-    // Smooth the track geometry so it matches the game's actual smooth curves.
     const smoothedGeometry = getPreviewGeometry(trackGeometry, payload.cornerRadius ?? 3);
     if (!smoothedGeometry) return;
 
@@ -461,10 +451,8 @@ export function renderTrackPreviewCanvas(canvas, payload) {
     surfacePath.addPath(outerPath);
     surfacePath.addPath(innerPath);
 
-    // 1. Fill track surface and infield
     fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, width, height, presentation);
 
-    // 2. Start/finish line (clipped to asphalt so dashed kerb gaps do not reveal it)
     if (startLine) {
         const p1 = mapPoint(startLine.p1);
         const p2 = mapPoint(startLine.p2);
@@ -474,21 +462,17 @@ export function renderTrackPreviewCanvas(canvas, payload) {
         ctx.restore();
     }
 
-    // 3. Draw curbs (kerbs)
     if (presentation.showCurbs !== false) {
         drawCurbs(ctx, outerPath, presentation);
         drawCurbs(ctx, innerPath, presentation);
     }
 
-    // 4. Track boundary strokes (canyon / default edge)
     drawTrackBoundaries(ctx, outerPath, innerPath, presentation);
 
-    // 5. Draw run history (the neon line)
     if (runHistory.length > 1) {
         drawNeonRoute(ctx, runHistory, mapPoint);
     }
 
-    // 6. Draw direction marker (the starting arrow)
     if (startPos) {
         const mappedStart = mapPoint(startPos);
         drawDirectionMarker(ctx, mappedStart, startAngle);

@@ -158,6 +158,28 @@ describe('server daily gp store wave4', () => {
         });
     });
 
+    it('repairs a rate-limit counter left without an expiry instead of blocking forever', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.incrBy.mockResolvedValue(13);
+        mockRedis.expireTime.mockResolvedValue(-1);
+
+        const result = await submitServerDailyGpRun({
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            redditUsername: 'RateLimited',
+            bestTime: 12.34,
+            replay: { inputs: [] },
+        });
+
+        expect(result.status).toBe(429);
+        expect(result.body.retryAfterSeconds).toBe(60);
+        expect(mockRedis.expire).toHaveBeenCalledWith(
+            expect.stringContaining('submit-rate-limit'),
+            60,
+        );
+    });
+
     it('loads nearby rows when the player rank equals the page boundary (L1460-L1463)', async () => {
         const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();

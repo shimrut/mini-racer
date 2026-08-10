@@ -116,7 +116,6 @@ describe('daily carousel card model', () => {
             challenge({ id: 'none', trackKey: 'sunlitTemple', trackPersonalBest: null }),
         ], { nowMs: NOW });
 
-        // A blistering time banks every tier; no time banks none of them.
         expect(earned.medalTiers.map((slot) => slot.tier))
             .toEqual(['bronze', 'silver', 'gold', 'author']);
         expect(earned.medalTiers.every((slot) => slot.filled)).toBe(true);
@@ -194,10 +193,6 @@ describe('Daily Start Race race brief', () => {
     });
 });
 
-/**
- * The view is exercised through a stubbed rail: only the selection maths and
- * the callbacks matter here, so the cards are plain positioned boxes.
- */
 function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320 } = {}) {
     const onSelect = vi.fn();
     const onOpenLeaderboard = vi.fn();
@@ -205,8 +200,12 @@ function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320
     const gap = 10;
     const prevBtn = { disabled: false, hidden: false };
     const nextBtn = { disabled: false, hidden: false };
-    // Wide enough that the last card can reach the centre, which is what the
-    // rail is laid out to allow; tests that care force it short themselves.
+    const navigation = { hidden: false };
+    const countLabel = {
+        textContent: '',
+        setAttribute: vi.fn(),
+        removeAttribute: vi.fn(),
+    };
     const railWidth = 80 + (count * cardWidth) + ((count - 1) * gap);
     const viewport = { clientWidth: viewportWidth, scrollLeft: 0, scrollWidth: railWidth };
     const railStyleValues = new Map();
@@ -242,6 +241,8 @@ function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320
     Object.defineProperty(carousel, 'rail', { get: () => rail });
     Object.defineProperty(carousel, 'prevBtn', { get: () => prevBtn });
     Object.defineProperty(carousel, 'nextBtn', { get: () => nextBtn });
+    Object.defineProperty(carousel, 'navigation', { get: () => navigation });
+    Object.defineProperty(carousel, 'countLabel', { get: () => countLabel });
 
     return {
         carousel,
@@ -251,6 +252,8 @@ function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320
         rail,
         prevBtn,
         nextBtn,
+        navigation,
+        countLabel,
         cardWidth,
         gap,
     };
@@ -295,6 +298,25 @@ describe('TrackCarousel selection', () => {
         expect(nextBtn.disabled).toBe(true);
     });
 
+    it('shows the selected track position between the navigation controls', () => {
+        const { carousel, countLabel, navigation } = createStubbedCarousel(3);
+
+        carousel.syncNavButtons();
+        expect(navigation.hidden).toBe(false);
+        expect(countLabel.textContent).toBe('1 / 3');
+        expect(countLabel.setAttribute).toHaveBeenLastCalledWith(
+            'aria-label',
+            'Track 1 of 3',
+        );
+
+        carousel.select(2);
+        expect(countLabel.textContent).toBe('3 / 3');
+        expect(countLabel.setAttribute).toHaveBeenLastCalledWith(
+            'aria-label',
+            'Track 3 of 3',
+        );
+    });
+
     it('hides both chevrons when there is only one day to show', () => {
         const { carousel, prevBtn, nextBtn } = createStubbedCarousel(1);
         carousel.syncNavButtons();
@@ -317,7 +339,6 @@ describe('TrackCarousel selection', () => {
             challengeId: 'c3',
         }));
 
-        // A drag that stops just short still resolves to the nearest card.
         centreOn(2);
         viewport.scrollLeft += (cardWidth + gap) * 0.4;
         carousel.syncSelectionFromScroll();
@@ -373,12 +394,6 @@ describe('TrackCarousel selection', () => {
         );
     });
 
-    /**
-     * WebKit drops a scroll container's trailing padding, so the Reddit app ran
-     * out of scroll before the last card was centred. Whatever the rail can
-     * actually be scrolled to is the last word, so the shortfall is measured and
-     * made up rather than assumed away.
-     */
     it('tops the tail up by however far the rail falls short of centring the last card', () => {
         const { carousel, viewport, rail } = createStubbedCarousel(5, {
             cardWidth: 240,
@@ -386,7 +401,6 @@ describe('TrackCarousel selection', () => {
         });
         const last = carousel._elements[4];
         const needed = last.offsetLeft + (last.offsetWidth / 2) - (viewport.clientWidth / 2);
-        // An engine that gives the rail's trailing space no room at all.
         viewport.scrollWidth = needed + viewport.clientWidth - 40;
 
         carousel.syncEdgeSpacing(last);
@@ -411,11 +425,6 @@ describe('TrackCarousel selection', () => {
         );
     });
 
-    /**
-     * The details used to hang off `is-carousel-selected`, which flips the
-     * instant a card takes the centre — so mid-swipe a card's whole caption
-     * appeared in one step while the finger was still moving.
-     */
     it('publishes how close each card is to the centre, not just which one holds it', () => {
         const { carousel, viewport, cardWidth, gap } = createStubbedCarousel(5, {
             cardWidth: 240,
@@ -433,7 +442,6 @@ describe('TrackCarousel selection', () => {
         expect(proximityOf(1)).toBe(1);
         expect(proximityOf(2)).toBe(0);
 
-        // Halfway between the two cards: neither is centred, and both say so.
         viewport.scrollLeft = centredScroll + ((cardWidth + gap) / 2);
         carousel.updateProximity();
         expect(proximityOf(1)).toBeGreaterThan(0);
@@ -466,6 +474,16 @@ describe('TrackCarousel selection', () => {
         expect(carousel.isEmpty()).toBe(true);
         expect(carousel.getSelectedChallenge()).toBe(null);
         expect(carousel.handleNavDirection('right')).toBe(false);
+    });
+
+    it('reports the empty rail as a selection so stale details can be cleared', () => {
+        const { carousel, onSelect, rail } = createStubbedCarousel(3);
+        rail.replaceChildren = vi.fn();
+
+        carousel.render([]);
+
+        expect(carousel.isEmpty()).toBe(true);
+        expect(onSelect).toHaveBeenCalledWith(null, null);
     });
 
     it('repaints every existing preview without rebuilding or moving the selection', () => {
@@ -593,11 +611,6 @@ describe('TrackCarousel selection', () => {
         }
     });
 
-    /**
-     * The end cards' outer room has to be a child of the rail, not the rail's
-     * own padding: WebKit does not count a scroll container's trailing padding,
-     * so in the Reddit app the last card could never reach the middle.
-     */
     it('brackets the cards with real spacers so both ends can reach the centre', () => {
         const attributes = new WeakMap();
         globalThis.document = {
@@ -618,7 +631,6 @@ describe('TrackCarousel selection', () => {
             expect(lead.className).toContain('track-carousel__edge--lead');
             expect(tail.className).toContain('track-carousel__edge--tail');
             expect(lead.getAttribute('aria-hidden')).toBe('true');
-            // Reused across rebuilds rather than rebuilt with the cards.
             expect(carousel.edgeSpacer('lead')).toBe(lead);
             expect(lead).not.toBe(tail);
         } finally {
@@ -628,7 +640,9 @@ describe('TrackCarousel selection', () => {
 
     it('keeps the standings value icon-only while preserving the rank action', () => {
         const carousel = new TrackCarousel();
-        const parts = {
+        carousel._footParts = {
+            bestCell: { hidden: true, classList: { toggle: vi.fn() } },
+            bestValue: { textContent: '' },
             rank: {
                 hidden: true,
                 disabled: true,
@@ -637,18 +651,29 @@ describe('TrackCarousel selection', () => {
             },
             rankIcon: { hidden: true },
             rankValue: { hidden: true, textContent: '' },
-            rankMedal: { hidden: true },
+            rankMedal: { hidden: true, dataset: {}, setAttribute: vi.fn() },
+            medal: { hidden: true, dataset: { medalKey: '' } },
+            requirement: { hidden: false },
+            requirementList: { replaceChildren: vi.fn() },
+            meta: { hidden: true },
         };
 
-        carousel.paintRank(parts, {
+        carousel.paintFoot({
             locked: false,
+            bestLabel: '12.345',
             rankPending: false,
             rankLabel: '#4',
             trackName: 'Circuit',
+            medalTiers: [],
         });
 
+        const parts = carousel._footParts;
+        expect(parts.rank.hidden).toBe(false);
+        expect(parts.rank.disabled).toBe(false);
         expect(parts.rankIcon.hidden).toBe(false);
+        expect(parts.rankValue.hidden).toBe(false);
         expect(parts.rankValue.textContent).toBe('#4');
+        expect(parts.rankMedal.hidden).toBe(true);
         expect(parts.rank.setAttribute).toHaveBeenCalledWith(
             'aria-label',
             'Circuit standings. Your rank: #4',

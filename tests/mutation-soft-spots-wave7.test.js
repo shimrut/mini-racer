@@ -6,6 +6,7 @@ import {
     parseStoredChallenge,
     parseStoredEntry,
     parseStoredPlayerProfile,
+    salvagePlayerPreferences,
 } from '../src/server/daily-gp-store.ts';
 import {
     formatDailyGpShareComment,
@@ -245,6 +246,16 @@ describe('wave7 store parse helpers — direct coercion', () => {
                 crashRestartDelaySec: 0.5,
             },
         }))).toMatchObject({
+            preferences: {
+                carSkin: 'assets/cars/mr_mr_red.webp',
+                trailId: 'spark',
+                carAudioEnabled: false,
+            },
+        });
+        expect(parseStoredPlayerProfile(JSON.stringify({
+            ...VALID_PROFILE,
+            preferences: 'nope',
+        }))).toMatchObject({
             preferences: null,
         });
     });
@@ -326,6 +337,59 @@ describe('wave7 store parse helpers — direct coercion', () => {
             crashAutoRestartEnabled: true,
             crashRestartDelaySec: 0.6,
             pbGhostEnabled: false,
+        });
+    });
+
+    it('salvagePlayerPreferences defaults only the fields it cannot read', () => {
+        expect(salvagePlayerPreferences(null)).toBeNull();
+        expect(salvagePlayerPreferences('prefs')).toBeNull();
+        expect(salvagePlayerPreferences({
+            carSkin: 'assets/cars/mr_extra_crimson.webp',
+            trailId: 'gold',
+            musicEnabled: 'not-a-boolean',
+            carAudioEnabled: false,
+            crashAutoRestartEnabled: true,
+            crashRestartDelaySec: 0.8,
+            pbGhostEnabled: false,
+        })).toEqual({
+            carSkin: 'assets/cars/mr_extra_crimson.webp',
+            trailId: 'gold',
+            musicEnabled: true,
+            carAudioEnabled: false,
+            crashAutoRestartEnabled: true,
+            crashRestartDelaySec: 0.8,
+            pbGhostEnabled: false,
+        });
+    });
+
+    it('keeps a stored profile readable when one preference stops validating', () => {
+        const profile = parseStoredPlayerProfile(JSON.stringify({
+            playerId: 'guest:preference-drift',
+            leaderboardIdentity: 'constructed',
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-07-01T00:00:00.000Z',
+            lastSeenAt: '2026-07-02T00:00:00.000Z',
+            updatedAt: '2026-07-02T00:00:00.000Z',
+            preferences: {
+                carSkin: 'assets/cars/mr_extra_crimson.webp',
+                trailId: 'gold',
+                musicEnabled: false,
+                carAudioEnabled: true,
+                crashAutoRestartEnabled: true,
+                crashRestartDelaySec: 9,
+                pbGhostEnabled: true,
+            },
+        }));
+
+        expect(profile.preferences).toEqual({
+            carSkin: 'assets/cars/mr_extra_crimson.webp',
+            trailId: 'gold',
+            musicEnabled: false,
+            carAudioEnabled: true,
+            crashAutoRestartEnabled: true,
+            crashRestartDelaySec: 0.5,
+            pbGhostEnabled: true,
         });
     });
 });

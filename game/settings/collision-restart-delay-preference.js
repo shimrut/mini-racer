@@ -6,7 +6,6 @@ export const COLLISION_RESTART_DELAY_MAX = 1;
 export const COLLISION_RESTART_DELAY_STEP = 0.1;
 export const COLLISION_RESTART_DELAY_DEFAULT = 0.5;
 
-/** Number of ticks on the settings meter (0, 0.1, … 1.0). */
 export const COLLISION_RESTART_DELAY_METER_TICKS =
     Math.round(COLLISION_RESTART_DELAY_MAX / COLLISION_RESTART_DELAY_STEP) + 1;
 

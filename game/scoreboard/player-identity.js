@@ -1,5 +1,3 @@
-/** Player id + guest token (localStorage). No API route table. */
-
 const PLAYER_ID_STORAGE_KEY = 'VectorGpScoreboardPlayerId';
 const GUEST_PLAYER_TOKEN_STORAGE_KEY = 'VectorGpGuestPlayerToken';
 let ephemeralPlayerId = null;
@@ -36,23 +34,7 @@ export function getOrCreatePlayerId(logLabel = 'scoreboard') {
     }
 }
 
-export function rotateGuestPlayerIdentity() {
-    const nextId = createPlayerId();
-    ephemeralPlayerId = nextId;
-    setGuestPlayerToken(null);
-
-    if (typeof window === 'undefined' || !window.localStorage) {
-        return nextId;
-    }
-
-    try {
-        window.localStorage.setItem(PLAYER_ID_STORAGE_KEY, nextId);
-    } catch (error) {
-        console.error('Error rotating guest player id:', error);
-    }
-
-    return nextId;
-}
+// A guest's player id is never replaced: it is the only handle on their server-side progress, so a rejected token is cleared alone.
 
 export function getGuestPlayerToken() {
     if (hasEphemeralGuestPlayerToken) {

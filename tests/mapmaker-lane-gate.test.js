@@ -66,11 +66,9 @@ describe('Mapmaker perpendicular lane gates', () => {
     });
 
     it('does not invent long diagonals between unrelated closest points', () => {
-        // Seed near a corner where independent closest points would slant hard.
         const gate = buildPerpendicularLaneGate({ x: 1, y: 1 }, OUTER, INNER);
         expect(gate).not.toBeNull();
         expect(distanceLike(gate)).toBeLessThan(3.5 + GATE_WALL_OVERHANG * 2);
-        // Gate should stay roughly axis-aligned (not a long 45° slash).
         const dx = Math.abs(gate.p1.x - gate.p2.x);
         const dy = Math.abs(gate.p1.y - gate.p2.y);
         expect(Math.min(dx, dy)).toBeLessThan(0.75);
@@ -95,7 +93,6 @@ describe('Mapmaker perpendicular lane gates', () => {
                 x: (gate.p1.x + gate.p2.x) / 2,
                 y: (gate.p1.y + gate.p2.y) / 2,
             };
-            // Stay on the bottom/right corridor, never jump to the left/top side.
             expect(mid.x).toBeGreaterThan(4);
             expect(mid.y).toBeLessThan(6);
             if (previousMid) {

@@ -78,7 +78,6 @@
     flex: 0 0 auto;
 }
 
-/* When a subtitle is shown, align the Back button with the title line, not the full heading block */
 .reusable-modal-header:has([data-modal-subtitle]:not([hidden])) {
     align-items: flex-start;
 }
@@ -106,7 +105,6 @@
     min-height: 0;
 }
 
-/* Scroll past the floating Back/Close without reserving a permanent footer tray. */
 .reusable-modal-content::after {
     content: '';
     flex: 0 0 auto;
@@ -187,7 +185,6 @@
 }
 
 .result-modal .modal-card-section--runs .modal-lap-times-container:has(> .leaderboard-day-rail) {
-    /* Let the nested standings rail claim horizontal touch gestures. */
     touch-action: auto;
 }
 
@@ -505,22 +502,10 @@
     }
 }
 
-/*
- * Standings replace the spinner wholesale, so the rows land as one block on
- * top of where the loading line was. Dealing them out instead gives the eye an
- * order to read them in.
- *
- * `backwards` is what holds a row invisible through its delay; `forwards`
- * would leave every row pinned to the keyframe's end transform afterwards.
- */
-/* The rank gap is dealt with the rows around it: left out, it would be the one
-   static thing sitting in the middle of the run. */
 .leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row) {
     animation: leaderboardRowIn var(--dur-base) var(--ease-settle) backwards;
 }
 
-/* The deal stops at five. Past that the tail is longer than the read, and the
-   list should already be there by the time the eye arrives. */
 .leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row):nth-child(2) {
     animation-delay: 20ms;
 }

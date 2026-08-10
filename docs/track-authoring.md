@@ -68,6 +68,8 @@ start/finish line and snaps onto that line's center axis when moved.
    - **Campaign only** keeps the track out of the Daily schedule.
 3. New Daily Challenge tracks are appended as the final
    `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
+   When extending an existing branch, keep the existing catalog and schedule
+   prefixes in their original order, then append new catalog and Daily entries.
    Renames replace the old key at its existing position after confirmation
    and remove the old definition file. Campaign-only saves never add the
    track to the Daily schedule; wiring stages still happens in

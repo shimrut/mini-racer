@@ -31,9 +31,6 @@ function midpoint(a, b) {
     };
 }
 
-/**
- * Closest point on a closed polygon to a seed point.
- */
 export function closestPointOnPolygon(point, polygon) {
     if (!polygon || polygon.length < 2) {
         return null;
@@ -95,9 +92,6 @@ function segmentTangent(a, b) {
     return normalizeVector(b.x - a.x, b.y - a.y);
 }
 
-/**
- * Unit inward normal for a wall segment, oriented toward towardPoint.
- */
 function inwardNormalForSegment(a, b, fromPoint, towardPoint) {
     const tangent = segmentTangent(a, b);
     if (tangent.x === 0 && tangent.y === 0) {
@@ -114,9 +108,6 @@ function inwardNormalForSegment(a, b, fromPoint, towardPoint) {
     return normal;
 }
 
-/**
- * First hit along a ray origin + t * direction for t in (minT, maxT].
- */
 export function firstRayPolygonHit(origin, direction, polygon, minT = 0.02, maxT = MAX_GATE_LENGTH) {
     if (!polygon || polygon.length < 2) {
         return null;
@@ -179,11 +170,7 @@ function castGateFromSegment(a, b, foot, toPolygon, towardPoint) {
     };
 }
 
-/**
- * Build candidate casts from a wall hit.
- * Always keep the foot at the cursor's closest wall point so dragging through
- * a corner cannot teleport the gate to another part of the track.
- */
+/** Keeps the foot at the cursor's closest wall point, so dragging through a corner cannot teleport the gate. */
 function gateCandidatesFromHit(hit, polygon, toPolygon, towardPoint) {
     const len = polygon.length;
     const candidates = [];
@@ -198,7 +185,6 @@ function gateCandidatesFromHit(hit, polygon, toPolygon, towardPoint) {
         return candidates;
     }
 
-    // At / near a vertex, try both adjacent wall normals from the same foot.
     const indexes = nearCorner
         ? [
             (hit.segmentIndex - 1 + len) % len,
@@ -231,14 +217,9 @@ function scoreGateCandidate(gate, seedPoint, previousMidpoint = null) {
     const continuity = previousMidpoint
         ? distance(gate.mid, previousMidpoint)
         : 0;
-    // Prefer staying near the cursor / previous gate; length is a weak tie-break.
     return seedDistance * 4 + continuity * 3 + gate.length;
 }
 
-/**
- * Extend a wall-to-wall gate past both walls so cars scraping the edge still
- * cross the checkpoint / start-line segment.
- */
 export function extendGatePastWalls(p1, p2, overhang = GATE_WALL_OVERHANG) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
@@ -263,15 +244,7 @@ export function extendGatePastWalls(p1, p2, overhang = GATE_WALL_OVERHANG) {
     };
 }
 
-/**
- * Build a short lane-crossing gate through seedPoint.
- * Casts perpendicular from the nearest wall into the opposite wall so both
- * ends stay on the corridor instead of linking unrelated closest points.
- *
- * @param {object} [options]
- * @param {{x:number,y:number}|null} [options.previousMidpoint] Prefer continuity
- *   with the gate's previous midpoint while dragging.
- */
+/** Casts perpendicular from the nearest wall into the opposite one, so both ends stay on the corridor. */
 export function buildPerpendicularLaneGate(seedPoint, outer, inner, options = {}) {
     if (!seedPoint || !outer || !inner || outer.length < 3 || inner.length < 3) {
         return null;
@@ -299,7 +272,6 @@ export function buildPerpendicularLaneGate(seedPoint, outer, inner, options = {}
     ));
     const chosen = candidates[0];
 
-    // Always return outer endpoint as p1 and inner as p2, then extend past walls.
     const outerEnd = closestPointOnPolygon(chosen.from, outer);
     const startsOnOuter = outerEnd && distance(outerEnd.closest, chosen.from) < 0.001;
     const wallSpan = startsOnOuter

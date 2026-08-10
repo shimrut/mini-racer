@@ -29,11 +29,9 @@ describe('Campaign locked-stage medal progress visual', () => {
             "className: 'track-carousel__preview-lock-medal medal-svg--row-placeholder'",
         );
         expect(ui).toContain('previewLock.append(');
-        // The lock plate remains on the drawing; the two requirements are a
-        // dedicated checklist below the schematic instead of a second unlock
-        // title block. Identity lives in the fixed lobby header, outside the card.
         expect(ui).toContain('gate.append(previewLock)');
-        expect(ui).toContain('element.append(preview, foot)');
+        expect(ui).toContain('element.append(preview)');
+        expect(ui).toContain('this.root.append(this._footParts.foot)');
         expect(ui).not.toContain('head.append(wordmark, billing)');
         expect(ui).toContain('requirement.append(requirementList)');
         expect(ui).not.toContain('Unlock requirements');
@@ -43,13 +41,11 @@ describe('Campaign locked-stage medal progress visual', () => {
         expect(ui).toContain('foot.append(requirement, meta, medal)');
         expect(ui).not.toContain("status.textContent = requirement.satisfied ? '✓' : '•'");
         expect(ui).toContain('preview.append(previewArt, gate)');
-        expect(ui).toContain('parts.gate.hidden = !locked');
+        expect(ui).toContain('parts.gate.hidden = !Boolean(card.locked)');
         expect(ui).toContain('parts.meta.hidden = locked');
         expect(ui).toContain('parts.medal.hidden = locked');
         expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
         expect(lockIcon).toContain("lock.setAttribute('viewBox', '0 -32 384 544')");
-        // The lock medal itself is the opaque container; there is no second CSS
-        // hex behind it to create a mismatched double outline.
         expect(css).toMatch(
             /\.track-carousel__preview-lock\s*\{[^}]*width:\s*4rem;[^}]*height:\s*4rem;[^}]*opacity:\s*1;/s,
         );

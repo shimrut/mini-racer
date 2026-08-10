@@ -87,16 +87,16 @@ describe("guest bootstrap recovery", () => {
     expect(state.playerPreferences).toEqual({ pbGhostEnabled: true });
   });
 
-  it("rotates once after 401, retries without the rejected token, and preserves local data", async () => {
+  it("keeps the player id after 401, retries without the rejected token, and preserves local data", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(createResponse(401))
       .mockResolvedValueOnce(createResponse(200, {
-        playerId: "guest:new-guest-id",
-        guestToken: "new-guest-token",
+        playerId: "guest:old-guest-id",
+        guestToken: "reissued-guest-token",
         leaderboardIdentity: "constructed",
         playerPreferences: null,
-        hasAnyData: false,
-        isReturningPlayer: false,
+        hasAnyData: true,
+        isReturningPlayer: true,
       }));
     vi.stubGlobal("fetch", fetchMock);
     const { getPlayerProgressState } = await import("../game/storage.js");
@@ -108,13 +108,14 @@ describe("guest bootstrap recovery", () => {
     const secondUrl = new URL(fetchMock.mock.calls[1][0]);
     expect(firstUrl.searchParams.get("playerId")).toBe("old-guest-id");
     expect(firstUrl.searchParams.get("guestToken")).toBe("old-guest-token");
-    expect(secondUrl.searchParams.get("playerId")).toBe("new-guest-id");
+    expect(secondUrl.searchParams.get("playerId")).toBe("old-guest-id");
     expect(secondUrl.searchParams.has("guestToken")).toBe(false);
-    expect(localStorage.getItem(PLAYER_ID_KEY)).toBe("new-guest-id");
-    expect(localStorage.getItem(GUEST_TOKEN_KEY)).toBe("new-guest-token");
+    expect(localStorage.getItem(PLAYER_ID_KEY)).toBe("old-guest-id");
+    expect(localStorage.getItem(GUEST_TOKEN_KEY)).toBe("reissued-guest-token");
     expect(localStorage.getItem("UnrelatedPreference")).toBe("keep-me");
     expect(localStorage.getItem("VectorGpDailyChallengeData")).toContain("12.3");
-    expect(state.leaderboardPlayerId).toBe("guest:new-guest-id");
+    expect(state.leaderboardPlayerId).toBe("guest:old-guest-id");
+    expect(state.hasAnyData).toBe(true);
   });
 
   it("does not rotate for non-authorization failures", async () => {
@@ -148,11 +149,11 @@ describe("guest bootstrap recovery", () => {
     await getPlayerProgressState();
 
     const retryUrl = new URL(fetchMock.mock.calls[1][0]);
-    expect(retryUrl.searchParams.get("playerId")).toBe("new-guest-id");
+    expect(retryUrl.searchParams.get("playerId")).toBe("old-guest-id");
     expect(retryUrl.searchParams.has("guestToken")).toBe(false);
   });
 
-  it("stops after one failed recovery attempt and keeps the rotated local identity", async () => {
+  it("stops after one failed recovery attempt and keeps the local player id", async () => {
     const fetchMock = vi.fn().mockResolvedValue(createResponse(401));
     vi.stubGlobal("fetch", fetchMock);
     const { getPlayerProgressState } = await import("../game/storage.js");
@@ -160,10 +161,10 @@ describe("guest bootstrap recovery", () => {
     const state = await getPlayerProgressState();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(localStorage.getItem(PLAYER_ID_KEY)).toBe("new-guest-id");
+    expect(localStorage.getItem(PLAYER_ID_KEY)).toBe("old-guest-id");
     expect(localStorage.getItem(GUEST_TOKEN_KEY)).toBeNull();
     expect(localStorage.getItem("UnrelatedPreference")).toBe("keep-me");
-    expect(state.leaderboardPlayerId).toBe("new-guest-id");
+    expect(state.leaderboardPlayerId).toBe("old-guest-id");
   });
 
   it("uses local progress state without fetching on localhost", async () => {

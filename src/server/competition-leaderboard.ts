@@ -1,9 +1,3 @@
-/**
- * One ranked board, shared across modes — lifted from Daily's implementation
- * unchanged and re-parameterised on a Competition, so Campaign reports the
- * same snapshot shape instead of a second payload the client has to adapt.
- * Redis keys arrive pre-built on the descriptor; nothing here templates one.
- */
 import { redis } from '@devvit/redis';
 import {
     DAILY_GP_NEARBY_RADIUS,
@@ -118,13 +112,7 @@ export function toSnapshotRow(
     };
 }
 
-/**
- * The leaderboard entry and the PB record are written by two concurrent writes,
- * and before they shared a timestamp they always disagreed by a few
- * milliseconds. The run identity that matters is the time itself: an exact
- * best-time match on both the record and its trace pins the ghost to this
- * leaderboard row without stranding every entry set before that fix.
- */
+/** The leaderboard row and the PB record are written concurrently, so an exact best-time match on both is what pins a ghost to a row. */
 export function isCompleteOpponentRecord(
     entry: DailyGpLeaderboardEntry,
     record: PlayerTrackPbRecord | null,
@@ -213,11 +201,6 @@ export async function readPlayerRank(
     return Number.isFinite(rankZeroBased) ? Number(rankZeroBased) + 1 : null;
 }
 
-/**
- * Adds the row to the board inside the caller's transaction. A permanent
- * competition carries no TTL, so the expiry calls are skipped rather than
- * written with a sentinel that would quietly delete the board.
- */
 export async function writeEntry(
     competition: Competition,
     playerId: string,
@@ -236,8 +219,7 @@ export async function writeEntry(
         member: playerId,
         score: encodeDailyGpLeaderboardScore(entry.bestTimeMs),
     });
-    // This is intentionally in the same transaction as the ranked write: a
-    // snapshot can never use a pre-write cache generation after this succeeds.
+    // Deliberately in the ranked write's transaction: no snapshot can use a pre-write cache generation once this succeeds.
     await transaction.incrBy(competition.standingsRevisionKey, 1);
     if (
         playerId.startsWith('guest:')
@@ -351,8 +333,6 @@ async function readSharedStandingsPageSource(
     const rows = await readRowsForRankedMembers(competition, rankedMembers, offset, null);
     return {
         leaderboardEntryCount,
-        // Redis' sorted-set response is the authority for row ownership. Invalid
-        // stored entries are omitted from rows just as they were before caching.
         rows: rows.map((row) => ({
             playerId: rankedMembers[row.rank - offset - 1]?.member ?? '',
             row: { ...row, isCurrentPlayer: false },

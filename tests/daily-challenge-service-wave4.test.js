@@ -215,7 +215,8 @@ describe('daily-challenge service wave4', () => {
 
         expect(playlist).toHaveLength(1);
         expect(playlist[0].id).toBe('wrapped-wave4');
-        expect(fetch.mock.calls[0][1]).toEqual({ method: 'GET' });
+        expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+        expect(fetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
     });
 
     it('rejects daily submissions outside the allowed time window (L986-L991)', async () => {

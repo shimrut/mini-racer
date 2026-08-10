@@ -8,14 +8,7 @@ import {
 export const CAMPAIGN_ID = 'numbered-v1';
 export const CAMPAIGN_RULES_REVISION = 1;
 
-/**
- * Gates open on the player's total campaign medals rather than one medal on
- * the stage before it, so strength on one track can pay for weakness on
- * another. From stage 03 the requirement is 2n + floor(n / 2) — Silver on
- * every prior track plus Gold on half — always reachable without Author. Each
- * gate also requires a medal on the immediately preceding stage, since the
- * total alone would let early medals fund skipping several stages at once.
- */
+/** Gate: 2n + floor(n / 2) total medals (clearable on Gold alone) plus a medal on the previous stage, so a total cannot fund skipping stages. */
 const STAGE_DEFINITIONS = [
     ['00', 'numberZero', 2, 0],
     ['01', 'numberOne', 2, 1],
@@ -66,13 +59,11 @@ export function getCampaignStage(raceId) {
     return typeof raceId === 'string' ? STAGE_BY_RACE_ID.get(raceId) ?? null : null;
 }
 
-/** Medal count toward the campaign total: bronze=1 through author=4. */
 export function getCampaignStageMedalCount(medal) {
     const rank = typeof medal === 'string' ? STANDARD_MEDAL_TIER_RANK[medal] : undefined;
     return rank === undefined ? 0 : rank + 1;
 }
 
-/** Medals banked across every campaign stage. Nothing outside the campaign counts. */
 export function countCampaignMedals(resultsByRaceId = {}) {
     let total = 0;
     for (const stage of CAMPAIGN_STAGES) {
@@ -81,7 +72,6 @@ export function countCampaignMedals(resultsByRaceId = {}) {
     return total;
 }
 
-/** An unlock can't lapse — progress only keeps the better medal per stage — except by an explicit server-side revoke, which re-derives from scratch. */
 export function getCampaignUnlockedRaceIds(resultsByRaceId = {}) {
     const medalTotal = countCampaignMedals(resultsByRaceId);
     return CAMPAIGN_STAGES

@@ -339,8 +339,6 @@ export class ModalShell {
     }
 
     getMenuPreferredIndex(buttons) {
-        // Improve is the win sheet's usual landing spot, but a won duel hides it and
-        // hands the accent — and the focus — to Brag.
         const winPreferred = this.combinedRestartBtn?.hidden
             ? this.combinedPlaylistBtn
             : this.combinedRestartBtn;
@@ -448,9 +446,6 @@ export class ModalShell {
         };
     }
 
-    /* The pause modal states which track is being raced. It used to draw the
-       schematic beside the name; the canvas and its wrapper are long gone from
-       the markup, so what is left is the name. */
     _hidePauseTrackPreview() {
         const nameEl = document.getElementById('modal-pause-track-name');
         if (nameEl) {
@@ -530,12 +525,6 @@ export class ModalShell {
         else if (button) button.textContent = label;
     }
 
-    /**
-     * The finish sheet's forward exit. Only Campaign has a race waiting after
-     * this one, so the button stays out of every other sheet; a stage still
-     * behind its gate shows disabled rather than missing, because what the
-     * campaign is asking for next is worth seeing before it opens.
-     */
     _syncCombinedNextRace(nextRace = null) {
         const button = this.combinedNextBtn;
         if (!button) return;
@@ -547,9 +536,6 @@ export class ModalShell {
         button.hidden = !visible;
         button.style.display = visible ? '' : 'none';
         actions?.classList?.toggle?.('combined-actions--with-next', visible);
-        // A stage that is actually open is the move the sheet is offering, so it
-        // takes the accent and Improve steps back to a plain button. A gated one
-        // never does: the accent would be pointing at something unreachable.
         button.classList?.toggle?.('combined-action-btn--primary', enabled);
         this.combinedRestartBtn?.classList?.toggle?.(
             'combined-action-btn--primary',
@@ -566,10 +552,6 @@ export class ModalShell {
         this._bindClickAction(button, enabled ? () => nextRace.action() : null);
     }
 
-    /**
-     * The gate can move under an open sheet: a run the server refuses takes back
-     * the stage it opened, and the button has to close with it.
-     */
     setCombinedNextRaceEnabled(enabled) {
         const button = this.combinedNextBtn;
         if (!button || button.hidden) return false;
@@ -582,12 +564,9 @@ export class ModalShell {
         return true;
     }
 
-    /** Every finish sheet starts without the mode shortcuts; only a won duel asks for them. */
     _hideCombinedModeShortcuts() {
         const label = this.combinedModeShortcutsLabel;
         if (label) label.hidden = true;
-        // Home is the sheet's own button in every other mode, so a won duel's
-        // relabelling has to be handed back with the shortcuts.
         const menu = this.combinedMenuBtn;
         if (menu) {
             this._setShareButtonLabel(menu, 'Home');
@@ -602,11 +581,6 @@ export class ModalShell {
         this._bindClickAction(button, null);
     }
 
-    /**
-     * A won duel has no rerun, so Improve gives way to Brag and the two modes
-     * waiting outside this one. Both of those leave the head to head, so both
-     * ask first — the duel's own poster is no longer on the way out.
-     */
     setChallengeWinActions({
         dailyAction = null,
         campaignAction = null,
@@ -664,11 +638,6 @@ export class ModalShell {
         return true;
     }
 
-    /**
-     * Asks before an action that ends the run the sheet is reporting on, in the
-     * sheet's own panel — the same card the share flow uses, so a question and a
-     * choice look the same wherever the finish asks one.
-     */
     _confirmInSheet({
         title = '',
         message = '',
@@ -732,7 +701,6 @@ export class ModalShell {
         return true;
     }
 
-    /** Puts Improve back when the server takes back a win the sheet opened on. */
     clearChallengeWinActions({ restartAction = null } = {}) {
         if (!this.modalCombinedView?.classList.contains('active-view')) return false;
 
@@ -1162,7 +1130,6 @@ export class ModalShell {
         const isChallengeBrag = shareKind === 'challenge-brag';
         const isDailyShare = !shareKind && options.shareRequest?.source === 'finish';
 
-        // The action row is shared by every mode; a previous win must not leak into it.
         this._hideCombinedModeShortcuts();
         this.combinedPlaylistBtn?.classList?.remove?.('combined-action-btn--primary');
 
@@ -1201,8 +1168,6 @@ export class ModalShell {
 
         this._syncCombinedNextRace(options.nextRace || null);
 
-        // Held so a won duel's Campaign shortcut can hand Home back if the server
-        // takes the win away again.
         this._combinedMenuAction = finishResultModal(options.secondaryAction);
         this._bindClickAction(this.combinedMenuBtn, this._combinedMenuAction);
         this._bindClickAction(this.combinedSettingsBtn, options.settingsAction);
@@ -1227,7 +1192,6 @@ export class ModalShell {
         );
         this._syncGarageButtonToPanelState();
 
-        // Bind click/tap interaction for global leaderboard modal on rank tap
         const rightGroupEl = this.modalCombinedView?.querySelector('#combined-stats-right-group');
         if (rightGroupEl) {
             const canOpenLeaderboard = Boolean(
@@ -1261,7 +1225,6 @@ export class ModalShell {
             if (!shouldCelebrateTier(tier)) return;
             this.playUnlockSound(tier);
         };
-        // Pending challenge heroes use a static placeholder — skip entrance.
         const challengePending = lapData.challengeConfirmPhase === 'pending'
             || (lapData.challengeFinish && lapData.challengeConfirmPhase !== 'won'
                 && lapData.lapMedal !== 'challenge');
@@ -1283,7 +1246,6 @@ export class ModalShell {
         });
     }
 
-    /** Repaints the hero medal on an already-open finish sheet; Campaign uses this to drop a medal the server refused. */
     setCombinedWinMedal(lapMedal) {
         if (!this.modalCombinedView?.classList.contains('active-view')) return;
         const lapData = this._combinedResultsLapData;
@@ -1306,7 +1268,6 @@ export class ModalShell {
         );
     }
 
-    /** Patches the challenge finish hero medal + Brag without remounting the sheet. */
     updateChallengeFinishHero({
         phase,
         statusText = null,
@@ -1318,11 +1279,7 @@ export class ModalShell {
 
         const heroMedalEl = this.modalCombinedView.querySelector('#combined-hero-medal');
         const lapData = this._combinedResultsLapData;
-        // The sheet may already have opened on this phase — a finish that beat the
-        // target opens won and only waits for the server to agree. Repainting it
-        // would replay the medal's entrance for a hero that never changed, so only
-        // a new phase or a margin the server corrected earns a repaint.
-        // A call that only carries a share request leaves the hero alone.
+        // Only a new phase or a server-corrected margin earns a repaint; otherwise the hero replays its entrance for nothing.
         const phaseUnchanged = phase === undefined || phase === this._challengeFinishPhase;
         const marginUnchanged = verdict === undefined
             || verdict?.deltaSec === lapData?.challengeVerdict?.deltaSec;
@@ -1415,7 +1372,6 @@ export class ModalShell {
         this._closeSharePanel?.({ restoreScroll: false });
         const wasActive = this.isModalActive();
 
-        // Save previous view state before clearing
         const wasCombinedActive = this.modalCombinedView?.classList.contains('active-view');
         const wasMainActive = this.modalMainView?.classList.contains('active-view');
         if (wasCombinedActive) {
@@ -1944,17 +1900,11 @@ export class ModalShell {
 
         if (this.modalRunsView?.classList.contains('active-view') && this.modalLapTimes) {
             const scrollTop = this.modalLapTimes.scrollTop;
-            // A snapshot that puts rows on screen for the first time — the
-            // usual cold open, spinner then standings — still owes the player
-            // the scroll to their own row. A refresh over existing rows does
-            // not: they are already reading them.
             const hadRows = Boolean(this.modalLapTimes.querySelector('.leaderboard-row'));
             const hasPersonalBestList = Array.isArray(this._modalRunsPayload.lapTimesArray);
             this.renderLeaderboardDayRail();
             this.renderLeaderboardHeaderSummary();
             if (this._modalRunsPayload.showGlobalLeaderboard) {
-                // Patches the standings in place: the renderer reuses the rows
-                // already on screen so a refresh does not re-deal the list.
                 const shareBest = this._leaderboardShareBestOption();
                 this.content.renderScoreboardList(
                     this.modalLapTimes,
@@ -2071,8 +2021,6 @@ export class ModalShell {
     }
 
     showModalLeaderboardPayload() {
-        // Non-Daily finishes own their standings screen: the challenge id in the
-        // payload is only meaningful to the mode that put it there.
         if (typeof this._modalRunsPayload?.onOpenStandings === 'function') {
             this._modalRunsPayload.onOpenStandings();
             return;

@@ -1,9 +1,3 @@
-/**
- * Normalizes checkbox / localStorage values written as `'1'` / `'0'` or loose truthy strings.
- * @param {unknown} raw
- * @param {{ treatMissingAsTrue?: boolean }} [opts] When true, `null` (missing storage key) counts as enabled (music default).
- * @returns {boolean}
- */
 export function parseStoredBooleanToggle(raw, { treatMissingAsTrue = false } = {}) {
     if (raw === true || raw === 'true' || raw === 1 || raw === '1') {
         return true;
@@ -14,12 +8,6 @@ export function parseStoredBooleanToggle(raw, { treatMissingAsTrue = false } = {
     return false;
 }
 
-/**
- * Builds a boolean preference backed by localStorage, returning `{ get, set }`.
- * `label` is used in console errors so each preference reports its own name.
- * @param {string} storageKey
- * @param {{ treatMissingAsTrue?: boolean, label?: string }} [opts]
- */
 export function createBooleanPreference(storageKey, {
     treatMissingAsTrue = false,
     label = 'boolean preference',

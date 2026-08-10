@@ -7,8 +7,6 @@ const headToHeadServiceMocks = vi.hoisted(() => ({
     submitHeadToHeadRun: vi.fn(),
 }));
 
-// Only the calls that go to the server are faked, so a new export here cannot
-// silently go missing from the mock.
 vi.mock('../game/head-to-head/service.js', async (importOriginal) => ({
     ...(await importOriginal()),
     createHeadToHead: vi.fn(),
@@ -31,7 +29,6 @@ import { headToHeadEngineMethods } from '../game/head-to-head/engine-methods.js'
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GENERIC_SNOO_URL } from '../game/ui/avatar.js';
 
-/** The real challenge pane, so the markup and the render stay honest about each other. */
 function challengePaneDom() {
     const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
     const pane = html.match(
@@ -49,6 +46,57 @@ afterEach(() => {
 });
 
 describe('Head to Head lobby and finish', () => {
+    it('does not submit or celebrate a run blocked by severe frame stalls', async () => {
+        const storedWins = stubLocalStorage();
+        const stallMessage = 'Leaderboard rank disabled because the run had severe frame stalls.';
+        const setChallengeWinActions = vi.fn();
+        const applyCarUnlockSnapshot = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            rankedSubmissionBlockedReason: stallMessage,
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero: vi.fn(),
+                setChallengeWinActions,
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            showDailyLobby: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            applyCarUnlockSnapshot,
+            settings: { openSettings: vi.fn() },
+        };
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.5 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            expect.objectContaining({
+                lapMedal: null,
+                challengeConfirmPhase: 'error',
+                challengeConfirmStatus: null,
+                challengeConfirmError: stallMessage,
+            }),
+            expect.objectContaining({
+                restartAction: expect.any(Function),
+                shareEnabled: false,
+            }),
+        );
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
+        expect(setChallengeWinActions).not.toHaveBeenCalled();
+        expect(applyCarUnlockSnapshot).not.toHaveBeenCalled();
+        expect(storedWins.size).toBe(0);
+    });
+
     it('does not strand a Head to Head finish when confirmation fails', async () => {
         const modalMsg = { style: {}, textContent: '' };
         const updateChallengeFinishHero = vi.fn();
@@ -166,13 +214,9 @@ describe('Head to Head lobby and finish', () => {
             { lapTime: 7.5 },
         );
         expect(winShowModal).toHaveBeenCalledTimes(1);
-        // A run that already beat the target opens on the win it earned — the
-        // server only has to agree, and the winner never sees "Submitting...".
         expect(winShowModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
-            // The margin rides on the verdict line the hero already shows, so a
-            // beaten challenge states what it was beaten by from the first frame.
             expect.objectContaining({
                 lapMedal: 'challenge',
                 challengeFinish: true,
@@ -223,7 +267,6 @@ describe('Head to Head lobby and finish', () => {
             pendingOptions,
         );
         await vi.waitFor(() => {
-            // A loss is owed the same number the win got.
             expect(lossUpdateHero).toHaveBeenCalledWith({
                 phase: 'lost',
                 verdict: { opponentName: 'shimroot', deltaSec: 0.4 },
@@ -296,7 +339,6 @@ describe('Head to Head lobby and finish', () => {
 
         await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.5 });
 
-        // The finish opens with no token to brag with; only the verified run earns one.
         expect(context.modal.showModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
@@ -397,15 +439,85 @@ describe('Head to Head lobby and finish', () => {
                 campaignAction: expect.any(Function),
             });
         });
-        // A run that already beat the target gets the winner's action row at once,
-        // then again once the server has verified the time.
         expect(setChallengeWinActions).toHaveBeenCalledTimes(2);
         const { dailyAction, campaignAction } = setChallengeWinActions.mock.calls.at(-1)[0];
         dailyAction();
         campaignAction();
-        // The duel is finished, so both exits are the way on to another mode.
         expect(context.showDailyLobby).toHaveBeenCalledTimes(1);
         expect(context.showCampaignLobby).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a stale attempt answering after the racer has retried', async () => {
+        stubLocalStorage();
+        const updateChallengeFinishHero = vi.fn();
+        const setChallengeWinActions = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero,
+                setChallengeWinActions,
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            showHomeLobby: vi.fn(),
+            showDailyLobby: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+
+        let answerFirstAttempt;
+        headToHeadServiceMocks.submitHeadToHeadRun.mockReturnValueOnce(
+            new Promise((resolve) => { answerFirstAttempt = resolve; }),
+        );
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'won',
+                bestTimeMs: 7_400,
+                differenceMs: -600,
+                acceptToken: 'accept-token-second',
+            },
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+        context.status = 'racing';
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.4 });
+        await vi.waitFor(() => {
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith(
+                expect.objectContaining({ phase: 'won' }),
+            );
+        });
+
+        answerFirstAttempt({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'lost',
+                bestTimeMs: 8_400,
+                differenceMs: 400,
+                acceptToken: 'accept-token-first',
+            },
+        });
+        await vi.waitFor(() => {
+            expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(2);
+        });
+
+        expect(updateChallengeFinishHero).not.toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'lost' }),
+        );
+        expect(updateChallengeFinishHero).not.toHaveBeenCalledWith({
+            shareRequest: { kind: 'challenge-brag', acceptToken: 'accept-token-first' },
+        });
     });
 
     it.each([
@@ -446,7 +558,6 @@ describe('Head to Head lobby and finish', () => {
                 expect.objectContaining({ phase: expect.stringMatching(/lost|tie|error/) }),
             );
         });
-        // Improve stays: a duel that was not beaten is still worth another run.
         expect(setChallengeWinActions).not.toHaveBeenCalled();
         expect(context.modal.showModal).toHaveBeenCalledWith(
             'Challenge complete',
@@ -493,7 +604,6 @@ describe('Head to Head lobby and finish', () => {
             bestTimeMs: 25_168,
         }));
 
-        // An ordinary arrival carries no verdict, so the poster still offers Accept.
         showChallenge.mockClear();
         await headToHeadEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
         expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({ outcome: null }));
@@ -531,7 +641,6 @@ describe('Head to Head lobby and finish', () => {
             lobbyUi: { showChallenge },
         };
 
-        // A cold open with no verdict in hand still lands on the winner's screen.
         await headToHeadEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
 
         expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
@@ -560,7 +669,6 @@ describe('Head to Head lobby and finish', () => {
             expiresAt: Date.now() - 1,
         }));
         expect(readHeadToHeadWin('challenge-1')).toBeNull();
-        // The stale receipt is dropped rather than left to be re-read.
         expect(expired.size).toBe(0);
     });
 
@@ -653,6 +761,39 @@ describe('Head to Head lobby and finish', () => {
             canRetry: true,
             statusMessage: 'Could not load this challenge. Check your connection and try again.',
         }));
+    });
+
+    it('initializes the challenge track even when it matches the default key', async () => {
+        const loadTrack = vi.fn().mockResolvedValue(undefined);
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                lapCount: 2,
+                rulesRevision: 1,
+                targetTimeMs: 8_000,
+                frozenGhost: null,
+            },
+            startButtonPending: false,
+            currentTrackKey: 'numberZero',
+            trackCanvas: null,
+            trackPersonalBestByTrackKey: {},
+            pbGhost: { clearTrack: vi.fn() },
+            journeys: { startAttempt: vi.fn() },
+            loadTrack,
+            applyDailyChallenge: vi.fn(),
+            startSequence: vi.fn(),
+        };
+
+        await headToHeadEngineMethods.startHeadToHead.call(context);
+
+        expect(loadTrack).toHaveBeenCalledWith('numberZero', {
+            loadPlayerProgress: false,
+            preserveDailyChallengeContext: true,
+            showStartOverlayOnReset: false,
+        });
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
     });
 
     it('keeps a permanent challenge error unavailable instead of offering Retry', async () => {
@@ -784,7 +925,6 @@ describe('Head to Head poster after the duel is beaten', () => {
 
         expect(doc.getElementById('challenge-poster').hidden).toBe(true);
         expect(doc.getElementById('challenge-won-hero').hidden).toBe(false);
-        // The same medal the finish sheet just handed them.
         expect(doc.getElementById('challenge-won-medal')
             .querySelector('.medal-svg--challenge')).not.toBeNull();
         expect(doc.querySelector('.challenge-won-hero__title').textContent.trim())
@@ -812,12 +952,9 @@ describe('Head to Head poster after the duel is beaten', () => {
             new URL('../styles/lobby-modes.css', import.meta.url),
             'utf8',
         );
-        // The duel joins the modes that pin the shared toolbar to their header —
-        // no second toolbar, no second rule.
         expect(lobbyCss).toMatch(
             /body\[data-lobby-mode="challenge"\] \.lobby-mode-toolbar,[\s\S]*?body\[data-lobby-mode="campaign"\] \.lobby-mode-toolbar\s*\{[^}]*position:\s*absolute;[^}]*top:\s*0;[^}]*right:\s*0;[^}]*display:\s*flex;/s,
         );
-        // A duel has one track and one time; there is no table to stand in.
         expect(lobbyCss).toMatch(
             /body\[data-lobby-mode="challenge"\] #lobby-mode-standings-btn\s*\{[^}]*display:\s*none;/s,
         );
@@ -831,8 +968,6 @@ describe('Head to Head poster after the duel is beaten', () => {
         expect(doc.body.textContent).not.toContain('Time to beat');
     });
 
-    // A racer with no Snoovatar is the common case, not an edge one, and the
-    // poster and the podium both seat them behind Reddit's own default Snoo.
     it('seats a racer with no avatar behind the same default Snoo the poster shows', () => {
         const doc = renderPane(readyState);
 

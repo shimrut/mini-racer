@@ -75,7 +75,6 @@ export async function bootDailyPreview() {
         await openGame(event);
     });
 
-    // Dynamic resize handler to keep track drawing resolution extremely sharp and responsive
     window.addEventListener('resize', () => {
         void postPreviewCarPromise.then((carImage) => {
             renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
@@ -199,7 +198,6 @@ function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage 
         event: skin ? { key: 'daily-challenge', trackKey, skin } : null
     });
 
-    // Set canvas dimensions dynamically based on its client display bounds (handling devicePixelRatio)
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.max(100, Math.round(rect.width * dpr));

@@ -124,9 +124,6 @@ describe('ui leaderboard helpers', () => {
             'daily-1',
             { forceRefresh: false, limit: 50, offset: 0 }
         );
-        // The fetched snapshot patches the standings already on screen rather
-        // than re-showing the modal, so the rows are not rebuilt underneath the
-        // player and the day rail keeps whatever the playlist last published.
         expect(showRunsModal).toHaveBeenCalledTimes(1);
         expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(scoreboardSnapshot);
     });

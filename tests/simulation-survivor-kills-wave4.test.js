@@ -28,7 +28,6 @@ describe('simulation survivor kills wave4 — contact normals', () => {
         const wallPoint = { x: 0, y: 5 };
         const bodyPoint = { x: 1, y: 5 };
         const distance = 1;
-        // Body is to the right, but safe point is to the left → flip.
         const normal = getSafeContactNormal(
             { x: -1, y: 5 },
             segment,
@@ -116,7 +115,6 @@ describe('simulation survivor kills wave4 — scrape and collision hash', () => 
             [wall],
         );
 
-        // Sliding parallel / non-penetrating should not emit scrape.
         expect(events.wallImpact).toBeNull();
     });
 
@@ -256,7 +254,6 @@ describe('simulation survivor kills wave4 — scrape and collision hash', () => 
             [],
         );
 
-        // No nearby cells → fallback to segments array (still no contact at x=50).
         expect(state.pos.x).toBeGreaterThan(0);
         expect(collisionData.queryStamp).toBeGreaterThan(0);
     });
@@ -316,7 +313,6 @@ describe('simulation survivor kills wave4 — skid and history gates', () => {
             [],
         );
 
-        // Stationary within 0.001 → no history sample.
         expect(push).not.toHaveBeenCalled();
     });
 
@@ -345,7 +341,6 @@ describe('simulation survivor kills wave4 — skid and history gates', () => {
             [],
         );
 
-        // Braking pulls reverse velocity toward zero (not past into forward boost).
         expect(state.velocity.x).toBeGreaterThan(-2);
         expect(state.velocity.x).toBeLessThanOrEqual(0);
         expect(state.velocity.x).toBeCloseTo(

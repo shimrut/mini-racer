@@ -34,13 +34,13 @@ import crystalineHarbor from './definitions/crystaline-harbor.js';
 import ironHook from './definitions/iron-hook.js';
 import greatBazaar from './definitions/great-bazaar.js';
 import circuitPromax from './definitions/circuit-promax.js';
-import mistfallCircuit from './definitions/mistfall-circuit.js';
 import stretchingCat from './definitions/stretching-cat.js';
 import turboShell from './definitions/turbo-shell.js';
 import redLagoon from './definitions/red-lagoon.js';
 import copperVale from './definitions/copper-vale.js';
 import obsidianRidge from './definitions/obsidian-ridge.js';
 import auroraRing from './definitions/aurora-ring.js';
+import furiousFast from './definitions/furious-fast.js';
 import lanternPier from './definitions/lantern-pier.js';
 import quartzHollow from './definitions/quartz-hollow.js';
 import needleChicane from './definitions/needle-chicane.js';
@@ -54,6 +54,7 @@ import numberFour from './definitions/number-four.js';
 import numberFive from './definitions/number-five.js';
 import numberSix from './definitions/number-six.js';
 import numberSeven from './definitions/number-seven.js';
+import mistfallCircuit from './definitions/mistfall-circuit.js';
 import numberEight from './definitions/number-eight.js';
 import numberNine from './definitions/number-nine.js';
 import analogAudio from './definitions/analog-audio.js';
@@ -62,7 +63,6 @@ import hardHitter from './definitions/hard-hitter.js';
 import roadRage from './definitions/road-rage.js';
 import yellowYard from './definitions/yellow-yard.js';
 import lunarLimbo from './definitions/lunar-limbo.js';
-import furiousFast from './definitions/furious-fast.js';
 import blackstoneRun from './definitions/blackstone-run.js';
 import titanTown from './definitions/titan-town.js';
 import eulersNumber from './definitions/eulers-number.js';
@@ -125,13 +125,13 @@ const TRACK_GEOMETRY = {
     ironHook,
     greatBazaar,
     circuitPromax,
-    mistfallCircuit,
     stretchingCat,
     turboShell,
     redLagoon,
     copperVale,
     obsidianRidge,
     auroraRing,
+    furiousFast,
     lanternPier,
     quartzHollow,
     needleChicane,
@@ -145,6 +145,7 @@ const TRACK_GEOMETRY = {
     numberFive,
     numberSix,
     numberSeven,
+    mistfallCircuit,
     numberEight,
     numberNine,
     analogAudio,
@@ -153,7 +154,6 @@ const TRACK_GEOMETRY = {
     roadRage,
     yellowYard,
     lunarLimbo,
-    furiousFast,
     blackstoneRun,
     titanTown,
     eulersNumber,

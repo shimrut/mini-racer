@@ -274,7 +274,6 @@ describe('leaderboard race comparison target', () => {
         this.raceComparisonTarget = value;
         return value;
       }),
-      // A press already in flight makes the real start a no-op.
       handleStartDailyChallenge: vi.fn(),
     };
 

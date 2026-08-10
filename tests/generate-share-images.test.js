@@ -12,7 +12,6 @@ import {
 } from '../tools/generate-share-images.js';
 
 describe('generate-share-images', () => {
-    /** @type {string | null} */
     let tempRoot = null;
 
     afterEach(() => {
@@ -39,7 +38,6 @@ describe('generate-share-images', () => {
         const bytes = readFileSync(outPath);
         expect(bytes.byteLength).toBeGreaterThan(1000);
         expect(bytes.byteLength).toBeLessThanOrEqual(SHARE_IMAGE_MAX_BYTES);
-        // JPEG SOI marker
         expect(bytes[0]).toBe(0xff);
         expect(bytes[1]).toBe(0xd8);
 

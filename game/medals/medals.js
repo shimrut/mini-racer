@@ -45,16 +45,8 @@ export {
     shouldShowPersonalBestMedalHero,
 };
 
-/** Hold time between first-unlock medal reveals when multiple tiers unlock in one run. */
 export const FIRST_UNLOCK_MEDAL_HOLD_MS = 250;
 
-/**
- * Entrance motion + unlock sound for a tier on this track. Standard medals only when newly earned vs stored best;
- * personal-best only when {@link shouldShowPersonalBestMedalHero} is true for this finish.
- * @param {string} tier
- * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} previousBestMedalOnTrack
- * @param {{ trackKey?: string|null, lapTimeSec?: number|null, previousPersonalBestSec?: number|null|undefined }} [context]
- */
 export function shouldCelebrateMedalTier(tier, previousBestMedalOnTrack, context = {}) {
     if (tier === 'challenge') return true;
     if (tier === 'personal-best') {
@@ -98,15 +90,6 @@ function revealDeferredMedalIcon(
     }
 }
 
-/**
- * Pile reveal timing: already-earned tiers show instantly (delay 0, no fanfare). Each first-unlock tier waits
- * {@link FIRST_UNLOCK_MEDAL_HOLD_MS} after the previous reveal — 250ms after a block of instant medals, then
- * +250ms between consecutive first-unlocks.
- * @param {string[]} tiersInOrder
- * @param {(tier: string) => boolean} shouldCelebrateTier
- * @param {number} [holdMs]
- * @returns {Array<{ tier: string, delayMs: number, celebrate: boolean }>}
- */
 export function planFirstUnlockMedalRevealDelays(
     tiersInOrder,
     shouldCelebrateTier,
@@ -168,13 +151,6 @@ function revealMedalIconsInOrder(
     }
 }
 
-/**
- * @param {HTMLElement} parent
- * @param {string|null|undefined} trackKey
- * @param {'author'|'gold'|'silver'|'bronze'|null|undefined} bestStoredMedal
- * @param {{ rowClass?: string, iconClass?: string, ariaLabel?: string }} [options]
- * @returns {HTMLDivElement}
- */
 function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
     rowClass = '',
     iconClass = 'medal-svg--hero medal-pile-icon--deferred',
@@ -236,21 +212,6 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
     return row;
 }
 
-/**
- * Challenge finish hero: pending placeholder, won medal, loss/tie label, or error.
- *
- * A settled duel stacks into three ranks — medal, who was raced, the margin —
- * so each reads on its own line and the margin keeps the sheet's timing-screen
- * grammar: the same signed delta the split times use.
- * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
- * @param {{
- *   phase?: 'pending'|'won'|'lost'|'tie'|'error',
- *   statusText?: string|null,
- *   error?: string|null,
- *   avatarUrl?: string|null,
- *   verdict?: { opponentName?: string|null, deltaSec?: number|null }|null,
- * }} [params]
- */
 export function renderChallengeFinishHero(
     overlayEl,
     {
@@ -306,11 +267,6 @@ export function renderChallengeFinishHero(
         const medal = createMedalIconSvg('challenge', {
             className: 'medal-svg--hero medal-pile-icon--deferred',
         });
-        // The winner wears the medal here exactly as they do on the lobby's win
-        // screen — same portrait, same pinned medal, so the finish and the poster
-        // it lands on are one picture. The portrait is unconditional: a racer
-        // with no Snoovatar gets the default Snoo, not a medal floating where
-        // their face should be.
         const portrait = document.createElement('div');
         portrait.className = 'challenge-won-hero__portrait';
         const avatar = createAvatarImage(document, avatarUrl, {
@@ -355,13 +311,9 @@ export function renderChallengeFinishHero(
         label.classList.add('combined-medal-challenge-label--error');
     }
 
-    // Medal, then who was raced, then by how much: one rank per line, so nothing
-    // reads as a caption pinned to the medal.
     root.appendChild(centerWrap);
     root.appendChild(label);
 
-    // A tie is 0.000 by definition, so the sentence says it and the margin line
-    // stays out — it only ever reports time gained or lost.
     const settled = phase === 'won' || phase === 'lost' || phase === 'tie';
     if (settled && (margin?.isGain || margin?.isLoss)) {
         const marginEl = document.createElement('p');
@@ -379,12 +331,6 @@ export function renderChallengeFinishHero(
     overlayEl.appendChild(root);
 }
 
-/**
- * Win combined overlay: horizontal row of all medal tiers for this track.
- * Challenge finishes use {@link renderChallengeFinishHero} instead of the campaign stack.
- * @param {HTMLElement|null|undefined} overlayEl `#combined-hero-medal`
- * @param {{ trackKey?: string|null, lapTimeSec?: number|null, lapMedal?: 'author'|'gold'|'silver'|'bronze'|'challenge'|null, challengeFinish?: boolean, challengeConfirmPhase?: 'pending'|'won'|'lost'|'tie'|'error'|null, challengeConfirmStatus?: string|null, challengeConfirmError?: string|null, challengeViewerAvatarUrl?: string|null, previousPersonalBestSec?: number|null, previousTrackMedal?: 'author'|'gold'|'silver'|'bronze'|null }} [params]
- */
 export function renderWinCombinedMedalOverlay(
     overlayEl,
     {
@@ -451,18 +397,11 @@ export function renderWinCombinedMedalOverlay(
     overlayEl.appendChild(root);
 }
 
-/**
- * Reveal combined-result medal row left to right (bronze → … → author).
- * @param {HTMLElement|null|undefined} rowEl `.combined-medal-row`
- * @param {{ baseDelayMs?: number, reduced?: boolean, playUnlockSound?: (tier: string) => void }} [options]
- */
 export function playCombinedMedalRowEntrance(
     rowEl,
     { baseDelayMs = 0, reduced = false, shouldCelebrateTier = null, playUnlockSound = null, firstUnlockHoldMs = FIRST_UNLOCK_MEDAL_HOLD_MS } = {},
 ) {
     if (!rowEl) return;
-    // Descendant, not child: a challenge win mounts its medal inside the
-    // winner's portrait, one level below the slot.
     const icons = rowEl.querySelectorAll(
         ':scope > .combined-medal-row-slot:not(.combined-medal-row-slot--locked) .medal-svg',
     );
@@ -486,12 +425,6 @@ function revealWinOverlayMedalRow(
     }
 }
 
-/**
- * Hero medal with the combined-results sheet intro; secondary medals stagger after.
- * @param {HTMLElement|null|undefined} combinedViewEl `#modal-combined-view`
- * @param {HTMLElement|null|undefined} winOverlayRoot `.win-combined-medal-overlay`
- * @param {{ secondaryStaggerMs?: number, secondaryBaseDelayMs?: number, reduced?: boolean, fallbackMs?: number, playUnlockSound?: (tier: string) => void }} [options]
- */
 function scheduleWinOverlayMedalEntranceWithSheetIntro(
     _combinedViewEl,
     winOverlayRoot,
@@ -520,11 +453,6 @@ function scheduleWinOverlayMedalEntranceWithSheetIntro(
     requestAnimationFrame(reveal);
 }
 
-/**
- * Plays the stacked medal entrance animation (call after modal intro).
- * @param {HTMLElement|null|undefined} stackEl
- * @param {{ staggerMs?: number, baseDelayMs?: number, playUnlockSound?: (tier: string) => void }} [options]
- */
 export function playMedalStackEntrance(
     stackEl,
     { baseDelayMs = 0, shouldCelebrateTier = null, playUnlockSound = null, firstUnlockHoldMs = FIRST_UNLOCK_MEDAL_HOLD_MS } = {},
@@ -541,11 +469,6 @@ export function playMedalStackEntrance(
     revealMedalIconsInOrder(icons, { reduced: false, shouldCelebrateTier, playUnlockSound, firstUnlockHoldMs });
 }
 
-/**
- * @param {HTMLElement|null|undefined} modalEl `#modal`
- * @param {HTMLElement|null|undefined} combinedViewEl `#modal-combined-view` when shown
- * @param {() => void} onReady
- */
 function scheduleAfterModalCombinedIntro(modalEl, combinedViewEl, onReady) {
     let done = false;
     const go = () => {
@@ -608,14 +531,6 @@ function scheduleAfterModalCombinedIntro(modalEl, combinedViewEl, onReady) {
     });
 }
 
-/**
- * Win overlay: hero medal with the combined view `fadeIn` start; earned/next small medals stagger after.
- * In-sheet hero pile and optional stack still wait for the modal + combined intro to finish.
- * @param {HTMLElement|null|undefined} modalEl
- * @param {HTMLElement|null|undefined} combinedViewEl
- * @param {{ heroMedalEl?: HTMLElement | null, stackEl?: HTMLElement | null }} targets
- * @param {{ staggerMs?: number, stackAfterHeroMs?: number, winSecondaryBaseDelayMs?: number, playUnlockSound?: (tier: string) => void }} [options]
- */
 export function scheduleCombinedMedalEntranceAfterModal(
     modalEl,
     combinedViewEl,

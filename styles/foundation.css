@@ -3,7 +3,6 @@
 }
 
 :root {
-    /* Colors - Racing Palette */
     --bg-color: #020617;
     --bg-color-darker: #010410;
     --bg-surface: #0f172a;
@@ -16,59 +15,40 @@
     --success-bright: #4ade80;
     --warning: #fbbf24;
 
-    /* Border Colors */
     --border-subtle: rgba(255, 255, 255, 0.08);
     --border-default: rgba(255, 255, 255, 0.12);
     --border-strong: rgba(255, 255, 255, 0.18);
 
-    /* UI Colors */
     --hud-panel-bg: var(--bg-color-darker);
     --hud-panel-border: rgba(148, 163, 184, 0.2);
 
-    /* Typography */
     --header-font: "Outfit", sans-serif;
     --mono-font: "JetBrains Mono", monospace;
 
-    /* Spacing */
     --space-xl: 2rem;
 
-    /* Border Radius */
     --radius-sm: 0.5rem;
     --radius-md: 1rem;
     --radius-lg: 1.25rem;
     --radius-full: 999px;
 
-    /* Sizing */
     --modal-floating-back-height: 2.55rem;
     --modal-floating-back-offset: 0.85rem;
-    /* The runtime replaces this with visualViewport.height. Reddit's embedded
-       browser can leave CSS viewport units taller than the area its native UI
-       actually exposes, so full-screen UI must share one measured height. */
+    /* Replaced at runtime with visualViewport.height: Reddit's embedded browser leaves CSS viewport units taller than the visible area. */
     --app-visible-height: 100vh;
-    /* Full-screen panels: visible app height, capped (adjust cap in one place). */
     --screen-height-cap: 1000px;
     --screen-fill-height: min(var(--app-visible-height), var(--screen-height-cap));
 
-    /* Motion — three steps, and every UI transition picks one of them. The
-       band tops out at 200ms on purpose: these fire while the player is
-       waiting on the interface, so they cover a state change rather than
-       perform one. Anything longer is a deliberate moment (the boot curtain,
-       the medal pop, the spinner loop) and stays written out at its own site,
-       where the number is the point. */
     --dur-fast: 120ms;
     --dur-base: 160ms;
     --dur-slow: 200ms;
-    /* Exact Start Race handoff requested for the full-screen selectors. */
     --dur-race-start-exit: 100ms;
 
-    /* Curves, by the job. `ease` stays the plain default for colour and
-       opacity; these are for anything that moves. */
     --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
     --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-    /* Z-Index */
     --z-canvas: 0;
     --z-hud: 100;
     --z-overlay: 1000;
@@ -87,9 +67,7 @@ a:focus-visible {
     outline: none !important;
 }
 
-/* The webview paints its own grey box over a tapped control, which reads as a
-   flicker on every press. The steering pad already opted out; everything the
-   player taps needs the same. */
+/* The webview paints its own grey box over a tapped control, which reads as a flicker on every press. */
 button,
 a,
 [role="button"] {
@@ -122,19 +100,6 @@ body {
     -webkit-user-select: none
 }
 
-/* The race chrome is out of the tree while the lobby owns the screen.
- *
- * The lobby's own exit is the exception, and it is what keeps the start from
- * arriving in two events. The scrim is what the player was looking at, so the
- * moment it begins to go the track underneath is already the whole screen —
- * chrome that waits for the exit to finish then appears a beat after the car,
- * which reads as the interface being late rather than the race being early.
- * It comes back in during the exit instead, and crosses with the scrim.
- *
- * Read off the class the overlay already wears for its own fade, rather than a
- * second one on `body`: one state, set in one place, and the script stays out
- * of it. The chrome sits *before* `#start-overlay` in the markup, so `:has` on
- * a common ancestor is what reaches backwards to it. */
 body.start-overlay-active:not(:has(#start-overlay.is-race-start-exiting)) :is(.hud-bar,
     .speedometer,
     .mobile-hud-bar,
@@ -150,9 +115,6 @@ body.start-selection-active :is(.hud-bar,
     display: none !important
 }
 
-/* Only the three top-level bands carry the entrance. The speedometer and the
-   pause button are inside them, and fading a child on top of its own parent
-   multiplies the two curves — the reading holds at nothing and then rushes. */
 body:has(#start-overlay.is-race-start-exiting) :is(.hud-bar, .mobile-hud-bar, .mobile-controls) {
     animation: raceChromeIn var(--dur-race-start-exit) ease-out both;
 }

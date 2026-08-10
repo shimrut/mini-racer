@@ -10,7 +10,6 @@ import {
 } from '../tools/generate-lp-assets.js';
 
 describe('generate-lp-assets', () => {
-    /** @type {string | null} */
     let tempRoot = null;
 
     afterEach(() => {
@@ -35,7 +34,6 @@ describe('generate-lp-assets', () => {
 
         const bytes = readFileSync(result.outPath);
         expect(bytes.byteLength).toBeGreaterThan(1000);
-        // PNG signature
         expect(bytes.subarray(0, 8)).toEqual(
             Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
         );

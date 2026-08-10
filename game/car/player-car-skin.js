@@ -43,9 +43,6 @@ function skinLabelForAsset(assetName) {
     return titleCaseUnderscored(rest);
 }
 
-/** @typedef {'mini' | 'cyberpunk' | 'steampunk' | 'extra'} PlayerCarSkinSeriesId */
-
-/** @param {string} assetName */
 function skinSeriesIdForAsset(assetName) {
     const m = /^assets\/cars\/mr_(.+)\.webp$/i.exec(assetName);
     if (!m) return 'mini';
@@ -57,7 +54,6 @@ function skinSeriesIdForAsset(assetName) {
     return 'mini';
 }
 
-/** Garage UI section order and headings. */
 export const PLAYER_CAR_SKIN_SECTION_META = Object.freeze([
     Object.freeze({ id: 'extra', title: 'Extra cars' }),
     Object.freeze({ id: 'mini', title: 'Mini cars' }),
@@ -65,13 +61,11 @@ export const PLAYER_CAR_SKIN_SECTION_META = Object.freeze([
     Object.freeze({ id: 'steampunk', title: 'Steampunk cars' })
 ]);
 
-/** Player-selectable skins (flat list; order matches ship list). */
 export const PLAYER_CAR_SKINS = Object.freeze(
     PLAYER_SELECTABLE_CAR_ASSETS.map((assetName) =>
         Object.freeze({
             id: skinIdForAsset(assetName),
             label: skinLabelForAsset(assetName),
-            /** @type {PlayerCarSkinSeriesId} */
             series: skinSeriesIdForAsset(assetName),
             assetName,
             unlockRequirement: CAR_UNLOCK_REQUIREMENTS[assetName] ?? null,
@@ -95,7 +89,6 @@ function buildPlayerCarSkinSections() {
     );
 }
 
-/** Skins grouped for garage display (subsections). */
 export const PLAYER_CAR_SKIN_SECTIONS = buildPlayerCarSkinSections();
 
 const ALLOWED = new Set(PLAYER_CAR_SKINS.map((s) => s.assetName));

@@ -68,7 +68,6 @@ function createMockElement(tagName, namespace = null) {
             return clone;
         },
         remove() {
-            // noop
         }
     };
     attributes[Symbol.iterator] = function* iterateAttributes() {

@@ -4,8 +4,7 @@ import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
 const LEADERBOARD_SHARE_ICON_PATH = 'M307.8 18.4c-12 5-19.8 16.6-19.8 29.6l0 80-112 0c-97.2 0-176 78.8-176 176 0 113.3 81.5 163.9 100.2 174.1 2.5 1.4 5.3 1.9 8.1 1.9 10.9 0 19.7-8.9 19.7-19.7 0-7.5-4.3-14.4-9.8-19.5-9.4-8.8-22.2-26.4-22.2-56.7 0-53 43-96 96-96l96 0 0 80c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l160-160c12.5-12.5 12.5-32.8 0-45.3l-160-160c-9.2-9.2-22.9-11.9-34.9-6.9z';
-// Font Awesome Free v7.3.1 ghost icon.
-// https://fontawesome.com/license/free
+// Font Awesome Free v7.3.1 ghost icon — https://fontawesome.com/license/free
 const LEADERBOARD_RACE_ICON_PATH = 'M40.1 467.1l-11.2 9C25.7 478.6 21.8 480 17.8 480 8 480 0 472 0 462.2L0 192C0 86 86 0 192 0S384 86 384 192l0 270.2c0 9.8-8 17.8-17.8 17.8-4 0-7.9-1.4-11.1-3.9l-11.2-9c-13.4-10.7-32.8-9-44.1 3.9L269.3 506c-3.3 3.8-8.2 6-13.3 6s-9.9-2.2-13.3-6l-26.6-30.5c-12.7-14.6-35.4-14.6-48.2 0L141.3 506c-3.3 3.8-8.2 6-13.3 6s-9.9-2.2-13.3-6L84.2 471c-11.3-12.9-30.7-14.6-44.1-3.9zM160 192a32 32 0 1 0 -64 0 32 32 0 1 0 64 0zm96 32a32 32 0 1 0 0-64 32 32 0 1 0 0 64z';
 
 function appendLeaderboardRowAction(item, {
@@ -58,7 +57,6 @@ const LEADERBOARD_ROW_ACTION_SHARE = 'share';
 const LEADERBOARD_ROW_ACTION_RACE = 'race';
 const LEADERBOARD_ROW_ACTION_NONE = 'none';
 
-/** Rows key by slot, not occupant, so a refresh patches text in place instead of dealing a fresh list (every new element replays its entrance). Ties/unranked rows fall back to a positional suffix. */
 function buildLeaderboardRowKey(prefix, rank, usedKeys) {
     const base = `${prefix}:${rank ?? ''}`;
     let key = base;
@@ -86,10 +84,6 @@ function ensureLeaderboardRowCell(item, className, tagName) {
     return cell;
 }
 
-/**
- * The action slot is rebuilt only when it changes shape — a share button and a
- * race label share no structure, and there is nothing to patch between them.
- */
 function syncLeaderboardRowAction(item, actionState) {
     const existing = item.querySelector('.leaderboard-row__action');
     if (!actionState) {
@@ -138,8 +132,6 @@ function applyLeaderboardRowSpec(item, spec) {
     } else {
         item.removeAttribute('tabindex');
         item.removeAttribute('aria-label');
-        // A row that has stopped being shareable or raceable must not keep the
-        // handler the previous render wired onto it.
         item.onclick = null;
         item.onkeydown = null;
     }
@@ -168,7 +160,6 @@ function applyLeaderboardRowSpec(item, spec) {
     syncLeaderboardRowAction(item, spec.actionState);
 }
 
-/** Keyed reconcile: rows keeping their slot are patched in place (no replayed entrance); moved rows are re-inserted and do replay it. Leaving rows are dropped up front so they don't register as a move for the rest of the list. */
 function syncLeaderboardRows(list, rowSpecs) {
     const kindByKey = new Map(rowSpecs.map((spec) => [spec.key, spec.kind]));
     const existingByKey = new Map();
@@ -274,10 +265,6 @@ export function bindPopoverOverlayEscapeDismiss(onDismiss) {
     return () => document.removeEventListener('keydown', onKeydown, true);
 }
 
-/**
- * @param {HTMLElement} container
- * @param {{ title: string, overlayClass?: string, buildRows: (listEl: HTMLElement) => void }} options
- */
 export function mountCombinedPopoverOverlay(container, { title, overlayClass = '', buildRows }) {
     const existing = container.querySelector('.combined-medal-times-overlay');
     if (existing) return;
@@ -342,11 +329,6 @@ export class ModalContentUi {
     constructor() {}
 
     get modalLapTimes() { return document.getElementById('modal-lap-times'); }
-    /**
-     * Paints the combined-result hero medal. Split out of renderCombinedResults
-     * so a finish already on screen can have its medal patched once the server
-     * confirms or refuses the run.
-     */
     renderCombinedMedalOverlay(heroMedalEl, options = {}) {
         if (!heroMedalEl) return;
         heroMedalEl.replaceChildren();
@@ -462,9 +444,7 @@ export class ModalContentUi {
     const objectiveType = typeof scoreboardSnapshot?.objectiveType === 'string'
         ? scoreboardSnapshot.objectiveType
         : null;
-    // Only racers who actually posted a time reach this list. Keep `totalCount`
-    // as a fallback for older Daily payloads that lack an entry count; it is
-    // never a row count to render up to.
+    // Only racers with a posted time are listed; `totalCount` is a fallback for older payloads, never a row count.
     const rawEntry = scoreboardSnapshot?.leaderboardEntryCount;
     const leaderboardEntryCount = rawEntry != null && Number.isFinite(Number(rawEntry))
         ? Math.max(0, Math.trunc(Number(rawEntry)))
@@ -480,9 +460,7 @@ export class ModalContentUi {
 
     const trackName = getTrackName(trackKey, null);
 
-    // Reuse the standings already on screen when there is one. A refresh
-    // publishes the same rows a second time, and rebuilding them would replay
-    // every row's entrance animation over a list the player is already reading.
+    // Reuse the standings already on screen — rebuilding replays every row's entrance animation.
     const existingSection = container.querySelector('.leaderboard-section');
     const section = existingSection || document.createElement('section');
     const leaderboardOnly = container.childElementCount - (existingSection ? 1 : 0) === 0;
@@ -675,8 +653,6 @@ export class ModalContentUi {
             lapCount,
         });
         
-        // A duel is settled by the hero — its verdict is the whole story, so the
-        // best-lap stat stays out of it rather than reporting "no lap times yet".
         const isChallengeHero = Boolean(
             challengeFinish || challengeConfirmPhase || lapMedal === 'challenge',
         );

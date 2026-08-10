@@ -62,8 +62,6 @@ describe('campaign carousel card model', () => {
             { unlocked: true, medal: 'gold', bestTimeMs: 26_500 },
         ]));
 
-        // Stage 00 wearing the live-stage marker made a finished campaign look
-        // like it had been reset back to the start.
         expect(cards.map((card) => card.isCurrent)).toEqual([false, false, false, false]);
     });
 
@@ -76,11 +74,6 @@ describe('campaign carousel card model', () => {
         expect(cards[1].lockedLabel).toContain('Earn any medal on');
     });
 
-    /**
-     * The card keeps both independent gates as structured copy: the previous
-     * stage medal and the campaign-wide total. The legacy label remains the
-     * first actionable sentence for non-carousel callers.
-     */
     it('carries both unlock requirements to the card', () => {
         const cards = buildCampaignCarouselCards(campaignState([
             { unlocked: true, medal: null },
@@ -119,7 +112,6 @@ describe('campaign carousel card model', () => {
 
         expect(cards[1].lockMeter).toEqual({ label: 'Medals', remainingMedals: 9, ratio: 0.25 });
         expect(cards[1].metaLabel).toBe('3 Laps');
-        // The sentence stays reachable for the screen reader on the rank chip.
         expect(cards[1].lockedLabel).toBe('9 more medals needed');
     });
 
@@ -142,17 +134,13 @@ describe('campaign carousel card model', () => {
             { unlocked: true, medal: 'author' },
             {
                 unlocked: false,
-                // Already past the price, held only by the unmedalled stage 02.
                 unlock: { type: 'medal_total', requiredMedals: 3, previousRaceId: 'numbered-v1-02' },
             },
         ]));
 
         expect(cards[0].lockMeter).toBeNull();
-        // Eight medals against a price of three: the ring fills, but no
-        // misleading over-target fraction is printed into it.
         expect(cards[2].lockMeter).toBeNull();
         expect(cards[2].lockedLabel).toBe('Complete the previous stage first');
-        // A locked stage with no price quoted has no bar to draw.
         expect(cards[3].lockMeter).toBeNull();
     });
 
@@ -319,11 +307,6 @@ describe('campaign carousel engine wiring', () => {
 });
 
 describe('campaign card medal targets', () => {
-    /**
-     * The card used to print the time the stage still owed. The medal stack is
-     * already on it, tier by tier, filled to whatever has been earned — the row
-     * restated that in numbers nobody had asked for.
-     */
     it('leaves the target times off the card entirely', () => {
         const cards = buildCampaignCarouselCards(campaignState([
             { unlocked: true, bestTimeMs: 60_000, medal: 'bronze' },
@@ -331,7 +314,6 @@ describe('campaign card medal targets', () => {
         ]));
 
         for (const card of cards) expect(card.chase).toBeUndefined();
-        // The stack is what says where the stage stands.
         expect(cards[0].medalTiers.map(({ tier, filled }) => [tier, filled])).toEqual([
             ['bronze', true], ['silver', false], ['gold', false], ['author', false],
         ]);

@@ -23,6 +23,10 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The stable Current Daily launcher always displays the active UTC-day track and opens the expanded game in Daily mode; it never reuses a dated post payload.
 - [ ] The Campaign launcher opens the expanded game in Campaign mode.
 - [ ] The Campaign launcher keeps the expanded game's loading screen visible until Campaign progress, stages, and unlocks resolve; the first Campaign lobby paint shows the actual player state without a pending Start Race spinner.
+- [ ] Open Campaign directly with a stale/missing guest token and during a
+  forced guest-promotion failure; an unranked or promotion-pending first response
+  never replaces progress, the repaired credential retries once, and the guest
+  credential remains available for a later retry if migration still fails.
 - [ ] The Lobby launcher opens the expanded game in the Home lobby, even after a previous Daily or Campaign launch on the same device.
 - [ ] The full game is understandable for a first-time player without extra instructions.
 - [ ] The launch card works without inline scroll traps.
@@ -57,7 +61,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.
 - [ ] Campaign stages use the fixed `2,2,1,1,2,1,1,3,2,1,3,1,2,2` lap sequence,
-  including Golden Ratio as the final three-lap stage, and require
+  closing on Golden Ratio as a two-lap stage — Imaginary Number is the last
+  three-lap one — and require
   the configured medal total plus any medal on the immediately previous stage,
   and keep independent permanent standings and PB ghosts.
 - [ ] A locked Campaign card shows both unlock gates with medal placeholders:
@@ -114,14 +119,18 @@ Mini Racer is a **game**, so the most important launch requirements are:
   locked Campaign track or expired Daily track only for that duel, reports
   win/tie/loss correctly, and writes no Daily/Campaign progress, PB, or
   leaderboard data.
-- [ ] A guest can race a Head to Head from the in-feed post, keep a best result
-  across retries, and merge that result when the guest later signs in.
+- [ ] A guest can race a Head to Head from the in-feed post; a verified win
+  remains visible for five minutes, creates no durable Head to Head history,
+  cannot be used to Brag while signed out, and does not merge at sign-in.
 - [ ] Open a Head to Head with no Reddit session and with a stale stored guest
   token; verify the post refreshes the guest identity once, enables Race Head to
   Head, and never shows a sign-in requirement for a ready challenge.
 - [ ] Interrupt or time out a Head to Head load and verify the global loader
   dismisses, the challenge pane offers Retry, and a successful retry enables
   Race Head to Head without a sign-in prompt.
+- [ ] Hold profile and Daily startup requests open while a Head to Head response
+  succeeds; the challenge opens from its single request without waiting for the
+  unrelated 20-second startup cap, and its track/frozen ghost remain selected.
 - [ ] Exercise more than twelve Head to Head submission attempts in one minute
   for one identity and verify the 429 response is actionable, expensive post
   resolution is skipped for throttled attempts, and normal submission resumes

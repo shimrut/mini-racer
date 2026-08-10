@@ -247,8 +247,6 @@ describe('daily GP result sharing', () => {
                 commentText: expect.stringContaining('42.38'),
             },
         });
-        // Preview no longer creates the score thread (deferred to confirm); no
-        // Reddit comment submission should happen during the preview step.
         expect(reddit.submitComment).not.toHaveBeenCalled();
 
         const confirmed = await confirmDailyGpShare(

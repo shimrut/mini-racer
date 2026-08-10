@@ -71,6 +71,15 @@ function readStoredTarget(root) {
     }
 }
 
+function clearStoredTarget(root) {
+    const storage = root?.localStorage;
+    if (!storage) return;
+    try {
+        storage.removeItem(LAUNCH_TARGET_KEY);
+    } catch {
+    }
+}
+
 export function requestGameLaunchTarget(mode, {
     challengeId = null,
     root = globalThis,
@@ -113,13 +122,12 @@ export function resolveGameLaunchTarget(root = globalThis) {
     const queryMode = readQueryTarget(root);
     if (queryMode) return { mode: queryMode, challengeId: null };
 
-    // Launcher posts are intentionally deterministic. They must not inherit a
-    // one-use target left by a previous Daily, Campaign, or challenge action.
     const explicitPostTarget = readExplicitPostTarget(root);
-    if (explicitPostTarget) return explicitPostTarget;
+    if (explicitPostTarget) {
+        clearStoredTarget(root);
+        return explicitPostTarget;
+    }
 
-    // Own-challenge redirects and explicit launcher buttons store targets like 'home' or 'campaign'.
-    // These must take precedence over challenge post data.
     const storedRedirect = peekStoredRedirectTarget(root);
     if (storedRedirect) return storedRedirect;
 

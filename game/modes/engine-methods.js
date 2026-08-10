@@ -1,4 +1,3 @@
-/** Cross-mode routing: Home, Daily, Campaign and Challenge share one race loop, so which mode owns a lobby/restart/finish is decided here and dispatched to each mode's own implementation. */
 import {
     cancelDeferredLobbyWork,
     deferLobbyWorkUntilAfterPaint,
@@ -16,8 +15,6 @@ export const modeRouterEngineMethods = {
         this.clearDailyChallengeRun();
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.lobbyUi.showHome();
-        // Re-syncs the background to today's track, since a race on any other
-        // track (or day) leaves currentTrackKey pointing at it.
         void this.syncReadyBackgroundTrack(this.currentDailyChallenge).catch((error) => {
             console.error('Error syncing Home background track:', error);
         });
@@ -35,8 +32,6 @@ export const modeRouterEngineMethods = {
         if (this.dailyCarousel?.isEmpty?.()) {
             this.dailyCarousel.renderStatus?.({ loading: true });
         }
-        // Switching panes is the response to the tap. Card construction and
-        // preview canvases wait until that lightweight state has painted.
         deferLobbyWorkUntilAfterPaint(this, 'daily', () => {
             void this.refreshDailyCarousel?.({ selectChallengeId });
         });
@@ -88,9 +83,6 @@ export const modeRouterEngineMethods = {
         if (this.activeRaceMode === 'challenge') {
             return this.loadChallengeLobby(this.activeHeadToHead?.challengeId);
         }
-        // Capture this before showDailyLobby resets the completed run. Scroll
-        // position is presentation state; the race record is the authority for
-        // which day must be restored.
         const racedChallengeId = this.activeDailyChallenge?.id
             || this.lastPlayedDailyChallenge?.id
             || this.selectedDailyChallengeId

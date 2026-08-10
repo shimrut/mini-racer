@@ -33,10 +33,6 @@ function makeDistortionCurve(amount) {
     return curve;
 }
 
-/**
- * Procedural motor: high-speed racing synth-engine, drivetrain whine, tire noise,
- * slip screech, and light bus compression. Ducked when disabled / paused / hidden tab.
- */
 export function createCarEffectsAudio(externalCtx, externalOutput) {
     const activeNodes = new Set();
     function keepAlive(node) {
@@ -204,7 +200,6 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         combustionPulseOsc.connect(exhaustPulseMod);
         motorPulseMod.connect(motorGain.gain);
 
-        // Subtle arcade drivetrain shimmer.
         thrumLFO = ctx.createOscillator();
         thrumLFO.type = 'sine';
         thrumLFO.frequency.value = 4.0;
@@ -361,7 +356,6 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const g = ctx.createGain();
 
             osc.type = 'sine';
-            // Low beep for the three red lights
             osc.frequency.setValueAtTime(600, t);
 
             g.gain.setValueAtTime(0, t);
@@ -387,7 +381,6 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const g = ctx.createGain();
 
             osc.type = 'sine';
-            // High beep for GO
             osc.frequency.setValueAtTime(1200, t);
 
             g.gain.setValueAtTime(0, t);
@@ -513,7 +506,6 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const engineVol = (0.065 + rpmNorm * 0.082 + speedNorm * 0.055) * (0.58 + load * 0.42);
             motorGain.gain.setTargetAtTime(engineVol, t, smooth);
 
-            // Slip / Screech - Higher Q makes it a 'screech' instead of 'rustle' (foșnit)
             const slipDrive = slip * slip;
             const slipVol = Math.min(0.18, slipDrive * 0.5) * (0.3 + speedNorm * 0.7);
             slipGain.gain.setTargetAtTime(slipVol, t, smooth);

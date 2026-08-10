@@ -213,7 +213,6 @@ async function deleteCommentBestEffort(comment: any): Promise<void> {
     try {
         await comment?.delete?.();
     } catch (_error) {
-        // Best effort cleanup after losing the share claim.
     }
 }
 
@@ -226,12 +225,7 @@ async function checkRateLimit(username: string): Promise<number | null> {
     if (Number.isFinite(expiresAt) && expiresAt > 0) {
         return Math.max(1, expiresAt - Math.floor(Date.now() / 1000));
     }
-    // The key is scoped to the username only (no challenge/competition id to
-    // age it out), so a missing TTL here — from a crash between incrBy and
-    // expire above, or any other gap — would otherwise wedge this user's
-    // counter above the limit forever: it can keep incrementing but never
-    // expire. Repair it so the window actually restarts instead of just
-    // reporting a retry time that never becomes true.
+    // Scoped to the username alone, so a missing TTL would wedge this counter above the limit forever — repair the window.
     await redis.expire(key, SHARE_RATE_LIMIT_SECONDS);
     return SHARE_RATE_LIMIT_SECONDS;
 }
@@ -298,7 +292,6 @@ async function recoverDailyGpPost({
             const postData = await post.getPostData();
             if (postData?.challengeId === challengeId) matches.push(post);
         } catch (_error) {
-            // Ignore unrelated or unavailable historical posts.
         }
     }
     if (!matches.length) return null;
@@ -331,7 +324,6 @@ export async function resolveDailyGpPostRecord({
             await reddit.getPostById(stored.postId);
             return stored;
         } catch (_error) {
-            // Recover from an older post or a stale record below.
         }
     }
     return recoverDailyGpPost({ subredditName, challengeId, appSlug, preferredPostUrl });
@@ -349,7 +341,6 @@ export async function ensureDailyGpScoreThread(
                 return record;
             }
         } catch (_error) {
-            // Rebuild a missing thread below.
         }
     }
 
@@ -437,7 +428,6 @@ async function readActiveSharedResult(record: SharePreviewRecord): Promise<Share
         const comment = await reddit.getCommentById(shared.commentId);
         if (!(comment as any)?.removed) return shared;
     } catch (_error) {
-        // Treat a deleted/unavailable comment as shareable again.
     }
     await redis.del(key);
     return null;
@@ -608,7 +598,6 @@ export async function confirmDailyGpShare(
             try {
                 await (comment as any).delete();
             } catch (_error) {
-                // Best effort cleanup; the share still fails closed.
             }
             return {
                 status: 409,

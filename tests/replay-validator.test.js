@@ -414,12 +414,6 @@ describe('server replay validator', () => {
     });
 
     it('freezes exactly the recorded relaunch-delay frames (no off-by-one input shift)', () => {
-        // A run that started from a crash auto-restart or pause-resume arms a
-        // relaunch delay, so the replay begins with relaunchDelay=true frames.
-        // The validator must freeze the car for exactly those frames and run
-        // physics on the very first relaunchDelay=false frame — matching the
-        // client. A residual timer (the old fixedDt + EPSILON) froze one extra
-        // frame, shifting every later steering input by one frame.
         const physicsFrames = 10;
         const replay = {
             targetLapNumber: 1,

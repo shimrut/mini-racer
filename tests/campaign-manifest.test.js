@@ -37,17 +37,10 @@ describe('Campaign manifest', () => {
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);
     });
 
-    /**
-     * The curve is a balance decision, not an implementation detail: every gate
-     * has to stay clearable without a single Author, and has to keep asking for
-     * more than the one before it or a stage would open for free.
-     */
     it('keeps every gate reachable on Gold alone and strictly rising', () => {
         const requirements = CAMPAIGN_STAGES.map((stage) => stage.unlock.requiredMedals ?? 0);
         expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30, 32]);
         requirements.forEach((required, index) => {
-            // Gold on every stage before this one, the best a player can do
-            // without ever touching an Author time.
             expect(required).toBeLessThanOrEqual(index * 3);
             if (index > 0) expect(required).toBeGreaterThan(requirements[index - 1]);
         });
@@ -65,8 +58,6 @@ describe('Campaign manifest', () => {
         expect(countCampaignMedals({
             'numbered-v1-00': { medal: 'author' },
             'numbered-v1-01': { medal: 'bronze' },
-            // A finished stage that earned nothing is worth nothing, and a race
-            // outside the campaign is not part of this total at all.
             'numbered-v1-02': { medal: null },
             'daily-2026-07-29': { medal: 'gold' },
         })).toBe(5);
@@ -79,11 +70,6 @@ describe('Campaign manifest', () => {
         })).toEqual(['numbered-v1-00', 'numbered-v1-01']);
     });
 
-    /**
-     * The point of the total: strength on one stage pays for weakness on
-     * another. Silver on stage 01 would have been a dead end under the old
-     * chain — here it still opens stage 03 because the other two carried it.
-     */
     it('opens a stage the old Gold chain would have kept shut', () => {
         expect(getCampaignUnlockedRaceIds({
             'numbered-v1-00': { medal: 'gold' },
@@ -97,12 +83,6 @@ describe('Campaign manifest', () => {
         ]);
     });
 
-    /**
-     * Medals spend against every gate at once, so a total on its own would let a
-     * strong early run open stages the player has never driven: six Authors is
-     * 24 medals, past the price of stages 06 through 09 together. The medal on
-     * the stage before is what holds the ladder to one rung at a time.
-     */
     it('opens one stage at a time however strong the early runs are', () => {
         for (const medal of ['gold', 'author']) {
             for (let played = 1; played < CAMPAIGN_STAGES.length; played += 1) {
@@ -111,7 +91,6 @@ describe('Campaign manifest', () => {
                     results[stage.raceId] = { medal };
                 }
                 const unlocked = getCampaignUnlockedRaceIds(results);
-                // Everything played, plus exactly one stage past it.
                 expect(unlocked).toHaveLength(played + 1);
                 expect(unlocked.at(-1)).toBe(CAMPAIGN_STAGES[played].raceId);
             }
@@ -124,11 +103,8 @@ describe('Campaign manifest', () => {
             'numbered-v1-01': { medal: 'author' },
             'numbered-v1-02': { medal: 'author' },
             'numbered-v1-03': { medal: 'author' },
-            // Driven and banked, but too slow for even a Bronze.
             'numbered-v1-04': { medal: null },
         };
-        // 16 medals is well past stage 05's price of 12 — the empty stage 04 is
-        // the only thing in the way.
         expect(countCampaignMedals(authorsThenNothing)).toBe(16);
         expect(getCampaignUnlockedRaceIds(authorsThenNothing)).not.toContain('numbered-v1-05');
 
@@ -140,7 +116,6 @@ describe('Campaign manifest', () => {
         const silverEverywhere = Object.fromEntries(
             CAMPAIGN_STAGES.slice(0, 9).map((stage) => [stage.raceId, { medal: 'silver' }]),
         );
-        // Silver on all nine earlier stages is 18 medals — four short of stage 09.
         expect(countCampaignMedals(silverEverywhere)).toBe(18);
         expect(getCampaignUnlockedRaceIds(silverEverywhere)).not.toContain('numbered-v1-09');
 
@@ -148,7 +123,6 @@ describe('Campaign manifest', () => {
         for (const stage of CAMPAIGN_STAGES.slice(0, 4)) withFourGolds[stage.raceId] = { medal: 'gold' };
         expect(getCampaignUnlockedRaceIds(withFourGolds)).toContain('numbered-v1-09');
 
-        // Two Authors are worth those four Golds: each is two medals past Silver.
         const withTwoAuthors = { ...silverEverywhere };
         for (const stage of CAMPAIGN_STAGES.slice(0, 2)) withTwoAuthors[stage.raceId] = { medal: 'author' };
         expect(getCampaignUnlockedRaceIds(withTwoAuthors)).toContain('numbered-v1-09');

@@ -180,9 +180,7 @@ describe('daily-challenge service wave6', () => {
     });
 
     it('sorts playlist entries by newest startsAt then id (L333-L336)', () => {
-        // Pinned like the merge test above: these fixtures are only in the
-        // cache while their `availableUntil` is in the future, so on the real
-        // clock the test starts failing the day it passes.
+        // Pinned: these fixtures only stay cached while `availableUntil` is in the future.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-26T00:00:00.000Z'));
 
@@ -297,9 +295,7 @@ describe('daily-challenge service wave6', () => {
     });
 
     it('persists cached playlist entries to localStorage (L366-L368)', () => {
-        // An entry is only written while it is still available, so the clock
-        // has to be pinned behind `availableUntil` rather than left to run
-        // past it.
+        // Pinned: an entry is only written while it is still available.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-26T00:00:00.000Z'));
 

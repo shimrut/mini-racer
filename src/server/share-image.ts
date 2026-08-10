@@ -4,10 +4,6 @@ export function getShareImageAssetPath(trackKey: string): string {
     return `share/${trackKey}.jpg`;
 }
 
-/**
- * Resolves the public CDN URL for a track's share JPG uploaded from `assets/share/`.
- * Returns null when the Devvit asset map is unavailable or the file was not uploaded.
- */
 export function resolveDailyShareImageUrl(trackKey: string): string | null {
     if (typeof trackKey !== 'string' || !trackKey.trim()) {
         return null;

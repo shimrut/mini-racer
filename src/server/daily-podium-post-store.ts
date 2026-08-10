@@ -3,7 +3,6 @@ import { DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
 import type { DailyGpPodiumPostData } from './daily-podium-model.js';
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
 
-/** How long a create-claim may sit if the winner crashes before release. */
 export const DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
 
 export type DailyGpPodiumPostRecord = {
@@ -133,7 +132,6 @@ export async function readDailyGpPodiumPostRecord(
     );
 }
 
-/** First-writer-wins create. Returns false if a record already exists. */
 export async function writeDailyGpPodiumPostRecordIfAbsent(
     record: DailyGpPodiumPostRecord,
 ): Promise<boolean> {

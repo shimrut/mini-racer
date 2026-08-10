@@ -46,6 +46,7 @@ import { objectiveTypeForLapCount } from '../race/race-spec.js';
 const MIN_DAILY_TIME = 2.0;
 const MAX_DAILY_TIME = 60 * 60;
 const DEFAULT_DAILY_LIMIT = 10;
+export const DAILY_REQUEST_TIMEOUT_MS = 20_000;
 const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
 const DAILY_PLAYLIST_CACHE_KEY = 'VectorGpDailyChallengePlaylistCache';
 const DAILY_SNAPSHOT_CACHE_KEY = 'VectorGpDailyChallengeSnapshotCache';
@@ -71,14 +72,12 @@ function getMockDailyUrlParams() {
     }
 }
 
-/** Standalone local preview cards (`preview.html` and `daily.html`) — use mock data only outside Reddit hosting. */
 export function isPreviewPage() {
     if (typeof window === 'undefined') return false;
     const path = window.location?.pathname || '';
     return /(?:^|\/)(?:preview|daily)\.html$/i.test(path);
 }
 
-/** mockDaily=true → random track; mockDaily=<trackKey> → that track only */
 export function resolveMockDailyTrackKey(params) {
     if (!params) return null;
 
@@ -672,6 +671,50 @@ export function getDailyChallengeTrackName(challenge) {
     return getTrackName(challenge?.trackKey, 'Unknown Track');
 }
 
+function createDailyRequestTimeout(options) {
+    const controller = typeof AbortController === 'function' && !options.signal
+        ? new AbortController()
+        : null;
+    const timeoutId = controller
+        ? setTimeout(() => controller.abort(), DAILY_REQUEST_TIMEOUT_MS)
+        : null;
+    return {
+        options: controller ? { ...options, signal: controller.signal } : options,
+        clear: () => {
+            if (timeoutId !== null) clearTimeout(timeoutId);
+        },
+    };
+}
+
+async function readDailyJson(url, options = {}) {
+    const timeout = createDailyRequestTimeout(options);
+    try {
+        const response = await fetch(url, timeout.options);
+        if (!response.ok) throw new Error(`Server returned status ${response.status}`);
+        return await response.json();
+    } finally {
+        timeout.clear();
+    }
+}
+
+async function postDailyJson(url, payload) {
+    const timeout = createDailyRequestTimeout({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    try {
+        const response = await fetch(url, timeout.options);
+        return {
+            ok: response.ok,
+            status: response.status,
+            body: await response.json().catch(() => null),
+        };
+    } finally {
+        timeout.clear();
+    }
+}
+
 export async function getActiveDailyChallenge({
     allowExpiredPost = false,
     ignorePostData = false,
@@ -694,17 +737,11 @@ export async function getActiveDailyChallenge({
 
     if (config && typeof fetch === 'function') {
         try {
-            const response = await fetch(config.dailyActiveUrl, { method: 'GET' });
-
-            if (response.ok) {
-                const payload = await response.json();
-                const challenge = normalizeDailyChallenge(payload);
-                if (challenge) {
-                    writeActiveDailyCacheStorable(challenge);
-                    return challenge;
-                }
-            } else {
-                throw new Error(`Server returned status ${response.status}`);
+            const payload = await readDailyJson(config.dailyActiveUrl, { method: 'GET' });
+            const challenge = normalizeDailyChallenge(payload);
+            if (challenge) {
+                writeActiveDailyCacheStorable(challenge);
+                return challenge;
             }
         } catch (error) {
             console.warn('Failed to fetch active daily challenge from server, trying fallbacks:', error);
@@ -728,23 +765,17 @@ async function loadDailyChallengePlaylist() {
     const config = API_ROUTES;
     if (config && typeof fetch === 'function') {
         try {
-            const response = await fetch(config.dailyPlaylistUrl, { method: 'GET' });
-
-            if (response.ok) {
-                const payload = await response.json();
-                const rawChallenges = Array.isArray(payload)
-                    ? payload
-                    : Array.isArray(payload?.challenges)
-                        ? payload.challenges
-                        : [];
-                const parsed = rawChallenges
-                    .map((challenge) => normalizeDailyChallenge(challenge))
-                    .filter(Boolean);
-                if (parsed.length > 0) {
-                    return parsed;
-                }
-            } else {
-                throw new Error(`Server returned status ${response.status}`);
+            const payload = await readDailyJson(config.dailyPlaylistUrl, { method: 'GET' });
+            const rawChallenges = Array.isArray(payload)
+                ? payload
+                : Array.isArray(payload?.challenges)
+                    ? payload.challenges
+                    : [];
+            const parsed = rawChallenges
+                .map((challenge) => normalizeDailyChallenge(challenge))
+                .filter(Boolean);
+            if (parsed.length > 0) {
+                return parsed;
             }
         } catch (error) {
             console.warn('Failed to fetch daily challenge playlist from server, trying fallbacks:', error);
@@ -812,14 +843,8 @@ async function loadDailyChallengeSnapshot({
             url.searchParams.set('limit', safeLimit.toString());
             url.searchParams.set('offset', safeOffset.toString());
 
-            const response = await fetch(url.toString(), { method: 'GET' });
-
-            if (response.ok) {
-                const payload = await response.json();
-                return normalizeScoreboardSnapshot(payload);
-            } else {
-                throw new Error(`Server returned status ${response.status}`);
-            }
+            const payload = await readDailyJson(url.toString(), { method: 'GET' });
+            return normalizeScoreboardSnapshot(payload);
         } catch (error) {
             console.warn('Failed to fetch daily challenge snapshot from server, trying fallbacks:', error);
             if (!shouldUseMockDailyChallenge() && !isLocalEnvironment()) {
@@ -923,28 +948,16 @@ export async function submitDailyChallengeBestTime({
         };
     }
 
-    const response = await fetch(config.dailySubmitUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            playerId: getOrCreatePlayerId('daily challenge'),
-            guestToken: getGuestPlayerToken(),
-            challengeId,
-            trackKey,
-            leaderboardIdentity: getLeaderboardIdentityPreference(),
-            bestTime,
-            replay,
-            checkpointTimesSec: Array.isArray(checkpointTimesSec) ? checkpointTimesSec : null,
-        })
+    return postDailyJson(config.dailySubmitUrl, {
+        playerId: getOrCreatePlayerId('daily challenge'),
+        guestToken: getGuestPlayerToken(),
+        challengeId,
+        trackKey,
+        leaderboardIdentity: getLeaderboardIdentityPreference(),
+        bestTime,
+        replay,
+        checkpointTimesSec: Array.isArray(checkpointTimesSec) ? checkpointTimesSec : null,
     });
-
-    return {
-        ok: response.ok,
-        status: response.status,
-        body: await response.json().catch(() => null)
-    };
 }
 
 async function postDailyShareRequest(url, body) {
@@ -955,16 +968,7 @@ async function postDailyShareRequest(url, body) {
             body: { status: 'unavailable_locally', error: 'Reddit sharing is only available in the hosted game.' }
         };
     }
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    return {
-        ok: response.ok,
-        status: response.status,
-        body: await response.json().catch(() => null),
-    };
+    return postDailyJson(url, body);
 }
 
 export function previewDailyChallengeShare(payload = {}) {

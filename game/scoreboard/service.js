@@ -16,7 +16,6 @@ import {
 const MAX_SCOREBOARD_LIMIT = 100;
 const DEFAULT_SCOREBOARD_LIMIT = 10;
 
-/** Same-key concurrent callers share one network round-trip. */
 const inflightScoreboardSnapshots = new Map();
 
 async function fetchScoreboardSnapshotViaProxy(config, trackKey, playerId, safeLimit, safeOffset) {

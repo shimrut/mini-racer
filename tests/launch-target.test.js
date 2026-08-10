@@ -40,6 +40,23 @@ describe('game launch target', () => {
         const root = createRoot({ postData: { postType, launchMode: mode } });
         requestGameLaunchTarget('daily', { root });
         expect(resolveGameLaunchTarget(root)).toEqual({ mode, challengeId: null });
+        expect(root.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
+    });
+
+    it('does not let a consumed Campaign launcher target hijack the next challenge post', () => {
+        const root = createRoot({ postData: { postType: 'campaign-launcher' } });
+        requestGameLaunchTarget('campaign', { root });
+
+        expect(resolveGameLaunchTarget(root))
+            .toEqual({ mode: 'campaign', challengeId: null });
+        expect(root.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
+
+        root.devvit.context.postData = {
+            postType: 'head-to-head',
+            challengeId: 'challenge-1',
+        };
+        expect(resolveGameLaunchTarget(root))
+            .toEqual({ mode: 'challenge', challengeId: 'challenge-1' });
     });
 
     it('accepts a generic mode launcher post target', () => {

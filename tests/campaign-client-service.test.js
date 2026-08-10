@@ -25,20 +25,16 @@ describe('campaign client progress', () => {
     });
 
     it('unlocks stages as the medal total climbs, one at a time', () => {
-        // Silver is two medals: enough for the 1-medal gate on stage 01.
         const silver = deriveCampaignProgress({
             'numbered-v1-00': { bestTimeMs: 7500, medal: 'silver' },
         });
         expect(silver.unlockedRaceIds).toEqual(['numbered-v1-00', 'numbered-v1-01']);
 
-        // Improving that same stage to Gold pays stage 02's price of 3, but
-        // stage 02 stays shut: stage 01 has not been raced yet.
         const gold = deriveCampaignProgress({
             'numbered-v1-00': { bestTimeMs: 7100, medal: 'gold' },
         });
         expect(gold.unlockedRaceIds).toEqual(['numbered-v1-00', 'numbered-v1-01']);
 
-        // A medal on stage 01 is what opens it.
         const both = deriveCampaignProgress({
             'numbered-v1-00': { bestTimeMs: 7100, medal: 'gold' },
             'numbered-v1-01': { bestTimeMs: 10_000, medal: 'bronze' },
@@ -96,6 +92,65 @@ describe('campaign client progress', () => {
             availability: 'unavailable',
             authoritative: false,
             ranked: false,
+        });
+    });
+
+    it('does not treat an unranked HTTP 200 Campaign bootstrap as authoritative', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: vi.fn().mockResolvedValue({
+                ranked: false,
+                signedIn: false,
+                progress: { resultsByRaceId: {} },
+            }),
+        });
+
+        await expect(getCampaignBootstrap()).resolves.toMatchObject({
+            availability: 'unavailable',
+            authoritative: false,
+            ranked: false,
+        });
+    });
+
+    it('keeps a signed-in Campaign promotion pending state non-authoritative', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: vi.fn().mockResolvedValue({
+                ranked: true,
+                signedIn: true,
+                guestPromotionPending: true,
+                campaignProgressPromotionPending: true,
+                progress: { resultsByRaceId: {} },
+            }),
+        });
+
+        await expect(getCampaignBootstrap()).resolves.toMatchObject({
+            availability: 'unavailable',
+            authoritative: false,
+            ranked: true,
+            signedIn: true,
+        });
+    });
+
+    it('keeps Campaign playable when only a non-Campaign promotion remains pending', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: vi.fn().mockResolvedValue({
+                ranked: true,
+                signedIn: true,
+                guestPromotionPending: true,
+                campaignProgressPromotionPending: false,
+                progress: { resultsByRaceId: {} },
+            }),
+        });
+
+        await expect(getCampaignBootstrap()).resolves.toMatchObject({
+            availability: 'available',
+            authoritative: true,
+            ranked: true,
         });
     });
 });

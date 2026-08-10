@@ -1,6 +1,5 @@
 export const PLAYER_TRAIL_STORAGE_KEY = 'MiniRacerPlayerTrail';
 
-/** Trail paint for the route line behind the car (canvas strokeStyle). */
 export const PLAYER_TRAIL_COLORS = Object.freeze([
     Object.freeze({ id: 'none', label: 'No Trail', strokeStyle: 'rgba(15, 23, 42, 0)', swatch: '#0f172a' }),
     Object.freeze({ id: 'sky', label: 'Sky', strokeStyle: 'rgba(56, 189, 248, 0.5)', swatch: '#38bdf8' }),

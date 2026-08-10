@@ -1,4 +1,3 @@
-/** @type {Set<() => void>} */
 const prepareFns = new Set();
 let windowListenersInstalled = false;
 
@@ -26,11 +25,6 @@ function onFirstUserGesture() {
     windowListenersInstalled = false;
 }
 
-/**
- * Web Audio contexts often start suspended until a user gesture.
- * Registers a prepare callback; installs at most one set of window listeners
- * until the first qualifying gesture runs all registered prepares.
- */
 export function registerAudioPrepareOnFirstUserGesture(prepareFn) {
     if (typeof window === 'undefined') {
         return;

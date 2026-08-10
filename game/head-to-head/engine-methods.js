@@ -36,8 +36,6 @@ function toRaceChallenge(stage) {
 }
 
 export const headToHeadEngineMethods = {
-    // The challenge record keeps no per-viewer result, so the finish sheet hands its own
-    // verdict over. Reopening the post falls back to the stored win until it expires.
     async loadChallengeLobby(challengeId = null, { outcome = null, bestTimeMs = null } = {}) {
         this.headToHeadChallengeId = challengeId;
         cancelDeferredLobbyWork(this);
@@ -48,9 +46,6 @@ export const headToHeadEngineMethods = {
         try {
             response = await getHeadToHead(challengeId);
         } catch (error) {
-            // A challenge post can outlive a slow WebView connection. Keep the
-            // failure inside the lobby flow so startup can always hand control
-            // to the player instead of leaving the global loader up forever.
             console.error('Failed to load Head to Head challenge:', error);
             response = {
                 ok: false,
@@ -73,8 +68,6 @@ export const headToHeadEngineMethods = {
         this.activeHeadToHead = response.ok && challenge ? {
             ...challenge,
             frozenGhost: response.body?.opponentGhost ?? null,
-            // The finish sheet crowns the viewer with their own face, so the duel
-            // carries the avatar the lobby already fetched.
             viewerAvatarUrl: response.body?.viewerAvatarUrl ?? null,
         } : null;
         const challengeReady = response.ok
@@ -89,9 +82,6 @@ export const headToHeadEngineMethods = {
         this.lobbyUi.showChallenge({
             signedIn: response.body?.viewerType === 'reddit',
             canRace: challengeReady,
-            // Contextual post data is presentation-only until the server has
-            // returned the authoritative frozen challenge and ghost. It is
-            // still useful while a transient request is waiting for Retry.
             available: challengeReady || Boolean(challenge),
             canRetry: retryable,
             challengerName: challenge?.challengerUsername,
@@ -148,7 +138,7 @@ export const headToHeadEngineMethods = {
             this.activeRaceMode = 'challenge';
             this.clearRaceComparisonTarget?.();
             this.pbGhost.clearTrack();
-            if (stage.trackKey !== this.currentTrackKey) {
+            if (stage.trackKey !== this.currentTrackKey || !this.trackCanvas) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
@@ -176,10 +166,14 @@ export const headToHeadEngineMethods = {
     async handleHeadToHeadWin(winData) {
         const challenge = this.activeHeadToHead;
         if (!challenge) return;
+        this._headToHeadFinishAttempt = (this._headToHeadFinishAttempt ?? 0) + 1;
+        const finishAttempt = this._headToHeadFinishAttempt;
         this.status = 'won';
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
+        const submissionBlockedReason = this.rankedSubmissionBlockedReason
+            || (replay ? null : 'This run could not be verified.');
         const submittingStatus = createVerificationSnapshot({
             verificationState: 'pending',
             isLoading: true,
@@ -191,16 +185,10 @@ export const headToHeadEngineMethods = {
             submissionStage: 'verifying',
         }).statusText || 'Verifying...';
 
-        // The target time is on the client, so the whole verdict — who won and by
-        // how much — is known the moment the race ends. Opening on it spares the
-        // winner a "Submitting..." sheet that flips a beat later; the server still
-        // gets the last word and can take it back.
         const finalTimeMs = Number.isFinite(finalTime) ? Math.round(finalTime * 1000) : null;
         const targetTimeMs = Number.isFinite(challenge.targetTimeMs)
             ? Math.round(challenge.targetTimeMs)
             : null;
-        // Won or lost, the margin is what the racer came for. The hero words the
-        // verdict; the duel only has to say who was raced and by how much.
         const buildVerdict = (differenceMs) => (
             Number.isFinite(differenceMs)
                 ? {
@@ -214,7 +202,10 @@ export const headToHeadEngineMethods = {
             : null;
         const beatsTarget = localDifferenceMs !== null && localDifferenceMs < 0;
 
-        const openPendingFinish = () => {
+        const openPendingFinish = ({
+            phase = beatsTarget ? 'won' : 'pending',
+            error = null,
+        } = {}) => {
             this.modal.showModal(
                 'Challenge complete',
                 null,
@@ -224,10 +215,11 @@ export const headToHeadEngineMethods = {
                     completedLaps: challenge.lapCount,
                     requiredLaps: challenge.lapCount,
                     primaryStatLabel: 'Race Time',
-                    lapMedal: beatsTarget ? 'challenge' : null,
+                    lapMedal: phase === 'won' ? 'challenge' : null,
                     challengeFinish: true,
-                    challengeConfirmPhase: beatsTarget ? 'won' : 'pending',
-                    challengeConfirmStatus: beatsTarget ? null : submittingStatus,
+                    challengeConfirmPhase: phase,
+                    challengeConfirmStatus: phase === 'pending' ? submittingStatus : null,
+                    challengeConfirmError: error,
                     challengeViewerAvatarUrl: challenge.viewerAvatarUrl ?? null,
                     challengeVerdict: buildVerdict(localDifferenceMs),
                     trackKey: challenge.trackKey,
@@ -248,13 +240,8 @@ export const headToHeadEngineMethods = {
             );
         };
 
-        // The verdict is the whole sheet, buttons included: a win retires Improve
-        // for Brag and the two modes waiting outside this duel. Opening on it
-        // keeps the winner from watching a loser's action row for the length of
-        // a round trip.
         const applyWinActions = () => {
             this.modal.setChallengeWinActions?.({
-                // The duel is over, so both exits end it — each asks first.
                 dailyAction: () => this.showDailyLobby(),
                 campaignAction: () => this.showCampaignLobby(),
             });
@@ -267,15 +254,15 @@ export const headToHeadEngineMethods = {
         };
 
         const stillOnThisFinish = () => (
-            this.status === 'won'
+            this._headToHeadFinishAttempt === finishAttempt
+            && this.status === 'won'
             && this.activeHeadToHead?.challengeId === challenge.challengeId
         );
 
-        if (!replay) {
-            openPendingFinish();
-            this.modal.updateChallengeFinishHero?.({
+        if (submissionBlockedReason) {
+            openPendingFinish({
                 phase: 'error',
-                error: 'This run could not be verified.',
+                error: submissionBlockedReason,
             });
             return;
         }
@@ -328,8 +315,6 @@ export const headToHeadEngineMethods = {
             const verdict = buildVerdict(Number(response.body?.differenceMs));
             this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
 
-            // Thread the acceptToken into the finish modal's shareRequest so the brag
-            // comment quotes the run just finished, not a re-derived best.
             const acceptToken = response.body?.acceptToken || null;
             if (acceptToken) {
                 this.modal.updateChallengeFinishHero?.({

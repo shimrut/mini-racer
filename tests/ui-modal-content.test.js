@@ -159,8 +159,6 @@ describe('ui modal content helpers', () => {
             playerRankLabel: null,
         }, 'daily', 'circuit');
 
-        // Nobody has posted a time, so the board is empty even for an older
-        // payload whose totalCount was padded beyond the accepted entries.
         expect(container.querySelectorAll('.combined-row-rank')).toHaveLength(0);
         expect(container.textContent).toContain('No scores recorded yet.');
         expect(container.textContent).not.toContain('You');
@@ -176,9 +174,6 @@ describe('ui modal content helpers', () => {
         const container = dom.window.document.getElementById('leaderboard');
         const component = new ModalContentUi();
 
-        // An older payload may have a padded `totalCount`. Only the 2 racers
-        // with accepted times get rows; the other slots are not the board's
-        // business.
         component.renderScoreboardList(container, {
             topRows: [
                 { rank: 1, displayName: 'Leader', bestTime: 12.3 },
@@ -378,7 +373,6 @@ describe('ui modal content helpers', () => {
         );
         expect(rightGroup.hidden).toBe(false);
 
-        // A payload old enough to carry only `totalCount` still gets a total.
         component.renderCombinedResults(container, {
             time: 12.34,
             bestLap: 12.34,
@@ -416,8 +410,6 @@ describe('ui modal content helpers', () => {
         const container = dom.window.document.getElementById('combined');
         const component = new ModalContentUi();
 
-        // An older payload may have a padded `totalCount`; ranking "of 40" out
-        // of 3 actual racers is the bug this pins shut.
         component.renderCombinedResults(container, {
             time: 12.34,
             bestLap: 12.34,
@@ -431,7 +423,6 @@ describe('ui modal content helpers', () => {
 
         expect(container.querySelector('#combined-rank-total').textContent).toBe('of 3');
 
-        // A zero entry count means nobody has posted, not "fall through to 40".
         component.renderCombinedResults(container, {
             time: 12.34,
             bestLap: 12.34,
@@ -449,12 +440,6 @@ describe('ui modal content helpers', () => {
     });
 });
 
-/**
- * Every element the renderer creates replays the row entrance animation, and a
- * standings screen publishes the same rows two or three times per open —
- * cached, refreshing, then fetched. These pin the rows to the elements already
- * on screen so a refresh rewrites text instead of re-dealing the list.
- */
 describe('leaderboard row patching', () => {
     const originalDocument = global.document;
 
@@ -520,8 +505,6 @@ describe('leaderboard row patching', () => {
         expect(merged).toHaveLength(4);
         expect(merged.slice(0, 2)).toEqual(firstPage);
         expect(merged[3].querySelector('.combined-row-name').textContent).toBe('Racer 4');
-        // The pagination line went away with hasMore, so nothing stale is left
-        // sitting between the rows and the end of the list.
         expect(container.querySelector('.leaderboard-pagination-state')).toBe(null);
     });
 
@@ -598,8 +581,6 @@ describe('leaderboard row patching', () => {
         expect(after).toHaveLength(3);
         expect(after[0]).toBe(before[0]);
         expect(after[1]).toBe(before[1]);
-        // Rank 4 keeps its own element rather than inheriting rank 3's, so it
-        // is not re-inserted and does not replay the entrance.
         expect(after[2]).toBe(before[3]);
         expect(after[2].querySelector('.combined-row-name').textContent).toBe('Racer 4');
     });

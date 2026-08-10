@@ -84,7 +84,6 @@ describe('leaderboard identity', () => {
         expect(hashLeaderboardPlayerId('a')).toBe(3826002220);
         expect(hashLeaderboardPlayerId('player-stable')).toBe(2558244288);
 
-        // No numeric suffix when high hash bits are divisible by four.
         expect(getConstructedLeaderboardName('a')).toBe('Flying Meteor');
         expect(getConstructedLeaderboardName('x')).toBe('Rocket Koala');
         // Suffix uses modulo 98 (not multiply) so the printed number stays small.

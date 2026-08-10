@@ -94,7 +94,6 @@ function getForcedPresentationEventSkin(trackKey) {
                 return forcedSkin.trim();
             }
         } catch (error) {
-            // Ignore malformed overrides and fall back to the first configured skin.
         }
     }
 

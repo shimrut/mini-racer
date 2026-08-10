@@ -1,10 +1,4 @@
-/**
- * Builds the standalone LP page track background with the same schematic
- * preview renderer used by the custom post preview (`preview.js`).
- *
- * Run: `npm run generate:lp-assets`
- * Optional: `node tools/generate-lp-assets.js --track=circuit`
- */
+// Builds the LP page track background with preview.js's schematic renderer. Run: `npm run generate:lp-assets [--track=circuit]`
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -20,12 +14,10 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');
 
-/** Retina-friendly full-bleed size so the page does not upscale a soft JPEG. */
 export const LP_TRACK_WIDTH = 2880;
 export const LP_TRACK_HEIGHT = 1620;
 export const LP_DEFAULT_TRACK_KEY = 'circuit';
 export const LP_BG = '#020617';
-/** Keep the track inside the frame instead of touching the crop edges. */
 export const LP_TRACK_INSET_RATIO = 0.1;
 
 function ensurePath2D() {
@@ -61,9 +53,6 @@ async function loadPreviewCarImage() {
     return loadImage(absolute);
 }
 
-/**
- * Same schematic options as `renderTrackPreview` in `preview.js`.
- */
 export function renderLpTrackPreviewCanvas(canvas, {
     trackKey,
     track,

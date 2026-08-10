@@ -8,8 +8,7 @@ function smoothPoly(points, radius) {
 
     const newPoints = [];
     const len = uniquePoints.length;
-    // Fixed 5 steps: must match the server-side replay-validation
-    // so collision (and scoreboard replays) match the server validator on all devices.
+    // Fixed 5 steps: must match the server-side replay validator so collision agrees on every device.
     const steps = 5;
 
     for (let i = 0; i < len; i++) {

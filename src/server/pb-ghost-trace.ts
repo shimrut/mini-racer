@@ -89,7 +89,6 @@ function cloneRawPose(pose: RawPose): RawPose {
     };
 }
 
-/** Shortest-arc angle delta in radians (matches client ghost playback). */
 function shortestAngleDeltaRad(next: number, previous: number): number {
     let delta = next - previous;
     while (delta > Math.PI) delta -= Math.PI * 2;
@@ -206,9 +205,7 @@ export function createPbGhostTraceRecorder(initialPose: {
             // Reject bad poses without moving lastPose so the next valid frame can still lerp.
             if (!isFiniteRawPose(pose)) return;
 
-            // Compact traces reconstruct regular times as index * 50ms. Stamp the due grid
-            // time, but lerp position/angle from the previous 60Hz pose so playback does not
-            // sit up to one physics frame ahead when the clocks drift.
+            // Stamp the due grid time but lerp the pose from the previous 60Hz sample, or playback sits a physics frame ahead.
             while (pose.timeSec + Number.EPSILON >= nextSampleTimeSec) {
                 appendPose(lerpRawPoseAtTime(lastPose, pose, nextSampleTimeSec));
                 nextSampleTimeSec += sampleIntervalSec;

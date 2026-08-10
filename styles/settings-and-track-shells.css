@@ -4,7 +4,6 @@
     padding: 0
 }
 
-/* Settings only: card shell and Close button rules stay default */
 #settings-modal .modal-card-section--sheet {
     gap: 0.85rem;
 }
@@ -20,7 +19,6 @@
     font-weight: 900;
     font-style: italic;
     text-transform: uppercase;
-    /* Match athletic game modal headers */
     color: var(--text-color);
 }
 
@@ -29,7 +27,6 @@
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    /* Match secondary structural labels */
     color: var(--text-dim);
     opacity: 0.6;
 }
@@ -169,11 +166,9 @@
 #settings-modal .modal-sheet-settings-delay-value {
     flex-shrink: 0;
     font-family: var(--mono-font);
-    /* Monospaced digital clock theme */
     font-size: 0.88rem;
     font-weight: 500;
     color: var(--accent-color);
-    /* Highlight color */
     letter-spacing: 0.02em;
     min-width: 3.5rem;
     text-align: right;
@@ -194,12 +189,9 @@
 
 #settings-modal .modal-sheet-settings-identity-heading {
     font-size: 0.92rem;
-    /* Clean and legible size */
     font-weight: 500;
-    /* Regular elegant weight, not bold! */
     color: var(--text-color);
     text-transform: none;
-    /* Sentence/Title case */
     letter-spacing: 0.01em;
     font-family: var(--header-font);
     flex: 1 1 auto;
@@ -232,10 +224,8 @@
 #settings-modal .modal-sheet-settings-identity-desc {
     margin: 0;
     font-family: var(--mono-font);
-    /* Clean monospaced ID block */
     font-size: 0.82rem;
     font-weight: 400;
-    /* Subtle digital weight */
     font-style: normal;
     text-transform: none;
     letter-spacing: 0.02em;
@@ -247,7 +237,6 @@
 
 #settings-modal .combined-action-btn {
     text-transform: uppercase;
-    /* Keep sports action styling */
     letter-spacing: 0.15em;
     font-size: 0.85rem;
     font-weight: 800;

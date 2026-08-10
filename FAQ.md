@@ -106,8 +106,9 @@ Onyx.
 Existing accepted Daily history and saved Campaign results also count for
 Crimson, including races completed before achievement tracking was added.
 Unlocks stay unlocked. Guest race completion is carried into the Reddit account
-when that guest signs in; creating or winning Head-to-Heads requires Reddit
-sign-in.
+when that guest signs in. Creating a Head-to-Head post or posting a Brag comment
+requires Reddit sign-in; guests can still race and beat another player's
+challenge.
 
 ### Why does Campaign say Start on one device and Continue on another?
 
@@ -125,21 +126,23 @@ the white stroke filling its perimeter shows how close the total is.
 ### Can a challenge unlock a Campaign track?
 
 No. A player challenge is an isolated duel against a frozen verified ghost.
-Its win, tie, or loss can be shared as another challenge, but it never changes
-Campaign progress, PBs, medals, or leaderboards. Challenge finishes also do not
-award Campaign medals or ranks, and they never appear on Campaign or Daily standings.
+Its verified win can be shared as a Brag comment by a signed-in winner, but it
+never changes Campaign progress, PBs, medals, or leaderboards. Challenge
+finishes also do not award Campaign medals or ranks, and they never appear on
+Campaign or Daily standings.
 A win shows a display-only challenge medal and **Challenge beaten** after the
 result is verified (you’ll see Submitting/Verifying in that medal spot first).
 Finish buttons are always **Improve**, **Brag**, and **Home**; **Brag** unlocks
 only after a verified beat. A loss or tie uses the same buttons, but **Brag**
 stays disabled.
 
-### Why can’t I accept or create a player challenge?
+### Can I accept or create a player challenge?
 
-Player challenges require Reddit sign-in. Guests can view the post and
-practice Campaign locally, but cannot challenge other players.
+Reddit sign-in is required to create a challenge post or submit a Brag comment.
+Guests can open, race, and submit against another player’s challenge, but their
+Head to Head result is temporary and does not merge if they later sign in.
 
-You also can’t accept a challenge you created yourself. Accepting your own
+You can’t accept a challenge you created yourself. Opening your own
 post shows a short message and opens your Campaign instead.
 
 ### Share says the preview expired

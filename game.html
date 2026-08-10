@@ -142,29 +142,34 @@
 
                     <section id="lobby-daily-pane" class="lobby-pane main-menu"
                         data-lobby-pane="daily" aria-label="Daily challenge" hidden>
-                        <div id="daily-carousel" class="track-carousel" role="group"
+                        <div id="daily-carousel" class="track-carousel track-carousel--lobby" role="group"
                             aria-roledescription="carousel" aria-label="Daily tracks">
                             <div id="daily-carousel-viewport" class="track-carousel__viewport">
                                 <div id="daily-carousel-rail" class="track-carousel__rail"></div>
                             </div>
                             <p id="daily-carousel-status" class="daily-playlist-empty track-carousel__status"
                                 aria-live="polite" hidden></p>
-                            <button id="daily-carousel-prev" class="track-carousel__nav track-carousel__nav--prev"
-                                type="button" aria-label="Previous track" hidden>
-                                <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
+                            <div id="daily-carousel-navigation" class="track-carousel__navigation"
+                                aria-label="Track navigation">
+                                <button id="daily-carousel-prev" class="track-carousel__nav track-carousel__nav--prev"
+                                    type="button" aria-label="Previous track" hidden>
+                                    <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
                                     <path
                                         d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 246.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z" />
-                                </svg>
-                                <span class="track-carousel__nav-label">Prev</span>
-                            </button>
-                            <button id="daily-carousel-next" class="track-carousel__nav track-carousel__nav--next"
-                                type="button" aria-label="Next track" hidden>
-                                <span class="track-carousel__nav-label">Next</span>
-                                <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
+                                    </svg>
+                                    <span class="track-carousel__nav-label">Prev</span>
+                                </button>
+                                <span id="daily-carousel-count" class="track-carousel__count" role="status"
+                                    aria-live="polite" aria-atomic="true"></span>
+                                <button id="daily-carousel-next" class="track-carousel__nav track-carousel__nav--next"
+                                    type="button" aria-label="Next track" hidden>
+                                    <span class="track-carousel__nav-label">Next</span>
+                                    <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
                                     <path
                                         d="M311.1 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L243.2 256 73.9 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z" />
-                                </svg>
-                            </button>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="lobby-primary-row lobby-primary-row--race">
                             <button id="daily-challenge-start-btn"
@@ -182,29 +187,34 @@
 
                     <section id="lobby-campaign-pane" class="lobby-pane lobby-pane--campaign main-menu"
                         data-lobby-pane="campaign" aria-label="Campaign" hidden>
-                        <div id="campaign-carousel" class="track-carousel" role="group"
+                        <div id="campaign-carousel" class="track-carousel track-carousel--lobby" role="group"
                             aria-roledescription="carousel" aria-label="Campaign stages">
                             <div id="campaign-carousel-viewport" class="track-carousel__viewport">
                                 <div id="campaign-carousel-rail" class="track-carousel__rail"></div>
                             </div>
                             <p id="campaign-carousel-status" class="daily-playlist-empty track-carousel__status"
                                 aria-live="polite" hidden></p>
-                            <button id="campaign-carousel-prev" class="track-carousel__nav track-carousel__nav--prev"
-                                type="button" aria-label="Previous track" hidden>
-                                <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
+                            <div id="campaign-carousel-navigation" class="track-carousel__navigation"
+                                aria-label="Track navigation">
+                                <button id="campaign-carousel-prev" class="track-carousel__nav track-carousel__nav--prev"
+                                    type="button" aria-label="Previous track" hidden>
+                                    <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
                                     <path
                                         d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 246.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z" />
-                                </svg>
-                                <span class="track-carousel__nav-label">Prev</span>
-                            </button>
-                            <button id="campaign-carousel-next" class="track-carousel__nav track-carousel__nav--next"
-                                type="button" aria-label="Next track" hidden>
-                                <span class="track-carousel__nav-label">Next</span>
-                                <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
+                                    </svg>
+                                    <span class="track-carousel__nav-label">Prev</span>
+                                </button>
+                                <span id="campaign-carousel-count" class="track-carousel__count" role="status"
+                                    aria-live="polite" aria-atomic="true"></span>
+                                <button id="campaign-carousel-next" class="track-carousel__nav track-carousel__nav--next"
+                                    type="button" aria-label="Next track" hidden>
+                                    <span class="track-carousel__nav-label">Next</span>
+                                    <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
                                     <path
                                         d="M311.1 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L243.2 256 73.9 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z" />
-                                </svg>
-                            </button>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="lobby-primary-row lobby-primary-row--race">
                             <button id="campaign-primary-btn"

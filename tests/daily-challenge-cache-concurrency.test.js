@@ -4,10 +4,7 @@ import {
     getDailyChallengeSnapshot
 } from '../game/daily-challenge/service.js';
 
-// This file gets its own fresh module graph (Vitest isolates per test file),
-// so the module-level playlist/snapshot caches start empty here. That lets us
-// exercise the in-flight request dedup without leftover state from other
-// daily-challenge test files.
+// Fresh module graph, so the playlist/snapshot caches start empty and the in-flight request dedup can be exercised on its own.
 
 function createJsonResponse(body) {
     return { ok: true, status: 200, json: async () => body };

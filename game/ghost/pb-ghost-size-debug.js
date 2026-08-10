@@ -92,11 +92,7 @@ function lerpRawPoseAtTime(last, current, atTimeSec) {
   };
 }
 
-/**
- * Browser copy of the server's schema-v2 recorder. It is intentionally kept
- * local to this debug feature so the production server contract remains the
- * single authority for accepted submissions.
- */
+/** Local copy of the server's schema-v2 recorder; the server contract stays the single authority. */
 export function createLocalPbGhostTraceRecorder(initialPose) {
   const sampleIntervalSec = PB_GHOST_SAMPLE_INTERVAL_MS / 1000;
   const poses = [];
@@ -252,7 +248,6 @@ async function gzipByteLength(value) {
       await writer.close();
       return readReadableByteLength(stream.readable);
     } catch (_error) {
-      // Fall through to the portable implementation below.
     }
   }
 
@@ -278,12 +273,7 @@ function normalizeLapCount(value) {
   return value === 2 || value === 3 ? value : 1;
 }
 
-/**
- * Builds the same JSON record shape written by pb-ghost-store.ts. The
- * fingerprint placeholder has the same fixed 43-character base64url length
- * as the server's SHA-256 fingerprint, so record-size measurements remain
- * representative without requiring server identity or Redis access.
- */
+/** The fingerprint placeholder matches the server's 43-character base64url length, so size measurements stay representative. */
 export function createLocalPbGhostStorageRecord({
   trace,
   trackKey = 'unknown',
@@ -542,9 +532,6 @@ export class PbGhostSizeCapture {
     };
     this.commitReport(report);
 
-    // JSON byte counts are available synchronously. Persist them before
-    // CompressionStream runs so a browser compression failure cannot erase
-    // the useful part of the debug result.
     let measurement;
     try {
       measurement = await measurePbGhostStorage({ trace, record });

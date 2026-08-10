@@ -443,8 +443,7 @@ describe('daily-challenge mutation survivors', () => {
     });
 
     it('caches post-bound challenges into the playlist before returning them', async () => {
-        // Pinned: buildChallenge defaults to a fixed availableUntil, so a real clock
-        // past it would prune the entry from the playlist cache before it is read back.
+        // Pinned: the fixture's `availableUntil` is fixed, so a real clock would prune it before the assertion.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const postChallenge = buildChallenge({ id: 'post-bound-playlist-cache' });
@@ -475,7 +474,10 @@ describe('daily-challenge mutation survivors', () => {
 
         await getActiveDailyChallenge();
 
-        expect(fetch).toHaveBeenCalledWith('/api/daily/active', { method: 'GET' });
+        expect(fetch).toHaveBeenCalledWith(
+            '/api/daily/active',
+            expect.objectContaining({ method: 'GET' }),
+        );
     });
 
     it('falls back to a mock playlist when the server returns only invalid challenges', async () => {
@@ -494,7 +496,10 @@ describe('daily-challenge mutation survivors', () => {
 
         expect(playlist).toHaveLength(1);
         expect(playlist[0].id).toBe('mock-daily-challenge-local');
-        expect(fetch).toHaveBeenCalledWith('/api/daily/playlist', { method: 'GET' });
+        expect(fetch).toHaveBeenCalledWith(
+            '/api/daily/playlist',
+            expect.objectContaining({ method: 'GET' }),
+        );
     });
 
     it('always refetches the playlist when forceRefresh is true even with a full cache', async () => {
@@ -545,7 +550,7 @@ describe('daily-challenge mutation survivors', () => {
         expect(url).toContain('playerId=');
         expect(url).toContain('limit=25');
         expect(url).toContain('offset=50');
-        expect(fetch.mock.calls[0][1]).toEqual({ method: 'GET' });
+        expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'GET' });
     });
 
     it('does not cache later snapshot pages', async () => {

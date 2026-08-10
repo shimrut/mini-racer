@@ -414,8 +414,6 @@ describe('medals', () => {
                 statusText: 'Submitting...',
             });
             expect(children[0].dataset.challengePhase).toBe('pending');
-            // Medal, then the line about it: the hero stacks, so nothing reads
-            // as a caption pinned beside the medal.
             expect(children[0].children.some(
                 (c) => c.textContent === 'Submitting...',
             )).toBe(true);
@@ -426,8 +424,6 @@ describe('medals', () => {
                 (c) => c.textContent === 'Challenge beaten',
             )).toBe(true);
 
-            // A settled duel names who was raced and prints the margin as the
-            // signed delta the split times use.
             renderChallengeFinishHero(overlay, {
                 phase: 'won',
                 verdict: { opponentName: 'shimroot', deltaSec: -0.305 },
@@ -435,7 +431,6 @@ describe('medals', () => {
             expect(children[0].children.some(
                 (c) => c.textContent === 'Beat shimroot',
             )).toBe(true);
-            // The margin is the last rank in the stack.
             const wonMargin = children[0].children.at(-1);
             expect(wonMargin.textContent).toBe('-0.305s');
             expect(wonMargin.classList.classes.has('is-gain')).toBe(true);
@@ -451,9 +446,6 @@ describe('medals', () => {
             expect(lostMargin.textContent).toBe('+0.546s');
             expect(lostMargin.classList.classes.has('is-loss')).toBe(true);
 
-            // A win with a face wears the medal on the winner's portrait — the
-            // same composition the challenge lobby lands on — and reads its
-            // title underneath rather than beside it.
             renderChallengeFinishHero(overlay, {
                 phase: 'won',
                 avatarUrl: 'https://i.redd.it/snoo.png',
@@ -469,9 +461,6 @@ describe('medals', () => {
                 (c) => c.textContent === 'Challenge beaten',
             )).toBe(true);
 
-            // A winner with no Snoovatar still gets a face: the default Snoo,
-            // wearing the medal in the same composition rather than a bare medal
-            // floating where the portrait should be.
             renderChallengeFinishHero(overlay, { phase: 'won' });
             const facelessPortrait = children[0].children[0].children[0].children[0]
                 .children.find((c) => c.className?.includes?.('challenge-won-hero__portrait'));

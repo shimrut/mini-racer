@@ -1,9 +1,6 @@
-/** `/api` route table + request helpers. Player identity lives in `player-identity.js`. */
-
 export {
     getGuestPlayerToken,
     getOrCreatePlayerId,
-    rotateGuestPlayerIdentity,
     setGuestPlayerToken,
 } from './player-identity.js';
 

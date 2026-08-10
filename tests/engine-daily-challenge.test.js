@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   addCampaignBootstrapToStartupGate,
   RealTimeRacer,
+  selectStartupGateForLaunch,
+  startInitialHeadToHeadLaunch,
+  waitForStartupGate,
 } from "../game/engine.js";
 import { CarSpriteLoader, getCarAssetNameForPresetConfig, getCarAssetUrlCandidates } from "../game/car/sprite.js";
 import { readTrackLastLapMedal } from "../game/medals/last-lap-medal-storage.js";
@@ -47,6 +50,79 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       ensureCampaignBootstrap,
     )).toBe(startupPromises);
     expect(ensureCampaignBootstrap).not.toHaveBeenCalled();
+  });
+
+  it("retries a non-authoritative direct Campaign bootstrap after player identity is ready", async () => {
+    let resolvePlayerHistory;
+    const playerHistory = new Promise((resolve) => {
+      resolvePlayerHistory = resolve;
+    });
+    const ensureCampaignBootstrap = vi.fn()
+      .mockResolvedValueOnce({ authoritative: false, ranked: false })
+      .mockResolvedValueOnce({ authoritative: true, ranked: true });
+    const startupPromises = addCampaignBootstrapToStartupGate(
+      [playerHistory],
+      { mode: "campaign" },
+      ensureCampaignBootstrap,
+      playerHistory,
+    );
+
+    await Promise.resolve();
+    expect(ensureCampaignBootstrap).toHaveBeenCalledTimes(1);
+    resolvePlayerHistory({ leaderboardPlayerId: "guest:repaired" });
+    await Promise.allSettled(startupPromises);
+
+    expect(ensureCampaignBootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts one direct Head to Head request without gating on unrelated startup work", async () => {
+    const unrelatedStartup = new Promise(() => {});
+    const loadChallengeLobby = vi.fn().mockResolvedValue(undefined);
+    const challengePromise = startInitialHeadToHeadLaunch(
+      { mode: "challenge", challengeId: "challenge-1" },
+      loadChallengeLobby,
+    );
+    const startupPromises = selectStartupGateForLaunch(
+      [unrelatedStartup],
+      { mode: "challenge", challengeId: "challenge-1" },
+      challengePromise,
+      [Promise.resolve("car"), Promise.resolve("track")],
+    );
+
+    expect(loadChallengeLobby).toHaveBeenCalledTimes(1);
+    expect(loadChallengeLobby).toHaveBeenCalledWith("challenge-1");
+    await expect(Promise.allSettled(startupPromises)).resolves.toHaveLength(3);
+  });
+
+  it("releases the startup gate when a critical dependency hangs", async () => {
+    vi.useFakeTimers();
+    try {
+      let startupSettled = false;
+      const startup = waitForStartupGate([
+        new Promise(() => {}),
+      ], 20_000).then(() => {
+        startupSettled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(19_999);
+      expect(startupSettled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await startup;
+      expect(startupSettled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("releases the startup gate immediately when dependencies settle", async () => {
+    vi.useFakeTimers();
+    try {
+      await waitForStartupGate([Promise.resolve("ready")], 20_000);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("compares intermediate laps using cumulative elapsed pace at equivalent PB boundaries", () => {
@@ -839,6 +915,18 @@ describe("RealTimeRacer daily challenge modal payload", () => {
   });
 
   it("starts verification processing synchronously when the finish is queued", () => {
+    const store = new Map();
+    globalThis.window = {
+      localStorage: {
+        getItem: (key) => (store.has(key) ? store.get(key) : null),
+        setItem: (key, value) => {
+          store.set(key, String(value));
+        },
+        removeItem: (key) => {
+          store.delete(key);
+        },
+      },
+    };
     const callOrder = [];
     const engine = {
       currentTrackKey: "circuit",
@@ -1658,7 +1746,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
     expect(RealTimeRacer.prototype.beginPersonalBestGhostRunAtGo.call(engine))
       .toEqual({ ghostActive: false, ghostExpected: true, noticeNeeded: true });
-    // Notice is deferred until GO clears in startSequence.
     expect(showGhostUnavailableNotice).not.toHaveBeenCalled();
   });
 

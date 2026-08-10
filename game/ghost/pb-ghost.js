@@ -211,8 +211,6 @@ export class PbGhost {
   }
 
   clearTrack() {
-    // An installed opponent outlives track loads and run resets: only
-    // clearOpponent (via clearRaceComparisonTarget) may drop it.
     if (this.preparedSource === 'opponent' || this.activeSource === 'opponent') {
       return false;
     }

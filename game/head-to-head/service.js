@@ -114,7 +114,6 @@ export async function confirmHeadToHeadBrag(shareToken) {
 const WON_CHALLENGE_KEY = 'MiniRacerHeadToHeadWin';
 const WON_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
-/** A won duel outlives its finish sheet, so reopening the post still lands on the win. */
 export function rememberHeadToHeadWin(challengeId, bestTimeMs, root = globalThis) {
     if (typeof challengeId !== 'string' || !challengeId || !root?.localStorage) return false;
     try {

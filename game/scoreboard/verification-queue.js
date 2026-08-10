@@ -2,11 +2,6 @@ const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
 const CHALLENGE_PLAYLIST_MS = 7 * 24 * 60 * 60 * 1000;
 const COMPETITION_BUFFER_MS = 6 * 60 * 60 * 1000;
-/**
- * Campaign progression is permanent, so a queued Campaign run has no
- * competition deadline to expire against. The queue still needs an upper
- * bound so abandoned entries cannot accumulate forever.
- */
 const CAMPAIGN_QUEUE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const QUEUE_BUCKETS = ["daily", "campaign"];
 const VERIFICATION_STAGE_SUBMITTING = "submitting";
@@ -105,7 +100,7 @@ function readQueueState() {
 
 function writeQueueState(queueState) {
   if (typeof window === "undefined" || !window.localStorage) {
-    return;
+    return false;
   }
 
   try {
@@ -113,8 +108,10 @@ function writeQueueState(queueState) {
       VERIFICATION_QUEUE_STORAGE_KEY,
       JSON.stringify(queueState),
     );
+    return true;
   } catch (error) {
     console.error("Error writing verification queue:", error);
+    return false;
   }
 }
 
@@ -186,31 +183,23 @@ function updateEntry(bucket, entryId, updater) {
     delete queueState[bucket][entryId];
   }
 
-  writeQueueState(queueState);
-  return cloneEntry(nextEntry);
+  return {
+    entry: cloneEntry(nextEntry),
+    persisted: writeQueueState(queueState),
+  };
 }
 
 export function getVerificationRetryDelayMs() {
   return DEFAULT_RETRY_DELAY_MS;
 }
 
-/**
- * A submission is worth retrying when the failure looks transient. An
- * unreachable server (no status) counts, because the run is otherwise lost.
- */
 export function isRetryableVerificationFailure(result) {
   const status = Number(result?.status);
   if (!Number.isFinite(status)) return true;
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
-/**
- * One queue implementation parameterised on its bucket; only the field names
- * differ per mode (Daily: challengeId, Campaign: raceId). Those names aren't
- * cosmetic — entries persist in localStorage across deploys, and an entry
- * this file can't read is deleted rather than skipped, so renaming one would
- * silently discard real queued runs.
- */
+/** Bucket field names persist in localStorage across deploys, and an unreadable entry is deleted — renaming one discards real queued runs. */
 function getEntry(bucket, entryId) {
   if (!entryId) return null;
   return cloneEntry(readQueueState()[bucket][entryId] || null);
@@ -221,7 +210,7 @@ function getState(bucket, entryId) {
 }
 
 function clearEntry(bucket, entryId) {
-  return updateEntry(bucket, entryId, () => null);
+  return updateEntry(bucket, entryId, () => null).entry;
 }
 
 function markPending(
@@ -246,7 +235,7 @@ function markPending(
         ? previousEntry.updatedAt
         : new Date().toISOString(),
     };
-  });
+  }).entry;
 }
 
 function markTerminal(bucket, entryId, verificationState, stage, statusText) {
@@ -260,7 +249,7 @@ function markTerminal(bucket, entryId, verificationState, stage, statusText) {
       nextAttemptAt: null,
       updatedAt: new Date().toISOString(),
     };
-  });
+  }).entry;
 }
 
 function getDue(bucket, now = Date.now()) {
@@ -275,12 +264,12 @@ function getDue(bucket, now = Date.now()) {
 
 function enqueue(bucket, entryId, nextEntry, isBetterThan) {
   let didEnqueue = false;
-  const entry = updateEntry(bucket, entryId, (previousEntry) => {
+  const { entry, persisted } = updateEntry(bucket, entryId, (previousEntry) => {
     if (!isBetterThan(nextEntry, previousEntry)) return previousEntry;
     didEnqueue = true;
     return nextEntry;
   });
-  return { enqueued: didEnqueue, entry };
+  return { enqueued: didEnqueue && persisted, entry };
 }
 
 function pendingEntry(fields) {
@@ -363,6 +352,32 @@ export function clearDailyChallengeVerification(challengeId) {
   return clearEntry("daily", challengeId);
 }
 
+export const MAX_TRACK_PB_RETRY_ATTEMPTS = 3;
+
+export function markDailyChallengeTrackPbRetry(challengeId, nextAttemptAt) {
+  let exhausted = false;
+  const { entry } = updateEntry("daily", challengeId, (previousEntry) => {
+    if (!previousEntry) return null;
+    const attempts = Number.isInteger(previousEntry.trackPbRetryCount)
+      ? previousEntry.trackPbRetryCount
+      : 0;
+    if (attempts >= MAX_TRACK_PB_RETRY_ATTEMPTS) {
+      exhausted = true;
+      return null;
+    }
+    return {
+      ...previousEntry,
+      trackPbRetryCount: attempts + 1,
+      verificationState: "pending",
+      submissionStage: VERIFICATION_STAGE_VERIFYING,
+      statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_VERIFYING],
+      nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
+      updatedAt: previousEntry.updatedAt,
+    };
+  });
+  return { exhausted, entry };
+}
+
 export function markDailyChallengeVerificationPending(
   challengeId,
   nextAttemptAt = Date.now(),
@@ -407,10 +422,6 @@ export function getCampaignVerificationEntry(raceId) {
   return getEntry("campaign", raceId);
 }
 
-/**
- * Unlike Daily, a slower run never replaces a queued faster one, because
- * Campaign keeps the best time per race and the server rejects regressions.
- */
 function isBetterCampaignCandidate(nextEntry, previousEntry) {
   if (!previousEntry) return true;
   return Number(previousEntry.bestTime) > Number(nextEntry.bestTime);

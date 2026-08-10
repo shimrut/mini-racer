@@ -165,7 +165,6 @@ describe('opponent race engine orchestration', () => {
             waitForVerification: true,
         });
 
-        // No rival has been looked up yet, so nothing may promise one.
         expect(setCombinedPrimaryAction.mock.calls[0][0].label).toBe('Improve');
 
         await opponentRaceEngineMethods.resolveLeaderboardOpponentAdvanceAfterVerification.call(
@@ -176,7 +175,6 @@ describe('opponent race engine orchestration', () => {
         const action = setCombinedPrimaryAction.mock.calls.at(-1)[0];
         expect(action.label).toBe('Improve');
         action.action();
-        // Improve races the player's own PB again, not the beaten opponent.
         expect(handleStartDailyChallenge).toHaveBeenCalledWith(race);
     });
 

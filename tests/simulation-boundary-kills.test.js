@@ -47,7 +47,6 @@ describe('simulation boundary kills — thrust gate (L578)', () => {
             []
         );
 
-        // Gate requires accel > 0. Mutants that force the gate open would subtract speed.
         expect(state.velocity.x).toBeCloseTo(before, 10);
         expect(state.velocity.y).toBeCloseTo(0, 10);
     });
@@ -101,7 +100,6 @@ describe('simulation boundary kills — contact selection', () => {
             segmentIndex: 0
         });
 
-        // Near-tie on speed → penetration decides → near wins.
         expect(selectWallContact([first, near])).toBe(near);
     });
 
