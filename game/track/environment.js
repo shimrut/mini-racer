@@ -21,11 +21,18 @@ export function shouldAutoRetryVerificationQueue() {
   return !isLocalEnvironment();
 }
 
-/** Android's embedded Reddit WebView advertises OffscreenCanvas but does not reliably present it, so it stays on the main-thread renderer. */
+/**
+ * The track layer draws in ~5us per frame, so the worker never bought meaningful
+ * parallelism -- it only added a structured-clone postMessage per frame and kept a
+ * second thread resident for the whole race, which blocks SoC idle and costs power.
+ * Everyone now uses the main-thread renderer that Android already ran on.
+ * Flip this back to `clientName !== "ANDROID"` to restore the worker path.
+ */
 export function shouldUseTrackLayerWorker(
+  // eslint-disable-next-line no-unused-vars
   clientName = globalThis.devvit?.context?.client?.name,
 ) {
-  return clientName !== "ANDROID";
+  return false;
 }
 
 export function readCanvasDevicePixelRatio() {

@@ -242,6 +242,8 @@ export class RealTimeRacer {
     this.routeTrace = new RingBuffer(480, () => ({ x: 0, y: 0 }));
     this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
     this.particles = [];
+    /** colour -> per-alpha-step particle lists, reused every frame to avoid render churn. */
+    this._particleBuckets = new Map();
     this.trailTimer = 0;
 
     this.steeringInput = new SteeringInput();

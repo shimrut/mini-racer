@@ -56,6 +56,9 @@ const CHORD_PROGRESSION_LENGTH = RACE_CHORDS.length;
 
 let registeredApi = null;
 const FRAME_SYNC_INTERVAL_SEC = 0.1;
+// Matches car-effects-audio: a 'running' context keeps a real-time audio thread
+// rendering silence, which blocks SoC idle even with the scheduler stopped.
+const IDLE_AUDIO_SUSPEND_MS = 250;
 
 export function userGesturePrepareMusic() {
     registeredApi?.prepareOnUserGesture?.();
@@ -82,6 +85,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
     };
 
     let schedulerIntervalId = null;
+    let idleSuspendTimer = null;
     let nextStepTime = 0.0;
     const scheduleAheadTime = 0.18;
     const lookaheadInterval = 60;
@@ -403,6 +407,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         if (schedulerIntervalId) return;
         buildGraph();
         if (!ctx) return;
+        clearIdleSuspendTimer();
 
         nextStepTime = ctx.currentTime + 0.05;
         currentStep = 0;
@@ -412,11 +417,31 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         schedulerIntervalId = setInterval(schedulerLoop, lookaheadInterval);
     }
 
+    function clearIdleSuspendTimer() {
+        if (!idleSuspendTimer) return;
+        clearTimeout(idleSuspendTimer);
+        idleSuspendTimer = null;
+    }
+
+    function scheduleIdleSuspend(delayMs = IDLE_AUDIO_SUSPEND_MS) {
+        if (!ctx || externalCtx || ctx.state !== 'running') return;
+        clearIdleSuspendTimer();
+        idleSuspendTimer = setTimeout(() => {
+            idleSuspendTimer = null;
+            if (ctx && ctx.state === 'running') {
+                void ctx.suspend();
+            }
+        }, Math.max(0, delayMs));
+    }
+
     function stop() {
         if (schedulerIntervalId) {
             clearInterval(schedulerIntervalId);
             schedulerIntervalId = null;
         }
+        // The delay line feeds back at 0.38, so the graph never decays to true
+        // silence on its own. Park the context instead of leaving it running.
+        scheduleIdleSuspend();
     }
 
     function shouldRunScheduler(status, enabled) {
@@ -508,15 +533,20 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             tabHidden = Boolean(hidden);
             if (hidden) {
                 stop();
+                // Backgrounded: park immediately rather than waiting out the idle delay.
+                clearIdleSuspendTimer();
+                if (ctx && !externalCtx && ctx.state === 'running') void ctx.suspend();
             } else {
                 ensureSchedulerRunning();
             }
         },
 
         prepareOnUserGesture() {
+            // Build only when music is actually on: constructing the context starts a
+            // real-time audio thread that nothing would later suspend.
+            if (!enabledCache) return;
             buildGraph();
             if (!ctx) return;
-            if (!enabledCache) return;
             // Resume on the gesture even before playback starts so iOS unlocks the context.
             if (ctx.state === 'suspended') {
                 void ctx.resume().then(() => {

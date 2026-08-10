@@ -86,6 +86,15 @@
     letter-spacing: -0.02em;
 }
 
+/* The lap timer rewrites its text every frame at millisecond precision. A box that
+   cannot change size, plus layout containment, keeps that write from reflowing the
+   rest of the HUD row. Paint containment is left off so the text-shadow still spills. */
+#time-val {
+    display: inline-block;
+    min-width: 7ch;
+    contain: layout style;
+}
+
 #best-time-val {
     font-size: 1.1rem;
     opacity: 0.5;

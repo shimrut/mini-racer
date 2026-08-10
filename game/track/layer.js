@@ -185,7 +185,29 @@ export class TrackLayerRenderer {
     }
 
     const ctx = this.ctx;
-    if (!ctx || !trackCanvas) return;
+    if (!ctx) return;
+
+    // The worker's render() re-syncs its backing store every frame; the main-thread
+    // path used to rely on resize() having already landed, which leaves the canvas at
+    // its 300x150 default whenever the container was unmeasured at setup time.
+    const pixelRatio = Math.max(devicePixelRatio || 1, 1);
+    const targetPixelWidth = Math.max(1, Math.round(canvasWidth * pixelRatio));
+    const targetPixelHeight = Math.max(1, Math.round(canvasHeight * pixelRatio));
+    if (
+      this.canvas &&
+      (this.canvas.width !== targetPixelWidth ||
+        this.canvas.height !== targetPixelHeight)
+    ) {
+      configureCanvasViewport(
+        this.canvas,
+        ctx,
+        canvasWidth,
+        canvasHeight,
+        devicePixelRatio,
+      );
+    }
+
+    if (!trackCanvas) return;
 
     const worldWidth = canvasWidth / zoom;
     const worldHeight = canvasHeight / zoom;

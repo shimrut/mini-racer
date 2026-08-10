@@ -104,6 +104,9 @@ function lerpAngle(a, b, t) {
   return a + delta * t;
 }
 
+/** Particle alpha is quantised to this many steps so same-colour particles batch into one fill. */
+const PARTICLE_ALPHA_STEPS = 12;
+
 function getSkidMarkStartIndex(skidMarks, frameSkip) {
   return frameSkip > 0 ? Math.max(0, skidMarks.length - 50) : 0;
 }
@@ -979,35 +982,44 @@ export const raceEngineMethods = {
     }
 
     if (this.particles.length > 0) {
-      const buckets = new Map();
+      // Buckets persist across frames and are emptied by resetting length, so a
+      // race no longer churns a Map plus one string key per particle per frame.
+      const buckets = this._particleBuckets;
       for (let i = 0; i < this.particles.length; i++) {
         const particle = this.particles[i];
         const rawAlpha =
           particle.maxLife > 0 ? particle.life / particle.maxLife : 0;
-        const quantizedAlpha = Math.round(rawAlpha * 12) / 12;
-        const key = `${particle.color}\0${quantizedAlpha}`;
-        let list = buckets.get(key);
-        if (!list) {
-          list = [];
-          buckets.set(key, list);
+        const alphaStep = Math.max(
+          0,
+          Math.min(PARTICLE_ALPHA_STEPS, Math.round(rawAlpha * PARTICLE_ALPHA_STEPS)),
+        );
+        let byAlphaStep = buckets.get(particle.color);
+        if (!byAlphaStep) {
+          byAlphaStep = [];
+          for (let step = 0; step <= PARTICLE_ALPHA_STEPS; step++) {
+            byAlphaStep.push([]);
+          }
+          buckets.set(particle.color, byAlphaStep);
         }
-        list.push(particle);
+        byAlphaStep[alphaStep].push(particle);
       }
-      for (const [key, list] of buckets) {
-        const sep = key.indexOf("\0");
-        const color = key.slice(0, sep);
-        const alphaValue = Number(key.slice(sep + 1));
+      for (const [color, byAlphaStep] of buckets) {
         ctx.fillStyle = color;
-        ctx.globalAlpha = Math.max(0, Math.min(1, alphaValue));
-        ctx.beginPath();
-        for (let i = 0; i < list.length; i++) {
-          const particle = list[i];
-          const px = particle.x * gs;
-          const py = particle.y * gs;
-          ctx.moveTo(px + particle.size, py);
-          ctx.arc(px, py, particle.size, 0, Math.PI * 2);
+        for (let step = 0; step <= PARTICLE_ALPHA_STEPS; step++) {
+          const list = byAlphaStep[step];
+          if (list.length === 0) continue;
+          ctx.globalAlpha = step / PARTICLE_ALPHA_STEPS;
+          ctx.beginPath();
+          for (let i = 0; i < list.length; i++) {
+            const particle = list[i];
+            const px = particle.x * gs;
+            const py = particle.y * gs;
+            ctx.moveTo(px + particle.size, py);
+            ctx.arc(px, py, particle.size, 0, Math.PI * 2);
+          }
+          ctx.fill();
+          list.length = 0;
         }
-        ctx.fill();
       }
       ctx.globalAlpha = 1.0;
     }

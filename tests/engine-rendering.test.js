@@ -220,9 +220,11 @@ describe("RealTimeRacer track layer renderer", () => {
         allowWorker: shouldUseTrackLayerWorker(),
       });
 
+      // Every client now renders the track layer on the main thread: the worker's
+      // per-frame postMessage cost more power than the ~5us of drawing it offloaded.
       expect(shouldUseTrackLayerWorker()).toBe(false);
-      expect(shouldUseTrackLayerWorker("IOS")).toBe(true);
-      expect(shouldUseTrackLayerWorker("WEB")).toBe(true);
+      expect(shouldUseTrackLayerWorker("IOS")).toBe(false);
+      expect(shouldUseTrackLayerWorker("WEB")).toBe(false);
       expect(transferControlToOffscreen).not.toHaveBeenCalled();
       expect(workerCtor).not.toHaveBeenCalled();
       expect(getContext).toHaveBeenCalledWith("2d", { alpha: false });
@@ -273,5 +275,36 @@ describe("RealTimeRacer track layer renderer", () => {
     } finally {
       global.createImageBitmap = originalCreateImageBitmap;
     }
+  });
+
+  it("sizes its backing store during draw when no resize has landed yet", () => {
+    const setTransform = vi.fn();
+    const canvas = { width: 300, height: 150 };
+    const renderer = new TrackLayerRenderer(canvas);
+    renderer.ctx = {
+      setTransform,
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+    };
+
+    // No updateViewportSize() call first: this is the state the main-thread path
+    // lands in whenever the container was unmeasured when setup() ran.
+    renderer.draw({
+      camera: { x: 0, y: 0 },
+      zoom: 1,
+      viewportWidth: 390,
+      viewportHeight: 844,
+      devicePixelRatio: 2,
+      trackCanvas: { width: 800, height: 800 },
+      trackCanvasOrigin: { x: 0, y: 0 },
+      presentation: {},
+      container: { clientWidth: 390, clientHeight: 844 },
+    });
+
+    expect(canvas.width).toBe(780);
+    expect(canvas.height).toBe(1688);
+    expect(setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0);
   });
 });
