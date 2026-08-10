@@ -299,11 +299,10 @@ export function formatHeadToHeadTime(timeMs: number): string {
 }
 
 export function formatHeadToHeadTitle(
-    username: string,
     timeMs: number,
     trackKey: string,
 ): string {
-    return `u/${username} · Head to Head: beat ${formatHeadToHeadTime(timeMs)} on ${getTrackName(trackKey, trackKey)}`;
+    return `Can you beat my ${formatHeadToHeadTime(timeMs)} time on ${getTrackName(trackKey, trackKey)}?`;
 }
 
 export function formatHeadToHeadTextFallback(
@@ -551,7 +550,7 @@ export function createHeadToHeadService(
         }
         const challengeId = createId();
         const createdAt = now().toISOString();
-        const title = formatHeadToHeadTitle(request.username, source.bestTimeMs, source.trackKey);
+        const title = formatHeadToHeadTitle(source.bestTimeMs, source.trackKey);
         const challengerAvatarUrl = await resolveRedditAvatarUrl(request.username);
         const record: PreviewRecord = {
             username: request.username,

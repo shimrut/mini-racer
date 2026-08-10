@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    formatDailyPreviewTimeLabel,
     getDailyPreviewChallengeOptions,
     isCurrentDailyLauncherPost,
 } from '../preview.js';
@@ -21,5 +22,10 @@ describe('current Daily launcher preview', () => {
         expect(getDailyPreviewChallengeOptions({
             devvit: { context: { postData: { postType: 'daily-launcher' } } },
         })).toEqual({ allowExpiredPost: true, ignorePostData: true });
+    });
+
+    it('frames the target as laps followed by time to beat', () => {
+        expect(formatDailyPreviewTimeLabel(1)).toBe('1 LAP · TIME TO BEAT');
+        expect(formatDailyPreviewTimeLabel(2)).toBe('2 LAPS · TIME TO BEAT');
     });
 });

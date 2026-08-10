@@ -68,5 +68,5 @@ Share verified times or challenge other players Head to Head.
 - Clearer daily post titles and better plain-text description under the post
 - Car look and settings save to your Reddit profile (less likely to reset after an update)
 - Standings load more racers as you scroll, while your own rank stays visible
-- Nicer post preview (today’s track, gold-medal target, car on the start line)
+- Nicer post preview (today’s track, lap count and time to beat, car on the start line)
 - Mini Racer app icon for the Reddit apps listing

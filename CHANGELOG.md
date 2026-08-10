@@ -1,5 +1,10 @@
 # Changelog
 
+- Reframed Head to Head post titles as a direct challenge —
+  `Can you beat my {time} time on {track name}?` — without repeating the
+  author's Reddit username. Daily post previews now place the lap count before
+  `TIME TO BEAT` instead of labeling the same target as `GOLD TARGET`.
+
 - Rewrote the Reddit app README with a concise, player-first overview while
   retaining its version history and adding a comprehensive 2.0 entry.
 

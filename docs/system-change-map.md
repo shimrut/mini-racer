@@ -278,7 +278,10 @@ flowchart LR
   isolated duel results, custom-post idempotency, and the three-new-posts per
   track/player/subreddit/UTC-day limit. New custom posts run as the signed-in
   challenger with Devvit's required user-generated-content declaration. The
-  returned Reddit author must match that challenger before the post is saved or
+  public title invites the reader to beat the frozen time and track without
+  repeating the challenger's Reddit username, which Reddit already displays as
+  the post author. The returned Reddit author must match that challenger before
+  the post is saved or
   an unlock is awarded; an app-account fallback is deleted best-effort and
   fails closed. Stored identities and interrupted-creation recovery likewise
   accept only challenger-authored posts, and recovery scans only that Reddit
@@ -554,7 +557,8 @@ These are useful, but they are not on the critical player path:
   Custom Reddit post preview surfaces. `default` receives immutable challenge
   data and remains bound to that dated Daily post; `daily` is the stable
   current-track launcher and explicitly ignores any frozen challenge payload.
-  Both show the lap count, scaled gold-medal threshold, shared gold medal
+  Both show the scaled gold-medal threshold as the player-facing time to beat,
+  with the uppercase `{laps} · TIME TO BEAT` caption above it, shared gold medal
   artwork, and the stock in-game car clearly past the start line. In-game
   schematic previews do not use that post-only treatment.
 - `campaign.html`, `campaign.js`, `campaign.css`

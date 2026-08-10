@@ -11,6 +11,7 @@ import {
 import {
     getRaceMedalThresholds,
 } from './game/medals/medal-timing.js';
+import { formatLapsLabel } from './game/shared/laps-label.js';
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 
 export function isCurrentDailyLauncherPost(root = globalThis) {
@@ -170,11 +171,15 @@ async function applyTimeToBeat(el, trackKey, lapCount = 1) {
         className: 'post-preview-gold-medal'
     }));
     if (labelEl) {
-        labelEl.textContent = lapCount === 1 ? 'Gold Target · 1 Lap' : `Gold Target · ${lapCount} Laps`;
+        labelEl.textContent = formatDailyPreviewTimeLabel(lapCount);
     }
     if (textEl) {
         textEl.textContent = formatTimeToBeat(seconds);
     }
+}
+
+export function formatDailyPreviewTimeLabel(lapCount = 1) {
+    return `${formatLapsLabel(lapCount).toUpperCase()} · TIME TO BEAT`;
 }
 
 function formatTimeToBeat(seconds) {
