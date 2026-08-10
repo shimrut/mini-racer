@@ -1,7 +1,7 @@
 # Changelog
 
 - Reframed Head to Head post titles as a direct challenge —
-  `Can you beat my {time} time on {track name}?` — without repeating the
+  `Can you beat {time}s on {track name}?` — without repeating the
   author's Reddit username. Daily post previews now place the lap count before
   `TIME TO BEAT` instead of labeling the same target as `GOLD TARGET`.
 

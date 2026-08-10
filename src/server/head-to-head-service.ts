@@ -302,7 +302,7 @@ export function formatHeadToHeadTitle(
     timeMs: number,
     trackKey: string,
 ): string {
-    return `Can you beat my ${formatHeadToHeadTime(timeMs)} time on ${getTrackName(trackKey, trackKey)}?`;
+    return `Can you beat ${formatHeadToHeadTime(timeMs)}s on ${getTrackName(trackKey, trackKey)}?`;
 }
 
 export function formatHeadToHeadTextFallback(

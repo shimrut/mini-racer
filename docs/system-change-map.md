@@ -278,11 +278,10 @@ flowchart LR
   isolated duel results, custom-post idempotency, and the three-new-posts per
   track/player/subreddit/UTC-day limit. New custom posts run as the signed-in
   challenger with Devvit's required user-generated-content declaration. The
-  public title invites the reader to beat the frozen time and track without
-  repeating the challenger's Reddit username, which Reddit already displays as
-  the post author. The returned Reddit author must match that challenger before
-  the post is saved or
-  an unlock is awarded; an app-account fallback is deleted best-effort and
+  public title uses `Can you beat {time}s on {track name}?` without repeating
+  the challenger's Reddit username, which Reddit already displays as the post
+  author. The returned Reddit author must match that challenger before
+  the post is saved or an unlock is awarded; an app-account fallback is deleted best-effort and
   fails closed. Stored identities and interrupted-creation recovery likewise
   accept only challenger-authored posts, and recovery scans only that Reddit
   user's posts. Old app-authored challenge posts are not recognized as live.

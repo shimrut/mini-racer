@@ -173,7 +173,7 @@ describe('head-to-head service', () => {
         const preview = await service.preview({ bestTimeMs: 1, ghost: 'forged' }, context);
 
         expect(preview.status).toBe(200);
-        expect(preview.body.title).toBe('Can you beat my 25.640 time on Number Three?');
+        expect(preview.body.title).toBe('Can you beat 25.640s on Number Three?');
         expect(preview.body.preview).not.toHaveProperty('ghost');
         expect(preview.body.preview).not.toHaveProperty('sourceId');
         expect(preview.body.preview.challengerAvatarUrl).toBe('https://i.redd.it/RaceFan.png');
@@ -187,7 +187,7 @@ describe('head-to-head service', () => {
             entry: 'head-to-head',
             runAs: 'USER',
             userGeneratedContent: {
-                text: 'Can you beat my 25.640 time on Number Three?',
+                text: 'Can you beat 25.640s on Number Three?',
             },
             postData: expect.objectContaining({
                 postType: 'head-to-head',
@@ -809,6 +809,6 @@ describe('head-to-head service', () => {
 describe('head-to-head formatting', () => {
     it('formats exact verified milliseconds', () => {
         expect(formatHeadToHeadTitle(9_005, 'numberZero'))
-            .toBe('Can you beat my 9.005 time on Number Zero?');
+            .toBe('Can you beat 9.005s on Number Zero?');
     });
 });
