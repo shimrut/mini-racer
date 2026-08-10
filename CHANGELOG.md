@@ -1,5 +1,8 @@
 # Changelog
 
+- Approved the current Mistfall Circuit boundary in the track-registry
+  fingerprint so integrity checks protect the geometry that actually ships.
+
 - Restored the complete `numbered-v1` stage set to Campaign-only publication;
   Number Zero through Golden Ratio can no longer enter future Daily rotation.
 

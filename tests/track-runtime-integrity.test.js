@@ -176,7 +176,7 @@ describe('track runtime integrity', () => {
             '2a272e53a4cc50320fc07daff2784898aef5c761c5301cb684aefd9d1cabb270',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '898bbf20672156e102d49500e778ba6b2245544135ad9f10d71c767c493b575f',
+            '89f1279533bb0556687dafe8440f6b756cdf7a2a0965febf36b36872a1831378',
         );
     });
 
