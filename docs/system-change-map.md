@@ -561,10 +561,11 @@ These are useful, but they are not on the critical player path:
   artwork, and the stock in-game car clearly past the start line. In-game
   schematic previews do not use that post-only treatment.
 - `campaign.html`, `campaign.js`, `campaign.css`
-  Stable Campaign launcher surface. Its CTA stores the Campaign launch target
-  and expands the shared `game` entrypoint. The `game` entrypoint itself is the
-  stable lobby surface; launcher post metadata pins it to Home so stale
-  one-use Daily/Campaign targets cannot change the destination.
+  Stable Campaign launcher surface, branded as `The Numbers` above the Campaign
+  title. Its CTA stores the Campaign launch target and expands the shared
+  `game` entrypoint. The `game` entrypoint itself is the stable lobby surface;
+  launcher post metadata pins it to Home so stale one-use Daily/Campaign targets
+  cannot change the destination.
 - `src/server/launcher-post-service.ts`, `src/server/launcher-post-store.ts`,
   and the launcher routes in `src/server/routes/internal-routes.ts` create one
   canonical Current Daily, Campaign, and Lobby post per subreddit. Launcher

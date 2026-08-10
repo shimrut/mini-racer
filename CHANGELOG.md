@@ -1,5 +1,7 @@
 # Changelog
 
+- Renamed the Campaign launcher's `Permanent Series` eyebrow to `The Numbers`.
+
 - Reframed Head to Head post titles as a direct challenge —
   `Can you beat {time}s on {track name}?` — without repeating the
   author's Reddit username. Daily post previews now place the lap count before
