@@ -373,6 +373,67 @@ function findCheckpointBoundaryPlacement(points, checkpointStart, checkpointEnd,
     return best || findClosestBoundaryPlacement(points, target);
 }
 
+// Half the curb stroke, which is centred on the boundary path.
+const CURB_OUTWARD_EXTENT = 3;
+// Furthest ink of a tire barrier from its anchor: the outermost tire sits at
+// offset 12 with an x radius of 7.5, and the stacked pair sit 2 below centre
+// with a y radius of 6. The 1px inner stroke is centred on that edge.
+const TIRE_BARRIER_OUTWARD_EXTENT = Math.hypot(12 + 7.5, 2 + 6) + 0.5;
+// Debris is thrown out along the boundary normal by up to 18 + 54, and slid
+// along the tangent by up to half of 26.
+const DEBRIS_MAX_NORMAL_OFFSET = 72;
+const DEBRIS_MAX_TANGENT_OFFSET = 13;
+// Each vertex of a debris shape sits at up to 1.06 of its major radius.
+const DEBRIS_VERTEX_REACH = 1.06;
+// Absorbs rounding in the shapes above rather than reserving whole cells.
+const TRACK_CANVAS_PADDING_SAFETY = 4;
+
+function getDebrisOutwardExtent(presentation) {
+    const maxRadius = Math.max(
+        Math.max(1, presentation.debrisMinRadius || 2),
+        presentation.debrisMaxRadius || 10,
+    );
+    const stretchMin = Math.max(1, presentation.debrisStretchMin || 1);
+    const stretchMax = Math.max(stretchMin, presentation.debrisStretchMax || stretchMin);
+    const strokeWidth = Math.max(0.5, presentation.debrisStrokeWidth || 1.2);
+
+    return Math.hypot(DEBRIS_MAX_NORMAL_OFFSET, DEBRIS_MAX_TANGENT_OFFSET)
+        + maxRadius * stretchMax * DEBRIS_VERTEX_REACH
+        + strokeWidth / 2;
+}
+
+/**
+ * How far past the track polygons this presentation actually paints.
+ *
+ * The canvas has to cover the boundary paths plus every decoration that sits
+ * outside them, and nothing else — it is sized in world pixels, so slack here
+ * is paid for across the whole bounding box. Only the decorations the
+ * presentation switches on contribute.
+ */
+export function getTrackCanvasPadding(presentation = {}) {
+    let extent = 0;
+
+    if (presentation.showCurbs !== false) {
+        extent = Math.max(extent, CURB_OUTWARD_EXTENT);
+    }
+    if (presentation.showTireWalls !== false) {
+        extent = Math.max(extent, TIRE_BARRIER_OUTWARD_EXTENT);
+    }
+    if (presentation.trackStyle === 'canyon') {
+        extent = Math.max(
+            extent,
+            (presentation.canyonWallShadowWidth ?? 14) / 2,
+            (presentation.canyonWallHighlightWidth ?? 6) / 2,
+            (presentation.canyonWallCoreWidth ?? 3) / 2,
+        );
+    }
+    if (presentation.debrisStyle === 'outer-drift') {
+        extent = Math.max(extent, getDebrisOutwardExtent(presentation));
+    }
+
+    return Math.ceil(extent + TRACK_CANVAS_PADDING_SAFETY);
+}
+
 export function buildTrackCanvas(track, geometry, presentation = {}) {
     const gs = CONFIG.gridSize;
     const outer = geometry.outer ?? [];
@@ -398,7 +459,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
         if (py > maxY) maxY = py;
     }
 
-    const padding = gs * 5;
+    const padding = getTrackCanvasPadding(presentation);
     const origin = {
         x: minX - padding,
         y: minY - padding
@@ -407,8 +468,12 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     canvas.width = Math.ceil((maxX - minX) + padding * 2);
     canvas.height = Math.ceil((maxY - minY) + padding * 2);
 
-    const useTransparentCanvas = presentation.backgroundStyle === 'desert';
-    const ctx = canvas.getContext('2d', { alpha: useTransparentCanvas });
+    // Off-track area is left transparent for every presentation. The draw path
+    // paints the same background across the viewport each frame before blitting
+    // this bitmap over it, so baking a copy in here only stored millions of
+    // pixels of one flat colour — on a typical track the ribbon covers barely a
+    // fifth of the bounding box.
+    const ctx = canvas.getContext('2d', { alpha: true });
     const offsetX = -origin.x;
     const offsetY = -origin.y;
     const mapTrackPoint = (point) => ({
@@ -416,11 +481,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
         y: point.y * gs + offsetY
     });
 
-    if (useTransparentCanvas) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    } else {
-        drawPresentationBackground(ctx, canvas.width, canvas.height, presentation, `${track?.name || 'track'}:${canvas.width}x${canvas.height}`);
-    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const surfacePath = new Path2D();
     let mappedPoint = mapTrackPoint(outer[0]);
