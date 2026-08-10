@@ -223,9 +223,10 @@ flowchart LR
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
   Number Zero through Nine, Imaginary Number, Infinite Pie, Euler's Number,
   and Golden Ratio with fixed `2,2,1,1,2,1,1,3,2,1,3,1,2,2` laps and
-  medal-total gating plus a preceding-stage medal. `TRACK_CATALOG`/`TRACKS`
-  contain all playable geometry; `TRACK_SCHEDULE_KEYS` is only the future
-  Daily publication subset.
+  medal-total gating plus a preceding-stage medal. Every stage track is
+  Campaign-only and must remain absent from `TRACK_SCHEDULE_KEYS`.
+  `TRACK_CATALOG`/`TRACKS` contain all playable geometry;
+  `TRACK_SCHEDULE_KEYS` is only the future Daily publication subset.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
   player challenges. Campaign finishes open the result sheet immediately (same

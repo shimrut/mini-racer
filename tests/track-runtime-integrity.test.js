@@ -7,6 +7,7 @@ import {
     TRACK_CATALOG,
     TRACK_SCHEDULE_KEYS,
 } from '../game/track/catalog.js';
+import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { CONFIG } from '../game/config.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
@@ -139,8 +140,12 @@ describe('track runtime integrity', () => {
             'doubleHook',
             'doubleCrest',
         ]);
-        expect(TRACK_SCHEDULE_KEYS.slice(0, firstNewTrackIndex)).toEqual(
-            catalogKeys.slice(0, firstNewTrackIndex),
+        const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
+        const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
+        expect(TRACK_SCHEDULE_KEYS.filter((trackKey) => (
+            existingCatalogKeys.includes(trackKey)
+        ))).toEqual(
+            existingCatalogKeys.filter((trackKey) => !campaignTrackKeys.has(trackKey)),
         );
 
         const intentionallyReviewedKeys = new Set([

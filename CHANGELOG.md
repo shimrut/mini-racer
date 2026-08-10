@@ -1,5 +1,8 @@
 # Changelog
 
+- Restored the complete `numbered-v1` stage set to Campaign-only publication;
+  Number Zero through Golden Ratio can no longer enter future Daily rotation.
+
 - Limited Devvit release contents to the compiled game client, server, source
   maps, and required build inputs. Tests, docs, internal notes, generated review
   artwork, unrelated tooling, and macOS metadata are no longer sent in the

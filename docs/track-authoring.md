@@ -99,7 +99,8 @@ and **Copy Integration** remain available as manual fallbacks.
 - Use `DEFAULT_TRACK_KEY` for the standard local fallback.
 - Use `TRACK_SCHEDULE_KEYS` when order controls Daily GP publication.
 - Use `game/campaign/manifest.js` when order or fixed lap count controls the
-  permanent Campaign. Do not add Campaign-only tracks to the Daily schedule.
+  permanent Campaign. Every `numbered-v1` stage track is Campaign-only; do not
+  add any of them to the Daily schedule.
 - Import `TRACKS` only when the caller needs boundaries, checkpoints, start
   geometry, rendering, collision, or replay validation.
 - Do not put track lists back into `game/config.js`.

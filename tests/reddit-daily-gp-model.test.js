@@ -4,6 +4,7 @@ import {
     TRACK_CATALOG,
     TRACK_SCHEDULE_KEYS,
 } from '../game/track/catalog.js';
+import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { PUBLISHED_DAILY_GP_TRACKS_BY_DATE } from '../game/shared/daily-gp-history-backfill.js';
 import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-backfill.ts';
 import { CAMPAIGN_GUEST_TTL_SECONDS } from '../src/server/competition.ts';
@@ -133,11 +134,10 @@ describe('reddit daily gp model', () => {
         expect(TRACK_SCHEDULE_KEYS.every((trackKey) => (
             Object.hasOwn(TRACK_CATALOG, trackKey)
         ))).toBe(true);
-        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberZero');
-        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberSeven');
-        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberEight');
-        expect(TRACK_SCHEDULE_KEYS).not.toContain('numberNine');
-        expect(TRACK_SCHEDULE_KEYS).not.toContain('goldenRatio');
+        const campaignTrackKeys = CAMPAIGN_STAGES.map((stage) => stage.trackKey);
+        expect(TRACK_SCHEDULE_KEYS.filter((trackKey) => (
+            campaignTrackKeys.includes(trackKey)
+        ))).toEqual([]);
     });
 
     it('keeps day indexing stable within the same UTC day', () => {
