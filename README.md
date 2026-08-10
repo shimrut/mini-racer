@@ -1,132 +1,32 @@
 # Mini Racer
 
-Mini Racer is a quick Daily and Campaign racing game for Reddit.
+Mini Racer is a quick racing game on Reddit.
 
-Outside Reddit, a standalone promo page lives in [`LP/`](LP/) — open `LP/index.html` and set the Daily / Campaign links in `LP/config.js`.
+Race the daily track, replay the last seven days, or take on the 14-stage Campaign.
+Chase personal bests, earn medals, unlock cars and trails, climb leaderboards, and race ghosts.
+Share verified times or challenge other players Head to Head.
 
-Open a Mini Racer post, tap **Race Now**, learn the track, and try again until your lap is cleaner and faster. Runs are short on purpose — restart fast, improve often.
+## Changelog
 
-## How the game works
+### 2.0
 
-Every new Daily GP attempt is **1 or 2 laps**, frozen when that day's challenge is published. Cross the finish line after the required laps to complete it.
-Press **R** to restart while racing, paused, or on the finish screen.
-Steer, finish the complete race as fast as you can, then try again.
-
-## What players can do
-
-- Race **today's featured track** and chase your personal best
-- Earn **medals** by beating the target times on each track
-- Climb that day's **leaderboard** in Standings
-- Missed a day? You can replay the last **7 days** of tracks
-- Play the permanent fourteen-stage **Campaign**, banking medals to unlock each
-  fixed 1-, 2-, or 3-lap race; locked cards put the count inside a medal-shaped
-  perimeter progress indicator
-- Change how your car looks in the **Garage** (available and achievement-unlocked
-  skins plus trails — handling stays the same)
-- **Share** a finished race or a verified daily best as a Reddit comment (you preview the text first)
-- When signed in, turn a verified Campaign or player-challenge result into a
-  custom challenge post with a frozen target and ghost carried by the post
-  itself
-
-Your selected car look and settings are saved to your player profile. Car
-unlocks are permanent. Other guest profile data expires after 7 inactive days;
-signed-in profile data expires after 30 inactive days.
-
-## Daily tracks
-
-- A **new track** becomes the featured race each day (day changes at midnight UTC)
-- Once a day's track is posted, it **stays that track** — it does not get swapped later
-- New Daily races randomly use 1 or 2 laps; no new Daily race uses 3 laps
-- Previously published three-lap Daily races remain playable under their stored rules
-- Medal targets scale from the one-lap targets, and intermediate finishes show the medal earned on cumulative race time
-- Tracks stay playable for **7 days**, then drop out of the list
-- Communities can auto-publish that track's final global podium when the window closes
-- Each track card shows a preview, your best time, medals, and how long that track is still available
-- Your personal best and ghost remain available until 6 hours after that daily track leaves the seven-day list
-
-## Standings and sharing
-
-- Standings show the full daily ranking as you scroll; **your rank stays visible** even if you are far down the list
-- On the finish screen: **Improve**, **Share**, and **Home**; **Share** offers **Comment Time** or **Issue Challenge**
-- In Standings: **Share Best** appears when you have a verified time for the day you are viewing
-- Shared results go to the post's pinned **score thread**, as a comment from your Reddit account after you confirm
-- Sharing the same result again reuses the existing comment instead of posting a duplicate
-
-Campaign has a separate permanent leaderboard for each stage. Guests are ranked
-server-side, with their Campaign progress, bests, and PB ghosts retained on a
-rolling 90-day inactivity window; the shared stage leaderboards themselves do
-not expire. Signing in merges verified guest results into the Reddit account,
-keeping the faster result for each stage. Reddit sign-in is still required to
-create challenge posts. Guests can open, race, and submit Head to Head
-challenges. A verified Head to Head win is retained for five minutes to keep
-the beaten-post state and, for a signed-in winner, authorize Brag. Head to Head
-results are not durable player history and do not merge when a guest signs in.
-The Head to Head post itself does not require Reddit sign-in; stale guest tokens
-are refreshed automatically.
-Challenge duels are isolated:
-they do not unlock Campaign stages or change Daily/Campaign standings or PBs.
-
-Daily finishes use **Share**. **Comment Time** keeps the existing verified
-score-thread flow, while **Issue Challenge** creates a Head to Head post from
-that exact finish. The post carries the immutable Daily race contract and
-frozen ghost, so that Head to Head remains playable after the Daily track's
-normal window expires. This exception applies only to the Head to Head post;
-regular Daily entry and ranking still follow Daily availability.
-
-## First look on Reddit
-
-The post preview shows today's track, lap count, scaled gold-medal target, a car on the start line, and a **Race Now** button.
-
-Older posts keep their original track while it is still available. If that day's track has expired, opening the post takes you to **today's** featured track instead.
-
-Daily posts use a short title like `Mini Racer, 12 Jul: Neon Apex`, with a plain-text description underneath for search and clients that cannot show the interactive game.
-
-Communities can also create three stable launcher posts: **Current Daily** always
-renders the active track and opens Daily mode, **Campaign** opens the permanent
-Campaign lobby, and **Lobby** opens the Home lobby. These launcher posts do not
-embed a dated Daily challenge, so they do not become frozen when the day changes.
-
-Final podium posts (separate moderator opt-in) show the top three verified times for the track that just expired, with each finalist's Reddit name or private racer name, their avatar when available, and a **Play Now** button for today's featured track.
-
-## Garage
-
-- **22 car skins** across Extra, Mini, Cyberpunk, and Steampunk sets
-- Extra unlocks: Crimson after one verified race; Gold and Blaze after Gold or
-  Author on 5/all 10 Campaign stages; Surge and Arctic after Author on 5/all
-  10 Campaign stages; Fuchsia and Plasma after posting Head-to-Heads on 1/5
-  distinct tracks; Lime and Onyx after 1/10 Head-to-Head wins
-- Existing accepted Daily history and saved Campaign results backfill Crimson,
-  so established racers are not treated as new when unlock tracking is added
-- Cobalt and every non-achievement car are available immediately
-- Locked cars show a white lock; its white progress arc appears only after
-  progress begins. Select one to open its unlock requirement and exact progress
-- **8 trails**, including no trail
-- Looks only — the car drives the same either way
-
-## For moderators
-
-Install Mini Racer in your subreddit, then use the subreddit menu:
-
-| Menu item | What it does |
-| --- | --- |
-| **Create Mini Racer post** | Creates a playable frozen Daily challenge post for the current UTC day |
-| **Create current Daily launcher** | Creates or reuses one post that always shows today's featured track and opens Daily mode |
-| **Create Campaign launcher** | Creates or reuses one post that opens Mini Racer in Campaign mode |
-| **Create Lobby launcher** | Creates or reuses one post that opens the Mini Racer Home lobby |
-| **Enable daily Mini Racer posts** | Auto-posts a new race each day (UTC) |
-| **Disable daily Mini Racer posts** | Stops the daily auto-posts |
-| **Enable daily Mini Racer podium posts** | Auto-posts the final podium after a track expires, with hourly retries during the six-hour publication window |
-| **Disable daily Mini Racer podium posts** | Stops final podium auto-posts without affecting race posts |
-
-Tips:
-
-- Only **one** race post is used per community per day — creating again reuses that post instead of flooding the feed
-- Each launcher type is also canonical per community — repeated menu actions reuse its existing post
-- Every race post gets a pinned **Mini Racer score thread** for player result comments
-- Podium posts are informational, use an independent opt-in, and never create a score thread
-- Players share scores as replies in that thread, from their own accounts
-
-## What's new
+- Added the permanent **14-stage Campaign** with medals, unlocks, personal bests,
+  ghosts, and a separate leaderboard for every stage.
+- Added **Head to Head** challenges from verified Daily and Campaign results.
+  Race another player’s frozen ghost, beat their time, and Brag when signed in.
+- Guests can race Daily, Campaign, and Head to Head. Signing in keeps the faster
+  Campaign result when guest progress is merged.
+- Daily races now use **1 or 2 laps**, with the last **7 days** available to replay.
+- Added **opponent ghost races** from Daily and Campaign standings.
+- Expanded the **Garage** to 22 car skins and 8 trails, including achievement
+  unlocks. Car choices remain cosmetic.
+- Added **Comment Time**, **Issue Challenge**, verified result sharing, and final
+  podium posts.
+- Redesigned the Home, Daily, Campaign, Garage, standings, and result screens for
+  faster navigation and clearer race information.
+- Improved millisecond timing, PB ghosts, challenge loading, Campaign startup,
+  guest recovery, and protection against lost progress.
+- Added more tracks, including **Golden Ratio** as the Campaign finale.
 
 ### 1.4.1
 

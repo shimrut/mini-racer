@@ -1,5 +1,8 @@
 # Changelog
 
+- Rewrote the Reddit app README with a concise, player-first overview while
+  retaining its version history and adding a comprehensive 2.0 entry.
+
 - Upgraded the Devvit toolchain to 0.13.11 using the supported CLI dependency
   synchronizer. All direct Devvit packages and the lockfile now stay on
   0.13.11; hosted playtest validation remains required before publishing.
