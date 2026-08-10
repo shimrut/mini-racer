@@ -308,3 +308,46 @@ describe("RealTimeRacer track layer renderer", () => {
     expect(setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0);
   });
 });
+
+describe("merged canvas mode", () => {
+  it("draws the track into the shared context and never touches the canvas", () => {
+    const sharedContext = createRenderContext();
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(),
+      transferControlToOffscreen: vi.fn(),
+    };
+    const renderer = new TrackLayerRenderer(canvas);
+
+    renderer.setup({ sharedContext });
+
+    expect(renderer.merged).toBe(true);
+    expect(renderer.ctx).toBe(sharedContext);
+    expect(renderer.canvas).toBe(null);
+    expect(canvas.getContext).not.toHaveBeenCalled();
+    expect(canvas.transferControlToOffscreen).not.toHaveBeenCalled();
+
+    // The engine owns sizing in merged mode, so resizing must be inert.
+    renderer.updateViewportSize({ clientWidth: 800, clientHeight: 600 }, 2);
+    expect(canvas.width).toBe(0);
+    expect(canvas.height).toBe(0);
+
+    // A draw still blits the track into the shared context.
+    const trackCanvas = { width: 400, height: 300 };
+    renderer.draw({
+      camera: { x: 0, y: 0 },
+      zoom: 1,
+      viewportWidth: 320,
+      viewportHeight: 200,
+      devicePixelRatio: 2,
+      trackCanvas,
+      trackCanvasOrigin: { x: 0, y: 0 },
+      presentation: {},
+      container: { clientWidth: 320, clientHeight: 200 },
+    });
+
+    expect(sharedContext.drawImage).toHaveBeenCalled();
+    expect(canvas.width).toBe(0);
+  });
+});

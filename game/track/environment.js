@@ -35,6 +35,24 @@ export function shouldUseTrackLayerWorker(
   return false;
 }
 
+/**
+ * Diagnostic A/B for the Chrome/Graphite compositing stutter.
+ *
+ * The default stacks two full-viewport canvases: the track layer underneath, and a
+ * transparent game canvas above it. That costs an extra composited layer plus a
+ * per-pixel blend every frame, because the game canvas must stay `alpha: true` for
+ * the track to show through. Merging draws both into one opaque canvas.
+ *
+ * `?canvas=1` (or `merged`) merges; `?canvas=2` (or absent) keeps the stacked pair.
+ */
+export function shouldMergeGameCanvases(
+  search = typeof window !== "undefined" ? window.location?.search : "",
+) {
+  if (!search) return false;
+  const mode = new URLSearchParams(search).get("canvas");
+  return mode === "1" || mode === "merged";
+}
+
 export function readCanvasDevicePixelRatio() {
   if (typeof window === "undefined") return 1;
   return window.devicePixelRatio || 1;

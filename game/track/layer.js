@@ -10,6 +10,8 @@ export class TrackLayerRenderer {
     this.workerActive = false;
     this.bitmapVersion = 0;
     this.bitmapPromise = null;
+    /** Merged mode: drawing into the engine's canvas, which the engine also sizes. */
+    this.merged = false;
     this.onTrackReady = null;
     this.renderMessage = {
       type: "render",
@@ -23,7 +25,17 @@ export class TrackLayerRenderer {
     };
   }
 
-  setup({ allowWorker = true } = {}) {
+  setup({ allowWorker = true, sharedContext = null } = {}) {
+    if (sharedContext) {
+      // The engine owns this canvas and its backing store, so drop our own reference:
+      // it is what updateViewportSize() and draw()'s resize guard key off, and both
+      // must stay out of the way here. The worker is unavailable by construction.
+      this.merged = true;
+      this.ctx = sharedContext;
+      this.canvas = null;
+      return;
+    }
+
     const canUseOffscreenWorker = Boolean(
       allowWorker &&
         this.canvas &&

@@ -13,6 +13,7 @@ import { createRunPolicy } from "./race/run-policy.js";
 import {
   detectDevicePerformance,
   shouldExposeDebugHooks,
+  shouldMergeGameCanvases,
   shouldUseTrackLayerWorker,
   readCanvasDevicePixelRatio,
 } from "./track/environment.js";
@@ -149,13 +150,24 @@ export class RealTimeRacer {
     this.trackLayerCanvas = document.getElementById("trackLayerCanvas");
     this.canvas = document.getElementById("gameCanvas");
     this.setLoadingStatus(10, "Initializing Engine...");
+    // Merged mode needs an opaque context: nothing renders beneath it, so the
+    // per-pixel blend the stacked layout requires is pure cost.
+    this.mergeGameCanvases = shouldMergeGameCanvases();
     this.ctx =
-      this.canvas.getContext("2d", { alpha: true }) ||
+      this.canvas.getContext("2d", { alpha: !this.mergeGameCanvases }) ||
       this.canvas.getContext("2d");
     this.container = document.getElementById("game-container");
     this.isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
     this.trackLayer = new TrackLayerRenderer(this.trackLayerCanvas);
-    this.trackLayer.setup({ allowWorker: shouldUseTrackLayerWorker() });
+    if (this.mergeGameCanvases) {
+      // Hiding it removes the layer from compositing entirely, which is the point of
+      // the comparison; render() already draws the track before it transforms for the
+      // world, so pointing the track layer at this context preserves the draw order.
+      if (this.trackLayerCanvas) this.trackLayerCanvas.style.display = "none";
+      this.trackLayer.setup({ sharedContext: this.ctx });
+    } else {
+      this.trackLayer.setup({ allowWorker: shouldUseTrackLayerWorker() });
+    }
     this.viewportWidth = 0;
     this.viewportHeight = 0;
     this.viewportDevicePixelRatio = 1;
