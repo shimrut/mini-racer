@@ -41,15 +41,15 @@ describe('runtime environment detection', () => {
 });
 
 describe('merged game canvas mode', () => {
-  it('keeps the stacked pair unless the merge flag is explicitly set', () => {
-    expect(shouldMergeGameCanvases('')).toBe(false);
-    expect(shouldMergeGameCanvases('?canvas=2')).toBe(false);
-    expect(shouldMergeGameCanvases('?other=1')).toBe(false);
+  it('merges by default', () => {
+    expect(shouldMergeGameCanvases('')).toBe(true);
+    expect(shouldMergeGameCanvases('?other=1')).toBe(true);
+    expect(shouldMergeGameCanvases('?canvas=1')).toBe(true);
   });
 
-  it('merges for either accepted spelling of the flag', () => {
-    expect(shouldMergeGameCanvases('?canvas=1')).toBe(true);
-    expect(shouldMergeGameCanvases('?canvas=merged')).toBe(true);
-    expect(shouldMergeGameCanvases('?debug=1&canvas=1')).toBe(true);
+  it('restores the stacked pair for either accepted spelling of the flag', () => {
+    expect(shouldMergeGameCanvases('?canvas=2')).toBe(false);
+    expect(shouldMergeGameCanvases('?canvas=stacked')).toBe(false);
+    expect(shouldMergeGameCanvases('?debug=1&canvas=2')).toBe(false);
   });
 });
