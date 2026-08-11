@@ -1322,6 +1322,13 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect(global.document.body.dataset.lobbyMode).toBe('campaign');
             expect(global.document.body.dataset.lobbyPaneSwap).toBe('toggle');
 
+            // The Campaign bootstrap repaints the pane it is already on; that must
+            // not move the entrance off the carousel and replay it.
+            lobby.showPane('campaign');
+
+            expect(global.document.body.dataset.lobbyPaneSwap).toBe('toggle');
+            expect(startViewTransition).not.toHaveBeenCalled();
+
             lobby.showPane('home');
 
             expect(overlay.classList.contains('is-lobby-transitioning')).toBe(true);

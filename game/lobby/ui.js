@@ -232,8 +232,13 @@ export class LobbyUi {
                 document.body.dataset.lobbyMode = mode;
                 // Stays on the body until the next swap replaces it — clearing it
                 // once the entrance finishes would re-apply the pane animation and
-                // replay it.
-                document.body.dataset.lobbyPaneSwap = toggleSwap ? 'toggle' : 'mode';
+                // replay it. Only a real swap writes one: the value decides whether
+                // `.lobby-pane` or `.track-carousel` carries the entrance, so
+                // rewriting it to repaint the mode already on screen moves the
+                // animation between them and restarts it.
+                if (previousMode !== mode) {
+                    document.body.dataset.lobbyPaneSwap = toggleSwap ? 'toggle' : 'mode';
+                }
                 if (mode === 'home' && previousMode !== 'home') {
                     document.body.dataset.lobbyHomeReturned = 'true';
                 }
