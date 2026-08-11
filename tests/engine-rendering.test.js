@@ -266,4 +266,19 @@ describe("single game canvas", () => {
     expect(html).toContain('<canvas id="gameCanvas"');
     expect(html).not.toContain("trackLayerCanvas");
   });
+
+  it("styles the single race canvas without stacking rules", () => {
+    const css = readFileSync(
+      new URL("../styles/lobby-and-garage.css", import.meta.url),
+      "utf8",
+    );
+    const foundation = readFileSync(
+      new URL("../styles/foundation.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(css).not.toContain("trackLayerCanvas");
+    expect(css).not.toContain("--z-canvas");
+    expect(foundation).not.toContain("--z-canvas");
+  });
 });

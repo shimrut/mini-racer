@@ -20,10 +20,6 @@
     display: block
 }
 
-#gameCanvas {
-    z-index: var(--z-canvas)
-}
-
 button:active {
     filter: none;
 }
