@@ -2419,6 +2419,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 stages: [{ id: 'numbered-v1-00', unlocked: true }],
             },
             currentTrackKey: 'numberZero',
+            trackCanvas: {},
             pbGhost: { clearTrack: vi.fn(), prepare: vi.fn() },
             trackPersonalBestByTrackKey: {},
             bestLapTime: null,
@@ -2465,6 +2466,25 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.loadTrack).not.toHaveBeenCalled();
         expect(context.startSequence).toHaveBeenCalledTimes(1);
         expect(context.startButtonPending).toBe(false);
+    });
+
+    it('rebuilds a missing Campaign canvas when the stage track key is unchanged', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+        const context = createStartContext({ trackCanvas: null });
+
+        await context.startCampaignStage();
+
+        expect(context.loadTrack).toHaveBeenCalledWith('numberZero', {
+            loadPlayerProgress: false,
+            preserveDailyChallengeContext: true,
+            preserveRaceComparisonTarget: false,
+            showStartOverlayOnReset: false,
+        });
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
     });
 
     it('starts the lights without waiting on the start stamp or the PB ghost', async () => {

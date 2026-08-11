@@ -428,9 +428,10 @@ export class RealTimeRacer {
       },
     });
     this.modalContent = new ModalContentUi();
-    // Nothing to wait for since the track draws on the main thread into the race
-    // canvas; the gate keeps the slot so startup ordering stays explicit.
-    this.trackReadyPromise = Promise.resolve();
+    this.trackReadyPromise = this.loadTrack(DEFAULT_TRACK_KEY, {
+      loadPlayerProgress: false,
+      showStartOverlayOnReset: false,
+    });
     this.fontsReadyPromise = document.fonts ? document.fonts.ready : Promise.resolve();
     this.modal = new ModalShell({
       content: this.modalContent,

@@ -573,7 +573,7 @@ export const campaignEngineMethods = {
                 });
             }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
-            if (stage.trackKey !== this.currentTrackKey) {
+            if (stage.trackKey !== this.currentTrackKey || !this.trackCanvas) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,

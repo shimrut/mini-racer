@@ -22,6 +22,29 @@ describe('mode-priority startup', () => {
         expect(entrySource).not.toMatch(/^const initialTrack = await loadClientTrack/m);
     });
 
+    it('builds the initial track canvas before resolving track readiness', () => {
+        const engineSource = readFileSync(new URL('../game/engine.js', import.meta.url), 'utf8');
+        const dailySource = readFileSync(
+            new URL('../game/daily-challenge/engine-methods.js', import.meta.url),
+            'utf8',
+        );
+        const campaignSource = readFileSync(
+            new URL('../game/campaign/engine-methods.js', import.meta.url),
+            'utf8',
+        );
+
+        expect(engineSource).toContain(
+            'this.trackReadyPromise = this.loadTrack(DEFAULT_TRACK_KEY, {',
+        );
+        expect(engineSource).not.toContain('this.trackReadyPromise = Promise.resolve();');
+        expect(dailySource).toContain(
+            '&& (challenge.trackKey !== this.currentTrackKey || !this.trackCanvas)',
+        );
+        expect(campaignSource).toContain(
+            'if (stage.trackKey !== this.currentTrackKey || !this.trackCanvas)',
+        );
+    });
+
     it('loads only the requested client track and reuses its geometry', async () => {
         clearClientTrackRegistryForTests();
         expect(getLoadedClientTrack('numberZero')).toBe(null);

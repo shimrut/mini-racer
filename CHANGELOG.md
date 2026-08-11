@@ -1,5 +1,10 @@
 # Changelog
 
+- Fixed the initial Home and Campaign lobby background so startup now builds
+  and renders the default track before the loading gate clears, instead of
+  showing a floating car over a blank canvas. Daily and Campaign starts also
+  rebuild a missing canvas even when the requested track key is unchanged.
+
 - Fixed Daily, Campaign, and Head to Head race starts after lazy mode loading.
   Start actions now retain the active racer context, so race preparation can
   render the background and begin the countdown instead of leaving players in

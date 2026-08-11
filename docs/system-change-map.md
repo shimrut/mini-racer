@@ -606,6 +606,14 @@ the authoritative challenge response, target track runtime/canvas, car, and
 the frozen opponent ghost. A bounded gate still prevents a failed request from
 stranding the loader.
 
+The racer constructor treats its initial track definition as data only. Its
+`trackReadyPromise` loads the default track without profile work or a start
+overlay, builds the runtime geometry, and renders the canvas before the startup
+gate clears. Home therefore has a complete background immediately, and a
+Campaign selection made from Home cannot inherit an unbuilt blank canvas.
+Daily and Campaign start paths use the same canvas-presence safeguard as Head
+to Head: a matching track key does not skip loading when `trackCanvas` is absent.
+
 Client track definitions are loaded through `game/track/client-registry.js` and
 Vite's per-definition chunks. The compatibility `game/track/tracks.js` registry
 remains for server, tooling, and non-game build paths; client carousel previews

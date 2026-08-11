@@ -894,7 +894,10 @@ export const dailyChallengeEngineMethods = {
       this.lastPlayedDailyChallenge = challenge;
       this.selectedDailyChallengeId = challenge.id;
       this.activeDailyChallenge = challenge;
-      if (challenge.trackKey && challenge.trackKey !== this.currentTrackKey) {
+      if (
+        challenge.trackKey
+        && (challenge.trackKey !== this.currentTrackKey || !this.trackCanvas)
+      ) {
         await this.loadTrack(challenge.trackKey, {
           loadPlayerProgress: false,
           preserveDailyChallengeContext: true,

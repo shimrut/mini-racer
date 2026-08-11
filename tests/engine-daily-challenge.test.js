@@ -826,6 +826,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       activeDailyChallenge: null,
       lastPlayedDailyChallenge: null,
       currentTrackKey: "circuit",
+      trackCanvas: {},
       startOverlay: { hideStartOverlay: vi.fn() },
       loadTrack: vi.fn(async function loadTrack(trackKey) {
         this.currentTrackKey = trackKey;
@@ -858,6 +859,37 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.startSequence).toHaveBeenCalled();
   });
 
+  it("rebuilds a missing Daily canvas when the challenge track key is unchanged", async () => {
+    const challenge = {
+      id: "daily-missing-canvas",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: challenge,
+      activeDailyChallenge: null,
+      currentTrackKey: challenge.trackKey,
+      trackCanvas: null,
+      startOverlay: { hideStartOverlay: vi.fn() },
+      loadTrack: vi.fn(),
+      applyDailyChallenge: vi.fn(),
+      startSequence: vi.fn(),
+      journeys: { startAttempt: vi.fn() },
+    };
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
+
+    expect(engine.loadTrack).toHaveBeenCalledWith(challenge.trackKey, {
+      loadPlayerProgress: false,
+      preserveDailyChallengeContext: true,
+      preserveRaceComparisonTarget: false,
+      showStartOverlayOnReset: false,
+    });
+    expect(engine.startSequence).toHaveBeenCalledTimes(1);
+  });
+
   it("waits for the Daily lobby exit before starting the countdown", async () => {
     const challenge = {
       id: "daily-transition",
@@ -874,6 +906,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: challenge,
       activeDailyChallenge: null,
       currentTrackKey: challenge.trackKey,
+      trackCanvas: {},
       startOverlay: {
         beginRaceStartTransition: vi.fn(() => raceStartTransition),
       },
@@ -1051,6 +1084,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: null,
       activeDailyChallenge: null,
       currentTrackKey: "blueSector",
+      trackCanvas: {},
       startOverlay: { hideStartOverlay: vi.fn() },
       applyDailyChallenge: vi.fn(),
       trackModeStart: vi.fn(),
@@ -1084,6 +1118,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: challenge,
       activeDailyChallenge: null,
       currentTrackKey: challenge.trackKey,
+      trackCanvas: {},
       preparedPbGhostChallengeId: challenge.id,
       pendingPbGhostCandidateChallengeIds: new Set([challenge.id]),
       startOverlay: { hideStartOverlay: vi.fn() },
@@ -1116,6 +1151,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: challenge,
       activeDailyChallenge: null,
       currentTrackKey: challenge.trackKey,
+      trackCanvas: {},
       preparedPbGhostChallengeId: null,
       pendingPbGhostCandidateChallengeIds: new Set(),
       unavailablePbGhostChallengeIds: new Set([challenge.id]),
@@ -1210,6 +1246,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       currentDailyChallenge: challenge,
       activeDailyChallenge: null,
       currentTrackKey: challenge.trackKey,
+      trackCanvas: {},
       preparedPbGhostChallengeId: challenge.id,
       startOverlay: { hideStartOverlay: vi.fn() },
       applyDailyChallenge: vi.fn(),
