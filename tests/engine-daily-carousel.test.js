@@ -26,7 +26,13 @@ vi.mock('../game/daily-challenge/service.js', async (importOriginal) => {
             return playlistState.cached;
         }),
         getCachedDailyChallengePlaylist: vi.fn(() => playlistState.cached),
-        getDailyChallengePlaylist: vi.fn(async () => playlistState.fetched),
+        getDailyChallengePlaylist: vi.fn(async () => {
+            // The real service merges the response into the cache before it resolves.
+            const byId = new Map(playlistState.cached.map((entry) => [entry.id, entry]));
+            for (const entry of playlistState.fetched) byId.set(entry.id, entry);
+            playlistState.cached = [...byId.values()];
+            return playlistState.fetched;
+        }),
         getCachedDailyChallengeSnapshot: vi.fn(
             (challengeId) => playlistState.snapshots.get(challengeId) || null,
         ),
@@ -117,6 +123,19 @@ describe('daily carousel engine wiring', () => {
         await pending;
         expect(render.mock.calls[1][0].map((card) => card.challengeId))
             .toEqual(CHALLENGES.map((entry) => entry.id));
+    });
+
+    it('keeps the cached run of days when the playlist answers with fewer', async () => {
+        playlistState.cached = CHALLENGES;
+        playlistState.fetched = [CHALLENGES[0]];
+        const { engine, render } = createEngine({ selectedDailyChallengeId: 'daily-2' });
+
+        await dailyChallengeEngineMethods.refreshDailyCarousel.call(engine);
+
+        const afterFetch = render.mock.calls[1];
+        expect(afterFetch[0].map((card) => card.challengeId))
+            .toEqual(CHALLENGES.map((entry) => entry.id));
+        expect(afterFetch[1].selectedChallengeId).toBe('daily-2');
     });
 
     it('opens on the day the player last raced', async () => {

@@ -317,6 +317,7 @@ export class TrackCarousel {
         this.syncCardWidth();
 
         const previousCards = this._cards;
+        const previousSelectedId = previousCards[this._selectedIndex]?.challengeId ?? null;
         const previousIds = previousCards.map((card) => card.challengeId).join('|');
         const nextIds = cards.map((card) => card.challengeId).join('|');
         const sameRun = previousIds === nextIds && this._elements.length === cards.length;
@@ -345,8 +346,16 @@ export class TrackCarousel {
             rail.replaceChildren(this.edgeSpacer('lead'), ...this._elements, this.edgeSpacer('tail'));
         }
 
+        // Refreshes arrive in stages, and an early one can be missing the card it
+        // was asked to select — a cached page that has not caught up, or a day that
+        // rolled off mid-session. Reaching for card 0 there scrolls the rail off the
+        // player's track and reports it as their choice, only for the next stage to
+        // scroll back. Hold what they are on, and fall back only once that is gone.
         const requestedIndex = findCarouselIndex(cards, selectedChallengeId);
-        const nextIndex = requestedIndex >= 0 ? requestedIndex : 0;
+        const heldIndex = requestedIndex >= 0
+            ? requestedIndex
+            : findCarouselIndex(cards, previousSelectedId);
+        const nextIndex = heldIndex >= 0 ? heldIndex : 0;
         const changed = nextIndex !== this._selectedIndex;
         this._selectedIndex = nextIndex;
         this.applySelectionClasses();

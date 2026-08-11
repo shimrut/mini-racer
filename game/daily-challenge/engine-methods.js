@@ -1035,7 +1035,11 @@ export const dailyChallengeEngineMethods = {
         const fetched = await getDailyChallengePlaylist();
         if (isStale()) return;
         if (fetched.length) {
-          challenges = fetched;
+          // Repaint from the cache rather than the response. The fetch has already
+          // been merged into it, and a response that fell back to a single
+          // challenge would otherwise replace a full rail with one card and drag
+          // the selection to it.
+          challenges = getCachedDailyChallengePlaylist();
           this.paintDailyCarousel(challenges, { selectedChallengeId: preferredId });
         }
       } catch (error) {

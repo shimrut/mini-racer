@@ -259,6 +259,20 @@ function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320
     };
 }
 
+/** Lets `render()` take its rebuild path without a DOM behind it. */
+function stubRailRebuild(carousel, rail) {
+    rail.replaceChildren = vi.fn();
+    carousel.edgeSpacer = vi.fn(() => ({}));
+    carousel.scrollToSelected = vi.fn();
+    carousel.buildCard = vi.fn((card, index) => ({
+        dataset: { index: String(index), challengeId: card.challengeId },
+        classList: { toggle: vi.fn() },
+        setAttribute: vi.fn(),
+        style: { setProperty: vi.fn(), getPropertyValue: () => '' },
+        _parts: {},
+    }));
+}
+
 describe('TrackCarousel selection', () => {
     it('steps with A/D and arrows and stops at both ends', () => {
         const { carousel, onSelect } = createStubbedCarousel(3);
@@ -484,6 +498,61 @@ describe('TrackCarousel selection', () => {
 
         expect(carousel.isEmpty()).toBe(true);
         expect(onSelect).toHaveBeenCalledWith(null, null);
+    });
+
+    it('holds the track the player is on when a refresh arrives without it', () => {
+        const { carousel, onSelect, rail } = createStubbedCarousel(4);
+        stubRailRebuild(carousel, rail);
+        carousel.select(2);
+        onSelect.mockClear();
+
+        // A refresh stage that has not caught up with the requested day yet.
+        carousel.render(
+            [
+                { challengeId: 'c0', challenge: { id: 'c0' } },
+                { challengeId: 'c2', challenge: { id: 'c2' } },
+            ],
+            { selectedChallengeId: 'rolled-off-day' },
+        );
+
+        expect(carousel.getSelectedChallengeId()).toBe('c2');
+        expect(onSelect).not.toHaveBeenCalledWith(
+            { id: 'c0' },
+            expect.anything(),
+        );
+    });
+
+    it('leads with the first track once the held one is gone too', () => {
+        const { carousel, rail } = createStubbedCarousel(4);
+        stubRailRebuild(carousel, rail);
+        carousel.select(2);
+
+        carousel.render(
+            [
+                { challengeId: 'c1', challenge: { id: 'c1' } },
+                { challengeId: 'c3', challenge: { id: 'c3' } },
+            ],
+            { selectedChallengeId: 'rolled-off-day' },
+        );
+
+        expect(carousel.getSelectedChallengeId()).toBe('c1');
+    });
+
+    it('still honours a requested day that the refresh does carry', () => {
+        const { carousel, rail } = createStubbedCarousel(4);
+        stubRailRebuild(carousel, rail);
+        carousel.select(2);
+
+        carousel.render(
+            [
+                { challengeId: 'c1', challenge: { id: 'c1' } },
+                { challengeId: 'c2', challenge: { id: 'c2' } },
+                { challengeId: 'c3', challenge: { id: 'c3' } },
+            ],
+            { selectedChallengeId: 'c3' },
+        );
+
+        expect(carousel.getSelectedChallengeId()).toBe('c3');
     });
 
     it('repaints every existing preview without rebuilding or moving the selection', () => {
