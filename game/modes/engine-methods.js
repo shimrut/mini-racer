@@ -15,9 +15,11 @@ export const modeRouterEngineMethods = {
         this.clearDailyChallengeRun();
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.lobbyUi.showHome();
-        void this.syncReadyBackgroundTrack(this.currentDailyChallenge).catch((error) => {
-            console.error('Error syncing Home background track:', error);
-        });
+        if (typeof this.syncReadyBackgroundTrack === 'function') {
+            void this.syncReadyBackgroundTrack(this.currentDailyChallenge).catch((error) => {
+                console.error('Error syncing Home background track:', error);
+            });
+        }
     },
 
     showDailyLobby({ selectChallengeId = null } = {}) {
@@ -52,7 +54,11 @@ export const modeRouterEngineMethods = {
     },
 
     handleActiveRaceLapCompleted(lapTime, details) {
-        this.handleDailyChallengeLapCompleted(lapTime, details);
+        if (typeof this.handleChallengeLapCompleted === 'function') {
+            this.handleChallengeLapCompleted(lapTime, details);
+            return;
+        }
+        this.handleDailyChallengeLapCompleted?.(lapTime, details);
     },
 
     handleActiveRaceWin(winData) {

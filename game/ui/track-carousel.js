@@ -1,11 +1,15 @@
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
-import { TRACKS } from '../track/tracks.js';
+import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { createLockIconSvg } from './lock-icon.js';
 import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from '../track/presentation.js';
+
+const legacyPreviewTracks = import.meta.env.MODE === 'test'
+    ? (await import('../track/tracks.js')).TRACKS
+    : null;
 
 const PREVIEW_WIDTH = 320;
 const PREVIEW_HEIGHT = 176;
@@ -118,7 +122,7 @@ function createSpecCell(label, element = 'span') {
 }
 
 export function getTrackAspectRatio(trackKey) {
-    const track = TRACKS[trackKey];
+    const track = getLoadedClientTrack(trackKey) || legacyPreviewTracks?.[trackKey];
     const points = track?.outer;
     if (!Array.isArray(points) || !points.length) return null;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -145,8 +149,14 @@ export function renderTrackPreviewCanvas(canvas, card, {
     carWorldSize = null,
     force = false,
 } = {}) {
-    const track = TRACKS[card?.trackKey];
-    if (!canvas || !track) return;
+    const track = getLoadedClientTrack(card?.trackKey) || legacyPreviewTracks?.[card?.trackKey];
+    if (!canvas) return;
+    if (!track) {
+        void loadClientTrack(card?.trackKey).then(() => {
+            if (canvas.isConnected !== false) renderTrackPreviewCanvas(canvas, card, { cacheNamespace, carImage, carAssetKey, carWorldSize, force: true });
+        }).catch(() => {});
+        return;
+    }
     const previewCarWorldSize = carWorldSize
         ? {
             width: carWorldSize.width * PREVIEW_CAR_SCALE,

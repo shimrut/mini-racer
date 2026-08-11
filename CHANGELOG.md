@@ -1,5 +1,12 @@
 # Changelog
 
+- Prioritized first-load work by launch mode. Daily now gates on its active
+  challenge, selected track, car, and PB ghost; Campaign gates on bootstrap,
+  the selected stage, car, and available stage ghost; Head to Head gates on the
+  authoritative challenge, target track, car, and frozen opponent ghost.
+  Client track geometry and non-selected mode runtimes now load lazily after
+  the selected lobby is ready.
+
 - Approved the current Mistfall Circuit boundary in the track-registry
   fingerprint so integrity checks protect the geometry that actually ships.
 

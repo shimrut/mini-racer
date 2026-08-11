@@ -441,6 +441,16 @@ This phase should be behavior-neutral for production Daily GP.
 4. Release Campaign behind a server-controlled flag if a staged rollout is
    needed.
 
+## Startup readiness
+
+Expanded launches now prepare the selected mode before the loading screen is
+dismissed. Daily loads the active challenge, selected track runtime/canvas, car,
+and PB ghost; Campaign loads bootstrap, the selected unlocked stage and its PB
+ghost; Head to Head loads the authoritative challenge, target track, car, and
+frozen opponent ghost. Other mode runtimes and playlist warming are deferred
+until the selected lobby is interactive, and a bounded startup timeout remains
+the final escape hatch.
+
 ## Required Validation
 
 Automated coverage must include:

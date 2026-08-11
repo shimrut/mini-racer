@@ -1,5 +1,5 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js';
-import { TRACKS } from '../track/tracks.js';
+import { getTrackName } from '../track/catalog.js';
 import {
     buildModalRunsPayload,
     buildModalRunsViewOptions,
@@ -460,15 +460,9 @@ export class ModalShell {
             this._hidePauseTrackPreview();
             return;
         }
-        const track = TRACKS[payload.trackKey];
-        if (!track) {
-            this._hidePauseTrackPreview();
-            return;
-        }
-
         const labelName = (typeof payload.trackName === 'string' && payload.trackName.trim())
             ? payload.trackName.trim()
-            : (track.name || payload.trackKey);
+            : getTrackName(payload.trackKey, payload.trackKey);
 
         if (nameEl) {
             nameEl.textContent = labelName;
@@ -2311,8 +2305,8 @@ export class ModalShell {
         title.textContent = `Race ${opponentName}?`;
 
         const payload = this._modalRunsPayload;
-        const trackName = payload?.scoreboardTrackKey && TRACKS[payload.scoreboardTrackKey]
-            ? TRACKS[payload.scoreboardTrackKey].name
+        const trackName = payload?.scoreboardTrackKey
+            ? getTrackName(payload.scoreboardTrackKey, payload?.scoreboardTitle || 'This track')
             : (payload?.scoreboardTitle || 'This track');
         const selectedContext = payload?.leaderboardDayOptions?.find?.(
             (option) => option?.challengeId === payload?.selectedLeaderboardDayId
@@ -2541,8 +2535,8 @@ export class ModalShell {
         const payload = this._modalRunsPayload;
         const hasPersonalBestList = Array.isArray(payload?.lapTimesArray);
         const isLeaderboardOnly = Boolean(payload?.showGlobalLeaderboard) && !hasPersonalBestList;
-        const trackName = payload?.scoreboardTrackKey && TRACKS[payload.scoreboardTrackKey]
-            ? TRACKS[payload.scoreboardTrackKey].name
+        const trackName = payload?.scoreboardTrackKey
+            ? getTrackName(payload.scoreboardTrackKey, null)
             : null;
         const playerBestTime = Number(payload?.scoreboardSnapshot?.currentPlayerRow?.bestTime);
         const playerTimeLabel = Number.isFinite(playerBestTime)

@@ -1,5 +1,5 @@
 import { getCombinedMedalStackTiers } from '../medals/medal-timing.js';
-import { TRACKS } from '../track/tracks.js';
+import { hasTrack } from '../track/catalog.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 
 export function formatCampaignStageLabel(stage) {
@@ -35,7 +35,7 @@ export function buildCampaignCarouselCards(campaignState = {}) {
     const cards = [];
 
     for (const stage of stages) {
-        if (!stage?.id || !stage.trackKey || !TRACKS[stage.trackKey]) continue;
+        if (!stage?.id || !stage.trackKey || !hasTrack(stage.trackKey)) continue;
         const lapsLabel = formatLapsLabel(stage.laps);
 
         cards.push({

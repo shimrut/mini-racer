@@ -4,7 +4,7 @@ import {
     getCombinedMedalStackTiers,
     getMedalForRaceTime,
 } from '../medals/medal-timing.js';
-import { TRACKS } from '../track/tracks.js';
+import { hasTrack } from '../track/catalog.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -48,7 +48,7 @@ export function buildDailyCarouselCards(challenges = [], {
 
     for (const challenge of Array.isArray(challenges) ? challenges : []) {
         if (!challenge?.id || seen.has(challenge.id)) continue;
-        if (!challenge.trackKey || !TRACKS[challenge.trackKey]) continue;
+        if (!challenge.trackKey || !hasTrack(challenge.trackKey)) continue;
         seen.add(challenge.id);
 
         const requiredLaps = getDailyChallengeRequiredLaps(challenge);

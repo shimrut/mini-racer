@@ -3,7 +3,7 @@ import { normalizeCampaignLobbyState } from '../lobby/service.js';
 import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
 import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
-import { TRACKS } from '../track/tracks.js';
+import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
@@ -399,6 +399,41 @@ export const campaignEngineMethods = {
         return promise;
     },
 
+    async prepareInitialCampaignLaunch() {
+        let bootstrap = await this.ensureCampaignBootstrap({ forceRefresh: true });
+        if (
+            bootstrap?.authoritative === false
+            && this.playerHistoryPromise
+        ) {
+            await this.playerHistoryPromise;
+            bootstrap = await this.ensureCampaignBootstrap({ forceRefresh: true });
+        }
+        const lobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
+        const stage = getDefaultCampaignLobbyStage(lobbyState);
+        if (!stage?.trackKey || !stage?.raceId) return null;
+
+        this.activeRaceMode = 'campaign';
+        this.activeCampaignStage = stage;
+        this.selectedCampaignStageId = stage.raceId;
+        await this.loadTrack(stage.trackKey, {
+            loadPlayerProgress: false,
+            preserveDailyChallengeContext: true,
+            showStartOverlayOnReset: false,
+        });
+
+        this.campaignPbGhostByRaceId ??= Object.create(null);
+        let response = null;
+        try {
+            response = await getCampaignPbGhost(stage.raceId);
+        } catch (error) {
+            console.warn('Campaign PB ghost was unavailable during startup:', error);
+        }
+        const personalBest = response?.ok ? response.body?.personalBest : null;
+        this.campaignPbGhostByRaceId[stage.raceId] = personalBest || null;
+        if (personalBest) this.applyCampaignPersonalBest(stage, personalBest);
+        return { stage, personalBest };
+    },
+
     async loadCampaignLobby({ show = true } = {}) {
         if (show) {
             this.showCampaignLobby({ refresh: false });
@@ -519,10 +554,14 @@ export const campaignEngineMethods = {
                     console.warn('Could not stamp the Campaign race start:', error);
                     return null;
                 });
-            const ghostRequest = getCampaignPbGhost(stage.raceId).catch((error) => {
-                console.warn('Campaign PB ghost was unavailable for this run:', error);
-                return null;
-            });
+            this.campaignPbGhostByRaceId ??= Object.create(null);
+            const cachedPersonalBest = this.campaignPbGhostByRaceId[stage.raceId];
+            const ghostRequest = cachedPersonalBest
+                ? null
+                : getCampaignPbGhost(stage.raceId).catch((error) => {
+                    console.warn('Campaign PB ghost was unavailable for this run:', error);
+                    return null;
+                });
 
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
@@ -544,6 +583,7 @@ export const campaignEngineMethods = {
             }
             this.applyDailyChallenge(toRaceChallenge(stage));
             this.activeRaceMode = 'campaign';
+            if (cachedPersonalBest) this.applyCampaignPersonalBest(stage, cachedPersonalBest);
             void this.journeys?.startAttempt?.({ reason: 'initial_start' });
             await raceStartTransition;
             this.startSequence();
@@ -552,6 +592,9 @@ export const campaignEngineMethods = {
             if (ghostRequest) {
                 void ghostRequest.then((response) => {
                     if (!response) return;
+                    this.campaignPbGhostByRaceId[stage.raceId] = response.ok
+                        ? response.body?.personalBest || null
+                        : null;
                     this.applyCampaignPersonalBest(
                         stage,
                         response.ok ? response.body?.personalBest : null,
@@ -569,11 +612,12 @@ export const campaignEngineMethods = {
 
     async startCampaignStageAgainstOpponent(stage, target) {
         if (!stage || !target) return false;
+        const track = await loadClientTrack(stage.trackKey);
         this.clearRaceComparisonTarget?.();
         if (!this.installRaceComparisonTarget?.(
             { ...target, mode: 'campaign' },
             {
-                track: TRACKS[stage.trackKey],
+                track,
                 lapCount: stage.lapCount,
             },
         )) {
@@ -647,7 +691,7 @@ export const campaignEngineMethods = {
         this.trackPersonalBestByTrackKey[stage.raceId] = trackPersonalBest;
         const paceBaseline = createPersonalBestPaceBaseline(
             personalBest,
-            TRACKS[stage.trackKey],
+            getLoadedClientTrack(stage.trackKey),
             stage.lapCount,
         );
         if (paceBaseline) {

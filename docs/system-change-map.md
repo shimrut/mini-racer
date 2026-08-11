@@ -595,6 +595,24 @@ These are useful, but they are not on the critical player path:
   post creation is idempotent and does not alter the dated Daily post or its
   score-thread workflow.
 
+## Startup mode-priority loading
+
+The expanded `game` entrypoint resolves the launch target before constructing
+the racer. `game/startup/coordinator.js` keeps the critical gate mode-specific:
+Daily waits for its active challenge, selected track runtime/canvas, car, and
+personal-best ghost; Campaign waits for bootstrap, the default unlocked stage,
+its track runtime/canvas, car, and available stage PB; Head to Head waits for
+the authoritative challenge response, target track runtime/canvas, car, and
+the frozen opponent ghost. A bounded gate still prevents a failed request from
+stranding the loader.
+
+Client track definitions are loaded through `game/track/client-registry.js` and
+Vite's per-definition chunks. The compatibility `game/track/tracks.js` registry
+remains for server, tooling, and non-game build paths; client carousel previews
+and race setup no longer import all geometry up front. Non-selected mode code,
+playlist data, and Campaign warming are installed after the selected lobby is
+interactive through `game/modes/runtime-loader.js`.
+
 ## Recommended Scoping Heuristic
 
 Before approving any new request, sort it into one of these buckets:

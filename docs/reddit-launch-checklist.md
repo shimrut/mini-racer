@@ -134,6 +134,10 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Hold profile and Daily startup requests open while a Head to Head response
   succeeds; the challenge opens from its single request without waiting for the
   unrelated 20-second startup cap, and its track/frozen ghost remain selected.
+- [ ] Open Daily, Campaign, and Head to Head custom launches and confirm the
+  selected mode's authoritative data, track runtime/canvas, car, and available
+  ghost are ready before the loader dismisses; playlist and other-mode warming
+  may continue after the lobby is interactive.
 - [ ] Exercise more than twelve Head to Head submission attempts in one minute
   for one identity and verify the 429 response is actionable, expensive post
   resolution is skipped for throttled attempts, and normal submission resumes

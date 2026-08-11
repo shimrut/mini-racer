@@ -12,7 +12,8 @@ import {
     getVerificationSnapshotFromQueueEntry
 } from '../scoreboard/verification-queue.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
-import { TRACKS } from '../track/tracks.js';
+import { hasTrack } from '../track/catalog.js';
+import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../track/presentation.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
@@ -150,7 +151,7 @@ export class DailyChallengeUi {
         }
 
         const playableChallenges = Array.isArray(challenges)
-            ? challenges.filter((challenge) => challenge?.trackKey && TRACKS[challenge.trackKey])
+            ? challenges.filter((challenge) => challenge?.trackKey && hasTrack(challenge.trackKey))
             : [];
         if (!playableChallenges.length) {
             const empty = document.createElement('div');
@@ -231,8 +232,13 @@ export class DailyChallengeUi {
     }
 
     renderPlaylistPreview(canvas, challenge) {
-        const track = TRACKS[challenge.trackKey];
-        if (!track) return;
+        const track = getLoadedClientTrack(challenge?.trackKey);
+        if (!track) {
+            void loadClientTrack(challenge?.trackKey).then(() => {
+                if (canvas?.isConnected !== false) this.renderPlaylistPreview(canvas, challenge);
+            }).catch(() => {});
+            return;
+        }
         const presentation = resolveTrackPresentation(challenge.trackKey, {
             surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
             event: challenge.skin ? { key: 'daily-challenge', trackKey: challenge.trackKey, skin: challenge.skin } : null

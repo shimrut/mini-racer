@@ -43,7 +43,7 @@ import {
 } from "../medals/last-lap-medal-storage.js";
 import { getTrackCanvasAsset } from "../track/assets.js";
 import { DEFAULT_TRACK_KEY } from "../track/catalog.js";
-import { TRACKS } from "../track/tracks.js";
+import { getLoadedClientTrack, loadClientTrack } from "../track/client-registry.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
@@ -194,7 +194,7 @@ function applyTrackPersonalBest(engine, challenge, record, { prepareGhost = fals
         bestTimeMs: Math.round(personalBest.bestTime * 1000),
         checkpointTimesSec: personalBest.checkpointTimesSec,
         lapCompletionTimesSec: personalBest.lapCompletionTimesSec,
-      }, TRACKS[challenge.trackKey], getDailyChallengeRequiredLaps(challenge))
+      }, getLoadedClientTrack(challenge.trackKey), getDailyChallengeRequiredLaps(challenge))
     : null;
   if (paceBaseline) {
     engine.personalBestPaceBaselineByRaceId[challenge.id] = paceBaseline;
@@ -497,7 +497,7 @@ export const dailyChallengeEngineMethods = {
     const prewarmId = (this._dailyPlaylistTrackPrewarmId || 0) + 1;
     this._dailyPlaylistTrackPrewarmId = prewarmId;
     const queue = (Array.isArray(challenges) ? challenges : [])
-      .filter((challenge) => challenge?.trackKey && TRACKS[challenge.trackKey]);
+      .filter((challenge) => challenge?.trackKey);
     const isSurfaceOpen = () => (
       !requireModal || this.dailyChallengeUi.isPlaylistModalOpen?.()
     );
@@ -514,7 +514,8 @@ export const dailyChallengeEngineMethods = {
       if (!isSurfaceOpen()) return;
       if (this.status === "playing" || this.status === "starting") return;
 
-      const track = TRACKS[challenge.trackKey];
+      const track = await loadClientTrack(challenge.trackKey);
+      if (!track) return;
       const presentation = resolveTrackPresentation(challenge.trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.RACE,
         event: createDailyChallengePresentationEvent(challenge),
@@ -1096,7 +1097,7 @@ export const dailyChallengeEngineMethods = {
 
   handleDailyCarouselSettled(card) {
     const challenge = card?.challenge;
-    if (!challenge?.trackKey || !TRACKS[challenge.trackKey]) return;
+    if (!challenge?.trackKey) return;
     if (this.status === "playing" || this.status === "starting") return;
     if (!this.startOverlay?.isStartOverlayVisible?.()) return;
     this.prewarmDailyPlaylistTracks([challenge], { requireModal: false });
@@ -1513,11 +1514,12 @@ export const dailyChallengeEngineMethods = {
 
   async startDailyChallengeAgainstOpponent(challenge, target) {
     if (!challenge || !target) return false;
+    const track = await loadClientTrack(challenge.trackKey);
     this.clearRaceComparisonTarget?.();
     if (!this.installRaceComparisonTarget?.(
       { ...target, mode: "daily" },
       {
-        track: TRACKS[challenge.trackKey],
+        track,
         lapCount: getDailyChallengeRequiredLaps(challenge),
       },
     )) {

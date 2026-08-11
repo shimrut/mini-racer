@@ -245,6 +245,21 @@ Optional later: thin `shared/` re-export barrel — only if it reduces confusion
 
 ---
 
+## Startup runtime seam
+
+The first expanded game load now uses the existing mixin composition seam with
+one additional coordinator: `game/index.js` installs only the launch mode's
+runtime methods before constructing `RealTimeRacer`, while
+`game/startup/coordinator.js` selects the mode's race-ready promises. Shared
+run/HUD/lap behavior lives in `game/challenge-run/engine-methods.js`; Daily,
+Campaign, and Head to Head retain their own result and lobby methods.
+
+Track geometry is a client-only lazy boundary in
+`game/track/client-registry.js`. It uses Vite's generated dynamic imports and
+does not change the server-safe `TRACKS` compatibility registry. This keeps
+the change aligned with the existing `*-engine-methods.js` + `Object.assign`
+pattern rather than introducing a framework or a second scene architecture.
+
 ## Patterns To Extend (do not invent new ones)
 
 1. **`*-engine-methods.js` + `Object.assign` onto `RealTimeRacer`** — split *into* this pattern, not away from it.

@@ -1,8 +1,12 @@
-import { TRACKS } from "./tracks.js";
 import {
   getTrackCanvasAsset,
   getTrackRuntimeAsset,
 } from "./assets.js";
+import {
+  getLoadedClientTrack,
+  loadClientTrack,
+  prefetchClientTracks,
+} from "./client-registry.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
@@ -114,10 +118,10 @@ export const trackEngineMethods = {
       showStartOverlayOnReset = true,
     } = {},
   ) {
-    const nextTrack = TRACKS[trackKey];
-    if (!nextTrack) return;
-
     const requestId = ++this.trackLoadRequestId;
+    const nextTrack = await loadClientTrack(trackKey);
+    if (!nextTrack) return;
+    if (requestId !== this.trackLoadRequestId) return;
     this.currentTrack = nextTrack;
     this.currentTrackKey = trackKey;
     this.pbGhost?.clearTrack?.();
@@ -183,6 +187,14 @@ export const trackEngineMethods = {
     ) {
       document.activeElement.blur();
     }
+  },
+
+  getLoadedTrack(trackKey = this.currentTrackKey) {
+    return getLoadedClientTrack(trackKey);
+  },
+
+  async prefetchTracks(trackKeys = []) {
+    return prefetchClientTracks(trackKeys);
   },
 
   drawVisibleTrackCanvas() {

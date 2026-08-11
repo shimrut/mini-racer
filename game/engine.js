@@ -1,6 +1,6 @@
 import { CONFIG } from "./config.js";
 import { DEFAULT_TRACK_KEY } from "./track/catalog.js";
-import { TRACKS } from "./track/tracks.js";
+import { getLoadedClientTrack } from "./track/client-registry.js";
 import {
   resolveTrackPresentation,
   TRACK_PRESENTATION_SURFACES,
@@ -43,11 +43,8 @@ import { resolveGameLaunchTarget } from "./modes/launch-target.js";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
 import { trackEngineMethods } from "./track/engine-methods.js";
 import { raceEngineMethods } from "./race/engine-methods.js";
-import { dailyChallengeEngineMethods } from "./daily-challenge/engine-methods.js";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
 import { opponentRaceEngineMethods } from "./scoreboard/opponent-race-engine-methods.js";
-import { campaignEngineMethods } from "./campaign/engine-methods.js";
-import { headToHeadEngineMethods } from "./head-to-head/engine-methods.js";
 import { modeRouterEngineMethods } from "./modes/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
@@ -57,6 +54,7 @@ import { getCollisionRestartDelaySec } from "./settings/collision-restart-delay-
 import { getCarProceduralAudioEnabled } from "./settings/car-audio-preference.js";
 import { getMusicEnabled } from "./settings/music-preference.js";
 import { getPbGhostEnabled } from "./settings/pb-ghost-preference.js";
+import { selectModeCriticalStartupPromises, selectModeSecondaryStartupTasks } from "./startup/coordinator.js";
 import { PbGhost } from "./ghost/pb-ghost.js";
 import { PbGhostService } from "./ghost/pb-ghost-service.js";
 import {
@@ -74,6 +72,13 @@ import {
   confirmDailyChallengeShare,
   previewDailyChallengeShare,
 } from "./daily-challenge/service.js";
+
+// The legacy Daily mixin remains available to unit tests that exercise the
+// prototype directly. Production loads it through runtime-loader.js so Daily
+// is not part of the first mode chunk for Campaign or Head-to-Head launches.
+const legacyDailyChallengeEngineMethods = import.meta.env.MODE === "test"
+  ? (await import("./daily-challenge/engine-methods.js")).dailyChallengeEngineMethods
+  : {};
 
 export const STARTUP_GATE_TIMEOUT_MS = 20_000;
 
@@ -144,7 +149,7 @@ export function selectStartupGateForLaunch(
 }
 
 export class RealTimeRacer {
-  constructor() {
+  constructor({ launchTarget = null, ensureModeRuntime = null, initialTrack = null } = {}) {
     this.canvas = document.getElementById("gameCanvas");
     this.setLoadingStatus(10, "Initializing Engine...");
     // The track and the car share this one canvas, so nothing renders beneath it and
@@ -170,7 +175,15 @@ export class RealTimeRacer {
     this.opponentCarSpriteLoader = new CarSpriteLoader();
     this.raceComparisonTarget = null;
 
-    this.currentTrack = TRACKS[DEFAULT_TRACK_KEY];
+    this.currentTrack = initialTrack || getLoadedClientTrack(DEFAULT_TRACK_KEY) || {
+      name: "Loading Track",
+      outer: [],
+      inner: [],
+      startLine: { p1: { x: 0, y: 0 }, p2: { x: 1, y: 0 } },
+      startPos: { x: 0, y: 0 },
+      startAngle: 0,
+      checkpoints: [],
+    };
     this.currentTrackKey = DEFAULT_TRACK_KEY;
     this.currentTrackPresentation = resolveTrackPresentation(DEFAULT_TRACK_KEY, {
       surface: TRACK_PRESENTATION_SURFACES.RACE,
@@ -201,7 +214,10 @@ export class RealTimeRacer {
     this._campaignBootstrapReady = false;
     this._campaignBootstrapPromise = null;
     this._campaignBootstrapRequestId = 0;
-    this.launchTarget = resolveGameLaunchTarget();
+    this.launchTarget = launchTarget || resolveGameLaunchTarget();
+    this.ensureModeRuntime = typeof ensureModeRuntime === "function"
+      ? ensureModeRuntime
+      : async () => null;
     this.lastPlayedDailyChallenge = null;
     this.currentChallengeRun = null;
     this.trackMedalBeforeLastLapWrite = null;
@@ -364,20 +380,22 @@ export class RealTimeRacer {
       }),
     });
     this.lobbyUi = new LobbyUi({
-      onSelectDaily: () => this.showDailyLobby(),
+      onSelectDaily: () => void this.activateMode("daily"),
       onCarouselNavigate: (mode, direction) => (
         mode === "campaign"
           ? this.campaignCarousel.handleNavDirection(direction)
           : this.dailyCarousel.handleNavDirection(direction)
       ),
-      onSelectCampaign: () => this.showCampaignLobby(),
+      onSelectCampaign: () => void this.activateMode("campaign"),
       onBack: () => this.showHomeLobby(),
       onOpenStandings: (mode) => this.openVisibleLobbyStandings(mode),
-      onStartCampaign: () => void this.startCampaignStage(
+      onStartCampaign: () => void this.invokeModeMethod(
+        "campaign",
+        "startCampaignStage",
         this.campaignCarousel.getSelectedChallenge(),
       ),
-      onAcceptChallenge: () => void this.startHeadToHead(),
-      onRetryChallenge: () => void this.retryHeadToHead(),
+      onAcceptChallenge: () => void this.invokeModeMethod("challenge", "startHeadToHead"),
+      onRetryChallenge: () => void this.invokeModeMethod("challenge", "retryHeadToHead"),
       onRenderChallengePreview: (canvas, card, options) => {
         const aspect = getTrackAspectRatio(card.trackKey);
         if (canvas?.parentElement && aspect) {
@@ -446,7 +464,7 @@ export class RealTimeRacer {
       showRunsModal: (...args) => this.modal.showRunsModal(...args),
       dailyChallengeUi: this.dailyChallengeUi,
       onStartDailyChallenge: (challenge, options = {}) => {
-        void this.handleStartDailyChallenge(challenge, options);
+        void this.invokeModeMethod("daily", "handleStartDailyChallenge", challenge, options);
       },
       onRaceOpponent: (challenge, entry) => this.prepareAndStartLeaderboardOpponent({
         mode: "daily",
@@ -495,7 +513,9 @@ export class RealTimeRacer {
         this.requestRender();
       },
       onLeaderboardIdentityChanged: async () => {
-        await this.refreshDailyChallengeSummary({ forceRefresh: true });
+        await this.invokeModeMethod("daily", "refreshDailyChallengeSummary", {
+          forceRefresh: true,
+        });
       },
       onPlayerPreferencesChanged: () => queuePlayerPreferencesSave(),
     });
@@ -530,7 +550,9 @@ export class RealTimeRacer {
       modal: this.modal,
       startOverlay: this.startOverlay,
       leaderboards: this.leaderboards,
-      onStartDailyChallenge: () => this.handleStartDailyChallenge(
+      onStartDailyChallenge: () => this.invokeModeMethod(
+        "daily",
+        "handleStartDailyChallenge",
         this.dailyCarousel.getSelectedChallenge(),
         { startSource: "main_menu" },
       ),
@@ -584,38 +606,39 @@ export class RealTimeRacer {
     }
     const initialChallengeLobbyPromise = startInitialHeadToHeadLaunch(
       this.launchTarget,
-      (challengeId) => this.loadChallengeLobby(challengeId),
+      (challengeId) => typeof this.loadChallengeLobby === "function"
+        ? this.loadChallengeLobby(challengeId)
+        : Promise.resolve(null),
     );
     this.initialChallengeLobbyPromise = initialChallengeLobbyPromise?.catch((error) => {
       console.error("Error displaying initial Head to Head lobby:", error);
       this.activeHeadToHead = null;
       this.showHomeLobby();
     }) ?? null;
-    this.dailyChallengePromise = this.loadDailyChallengeCritical();
-    this.initialPbGhostAssetPromise = this.launchTarget.mode === "challenge"
-      ? Promise.resolve(null)
-      : this.loadInitialPersonalBestGhostAsset();
+    this.dailyChallengePromise = this.launchTarget.mode === "daily"
+      && typeof this.loadDailyChallengeCritical === "function"
+      ? this.loadDailyChallengeCritical()
+      : Promise.resolve(null);
+    this.initialPbGhostAssetPromise = this.launchTarget.mode === "daily"
+      && typeof this.loadInitialPersonalBestGhostAsset === "function"
+      ? this.loadInitialPersonalBestGhostAsset()
+      : Promise.resolve(null);
+    this.initialCampaignLaunchPromise = this.launchTarget.mode === "campaign"
+      && typeof this.prepareInitialCampaignLaunch === "function"
+      ? this.prepareInitialCampaignLaunch()
+      : Promise.resolve(null);
     if (this.launchTarget.mode === "campaign") {
       this.setLoadingStatus(70, "Loading Campaign...");
     }
-    const defaultStartupPromises = addCampaignBootstrapToStartupGate(
-      [
-        this.playerHistoryPromise,
-        this.dailyChallengePromise,
-        this.initialPbGhostAssetPromise,
-        this.carAssetPromise,
-        this.trackReadyPromise,
-      ],
-      this.launchTarget,
-      (options) => this.ensureCampaignBootstrap(options),
-      this.playerHistoryPromise,
-    );
-    const startupPromises = selectStartupGateForLaunch(
-      defaultStartupPromises,
-      this.launchTarget,
-      this.initialChallengeLobbyPromise,
-      [this.carAssetPromise, this.trackReadyPromise],
-    );
+    const startupPromises = selectModeCriticalStartupPromises(this.launchTarget.mode, {
+      playerHistory: this.playerHistoryPromise,
+      carAsset: this.carAssetPromise,
+      trackReady: this.trackReadyPromise,
+      dailyChallenge: this.dailyChallengePromise,
+      personalBestGhost: this.initialPbGhostAssetPromise,
+      campaignLaunch: this.initialCampaignLaunchPromise,
+      challengeLobby: this.initialChallengeLobbyPromise,
+    });
     waitForStartupGate(startupPromises).finally(async () => {
       this.loadingScreen.update(95, "Displaying Lobby...");
       try {
@@ -745,6 +768,23 @@ export class RealTimeRacer {
 
   getNow() {
     return performance.now() + this.timeOffsetMs;
+  }
+
+  async activateMode(mode, options = {}) {
+    await this.ensureModeRuntime(mode);
+    if (mode === "daily") return this.showDailyLobby(options);
+    if (mode === "campaign") return this.showCampaignLobby(options);
+    if (mode === "challenge") {
+      return this.loadChallengeLobby(options.challengeId || this.launchTarget?.challengeId || null);
+    }
+    return this.showHomeLobby();
+  }
+
+  async invokeModeMethod(mode, method, ...args) {
+    await this.ensureModeRuntime(mode);
+    const handler = this[method];
+    if (typeof handler !== "function") return null;
+    return handler(...args);
   }
 
   getCanvasDevicePixelRatio() {
@@ -898,7 +938,9 @@ export class RealTimeRacer {
   }
 
   loadSecondaryStartupData() {
-    this.dailyChallengeSummaryPromise = this.refreshDailyChallengeSummary()
+    const secondaryModes = selectModeSecondaryStartupTasks(this.launchTarget.mode);
+    this.dailyChallengeSummaryPromise = Promise.resolve(this.ensureModeRuntime("daily"))
+      .then(() => this.refreshDailyChallengeSummary?.())
       .catch((error) => {
         console.error("Error loading daily challenge summary:", error);
         return null;
@@ -907,10 +949,17 @@ export class RealTimeRacer {
         this.dailyChallengeUi.refreshDailyChallengeVerificationState();
       });
     window.setTimeout(() => {
-      this.prefetchDailyChallengePlaylist?.();
-      void Promise.resolve(this.ensureCampaignBootstrap?.()).catch((error) => {
-        console.error("Error warming the Campaign lobby:", error);
-      });
+      for (const mode of secondaryModes) {
+        void this.ensureModeRuntime(mode)
+          .then(() => {
+            if (mode === "daily") return this.prefetchDailyChallengePlaylist?.();
+            if (mode === "campaign") return this.ensureCampaignBootstrap?.();
+            return null;
+          })
+          .catch((error) => {
+            console.error(`Error warming the ${mode} runtime:`, error);
+          });
+      }
     }, 0);
     this.scheduleVerificationQueueProcessing(0);
   }
@@ -920,10 +969,8 @@ Object.assign(
   RealTimeRacer.prototype,
   trackEngineMethods,
   raceEngineMethods,
-  dailyChallengeEngineMethods,
+  legacyDailyChallengeEngineMethods,
   scoreboardEngineMethods,
   opponentRaceEngineMethods,
-  campaignEngineMethods,
-  headToHeadEngineMethods,
   modeRouterEngineMethods,
 );

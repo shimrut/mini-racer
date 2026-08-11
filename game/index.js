@@ -1,5 +1,9 @@
 import { RealTimeRacer } from './engine.js';
 import { setupVisibleViewportHeight } from './ui/visible-viewport.js';
+import { resolveGameLaunchTarget } from './modes/launch-target.js';
+import { loadModeRuntime } from './modes/runtime-loader.js';
+import { loadClientTrack } from './track/client-registry.js';
+import { DEFAULT_TRACK_KEY } from './track/catalog.js';
 
 function setupMobileViewportGuards() {
     const hasTouchInput = window.matchMedia('(pointer: coarse)').matches
@@ -55,4 +59,34 @@ function setupMobileViewportGuards() {
 
 setupVisibleViewportHeight();
 setupMobileViewportGuards();
-new RealTimeRacer();
+
+const launchTarget = resolveGameLaunchTarget();
+const installedModeRuntimes = new Map();
+const ensureModeRuntime = async (mode) => {
+    const normalizedMode = mode === 'challenge' ? 'challenge' : mode;
+    if (installedModeRuntimes.has(normalizedMode)) {
+        return installedModeRuntimes.get(normalizedMode);
+    }
+    const runtime = await loadModeRuntime(normalizedMode);
+    Object.assign(RealTimeRacer.prototype, runtime.methods);
+    installedModeRuntimes.set(normalizedMode, runtime);
+    return runtime;
+};
+
+let resolvedLaunchTarget = launchTarget;
+try {
+    await ensureModeRuntime(launchTarget.mode);
+} catch (error) {
+    console.error('Failed to load the selected mode runtime:', error);
+    resolvedLaunchTarget = { mode: 'home', challengeId: null };
+    await ensureModeRuntime('home');
+}
+const initialTrack = await loadClientTrack(DEFAULT_TRACK_KEY).catch((error) => {
+    console.error('Failed to load the default track asset:', error);
+    return null;
+});
+new RealTimeRacer({
+    launchTarget: resolvedLaunchTarget,
+    ensureModeRuntime,
+    initialTrack,
+});

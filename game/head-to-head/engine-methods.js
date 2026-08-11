@@ -73,6 +73,29 @@ export const headToHeadEngineMethods = {
         const challengeReady = response.ok
             && response.body?.status === 'ready'
             && Boolean(challenge);
+        if (challengeReady && typeof this.loadTrack === 'function') {
+            try {
+                this.setLoadingStatus?.(78, 'Preparing Challenge Track...');
+                await this.loadTrack(challenge.trackKey, {
+                    loadPlayerProgress: false,
+                    preserveDailyChallengeContext: true,
+                    showStartOverlayOnReset: false,
+                });
+                if (this.activeHeadToHead?.frozenGhost) {
+                    const prepareGhost = this.pbGhost.prepareOpponent || this.pbGhost.prepare;
+                    prepareGhost?.call(this.pbGhost, {
+                        bestTimeMs: challenge.targetTimeMs,
+                        ghost: this.activeHeadToHead.frozenGhost,
+                    });
+                    this.activeHeadToHead = {
+                        ...this.activeHeadToHead,
+                        frozenGhostPrepared: true,
+                    };
+                }
+            } catch (error) {
+                console.error('Failed to prepare the Head to Head track:', error);
+            }
+        }
         const retryable = !response.ok
             && (response.status === 0 || response.status >= 500);
         const remembered = outcome
