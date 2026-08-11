@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { RealTimeRacer } from '../game/engine.js';
 import {
     clearClientTrackRegistryForTests,
     getLoadedClientTrack,
@@ -85,5 +86,29 @@ describe('mode-priority startup', () => {
         expect(challenge.methods.showCampaignLobby).toBeUndefined();
         expect(campaign.methods.prepareInitialCampaignLaunch).toBeTypeOf('function');
         expect(campaign.methods.loadChallengeLobby).toBeUndefined();
+    });
+
+    it('invokes dynamically installed mode methods with racer context and arguments', async () => {
+        const racer = Object.create(RealTimeRacer.prototype);
+        racer.ensureModeRuntime = vi.fn(async (mode) => {
+            racer.startSelectedMode = function (...args) {
+                return { context: this, mode, args };
+            };
+        });
+        const options = { retry: true };
+
+        const result = await racer.invokeModeMethod(
+            'campaign',
+            'startSelectedMode',
+            'numberZero',
+            options,
+        );
+
+        expect(racer.ensureModeRuntime).toHaveBeenCalledWith('campaign');
+        expect(result).toEqual({
+            context: racer,
+            mode: 'campaign',
+            args: ['numberZero', options],
+        });
     });
 });

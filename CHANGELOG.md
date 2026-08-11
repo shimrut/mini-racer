@@ -1,5 +1,10 @@
 # Changelog
 
+- Fixed Daily, Campaign, and Head to Head race starts after lazy mode loading.
+  Start actions now retain the active racer context, so race preparation can
+  render the background and begin the countdown instead of leaving players in
+  the lobby.
+
 - Prioritized first-load work by launch mode. Daily now gates on its active
   challenge, selected track, car, and PB ghost; Campaign gates on bootstrap,
   the selected stage, car, and available stage ghost; Head to Head gates on the

@@ -784,7 +784,7 @@ export class RealTimeRacer {
     await this.ensureModeRuntime(mode);
     const handler = this[method];
     if (typeof handler !== "function") return null;
-    return handler(...args);
+    return handler.call(this, ...args);
   }
 
   getCanvasDevicePixelRatio() {

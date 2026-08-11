@@ -613,6 +613,11 @@ and race setup no longer import all geometry up front. Non-selected mode code,
 playlist data, and Campaign warming are installed after the selected lobby is
 interactive through `game/modes/runtime-loader.js`.
 
+`RealTimeRacer.invokeModeMethod` is the shared dispatcher for lazy Daily,
+Campaign, and Head to Head actions. It must invoke installed methods with the
+racer instance as `this`; detaching those methods prevents race preparation
+from starting, leaving the lobby visible without the race background.
+
 The entry module starts this asynchronous boot without top-level `await`.
 Deferred mode chunks import shared symbols from the main game chunk, so the
 entry chunk must finish evaluating before it waits for the selected mode chunk;
