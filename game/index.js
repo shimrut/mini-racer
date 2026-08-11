@@ -60,7 +60,6 @@ function setupMobileViewportGuards() {
 setupVisibleViewportHeight();
 setupMobileViewportGuards();
 
-const launchTarget = resolveGameLaunchTarget();
 const installedModeRuntimes = new Map();
 const ensureModeRuntime = async (mode) => {
     const normalizedMode = mode === 'challenge' ? 'challenge' : mode;
@@ -73,20 +72,29 @@ const ensureModeRuntime = async (mode) => {
     return runtime;
 };
 
-let resolvedLaunchTarget = launchTarget;
-try {
-    await ensureModeRuntime(launchTarget.mode);
-} catch (error) {
-    console.error('Failed to load the selected mode runtime:', error);
-    resolvedLaunchTarget = { mode: 'home', challengeId: null };
-    await ensureModeRuntime('home');
+async function startGame() {
+    const launchTarget = resolveGameLaunchTarget();
+    let resolvedLaunchTarget = launchTarget;
+    try {
+        await ensureModeRuntime(launchTarget.mode);
+    } catch (error) {
+        console.error('Failed to load the selected mode runtime:', error);
+        resolvedLaunchTarget = { mode: 'home', challengeId: null };
+        await ensureModeRuntime('home');
+    }
+    const initialTrack = await loadClientTrack(DEFAULT_TRACK_KEY).catch((error) => {
+        console.error('Failed to load the default track asset:', error);
+        return null;
+    });
+    new RealTimeRacer({
+        launchTarget: resolvedLaunchTarget,
+        ensureModeRuntime,
+        initialTrack,
+    });
 }
-const initialTrack = await loadClientTrack(DEFAULT_TRACK_KEY).catch((error) => {
-    console.error('Failed to load the default track asset:', error);
-    return null;
-});
-new RealTimeRacer({
-    launchTarget: resolvedLaunchTarget,
-    ensureModeRuntime,
-    initialTrack,
+
+void startGame().catch((error) => {
+    console.error('Failed to start Mini Racer:', error);
+    const loaderStatus = document.getElementById('loader-status');
+    if (loaderStatus) loaderStatus.textContent = 'Unable to start. Reload to retry.';
 });

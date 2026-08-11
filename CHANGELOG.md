@@ -5,7 +5,8 @@
   the selected stage, car, and available stage ghost; Head to Head gates on the
   authoritative challenge, target track, car, and frozen opponent ghost.
   Client track geometry and non-selected mode runtimes now load lazily after
-  the selected lobby is ready.
+  the selected lobby is ready. The entry module no longer blocks its own
+  deferred mode chunk during evaluation, preventing a blank startup screen.
 
 - Approved the current Mistfall Circuit boundary in the track-registry
   fingerprint so integrity checks protect the geometry that actually ships.

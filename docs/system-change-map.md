@@ -613,6 +613,11 @@ and race setup no longer import all geometry up front. Non-selected mode code,
 playlist data, and Campaign warming are installed after the selected lobby is
 interactive through `game/modes/runtime-loader.js`.
 
+The entry module starts this asynchronous boot without top-level `await`.
+Deferred mode chunks import shared symbols from the main game chunk, so the
+entry chunk must finish evaluating before it waits for the selected mode chunk;
+otherwise both chunks wait on each other and the racer is never constructed.
+
 ## Recommended Scoping Heuristic
 
 Before approving any new request, sort it into one of these buckets:

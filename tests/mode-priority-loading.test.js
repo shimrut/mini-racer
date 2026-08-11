@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
     clearClientTrackRegistryForTests,
@@ -11,6 +12,15 @@ import {
 } from '../game/startup/coordinator.js';
 
 describe('mode-priority startup', () => {
+    it('starts mode loading after the entry module can finish evaluating', () => {
+        const entrySource = readFileSync(new URL('../game/index.js', import.meta.url), 'utf8');
+
+        expect(entrySource).toContain('async function startGame()');
+        expect(entrySource).toContain('void startGame().catch(');
+        expect(entrySource).not.toMatch(/^await ensureModeRuntime/m);
+        expect(entrySource).not.toMatch(/^const initialTrack = await loadClientTrack/m);
+    });
+
     it('loads only the requested client track and reuses its geometry', async () => {
         clearClientTrackRegistryForTests();
         expect(getLoadedClientTrack('numberZero')).toBe(null);
