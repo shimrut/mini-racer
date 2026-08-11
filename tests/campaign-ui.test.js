@@ -974,10 +974,15 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect(html).toContain(
                 `id="${prefix}-carousel" class="track-carousel track-carousel--lobby"`,
             );
+            // Prev/Next flank the schematic, so they leave the count's row and
+            // sit alongside it rather than around it.
             expect(html).toMatch(
                 new RegExp(
-                    `id="${prefix}-carousel-prev"[\\s\\S]*id="${prefix}-carousel-count"[\\s\\S]*id="${prefix}-carousel-next"`,
+                    `id="${prefix}-carousel-prev"[\\s\\S]*id="${prefix}-carousel-next"[\\s\\S]*id="${prefix}-carousel-navigation"[\\s\\S]*id="${prefix}-carousel-count"`,
                 ),
+            );
+            expect(html).not.toMatch(
+                new RegExp(`id="${prefix}-carousel-navigation"[\\s\\S]*id="${prefix}-carousel-prev"`),
             );
         }
         expect(lobbyCss).toMatch(
@@ -1183,6 +1188,50 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
+    it('sends the wordmark home and leaves it inert once Home is showing', () => {
+        const originalDocument = global.document;
+        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        expect(html).toMatch(
+            /<h1 class="lobby-title">\s*<button id="lobby-title-home-btn"[\s\S]*?data-lobby-back disabled>\s*<span class="lobby-title__mini">/,
+        );
+
+        const titleHome = createElement('button');
+        const label = createElement('p');
+        global.document = {
+            body: { dataset: {} },
+            getElementById: vi.fn((id) => (
+                id === 'lobby-title-home-btn' ? titleHome : null
+            )),
+            querySelector: vi.fn((selector) => (
+                selector === '[data-lobby-mode-label]' ? label : null
+            )),
+            querySelectorAll: vi.fn(() => [titleHome]),
+            addEventListener: vi.fn(),
+        };
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        global.requestAnimationFrame = vi.fn();
+
+        try {
+            const onBack = vi.fn();
+            const lobby = new LobbyUi({ onBack });
+            lobby.resetKeyboardNav = vi.fn();
+            lobby.focus = vi.fn();
+            lobby.bind();
+
+            lobby.showPane('campaign');
+            expect(titleHome.disabled).toBe(false);
+
+            titleHome.listeners.get('click')();
+            expect(onBack).toHaveBeenCalledWith('campaign');
+
+            lobby.showPane('home');
+            expect(titleHome.disabled).toBe(true);
+        } finally {
+            global.requestAnimationFrame = originalRequestAnimationFrame;
+            global.document = originalDocument;
+        }
+    });
+
     it('routes Standings through the currently active lobby mode', () => {
         const originalDocument = global.document;
         const standings = createElement('button');
@@ -1222,6 +1271,69 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(event.preventDefault).not.toHaveBeenCalled();
         expect(lobbyUi.onBack).not.toHaveBeenCalled();
+    });
+
+    it('swaps Daily and Campaign without veiling or view-transitioning the lobby', async () => {
+        const originalDocument = global.document;
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        const overlay = createElement('div');
+        const panes = {
+            home: createElement('section'),
+            daily: createElement('section'),
+            campaign: createElement('section'),
+            challenge: createElement('section'),
+        };
+        const subhead = createElement('div');
+        const label = createElement('p');
+        const startViewTransition = vi.fn((update) => {
+            update();
+            return { finished: Promise.resolve() };
+        });
+        global.document = {
+            body: { dataset: {} },
+            documentElement: createElement('html'),
+            startViewTransition,
+            getElementById: (id) => {
+                if (id === 'start-overlay') return overlay;
+                const match = id.match(/^lobby-(home|daily|challenge|campaign)-pane$/);
+                return match ? panes[match[1]] : null;
+            },
+            querySelector: (selector) => ({
+                '[data-lobby-subhead]': subhead,
+                '[data-lobby-mode-label]': label,
+            }[selector] || null),
+            addEventListener: vi.fn(),
+        };
+        global.requestAnimationFrame = vi.fn();
+
+        try {
+            const lobby = new LobbyUi();
+            lobby.resetKeyboardNav = vi.fn();
+            lobby.focus = vi.fn();
+            lobby.mode = 'daily';
+
+            lobby.showPane('campaign');
+
+            expect(overlay.classList.contains('is-lobby-transitioning')).toBe(false);
+            expect(startViewTransition).not.toHaveBeenCalled();
+            expect(lobby.isKeyboardNavBlocked()).toBe(false);
+            expect(panes.daily.hidden).toBe(true);
+            expect(panes.campaign.hidden).toBe(false);
+            expect(global.document.body.dataset.lobbyMode).toBe('campaign');
+            expect(global.document.body.dataset.lobbyPaneSwap).toBe('toggle');
+
+            lobby.showPane('home');
+
+            expect(overlay.classList.contains('is-lobby-transitioning')).toBe(true);
+            expect(startViewTransition).toHaveBeenCalledTimes(1);
+            expect(global.document.body.dataset.lobbyPaneSwap).toBe('mode');
+            // Let the view transition's cleanup run before `document` is restored.
+            await Promise.resolve();
+            await Promise.resolve();
+        } finally {
+            global.requestAnimationFrame = originalRequestAnimationFrame;
+            global.document = originalDocument;
+        }
     });
 
     it('covers a mode swap and releases the veil after the pane is painted', () => {

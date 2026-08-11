@@ -79,14 +79,30 @@ maintaining mode-specific card layouts:
   fixed `4rem` status band and the artwork is clipped to the card itself. The
   personal-best icon, standings value, and medal ladder remain present for open cards,
   while locked cards replace that context with a two-item prerequisite checklist.
-- The Daily/Campaign carousel adds a compact navigation row between the
-  schematic and its status footer. Previous and Next stay in normal grid flow,
-  while the centered `current / total` counter is updated by
-  `game/ui/track-carousel.js`; the challenge poster keeps its original two-row
-  layout.
+- The Daily/Campaign carousel stacks the schematic, the `current / total`
+  counter, then the track's own footer (time, rank, medals) — everything below
+  the artwork describes the track above it. Previous and Next leave that stack:
+  they are circular icon buttons grid-placed into row 1 with `align-self:
+  center` and `justify-self: start`/`end`, so they flank the schematic and stay
+  centred on artwork whose height is only resolved at layout time. Absolute
+  offsets from the carousel's own edges could not track that `1fr` row. They
+  are direct children of `.track-carousel` rather than of
+  `.track-carousel__navigation`, which now carries only the counter;
+  `syncNavButtons()` still hides that wrapper when the rail is empty and the
+  buttons themselves below two cards. Their 2.5rem circles overlay the outer
+  edge of the scroll viewport, so a swipe has to start inboard of them. The
+  challenge poster keeps its original two-row layout.
 - The Daily/Campaign header remains in normal flow above the rail. The actual
   `.lobby-title` is the fixed Mini Racer wordmark, and `.lobby-subhead` owns the
   mode label, divider, and right-side Daily date or Campaign track selection.
+- The wordmark is the route back to the mode menu. `.lobby-title` stays the `h1`
+  and keeps `pointer-events: none`; the `.lobby-title__home` button inside it
+  takes them back, so the hit area is the letters rather than the full header
+  width. The button inherits `font`, `color`, `letter-spacing`, `line-height`,
+  `text-align`, `text-transform` and `text-shadow` — a bare `button` would
+  otherwise pick all of those up from the UA sheet. It is `disabled` on Home,
+  which keeps it out of the tab order there, and its `:disabled` rule restores
+  `color` and `opacity` so the UA's grey does not reach "MINI".
   Carousel movement
   updates only `[data-lobby-mode-selection]`; the wordmark, mode label, and
   divider keep their layout coordinates. Daily/Campaign reuse the compact
@@ -176,17 +192,33 @@ interruption must remain intact for retained Reddit WebViews.
 ## Lobby Mode Transition Contract
 
 `LobbyUi.showPane()` owns the Home, Daily, Campaign and Challenge handoff. On a
-real mode change it adds `is-lobby-transitioning` to `#start-overlay`, swaps the
-pane and body mode synchronously under the veil, then removes the class after
-two animation frames. The overlay's opaque `::after` layer fades away with
-`--dur-base`, so the live race canvas, old pane and independently changing
-header cannot bleed through the swap.
+mode change that routes through Home or Challenge it adds
+`is-lobby-transitioning` to `#start-overlay`, swaps the pane and body mode
+synchronously under the veil, then removes the class after two animation frames.
+The overlay's opaque `::after` layer fades away with `--dur-base`, so the live
+race canvas, old pane and independently changing header cannot bleed through the
+swap. Those handoffs also run inside a `startViewTransition()` scoped to
+`.lobby-panes`.
+
+Switching directly between Daily and Campaign takes neither path. The two modes
+share a header, a background track and a pane layout, so `showPane()` treats
+them as a toggle: the `.lobby-mode-switch` thumb slides on its own transition
+and `lobbyPaneIn` runs on the arriving pane's `.track-carousel` instead of the
+pane itself, leaving the Start Race button planted. Veiling or cross-fading the
+whole lobby there reads as a full-screen flicker over content that barely
+changed, and the veil's reason to exist — hiding a background track reload —
+does not apply, because neither mode reloads it.
+
+`showPane()` records which kind of swap it ran in `body[data-lobby-pane-swap]`,
+and that value stays until the next swap replaces it. Clearing it once the
+entrance settles would re-apply `animation` to `.lobby-pane` and replay the
+entrance a second time.
 
 The panes remain in one grid cell for stable measurement, but hidden panes leave
 the layout immediately. Only the arriving pane runs `lobbyPaneIn`; the lobby no
 longer relies on a delayed `display` transition or `allow-discrete` support in
 an embedded WebView. Keyboard navigation and pointer input are blocked while
-the veil is active.
+the veil is active, so the Daily/Campaign toggle stays interactive throughout.
 
 The race HUD keeps a stable `12px` top position during the race-start handoff.
 `RaceHud.anchorHudBar()` does not measure the generic lobby `header`, because

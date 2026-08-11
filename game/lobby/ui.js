@@ -15,6 +15,12 @@ import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
+// Daily and Campaign share the same header, background track and pane layout, so
+// switching between them only needs the mode switch to slide and the pane to
+// swap. The full-overlay veil and the document view transition are for hand-offs
+// that reload the background track (anything through Home); here they blank or
+// cross-fade the whole lobby over content that barely changed.
+const TOGGLE_MODES = ['daily', 'campaign'];
 const BLOCKING_OVERLAY_IDS = [
     'modal',
     'settings-modal',
@@ -200,10 +206,17 @@ export class LobbyUi {
         });
     }
 
+    isToggleSwap(previousMode, mode) {
+        return previousMode !== mode
+            && TOGGLE_MODES.includes(previousMode)
+            && TOGGLE_MODES.includes(mode);
+    }
+
     showPane(mode) {
         if (!LOBBY_MODES.includes(mode)) return false;
         const previousMode = this.mode;
-        if (previousMode !== mode) this.beginPaneTransition();
+        const toggleSwap = this.isToggleSwap(previousMode, mode);
+        if (previousMode !== mode && !toggleSwap) this.beginPaneTransition();
         this.mode = mode;
 
         const updateDom = () => {
@@ -217,6 +230,10 @@ export class LobbyUi {
             }
             if (document.body?.dataset) {
                 document.body.dataset.lobbyMode = mode;
+                // Stays on the body until the next swap replaces it — clearing it
+                // once the entrance finishes would re-apply the pane animation and
+                // replay it.
+                document.body.dataset.lobbyPaneSwap = toggleSwap ? 'toggle' : 'mode';
                 if (mode === 'home' && previousMode !== 'home') {
                     document.body.dataset.lobbyHomeReturned = 'true';
                 }
@@ -231,7 +248,12 @@ export class LobbyUi {
             });
         };
 
-        if (document.startViewTransition && previousMode !== mode && previousMode !== 'home') {
+        if (
+            document.startViewTransition
+            && previousMode !== mode
+            && previousMode !== 'home'
+            && !toggleSwap
+        ) {
             document.documentElement.classList.add('is-lobby-view-transition');
             void document.documentElement.offsetHeight;
             const transition = document.startViewTransition(() => updateDom());
@@ -251,6 +273,10 @@ export class LobbyUi {
         const toggle = document.querySelector('[data-lobby-mode-switch]');
         const switchDaily = document.getElementById('lobby-switch-daily-btn');
         const switchCampaign = document.getElementById('lobby-switch-campaign-btn');
+        // Home is where the wordmark already leads, so it is inert there rather
+        // than a button that tabs to nothing.
+        const titleHome = document.getElementById('lobby-title-home-btn');
+        if (titleHome) titleHome.disabled = mode === 'home';
         if (!label) return;
         if (mode === 'daily' || mode === 'campaign') {
             if (subhead) subhead.hidden = false;

@@ -113,8 +113,10 @@ body[data-lobby-mode="campaign"] #start-overlay {
     );
 }
 
+/* Prev/Next flank the schematic in row 1, so the rows below it read as one
+   block about the selected track: its position in the rail, then its record. */
 .track-carousel--lobby {
-    grid-template-rows: minmax(0, 1fr) 2.75rem 4rem;
+    grid-template-rows: minmax(0, 1fr) 1.25rem 4rem;
     row-gap: clamp(0.25rem, 1.2vh, 0.75rem);
 }
 
@@ -540,14 +542,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     z-index: 9999;
 }
 
-.track-carousel__nav-label {
-    font-family: var(--header-font);
-    font-size: 0.85rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-}
-
 .track-carousel__nav svg {
     width: 0.6rem;
     height: 1rem;
@@ -562,20 +556,30 @@ body[data-lobby-mode="campaign"] #start-overlay {
     right: 0;
 }
 
+/* Grid-placed over the schematic's own row rather than absolutely positioned:
+   that row is a `1fr` track whose height is only known at layout time, so an
+   offset from the carousel's edges could not stay centred on the artwork. */
 .track-carousel--lobby .track-carousel__nav {
+    grid-area: 1 / 1;
     position: static;
     inset: auto;
+    align-self: center;
+    width: 2.5rem;
+    height: 2.5rem;
     margin: 0;
+    padding: 0;
+    gap: 0;
+    border-radius: var(--radius-full);
+    background: rgba(2, 6, 23, 0.72);
+    color: var(--text-color);
     z-index: 3;
 }
 
 .track-carousel--lobby .track-carousel__nav--prev {
-    grid-column: 1;
     justify-self: start;
 }
 
 .track-carousel--lobby .track-carousel__nav--next {
-    grid-column: 3;
     justify-self: end;
 }
 
@@ -626,7 +630,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     }
 
     .track-carousel--lobby {
-        grid-template-rows: minmax(0, 1fr) 2.25rem 3.6rem;
+        grid-template-rows: minmax(0, 1fr) 1.1rem 3.6rem;
     }
 
     .track-carousel__card-foot {
@@ -635,6 +639,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     }
 
     .track-carousel--lobby .track-carousel__nav {
+        width: 2.25rem;
         height: 2.25rem;
     }
 

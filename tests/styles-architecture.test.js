@@ -178,6 +178,37 @@ describe('game stylesheet architecture', () => {
         );
     });
 
+    it('keeps the wordmark a real button without letting the UA restyle it', () => {
+        const lobbyStyles = readFileSync(
+            new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
+        // The h1 stays untouchable so the hit area is the letters, not the header.
+        expect(lobbyStyles).toMatch(/\.lobby-title\s*\{[^}]*pointer-events:\s*none;/s);
+        const home = lobbyStyles.match(/\.lobby-title__home\s*\{[^}]*\}/s)?.[0];
+        expect(home).toBeTruthy();
+        for (const declaration of [
+            'font: inherit;',
+            'color: inherit;',
+            'letter-spacing: inherit;',
+            'line-height: inherit;',
+            'text-align: left;',
+            'text-transform: inherit;',
+            'text-shadow: inherit;',
+            'pointer-events: auto;',
+            'cursor: pointer;',
+        ]) {
+            expect(home).toContain(declaration);
+        }
+        // Home disables it, and the UA's disabled grey must not reach "MINI".
+        expect(lobbyStyles).toMatch(
+            /\.lobby-title__home:disabled\s*\{[^}]*color:\s*inherit;[^}]*opacity:\s*1;[^}]*pointer-events:\s*none;/s,
+        );
+        expect(lobbyStyles).toMatch(
+            /\.lobby-title__home:focus-visible\s*\{[^}]*outline:/s,
+        );
+    });
+
     it('slides the picker in and back out without a script to drive it', () => {
         const paneEntrance = lobbyModeStyles.match(/@keyframes lobbyPaneIn\s*\{[\s\S]*?\n\}/)?.[0];
         expect(paneEntrance).toMatch(/opacity:\s*0;[\s\S]*opacity:\s*1;/);
@@ -397,18 +428,27 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__nav\s*\{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*2\.75rem;/s,
         );
+        // Schematic, then its place in the rail, then its record. Prev/Next
+        // leaves the stack entirely and flanks the schematic in row 1.
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 2\.75rem 4rem;/s,
+            /\.track-carousel--lobby\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 1\.25rem 4rem;/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel__navigation\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto minmax\(0, 1fr\);/s,
+            /\.track-carousel__navigation\s*\{[^}]*grid-area:\s*2 \/ 1;[^}]*display:\s*grid;/s,
         );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby \.track-carousel__card-foot\s*\{[^}]*grid-area:\s*3 \/ 1;/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby \.track-carousel__nav\s*\{[^}]*position:\s*static;[^}]*inset:\s*auto;/s,
+            /\.track-carousel--lobby \.track-carousel__nav\s*\{[^}]*grid-area:\s*1 \/ 1;[^}]*position:\s*static;[^}]*inset:\s*auto;[^}]*align-self:\s*center;[^}]*width:\s*2\.5rem;[^}]*height:\s*2\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby \.track-carousel__nav--prev\s*\{[^}]*justify-self:\s*start;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby \.track-carousel__nav--next\s*\{[^}]*justify-self:\s*end;/s,
+        );
+        expect(trackCarouselStyles).not.toContain('.track-carousel__nav-label');
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__count\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*text-align:\s*center;/s,
         );

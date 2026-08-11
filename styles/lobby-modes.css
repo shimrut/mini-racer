@@ -32,6 +32,17 @@
     }
 }
 
+/* Daily and Campaign put a primary button in the same spot, so a pane-wide
+   entrance drags it through a fade it has no reason to run. On that swap the
+   entrance moves down to the track carousel, which is the part that changed. */
+body[data-lobby-pane-swap="toggle"] .lobby-pane {
+    animation: none;
+}
+
+body[data-lobby-pane-swap="toggle"] .lobby-pane .track-carousel {
+    animation: lobbyPaneIn var(--dur-base) var(--ease-settle) both;
+}
+
 .lobby-pane.main-menu {
     margin-top: auto;
 }
@@ -529,6 +540,10 @@ body[data-lobby-mode="campaign"] .lobby-panes {
         --lobby-pane-travel: 0;
         animation: none;
         transition: none;
+    }
+
+    body[data-lobby-pane-swap="toggle"] .lobby-pane .track-carousel {
+        animation: none;
     }
 
     body[data-lobby-home-returned="true"] .lobby-title,

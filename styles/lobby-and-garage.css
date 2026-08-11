@@ -20,12 +20,8 @@
     display: block
 }
 
-#trackLayerCanvas {
-    z-index: var(--z-canvas)
-}
-
 #gameCanvas {
-    z-index: 1
+    z-index: var(--z-canvas)
 }
 
 button:active {
@@ -74,6 +70,43 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     box-shadow: none;
     border: none;
     text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* The wordmark is the way back to the mode menu, so it carries the hit area.
+   `.lobby-title` keeps `pointer-events: none` and the button takes them back,
+   leaving the empty header width beside the letters unclickable. */
+.lobby-title__home {
+    display: flex;
+    flex-direction: column;
+    align-self: flex-start;
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    line-height: inherit;
+    text-align: left;
+    text-transform: inherit;
+    text-shadow: inherit;
+    background: none;
+    border: 0;
+    pointer-events: auto;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Home already is the destination. The wordmark has to keep its own colours
+   there — the UA's disabled button style would grey "MINI" out. */
+.lobby-title__home:disabled {
+    color: inherit;
+    opacity: 1;
+    pointer-events: none;
+    cursor: default;
+}
+
+.lobby-title__home:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 4px;
 }
 
 @keyframes slideInLeft {
