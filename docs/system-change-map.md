@@ -53,7 +53,7 @@ flowchart LR
   the full-screen shell inside the actually visible Reddit WebView even when
   native app chrome does not reduce `dvh`.
 - `game/engine.js` is the top-level orchestrator. It creates the feature modules, owns current run state, and wires together UI, simulation, track rendering, audio, storage, and network flows.
-- The static track and the moving car use separate canvas layers. Devvit's Android client keeps the track layer on the main thread because its embedded WebView can expose the worker APIs without reliably presenting that canvas; iOS and web clients retain the worker renderer when supported.
+- The static track and the moving car share one opaque canvas (`#gameCanvas`), drawn on the main thread: `render()` blits the visible track slice through `game/track/layer.js` before it transforms for the world. The earlier second canvas — and the worker/OffscreenCanvas renderer behind it — are gone. The worker never presented reliably inside Devvit's Android WebView (the car appeared over a blank white background), and the extra layer forced the game canvas to stay `alpha: true`, costing a full-viewport composite every frame while saving no drawing, because the track was redrawn each frame either way.
 
 ### Gameplay Loop
 

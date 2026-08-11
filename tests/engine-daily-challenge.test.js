@@ -1431,7 +1431,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     let containerHeight = 900;
     const callOrder = [];
     const canvas = { width: 1000, height: 900 };
-    const trackLayerCanvas = { width: 1000, height: 900 };
 
     try {
       RealTimeRacer.prototype.reset.call({
@@ -1479,7 +1478,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         clearDailyChallengeRun: vi.fn(),
         bestLapTime: null,
         canvas,
-        trackLayerCanvas,
         resize: RealTimeRacer.prototype.resize,
         container: {
           clientWidth: 1000,
@@ -1487,12 +1485,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
             return containerHeight;
           },
         },
-        updateTrackLayerViewportSize: vi.fn(
-          function updateTrackLayerViewportSize() {
-            trackLayerCanvas.width = this.container.clientWidth;
-            trackLayerCanvas.height = this.container.clientHeight;
-          },
-        ),
         isNarrowViewport: false,
         camera: { x: 0, y: 0 },
         zoom: 1,
@@ -1507,7 +1499,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     }
 
     expect(canvas.height).toBe(820);
-    expect(trackLayerCanvas.height).toBe(820);
     expect(callOrder).toEqual(["showStartOverlay", "requestRender"]);
   });
 

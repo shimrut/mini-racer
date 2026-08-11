@@ -13,8 +13,6 @@ import { createRunPolicy } from "./race/run-policy.js";
 import {
   detectDevicePerformance,
   shouldExposeDebugHooks,
-  shouldMergeGameCanvases,
-  shouldUseTrackLayerWorker,
   readCanvasDevicePixelRatio,
 } from "./track/environment.js";
 import { ReplayRecorder } from "./race/replay.js";
@@ -147,27 +145,18 @@ export function selectStartupGateForLaunch(
 
 export class RealTimeRacer {
   constructor() {
-    this.trackLayerCanvas = document.getElementById("trackLayerCanvas");
     this.canvas = document.getElementById("gameCanvas");
     this.setLoadingStatus(10, "Initializing Engine...");
-    // Merged mode needs an opaque context: nothing renders beneath it, so the
-    // per-pixel blend the stacked layout requires is pure cost.
-    this.mergeGameCanvases = shouldMergeGameCanvases();
+    // The track and the car share this one canvas, so nothing renders beneath it and
+    // the context can be opaque: the per-pixel blend a transparent canvas costs every
+    // frame would buy nothing. render() draws the track first, before it transforms
+    // for the world, which is what keeps the draw order right.
     this.ctx =
-      this.canvas.getContext("2d", { alpha: !this.mergeGameCanvases }) ||
+      this.canvas.getContext("2d", { alpha: false }) ||
       this.canvas.getContext("2d");
     this.container = document.getElementById("game-container");
     this.isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
-    this.trackLayer = new TrackLayerRenderer(this.trackLayerCanvas);
-    if (this.mergeGameCanvases) {
-      // Hiding it removes the layer from compositing entirely, which is the point of
-      // the comparison; render() already draws the track before it transforms for the
-      // world, so pointing the track layer at this context preserves the draw order.
-      if (this.trackLayerCanvas) this.trackLayerCanvas.style.display = "none";
-      this.trackLayer.setup({ sharedContext: this.ctx });
-    } else {
-      this.trackLayer.setup({ allowWorker: shouldUseTrackLayerWorker() });
-    }
+    this.trackLayer = new TrackLayerRenderer(this.ctx);
     this.viewportWidth = 0;
     this.viewportHeight = 0;
     this.viewportDevicePixelRatio = 1;
@@ -421,13 +410,9 @@ export class RealTimeRacer {
       },
     });
     this.modalContent = new ModalContentUi();
-    this.trackReadyPromise = new Promise((resolve) => {
-      if (this.trackLayer.workerActive || !this.trackLayer.workerReady) {
-        resolve();
-      } else {
-        this.trackLayer.onTrackReady = resolve;
-      }
-    });
+    // Nothing to wait for since the track draws on the main thread into the race
+    // canvas; the gate keeps the slot so startup ordering stays explicit.
+    this.trackReadyPromise = Promise.resolve();
     this.fontsReadyPromise = document.fonts ? document.fonts.ready : Promise.resolve();
     this.modal = new ModalShell({
       content: this.modalContent,

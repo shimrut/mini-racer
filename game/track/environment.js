@@ -21,40 +21,6 @@ export function shouldAutoRetryVerificationQueue() {
   return !isLocalEnvironment();
 }
 
-/**
- * The track layer draws in ~5us per frame, so the worker never bought meaningful
- * parallelism -- it only added a structured-clone postMessage per frame and kept a
- * second thread resident for the whole race, which blocks SoC idle and costs power.
- * Everyone now uses the main-thread renderer that Android already ran on.
- * Flip this back to `clientName !== "ANDROID"` to restore the worker path.
- */
-export function shouldUseTrackLayerWorker(
-  // eslint-disable-next-line no-unused-vars
-  clientName = globalThis.devvit?.context?.client?.name,
-) {
-  return false;
-}
-
-/**
- * The race used to stack two full-viewport canvases: the track layer underneath and a
- * transparent game canvas above it. That cost an extra composited layer plus a
- * per-pixel blend every frame, because the game canvas had to stay `alpha: true` for
- * the track to show through, and it bought nothing -- render() redraws the track every
- * frame regardless, so the split never saved any drawing.
- *
- * Both now share one opaque canvas. Chrome's Graphite backend stutters visibly on the
- * stacked layout where Safari does not, and merging is what cleared it.
- *
- * `?canvas=2` (or `stacked`) restores the old two-canvas path for comparison.
- */
-export function shouldMergeGameCanvases(
-  search = typeof window !== "undefined" ? window.location?.search : "",
-) {
-  if (!search) return true;
-  const mode = new URLSearchParams(search).get("canvas");
-  return !(mode === "2" || mode === "stacked");
-}
-
 export function readCanvasDevicePixelRatio() {
   if (typeof window === "undefined") return 1;
   return window.devicePixelRatio || 1;

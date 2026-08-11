@@ -1,4 +1,3 @@
-import { CONFIG } from "../config.js";
 import { TRACKS } from "./tracks.js";
 import {
   getTrackCanvasAsset,
@@ -28,7 +27,7 @@ export const trackEngineMethods = {
     });
   },
 
-  async refreshTrackPresentation(trackLoadRequestId = this.trackLoadRequestId) {
+  async refreshTrackPresentation() {
     if (!this.currentTrackKey || !this.currentTrack) return;
 
     const presentation = this.getTrackPresentation(this.currentTrackKey, {
@@ -46,7 +45,6 @@ export const trackEngineMethods = {
     );
     this.trackCanvas = trackCanvasRuntime.canvas;
     this.trackCanvasOrigin = trackCanvasRuntime.origin;
-    this.syncTrackLayerBitmap(trackLoadRequestId);
     this.requestRender();
   },
 
@@ -54,13 +52,6 @@ export const trackEngineMethods = {
     this.frameTimeHistory = [];
     this.frameTimeHistoryIndex = 0;
     this.frameTimeTotal = 0;
-  },
-
-  updateTrackLayerViewportSize(devicePixelRatio = null) {
-    this.trackLayer.updateViewportSize(
-      this.container,
-      devicePixelRatio || readCanvasDevicePixelRatio(),
-    );
   },
 
   scheduleResizeCommit() {
@@ -83,7 +74,6 @@ export const trackEngineMethods = {
       typeof this.getCanvasDevicePixelRatio === "function"
         ? this.getCanvasDevicePixelRatio()
         : readCanvasDevicePixelRatio();
-    this.updateTrackLayerViewportSize(devicePixelRatio);
     const viewport = configureCanvasViewport(
       this.canvas,
       this.ctx,
@@ -147,7 +137,7 @@ export const trackEngineMethods = {
     this.collisionSegments = runtime.collisionSegments;
     this.collisionHash = runtime.collisionHash;
     this.setLoadingStatus(75, "Syncing Graphics...");
-    await this.refreshTrackPresentation(requestId);
+    await this.refreshTrackPresentation();
     if (requestId !== this.trackLoadRequestId) return;
 
     this.bestLapTime = null;
@@ -193,19 +183,6 @@ export const trackEngineMethods = {
     ) {
       document.activeElement.blur();
     }
-  },
-
-  async syncTrackLayerBitmap(trackLoadRequestId = this.trackLoadRequestId) {
-    if (!this.trackCanvas) return;
-    await this.trackLayer.syncBitmap({
-      trackCanvas: this.trackCanvas,
-      trackCanvasOrigin: this.trackCanvasOrigin,
-      offTrackColor:
-        this.currentTrackPresentation?.offTrackColor || CONFIG.offTrackColor,
-      presentation: this.currentTrackPresentation || null,
-      trackLoadRequestId,
-      currentTrackLoadRequestId: this.trackLoadRequestId,
-    });
   },
 
   drawVisibleTrackCanvas() {

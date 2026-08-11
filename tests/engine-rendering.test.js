@@ -1,8 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { CONFIG } from "../game/config.js";
 import { RealTimeRacer } from "../game/engine.js";
 import { RingBuffer } from "../game/race/ring-buffer.js";
-import { shouldUseTrackLayerWorker } from "../game/track/environment.js";
 import { TrackLayerRenderer } from "../game/track/layer.js";
 
 function createRenderContext() {
@@ -156,185 +156,11 @@ describe("RealTimeRacer track layer renderer", () => {
     }
   });
 
-  it("uses the worker track layer when the browser supports it", () => {
-    const fallbackContext = { id: "2d-context" };
-    const transferControlToOffscreen = vi.fn(() => ({
-      id: "offscreen-canvas",
-    }));
-    const getContext = vi.fn(() => fallbackContext);
-    const worker = { postMessage: vi.fn() };
-    const workerCtor = vi.fn(() => worker);
-    const createImageBitmap = vi.fn();
-
-    const originalWorker = global.Worker;
-    const originalCreateImageBitmap = global.createImageBitmap;
-
-    global.Worker = workerCtor;
-    global.createImageBitmap = createImageBitmap;
-
-    try {
-      const renderer = new TrackLayerRenderer({
-        transferControlToOffscreen,
-        getContext,
-      });
-
-      renderer.setup();
-
-      expect(transferControlToOffscreen).toHaveBeenCalled();
-      expect(workerCtor).toHaveBeenCalled();
-      expect(worker.postMessage).toHaveBeenCalledWith(
-        { type: "init", canvas: { id: "offscreen-canvas" } },
-        [{ id: "offscreen-canvas" }],
-      );
-      expect(getContext).not.toHaveBeenCalled();
-      expect(renderer.ctx).toBe(null);
-      expect(renderer.workerReady).toBe(true);
-    } finally {
-      global.Worker = originalWorker;
-      global.createImageBitmap = originalCreateImageBitmap;
-    }
-  });
-
-  it("keeps the Android Reddit client on the main-thread track layer", () => {
-    const fallbackContext = { id: "2d-context" };
-    const transferControlToOffscreen = vi.fn();
-    const getContext = vi.fn(() => fallbackContext);
-    const workerCtor = vi.fn();
-    const createImageBitmap = vi.fn();
-
-    const originalWorker = global.Worker;
-    const originalCreateImageBitmap = global.createImageBitmap;
-    const originalDevvit = globalThis.devvit;
-
-    global.Worker = workerCtor;
-    global.createImageBitmap = createImageBitmap;
-    globalThis.devvit = { context: { client: { name: "ANDROID" } } };
-
-    try {
-      const renderer = new TrackLayerRenderer({
-        transferControlToOffscreen,
-        getContext,
-      });
-
-      renderer.setup({
-        allowWorker: shouldUseTrackLayerWorker(),
-      });
-
-      // Every client now renders the track layer on the main thread: the worker's
-      // per-frame postMessage cost more power than the ~5us of drawing it offloaded.
-      expect(shouldUseTrackLayerWorker()).toBe(false);
-      expect(shouldUseTrackLayerWorker("IOS")).toBe(false);
-      expect(shouldUseTrackLayerWorker("WEB")).toBe(false);
-      expect(transferControlToOffscreen).not.toHaveBeenCalled();
-      expect(workerCtor).not.toHaveBeenCalled();
-      expect(getContext).toHaveBeenCalledWith("2d", { alpha: false });
-      expect(renderer.ctx).toBe(fallbackContext);
-      expect(renderer.workerReady).toBe(false);
-    } finally {
-      global.Worker = originalWorker;
-      global.createImageBitmap = originalCreateImageBitmap;
-      if (originalDevvit === undefined) {
-        delete globalThis.devvit;
-      } else {
-        globalThis.devvit = originalDevvit;
-      }
-    }
-  });
-
-  it("uses the resolved track presentation off-track color when syncing the worker bitmap", async () => {
-    const bitmap = { close: vi.fn() };
-    const createImageBitmap = vi.fn().mockResolvedValue(bitmap);
-    const postMessage = vi.fn();
-    const originalCreateImageBitmap = global.createImageBitmap;
-
-    global.createImageBitmap = createImageBitmap;
-
-    try {
-      const renderer = new TrackLayerRenderer(null);
-      renderer.workerReady = true;
-      renderer.worker = { postMessage };
-
-      await renderer.syncBitmap({
-        trackCanvas: { width: 20, height: 20 },
-        trackCanvasOrigin: { x: 12, y: 18 },
-        offTrackColor: "#41291f",
-        presentation: { offTrackColor: "#41291f" },
-        trackLoadRequestId: 7,
-        currentTrackLoadRequestId: 7,
-      });
-
-      expect(postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "track",
-          bitmap,
-          origin: { x: 12, y: 18 },
-          offTrackColor: "#41291f",
-        }),
-        [bitmap],
-      );
-    } finally {
-      global.createImageBitmap = originalCreateImageBitmap;
-    }
-  });
-
-  it("sizes its backing store during draw when no resize has landed yet", () => {
-    const setTransform = vi.fn();
-    const canvas = { width: 300, height: 150 };
-    const renderer = new TrackLayerRenderer(canvas);
-    renderer.ctx = {
-      setTransform,
-      fillRect: vi.fn(),
-      drawImage: vi.fn(),
-      save: vi.fn(),
-      restore: vi.fn(),
-    };
-
-    // No updateViewportSize() call first: this is the state the main-thread path
-    // lands in whenever the container was unmeasured when setup() ran.
-    renderer.draw({
-      camera: { x: 0, y: 0 },
-      zoom: 1,
-      viewportWidth: 390,
-      viewportHeight: 844,
-      devicePixelRatio: 2,
-      trackCanvas: { width: 800, height: 800 },
-      trackCanvasOrigin: { x: 0, y: 0 },
-      presentation: {},
-      container: { clientWidth: 390, clientHeight: 844 },
-    });
-
-    expect(canvas.width).toBe(780);
-    expect(canvas.height).toBe(1688);
-    expect(setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0);
-  });
-});
-
-describe("merged canvas mode", () => {
-  it("draws the track into the shared context and never touches the canvas", () => {
-    const sharedContext = createRenderContext();
-    const canvas = {
-      width: 0,
-      height: 0,
-      getContext: vi.fn(),
-      transferControlToOffscreen: vi.fn(),
-    };
-    const renderer = new TrackLayerRenderer(canvas);
-
-    renderer.setup({ sharedContext });
-
-    expect(renderer.merged).toBe(true);
-    expect(renderer.ctx).toBe(sharedContext);
-    expect(renderer.canvas).toBe(null);
-    expect(canvas.getContext).not.toHaveBeenCalled();
-    expect(canvas.transferControlToOffscreen).not.toHaveBeenCalled();
-
-    // The engine owns sizing in merged mode, so resizing must be inert.
-    renderer.updateViewportSize({ clientWidth: 800, clientHeight: 600 }, 2);
-    expect(canvas.width).toBe(0);
-    expect(canvas.height).toBe(0);
-
-    // A draw still blits the track into the shared context.
+  it("draws the track into the race canvas context it was handed", () => {
+    const ctx = createRenderContext();
+    const renderer = new TrackLayerRenderer(ctx);
     const trackCanvas = { width: 400, height: 300 };
+
     renderer.draw({
       camera: { x: 0, y: 0 },
       zoom: 1,
@@ -347,7 +173,97 @@ describe("merged canvas mode", () => {
       container: { clientWidth: 320, clientHeight: 200 },
     });
 
-    expect(sharedContext.drawImage).toHaveBeenCalled();
-    expect(canvas.width).toBe(0);
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      trackCanvas,
+      0,
+      0,
+      320,
+      200,
+      0,
+      0,
+      320,
+      200,
+    );
+  });
+
+  it("falls back to the engine backing store before the container is measured", () => {
+    const ctx = createRenderContext();
+    const renderer = new TrackLayerRenderer(ctx);
+
+    renderer.draw({
+      camera: { x: 0, y: 0 },
+      zoom: 1,
+      viewportWidth: 0,
+      viewportHeight: 0,
+      devicePixelRatio: 2,
+      trackCanvas: { width: 800, height: 800 },
+      trackCanvasOrigin: { x: 0, y: 0 },
+      presentation: {},
+      container: { clientWidth: 0, clientHeight: 0 },
+      // The engine sized its canvas at dpr 2, so the CSS viewport is half of it.
+      fallbackWidth: 780,
+      fallbackHeight: 1688,
+    });
+
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      expect.anything(),
+      0,
+      0,
+      390,
+      800,
+      0,
+      0,
+      390,
+      800,
+    );
+  });
+
+  it("never reaches for a worker or an OffscreenCanvas", () => {
+    // Devvit's Android WebView exposes the worker APIs but does not reliably present
+    // a canvas whose control was transferred to one, which showed the car over a
+    // blank white background. There is one main-thread canvas now, so the renderer
+    // must not touch either API even when the browser advertises them.
+    const originalWorker = global.Worker;
+    const originalCreateImageBitmap = global.createImageBitmap;
+    const workerCtor = vi.fn();
+    const createImageBitmap = vi.fn();
+    global.Worker = workerCtor;
+    global.createImageBitmap = createImageBitmap;
+
+    try {
+      const ctx = createRenderContext();
+      const renderer = new TrackLayerRenderer(ctx);
+
+      renderer.draw({
+        camera: { x: 0, y: 0 },
+        zoom: 1,
+        viewportWidth: 320,
+        viewportHeight: 200,
+        devicePixelRatio: 1,
+        trackCanvas: { width: 400, height: 300 },
+        trackCanvasOrigin: { x: 0, y: 0 },
+        presentation: {},
+        container: { clientWidth: 320, clientHeight: 200 },
+      });
+
+      expect(workerCtor).not.toHaveBeenCalled();
+      expect(createImageBitmap).not.toHaveBeenCalled();
+      expect(renderer.ctx).toBe(ctx);
+      expect(renderer.canvas).toBeUndefined();
+    } finally {
+      global.Worker = originalWorker;
+      global.createImageBitmap = originalCreateImageBitmap;
+    }
+  });
+});
+
+describe("single game canvas", () => {
+  it("ships exactly one race canvas in the game shell", () => {
+    const html = readFileSync(new URL("../game.html", import.meta.url), "utf8");
+    const raceCanvases = html.match(/<canvas[^>]*class="game-layer-canvas"/g);
+
+    expect(raceCanvases).toHaveLength(1);
+    expect(html).toContain('<canvas id="gameCanvas"');
+    expect(html).not.toContain("trackLayerCanvas");
   });
 });
