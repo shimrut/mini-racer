@@ -7,6 +7,8 @@
   Client track geometry and non-selected mode runtimes now load lazily after
   the selected lobby is ready. The entry module no longer blocks its own
   deferred mode chunk during evaluation, preventing a blank startup screen.
+  Dynamically split mode source maps now use unique hashed filenames instead
+  of overwriting each other during the production build.
 
 - Approved the current Mistfall Circuit boundary in the track-registry
   fingerprint so integrity checks protect the geometry that actually ships.

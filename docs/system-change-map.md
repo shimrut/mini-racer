@@ -617,6 +617,10 @@ The entry module starts this asynchronous boot without top-level `await`.
 Deferred mode chunks import shared symbols from the main game chunk, so the
 entry chunk must finish evaluating before it waits for the selected mode chunk;
 otherwise both chunks wait on each other and the racer is never constructed.
+The client build gives source maps a content hash because Daily, Campaign, Head
+to Head, and shared challenge code all use the source basename
+`engine-methods.js`; unique map names preserve every mode's production stack
+trace instead of overwriting three maps during the build.
 
 ## Recommended Scoping Heuristic
 

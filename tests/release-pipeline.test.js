@@ -7,6 +7,10 @@ const packageJson = JSON.parse(
 const devvitConfig = JSON.parse(
     readFileSync(new URL('../devvit.json', import.meta.url), 'utf8'),
 );
+const viteConfigSource = readFileSync(
+    new URL('../vite.config.js', import.meta.url),
+    'utf8',
+);
 
 function devvitReleaseCommands(script) {
     return script.match(/devvit\s+(?:upload|publish)\b/g) ?? [];
@@ -38,6 +42,10 @@ describe('release pipeline', () => {
         expect(devvitConfig.scripts.build).toBe('npm run build');
         expect(viteBuildIndex).toBeGreaterThanOrEqual(0);
         expect(cacheBustIndex).toBeGreaterThan(viteBuildIndex);
+    });
+
+    it('keeps dynamically split mode source maps from overwriting each other', () => {
+        expect(viteConfigSource).toContain("sourcemapFileNames: '[name]-[hash].js.map'");
     });
 
     it('keeps non-product material out of the Devvit publish source archive', () => {

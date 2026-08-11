@@ -7,7 +7,12 @@ export default defineConfig({
         devvit({
             client: {
                 build: {
-                    chunkSizeWarningLimit: 2000
+                    chunkSizeWarningLimit: 2000,
+                    rollupOptions: {
+                        output: {
+                            sourcemapFileNames: '[name]-[hash].js.map'
+                        }
+                    }
                 }
             }
         })
