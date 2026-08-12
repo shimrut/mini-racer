@@ -40,11 +40,9 @@ describe('mode-priority startup', () => {
             'this.trackReadyPromise = this.loadTrack(DEFAULT_TRACK_KEY, {',
         );
         expect(engineSource).not.toContain('this.trackReadyPromise = Promise.resolve();');
-        expect(engineSource).toContain(
+        expect(engineSource).toContain('from "./head-to-head/service.js"');
+        expect(engineSource).not.toContain(
             'invokeModeMethod("challenge", "previewHeadToHead"',
-        );
-        expect(engineSource).toContain(
-            'invokeModeMethod("challenge", "confirmHeadToHead"',
         );
         expect(dailySource).toContain(
             '&& (challenge.trackKey !== this.currentTrackKey || !this.trackCanvas)',
@@ -208,27 +206,5 @@ describe('mode-priority startup', () => {
         expect(racer.installModeRuntime).toHaveBeenCalledWith('campaign');
         expect(racer.ensureModeRuntime).not.toHaveBeenCalled();
         expect(racer.showCampaignLobby).toHaveBeenCalled();
-    });
-
-    it('loads Head to Head share helpers without replacing Daily handlers', async () => {
-        clearModeRuntimeCacheForTests();
-        const controller = createModeRuntimeController(RealTimeRacer);
-        const racer = Object.create(RealTimeRacer.prototype);
-        racer.activeRaceMode = 'daily';
-        racer.launchTarget = { mode: 'daily' };
-        racer.ensureModeRuntime = (mode) => controller.ensure(
-            mode,
-            racer.activeRaceMode,
-            racer.launchTarget.mode,
-        );
-
-        await racer.ensureModeRuntime('daily');
-        await racer.ensureModeRuntime('challenge');
-
-        expect(typeof racer.previewHeadToHead).toBe('function');
-        expect(typeof racer.confirmHeadToHead).toBe('function');
-        expect(RealTimeRacer.prototype.applyDailyChallenge)
-            .toBe(dailyChallengeEngineMethods.applyDailyChallenge);
-        controller.clearForTests();
     });
 });

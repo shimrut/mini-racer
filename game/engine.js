@@ -73,6 +73,12 @@ import {
   confirmDailyChallengeShare,
   previewDailyChallengeShare,
 } from "./daily-challenge/service.js";
+import {
+  confirmHeadToHeadBrag,
+  createHeadToHead,
+  previewHeadToHead,
+  previewHeadToHeadBrag,
+} from "./head-to-head/service.js";
 
 // The legacy Daily mixin remains available to unit tests that exercise the
 // prototype directly. Production loads it through runtime-loader.js so Daily
@@ -476,19 +482,24 @@ export class RealTimeRacer {
       getRedditUsername: () => this.redditUsername,
       previewShare: (payload) => {
         if (payload?.kind === "head-to-head") {
-          return this.invokeModeMethod("challenge", "previewHeadToHead", payload);
+          return previewHeadToHead(payload);
         }
         if (payload?.kind === "challenge-brag") {
-          return this.invokeModeMethod("challenge", "previewHeadToHeadBrag", payload);
+          return previewHeadToHeadBrag(payload);
         }
         return previewDailyChallengeShare(payload);
       },
-      confirmShare: (shareToken, request) => {
+      confirmShare: async (shareToken, request) => {
         if (request?.kind === "head-to-head") {
-          return this.invokeModeMethod("challenge", "confirmHeadToHead", shareToken, request);
+          const response = await createHeadToHead(
+            shareToken,
+            request?.source === "daily" ? { replay: request.replay } : {},
+          );
+          if (response?.ok) this.applyCarUnlockSnapshot?.(response.body?.carUnlocks);
+          return response;
         }
         if (request?.kind === "challenge-brag") {
-          return this.invokeModeMethod("challenge", "confirmHeadToHeadBrag", shareToken);
+          return confirmHeadToHeadBrag(shareToken);
         }
         return confirmDailyChallengeShare(shareToken);
       },
