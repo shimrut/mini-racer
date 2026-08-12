@@ -1,3 +1,8 @@
+import {
+  getActivePlayerOwnerId,
+  getPlayerSessionId,
+} from "../player/active-owner.js";
+
 const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
 const CHALLENGE_PLAYLIST_MS = 7 * 24 * 60 * 60 * 1000;
@@ -12,6 +17,7 @@ const VERIFICATION_STAGE_REJECTED = "rejected";
 const VERIFICATION_STAGE_ERROR = "error";
 const CAMPAIGN_EXPIRY_MESSAGE = "Result expired — race again.";
 const CAMPAIGN_GHOST_RETRY_MESSAGE = "Saving ghost...";
+const OWNER_KEY_SEPARATOR = "::";
 
 const VERIFICATION_STAGE_TEXT = {
   [VERIFICATION_STAGE_SUBMITTING]: "Submitting...",
@@ -197,14 +203,29 @@ function isBetterDailyCandidate(nextEntry, previousEntry) {
   return Number(nextEntry.bestTime) < Number(previousEntry.bestTime);
 }
 
+/**
+ * Two accounts can each hold a queued result for the same race on one browser, so entries are stored
+ * per owner. A result raced before the account was known keeps the bare id until it is claimed.
+ */
+function ownedEntryKey(entryId, ownerPlayerId) {
+  return ownerPlayerId ? `${ownerPlayerId}${OWNER_KEY_SEPARATOR}${entryId}` : entryId;
+}
+
+function resolveEntryKey(queueState, bucket, entryId) {
+  const ownedKey = ownedEntryKey(entryId, getActivePlayerOwnerId());
+  if (queueState[bucket][ownedKey]) return ownedKey;
+  // A result raced before the account was known is still this session's until it is claimed.
+  return queueState[bucket][entryId]?.ownerPlayerId ? ownedKey : entryId;
+}
+
 function updateEntry(bucket, entryId, updater) {
   const queueState = readQueueState();
-  const nextEntry = updater(queueState[bucket][entryId] || null);
+  const previousKey = resolveEntryKey(queueState, bucket, entryId);
+  const nextEntry = updater(queueState[bucket][previousKey] || null);
 
+  delete queueState[bucket][previousKey];
   if (nextEntry) {
-    queueState[bucket][entryId] = nextEntry;
-  } else {
-    delete queueState[bucket][entryId];
+    queueState[bucket][ownedEntryKey(entryId, nextEntry.ownerPlayerId)] = nextEntry;
   }
 
   return {
@@ -226,7 +247,11 @@ export function isRetryableVerificationFailure(result) {
 /** Bucket field names persist in localStorage across deploys, and an unreadable entry is deleted — renaming one discards real queued runs. */
 function getEntry(bucket, entryId) {
   if (!entryId) return null;
-  return cloneEntry(readQueueState()[bucket][entryId] || null);
+  const queueState = readQueueState();
+  const entry = queueState[bucket][resolveEntryKey(queueState, bucket, entryId)] || null;
+  // Another owner's queued result is theirs to see, not this account's.
+  if (entry?.ownerPlayerId && !isOwnedByActivePlayer(entry)) return null;
+  return cloneEntry(entry);
 }
 
 function getState(bucket, entryId) {
@@ -276,14 +301,60 @@ function markTerminal(bucket, entryId, verificationState, stage, statusText) {
   }).entry;
 }
 
+/**
+ * A queued result belongs to the account that raced it. Submitting one under whoever happens to be
+ * signed in now credits the wrong player, so entries for another owner wait, and an entry no owner
+ * can be named for never submits at all.
+ */
+function isOwnedByActivePlayer(entry) {
+  const activeOwnerId = getActivePlayerOwnerId();
+  if (!activeOwnerId) return false;
+  return entry?.ownerPlayerId === activeOwnerId;
+}
+
 function getDue(bucket, now = Date.now()) {
   return Object.values(readQueueState()[bucket])
     .filter(
       (entry) =>
         entry?.verificationState === "pending" &&
+        isOwnedByActivePlayer(entry) &&
         normalizeNextAttemptAt(entry.nextAttemptAt) <= now,
     )
     .map((entry) => cloneEntry(entry));
+}
+
+/**
+ * The account is only named once the bootstrap answers, which can be after a race finishes. Results
+ * queued in this session are claimed by that answer; anything older is from a session whose account
+ * this one cannot vouch for.
+ */
+export function claimVerificationEntriesForOwner(ownerPlayerId) {
+  const activeOwnerId = typeof ownerPlayerId === "string" && ownerPlayerId.trim()
+    ? ownerPlayerId.trim()
+    : null;
+  if (!activeOwnerId) return { claimed: [], orphaned: [] };
+
+  const queueState = readQueueState();
+  const sessionId = getPlayerSessionId();
+  const claimed = [];
+  const orphaned = [];
+  for (const bucket of QUEUE_BUCKETS) {
+    for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
+      if (entry?.ownerPlayerId) continue;
+      delete queueState[bucket][entryKey];
+      if (entry?.sessionId === sessionId) {
+        queueState[bucket][`${activeOwnerId}${OWNER_KEY_SEPARATOR}${entryKey}`] = {
+          ...entry,
+          ownerPlayerId: activeOwnerId,
+        };
+        claimed.push({ bucket, entryId: entryKey });
+        continue;
+      }
+      orphaned.push({ bucket, entryId: entryKey, entry: cloneEntry(entry) });
+    }
+  }
+  if (claimed.length || orphaned.length) writeQueueState(queueState);
+  return { claimed, orphaned };
 }
 
 function enqueue(bucket, entryId, nextEntry, isBetterThan) {
@@ -299,6 +370,8 @@ function enqueue(bucket, entryId, nextEntry, isBetterThan) {
 function pendingEntry(fields) {
   return {
     ...fields,
+    ownerPlayerId: getActivePlayerOwnerId(),
+    sessionId: getPlayerSessionId(),
     verificationState: "pending",
     submissionStage: VERIFICATION_STAGE_SUBMITTING,
     statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_SUBMITTING],
@@ -454,9 +527,10 @@ export function getCampaignVerificationEntry(raceId) {
 
 export function getCampaignVerificationEntries() {
   const entries = Object.create(null);
-  for (const [raceId, entry] of Object.entries(readQueueState().campaign)) {
+  for (const entry of Object.values(readQueueState().campaign)) {
+    if (entry?.ownerPlayerId && !isOwnedByActivePlayer(entry)) continue;
     const cloned = cloneEntry(entry);
-    if (cloned) entries[raceId] = cloned;
+    if (cloned?.raceId) entries[cloned.raceId] = cloned;
   }
   return entries;
 }
@@ -544,6 +618,7 @@ export function getNextVerificationAttemptAt() {
     .filter(
       (entry) =>
         entry?.verificationState === "pending" &&
+        isOwnedByActivePlayer(entry) &&
         Number.isFinite(Number(entry.nextAttemptAt)),
     )
     .map((entry) => Number(entry.nextAttemptAt));

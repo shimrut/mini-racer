@@ -434,6 +434,47 @@ describe('Campaign server store', () => {
         expect(mockValidateDailyGpReplayDetailed).not.toHaveBeenCalled();
     });
 
+    it('refuses a queued result whose account changed, before the stage lock can hide why', async () => {
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+
+        const lockedStage = await submitServerCampaignRun({
+            raceId: 'numbered-v1-01',
+            trackKey: 'numberOne',
+            replay: {},
+            redditUsername: 'RaceFan',
+            submissionOwnerId: 'reddit:someone-else',
+        });
+        const unlockedStage = await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { inputs: [{ frames: 60, left: false, right: false, relaunchDelay: false }] },
+            redditUsername: 'RaceFan',
+            submissionOwnerId: 'reddit:someone-else',
+        });
+
+        for (const result of [lockedStage, unlockedStage]) {
+            expect(result).toMatchObject({
+                status: 409,
+                body: { accepted: false, reason: 'submission_identity_changed' },
+            });
+        }
+        expect(mockValidateDailyGpReplayDetailed).not.toHaveBeenCalled();
+    });
+
+    it('accepts a queued result that still names the account submitting it', async () => {
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+
+        const result = await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            replay: { inputs: [{ frames: 60, left: false, right: false, relaunchDelay: false }] },
+            redditUsername: 'RaceFan',
+            submissionOwnerId: 'reddit:racefan',
+        });
+
+        expect(result).toMatchObject({ status: 200, body: { accepted: true } });
+    });
+
     it('marks and prepares only an exact compatible Campaign opponent ghost without exposing identity', async () => {
         const raceId = 'numbered-v1-00';
         const playerId = 'reddit:opponent';

@@ -23,6 +23,7 @@ import {
   readLastConfirmedProfileOwnerId,
   writeCachedPlayerProfile,
 } from "./player/profile-cache.js";
+import { setActivePlayerOwnerId } from "./player/active-owner.js";
 
 async function fetchRemotePlayerProgressState() {
   const config = API_ROUTES;
@@ -75,6 +76,8 @@ async function fetchRemotePlayerProgressState() {
 
 function getLocalPlayerProgressState() {
   const hasAnyData = hasAnyDailyChallengeStoredData();
+  // Local development has no server to name an owner, so it owns its own namespace and keeps its queue working.
+  setActivePlayerOwnerId(`local:${getOrCreatePlayerId("player bootstrap")}`);
   return {
     hasAnyData,
     isReturningPlayer: false,
@@ -127,13 +130,23 @@ export async function getPlayerProgressState() {
       setGuestPlayerToken(remoteState.guestToken);
       if (remoteState.retireGuestIdentity) {
         rotateGuestPlayerIdentity("completed guest promotion");
+        // The server refused a spent guest credential: this browser needs a fresh identity before it owns anything again.
+        if (!remoteState.leaderboardPlayerId) {
+          const rebootstrapped = await fetchRemotePlayerProgressState();
+          if (rebootstrapped) {
+            setGuestPlayerToken(rebootstrapped.guestToken);
+            remoteState = rebootstrapped;
+          }
+        }
       }
       setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
+      // Without a player id the server did not recognise anyone, so nothing here may be treated as this account's state.
+      if (!remoteState.leaderboardPlayerId) {
+        return { ...remoteState, authoritative: false };
+      }
       const authoritativeState = { ...remoteState, authoritative: true };
-      writeCachedPlayerProfile(
-        remoteState.leaderboardPlayerId ?? getOrCreatePlayerId("player bootstrap"),
-        authoritativeState,
-      );
+      setActivePlayerOwnerId(remoteState.leaderboardPlayerId);
+      writeCachedPlayerProfile(remoteState.leaderboardPlayerId, authoritativeState);
       return authoritativeState;
     }
   } catch (error) {

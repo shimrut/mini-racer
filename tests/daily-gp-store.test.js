@@ -178,6 +178,18 @@ class RedisTestDouble {
     return index >= 0 ? index : undefined;
   }
 
+  async zScore(key, member) {
+    this._isExpired(key);
+    return this.sortedSets.get(key)?.get(member);
+  }
+
+  async zRem(key, members) {
+    this._isExpired(key);
+    const set = this.sortedSets.get(key);
+    members.forEach((member) => set?.delete(member));
+    return members.length;
+  }
+
   async zRange(key, start, stop) {
     this._isExpired(key);
     const ordered = [...(this.sortedSets.get(key)?.entries() || [])]
@@ -690,6 +702,87 @@ describe("daily-gp-store submission hardening", () => {
     expect(second.body.trackPbPersistenceStatus).toBe("unchanged");
     expect(second.body.trackPersonalBest).toEqual(first.body.trackPersonalBest);
     expect(second.body.validationMethod).toBe("strict-replay");
+  });
+
+  it("refuses a queued run whose account changed before it was submitted", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-owner-changed";
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+
+    const result = await submitServerDailyGpRun({
+      playerId: guestPlayerId,
+      guestToken,
+      challengeId: challenge.id,
+      trackKey: challenge.trackKey,
+      replay: { targetLapNumber: 1, inputs: [] },
+      submissionOwnerId: "reddit:someone-else",
+    });
+
+    expect(result.status).toBe(409);
+    expect(result.body).toMatchObject({
+      accepted: false,
+      reason: "submission_identity_changed",
+    });
+    // Refused before rate limiting, so a paused result cannot burn the owner's submission budget.
+    expect(validateDailyGpReplayDetailedMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a queued run that still names the account submitting it", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-owner-matches";
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+
+    const result = await submitServerDailyGpRun({
+      playerId: guestPlayerId,
+      guestToken,
+      challengeId: challenge.id,
+      trackKey: challenge.trackKey,
+      replay: { targetLapNumber: 1, inputs: [] },
+      submissionOwnerId: `guest:${guestPlayerId}`,
+    });
+
+    expect(result.status).not.toBe(409);
+  });
+
+  it("refuses a guest credential that was already promoted into an account", async () => {
+    const guestPlayerId = "guest-promoted-away";
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    const promoted = await getServerPlayerBootstrap({
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+      redditUsername: "RaceFan",
+    });
+
+    const reused = await getServerPlayerBootstrap({
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+    });
+    const preferences = await updateServerPlayerPreferences({
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+      playerPreferences,
+    });
+
+    expect(promoted.retireGuestIdentity).toBe(true);
+    expect(reused.playerId).toBeNull();
+    expect(reused.retireGuestIdentity).toBe(true);
+    expect(preferences.playerId).toBeNull();
+  });
+
+  it("does not re-adopt a retired guest id when its token is gone", async () => {
+    const guestPlayerId = "guest-promoted-tokenless";
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    await getServerPlayerBootstrap({
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+      redditUsername: "RaceFan",
+    });
+
+    const tokenless = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+
+    expect(tokenless.playerId).toBeNull();
+    expect(tokenless.guestToken).toBeNull();
+    expect(tokenless.retireGuestIdentity).toBe(true);
   });
 
   it("trims whitespace from a guest playerId when claiming a new profile", async () => {

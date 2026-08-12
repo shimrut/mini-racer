@@ -7,6 +7,7 @@ import {
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
 import { mintGuestPlayerToken, verifyGuestPlayerToken } from './player-token.js';
+import { resolveGuestIdentityStatus, type GuestIdentityStatus } from './guest-retirement.js';
 import { STOCK_CAR_ASSET_NAME } from '../../game/car/car-unlock-policy.js';
 import {
     normalizeLeaderboardIdentityPreference,
@@ -17,6 +18,7 @@ export type ResolvedPlayerIdentity = {
     canonicalPlayerId: string | null;
     guestPlayerId: string | null;
     guestToken: string | null;
+    guestStatus?: GuestIdentityStatus;
 };
 
 const MAX_CAR_SKIN_LENGTH = 160;
@@ -250,10 +252,23 @@ export async function resolveAuthorizedPlayerIdentity({
             };
         }
 
+        const canonicalPlayerId = `guest:${verifiedGuestPlayerId}`;
+        // A promoted guest's credential is spent: honouring it would write this browser's races into the account it was merged into.
+        const { status } = await resolveGuestIdentityStatus(canonicalPlayerId);
+        if (status === 'guest_identity_retired') {
+            return {
+                canonicalPlayerId: null,
+                guestPlayerId: null,
+                guestToken: null,
+                guestStatus: status,
+            };
+        }
+
         return {
-            canonicalPlayerId: `guest:${verifiedGuestPlayerId}`,
+            canonicalPlayerId,
             guestPlayerId: verifiedGuestPlayerId,
             guestToken: normalizedGuestToken,
+            guestStatus: status,
         };
     }
 

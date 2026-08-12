@@ -923,6 +923,55 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(getCampaignVerificationEntry('numbered-v1-00')?.trackPbRetryCount).toBe(2);
     });
 
+    it('holds a queued run whose account changed instead of failing it', async () => {
+        const context = createCampaignFinishContext();
+        const queued = queueCampaignRun(8.25);
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: false,
+            status: 409,
+            body: { accepted: false, reason: 'submission_identity_changed' },
+        });
+
+        await context.processCampaignVerificationEntry(queued);
+
+        const entry = getCampaignVerificationEntry('numbered-v1-00');
+        expect(entry).toMatchObject({ verificationState: 'pending' });
+        expect(entry.replay).not.toBeNull();
+        expect(context.modal.setCombinedWinMedal).not.toHaveBeenCalled();
+    });
+
+    it('does not spend a ghost retry when the account changed', async () => {
+        const context = createCampaignFinishContext();
+        const entry = await queueCampaignGhostRecovery(context);
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: false,
+            status: 409,
+            body: { accepted: false, reason: 'submission_identity_changed' },
+        });
+
+        await context.processCampaignVerificationEntry(entry);
+
+        expect(getCampaignVerificationEntry('numbered-v1-00')).toMatchObject({
+            progressConfirmed: true,
+            trackPbRetryCount: 1,
+        });
+    });
+
+    it('names the account a queued run was raced under when submitting it', async () => {
+        const context = createCampaignFinishContext();
+        const queued = queueCampaignRun(8.25);
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: acceptedCampaignBody({ trackPbPersistenceStatus: 'stored' }),
+        });
+
+        await context.processCampaignVerificationEntry(queued);
+
+        expect(campaignServiceMocks.submitCampaignRun).toHaveBeenCalledWith(
+            expect.objectContaining({ submissionOwnerId: queued.ownerPlayerId ?? null }),
+        );
+    });
+
     it('stops retrying a run the server refuses outright', async () => {
         const context = createCampaignFinishContext();
         campaignServiceMocks.submitCampaignRun.mockResolvedValue({

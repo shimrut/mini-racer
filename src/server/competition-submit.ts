@@ -63,6 +63,30 @@ function resolveRateLimitIdentity(
         : playerId;
 }
 
+/**
+ * A queued replay names the account it was raced under. If the browser has since switched accounts,
+ * the trusted identity on this request is somebody else, and accepting the run would credit their
+ * board with a race they never drove — so it is refused without touching the replay.
+ */
+export function isMismatchedSubmissionOwner(
+    playerId: string,
+    submissionOwnerId: unknown,
+): boolean {
+    const claimedOwnerId = typeof submissionOwnerId === 'string' && submissionOwnerId.trim()
+        ? submissionOwnerId.trim()
+        : null;
+    return Boolean(claimedOwnerId) && claimedOwnerId !== playerId;
+}
+
+export const SUBMISSION_IDENTITY_CHANGED_RESULT = {
+    status: 409,
+    body: {
+        accepted: false,
+        error: 'This result belongs to a different account. Sign back in to rank it.',
+        reason: 'submission_identity_changed',
+    },
+} as const;
+
 export async function submitCompetitionRun({
     competition,
     playerId,
@@ -70,6 +94,7 @@ export async function submitCompetitionRun({
     trackKey,
     replay,
     requestRateLimitIdentity,
+    submissionOwnerId,
 }: {
     competition: Competition;
     playerId: string;
@@ -77,7 +102,12 @@ export async function submitCompetitionRun({
     trackKey?: unknown;
     replay?: unknown;
     requestRateLimitIdentity?: unknown;
+    submissionOwnerId?: unknown;
 }) {
+    if (isMismatchedSubmissionOwner(playerId, submissionOwnerId)) {
+        return SUBMISSION_IDENTITY_CHANGED_RESULT;
+    }
+
     if (trackKey !== competition.trackKey) {
         return {
             status: 422,

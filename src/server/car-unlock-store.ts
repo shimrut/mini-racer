@@ -51,6 +51,15 @@ async function resolvePromotedPlayerId(playerId: string, client: RedisClient): P
     return await client.get(promotionKey(playerId)) || playerId;
 }
 
+/** The account a guest was promoted into, if any. Written inside the promotion transaction, so its presence is proof the promotion committed. */
+export async function readGuestPromotionTarget(
+    guestPlayerId: string,
+    client: RedisClient = redis,
+): Promise<string | null> {
+    if (!guestPlayerId.startsWith('guest:')) return null;
+    return await client.get(promotionKey(guestPlayerId)) || null;
+}
+
 async function writeCarUnlockEvent(
     playerId: string,
     write: (key: string) => Promise<void>,

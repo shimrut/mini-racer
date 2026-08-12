@@ -37,7 +37,7 @@ function previousBestFromVerificationEntry(entry) {
   };
 }
 
-function rollbackLocalBestForFailedVerificationEntry(engine, entry) {
+export function rollbackLocalBestForFailedVerificationEntry(engine, entry) {
   if (!entry?.challengeId || !Number.isFinite(entry?.bestTime)) return null;
   const restored = rollbackDailyChallengeBestIfMatchesFailedSubmission(
     {
@@ -190,6 +190,7 @@ export const scoreboardEngineMethods = {
         bestTime: entry.bestTime,
         replay: entry.replay,
         checkpointTimesSec: entry.checkpointTimesSec,
+        submissionOwnerId: entry.ownerPlayerId ?? null,
       });
       await this.handleDailyChallengeVerificationResult(entry, result);
     } catch (error) {
@@ -253,6 +254,17 @@ export const scoreboardEngineMethods = {
           }),
         );
       }
+      return;
+    }
+
+    // The account changed under this queued run: keep the replay and wait for its owner to come back.
+    if (result?.status === 409 && body?.reason === "submission_identity_changed") {
+      markDailyChallengeVerificationPending(
+        entry.challengeId,
+        Date.now() + getVerificationRetryDelayMs(),
+        { submissionStage: "pending", preserveUpdatedAt: true },
+      );
+      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
       return;
     }
 

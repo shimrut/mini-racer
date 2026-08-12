@@ -24,6 +24,10 @@ import {
     markDailyChallengeVerificationRejected,
     resetVerificationQueueForTests,
 } from '../game/scoreboard/verification-queue.js';
+import {
+    clearActivePlayerOwnerId,
+    setActivePlayerOwnerId,
+} from '../game/player/active-owner.js';
 
 const STORAGE_KEY = 'VectorGpVerificationQueue';
 const REPLAY = { inputs: [{ frames: 1, left: false, right: false }] };
@@ -285,11 +289,13 @@ describe('verification-queue mutation kills', () => {
     beforeEach(() => {
         installLocalStorage();
         resetVerificationQueueForTests();
+        setActivePlayerOwnerId('reddit:racer');
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
         vi.useRealTimers();
+        clearActivePlayerOwnerId();
         delete globalThis.window;
     });
 

@@ -1087,6 +1087,7 @@ export const campaignEngineMethods = {
                 raceId,
                 trackKey: stage.trackKey,
                 replay: entry.replay,
+                submissionOwnerId: entry.ownerPlayerId ?? null,
             });
         } catch (submitError) {
             console.error('Could not confirm Campaign race result:', submitError);
@@ -1100,6 +1101,20 @@ export const campaignEngineMethods = {
         }
 
         if (isSupersededCampaignVerificationEntry(inFlight)) return;
+
+        // The account changed under this queued run. It keeps its replay and its retries, and waits for its owner.
+        if (response.status === 409 && response.body?.reason === 'submission_identity_changed') {
+            markCampaignVerificationPending(
+                raceId,
+                Date.now() + getVerificationRetryDelayMs(),
+                {
+                    submissionStage: entry.progressConfirmed ? 'verifying' : 'pending',
+                    statusText: entry.progressConfirmed ? entry.statusText : null,
+                    preserveUpdatedAt: true,
+                },
+            );
+            return;
+        }
 
         if (response.ok && response.body?.accepted === true) {
             if (!responseConfirmsCampaignResult(response, entry)) {

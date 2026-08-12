@@ -78,6 +78,11 @@ import {
     isCarAssetUnlocked,
 } from '../../game/car/car-unlock-policy.js';
 import { verifyGuestPlayerToken } from './player-token.js';
+import { isRetiredGuestPlayerId } from './guest-retirement.js';
+import {
+    isMismatchedSubmissionOwner,
+    SUBMISSION_IDENTITY_CHANGED_RESULT,
+} from './competition-submit.js';
 
 // Re-exported here so the paths callers and tests already import from keep resolving.
 export {
@@ -787,10 +792,19 @@ export async function getServerPlayerBootstrap({
     });
     let previousProfile: DailyGpPlayerProfile | null = null;
     let profile: DailyGpPlayerProfile | null = null;
-    let retireGuestIdentity = false;
+    let retireGuestIdentity = identity.guestStatus === 'guest_identity_retired';
+
+    // Claiming or adopting a retired guest id would resurrect a credential whose progress already moved to an account.
+    const retiredGuestId = !identity.canonicalPlayerId
+        && !safeRequestRedditUsername
+        && typeof playerId === 'string'
+        && playerId.trim()
+        ? await isRetiredGuestPlayerId(`guest:${playerId.trim()}`)
+        : false;
+    retireGuestIdentity ||= retiredGuestId;
 
     // A player id with no token is either a first visit or a guest whose token was lost: claiming covers the first, adopting the second.
-    if (!identity.canonicalPlayerId && !safeRequestRedditUsername && !suppliedGuestToken) {
+    if (!identity.canonicalPlayerId && !safeRequestRedditUsername && !suppliedGuestToken && !retiredGuestId) {
         const claimedGuest = await claimNewGuestPlayerProfile({
             playerId,
             leaderboardIdentity,
@@ -827,7 +841,7 @@ export async function getServerPlayerBootstrap({
             firstSeenAt: null,
             lastSeenAt: null,
             carUnlocks: null,
-            retireGuestIdentity: false,
+            retireGuestIdentity,
         };
     }
 
@@ -852,7 +866,7 @@ export async function getServerPlayerBootstrap({
                 console.error('Player guest progress claim failed:', error);
             }
         }
-        retireGuestIdentity = Boolean(guestPlayerId && guestPromotionComplete);
+        retireGuestIdentity ||= Boolean(guestPlayerId && guestPromotionComplete);
         if (guestPlayerId && !guestPromotionComplete) {
             identity.guestToken = typeof guestToken === 'string' ? guestToken.trim() : null;
         }
@@ -1090,6 +1104,7 @@ export async function submitServerDailyGpRun({
     checkpointTimesSec,
     trackKey,
     requestRateLimitIdentity,
+    submissionOwnerId,
 }: {
     playerId?: unknown;
     challengeId?: unknown;
@@ -1101,6 +1116,7 @@ export async function submitServerDailyGpRun({
     checkpointTimesSec?: unknown;
     trackKey?: unknown;
     requestRateLimitIdentity?: unknown;
+    submissionOwnerId?: unknown;
 }) {
     const challenge = await getServerDailyGpPlayableChallenge(
         typeof challengeId === 'string' ? challengeId : null,
@@ -1141,6 +1157,11 @@ export async function submitServerDailyGpRun({
                 error: 'Invalid Mini Racer submission.',
             },
         };
+    }
+
+    // Checked before rate limiting and replay work: a run raced under another account is not this player's to spend.
+    if (isMismatchedSubmissionOwner(identity.canonicalPlayerId, submissionOwnerId)) {
+        return SUBMISSION_IDENTITY_CHANGED_RESULT;
     }
 
     const safeRequestRateLimitIdentity = typeof requestRateLimitIdentity === 'string'

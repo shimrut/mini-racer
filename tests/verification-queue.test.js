@@ -19,8 +19,16 @@ import {
     markDailyChallengeVerificationError,
     markDailyChallengeVerificationPending,
     markDailyChallengeVerificationRejected,
-    resetVerificationQueueForTests
+    resetVerificationQueueForTests,
+    claimVerificationEntriesForOwner
 } from '../game/scoreboard/verification-queue.js';
+import {
+    clearActivePlayerOwnerId,
+    getPlayerSessionId,
+    setActivePlayerOwnerId
+} from '../game/player/active-owner.js';
+
+const OWNER = 'reddit:racer';
 
 const STORAGE_KEY = 'VectorGpVerificationQueue';
 
@@ -51,11 +59,13 @@ describe('verification queue', () => {
     beforeEach(() => {
         installLocalStorage();
         resetVerificationQueueForTests();
+        setActivePlayerOwnerId(OWNER);
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
         vi.useRealTimers();
+        clearActivePlayerOwnerId();
         delete globalThis.window;
     });
 
@@ -186,7 +196,7 @@ describe('verification queue', () => {
             enqueued: true,
             entry: expect.objectContaining({ challengeId: 'fresh-entry' }),
         });
-        expect(readStoredQueue().daily['fresh-entry']).toBeTruthy();
+        expect(readStoredQueue().daily[`${OWNER}::fresh-entry`]).toBeTruthy();
     });
 
     it('normalizes malformed stored queue sections and clones replay payloads', () => {
@@ -217,7 +227,7 @@ describe('verification queue', () => {
         });
 
         expect(readStoredQueue().daily['challenge-1']).toBeTruthy();
-        expect(readStoredQueue().daily['challenge-2']).toBeTruthy();
+        expect(readStoredQueue().daily[`${OWNER}::challenge-2`]).toBeTruthy();
     });
 
     it('keeps the best daily candidate for time-based challenges and normalizes metadata', () => {
@@ -768,6 +778,90 @@ describe('verification queue', () => {
 
         clearCampaignVerification('numbered-v1-03');
         expect(getCampaignVerificationEntry('numbered-v1-03')).toBeNull();
+    });
+
+    function queueDailyRun(challengeId = 'daily-gp-2031-05-01', bestTime = 30) {
+        return enqueueDailyChallengeVerification({
+            challengeId,
+            challengeDate: challengeId.slice('daily-gp-'.length),
+            trackKey: 'circuit',
+            bestTime,
+            replay: REPLAY,
+        });
+    }
+
+    it('stamps queued results with the account that raced them', () => {
+        queueDailyRun();
+
+        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toMatchObject({
+            ownerPlayerId: OWNER,
+            sessionId: getPlayerSessionId(),
+        });
+    });
+
+    it('holds another account\'s queued result instead of submitting it', () => {
+        queueDailyRun();
+        setActivePlayerOwnerId('reddit:someone-else');
+
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+        expect(getDailyChallengeVerificationEntry('daily-gp-2031-05-01')).toBeNull();
+        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toBeTruthy();
+    });
+
+    it('resumes the original account\'s result when it comes back', () => {
+        queueDailyRun();
+        setActivePlayerOwnerId('reddit:someone-else');
+        setActivePlayerOwnerId(OWNER);
+
+        expect(getDueDailyChallengeVerifications()).toMatchObject([
+            { challengeId: 'daily-gp-2031-05-01', ownerPlayerId: OWNER },
+        ]);
+    });
+
+    it('queues each account\'s run for the same race side by side', () => {
+        queueDailyRun('daily-gp-2031-05-01', 30);
+        setActivePlayerOwnerId('reddit:someone-else');
+        queueDailyRun('daily-gp-2031-05-01', 45);
+
+        expect(getDueDailyChallengeVerifications()).toMatchObject([{ bestTime: 45 }]);
+        setActivePlayerOwnerId(OWNER);
+        expect(getDueDailyChallengeVerifications()).toMatchObject([{ bestTime: 30 }]);
+    });
+
+    it('never submits a result queued before any account was known', () => {
+        clearActivePlayerOwnerId();
+        queueDailyRun();
+
+        setActivePlayerOwnerId(OWNER);
+
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+    });
+
+    it('claims this session\'s ownerless results for the account the server names', () => {
+        clearActivePlayerOwnerId();
+        queueDailyRun();
+        setActivePlayerOwnerId(OWNER);
+
+        const { claimed, orphaned } = claimVerificationEntriesForOwner(OWNER);
+
+        expect(claimed).toMatchObject([{ bucket: 'daily', entryId: 'daily-gp-2031-05-01' }]);
+        expect(orphaned).toEqual([]);
+        expect(getDueDailyChallengeVerifications()).toMatchObject([{ ownerPlayerId: OWNER }]);
+    });
+
+    it('drops an ownerless result left by an earlier session', () => {
+        clearActivePlayerOwnerId();
+        queueDailyRun();
+        const queueState = readStoredQueue();
+        queueState.daily['daily-gp-2031-05-01'].sessionId = 'session-from-a-previous-load';
+        globalThis.window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queueState));
+        setActivePlayerOwnerId(OWNER);
+
+        const { claimed, orphaned } = claimVerificationEntriesForOwner(OWNER);
+
+        expect(claimed).toEqual([]);
+        expect(orphaned).toMatchObject([{ bucket: 'daily', entryId: 'daily-gp-2031-05-01' }]);
+        expect(readStoredQueue().daily['daily-gp-2031-05-01']).toBeUndefined();
     });
 
     it('classifies transient submission failures as retryable', () => {

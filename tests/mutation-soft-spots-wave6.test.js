@@ -24,6 +24,10 @@ import {
     resetVerificationQueueForTests,
 } from '../game/scoreboard/verification-queue.js';
 import {
+    clearActivePlayerOwnerId,
+    setActivePlayerOwnerId,
+} from '../game/player/active-owner.js';
+import {
     PB_GHOST_MAX_ENCODED_BYTES,
     PB_GHOST_SAMPLE_INTERVAL_MS,
     PB_GHOST_SCHEMA_VERSION,
@@ -68,6 +72,7 @@ describe('mutation soft spots wave 6', () => {
     afterEach(() => {
         vi.restoreAllMocks();
         vi.useRealTimers();
+        clearActivePlayerOwnerId();
         delete globalThis.window;
     });
 
@@ -188,6 +193,11 @@ describe('mutation soft spots wave 6', () => {
         beforeEach(() => {
             installLocalStorage();
             resetVerificationQueueForTests();
+            setActivePlayerOwnerId('reddit:racer');
+        });
+
+        afterEach(() => {
+            clearActivePlayerOwnerId();
         });
 
         it('derives legacy expiry from challengeDate when challengeId does not match the anchored pattern', () => {

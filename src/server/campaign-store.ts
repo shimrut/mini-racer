@@ -21,12 +21,15 @@ import {
     readSnapshot,
     writeEntry,
 } from './competition-leaderboard.js';
+import { campaignProgressKey } from './campaign-progress-key.js';
 import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
 import { verifyGuestPlayerToken } from './player-token.js';
 import {
     competitionSubmissionLockKey,
+    isMismatchedSubmissionOwner,
     submitCompetitionRun,
+    SUBMISSION_IDENTITY_CHANGED_RESULT,
     SUBMISSION_LOCK_TTL_MS,
 } from './competition-submit.js';
 import { getPlayerTrackPbRecord } from './pb-ghost-store.js';
@@ -77,9 +80,7 @@ function playerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
 }
 
-function progressKey(playerId: string): string {
-    return `campaign:${CAMPAIGN_ID}:progress:${playerField(playerId)}`;
-}
+const progressKey = campaignProgressKey;
 
 function progressLockKey(playerId: string): string {
     return `campaign:${CAMPAIGN_ID}:progress-lock:${playerField(playerId)}`;
@@ -206,6 +207,11 @@ export function parseCampaignProgress(raw: string | null | undefined): CampaignP
 
 async function readProgress(playerId: string): Promise<CampaignProgress> {
     return parseCampaignProgress(await redis.get(progressKey(playerId)));
+}
+
+/** Campaign progress left under a promoted guest means its migration never finished, so that guest is still needed. */
+export async function hasStoredCampaignProgress(playerId: string): Promise<boolean> {
+    return Boolean(await redis.get(progressKey(playerId)));
 }
 
 class CampaignProgressBusyError extends Error {}
@@ -632,6 +638,7 @@ export async function submitServerCampaignRun({
     redditUsername,
     guestToken,
     requestRateLimitIdentity,
+    submissionOwnerId,
 }: {
     raceId?: unknown;
     trackKey?: unknown;
@@ -640,6 +647,7 @@ export async function submitServerCampaignRun({
     redditUsername?: unknown;
     guestToken?: unknown;
     requestRateLimitIdentity?: unknown;
+    submissionOwnerId?: unknown;
 } = {}) {
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     if (!identity.canonicalPlayerId) {
@@ -647,6 +655,10 @@ export async function submitServerCampaignRun({
             status: 401,
             body: { accepted: false, error: 'Player identity is required to submit Campaign results.' },
         };
+    }
+    // Checked before the stage lock, so a result queued under another account is never mistaken for a locked stage.
+    if (isMismatchedSubmissionOwner(identity.canonicalPlayerId, submissionOwnerId)) {
+        return SUBMISSION_IDENTITY_CHANGED_RESULT;
     }
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { accepted: false, error: 'Campaign race not found.' } };

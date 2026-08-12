@@ -924,6 +924,7 @@ export async function submitDailyChallengeBestTime({
     bestTime,
     replay,
     checkpointTimesSec = null,
+    submissionOwnerId = null,
 } = {}) {
     const config = API_ROUTES;
     if (!config || typeof fetch !== 'function') return null;
@@ -951,6 +952,8 @@ export async function submitDailyChallengeBestTime({
     return postDailyJson(config.dailySubmitUrl, {
         playerId: getOrCreatePlayerId('daily challenge'),
         guestToken: getGuestPlayerToken(),
+        // The account this run was raced under. The server rejects the submission if it no longer matches.
+        submissionOwnerId,
         challengeId,
         trackKey,
         leaderboardIdentity: getLeaderboardIdentityPreference(),

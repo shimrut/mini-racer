@@ -1,5 +1,8 @@
 import { getPlayerProgressState } from '../storage.js';
 import { queuePlayerPreferencesSave } from './preferences.js';
+import { getActivePlayerOwnerId } from './active-owner.js';
+import { claimVerificationEntriesForOwner } from '../scoreboard/verification-queue.js';
+import { rollbackLocalBestForFailedVerificationEntry } from '../scoreboard/engine-methods.js';
 
 const PROFILE_RECOVERY_DELAYS_MS = [5_000, 30_000, 120_000];
 
@@ -23,6 +26,7 @@ export const playerProfileEngineMethods = {
             : null;
         this.applyCarUnlockSnapshot?.(carUnlocks, { authoritative });
         if (authoritative) {
+            this.claimQueuedResultsForOwner();
             if (playerPreferences) {
                 await this.applyPersistedPlayerPreferences(playerPreferences);
             } else {
@@ -33,6 +37,22 @@ export const playerProfileEngineMethods = {
             hasAnyData: this.hasAnyData,
             isReturningPlayer: this.isReturningPlayer,
         };
+    },
+
+    /**
+     * Results raced before the account was known belong to whoever this session's bootstrap names —
+     * the signed-in account cannot change without a reload. Anything queued by an earlier session has
+     * no owner this one can vouch for, so it is dropped along with the local best it provisionally set.
+     */
+    claimQueuedResultsForOwner() {
+        const { orphaned } = claimVerificationEntriesForOwner(getActivePlayerOwnerId());
+        for (const { bucket, entry } of orphaned) {
+            if (bucket !== 'daily' || !entry) continue;
+            rollbackLocalBestForFailedVerificationEntry(this, entry);
+            this.dailyChallengeUi?.refreshDailyChallengeVerificationState?.(entry.challengeId);
+        }
+        if (orphaned.length) this.refreshCampaignVerificationOverlay?.();
+        return orphaned;
     },
 
     /** Fallback state is temporary by definition, so the real profile is chased until it answers. */

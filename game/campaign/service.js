@@ -199,11 +199,12 @@ export async function getCampaignSnapshot(raceId, { limit = 50, offset = 0 } = {
     return requestJson(url.toString());
 }
 
-export async function submitCampaignRun({ raceId, trackKey, replay }) {
+export async function submitCampaignRun({ raceId, trackKey, replay, submissionOwnerId = null }) {
     return requestJson(API_ROUTES.campaignSubmitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(playerIdentityBody({ raceId, trackKey, replay })),
+        // submissionOwnerId names the account this run was raced under; the server refuses it if that changed.
+        body: JSON.stringify(playerIdentityBody({ raceId, trackKey, replay, submissionOwnerId })),
     });
 }
 
