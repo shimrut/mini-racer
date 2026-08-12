@@ -377,10 +377,22 @@ export class LobbyUi {
             document.querySelector?.('.lobby-header'),
             '[data-lobby-action]',
             { requireLaidOut: false },
-        ).filter((button) => (
-            this.mode !== 'challenge' || button.id !== 'lobby-mode-standings-btn'
-        ));
+        ).filter((button) => this.isHeaderActionVisible(button));
         return [...paneActions, ...headerActions];
+    }
+
+    isHeaderActionVisible(button) {
+        if (button?.id === 'lobby-mode-standings-btn' && this.mode === 'challenge') {
+            return false;
+        }
+        if (
+            button?.classList?.contains?.('lobby-mode-switch__btn')
+            && this.mode !== 'daily'
+            && this.mode !== 'campaign'
+        ) {
+            return false;
+        }
+        return true;
     }
 
     getSelectedAction(buttons = this.getVisibleActions()) {
@@ -392,10 +404,11 @@ export class LobbyUi {
         return preferredIndex >= 0 ? buttons[preferredIndex] : null;
     }
 
-    isToolbarAction(button) {
+    isHeaderChromeAction(button) {
         return Boolean(
             button?.classList?.contains?.('lobby-mode-toolbar__action')
-            || button?.classList?.contains?.('lobby-header-action'),
+            || button?.classList?.contains?.('lobby-header-action')
+            || button?.classList?.contains?.('lobby-mode-switch__btn')
         );
     }
 
@@ -446,9 +459,11 @@ export class LobbyUi {
         }
         const buttons = this.getVisibleActions();
         const direction = getMenuNavDirection(event.key);
+        const chromeHasCue = this._menuKeyboardState.keyboardNavActive
+            && this.isHeaderChromeAction(this.getSelectedAction(buttons));
         if (
             (direction === 'left' || direction === 'right')
-            && !this.isToolbarAction(this.getSelectedAction(buttons))
+            && !chromeHasCue
             && this.handleCarouselKeydown(event)
         ) {
             return;

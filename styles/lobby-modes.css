@@ -205,6 +205,10 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before {
     color: var(--text-dim);
 }
 
+.lobby-mode-switch__btn.is-menu-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
 body[data-lobby-mode="challenge"] .lobby-mode-label,
 body[data-lobby-mode="daily"] .lobby-mode-label,
 body[data-lobby-mode="campaign"] .lobby-mode-label {

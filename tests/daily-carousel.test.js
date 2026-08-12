@@ -873,6 +873,14 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
                 classes: ['main-menu__item', 'main-menu__item--primary'],
                 rect: { left: 20, top: 400, width: 360, height: 64 },
             }),
+            makeAction('lobby-switch-daily-btn', {
+                classes: ['lobby-mode-switch__btn'],
+                rect: { left: 16, top: 64, width: 104, height: 32 },
+            }),
+            makeAction('lobby-switch-campaign-btn', {
+                classes: ['lobby-mode-switch__btn'],
+                rect: { left: 120, top: 64, width: 104, height: 32 },
+            }),
             makeAction('lobby-mode-standings-btn', {
                 classes: ['lobby-mode-toolbar__action', 'lobby-header-action'],
                 rect: { left: 260, top: 8, width: 44, height: 44 },
@@ -900,11 +908,11 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
         }
     }
 
-    it('moves from Start Race up into the top-right toolbar, then across those icons', () => {
+    it('moves from Start Race up into the mode switch, then across to the top-right icons', () => {
         const onCarouselNavigate = vi.fn(() => true);
         const lobby = new LobbyUi({ onCarouselNavigate });
-        const [start, standings, garage, settings] = dailyActions();
-        const actions = [start, standings, garage, settings];
+        const [start, daily, campaign, standings, garage, settings] = dailyActions();
+        const actions = [start, daily, campaign, standings, garage, settings];
         lobby.mode = 'daily';
         attachOverlay(lobby);
         lobby.getVisibleActions = () => actions;
@@ -913,13 +921,20 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
             lobby.resetKeyboardNav();
 
             lobby.handleKeydown(keyEvent('ArrowUp'));
-            expect(standings.classList.contains('is-menu-selected')).toBe(true);
+            expect(daily.classList.contains('is-menu-selected')).toBe(true);
             expect(start.classList.contains('is-menu-selected')).toBe(false);
             expect(onCarouselNavigate).not.toHaveBeenCalled();
 
             lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(campaign.classList.contains('is-menu-selected')).toBe(true);
+            expect(onCarouselNavigate).not.toHaveBeenCalled();
+
+            lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(standings.classList.contains('is-menu-selected')).toBe(true);
+            expect(onCarouselNavigate).not.toHaveBeenCalled();
+
+            lobby.handleKeydown(keyEvent('ArrowRight'));
             expect(garage.classList.contains('is-menu-selected')).toBe(true);
-            expect(standings.classList.contains('is-menu-selected')).toBe(false);
             expect(onCarouselNavigate).not.toHaveBeenCalled();
 
             lobby.handleKeydown(keyEvent('ArrowRight'));
@@ -938,6 +953,23 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
 
         withDocument(actions, () => {
             lobby.resetKeyboardNav();
+            lobby.handleKeydown(keyEvent('ArrowLeft'));
+            expect(onCarouselNavigate).toHaveBeenCalledWith('daily', 'left');
+            expect(actions[0].classList.contains('is-menu-selected')).toBe(false);
+        });
+    });
+
+    it('keeps left/right on the track picker until a header control is cued', () => {
+        const onCarouselNavigate = vi.fn(() => true);
+        const lobby = new LobbyUi({ onCarouselNavigate });
+        const actions = dailyActions().slice(1);
+        lobby.mode = 'daily';
+        attachOverlay(lobby);
+        lobby.getVisibleActions = () => actions;
+
+        withDocument(actions, () => {
+            lobby.resetKeyboardNav();
+            expect(lobby._menuKeyboardState.keyboardNavActive).toBe(false);
             lobby.handleKeydown(keyEvent('ArrowLeft'));
             expect(onCarouselNavigate).toHaveBeenCalledWith('daily', 'left');
             expect(actions[0].classList.contains('is-menu-selected')).toBe(false);
@@ -991,6 +1023,46 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
         };
         try {
             expect(lobby.getVisibleActions()).toEqual([daily]);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('omits the mode switch outside Daily and Campaign', () => {
+        const start = {
+            id: 'challenge-accept-btn',
+            disabled: false,
+            hidden: false,
+        };
+        const dailySwitch = {
+            id: 'lobby-switch-daily-btn',
+            disabled: false,
+            hidden: false,
+            classList: { contains: (name) => name === 'lobby-mode-switch__btn' },
+        };
+        const standings = {
+            id: 'lobby-mode-standings-btn',
+            disabled: false,
+            hidden: false,
+            classList: { contains: () => false },
+        };
+        const garage = {
+            id: 'lobby-mode-garage-btn',
+            disabled: false,
+            hidden: false,
+            classList: { contains: () => false },
+        };
+        const pane = { querySelectorAll: () => [start] };
+        const header = { querySelectorAll: () => [dailySwitch, standings, garage] };
+        const lobby = new LobbyUi();
+        lobby.mode = 'challenge';
+        Object.defineProperty(lobby, 'activePane', { get: () => pane });
+        const originalDocument = global.document;
+        global.document = {
+            querySelector: (selector) => (selector === '.lobby-header' ? header : null),
+        };
+        try {
+            expect(lobby.getVisibleActions()).toEqual([start, garage]);
         } finally {
             global.document = originalDocument;
         }

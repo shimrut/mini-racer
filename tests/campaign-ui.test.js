@@ -1291,10 +1291,21 @@ describe('Campaign lobby and shared modal adapters', () => {
             /<button id="lobby-mode-garage-btn"[\s\S]*?<\/button>/,
         )?.[0];
         expect(garageMarkup).toContain('viewBox="0 0 576 512"');
+        const switchDailyMarkup = html.match(
+            /<button id="lobby-switch-daily-btn"[\s\S]*?<\/button>/,
+        )?.[0];
+        const switchCampaignMarkup = html.match(
+            /<button id="lobby-switch-campaign-btn"[\s\S]*?<\/button>/,
+        )?.[0];
+        expect(switchDailyMarkup).toContain('data-lobby-action');
+        expect(switchCampaignMarkup).toContain('data-lobby-action');
 
         expect(css).toContain('.lobby-mode-action');
         expect(css).toMatch(
             /\.lobby-mode-action\s*\{[^}]*width:\s*max-content;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-switch__btn\.is-menu-selected\s*\{[^}]*box-shadow:/s,
         );
         expect(css).not.toContain('.lobby-utility-row');
         expect(css).not.toContain('lobby-mode-action::after');
