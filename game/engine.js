@@ -476,19 +476,19 @@ export class RealTimeRacer {
       getRedditUsername: () => this.redditUsername,
       previewShare: (payload) => {
         if (payload?.kind === "head-to-head") {
-          return this.previewHeadToHead(payload);
+          return this.invokeModeMethod("challenge", "previewHeadToHead", payload);
         }
         if (payload?.kind === "challenge-brag") {
-          return this.previewHeadToHeadBrag(payload);
+          return this.invokeModeMethod("challenge", "previewHeadToHeadBrag", payload);
         }
         return previewDailyChallengeShare(payload);
       },
       confirmShare: (shareToken, request) => {
         if (request?.kind === "head-to-head") {
-          return this.confirmHeadToHead(shareToken, request);
+          return this.invokeModeMethod("challenge", "confirmHeadToHead", shareToken, request);
         }
         if (request?.kind === "challenge-brag") {
-          return this.confirmHeadToHeadBrag(shareToken);
+          return this.invokeModeMethod("challenge", "confirmHeadToHeadBrag", shareToken);
         }
         return confirmDailyChallengeShare(shareToken);
       },

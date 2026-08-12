@@ -119,8 +119,9 @@ flowchart LR
 - `game/race/ui-modal-shell.js` owns the shared result-confirmation UI used by both the finish screen and daily standings. `game/daily-challenge/service.js` sends preview and confirm requests; the browser never composes the public comment itself.
 - A Daily finish labels its action **Share** and opens a small chooser for
   **Comment Time** or **Issue Challenge**. Commenting keeps the existing
-  signed-in Reddit score-thread flow; issuing a challenge sends the exact
-  verified finish replay through the challenge preview/create contract.
+  signed-in Reddit score-thread flow; issuing a challenge loads the Head to Head
+  runtime first, then sends the exact verified finish replay through the
+  challenge preview/create contract. Campaign **Brag** uses the same load-then-call path.
 - Daily GP track selection walks the explicit `TRACK_SCHEDULE_KEYS` order from `game/track/catalog.js`, one track per day, using the most-recent published day as the playhead; `src/server/daily-gp-store.ts` persists each new day to the `dailygp:challenges` Redis ledger (first-writer-wins) so past days never change.
 - New Daily publication currently selects only one or two laps for scheduled tracks; the shared three-lap contract remains for historical Daily records and Campaign stages.
 - Published Daily GP playlist rows come from server-side challenge history, not from recalculating old dates against the current track file.
