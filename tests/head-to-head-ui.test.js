@@ -763,6 +763,46 @@ describe('Head to Head lobby and finish', () => {
         }));
     });
 
+    it('turns failed challenge track preparation into a retryable lobby state', async () => {
+        const showChallenge = vi.fn();
+        const context = {
+            status: 'ready',
+            currentChallengeRun: null,
+            activeHeadToHead: null,
+            hasAnyData: false,
+            isReturningPlayer: false,
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: { showChallenge },
+            loadTrack: vi.fn().mockRejectedValue(new Error('track chunk failed')),
+        };
+        headToHeadServiceMocks.getHeadToHead.mockResolvedValue({
+            ok: true,
+            status: 200,
+            body: {
+                status: 'ready',
+                viewerType: 'guest',
+                challenge: {
+                    challengeId: 'challenge-1',
+                    raceId: 'numbered-v1-00',
+                    trackKey: 'numberZero',
+                    lapCount: 1,
+                    rulesRevision: 1,
+                    targetTimeMs: 8_000,
+                },
+            },
+        });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await headToHeadEngineMethods.loadChallengeLobby.call(context, 'challenge-1');
+
+        expect(context.activeHeadToHead).toBeNull();
+        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
+            canRace: false,
+            canRetry: true,
+            statusMessage: 'Could not prepare this track. Try again.',
+        }));
+    });
+
     it('initializes the challenge track even when it matches the default key', async () => {
         const loadTrack = vi.fn().mockResolvedValue(undefined);
         const context = {
@@ -794,6 +834,48 @@ describe('Head to Head lobby and finish', () => {
             showStartOverlayOnReset: false,
         });
         expect(context.startSequence).toHaveBeenCalledTimes(1);
+    });
+
+    it('restores Head to Head with Retry Start when race track loading fails', async () => {
+        const showChallenge = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                lapCount: 2,
+                rulesRevision: 1,
+                targetTimeMs: 8_000,
+            },
+            hasAnyData: false,
+            isReturningPlayer: false,
+            startButtonPending: false,
+            currentTrackKey: 'circuit',
+            trackCanvas: {},
+            trackPersonalBestByTrackKey: {},
+            pbGhost: { clearTrack: vi.fn() },
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: {
+                challengeState: { canRace: true, trackName: 'Number Zero' },
+                showChallenge,
+            },
+            loadTrack: vi.fn().mockRejectedValue(new Error('track chunk failed')),
+            applyDailyChallenge: vi.fn(),
+            startSequence: vi.fn(),
+            journeys: { startAttempt: vi.fn() },
+        };
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await headToHeadEngineMethods.startHeadToHead.call(context);
+
+        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
+            canRace: true,
+            startError: true,
+            statusMessage: 'Could not prepare this track. Tap Retry Start.',
+        }));
+        expect(context.applyDailyChallenge).not.toHaveBeenCalled();
+        expect(context.startSequence).not.toHaveBeenCalled();
+        expect(context.startButtonPending).toBe(false);
     });
 
     it('keeps a permanent challenge error unavailable instead of offering Retry', async () => {

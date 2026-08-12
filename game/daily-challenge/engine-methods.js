@@ -845,6 +845,7 @@ export const dailyChallengeEngineMethods = {
   },
 
   async handleStartDailyChallenge(challengeOverride = null, options = {}) {
+    this.lobbyUi?.clearRaceStartError?.("daily");
     if (!options.preserveRaceComparisonTarget) {
       this.clearRaceComparisonTarget?.();
     }
@@ -936,6 +937,14 @@ export const dailyChallengeEngineMethods = {
       });
       await raceStartTransition;
       this.startSequence();
+    } catch (error) {
+      console.error("Could not start Daily race:", error);
+      this.activeDailyChallenge = null;
+      this.showDailyLobby?.({ selectChallengeId: challenge.id });
+      this.lobbyUi?.setRaceStartError?.(
+        "daily",
+        "Track failed to load. Tap Retry Start.",
+      );
     } finally {
       this.startButtonPending = false;
     }

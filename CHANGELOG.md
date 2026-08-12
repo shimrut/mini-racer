@@ -1,5 +1,16 @@
 # Changelog
 
+- Fixed track-load failures that could leave the loading screen or race-start
+  transition stranded. The racer now constructs before the default track
+  chunk resolves, track imports time out after 20 seconds, and Daily,
+  Campaign, and Head to Head return to their lobby with a retry action when a
+  selected track cannot be prepared.
+
+- Hardened guest Campaign promotion for slow and concurrent sign-ins. All
+  stage/progress locks renew for the full merge, ownership is checked before
+  writes and cleanup, and car-unlock events that arrive during promotion are
+  redirected to the Reddit account instead of being lost.
+
 - Fixed the initial Home and Campaign lobby background so startup now builds
   and renders the default track before the loading gate clears, instead of
   showing a floating car over a blank canvas. Daily and Campaign starts also

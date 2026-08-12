@@ -2487,6 +2487,36 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.startSequence).toHaveBeenCalledTimes(1);
     });
 
+    it('restores Campaign with Retry Start when the selected track cannot load', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: {} });
+        const loadCampaignLobby = vi.fn().mockResolvedValue({});
+        const setRaceStartError = vi.fn();
+        const context = createStartContext({
+            currentTrackKey: 'circuit',
+            startOverlay: { beginRaceStartTransition: vi.fn(() => Promise.resolve()) },
+            lobbyUi: {
+                setCampaignPrimaryLoading: vi.fn(),
+                clearRaceStartError: vi.fn(),
+                setRaceStartError,
+            },
+            loadTrack: vi.fn().mockRejectedValue(new Error('track chunk failed')),
+            loadCampaignLobby,
+        });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await context.startCampaignStage();
+
+        expect(loadCampaignLobby).toHaveBeenCalledWith({ show: true });
+        expect(setRaceStartError).toHaveBeenCalledWith(
+            'campaign',
+            'Track failed to load. Tap Retry Start.',
+        );
+        expect(context.applyDailyChallenge).not.toHaveBeenCalled();
+        expect(context.startSequence).not.toHaveBeenCalled();
+        expect(context.startButtonPending).toBe(false);
+    });
+
     it('starts the lights without waiting on the start stamp or the PB ghost', async () => {
         let resolveStart;
         let resolveGhost;

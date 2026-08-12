@@ -6,6 +6,23 @@ import { TRACK_CATALOG, getTrackName } from './catalog.js';
 const DEFINITION_MODULES = import.meta.glob('./definitions/*.js');
 const loadedTracks = new Map();
 const pendingLoads = new Map();
+export const CLIENT_TRACK_LOAD_TIMEOUT_MS = 20_000;
+
+export function waitForClientTrackDefinition(
+    loadPromise,
+    trackKey,
+    timeoutMs = CLIENT_TRACK_LOAD_TIMEOUT_MS,
+) {
+    let timeoutId = null;
+    const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            reject(new Error(`Timed out loading the ${trackKey} track.`));
+        }, timeoutMs);
+    });
+    return Promise.race([loadPromise, timeout]).finally(() => {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+    });
+}
 
 function toDefinitionFilename(trackKey) {
     const kebabKey = String(trackKey)
@@ -47,7 +64,7 @@ export async function loadClientTrack(trackKey) {
         throw new Error(`No client track definition was generated for ${trackKey}.`);
     }
 
-    const promise = importer()
+    const promise = waitForClientTrackDefinition(importer(), trackKey)
         .then((module) => {
             const track = normalizeTrack(trackKey, module?.default);
             if (!track) throw new Error(`Track definition ${trackKey} was empty.`);

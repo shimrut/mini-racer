@@ -272,11 +272,16 @@ flowchart LR
   progress, bests, and PB ghosts use a rolling 90-day inactivity window, while
   shared stage leaderboards remain permanent. Signing in merges verified guest
   results into the Reddit account and keeps the faster result per stage. The
-  merge inventories every Campaign stage under the existing submission and
-  progress locks, repairs a missing progress row from a strict-replay leaderboard
-  entry, copies a better PB, and only then removes guest records. If any Campaign
+  merge inventories every Campaign stage under renewable submission and
+  progress leases, confirms ownership before each stage and before cleanup,
+  repairs a missing progress row from a strict-replay leaderboard entry,
+  copies a better PB, and only then removes guest records. If any Campaign
   or car-unlock promotion step fails, player bootstrap returns the still-verified
   guest token so the next bootstrap can retry instead of stranding that source.
+  Car-unlock promotion atomically merges the guest hash and records a small
+  guest-to-Reddit pointer; late guest achievement writes follow that pointer,
+  so an event arriving during sign-in is not deleted or recreated under the
+  guest identity.
   A direct Campaign launch keeps its first Campaign request parallel with player
   bootstrap, but an unranked or promotion-pending response is non-authoritative
   and receives one retry after identity repair; it cannot become cached empty
@@ -613,6 +618,11 @@ gate clears. Home therefore has a complete background immediately, and a
 Campaign selection made from Home cannot inherit an unbuilt blank canvas.
 Daily and Campaign start paths use the same canvas-presence safeguard as Head
 to Head: a matching track key does not skip loading when `trackCanvas` is absent.
+Client definition chunks are bounded to 20 seconds. A failed or timed-out
+selected track never enters the countdown: Daily, Campaign, and Head to Head
+restore their lobby, clear the pending start state, and expose an in-place
+retry action. A failed initial track is contained by the startup gate instead
+of blocking racer construction indefinitely.
 
 Client track definitions are loaded through `game/track/client-registry.js` and
 Vite's per-definition chunks. The compatibility `game/track/tracks.js` registry

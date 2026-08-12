@@ -5,6 +5,7 @@ import {
     clearClientTrackRegistryForTests,
     getLoadedClientTrack,
     loadClientTrack,
+    waitForClientTrackDefinition,
 } from '../game/track/client-registry.js';
 import { loadModeRuntime, clearModeRuntimeCacheForTests } from '../game/modes/runtime-loader.js';
 import {
@@ -60,6 +61,25 @@ describe('mode-priority startup', () => {
         expect(getLoadedClientTrack('numberZero')).toBe(first);
         expect(getLoadedClientTrack('numberOne')).toBe(null);
         expect(await loadClientTrack('missingTrack')).toBe(null);
+    });
+
+    it('bounds a stalled client track definition load', async () => {
+        vi.useFakeTimers();
+        try {
+            const stalled = waitForClientTrackDefinition(
+                new Promise(() => {}),
+                'numberZero',
+                25,
+            );
+            const rejection = expect(stalled).rejects.toThrow(
+                'Timed out loading the numberZero track.',
+            );
+
+            await vi.advanceTimersByTimeAsync(25);
+            await rejection;
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('keeps each mode gate focused on its race-ready dependencies', () => {

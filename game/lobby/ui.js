@@ -109,6 +109,8 @@ export class LobbyUi {
         this._dailySelectedLaps = null;
         this._dailySelectedBillingLabel = null;
         this._campaignSelectedBillingLabel = null;
+        this._dailyStartError = null;
+        this._campaignStartError = null;
         this._menuKeyboardState = createMenuKeyboardState();
         this._paneTransitionGeneration = 0;
         this._bound = false;
@@ -145,8 +147,12 @@ export class LobbyUi {
         document.getElementById('lobby-back-btn')
             ?.addEventListener('click', () => this.onBack?.(this.mode));
         document.getElementById('daily-challenge-start-btn')
-            ?.addEventListener('click', () => this.onStartDaily?.());
+            ?.addEventListener('click', () => {
+                this.clearRaceStartError('daily');
+                this.onStartDaily?.();
+            });
         this.campaignPrimaryBtn?.addEventListener('click', () => {
+            this.clearRaceStartError('campaign');
             this.onStartCampaign?.();
         });
         this.challengeAcceptBtn?.addEventListener('click', () => {
@@ -462,6 +468,10 @@ export class LobbyUi {
     }
 
     renderDaily() {
+        setSwappingText(
+            this.dailyPrimaryBtn?.querySelector('.main-menu__label'),
+            this._dailyStartError ? 'Retry Start' : 'Start Race',
+        );
         setRaceBriefText(
             this.dailyPrimaryBtn?.querySelector('.main-menu__race-brief'),
             this._dailySelectedTrackName,
@@ -478,6 +488,7 @@ export class LobbyUi {
     }
 
     getCampaignPrimaryLabel() {
+        if (this._campaignStartError) return 'Retry Start';
         const stage = this._campaignSelectedStage;
         if (stage) return stage.unlocked ? 'Start Race' : 'Locked';
         return this.campaignState.primaryLabel
@@ -534,6 +545,32 @@ export class LobbyUi {
             }
         } else {
             spinner?.remove();
+            this.renderCampaign();
+        }
+    }
+
+    setRaceStartError(mode, message = 'Track failed to load. Try again.') {
+        const error = typeof message === 'string' && message.trim()
+            ? message.trim()
+            : 'Track failed to load. Try again.';
+        if (mode === 'daily') {
+            this._dailyStartError = error;
+            this.renderDaily();
+            return;
+        }
+        if (mode === 'campaign') {
+            this._campaignStartError = error;
+            this.renderCampaign();
+        }
+    }
+
+    clearRaceStartError(mode) {
+        if (mode === 'daily' && this._dailyStartError) {
+            this._dailyStartError = null;
+            this.renderDaily();
+        }
+        if (mode === 'campaign' && this._campaignStartError) {
+            this._campaignStartError = null;
             this.renderCampaign();
         }
     }
@@ -612,6 +649,8 @@ export class LobbyUi {
                 this.challengeAcceptBtn.querySelector('.main-menu__label'),
                 this.challengeState.challengeLoading
                     ? 'Loading…'
+                    : this.challengeState.startError
+                        ? 'Retry Start'
                     : this.challengeState.canRetry
                         ? 'Retry'
                         : this.challengeState.canRace

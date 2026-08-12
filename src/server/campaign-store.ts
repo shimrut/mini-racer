@@ -39,7 +39,9 @@ import {
     acquireRedisLock,
     beginOwnedRedisLockTransaction,
     releaseRedisLock,
+    startRedisLockLeaseRenewal,
     type RedisLock,
+    type RedisLockLease,
 } from './redis-lock.js';
 
 type CampaignMedal = 'bronze' | 'silver' | 'gold' | 'author';
@@ -718,11 +720,19 @@ export async function mergeGuestCampaignProgress({
     }
 
     const locks: RedisLock[] = [];
+    const leases: RedisLockLease[] = [];
     const acquireAll = async (keys: string[], ttlMs: number) => {
         for (const key of [...new Set(keys)].sort()) {
             const lock = await acquireRedisLock(key, ttlMs, redis);
             if (!lock) throw new CampaignProgressBusyError('Campaign merge is already in progress.');
             locks.push(lock);
+            leases.push(startRedisLockLeaseRenewal(lock, Math.max(1, Math.floor(ttlMs / 3)), redis));
+        }
+    };
+    const confirmMergeOwnership = async () => {
+        const ownership = await Promise.all(leases.map((lease) => lease.confirmOwnership()));
+        if (ownership.some((owned) => !owned)) {
+            throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
         }
     };
     try {
@@ -738,6 +748,7 @@ export async function mergeGuestCampaignProgress({
             progressLockKey(guestPlayerId),
             progressLockKey(redditPlayerId),
         ], CAMPAIGN_PROGRESS_LOCK_TTL_MS);
+        await confirmMergeOwnership();
 
         const guestProgressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId))!;
         const redditProgressLock = locks.find((lock) => lock.key === progressLockKey(redditPlayerId))!;
@@ -752,6 +763,7 @@ export async function mergeGuestCampaignProgress({
             || Object.keys(guestProgress.resultsByRaceId).length > 0
         );
         for (const stage of CAMPAIGN_STAGES) {
+            await confirmMergeOwnership();
             const guestCompetition = competitionFor(stage, guestPlayerId);
             const redditCompetition = competitionFor(stage, redditPlayerId);
             const [guestEntry, redditEntry, guestPb, redditPb] = await Promise.all([
@@ -831,6 +843,7 @@ export async function mergeGuestCampaignProgress({
 
         if (!hasGuestEvidence) return { merged: false, mergedRaceIds: [] };
 
+        await confirmMergeOwnership();
         const nowIso = new Date().toISOString();
         await writeProgressWithOwnedLock(redditPlayerId, {
             campaignId: CAMPAIGN_ID,
@@ -840,6 +853,7 @@ export async function mergeGuestCampaignProgress({
         }, redditProgressLock);
 
         // Delete the guest only after every copy succeeded, so an earlier failure leaves a complete retry source.
+        await confirmMergeOwnership();
         const cleanup = await beginOwnedRedisLockTransaction(guestProgressLock, redis);
         if (!cleanup) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
         for (const stage of CAMPAIGN_STAGES) {
@@ -857,6 +871,11 @@ export async function mergeGuestCampaignProgress({
         }
         return { merged: mergedRaceIds.length > 0, mergedRaceIds };
     } finally {
+        for (const lease of leases) {
+            await lease.stop().catch((error) => {
+                console.error('Campaign merge lease cleanup failed:', error);
+            });
+        }
         for (const lock of [...locks].reverse()) {
             await releaseRedisLock(lock, redis).catch((error) => {
                 console.error('Campaign merge lock cleanup failed:', error);

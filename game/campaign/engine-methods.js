@@ -524,6 +524,7 @@ export const campaignEngineMethods = {
         confirmUnlockFor = null,
     } = {}) {
         if (this.startButtonPending) return;
+        this.lobbyUi?.clearRaceStartError?.('campaign');
         if (!preserveRaceComparisonTarget) this.clearRaceComparisonTarget?.();
         this.startButtonPending = true;
         this.lobbyUi?.setCampaignPrimaryLoading?.(true);
@@ -604,6 +605,10 @@ export const campaignEngineMethods = {
         } catch (error) {
             console.error('Could not start Campaign race:', error);
             await this.loadCampaignLobby({ show: true });
+            this.lobbyUi?.setRaceStartError?.(
+                'campaign',
+                'Track failed to load. Tap Retry Start.',
+            );
         } finally {
             this.lobbyUi?.setCampaignPrimaryLoading?.(false);
             this.startButtonPending = false;

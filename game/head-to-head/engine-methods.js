@@ -70,7 +70,7 @@ export const headToHeadEngineMethods = {
             frozenGhost: response.body?.opponentGhost ?? null,
             viewerAvatarUrl: response.body?.viewerAvatarUrl ?? null,
         } : null;
-        const challengeReady = response.ok
+        let challengeReady = response.ok
             && response.body?.status === 'ready'
             && Boolean(challenge);
         if (challengeReady && typeof this.loadTrack === 'function') {
@@ -94,6 +94,16 @@ export const headToHeadEngineMethods = {
                 }
             } catch (error) {
                 console.error('Failed to prepare the Head to Head track:', error);
+                challengeReady = false;
+                this.activeHeadToHead = null;
+                response = {
+                    ok: false,
+                    status: 0,
+                    body: {
+                        ...response.body,
+                        error: 'Could not prepare this track. Try again.',
+                    },
+                };
             }
         }
         const retryable = !response.ok
@@ -181,6 +191,17 @@ export const headToHeadEngineMethods = {
             this.activeRaceMode = 'challenge';
             void this.journeys?.startAttempt?.({ reason: 'initial_start' });
             this.startSequence();
+        } catch (error) {
+            console.error('Could not start Head to Head race:', error);
+            this.startOverlay?.showStartOverlay?.(this.hasAnyData, this.isReturningPlayer);
+            this.lobbyUi?.showChallenge?.({
+                ...(this.lobbyUi?.challengeState || {}),
+                canRace: true,
+                canRetry: false,
+                challengeLoading: false,
+                startError: true,
+                statusMessage: 'Could not prepare this track. Tap Retry Start.',
+            });
         } finally {
             this.startButtonPending = false;
         }

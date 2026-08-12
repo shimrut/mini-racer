@@ -30,6 +30,10 @@ leaderboard, and retention rules.
   committed before its progress write failed. A verified guest token is retained
   until both Campaign and car-unlock promotion succeed, so failures remain
   retryable on the next bootstrap.
+- Campaign promotion renews every stage-submission and progress lease for the
+  full merge and stops before ownership-safe release. Car-unlock promotion
+  merges fields atomically and keeps a guest-to-Reddit pointer so a concurrent
+  guest achievement follows the claimed identity instead of being lost.
 - Campaign result posts freeze a verified result and ghost. Signed-in viewers
   may race that ghost even when the corresponding Campaign stage is locked;
   duel results never write Campaign progression, leaderboards, or PBs.

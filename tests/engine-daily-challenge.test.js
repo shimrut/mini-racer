@@ -890,6 +890,46 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.startSequence).toHaveBeenCalledTimes(1);
   });
 
+  it("restores Daily with Retry Start when the selected track cannot load", async () => {
+    const challenge = {
+      id: "daily-track-failed",
+      trackKey: "blueSector",
+      objectiveType: "single_lap_fastest",
+    };
+    const showDailyLobby = vi.fn();
+    const setRaceStartError = vi.fn();
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      currentDailyChallenge: challenge,
+      activeDailyChallenge: null,
+      currentTrackKey: "circuit",
+      trackCanvas: {},
+      startOverlay: { beginRaceStartTransition: vi.fn(() => Promise.resolve()) },
+      lobbyUi: {
+        clearRaceStartError: vi.fn(),
+        setRaceStartError,
+      },
+      loadTrack: vi.fn().mockRejectedValue(new Error("track chunk failed")),
+      showDailyLobby,
+      applyDailyChallenge: vi.fn(),
+      startSequence: vi.fn(),
+      journeys: { startAttempt: vi.fn() },
+    };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
+
+    expect(showDailyLobby).toHaveBeenCalledWith({ selectChallengeId: challenge.id });
+    expect(setRaceStartError).toHaveBeenCalledWith(
+      "daily",
+      "Track failed to load. Tap Retry Start.",
+    );
+    expect(engine.applyDailyChallenge).not.toHaveBeenCalled();
+    expect(engine.startSequence).not.toHaveBeenCalled();
+    expect(engine.startButtonPending).toBe(false);
+  });
+
   it("waits for the Daily lobby exit before starting the countdown", async () => {
     const challenge = {
       id: "daily-transition",

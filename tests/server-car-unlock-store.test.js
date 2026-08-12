@@ -10,12 +10,22 @@ import { EXTRA_CAR_ASSETS } from '../game/car/car-unlock-policy.js';
 
 function createRedisMock() {
     const hashes = new Map();
+    const strings = new Map();
     const getHash = (key) => {
         if (!hashes.has(key)) hashes.set(key, new Map());
         return hashes.get(key);
     };
-    return {
+    const client = {
         hashes,
+        strings,
+        async get(key) {
+            return strings.get(key) ?? null;
+        },
+        async set(key, value, options = {}) {
+            if (options.nx && strings.has(key)) return '';
+            strings.set(key, String(value));
+            return 'OK';
+        },
         async hGetAll(key) {
             return Object.fromEntries(getHash(key));
         },
@@ -30,9 +40,35 @@ function createRedisMock() {
             for (const [field, value] of Object.entries(fields)) hash.set(field, String(value));
         },
         async del(key) {
-            return hashes.delete(key) ? 1 : 0;
+            const removed = Number(hashes.delete(key)) + Number(strings.delete(key));
+            return removed > 0 ? 1 : 0;
+        },
+        async expire() {
+            return true;
+        },
+        async watch() {
+            const commands = [];
+            return {
+                async multi() {},
+                async unwatch() {},
+                async discard() {},
+                async hSet(...args) { commands.push(() => client.hSet(...args)); },
+                async set(...args) { commands.push(() => client.set(...args)); },
+                async del(...args) { commands.push(() => client.del(...args)); },
+                async expire(...args) { commands.push(() => client.expire(...args)); },
+                async exec() {
+                    if (client.abortNextExec) {
+                        client.abortNextExec = false;
+                        return [];
+                    }
+                    const results = [];
+                    for (const command of commands) results.push(await command());
+                    return results;
+                },
+            };
         },
     };
+    return client;
 }
 
 describe('server car unlock store', () => {
@@ -104,5 +140,62 @@ describe('server car unlock store', () => {
         expect(snapshot.unlockedAssets).toContain(EXTRA_CAR_ASSETS.lime);
         expect(await getCarUnlockSnapshot('guest:driver', {}, client))
             .toMatchObject({ progress: { completedRace: 0 } });
+    });
+
+    it('redirects an achievement that arrives while guest promotion is completing', async () => {
+        await recordCompletedRace('guest:driver', client);
+        await recordHeadToHeadPost('reddit:driver', 'existing-track', client);
+        const defaultHGetAll = client.hGetAll.bind(client);
+        let releasePromotionRead;
+        const promotionRead = new Promise((resolve) => { releasePromotionRead = resolve; });
+        let promotionReadStarted;
+        const promotionStarted = new Promise((resolve) => { promotionReadStarted = resolve; });
+        client.hGetAll = async (key) => {
+            const fields = await defaultHGetAll(key);
+            if (Object.keys(fields).includes('race:completed')) {
+                promotionReadStarted();
+                await promotionRead;
+            }
+            return fields;
+        };
+
+        const promotion = mergeGuestCarUnlockProgress({
+            guestPlayerId: 'guest:driver',
+            redditPlayerId: 'reddit:driver',
+            client,
+        });
+        await promotionStarted;
+        const concurrentWin = recordHeadToHeadWin('guest:driver', 'challenge-race', client);
+        releasePromotionRead();
+        await Promise.all([promotion, concurrentWin]);
+
+        const redditSnapshot = await getCarUnlockSnapshot('reddit:driver', {}, client);
+        expect(redditSnapshot.progress.completedRace).toBe(1);
+        expect(redditSnapshot.progress.headToHeadWins).toBe(1);
+        expect(redditSnapshot.progress.headToHeadTracksPosted).toBe(1);
+        expect(await getCarUnlockSnapshot('guest:driver', {}, client))
+            .toMatchObject({ progress: { completedRace: 0, headToHeadWins: 0 } });
+    });
+
+    it('keeps the guest source intact when the atomic promotion transaction is interrupted', async () => {
+        await recordCompletedRace('guest:driver', client);
+        await recordHeadToHeadWin('reddit:driver', 'existing-win', client);
+        client.abortNextExec = true;
+
+        await expect(mergeGuestCarUnlockProgress({
+            guestPlayerId: 'guest:driver',
+            redditPlayerId: 'reddit:driver',
+            client,
+        })).rejects.toThrow('Car unlock promotion was interrupted.');
+        expect((await getCarUnlockSnapshot('guest:driver', {}, client)).progress.completedRace).toBe(1);
+
+        await expect(mergeGuestCarUnlockProgress({
+            guestPlayerId: 'guest:driver',
+            redditPlayerId: 'reddit:driver',
+            client,
+        })).resolves.toBe(true);
+        const redditSnapshot = await getCarUnlockSnapshot('reddit:driver', {}, client);
+        expect(redditSnapshot.progress.completedRace).toBe(1);
+        expect(redditSnapshot.progress.headToHeadWins).toBe(1);
     });
 });

@@ -1176,6 +1176,74 @@ describe('Campaign server store', () => {
         expect(strings.has(progressKeyFor(guestPlayerId))).toBe(false);
     });
 
+    it('renews every Campaign merge lock while stage data is still being read', async () => {
+        vi.useFakeTimers();
+        try {
+            const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+            const defaultHGet = mockRedis.hGet.getMockImplementation();
+            let releaseStageRead;
+            const stageReadBlocked = new Promise((resolve) => { releaseStageRead = resolve; });
+            let stageReadStarted;
+            const stageReadReached = new Promise((resolve) => { stageReadStarted = resolve; });
+            let blocked = false;
+            mockRedis.hGet.mockImplementation(async (...args) => {
+                if (!blocked) {
+                    blocked = true;
+                    stageReadStarted();
+                    await stageReadBlocked;
+                }
+                return defaultHGet(...args);
+            });
+
+            const merge = mergeGuestCampaignProgress({
+                guestPlayerId: 'guest:renew-locks',
+                redditPlayerId: 'reddit:renew-locks',
+            });
+            await stageReadReached;
+            await vi.advanceTimersByTimeAsync(10_000);
+            releaseStageRead();
+            await merge;
+
+            const renewedLockKeys = new Set(mockRedis.expire.mock.calls
+                .map(([key]) => key)
+                .filter((key) => String(key).includes(':submit-lock:')
+                    || String(key).includes(':progress-lock:')));
+            expect(renewedLockKeys.size).toBe(30);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('stops Campaign promotion before writes when any acquired lock is no longer owned', async () => {
+        const guestPlayerId = 'guest:lost-merge-lock';
+        const redditPlayerId = 'reddit:lost-merge-lock';
+        const guestProgressKey = `campaign:numbered-v1:progress:${
+            createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url')
+        }`;
+        strings.set(guestProgressKey, JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: {},
+            updatedAt: '2026-07-01T00:00:00.000Z',
+        }));
+        const defaultGet = mockRedis.get.getMockImplementation();
+        mockRedis.get.mockImplementation(async (key) => {
+            if (String(key).includes(':submit-lock:') && String(key).includes(guestPlayerId)) {
+                return 'successor-owner';
+            }
+            return defaultGet(key);
+        });
+        const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+
+        await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
+            .rejects.toThrow('Campaign merge ownership was lost.');
+        expect(strings.has(guestProgressKey)).toBe(true);
+        expect(mockRedis.hSet).not.toHaveBeenCalledWith(
+            expect.stringContaining('leaderboard'),
+            expect.objectContaining({ [redditPlayerId]: expect.anything() }),
+        );
+    });
+
     it('refuses to trade a verified account time down for a slower guest one', async () => {
         const {
             getServerCampaignPbGhost,
