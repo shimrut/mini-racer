@@ -11,6 +11,7 @@ const VERIFICATION_STAGE_RETRYING = "retrying";
 const VERIFICATION_STAGE_REJECTED = "rejected";
 const VERIFICATION_STAGE_ERROR = "error";
 const CAMPAIGN_EXPIRY_MESSAGE = "Result expired — race again.";
+const CAMPAIGN_GHOST_RETRY_MESSAGE = "Saving ghost...";
 
 const VERIFICATION_STAGE_TEXT = {
   [VERIFICATION_STAGE_SUBMITTING]: "Submitting...",
@@ -377,9 +378,10 @@ export function clearDailyChallengeVerification(challengeId) {
 
 export const MAX_TRACK_PB_RETRY_ATTEMPTS = 3;
 
-export function markDailyChallengeTrackPbRetry(challengeId, nextAttemptAt) {
+/** The run is already accepted; only its ghost is missing, so the replay is kept for a bounded number of retries and then dropped. */
+function markTrackPbRetry(bucket, entryId, nextAttemptAt, extraFields = {}) {
   let exhausted = false;
-  const { entry } = updateEntry("daily", challengeId, (previousEntry) => {
+  const { entry } = updateEntry(bucket, entryId, (previousEntry) => {
     if (!previousEntry) return null;
     const attempts = Number.isInteger(previousEntry.trackPbRetryCount)
       ? previousEntry.trackPbRetryCount
@@ -396,9 +398,14 @@ export function markDailyChallengeTrackPbRetry(challengeId, nextAttemptAt) {
       statusText: VERIFICATION_STAGE_TEXT[VERIFICATION_STAGE_VERIFYING],
       nextAttemptAt: normalizeNextAttemptAt(nextAttemptAt),
       updatedAt: previousEntry.updatedAt,
+      ...extraFields,
     };
   });
   return { exhausted, entry };
+}
+
+export function markDailyChallengeTrackPbRetry(challengeId, nextAttemptAt) {
+  return markTrackPbRetry("daily", challengeId, nextAttemptAt);
 }
 
 export function markDailyChallengeVerificationPending(
@@ -506,6 +513,14 @@ export function markCampaignVerificationPending(
   options = {},
 ) {
   return markPending("campaign", raceId, nextAttemptAt, options);
+}
+
+/** Campaign progress is already confirmed when this runs: the entry survives only to recover the ghost, so it must not read as unverified progress. */
+export function markCampaignTrackPbRetry(raceId, nextAttemptAt) {
+  return markTrackPbRetry("campaign", raceId, nextAttemptAt, {
+    progressConfirmed: true,
+    statusText: CAMPAIGN_GHOST_RETRY_MESSAGE,
+  });
 }
 
 export function markCampaignVerificationError(raceId, errorMessage = null) {

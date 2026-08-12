@@ -26,6 +26,7 @@ import {
     getCampaignVerificationEntries,
     getVerificationRetryDelayMs,
     isRetryableVerificationFailure,
+    markCampaignTrackPbRetry,
     markCampaignVerificationError,
     markCampaignVerificationPending,
 } from '../scoreboard/verification-queue.js';
@@ -247,6 +248,8 @@ function buildDisplayedCampaignBootstrap(bootstrap) {
     for (const stage of CAMPAIGN_STAGES) {
         const entry = entries[stage.raceId];
         if (!entry) continue;
+        // A ghost-recovery entry is queued behind confirmed server progress: it is neither provisional nor an error.
+        if (entry.progressConfirmed) continue;
         if (entry.verificationState === 'pending') {
             const provisional = campaignResultFromVerificationEntry(stage, entry);
             const verified = resultsByRaceId[stage.raceId];
@@ -550,7 +553,8 @@ export const campaignEngineMethods = {
         const deadline = Date.now() + timeoutMs;
         for (;;) {
             const entry = getCampaignVerificationEntry(raceId);
-            if (!entry) return true;
+            // A ghost-recovery entry has already had its progress confirmed, so the next stage must not wait on it.
+            if (!entry || entry.progressConfirmed) return true;
             if (entry.verificationState !== 'pending') return false;
             if (Date.now() >= deadline) return false;
             await new Promise((resolve) => { setTimeout(resolve, pollMs); });
@@ -1001,6 +1005,36 @@ export const campaignEngineMethods = {
         }
     },
 
+    /**
+     * Progress is confirmed by the time this runs, so the result, medal, unlock and Next action are already safe.
+     * Only the ghost is missing: keep the replay for a bounded number of retries, then stop asking for it.
+     */
+    settleCampaignGhostPersistence(raceId, response) {
+        const trackPbStatus = response.body?.trackPbPersistenceStatus;
+        if (trackPbStatus === 'unavailable') {
+            const { exhausted } = markCampaignTrackPbRetry(
+                raceId,
+                Date.now() + getVerificationRetryDelayMs(),
+            );
+            return { ghost: exhausted ? 'fetch' : 'skip' };
+        }
+
+        clearCampaignVerification(raceId);
+        const personalBest = response.body?.trackPersonalBest;
+        return (trackPbStatus === 'stored' || trackPbStatus === 'unchanged')
+            && personalBest
+            && typeof personalBest === 'object'
+            ? { ghost: 'install', personalBest }
+            : { ghost: 'fetch' };
+    },
+
+    retryCampaignGhostRecoveryLater(raceId) {
+        return !markCampaignTrackPbRetry(
+            raceId,
+            Date.now() + getVerificationRetryDelayMs(),
+        ).exhausted;
+    },
+
     retryCampaignVerificationLater(entry, statusText = null) {
         markCampaignVerificationPending(
             entry.raceId,
@@ -1034,12 +1068,16 @@ export const campaignEngineMethods = {
 
         const inFlight = markCampaignVerificationPending(raceId, Date.now(), {
             submissionStage: 'verifying',
+            statusText: entry.progressConfirmed ? entry.statusText : null,
             preserveUpdatedAt: true,
         }) || entry;
-        this.updateCampaignFinishSnapshot(
-            raceId,
-            campaignPendingSnapshot(entry.bestTime, 'verifying'),
-        );
+        // A ghost-recovery attempt must not drag a settled result screen back to "Verifying...".
+        if (!entry.progressConfirmed) {
+            this.updateCampaignFinishSnapshot(
+                raceId,
+                campaignPendingSnapshot(entry.bestTime, 'verifying'),
+            );
+        }
 
         let response = null;
         try {
@@ -1051,6 +1089,10 @@ export const campaignEngineMethods = {
         } catch (submitError) {
             console.error('Could not confirm Campaign race result:', submitError);
             if (isSupersededCampaignVerificationEntry(inFlight)) return;
+            if (entry.progressConfirmed) {
+                this.retryCampaignGhostRecoveryLater(raceId);
+                return;
+            }
             this.retryCampaignVerificationLater(inFlight);
             return;
         }
@@ -1059,6 +1101,10 @@ export const campaignEngineMethods = {
 
         if (response.ok && response.body?.accepted === true) {
             if (!responseConfirmsCampaignResult(response, entry)) {
+                if (entry.progressConfirmed) {
+                    this.retryCampaignGhostRecoveryLater(raceId);
+                    return;
+                }
                 this.retryCampaignVerificationLater(
                     inFlight,
                     'Saving Campaign progress...',
@@ -1066,7 +1112,7 @@ export const campaignEngineMethods = {
                 return;
             }
             this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
-            clearCampaignVerification(raceId);
+            const ghostRecovery = this.settleCampaignGhostPersistence(raceId, response);
             if (this.campaignVerifiedBootstrap && response.body.progress) {
                 this.applyCampaignLobbyBootstrap({
                     ...this.campaignVerifiedBootstrap,
@@ -1076,12 +1122,18 @@ export const campaignEngineMethods = {
             } else {
                 this.refreshCampaignVerificationOverlay?.();
             }
-            await this.refreshCampaignAfterAcceptedRun(stage);
+            await this.refreshCampaignAfterAcceptedRun(stage, ghostRecovery);
             void this.resolveLeaderboardOpponentAdvanceAfterVerification?.({
                 mode: 'campaign',
                 competitionId: raceId,
                 benchmarkTimeMs: Math.round(entry.bestTime * 1000),
             });
+            return;
+        }
+
+        // A confirmed result is never re-opened by a failed ghost recovery, whatever the server says about this attempt.
+        if (entry.progressConfirmed) {
+            this.retryCampaignGhostRecoveryLater(raceId);
             return;
         }
 
@@ -1108,7 +1160,7 @@ export const campaignEngineMethods = {
         );
     },
 
-    async refreshCampaignAfterAcceptedRun(stage) {
+    async refreshCampaignAfterAcceptedRun(stage, { ghost = 'fetch', personalBest = null } = {}) {
         const activeStandingsSession = this._activeCampaignStandingsRefreshSession;
         const olderRequest = activeStandingsSession?.inFlightByRaceId.get(stage.raceId);
         if (olderRequest) {
@@ -1139,12 +1191,21 @@ export const campaignEngineMethods = {
             console.warn('Campaign finish opened without a live rank snapshot:', snapshotError);
         }
 
-        try {
-            const ghost = await getCampaignPbGhost(stage.raceId);
-            const personalBest = ghost.ok ? ghost.body?.personalBest : null;
+        if (ghost === 'install') {
+            // The submission already returned the canonical record; asking for it again can only lose it.
+            this.campaignPbGhostByRaceId ??= Object.create(null);
+            this.campaignPbGhostByRaceId[stage.raceId] = personalBest;
             this.applyCampaignPersonalBest(stage, personalBest);
-        } catch (ghostError) {
-            console.warn('Campaign result was saved, but PB ghost refresh failed:', ghostError);
+        } else if (ghost !== 'skip') {
+            try {
+                const ghostResponse = await getCampaignPbGhost(stage.raceId);
+                this.applyCampaignPersonalBest(
+                    stage,
+                    ghostResponse.ok ? ghostResponse.body?.personalBest : null,
+                );
+            } catch (ghostError) {
+                console.warn('Campaign result was saved, but PB ghost refresh failed:', ghostError);
+            }
         }
 
         try {

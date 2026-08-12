@@ -817,6 +817,112 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
     });
 
+    function acceptedCampaignBody(overrides = {}) {
+        return {
+            accepted: true,
+            progress: {
+                resultsByRaceId: {
+                    'numbered-v1-00': { bestTimeMs: 8250, medal: 'gold' },
+                },
+            },
+            ...overrides,
+        };
+    }
+
+    async function queueCampaignGhostRecovery(context) {
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: acceptedCampaignBody({ trackPbPersistenceStatus: 'unavailable' }),
+        });
+        await context.processCampaignVerificationEntry(queueCampaignRun(8.25));
+        return getCampaignVerificationEntry('numbered-v1-00');
+    }
+
+    it('keeps the replay and retries when an accepted run could not save its ghost', async () => {
+        const context = createCampaignFinishContext();
+
+        const entry = await queueCampaignGhostRecovery(context);
+
+        expect(entry).toMatchObject({
+            verificationState: 'pending',
+            progressConfirmed: true,
+            trackPbRetryCount: 1,
+        });
+        expect(entry.replay).not.toBeNull();
+        expect(campaignServiceMocks.getCampaignPbGhost).not.toHaveBeenCalled();
+        expect(context.campaignBootstrap.progress.resultsByRaceId['numbered-v1-00'])
+            .toMatchObject({ bestTimeMs: 8250, medal: 'gold' });
+    });
+
+    it('installs the recovered personal best from the retry response without another fetch', async () => {
+        const context = createCampaignFinishContext();
+        const entry = await queueCampaignGhostRecovery(context);
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: acceptedCampaignBody({
+                trackPbPersistenceStatus: 'stored',
+                trackPersonalBest: {
+                    bestTimeMs: 8250,
+                    checkpointTimesSec: [4, 8],
+                    lapCompletionTimesSec: null,
+                    ghost: { schemaVersion: 2, sampleIntervalMs: 50, finishTimeMs: 8250 },
+                    updatedAt: '2030-01-01T00:00:00.000Z',
+                },
+            }),
+        });
+
+        await context.processCampaignVerificationEntry(entry);
+
+        expect(getCampaignVerificationEntry('numbered-v1-00')).toBeNull();
+        expect(campaignServiceMocks.getCampaignPbGhost).not.toHaveBeenCalled();
+        expect(context.pbGhost.prepare).toHaveBeenCalled();
+        expect(context.trackPersonalBestByTrackKey['numbered-v1-00'])
+            .toMatchObject({ bestTime: 8.25, ghostAvailable: true });
+    });
+
+    it('drops the replay after three ghost recoveries fail and keeps the verified result', async () => {
+        const context = createCampaignFinishContext();
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+
+        let entry = await queueCampaignGhostRecovery(context);
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            expect(entry).not.toBeNull();
+            await context.processCampaignVerificationEntry(entry);
+            entry = getCampaignVerificationEntry('numbered-v1-00');
+        }
+
+        expect(entry).toBeNull();
+        expect(campaignServiceMocks.getCampaignPbGhost).toHaveBeenCalledTimes(1);
+        expect(context.campaignBootstrap.progress.resultsByRaceId['numbered-v1-00'])
+            .toMatchObject({ bestTimeMs: 8250, medal: 'gold' });
+    });
+
+    it('does not hold the next race behind a queued ghost recovery', async () => {
+        const context = createCampaignFinishContext();
+        await queueCampaignGhostRecovery(context);
+
+        await expect(context.awaitCampaignVerificationSettled('numbered-v1-00', {
+            timeoutMs: 200,
+        })).resolves.toBe(true);
+    });
+
+    it('does not reopen a settled result screen while the ghost is still being recovered', async () => {
+        const context = createCampaignFinishContext();
+        const entry = await queueCampaignGhostRecovery(context);
+        context.modal.updateModalScoreboardSnapshot.mockClear();
+        campaignServiceMocks.submitCampaignRun.mockRejectedValue(new Error('offline'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await context.processCampaignVerificationEntry(entry);
+
+        expect(context.modal.updateModalScoreboardSnapshot).not.toHaveBeenCalled();
+        expect(context.modal.setCombinedWinMedal).not.toHaveBeenCalled();
+        expect(getCampaignVerificationEntry('numbered-v1-00')?.trackPbRetryCount).toBe(2);
+    });
+
     it('stops retrying a run the server refuses outright', async () => {
         const context = createCampaignFinishContext();
         campaignServiceMocks.submitCampaignRun.mockResolvedValue({
