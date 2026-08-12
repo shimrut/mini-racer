@@ -98,6 +98,7 @@ type PlayerBootstrapPayload = {
     firstSeenAt: string | null;
     lastSeenAt: string | null;
     carUnlocks: CarUnlockSnapshot | null;
+    retireGuestIdentity: boolean;
 };
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -786,6 +787,7 @@ export async function getServerPlayerBootstrap({
     });
     let previousProfile: DailyGpPlayerProfile | null = null;
     let profile: DailyGpPlayerProfile | null = null;
+    let retireGuestIdentity = false;
 
     // A player id with no token is either a first visit or a guest whose token was lost: claiming covers the first, adopting the second.
     if (!identity.canonicalPlayerId && !safeRequestRedditUsername && !suppliedGuestToken) {
@@ -825,6 +827,7 @@ export async function getServerPlayerBootstrap({
             firstSeenAt: null,
             lastSeenAt: null,
             carUnlocks: null,
+            retireGuestIdentity: false,
         };
     }
 
@@ -849,6 +852,7 @@ export async function getServerPlayerBootstrap({
                 console.error('Player guest progress claim failed:', error);
             }
         }
+        retireGuestIdentity = Boolean(guestPlayerId && guestPromotionComplete);
         if (guestPlayerId && !guestPromotionComplete) {
             identity.guestToken = typeof guestToken === 'string' ? guestToken.trim() : null;
         }
@@ -861,7 +865,6 @@ export async function getServerPlayerBootstrap({
             leaderboardIdentity,
             redditUsername,
             hasAnyData: false,
-            previousProfile,
         });
     }
     const firstSeenMs = Date.parse(profile.firstSeenAt);
@@ -890,7 +893,6 @@ export async function getServerPlayerBootstrap({
             redditUsername,
             preferences: playerPreferences,
             hasAnyData: false,
-            previousProfile: profile,
         });
     }
 
@@ -905,6 +907,7 @@ export async function getServerPlayerBootstrap({
         firstSeenAt: profile.firstSeenAt,
         lastSeenAt: profile.lastSeenAt,
         carUnlocks,
+        retireGuestIdentity,
     };
 }
 

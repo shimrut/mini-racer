@@ -158,3 +158,55 @@ export function startRedisLockLeaseRenewal(
         },
     };
 }
+
+export function startRedisLockGroupLeaseRenewal(
+    locks: readonly RedisLock[],
+    renewalIntervalMs: number,
+    client: RedisClient = redis,
+): RedisLockLease {
+    let stopped = false;
+    let ownershipLost = false;
+    let renewal = Promise.resolve();
+
+    const queueRenewal = (): void => {
+        renewal = renewal.then(async () => {
+            if (stopped || ownershipLost) return;
+            try {
+                for (const lock of locks) {
+                    if (!await renewRedisLock(lock, client)) {
+                        ownershipLost = true;
+                        return;
+                    }
+                }
+            } catch (_error) {
+                ownershipLost = true;
+            }
+        });
+    };
+    const timer = setInterval(queueRenewal, renewalIntervalMs);
+    timer.unref?.();
+
+    return {
+        isOwned: () => !ownershipLost,
+        async confirmOwnership(): Promise<boolean> {
+            await renewal;
+            if (stopped || ownershipLost) return false;
+            try {
+                for (const lock of locks) {
+                    if (!await isRedisLockOwned(lock, client)) {
+                        ownershipLost = true;
+                        return false;
+                    }
+                }
+            } catch (_error) {
+                ownershipLost = true;
+            }
+            return !ownershipLost;
+        },
+        async stop(): Promise<void> {
+            stopped = true;
+            clearInterval(timer);
+            await renewal;
+        },
+    };
+}

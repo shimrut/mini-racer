@@ -1205,6 +1205,99 @@ describe('Campaign server store', () => {
         expect(strings.has(progressKeyFor(guestPlayerId))).toBe(false);
     });
 
+    it('repairs an account rank when a prior promotion copied its entry but missed the sorted-set write', async () => {
+        const guestPlayerId = 'guest:rank-retry';
+        const redditPlayerId = 'reddit:rank-retry';
+        const raceId = 'numbered-v1-00';
+        const entryKey = `campaign:numbered-v1:leaderboard:${raceId}:entries`;
+        const progressKeyFor = (playerId) => `campaign:numbered-v1:progress:${
+            createHash('sha256').update(playerId, 'utf8').digest('base64url')
+        }`;
+        const result = {
+            raceId,
+            trackKey: 'numberZero',
+            lapCount: 2,
+            rulesRevision: 1,
+            bestTimeMs: 1_000,
+            medal: 'author',
+            checkpointTimesSec: null,
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        };
+        strings.set(progressKeyFor(guestPlayerId), JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: { [raceId]: result },
+            updatedAt: result.updatedAt,
+        }));
+        hashes.set(entryKey, new Map([
+            [guestPlayerId, JSON.stringify({
+                ...result,
+                playerId: guestPlayerId,
+                completedLaps: 2,
+                validationMethod: 'strict-replay',
+                strictReplayFailureReason: null,
+            })],
+            [redditPlayerId, JSON.stringify({
+                ...result,
+                playerId: redditPlayerId,
+                completedLaps: 2,
+                validationMethod: 'strict-replay',
+                strictReplayFailureReason: null,
+            })],
+        ]));
+        const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+
+        await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
+            .resolves.toEqual({ merged: false, mergedRaceIds: [] });
+
+        expect(mockRedis.zAdd).toHaveBeenCalledWith(
+            `campaign:numbered-v1:leaderboard:${raceId}`,
+            { member: redditPlayerId, score: result.bestTimeMs },
+        );
+        expect(hashes.get(entryKey)?.has(guestPlayerId)).toBe(false);
+    });
+
+    it('restores a missing Campaign rank from its retained strict entry during bootstrap', async () => {
+        const playerId = 'reddit:rank-bootstrap';
+        const raceId = 'numbered-v1-00';
+        const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        strings.set(`campaign:numbered-v1:progress:${playerHash}`, JSON.stringify({
+            campaignId: 'numbered-v1',
+            startedAt: '2026-07-01T00:00:00.000Z',
+            resultsByRaceId: {
+                [raceId]: {
+                    raceId,
+                    trackKey: 'numberZero',
+                    lapCount: 2,
+                    rulesRevision: 1,
+                    bestTimeMs: 1_000,
+                    medal: 'author',
+                    checkpointTimesSec: null,
+                    updatedAt: '2026-07-27T10:00:00.000Z',
+                },
+            },
+            updatedAt: '2026-07-27T10:00:00.000Z',
+        }));
+        hashes.set(`campaign:numbered-v1:leaderboard:${raceId}:entries`, new Map([[
+            playerId,
+            JSON.stringify({
+                playerId,
+                trackKey: 'numberZero',
+                bestTimeMs: 1_000,
+                updatedAt: '2026-07-27T10:00:00.000Z',
+                completedLaps: 2,
+            }),
+        ]]));
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+
+        await getServerCampaignBootstrap({ redditUsername: 'Rank-Bootstrap' });
+
+        expect(mockRedis.zAdd).toHaveBeenCalledWith(
+            `campaign:numbered-v1:leaderboard:${raceId}`,
+            { member: playerId, score: 1_000 },
+        );
+    });
+
     it('renews every Campaign merge lock while stage data is still being read', async () => {
         vi.useFakeTimers();
         try {

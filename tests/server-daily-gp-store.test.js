@@ -44,6 +44,7 @@ const mockRedis = {
 };
 const mockValidateDailyGpReplayDetailed = vi.fn();
 const ownedLocks = new Map();
+const storedStrings = new Map();
 
 function checkpointSplitsForChallenge(challenge, bestTimeSec) {
     const count = TRACKS[challenge.trackKey]?.checkpoints?.length || 0;
@@ -66,6 +67,14 @@ function findWrittenPlayerProfile(playerId) {
     return null;
 }
 
+function playerProfileRedisKey(playerId) {
+    return `dailygp:player-profile:${createHash('sha256').update(playerId, 'utf8').digest('base64url')}`;
+}
+
+function seedStoredPlayerProfile(playerId, profile) {
+    storedStrings.set(playerProfileRedisKey(playerId), JSON.stringify(profile));
+}
+
 function createMockTransaction(options = {}) {
     const commands = [];
     const hasExecResult = Object.prototype.hasOwnProperty.call(options, 'execResult');
@@ -75,6 +84,9 @@ function createMockTransaction(options = {}) {
         unwatch: vi.fn().mockResolvedValue(undefined),
         del: vi.fn(async (...args) => {
             commands.push(() => mockRedis.del(...args));
+        }),
+        set: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.set(...args));
         }),
         hSet: vi.fn(async (...args) => {
             commands.push(() => mockRedis.hSet(...args));
@@ -115,17 +127,21 @@ describe('server daily gp store submissions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         ownedLocks.clear();
-        mockRedis.get.mockImplementation(async (key) => ownedLocks.get(key) ?? null);
+        storedStrings.clear();
+        mockRedis.get.mockImplementation(async (key) => ownedLocks.get(key) ?? storedStrings.get(key) ?? null);
         mockRedis.mGet.mockResolvedValue([]);
         mockRedis.set.mockImplementation(async (key, value, options = {}) => {
-            if (options.nx && ownedLocks.has(key)) return '';
+            if (options.nx && (ownedLocks.has(key) || storedStrings.has(key))) return '';
             if (String(key).includes('lock:') || String(key).includes('-lock:')) {
                 ownedLocks.set(key, value);
+            } else {
+                storedStrings.set(key, value);
             }
             return 'OK';
         });
         mockRedis.del.mockImplementation(async (key) => {
             ownedLocks.delete(key);
+            storedStrings.delete(key);
         });
         mockRedis.incrBy.mockResolvedValue(1);
         mockRedis.hGet.mockResolvedValue(null);
@@ -1238,7 +1254,7 @@ describe('server daily gp store submissions', () => {
 
     it('keeps the last stored identity on bootstrap reads until the player changes it', async () => {
         const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-        mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+        seedStoredPlayerProfile('reddit:pm-user', {
             playerId: 'reddit:pm-user',
             leaderboardIdentity: 'reddit',
             redditUsername: 'Pm-User',
@@ -1247,7 +1263,7 @@ describe('server daily gp store submissions', () => {
             firstSeenAt: '2026-01-01T00:00:00.000Z',
             lastSeenAt: '2026-01-02T00:00:00.000Z',
             updatedAt: '2026-01-02T00:00:00.000Z',
-        }));
+        });
 
         const payload = await getServerPlayerBootstrap({
             playerId: 'browser-player-id',
@@ -1285,6 +1301,53 @@ describe('server daily gp store submissions', () => {
         });
         const storedProfile = findWrittenPlayerProfile('reddit:pm-user');
         expect(storedProfile.profile.leaderboardIdentity).toBe('reddit');
+    });
+
+    it('retries a profile write from the latest Redis snapshot after a competing preferences save', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'reddit:profile-cas';
+        seedStoredPlayerProfile(playerId, {
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'Profile-Cas',
+            preferences: { carSkin: 'assets/cars/mr_stock.webp' },
+            hasSeenGame: true,
+            hasAnyData: false,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+            lastSeenAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+        });
+        const concurrentProfile = {
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'Profile-Cas',
+            preferences: { carSkin: 'assets/cars/mr_extra_crimson.webp' },
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+            lastSeenAt: '2026-01-02T00:00:00.000Z',
+            updatedAt: '2026-01-02T00:00:00.000Z',
+        };
+        mockRedis.watch
+            .mockImplementationOnce(() => ({
+                multi: vi.fn().mockResolvedValue(undefined),
+                set: vi.fn().mockResolvedValue(undefined),
+                exec: vi.fn(async () => {
+                    seedStoredPlayerProfile(playerId, concurrentProfile);
+                    return [];
+                }),
+                discard: vi.fn().mockResolvedValue(undefined),
+            }))
+            .mockImplementation(() => createMockTransaction());
+
+        const profile = await upsertPlayerProfile({
+            playerId,
+            redditUsername: 'Profile-Cas',
+            hasAnyData: false,
+        });
+
+        expect(profile.preferences.carSkin).toBe(concurrentProfile.preferences.carSkin);
+        expect(profile.hasAnyData).toBe(true);
     });
 
     it('ignores profiles left in the retired shared hash', async () => {
@@ -1789,7 +1852,7 @@ describe('server daily gp store submissions', () => {
             vi.setSystemTime(new Date('2026-07-10T00:00:00.000Z'));
             try {
                 const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-                mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+                seedStoredPlayerProfile('reddit:returning-player', {
                     playerId: 'reddit:returning-player',
                     leaderboardIdentity: 'reddit',
                     redditUsername: 'Returning-Player',
@@ -1798,7 +1861,7 @@ describe('server daily gp store submissions', () => {
                     firstSeenAt: '2026-07-08T00:00:00.000Z',
                     lastSeenAt: '2026-07-08T00:00:00.000Z',
                     updatedAt: '2026-07-08T00:00:00.000Z',
-                }));
+                });
 
                 const payload = await getServerPlayerBootstrap({ redditUsername: 'Returning-Player' });
 
@@ -1883,9 +1946,9 @@ describe('server daily gp store submissions', () => {
     describe('profile field fallbacks across writes', () => {
         it('falls back to the epoch timestamp for a missing firstSeenAt field', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:date-fallback', {
                 playerId: 'reddit:date-fallback',
-            }));
+            });
 
             const payload = await getServerPlayerBootstrap({ redditUsername: 'Date-Fallback' });
 
@@ -1894,10 +1957,10 @@ describe('server daily gp store submissions', () => {
 
         it('falls back to the epoch timestamp for an empty-string firstSeenAt field', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:empty-date-fallback', {
                 playerId: 'reddit:empty-date-fallback',
                 firstSeenAt: '',
-            }));
+            });
 
             const payload = await getServerPlayerBootstrap({ redditUsername: 'Empty-Date-Fallback' });
 
@@ -1906,7 +1969,7 @@ describe('server daily gp store submissions', () => {
 
         it('keeps hasAnyData true once set even when a later write does not explicitly set it', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:has-any-data-player', {
                 playerId: 'reddit:has-any-data-player',
                 leaderboardIdentity: 'reddit',
                 redditUsername: 'Has-Any-Data-Player',
@@ -1915,7 +1978,7 @@ describe('server daily gp store submissions', () => {
                 firstSeenAt: '2026-01-01T00:00:00.000Z',
                 lastSeenAt: '2026-01-01T00:00:00.000Z',
                 updatedAt: '2026-01-01T00:00:00.000Z',
-            }));
+            });
 
             await getServerPlayerBootstrap({ redditUsername: 'Has-Any-Data-Player' });
 
@@ -1925,7 +1988,7 @@ describe('server daily gp store submissions', () => {
 
         it('backfills Crimson for a player with an accepted race predating unlock tracking', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:existing-racer', {
                 playerId: 'reddit:existing-racer',
                 leaderboardIdentity: 'reddit',
                 redditUsername: 'Existing-Racer',
@@ -1934,7 +1997,7 @@ describe('server daily gp store submissions', () => {
                 firstSeenAt: '2026-01-01T00:00:00.000Z',
                 lastSeenAt: '2026-01-01T00:00:00.000Z',
                 updatedAt: '2026-01-01T00:00:00.000Z',
-            }));
+            });
 
             const payload = await getServerPlayerBootstrap({ redditUsername: 'Existing-Racer' });
             const playerHash = createHash('sha256')
@@ -1953,7 +2016,7 @@ describe('server daily gp store submissions', () => {
 
         it('preserves the original firstSeenAt across profile updates', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:preserve-first-seen', {
                 playerId: 'reddit:preserve-first-seen',
                 leaderboardIdentity: 'reddit',
                 redditUsername: 'Preserve-First-Seen',
@@ -1962,7 +2025,7 @@ describe('server daily gp store submissions', () => {
                 firstSeenAt: '2020-01-01T00:00:00.000Z',
                 lastSeenAt: '2026-01-01T00:00:00.000Z',
                 updatedAt: '2026-01-01T00:00:00.000Z',
-            }));
+            });
 
             await getServerPlayerBootstrap({ redditUsername: 'Preserve-First-Seen' });
 
@@ -1972,7 +2035,7 @@ describe('server daily gp store submissions', () => {
 
         it('falls back to constructed leaderboard identity when the previous profile also had none stored', async () => {
             const { updateServerPlayerIdentity } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:identity-fallback', {
                 playerId: 'reddit:identity-fallback',
                 leaderboardIdentity: 'reddit',
                 redditUsername: 'Identity-Fallback',
@@ -1981,7 +2044,7 @@ describe('server daily gp store submissions', () => {
                 firstSeenAt: '2026-01-01T00:00:00.000Z',
                 lastSeenAt: '2026-01-01T00:00:00.000Z',
                 updatedAt: '2026-01-01T00:00:00.000Z',
-            }));
+            });
 
             const payload = await updateServerPlayerIdentity({
                 redditUsername: 'Identity-Fallback',
@@ -2665,7 +2728,7 @@ describe('server daily gp store submissions', () => {
     describe('profile timestamp fallbacks', () => {
         it('preserves the parsed epoch firstSeenAt when stored timestamps are empty strings', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:timestamp-fallback', {
                 playerId: 'reddit:timestamp-fallback',
                 leaderboardIdentity: 'reddit',
                 redditUsername: 'Timestamp-Fallback',
@@ -2674,7 +2737,7 @@ describe('server daily gp store submissions', () => {
                 firstSeenAt: '2026-01-01T00:00:00.000Z',
                 lastSeenAt: '',
                 updatedAt: '',
-            }));
+            });
 
             const payload = await getServerPlayerBootstrap({ redditUsername: 'Timestamp-Fallback' });
 
@@ -2684,7 +2747,7 @@ describe('server daily gp store submissions', () => {
 
         it('falls back to the epoch timestamp for non-string firstSeenAt fields', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
-            mockRedis.get.mockResolvedValueOnce(JSON.stringify({
+            seedStoredPlayerProfile('reddit:non-string-timestamps', {
                 playerId: 'reddit:non-string-timestamps',
                 leaderboardIdentity: 'reddit',
                 redditUsername: 'Non-String-Timestamps',
@@ -2693,7 +2756,7 @@ describe('server daily gp store submissions', () => {
                 firstSeenAt: 123,
                 lastSeenAt: null,
                 updatedAt: false,
-            }));
+            });
 
             const payload = await getServerPlayerBootstrap({ redditUsername: 'Non-String-Timestamps' });
 
@@ -2951,6 +3014,7 @@ describe('server daily gp store submissions', () => {
                 leaderboardIdentity: 'constructed',
                 playerPreferences: null,
                 carUnlocks: null,
+                retireGuestIdentity: false,
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
@@ -2983,6 +3047,7 @@ describe('server daily gp store submissions', () => {
                 leaderboardIdentity: 'constructed',
                 playerPreferences: null,
                 carUnlocks: null,
+                retireGuestIdentity: false,
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
@@ -3103,6 +3168,7 @@ describe('server daily gp store submissions', () => {
                 leaderboardIdentity: 'constructed',
                 playerPreferences: null,
                 carUnlocks: null,
+                retireGuestIdentity: false,
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,

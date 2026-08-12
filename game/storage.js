@@ -10,6 +10,7 @@ import {
 import {
   getGuestPlayerToken,
   getOrCreatePlayerId,
+  rotateGuestPlayerIdentity,
   setGuestPlayerToken,
 } from "./scoreboard/player-identity.js";
 import { isLocalEnvironment } from "./track/environment.js";
@@ -63,6 +64,7 @@ async function fetchRemotePlayerProgressState() {
         ? payload.playerPreferences
         : null,
     carUnlocks: normalizeCarUnlockSnapshot(payload?.carUnlocks),
+    retireGuestIdentity: Boolean(payload?.retireGuestIdentity),
   };
 }
 
@@ -98,6 +100,9 @@ export async function getPlayerProgressState() {
     }
     if (remoteState) {
       setGuestPlayerToken(remoteState.guestToken);
+      if (remoteState.retireGuestIdentity) {
+        rotateGuestPlayerIdentity("completed guest promotion");
+      }
       setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
       return remoteState;
     }

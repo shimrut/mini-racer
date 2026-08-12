@@ -287,7 +287,9 @@ flowchart LR
   Car-unlock promotion atomically merges the guest hash and records a small
   guest-to-Reddit pointer; late guest achievement writes follow that pointer,
   so an event arriving during sign-in is not deleted or recreated under the
-  guest identity.
+  guest identity. Once both signed-in promotions succeed, bootstrap retires the
+  browser guest identity and token, so a later signed-out session begins with a
+  new guest instead of routing new progress through that completed pointer.
   A direct Campaign launch keeps its first Campaign request parallel with player
   bootstrap, but an unranked or promotion-pending response is non-authoritative
   and receives one retry after identity repair; it cannot become cached empty
@@ -298,7 +300,9 @@ flowchart LR
 - `src/server/campaign-store.ts` owns Campaign start state and progress, one
   permanent leaderboard and PB ghost hash per stage, replay validation,
   server-derived medals, rolling guest inactivity retention, and verified guest
-  result merge on sign-in. Signed-in progress is permanent. Campaign records do
+  result merge on sign-in. Each promoted entry, sorted-set rank, and standings
+  revision commits together; bootstrap repairs retained strict entries whose
+  rank is missing. Signed-in progress is permanent. Campaign records do
   not share Daily keys or expiry policy.
 - `src/server/head-to-head-*` owns verified-result source resolution,
   isolated duel results, custom-post idempotency, and the three-new-posts per
@@ -440,7 +444,7 @@ flowchart LR
   These workflows use the existing Daily GP stores and sharing services without
   changing their Redis keys or public contracts.
 - `src/server/daily-gp-model.ts` defines the challenge schedule, IDs, playable window, and Redis key model.
-- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. The existing combined profile/preferences JSON remains in derived per-player keys. A profile outlives everything it names, because it carries both the player's settings and the name their ranked rows display: guests get the 90-day Campaign guest window, and signed-in profiles never expire, matching the permanent Campaign progress, car unlocks and Campaign standings they describe. Permanent car-unlock events live separately in `src/server/car-unlock-store.ts`, are merged from an authorized guest identity at Reddit sign-in, and have no rolling expiry. A new guest profile is claimed once with an atomic Redis write, and a bootstrap presenting a player id whose profile already exists re-issues a token for it rather than refusing — the id is the only handle on that guest's progress. Every later preference update, identity update, personalized snapshot, and submission requires the matching signed guest token. Stored preferences are repaired field by field on read: a value this build cannot parse costs that one setting its stored value, never the whole set. Public snapshots remain available without a token but do not expose or refresh player-specific state. Published challenge history is pruned in bounded batches after 30 days.
+- `src/server/daily-gp-store.ts` persists generated challenge records, player profiles, durable player preferences, snapshots, and accepted runs. The existing combined profile/preferences JSON remains in derived per-player keys. A profile outlives everything it names, because it carries both the player's settings and the name their ranked rows display: guests get the 90-day Campaign guest window, and signed-in profiles never expire, matching the permanent Campaign progress, car unlocks and Campaign standings they describe. Profile writes WATCH and rebuild from the current key, so a conflicting preference save retries without restoring stale settings or clearing `hasAnyData`. Permanent car-unlock events live separately in `src/server/car-unlock-store.ts`, are merged from an authorized guest identity at Reddit sign-in, and have no rolling expiry. A new guest profile is claimed once with an atomic Redis write, and a bootstrap presenting a player id whose profile already exists re-issues a token for it rather than refusing — the id is the only handle on that guest's progress. Every later preference update, identity update, personalized snapshot, and submission requires the matching signed guest token. Stored preferences are repaired field by field on read: a value this build cannot parse costs that one setting its stored value, never the whole set. Public snapshots remain available without a token but do not expose or refresh player-specific state. Published challenge history is pruned in bounded batches after 30 days.
 - `game/car/car-unlock-policy.js` is the source of the Garage's player-facing unlock labels. Each locked skin shows one short requirement: 1 completed race; 5/10 Gold Campaign medals; 5/10 Author Campaign medals; 1 issued Head to Head challenge; Head to Head challenges posted on 5 tracks; or 1/10 beaten Head to Head challenges.
 - `src/server/pb-ghost-store.ts` persists compressed challenge-scoped PB records in one hash per challenge, with hashed player fields. The whole hash expires at `availableUntil + 6 hours` for guests and signed-in players alike. Daily leaderboard keys and payloads are unchanged and receive the same fixed deadline on writes. A track-geometry fingerprint plus simulation revision still invalidates incompatible ghosts.
 - The continuous slip-speed adjustment is intentionally continuity-compatible with simulation revision 1. Existing verified PB times and schema-v2 pose-trace ghosts remain eligible when track geometry, rules revision, and lap count are unchanged. New submissions are still replay-validated with current physics: a slower run under the adjusted handling keeps the stored time and ghost, while a strictly faster verified run replaces both. Physics changes that materially alter attainable results must still increment the simulation revision rather than reuse this exception.

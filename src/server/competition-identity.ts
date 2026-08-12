@@ -191,13 +191,7 @@ function createPlayerProfileExpiration(
         : { expiration: new Date(Date.now() + ttlSeconds * 1000) };
 }
 
-async function writePlayerProfile(profile: DailyGpPlayerProfile): Promise<void> {
-    await redis.set(
-        createRedisPlayerProfileKey(profile.playerId),
-        JSON.stringify(profile),
-        createPlayerProfileExpiration(profile.playerId),
-    );
-}
+const PLAYER_PROFILE_WRITE_ATTEMPTS = 3;
 
 function resolveStoredLeaderboardIdentity(
     leaderboardIdentity: unknown,
@@ -393,27 +387,45 @@ export async function upsertPlayerProfile({
     redditUsername,
     preferences,
     hasAnyData,
-    previousProfile,
 }: {
     playerId: string;
     leaderboardIdentity?: unknown;
     redditUsername?: unknown;
     preferences?: unknown;
     hasAnyData?: boolean;
-    previousProfile?: DailyGpPlayerProfile | null;
 }): Promise<DailyGpPlayerProfile> {
-    const resolvedPreviousProfile = previousProfile ?? await readPlayerProfile(playerId);
-    const nextProfile = buildPlayerProfile({
-        playerId,
-        leaderboardIdentity,
-        redditUsername,
-        preferences,
-        hasAnyData,
-        previousProfile: resolvedPreviousProfile,
-    });
-
-    await writePlayerProfile(nextProfile);
-    return nextProfile;
+    const profileKey = createRedisPlayerProfileKey(playerId);
+    for (let attempt = 0; attempt < PLAYER_PROFILE_WRITE_ATTEMPTS; attempt += 1) {
+        const transaction = await redis.watch(profileKey);
+        try {
+            // Read through the base client after WATCH; EXEC rejects any write that raced this snapshot.
+            const currentProfile = parseStoredPlayerProfile(await redis.get(profileKey));
+            const nextProfile = buildPlayerProfile({
+                playerId,
+                leaderboardIdentity,
+                redditUsername,
+                preferences,
+                hasAnyData,
+                previousProfile: currentProfile,
+            });
+            await transaction.multi();
+            await transaction.set(
+                profileKey,
+                JSON.stringify(nextProfile),
+                createPlayerProfileExpiration(playerId),
+            );
+            const results = await transaction.exec();
+            if (Array.isArray(results) && results.length > 0) return nextProfile;
+        } catch (error) {
+            try {
+                await transaction.discard();
+            } catch (_discardError) {
+                // EXEC may already have closed the transaction.
+            }
+            throw error;
+        }
+    }
+    throw new Error('Player profile update was interrupted. Try again.');
 }
 
 export async function readPlayerProfileMap(playerIds: string[]): Promise<Map<string, DailyGpPlayerProfile>> {

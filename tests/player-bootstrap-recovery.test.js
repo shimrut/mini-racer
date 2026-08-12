@@ -131,6 +131,26 @@ describe("guest bootstrap recovery", () => {
     expect(state.leaderboardPlayerId).toBe("old-guest-id");
   });
 
+  it("retires a guest identity only after the server confirms its signed-in promotion", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(200, {
+      playerId: "reddit:promoted-player",
+      guestToken: null,
+      retireGuestIdentity: true,
+      leaderboardIdentity: "reddit",
+      playerPreferences: null,
+      hasAnyData: true,
+      isReturningPlayer: true,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(localStorage.getItem(PLAYER_ID_KEY)).toBe("new-guest-id");
+    expect(localStorage.getItem(GUEST_TOKEN_KEY)).toBeNull();
+    expect(state.leaderboardPlayerId).toBe("reddit:promoted-player");
+  });
+
   it("does not reuse a rejected token when browser storage cannot remove it", async () => {
     localStorage.removeItem = vi.fn(() => {
       throw new Error("storage is read-only");

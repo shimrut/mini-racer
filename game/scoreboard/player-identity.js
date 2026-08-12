@@ -34,7 +34,23 @@ export function getOrCreatePlayerId(logLabel = 'scoreboard') {
     }
 }
 
-// A guest's player id is never replaced: it is the only handle on their server-side progress, so a rejected token is cleared alone.
+export function rotateGuestPlayerIdentity(logLabel = 'scoreboard') {
+    const nextId = createPlayerId();
+    ephemeralPlayerId = nextId;
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+            window.localStorage.setItem(PLAYER_ID_STORAGE_KEY, nextId);
+        } catch (error) {
+            console.error(`Error rotating ${logLabel} player id:`, error);
+        }
+    }
+
+    setGuestPlayerToken(null);
+    return nextId;
+}
+
+// A guest id is retained for token recovery, then retired only after a successful Reddit promotion.
 
 export function getGuestPlayerToken() {
     if (hasEphemeralGuestPlayerToken) {
