@@ -1303,10 +1303,10 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(css).toContain('.lobby-mode-action');
         expect(css).toMatch(
-            /\.lobby-mode-action__label\s*\{[^}]*display:\s*inline-block;[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.lobby-mode-action\s*\{[^}]*padding:\s*0\.65rem 0\.85rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(css).toMatch(
-            /\.lobby-mode-action\.is-menu-selected \.lobby-mode-action__label\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+            /\.lobby-mode-action\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
         );
         expect(css).toMatch(
             /\.lobby-mode-switch__btn\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
