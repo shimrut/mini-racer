@@ -816,3 +816,183 @@ describe('lobby keyboard handoff to the carousels', () => {
         expect(lobby.handleCarouselKeydown(keyEvent('ArrowLeft'))).toBe(false);
     });
 });
+
+describe('lobby keyboard nav on Daily and Campaign', () => {
+    function keyEvent(key, overrides = {}) {
+        return {
+            key,
+            target: { tagName: 'BODY' },
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            ...overrides,
+        };
+    }
+
+    function makeAction(id, {
+        classes = [],
+        rect = { left: 0, top: 0, width: 80, height: 40 },
+        disabled = false,
+    } = {}) {
+        const classNames = new Set(classes);
+        return {
+            id,
+            disabled,
+            hidden: false,
+            classList: {
+                add(name) { classNames.add(name); },
+                remove(name) { classNames.delete(name); },
+                contains(name) { return classNames.has(name); },
+                toggle(name, force) {
+                    if (force) classNames.add(name);
+                    else classNames.delete(name);
+                    return force;
+                },
+            },
+            focus: vi.fn(),
+            click: vi.fn(),
+            getBoundingClientRect: () => rect,
+        };
+    }
+
+    function attachOverlay(lobby) {
+        Object.defineProperty(lobby, 'overlay', {
+            value: {
+                style: { display: 'flex' },
+                classList: {
+                    contains: () => false,
+                    add() {},
+                    remove() {},
+                },
+            },
+        });
+    }
+
+    function dailyActions() {
+        return [
+            makeAction('daily-challenge-start-btn', {
+                classes: ['main-menu__item', 'main-menu__item--primary'],
+                rect: { left: 20, top: 400, width: 360, height: 64 },
+            }),
+            makeAction('lobby-mode-standings-btn', {
+                classes: ['lobby-mode-toolbar__action', 'lobby-header-action'],
+                rect: { left: 260, top: 8, width: 44, height: 44 },
+            }),
+            makeAction('lobby-mode-garage-btn', {
+                classes: ['lobby-mode-toolbar__action', 'lobby-header-action'],
+                rect: { left: 312, top: 8, width: 44, height: 44 },
+            }),
+            makeAction('lobby-mode-settings-btn', {
+                classes: ['lobby-mode-toolbar__action', 'lobby-header-action'],
+                rect: { left: 364, top: 8, width: 44, height: 44 },
+            }),
+        ];
+    }
+
+    function withDocument(actions, run) {
+        const originalDocument = global.document;
+        global.document = {
+            getElementById: (id) => actions.find((action) => action.id === id) || null,
+        };
+        try {
+            return run();
+        } finally {
+            global.document = originalDocument;
+        }
+    }
+
+    it('moves from Start Race up into the top-right toolbar, then across those icons', () => {
+        const onCarouselNavigate = vi.fn(() => true);
+        const lobby = new LobbyUi({ onCarouselNavigate });
+        const [start, standings, garage, settings] = dailyActions();
+        const actions = [start, standings, garage, settings];
+        lobby.mode = 'daily';
+        attachOverlay(lobby);
+        lobby.getVisibleActions = () => actions;
+
+        withDocument(actions, () => {
+            lobby.resetKeyboardNav();
+
+            lobby.handleKeydown(keyEvent('ArrowUp'));
+            expect(standings.classList.contains('is-menu-selected')).toBe(true);
+            expect(start.classList.contains('is-menu-selected')).toBe(false);
+            expect(onCarouselNavigate).not.toHaveBeenCalled();
+
+            lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(garage.classList.contains('is-menu-selected')).toBe(true);
+            expect(standings.classList.contains('is-menu-selected')).toBe(false);
+            expect(onCarouselNavigate).not.toHaveBeenCalled();
+
+            lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(settings.classList.contains('is-menu-selected')).toBe(true);
+            expect(onCarouselNavigate).not.toHaveBeenCalled();
+        });
+    });
+
+    it('keeps left/right on Start Race for the track picker', () => {
+        const onCarouselNavigate = vi.fn(() => true);
+        const lobby = new LobbyUi({ onCarouselNavigate });
+        const actions = dailyActions();
+        lobby.mode = 'daily';
+        attachOverlay(lobby);
+        lobby.getVisibleActions = () => actions;
+
+        withDocument(actions, () => {
+            lobby.resetKeyboardNav();
+            lobby.handleKeydown(keyEvent('ArrowLeft'));
+            expect(onCarouselNavigate).toHaveBeenCalledWith('daily', 'left');
+            expect(actions[0].classList.contains('is-menu-selected')).toBe(false);
+        });
+    });
+
+    it('includes header actions that are not laid out yet', () => {
+        const start = {
+            id: 'daily-challenge-start-btn',
+            disabled: false,
+            hidden: false,
+            offsetParent: null,
+        };
+        const standings = {
+            id: 'lobby-mode-standings-btn',
+            disabled: false,
+            hidden: false,
+            offsetParent: null,
+        };
+        const pane = {
+            querySelectorAll: () => [start],
+        };
+        const header = {
+            querySelectorAll: () => [standings],
+        };
+        const lobby = new LobbyUi();
+        lobby.mode = 'daily';
+        Object.defineProperty(lobby, 'activePane', { get: () => pane });
+        const originalDocument = global.document;
+        global.document = {
+            querySelector: (selector) => (selector === '.lobby-header' ? header : null),
+        };
+        try {
+            expect(lobby.getVisibleActions()).toEqual([start, standings]);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('keeps Home on the mode list and omits the hidden Daily toolbar', () => {
+        const daily = { id: 'lobby-home-daily-btn', disabled: false, hidden: false };
+        const standings = { id: 'lobby-mode-standings-btn', disabled: false, hidden: false };
+        const pane = { querySelectorAll: () => [daily] };
+        const header = { querySelectorAll: () => [standings] };
+        const lobby = new LobbyUi();
+        lobby.mode = 'home';
+        Object.defineProperty(lobby, 'activePane', { get: () => pane });
+        const originalDocument = global.document;
+        global.document = {
+            querySelector: (selector) => (selector === '.lobby-header' ? header : null),
+        };
+        try {
+            expect(lobby.getVisibleActions()).toEqual([daily]);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+});

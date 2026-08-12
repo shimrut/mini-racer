@@ -1186,7 +1186,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             /id="lobby-challenge-pane"[\s\S]*lobby-pane-heading__eyebrow/,
         );
         expect(css).toMatch(
-            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-end;/s,
+            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-start;/s,
         );
         expect(css).toMatch(
             /\.lobby-pane\.main-menu\s*\{[^}]*margin-top:\s*auto;/s,
@@ -1293,6 +1293,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(garageMarkup).toContain('viewBox="0 0 576 512"');
 
         expect(css).toContain('.lobby-mode-action');
+        expect(css).toMatch(
+            /\.lobby-mode-action\s*\{[^}]*width:\s*max-content;/s,
+        );
         expect(css).not.toContain('.lobby-utility-row');
         expect(css).not.toContain('lobby-mode-action::after');
         expect(lobbyCss).toContain('.lobby-header-action');

@@ -366,13 +366,37 @@ export class LobbyUi {
     }
 
     getVisibleActions() {
-        return [
-            ...collectVisibleActionButtons(this.activePane, '[data-lobby-action]'),
-            ...collectVisibleActionButtons(
-                document.querySelector?.('.lobby-header'),
-                '[data-lobby-action]',
-            ),
-        ];
+        const paneActions = collectVisibleActionButtons(
+            this.activePane,
+            '[data-lobby-action]',
+            { requireLaidOut: false },
+        );
+        if (this.mode === 'home') return paneActions;
+
+        const headerActions = collectVisibleActionButtons(
+            document.querySelector?.('.lobby-header'),
+            '[data-lobby-action]',
+            { requireLaidOut: false },
+        ).filter((button) => (
+            this.mode !== 'challenge' || button.id !== 'lobby-mode-standings-btn'
+        ));
+        return [...paneActions, ...headerActions];
+    }
+
+    getSelectedAction(buttons = this.getVisibleActions()) {
+        const index = this._menuKeyboardState.selectedIndex;
+        if (typeof index === 'number' && index >= 0 && index < buttons.length) {
+            return buttons[index];
+        }
+        const preferredIndex = this.getPreferredIndex(buttons);
+        return preferredIndex >= 0 ? buttons[preferredIndex] : null;
+    }
+
+    isToolbarAction(button) {
+        return Boolean(
+            button?.classList?.contains?.('lobby-mode-toolbar__action')
+            || button?.classList?.contains?.('lobby-header-action'),
+        );
     }
 
     getPreferredIndex(buttons = this.getVisibleActions()) {
@@ -391,7 +415,7 @@ export class LobbyUi {
         const buttons = this.getVisibleActions();
         resetMenuKeyboardState(this._menuKeyboardState, buttons, {
             preferredIndex: this.getPreferredIndex(buttons),
-            container: this.activePane,
+            container: this.overlay,
             focusPreferred: false,
         });
     }
@@ -420,11 +444,19 @@ export class LobbyUi {
             this.onBack?.(this.mode);
             return;
         }
-        if (this.handleCarouselKeydown(event)) return;
+        const buttons = this.getVisibleActions();
+        const direction = getMenuNavDirection(event.key);
+        if (
+            (direction === 'left' || direction === 'right')
+            && !this.isToolbarAction(this.getSelectedAction(buttons))
+            && this.handleCarouselKeydown(event)
+        ) {
+            return;
+        }
         handleMenuListKeydown(event, {
-            buttons: this.getVisibleActions(),
+            buttons,
             state: this._menuKeyboardState,
-            container: this.activePane,
+            container: this.overlay,
         });
     }
 
@@ -448,7 +480,7 @@ export class LobbyUi {
         if (!this._menuKeyboardState.keyboardNavActive) return;
         if (event.pointerType && event.pointerType !== 'mouse') return;
         dismissMenuKeyboardCue(this._menuKeyboardState, this.getVisibleActions(), {
-            container: this.activePane,
+            container: this.overlay,
             preferredIndex: this.getPreferredIndex(),
         });
     }
