@@ -724,6 +724,7 @@ describe('TrackCarousel selection', () => {
             medal: { hidden: true, dataset: { medalKey: '' } },
             requirement: { hidden: false },
             requirementList: { replaceChildren: vi.fn() },
+            verificationError: { hidden: true, textContent: '' },
             meta: { hidden: true },
         };
 
@@ -908,7 +909,7 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
         }
     }
 
-    it('moves from Start Race up into the mode switch, then across to the top-right icons', () => {
+    it('moves from Start Race up into the top-right toolbar, then left into the mode switch', () => {
         const onCarouselNavigate = vi.fn(() => true);
         const lobby = new LobbyUi({ onCarouselNavigate });
         const [start, daily, campaign, standings, garage, settings] = dailyActions();
@@ -921,16 +922,9 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
             lobby.resetKeyboardNav();
 
             lobby.handleKeydown(keyEvent('ArrowUp'));
-            expect(daily.classList.contains('is-menu-selected')).toBe(true);
-            expect(start.classList.contains('is-menu-selected')).toBe(false);
-            expect(onCarouselNavigate).not.toHaveBeenCalled();
-
-            lobby.handleKeydown(keyEvent('ArrowRight'));
-            expect(campaign.classList.contains('is-menu-selected')).toBe(true);
-            expect(onCarouselNavigate).not.toHaveBeenCalled();
-
-            lobby.handleKeydown(keyEvent('ArrowRight'));
             expect(standings.classList.contains('is-menu-selected')).toBe(true);
+            expect(start.classList.contains('is-menu-selected')).toBe(false);
+            expect(daily.classList.contains('is-menu-selected')).toBe(false);
             expect(onCarouselNavigate).not.toHaveBeenCalled();
 
             lobby.handleKeydown(keyEvent('ArrowRight'));
@@ -939,6 +933,18 @@ describe('lobby keyboard nav on Daily and Campaign', () => {
 
             lobby.handleKeydown(keyEvent('ArrowRight'));
             expect(settings.classList.contains('is-menu-selected')).toBe(true);
+            expect(onCarouselNavigate).not.toHaveBeenCalled();
+
+            lobby.handleKeydown(keyEvent('ArrowLeft'));
+            lobby.handleKeydown(keyEvent('ArrowLeft'));
+            expect(standings.classList.contains('is-menu-selected')).toBe(true);
+
+            lobby.handleKeydown(keyEvent('ArrowLeft'));
+            expect(campaign.classList.contains('is-menu-selected')).toBe(true);
+            expect(onCarouselNavigate).not.toHaveBeenCalled();
+
+            lobby.handleKeydown(keyEvent('ArrowLeft'));
+            expect(daily.classList.contains('is-menu-selected')).toBe(true);
             expect(onCarouselNavigate).not.toHaveBeenCalled();
         });
     });

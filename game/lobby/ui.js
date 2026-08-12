@@ -1,7 +1,9 @@
 import {
+    applyMenuSelection,
     collectVisibleActionButtons,
     createMenuKeyboardState,
     dismissMenuKeyboardCue,
+    findSpatialMenuIndex,
     getMenuNavDirection,
     handleMenuListKeydown,
     resetMenuKeyboardState,
@@ -404,12 +406,19 @@ export class LobbyUi {
         return preferredIndex >= 0 ? buttons[preferredIndex] : null;
     }
 
-    isHeaderChromeAction(button) {
+    isToolbarAction(button) {
         return Boolean(
             button?.classList?.contains?.('lobby-mode-toolbar__action')
             || button?.classList?.contains?.('lobby-header-action')
-            || button?.classList?.contains?.('lobby-mode-switch__btn')
         );
+    }
+
+    isModeSwitchAction(button) {
+        return Boolean(button?.classList?.contains?.('lobby-mode-switch__btn'));
+    }
+
+    isHeaderChromeAction(button) {
+        return this.isToolbarAction(button) || this.isModeSwitchAction(button);
     }
 
     getPreferredIndex(buttons = this.getVisibleActions()) {
@@ -468,11 +477,36 @@ export class LobbyUi {
         ) {
             return;
         }
+        if (this.movePrimaryUpToToolbar(event, buttons, direction)) return;
         handleMenuListKeydown(event, {
             buttons,
             state: this._menuKeyboardState,
             container: this.overlay,
         });
+    }
+
+    movePrimaryUpToToolbar(event, buttons, direction) {
+        if (this.mode !== 'daily' && this.mode !== 'campaign') return false;
+        if (direction !== 'up') return false;
+        const selected = this.getSelectedAction(buttons);
+        if (!selected || this.isHeaderChromeAction(selected)) return false;
+
+        const toolbar = buttons.filter((button) => this.isToolbarAction(button));
+        if (!toolbar.length) return false;
+
+        const subset = [selected, ...toolbar];
+        const nextSubsetIndex = findSpatialMenuIndex(subset, 0, 'up');
+        if (nextSubsetIndex < 0) return false;
+
+        const nextIndex = buttons.indexOf(subset[nextSubsetIndex]);
+        if (nextIndex < 0) return false;
+
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        this._menuKeyboardState.selectedIndex = nextIndex;
+        this._menuKeyboardState.keyboardNavActive = true;
+        applyMenuSelection(buttons, nextIndex, { container: this.overlay });
+        return true;
     }
 
     handleCarouselKeydown(event) {

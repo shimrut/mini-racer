@@ -1186,7 +1186,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             /id="lobby-challenge-pane"[\s\S]*lobby-pane-heading__eyebrow/,
         );
         expect(css).toMatch(
-            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-start;/s,
+            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-end;/s,
         );
         expect(css).toMatch(
             /\.lobby-pane\.main-menu\s*\{[^}]*margin-top:\s*auto;/s,
@@ -1302,7 +1302,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(css).toContain('.lobby-mode-action');
         expect(css).toMatch(
-            /\.lobby-mode-action\s*\{[^}]*width:\s*max-content;/s,
+            /\.lobby-mode-action\.is-menu-selected \.lobby-mode-action__label\s*\{[^}]*box-shadow:/s,
         );
         expect(css).toMatch(
             /\.lobby-mode-switch__btn\.is-menu-selected\s*\{[^}]*box-shadow:/s,

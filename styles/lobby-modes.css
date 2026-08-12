@@ -319,16 +319,15 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 .lobby-mode-menu {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: flex-end;
     gap: 0.5rem;
     width: 100%;
 }
 
 .lobby-mode-action {
     display: block;
-    width: max-content;
-    max-width: 100%;
-    padding: 0.45rem 0.4rem;
+    width: min(95%, 27rem);
+    padding: 0.45rem 0;
     color: var(--text-color);
     text-align: left;
     background: transparent;
@@ -337,6 +336,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 .lobby-mode-action__label {
+    display: inline-block;
     font-family: var(--header-font);
     font-size: clamp(1.35rem, 5vw, 1.85rem);
     font-style: italic;
@@ -346,7 +346,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     text-transform: uppercase;
 }
 
-.lobby-mode-action.is-menu-selected {
+.lobby-mode-action.is-menu-selected .lobby-mode-action__label {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
