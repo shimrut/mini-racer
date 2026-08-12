@@ -157,6 +157,16 @@ describe('mode-priority startup', () => {
         controller.clearForTests();
     });
 
+    it('leaves Campaign installed when switching away from Daily', async () => {
+        clearModeRuntimeCacheForTests();
+        const controller = createModeRuntimeController(RealTimeRacer);
+        await controller.ensure('daily');
+        await controller.ensure('campaign');
+        expect(RealTimeRacer.prototype.applyDailyChallenge)
+            .toBe(challengeRunEngineMethods.applyDailyChallenge);
+        controller.clearForTests();
+    });
+
     it('invokes dynamically installed mode methods with racer context and arguments', async () => {
         const racer = Object.create(RealTimeRacer.prototype);
         racer.ensureModeRuntime = vi.fn(async (mode) => {
@@ -179,5 +189,18 @@ describe('mode-priority startup', () => {
             mode: 'campaign',
             args: ['numberZero', options],
         });
+    });
+
+    it('installs the selected mode when switching lobbies', async () => {
+        const racer = Object.create(RealTimeRacer.prototype);
+        racer.installModeRuntime = vi.fn(async () => {});
+        racer.ensureModeRuntime = vi.fn(async () => {});
+        racer.showCampaignLobby = vi.fn();
+
+        await racer.activateMode('campaign');
+
+        expect(racer.installModeRuntime).toHaveBeenCalledWith('campaign');
+        expect(racer.ensureModeRuntime).not.toHaveBeenCalled();
+        expect(racer.showCampaignLobby).toHaveBeenCalled();
     });
 });

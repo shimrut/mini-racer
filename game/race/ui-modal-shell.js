@@ -520,6 +520,7 @@ export class ModalShell {
     }
 
     _syncCombinedNextRace(nextRace = null) {
+        this._combinedNextRace = nextRace;
         const button = this.combinedNextBtn;
         if (!button) return;
         const actions = this.modalCombinedView?.querySelector?.('.combined-actions');
@@ -554,6 +555,11 @@ export class ModalShell {
         this.combinedRestartBtn?.classList?.toggle?.(
             'combined-action-btn--primary',
             !enabled,
+        );
+        const action = this._combinedNextRace?.action;
+        this._bindClickAction(
+            button,
+            enabled && typeof action === 'function' ? () => action() : null,
         );
         return true;
     }

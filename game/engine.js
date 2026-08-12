@@ -225,6 +225,12 @@ export class RealTimeRacer {
     this.modeRuntimeController = modeRuntimeController;
     if (typeof ensureModeRuntime === "function") {
       this.ensureModeRuntime = ensureModeRuntime;
+      this.installModeRuntime = (mode) => {
+        if (this.modeRuntimeController) {
+          return this.modeRuntimeController.ensure(mode);
+        }
+        return this.ensureModeRuntime(mode);
+      };
       this.prefetchModeRuntime = async (mode) => {
         if (this.modeRuntimeController) {
           return this.modeRuntimeController.prefetch(mode);
@@ -237,9 +243,11 @@ export class RealTimeRacer {
         this.activeRaceMode,
         this.launchTarget?.mode,
       );
+      this.installModeRuntime = (mode) => modeRuntimeController.ensure(mode);
       this.prefetchModeRuntime = (mode) => modeRuntimeController.prefetch(mode);
     } else {
       this.ensureModeRuntime = async () => null;
+      this.installModeRuntime = async () => null;
       this.prefetchModeRuntime = async () => null;
     }
     this.lastPlayedDailyChallenge = null;
@@ -782,7 +790,7 @@ export class RealTimeRacer {
   }
 
   async activateMode(mode, options = {}) {
-    await this.ensureModeRuntime(mode);
+    await this.installModeRuntime(mode);
     if (mode === "daily") return this.showDailyLobby(options);
     if (mode === "campaign") return this.showCampaignLobby(options);
     if (mode === "challenge") {

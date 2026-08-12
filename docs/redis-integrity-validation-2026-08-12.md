@@ -41,8 +41,8 @@ These close the findings the hosted run left open, plus the residual windows it 
 
 - Mode warmup prefetches other mode bundles without leaving Campaign `challenge-run` helpers on the prototype when Daily is active.
 - Collision auto-restart resets multi-lap challenge progress so a crash cannot fake-finish the race.
-- Campaign **Next** and lobby unlocks use verified progress only; starting the next stage waits for confirmation and aborts when verification does not settle.
-- Reddit sign-in merges guest Daily leaderboard rows for the seven-day playlist onto the signed-in account, then deletes the guest row.
+- Campaign **Next** and lobby unlocks use verified progress only; starting the next stage waits for confirmation and aborts when verification does not settle. After the server accepts the run, the open finish sheet turns **Next** on and restores its click action.
+- Reddit sign-in merges guest Daily leaderboard rows for the seven-day playlist onto the signed-in account, then deletes the guest row. Copy and delete hold both players' Daily submission locks, matching Campaign merge.
 
 ## Local gates
 

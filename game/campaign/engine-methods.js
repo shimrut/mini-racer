@@ -1037,7 +1037,8 @@ export const campaignEngineMethods = {
     },
 
     /**
-     * Progress is confirmed by the time this runs, so the result, medal, unlock and Next action are already safe.
+     * Progress is confirmed by the time this runs, so the result, medal and unlock are already safe.
+     * The finish-sheet Next action is turned on after this accept path updates verified progress.
      * Only the ghost is missing: keep the replay for a bounded number of retries, then stop asking for it.
      */
     settleCampaignGhostPersistence(raceId, response) {
@@ -1167,6 +1168,11 @@ export const campaignEngineMethods = {
                 }, { paint: true });
             } else {
                 this.refreshCampaignVerificationOverlay?.();
+            }
+            if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
+                this.modal.setCombinedNextRaceEnabled?.(
+                    getCampaignNextStageTarget(this, stage)?.unlocked === true,
+                );
             }
             await this.refreshCampaignAfterAcceptedRun(stage, ghostRecovery);
             void this.resolveLeaderboardOpponentAdvanceAfterVerification?.({

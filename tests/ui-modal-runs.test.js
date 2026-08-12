@@ -1474,6 +1474,25 @@ describe('combined finish next race button', () => {
         context._syncCombinedNextRace(null);
         expect(context.setCombinedNextRaceEnabled(true)).toBe(false);
     });
+
+    it('rebinds Next after a pending offer is later unlocked', () => {
+        const dom = combinedActionsDom();
+        const context = nextButtonContext(dom);
+        const action = vi.fn();
+
+        context._syncCombinedNextRace({
+            label: 'Next',
+            enabled: false,
+            action,
+        });
+        expect(context.combinedNextBtn.disabled).toBe(true);
+        expect(context.combinedNextBtn.onclick).toBe(null);
+
+        expect(context.setCombinedNextRaceEnabled(true)).toBe(true);
+        expect(context.combinedNextBtn.disabled).toBe(false);
+        context.combinedNextBtn.onclick();
+        expect(action).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe('combined finish head to head win actions', () => {

@@ -1749,6 +1749,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       collisionRestartDelaySec: 0.5,
       scoreboardReplay: { reset: vi.fn() },
       resetRunToTrackStart: RealTimeRacer.prototype.resetRunToTrackStart,
+      resetChallengeRunAfterCollisionRestart:
+        RealTimeRacer.prototype.resetChallengeRunAfterCollisionRestart,
       armRelaunchDelay: RealTimeRacer.prototype.armRelaunchDelay,
       clearSteeringInput: vi.fn(),
       _resetLapTrailAfterIntermediateLap:
@@ -1774,6 +1776,55 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.currentTime).toBe(0);
     expect(engine.relaunchDelayRemaining).toBe(0.5);
     expect(engine.status).toBe("playing");
+  });
+
+  it("resets multi-lap challenge progress when collision auto-restart starts a fresh attempt", () => {
+    const engine = {
+      status: "playing",
+      currentTrack: {
+        startPos: { x: 8, y: 4 },
+        startAngle: 0,
+      },
+      runtimeConfig: { carRearAxleOffset: 0 },
+      collisionRestartDelaySec: 0.5,
+      currentChallengeRun: {
+        objectiveType: "multi_lap_total",
+        requiredLaps: 2,
+        completedLaps: 1,
+        lastLapAt: 20,
+        bestLap: 20,
+        bestLapSecBeforeLastLap: null,
+        recentLaps: [20],
+      },
+      scoreboardReplay: { reset: vi.fn() },
+      resetRunToTrackStart: RealTimeRacer.prototype.resetRunToTrackStart,
+      resetChallengeRunAfterCollisionRestart:
+        RealTimeRacer.prototype.resetChallengeRunAfterCollisionRestart,
+      armRelaunchDelay: RealTimeRacer.prototype.armRelaunchDelay,
+      clearSteeringInput: vi.fn(),
+      _resetLapTrailAfterIntermediateLap:
+        RealTimeRacer.prototype._resetLapTrailAfterIntermediateLap,
+      recordRunPoint: vi.fn(),
+      routeTrace: { clear: vi.fn() },
+      runHistory: { clear: vi.fn() },
+      skidMarks: { clear: vi.fn() },
+      modal: { closeModal: vi.fn() },
+      hud: {
+        setPauseVisible: vi.fn(),
+        setHudPersonalBestsOpenAllowed: vi.fn(),
+        syncHud: vi.fn(),
+      },
+      updateDailyChallengeHud: vi.fn(),
+      requestRender: vi.fn(),
+      getNow: () => 1234,
+    };
+
+    RealTimeRacer.prototype.restartCurrentRunAfterCollision.call(engine);
+
+    expect(engine.currentChallengeRun.completedLaps).toBe(0);
+    expect(engine.currentChallengeRun.lastLapAt).toBe(0);
+    expect(engine.currentChallengeRun.bestLap).toBe(null);
+    expect(engine.currentChallengeRun.recentLaps).toEqual([]);
   });
 
   it("preserves cumulative checkpoint splits when resetting intermediate-lap trails", () => {

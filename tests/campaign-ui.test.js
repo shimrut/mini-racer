@@ -762,6 +762,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
             unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
         });
+        expect(context.modal.setCombinedNextRaceEnabled).toHaveBeenCalledWith(true);
         expect(standingsSession.refreshedRaceIds).toContain('numbered-v1-00');
         expect(standingsSession.snapshotByRaceId.get('numbered-v1-00')).toMatchObject({
             playerRankLabel: '#1',
@@ -2625,7 +2626,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             bestLapTime: null,
             activeDailyChallenge: null,
             journeys: { startAttempt: vi.fn() },
-            lobbyUi: { setCampaignPrimaryLoading: vi.fn() },
+            lobbyUi: {
+                setCampaignPrimaryLoading: vi.fn(),
+                setRaceStartError: vi.fn(),
+            },
             loadTrack: vi.fn(),
             applyDailyChallenge: vi.fn(function applyDailyChallenge(challenge) {
                 this.activeDailyChallenge = challenge;
@@ -2895,6 +2899,42 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(campaignServiceMocks.startServerCampaignRace)
             .toHaveBeenCalledWith(nextStage.raceId);
         expect(context.loadCampaignLobby).not.toHaveBeenCalled();
+    });
+
+    it('does not start the next stage when the previous run is refused', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
+        const nextStage = CAMPAIGN_STAGES[1];
+        const context = createStartContext({
+            status: 'won',
+            activeCampaignStage: CAMPAIGN_STAGES[0],
+            campaignLobbyState: {
+                complete: false,
+                nextStage: { id: nextStage.raceId },
+                stages: [{ id: nextStage.raceId, unlocked: true }],
+            },
+            reset: vi.fn(),
+        });
+        enqueueCampaignVerification({
+            raceId: CAMPAIGN_STAGES[0].raceId,
+            trackKey: CAMPAIGN_STAGES[0].trackKey,
+            bestTime: 7.3,
+            lapCount: 1,
+            rulesRevision: 1,
+            replay: { revision: 1, segments: [] },
+        });
+        markCampaignVerificationError(
+            CAMPAIGN_STAGES[0].raceId,
+            'Submission replay validation failed.',
+        );
+
+        await context.startCampaignNextStage(nextStage);
+
+        expect(campaignServiceMocks.startServerCampaignRace).not.toHaveBeenCalled();
+        expect(context.startSequence).not.toHaveBeenCalled();
+        expect(context.lobbyUi.setRaceStartError).toHaveBeenCalledWith(
+            'campaign',
+            'Your last run is still being verified. Wait a moment, then try Next again.',
+        );
     });
 
     it('keeps racing when the start stamp is refused for a reason that is not the stage', async () => {

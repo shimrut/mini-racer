@@ -4,6 +4,7 @@ import {
     handleFinishCrossing,
     handleHardCrash
 } from '../game/race/run-policy.js';
+import { raceEngineMethods } from '../game/race/engine-methods.js';
 
 function createDailyState(overrides = {}) {
     return {
@@ -75,8 +76,7 @@ describe('run-policy daily challenge parity', () => {
             mode: 'campaign',
         });
 
-        state.currentChallengeRun.completedLaps = 0;
-        state.currentChallengeRun.lastLapAt = 0;
+        raceEngineMethods.resetChallengeRunAfterCollisionRestart.call(state);
         state.currentTime = 0;
 
         const finishResult = handleFinishCrossing(state, policy, 0, 18);
