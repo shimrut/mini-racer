@@ -914,3 +914,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     font-weight: 800;
     color: var(--text-color);
 }
+
+#garage-modal .garage-unlock-panel__detail {
+    margin: -.35rem 0 0;
+    font-family: var(--header-font);
+    font-size: .82rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+}

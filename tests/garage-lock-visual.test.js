@@ -21,6 +21,11 @@ describe('Garage locked-car visual contract', () => {
         expect(ui).toContain(
             "lockIndicator.classList.toggle('has-progress', !unlocked && ratio > 0)",
         );
+        expect(ui).toContain("statusLabel.textContent = 'How to unlock'");
+        expect(ui).toContain("detail.className = 'garage-unlock-panel__detail'");
+        expect(ui).toContain('detail.textContent = status.detail ||');
+        expect(ui).toContain('progress.textContent = `Progress: ${status.current} of ${status.required}`');
+        expect(css).toContain('.garage-unlock-panel__detail');
         expect(css).toMatch(
             /\.garage-skin-option__lock\s*\{[^}]*background:\s*rgba\(248,\s*250,\s*252,\s*\.06\);[^}]*color:\s*#fff;/s,
         );
