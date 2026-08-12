@@ -246,16 +246,13 @@ export class GarageUi {
         title.textContent = `${skin.label} locked`;
         const statusLabel = document.createElement('p');
         statusLabel.className = 'result-share-panel__status';
-        statusLabel.textContent = 'How to unlock';
+        statusLabel.textContent = 'Unlock requirement';
         const requirement = document.createElement('blockquote');
         requirement.className = 'result-share-panel__copy';
         requirement.textContent = status.label;
-        const detail = document.createElement('p');
-        detail.className = 'garage-unlock-panel__detail';
-        detail.textContent = status.detail || '';
         const progress = document.createElement('p');
         progress.className = 'garage-unlock-panel__progress';
-        progress.textContent = `Progress: ${status.current} of ${status.required}`;
+        progress.textContent = `Progress ${status.current}/${status.required}`;
         const actions = document.createElement('div');
         actions.className = 'result-share-panel__actions';
         const close = document.createElement('button');
@@ -266,7 +263,7 @@ export class GarageUi {
         close.addEventListener('click', () => this.closeUnlockDetails());
 
         actions.appendChild(close);
-        card.append(title, statusLabel, requirement, detail, progress, actions);
+        card.append(title, statusLabel, requirement, progress, actions);
         scrim.appendChild(card);
         host.appendChild(scrim);
         this.unlockDetailsPanel = scrim;
@@ -315,7 +312,7 @@ export class GarageUi {
             btn.classList.toggle('is-locked', !unlocked);
             btn.setAttribute('aria-disabled', !unlocked ? 'true' : 'false');
             btn.setAttribute('aria-label', !unlocked && unlockLabel
-                ? `${skin.label}. Locked. ${unlockProgress?.detail || unlockLabel} Progress: ${unlockProgress?.current ?? 0} of ${unlockProgress?.required ?? 1}. Open unlock requirements.`
+                ? `${skin.label}. Locked. ${unlockLabel} Progress ${unlockProgress?.current ?? 0} of ${unlockProgress?.required ?? 1}. Open unlock requirements.`
                 : skin.label);
             const lockIndicator = btn.querySelector('.garage-skin-option__lock');
             const ratio = Math.max(0, Math.min(1, unlockProgress?.ratio ?? 0));

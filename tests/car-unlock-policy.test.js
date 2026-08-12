@@ -94,8 +94,7 @@ describe('car unlock policy', () => {
         });
 
         expect(getCarUnlockRequirementProgress(EXTRA_CAR_ASSETS.plasma, snapshot)).toMatchObject({
-            label: 'Publish Head to Head challenge posts on 5 different tracks',
-            detail: 'While signed in to Reddit, create user-authored Head to Head challenge posts on 5 different tracks. Repeating a track does not add progress; comments and Brag replies do not count.',
+            label: 'You need to post Head to Head challenges on 5 different tracks to unlock this skin.',
             current: 3,
             required: 5,
             ratio: 0.6,
@@ -104,22 +103,22 @@ describe('car unlock policy', () => {
         expect(getCarUnlockRequirementProgress(EXTRA_CAR_ASSETS.cobalt, snapshot)).toBeNull();
     });
 
-    it('describes the exact player action behind every tracked unlock', () => {
+    it('states every unlock requirement in one specific sentence', () => {
         const expected = [
-            [EXTRA_CAR_ASSETS.crimson, 'Finish any verified race', 'Complete a Daily, Campaign, or Head to Head race whose result the server verifies. A win is not required.'],
-            [EXTRA_CAR_ASSETS.gold, 'Earn Gold or Author on 5 different Campaign stages', 'Finish 5 different Campaign stages with a Gold or Author medal. Each stage counts once; Author also counts as Gold-or-better.'],
-            [EXTRA_CAR_ASSETS.blaze, 'Earn Gold or Author on 10 different Campaign stages', 'Finish 10 different Campaign stages with a Gold or Author medal. Each stage counts once; Author also counts as Gold-or-better.'],
-            [EXTRA_CAR_ASSETS.surge, 'Earn Author on 5 different Campaign stages', 'Finish 5 different Campaign stages with an Author medal. Each stage counts once.'],
-            [EXTRA_CAR_ASSETS.arctic, 'Earn Author on 10 different Campaign stages', 'Finish 10 different Campaign stages with an Author medal. Each stage counts once.'],
-            [EXTRA_CAR_ASSETS.fuchsia, 'Publish a Head to Head challenge post', 'While signed in to Reddit, create and publish your first user-authored Head to Head challenge post from a verified race result. Comments and Brag replies do not count.'],
-            [EXTRA_CAR_ASSETS.plasma, 'Publish Head to Head challenge posts on 5 different tracks', 'While signed in to Reddit, create user-authored Head to Head challenge posts on 5 different tracks. Repeating a track does not add progress; comments and Brag replies do not count.'],
-            [EXTRA_CAR_ASSETS.lime, 'Beat another player’s Head to Head challenge', 'Win your first verified Head to Head challenge against another player. Ties and losses do not count; the optional Brag comment does not unlock this car.'],
-            [EXTRA_CAR_ASSETS.onyx, 'Beat 10 different Head to Head challenges', 'Win 10 different verified Head to Head challenges against other players. Replaying the same challenge does not add progress; ties and losses do not count; Brag comments do not add progress.'],
+            [EXTRA_CAR_ASSETS.crimson, 'You need to complete 1 race to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.gold, 'You need 5 Gold Campaign medals to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.blaze, 'You need 10 Gold Campaign medals to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.surge, 'You need 5 Author Campaign medals to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.arctic, 'You need 10 Author Campaign medals to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.fuchsia, 'You need to issue 1 Head to Head challenge to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.plasma, 'You need to post Head to Head challenges on 5 different tracks to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.lime, 'You need to beat 1 Head to Head challenge to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.onyx, 'You need to beat 10 Head to Head challenges to unlock this skin.'],
         ];
 
-        for (const [assetName, label, detail] of expected) {
+        for (const [assetName, label] of expected) {
             expect(getCarUnlockRequirementProgress(assetName, buildCarUnlockSnapshot()))
-                .toMatchObject({ label, detail });
+                .toMatchObject({ label });
         }
     });
 });

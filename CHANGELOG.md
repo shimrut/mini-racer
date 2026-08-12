@@ -1,11 +1,8 @@
 # Changelog
 
-- Clarified the Garage Extra-car unlock instructions. Locked-car details now
-  distinguish a server-verified race from Campaign stage medals, a signed-in
-  user-authored Head to Head challenge post from comments and Brag replies,
-  and a verified unique duel win from ties, losses, and replaying a challenge.
-  The panel now shows the action in plain language with progress as `current of
-  required`.
+- Replaced ambiguous Garage Extra-car unlock text with one short requirement
+  per skin: races, Gold Campaign medals, Author Campaign medals, posted Head to
+  Head challenges, or beaten Head to Head challenges.
 
 - Fixed track-load failures that could leave the loading screen or race-start
   transition stranded. The racer now constructs before the default track

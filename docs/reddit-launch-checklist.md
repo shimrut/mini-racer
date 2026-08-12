@@ -78,9 +78,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
   Crimson; an accepted Head-to-Head loss or tie still counts as completion.
   Retained accepted Daily history and any saved Campaign result from before
   achievement tracking also backfill Crimson.
-- [ ] Campaign Extra-car progress treats Author as Gold-or-better on that same
-  stage: 5/all 10 Gold-or-Author stages unlock Gold/Blaze, while 5/all 10 Author
-  stages unlock Surge/Arctic.
+- [ ] The 5/10 Gold Campaign medal requirements unlock Gold/Blaze, while the
+  5/10 Author Campaign medal requirements unlock Surge/Arctic.
 - [ ] While signed in, the first successful user-authored Head-to-Head challenge
   post unlocks Fuchsia, five different posted track keys unlock Plasma, the
   first verified duel win unlocks Lime, and ten different won challenge IDs
@@ -89,11 +88,11 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Locked Garage cars show a white lock on a barely visible backing. The
   white circular progress arc is absent at zero and appears after progress
   begins. Pointer or keyboard activation opens the compact requirement/progress
-  panel with a plain-language action and `Progress: current of required`, but
-  cannot select the car; Close and Escape dismiss only that panel and restore
-  focus to its car. The preferences API still rejects locked choices. Unlocks
-  remain after post deletion, slower retries, and profile expiry; an authorized
-  guest Crimson unlock merges at Reddit sign-in.
+  panel with one short requirement, but cannot select the car; Close and Escape
+  dismiss only that panel and restore focus to its car. The preferences API
+  still rejects locked choices. Unlocks remain after post deletion, slower
+  retries, and profile expiry; an authorized guest Crimson unlock merges at
+  Reddit sign-in.
 - [ ] In Daily standings, select an available historical day and a non-self
   racer, confirm Race Opponent, and verify the correct day/track starts with
   that opponent's ghost, target time, and checkpoint deltas while a faster
