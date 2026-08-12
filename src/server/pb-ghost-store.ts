@@ -117,14 +117,21 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
     }
 }
 
+/**
+ * Discarding an unusable record is cleanup, not correctness: every caller treats it as absent either way.
+ * Only the writer, holding this player's PB lock, may delete it — a lock-free reader would otherwise delete
+ * a fresh record committed between its own read and its delete, costing the player a ghost permanently.
+ */
 async function readCompatibleRecord({
     playerId,
     competition,
     track,
+    cleanupUnusable = false,
 }: {
     playerId: string;
     competition: Competition;
     track: Record<string, any>;
+    cleanupUnusable?: boolean;
 }): Promise<PlayerTrackPbRecord | null> {
     const collectionKey = competition.pbHashKey;
     const field = playerField(playerId);
@@ -133,7 +140,7 @@ async function readCompatibleRecord({
     const fingerprint = createTrackFingerprint(track);
     const raceIdentity = getCompetitionRaceIdentity(competition);
     if (!record) {
-        if (raw) await redis.hDel(collectionKey, [field]);
+        if (raw && cleanupUnusable) await redis.hDel(collectionKey, [field]);
         return null;
     }
     if (
@@ -143,7 +150,7 @@ async function readCompatibleRecord({
         || record.rulesRevision !== raceIdentity.rulesRevision
         || record.lapCount !== raceIdentity.lapCount
     ) {
-        await redis.hDel(collectionKey, [field]);
+        if (cleanupUnusable) await redis.hDel(collectionKey, [field]);
         return null;
     }
     return record;
@@ -196,7 +203,12 @@ export async function upsertPlayerTrackPersonalBest({
         throw new Error('Personal best update already in progress.');
     }
     try {
-        const existing = await readCompatibleRecord({ playerId, competition, track });
+        const existing = await readCompatibleRecord({
+            playerId,
+            competition,
+            track,
+            cleanupUnusable: true,
+        });
         const trackFingerprint = createTrackFingerprint(track);
         const raceIdentity = getCompetitionRaceIdentity(competition);
         const current: PlayerTrackPbRecord = {

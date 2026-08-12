@@ -544,7 +544,7 @@ describe('PB ghost trace and storage', () => {
         }
     });
 
-    it('deletes a stored PB when competitive track geometry changes', async () => {
+    it('ignores a stored PB when competitive track geometry changes', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:racer',
             competition: toDailyCompetition(CHALLENGE),
@@ -557,6 +557,7 @@ describe('PB ghost trace and storage', () => {
             ...TRACK,
             startPos: { x: 1, y: -1 },
         };
+        vi.clearAllMocks();
 
         expect(createTrackFingerprint(changedTrack)).not.toBe(createTrackFingerprint(TRACK));
         expect(await getPlayerTrackPbRecord({
@@ -564,13 +565,39 @@ describe('PB ghost trace and storage', () => {
             competition: toDailyCompetition(CHALLENGE),
             track: changedTrack,
         })).toBeNull();
+        expect(redis.hDel).not.toHaveBeenCalled();
+    });
+
+    it('clears an incompatible record on the next write, which owns the PB lock', async () => {
+        await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:racer',
+            competition: toDailyCompetition(CHALLENGE),
+            track: TRACK,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: null,
+            ghost: GHOST,
+        });
+        const changedTrack = { ...TRACK, startPos: { x: 1, y: -1 } };
+        vi.clearAllMocks();
+
+        const result = await upsertPlayerTrackPersonalBest({
+            playerId: 'reddit:racer',
+            competition: toDailyCompetition(CHALLENGE),
+            track: changedTrack,
+            bestTimeMs: 15_000,
+            checkpointTimesSec: null,
+            ghost: GHOST,
+        });
+
         expect(redis.hDel).toHaveBeenCalledWith(
             `dailygp:challenge-pbs:${CHALLENGE.id}`,
             [expect.any(String)],
         );
+        expect(result.improved).toBe(true);
+        expect(result.record.trackFingerprint).toBe(createTrackFingerprint(changedTrack));
     });
 
-    it('deletes corrupt PB hash entries instead of returning them', async () => {
+    it('leaves corrupt PB hash entries in place instead of returning them', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:corrupt',
             competition: toDailyCompetition(CHALLENGE),
@@ -582,13 +609,49 @@ describe('PB ghost trace and storage', () => {
         const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
         const field = [...redis.hashes.get(collectionKey).keys()][0];
         redis.hashes.get(collectionKey).set(field, '{not-json');
+        vi.clearAllMocks();
 
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:corrupt',
             competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
-        expect(redis.hDel).toHaveBeenCalledWith(collectionKey, [field]);
+        expect(redis.hDel).not.toHaveBeenCalled();
+        expect(redis.hashes.get(collectionKey).get(field)).toBe('{not-json');
+    });
+
+    it('keeps a fresh PB written between a corrupt read and its cleanup', async () => {
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const field = createHash('sha256').update('reddit:racing-cleanup', 'utf8').digest('base64url');
+        redis.hashes.set(collectionKey, new Map([[field, '{not-json']]));
+
+        // The reader parses the corrupt value, then a fresh PB commits before the reader acts on it.
+        redis.hGet.mockImplementationOnce(async () => {
+            const raw = '{not-json';
+            await upsertPlayerTrackPersonalBest({
+                playerId: 'reddit:racing-cleanup',
+                competition: toDailyCompetition(CHALLENGE),
+                track: TRACK,
+                bestTimeMs: 11_000,
+                checkpointTimesSec: [4, 8],
+                ghost: GHOST,
+            });
+            return raw;
+        });
+
+        expect(await getPlayerTrackPbRecord({
+            playerId: 'reddit:racing-cleanup',
+            competition: toDailyCompetition(CHALLENGE),
+            track: TRACK,
+        })).toBeNull();
+
+        const survivor = await getPlayerTrackPbRecord({
+            playerId: 'reddit:racing-cleanup',
+            competition: toDailyCompetition(CHALLENGE),
+            track: TRACK,
+        });
+        expect(survivor?.bestTimeMs).toBe(11_000);
+        expect(survivor?.ghost).not.toBeNull();
     });
 
     it('rejects PB writes when another update already owns the lock', async () => {
@@ -724,10 +787,11 @@ describe('PB ghost trace and storage', () => {
             competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
-        expect(redis.hDel).toHaveBeenCalledWith(collectionKey, [field]);
+        expect(redis.hDel).not.toHaveBeenCalled();
+        expect(redis.hashes.get(collectionKey).has(field)).toBe(true);
     });
 
-    it('deletes stored PBs when the challenge track key no longer matches', async () => {
+    it('ignores stored PBs when the challenge track key no longer matches', async () => {
         await upsertPlayerTrackPersonalBest({
             playerId: 'reddit:track-key',
             competition: toDailyCompetition(CHALLENGE),
@@ -738,12 +802,13 @@ describe('PB ghost trace and storage', () => {
         });
 
         const mismatchedChallenge = { ...CHALLENGE, trackKey: 'harborParkLoop' };
+        vi.clearAllMocks();
         expect(await getPlayerTrackPbRecord({
             playerId: 'reddit:track-key',
             competition: toDailyCompetition(mismatchedChallenge),
             track: TRACK,
         })).toBeNull();
-        expect(redis.hDel).toHaveBeenCalled();
+        expect(redis.hDel).not.toHaveBeenCalled();
     });
 
     it('drops invalid ghost traces when reading stored PB records', async () => {
@@ -792,7 +857,7 @@ describe('PB ghost trace and storage', () => {
         expect([...redis.hashes.get(collectionKey).keys()]).toContain(expectedField);
     });
 
-    it('deletes stored records with empty track keys or invalid schema fields', async () => {
+    it('rejects stored records with empty track keys or invalid schema fields', async () => {
         const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
         const emptyKeyField = createHash('sha256').update('reddit:empty-key', 'utf8').digest('base64url');
         const badRevisionField = createHash('sha256').update('reddit:bad-revision', 'utf8').digest('base64url');
@@ -842,7 +907,7 @@ describe('PB ghost trace and storage', () => {
             competition: toDailyCompetition(CHALLENGE),
             track: TRACK,
         })).toBeNull();
-        expect(redis.hDel).toHaveBeenCalledTimes(3);
+        expect(redis.hDel).not.toHaveBeenCalled();
     });
 
     it('returns the existing record without rewriting when it already wins the comparison', async () => {
