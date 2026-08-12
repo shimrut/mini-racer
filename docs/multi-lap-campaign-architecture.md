@@ -21,6 +21,12 @@ leaderboard, and retention rules.
   server records for guests and signed-in players. Shared stage leaderboards
   are permanent. Signed-in progress is permanent; guest progress, bests, and PB
   ghosts use a rolling 90-day inactivity window.
+- A finish remains provisional in the client verification queue until the
+  accepted submission response includes an equal-or-better server progress
+  result. Campaign bootstrap repairs a missing progress row from that player's
+  strict-replay leaderboard entry. Expired provisional results are removed from
+  unlock calculation and show `Result expired — race again.` until a new valid
+  run or verified server result resolves the marker.
 - Guest finishes are replay-verified through the normal Campaign submission
   path and ranked under the guest identity. Signing in merges those verified
   results into the Reddit account, keeping the faster result for each stage. A

@@ -85,6 +85,31 @@ describe('campaign client progress', () => {
         });
     });
 
+    it('clears the retired local-only Campaign results on bootstrap', async () => {
+        const storage = new Map();
+        vi.stubGlobal('localStorage', {
+            getItem: (key) => storage.get(key) ?? null,
+            setItem: (key, value) => storage.set(key, String(value)),
+            removeItem: (key) => storage.delete(key),
+        });
+        globalThis.localStorage.setItem('MiniRacerCampaignPending:numbered-v1', JSON.stringify({
+            'numbered-v1-00': { bestTimeMs: 8_250 },
+        }));
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: vi.fn().mockResolvedValue({
+                ranked: true,
+                progress: { resultsByRaceId: {} },
+                standingsByRaceId: {},
+            }),
+        });
+
+        await getCampaignBootstrap();
+
+        expect(globalThis.localStorage.getItem('MiniRacerCampaignPending:numbered-v1')).toBeNull();
+    });
+
     it('marks an unavailable Campaign bootstrap as non-authoritative', async () => {
         globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'));
 

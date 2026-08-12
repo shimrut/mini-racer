@@ -105,6 +105,9 @@ export const scoreboardEngineMethods = {
       for (const entry of dueCampaignEntries) {
         await this.processCampaignVerificationEntry(entry);
       }
+      if (this.campaignVerifiedBootstrap) {
+        this.refreshCampaignVerificationOverlay?.();
+      }
     } finally {
       this.isProcessingVerificationQueue = false;
       this.scheduleVerificationQueueProcessing(null);

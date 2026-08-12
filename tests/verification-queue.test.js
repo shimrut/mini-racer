@@ -641,6 +641,46 @@ describe('verification queue', () => {
             .toBe(new Date(now + 120_000).toISOString());
     });
 
+    it('turns an expired Campaign result into a persistent race-again error', () => {
+        const now = Date.parse('2026-07-18T12:00:00.000Z');
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        installLocalStorage({
+            [STORAGE_KEY]: JSON.stringify({
+                daily: {},
+                campaign: {
+                    'numbered-v1-00': {
+                        raceId: 'numbered-v1-00',
+                        bestTime: 8.25,
+                        replay: REPLAY,
+                        verificationState: 'pending',
+                        nextAttemptAt: now,
+                        expiresAt: new Date(now).toISOString(),
+                    },
+                },
+            }),
+        });
+
+        expect(getCampaignVerificationEntry('numbered-v1-00')).toMatchObject({
+            verificationState: 'error',
+            submissionStage: 'error',
+            statusText: 'Result expired — race again.',
+            replay: null,
+        });
+        expect(getDueCampaignVerifications()).toEqual([]);
+        expect(enqueueCampaignVerification({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime: 9,
+            lapCount: 1,
+            rulesRevision: 1,
+            replay: REPLAY,
+        }).enqueued).toBe(true);
+        expect(getCampaignVerificationEntry('numbered-v1-00')).toMatchObject({
+            verificationState: 'pending',
+            bestTime: 9,
+        });
+    });
+
     it('ignores malformed daily-gp ids when deriving legacy expiry', () => {
         const future = Date.now() + 60_000;
         enqueueDailyChallengeVerification({

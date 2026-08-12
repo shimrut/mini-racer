@@ -464,6 +464,9 @@ export class TrackCarousel {
 
         const meta = document.createElement('div');
         meta.className = 'track-carousel__meta';
+        const verificationError = document.createElement('div');
+        verificationError.className = 'track-carousel__verification-error';
+        verificationError.hidden = true;
         const [bestCell, bestValue] = createSpecCell(createPersonalBestIcon());
         const [rank, rankValue, rankIcon] = createSpecCell(createStandingsIcon(), 'button');
         rank.classList.add('track-carousel__rank');
@@ -484,11 +487,11 @@ export class TrackCarousel {
         medal.className = 'daily-playlist-hero-medal';
         medal.setAttribute('aria-hidden', 'true');
 
-        foot.append(requirement, meta, medal);
+        foot.append(requirement, meta, verificationError, medal);
 
         return {
             foot, requirement, requirementList, meta, bestCell, bestValue,
-            rank, rankValue, rankIcon, rankMedal, medal,
+            rank, rankValue, rankIcon, rankMedal, medal, verificationError,
         };
     }
 
@@ -513,6 +516,9 @@ export class TrackCarousel {
         }
 
         const locked = Boolean(card.locked);
+        const verificationError = !locked && typeof card.verificationError === 'string'
+            ? card.verificationError.trim()
+            : '';
         
         parts.bestCell.hidden = locked;
         parts.bestCell.classList.toggle('is-muted', !card.bestLabel);
@@ -574,7 +580,9 @@ export class TrackCarousel {
         }
 
         parts.requirement.hidden = !locked;
-        parts.meta.hidden = locked;
+        parts.verificationError.hidden = !verificationError;
+        setText(parts.verificationError, verificationError);
+        parts.meta.hidden = locked || Boolean(verificationError);
         parts.medal.hidden = locked;
         if (!locked) {
             parts.requirementList.replaceChildren();

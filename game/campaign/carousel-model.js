@@ -51,6 +51,7 @@ export function buildCampaignCarouselCards(campaignState = {}) {
             lapsLabel,
             bestLabel: stage.bestTimeMs === null ? null : stage.bestTimeLabel,
             metaLabel: buildMetaLabel(stage, lapsLabel),
+            verificationError: stage.verificationError || null,
             medal: stage.medal || null,
             medalTiers: getCombinedMedalStackTiers(stage.trackKey, stage.medal || null),
             rankLabel: Number.isInteger(stage.playerRank) && stage.playerRank > 0

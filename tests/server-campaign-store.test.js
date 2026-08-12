@@ -886,6 +886,35 @@ describe('Campaign server store', () => {
             });
     });
 
+    it('repairs missing progress from a strict-replay leaderboard entry on bootstrap', async () => {
+        const playerId = 'reddit:bootstrap-repair';
+        const entryKey = 'campaign:numbered-v1:leaderboard:numbered-v1-00:entries';
+        hashes.set(entryKey, new Map([[
+            playerId,
+            JSON.stringify({
+                playerId,
+                trackKey: 'numberZero',
+                bestTimeMs: 12_345,
+                updatedAt: '2026-07-27T10:00:00.000Z',
+                completedLaps: 2,
+                checkpointTimesSec: [4.2, 9.8],
+                validationMethod: 'strict-replay',
+            }),
+        ]]));
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+
+        await expect(getServerCampaignBootstrap({ redditUsername: 'Bootstrap-Repair' }))
+            .resolves.toMatchObject({
+                body: {
+                    progress: {
+                        resultsByRaceId: {
+                            'numbered-v1-00': { bestTimeMs: 12_345 },
+                        },
+                    },
+                },
+            });
+    });
+
     it('never lets a slower accepted retry overwrite a faster Campaign result', async () => {
         const playerId = 'reddit:faster';
         const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');

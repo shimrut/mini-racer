@@ -247,7 +247,9 @@ async function mutateProgress(
     }
     if (!lock) throw new CampaignProgressBusyError('Campaign progress update is already in progress.');
     try {
-        const next = mutate(await readProgress(playerId));
+        const current = await readProgress(playerId);
+        const next = mutate(current);
+        if (next === current) return current;
         await writeProgressWithOwnedLock(playerId, next, lock);
         return next;
     } finally {
@@ -368,6 +370,46 @@ async function readCampaignStandingsByRaceId(playerId: string | null) {
     return Object.fromEntries(entries);
 }
 
+async function repairCampaignProgressFromLeaderboard(
+    playerId: string,
+    progress: CampaignProgress,
+): Promise<CampaignProgress> {
+    const missingStages = CAMPAIGN_STAGES.filter(
+        (stage) => !progress.resultsByRaceId[stage.raceId],
+    );
+    if (!missingStages.length) return progress;
+
+    const recovered = await Promise.all(missingStages.map(async (stage) => {
+        const entry = await readEntryByPlayerId(
+            competitionFor(stage, playerId),
+            playerId,
+        );
+        return campaignResultFromEntry(stage, entry, playerId);
+    }));
+    const recoveredResults = recovered.filter(
+        (result): result is CampaignBestResult => result !== null,
+    );
+    if (!recoveredResults.length) return progress;
+
+    return mutateProgress(playerId, (freshProgress) => {
+        const resultsByRaceId = { ...freshProgress.resultsByRaceId };
+        let changed = false;
+        for (const result of recoveredResults) {
+            if (resultsByRaceId[result.raceId]) continue;
+            resultsByRaceId[result.raceId] = result;
+            changed = true;
+        }
+        if (!changed) return freshProgress;
+        const nowIso = new Date().toISOString();
+        return {
+            campaignId: CAMPAIGN_ID,
+            startedAt: freshProgress.startedAt || nowIso,
+            resultsByRaceId,
+            updatedAt: nowIso,
+        } satisfies CampaignProgress;
+    });
+}
+
 export async function getServerCampaignBootstrap({
     playerId,
     redditUsername,
@@ -409,7 +451,11 @@ export async function getServerCampaignBootstrap({
     }
 
     const [progress, standingsByRaceId] = await Promise.all([
-        canonicalPlayerId ? readProgress(canonicalPlayerId) : Promise.resolve(emptyProgress()),
+        canonicalPlayerId
+            ? readProgress(canonicalPlayerId).then((current) => (
+                repairCampaignProgressFromLeaderboard(canonicalPlayerId, current)
+            ))
+            : Promise.resolve(emptyProgress()),
         readCampaignStandingsByRaceId(canonicalPlayerId),
     ]);
     const carUnlocks = canonicalPlayerId
@@ -620,6 +666,14 @@ export async function submitServerCampaignRun({
             };
         }
         throw error;
+    }
+
+    const confirmedResult = savedProgress.resultsByRaceId[stage.raceId];
+    if (!confirmedResult || confirmedResult.bestTimeMs > body.bestTimeMs) {
+        return {
+            status: 503,
+            body: { accepted: false, error: 'Campaign progress save was interrupted. Retry.' },
+        };
     }
 
     await recordCompletedRace(canonicalPlayerId);

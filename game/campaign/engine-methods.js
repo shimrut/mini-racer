@@ -8,10 +8,7 @@ import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
 import {
-    clearPendingCampaignResult,
     deriveCampaignProgress,
-    mergePendingCampaignResults,
-    recordPendingCampaignResult,
     getCampaignBootstrap,
     getCampaignPbGhost,
     getCampaignSnapshot,
@@ -26,6 +23,7 @@ import {
     createVerificationSnapshot,
     enqueueCampaignVerification,
     getCampaignVerificationEntry,
+    getCampaignVerificationEntries,
     getVerificationRetryDelayMs,
     isRetryableVerificationFailure,
     markCampaignVerificationError,
@@ -186,6 +184,7 @@ function decorateCampaignState(bootstrap) {
     const results = progress.resultsByRaceId || {};
     const unlocked = new Set(progress.unlockedRaceIds || []);
     const standings = bootstrap?.standingsByRaceId || {};
+    const verificationErrors = bootstrap?.verificationErrors || {};
     const standingsResolved = Boolean(bootstrap?.standingsByRaceId);
     return {
         ranked: bootstrap?.ranked === true,
@@ -210,6 +209,9 @@ function decorateCampaignState(bootstrap) {
                 leaderboardEntryCount: standing?.totalCount ?? 0,
                 standingsResolved,
                 standingsAvailable: true,
+                verificationError: typeof verificationErrors[stage.raceId] === 'string'
+                    ? verificationErrors[stage.raceId]
+                    : null,
             };
         }),
     };
@@ -222,34 +224,49 @@ function isSupersededCampaignVerificationEntry(entry) {
     return current.updatedAt !== entry.updatedAt || current.bestTime !== entry.bestTime;
 }
 
-function applyPendingCampaignResult(engine, stage, finalTime, medal) {
-    if (!engine.campaignBootstrap) return;
-    const bestTimeMs = Math.round(Number(finalTime) * 1000);
-    if (!Number.isSafeInteger(bestTimeMs) || bestTimeMs <= 0) return;
-    const merged = mergePendingCampaignResults(
-        engine.campaignBootstrap.progress?.resultsByRaceId,
-        recordPendingCampaignResult(stage.raceId, { bestTimeMs, medal }),
-    );
-    engine.campaignBootstrap.progress = deriveCampaignProgress(
-        merged,
-        engine.campaignBootstrap.progress?.startedAt ?? null,
-    );
-    engine.applyCampaignLobbyBootstrap?.(engine.campaignBootstrap);
+function campaignResultFromVerificationEntry(stage, entry) {
+    const bestTimeMs = Math.round(Number(entry?.bestTime) * 1000);
+    if (!Number.isSafeInteger(bestTimeMs) || bestTimeMs <= 0) return null;
+    return {
+        raceId: stage.raceId,
+        trackKey: stage.trackKey,
+        lapCount: stage.lapCount,
+        rulesRevision: stage.rulesRevision,
+        bestTimeMs,
+        medal: getMedalForRaceTime(stage.trackKey, bestTimeMs / 1000, stage.lapCount),
+        checkpointTimesSec: null,
+        updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : null,
+    };
 }
 
-function revokePendingCampaignResult(engine, raceId, bestTime) {
-    clearPendingCampaignResult(raceId);
-    const progress = engine.campaignBootstrap?.progress;
-    if (!progress?.resultsByRaceId) return;
-    const existing = progress.resultsByRaceId[raceId];
-    const bestTimeMs = Math.round(Number(bestTime) * 1000);
-    if (!existing || Number(existing.bestTimeMs) !== bestTimeMs) return;
-    const { [raceId]: _refused, ...rest } = progress.resultsByRaceId;
-    engine.campaignBootstrap.progress = deriveCampaignProgress(
-        rest,
-        progress.startedAt ?? null,
-    );
-    engine.applyCampaignLobbyBootstrap?.(engine.campaignBootstrap);
+function buildDisplayedCampaignBootstrap(bootstrap) {
+    const verifiedProgress = bootstrap?.progress || deriveCampaignProgress();
+    const resultsByRaceId = { ...(verifiedProgress.resultsByRaceId || {}) };
+    const verificationErrors = Object.create(null);
+    const entries = getCampaignVerificationEntries();
+    for (const stage of CAMPAIGN_STAGES) {
+        const entry = entries[stage.raceId];
+        if (!entry) continue;
+        if (entry.verificationState === 'pending') {
+            const provisional = campaignResultFromVerificationEntry(stage, entry);
+            const verified = resultsByRaceId[stage.raceId];
+            if (provisional && (!verified || provisional.bestTimeMs < Number(verified.bestTimeMs))) {
+                resultsByRaceId[stage.raceId] = provisional;
+            }
+            continue;
+        }
+        if (entry.verificationState === 'error' && typeof entry.statusText === 'string') {
+            verificationErrors[stage.raceId] = entry.statusText;
+        }
+    }
+    return {
+        ...bootstrap,
+        progress: {
+            ...verifiedProgress,
+            ...deriveCampaignProgress(resultsByRaceId, verifiedProgress.startedAt ?? null),
+        },
+        verificationErrors,
+    };
 }
 
 function buildProvisionalCampaignBootstrap(previous = null) {
@@ -311,17 +328,31 @@ function campaignErrorSnapshot(bestTime, statusText) {
     };
 }
 
+function responseConfirmsCampaignResult(response, entry) {
+    const confirmedBestTimeMs = Number(
+        response?.body?.progress?.resultsByRaceId?.[entry?.raceId]?.bestTimeMs,
+    );
+    const submittedBestTimeMs = Math.round(Number(entry?.bestTime) * 1000);
+    return Number.isSafeInteger(confirmedBestTimeMs)
+        && confirmedBestTimeMs > 0
+        && Number.isSafeInteger(submittedBestTimeMs)
+        && submittedBestTimeMs > 0
+        && confirmedBestTimeMs <= submittedBestTimeMs;
+}
+
 export const campaignEngineMethods = {
     applyCampaignLobbyBootstrap(bootstrap, { paint = false } = {}) {
+        this.campaignVerifiedBootstrap = bootstrap;
+        const displayedBootstrap = buildDisplayedCampaignBootstrap(bootstrap);
         const bootstrapReady = Boolean(
-            bootstrap
-            && bootstrap.authoritative !== false
-            && bootstrap.availability !== 'unavailable'
+            displayedBootstrap
+            && displayedBootstrap.authoritative !== false
+            && displayedBootstrap.availability !== 'unavailable'
         );
-        this.applyCarUnlockSnapshot?.(bootstrap?.carUnlocks);
-        this.campaignBootstrap = bootstrap;
+        this.applyCarUnlockSnapshot?.(displayedBootstrap?.carUnlocks);
+        this.campaignBootstrap = displayedBootstrap;
         this._campaignBootstrapReady = bootstrapReady;
-        this.campaignLobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
+        this.campaignLobbyState = normalizeCampaignLobbyState(decorateCampaignState(displayedBootstrap));
         if (
             paint
             && this.activeRaceMode === 'campaign'
@@ -336,6 +367,13 @@ export const campaignEngineMethods = {
             }
         }
         return this.campaignLobbyState;
+    },
+
+    refreshCampaignVerificationOverlay({ paint = true } = {}) {
+        const verifiedBootstrap = this.campaignVerifiedBootstrap;
+        if (!verifiedBootstrap) return this.campaignBootstrap || null;
+        this.applyCampaignLobbyBootstrap(verifiedBootstrap, { paint });
+        return this.campaignBootstrap;
     },
 
     paintCampaignLobby(state, {
@@ -640,16 +678,20 @@ export const campaignEngineMethods = {
         const started = await startRequest;
         if (!started) return;
         if (started.ok) {
-            if (this.campaignBootstrap && started.body?.progress) {
+            if (this.campaignVerifiedBootstrap && started.body?.progress) {
                 const startedAt = started.body.progress.startedAt;
                 if (
                     typeof startedAt === 'string'
-                    && !this.campaignBootstrap.progress?.startedAt
+                    && !this.campaignVerifiedBootstrap.progress?.startedAt
                 ) {
-                    this.campaignBootstrap.progress = {
-                        ...(this.campaignBootstrap.progress || deriveCampaignProgress()),
-                        startedAt,
+                    this.campaignVerifiedBootstrap = {
+                        ...this.campaignVerifiedBootstrap,
+                        progress: {
+                            ...(this.campaignVerifiedBootstrap.progress || deriveCampaignProgress()),
+                            startedAt,
+                        },
                     };
+                    this.refreshCampaignVerificationOverlay?.({ paint: false });
                 }
             }
             return;
@@ -918,7 +960,7 @@ export const campaignEngineMethods = {
             replay,
         });
 
-        if (enqueued) applyPendingCampaignResult(this, stage, finalTime, medal);
+        if (enqueued) this.refreshCampaignVerificationOverlay?.();
 
         this.showCampaignFinish(stage, {
             finalTime,
@@ -982,6 +1024,7 @@ export const campaignEngineMethods = {
         if (!entry.replay) {
             const error = 'Submission replay is missing. Race again to rank it.';
             markCampaignVerificationError(raceId, error);
+            this.refreshCampaignVerificationOverlay?.();
             this.updateCampaignFinishSnapshot(
                 raceId,
                 campaignErrorSnapshot(entry.bestTime, error),
@@ -1015,11 +1058,23 @@ export const campaignEngineMethods = {
         if (isSupersededCampaignVerificationEntry(inFlight)) return;
 
         if (response.ok && response.body?.accepted === true) {
+            if (!responseConfirmsCampaignResult(response, entry)) {
+                this.retryCampaignVerificationLater(
+                    inFlight,
+                    'Saving Campaign progress...',
+                );
+                return;
+            }
             this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
             clearCampaignVerification(raceId);
-            clearPendingCampaignResult(raceId);
-            if (this.campaignBootstrap && response.body.progress) {
-                this.campaignBootstrap.progress = response.body.progress;
+            if (this.campaignVerifiedBootstrap && response.body.progress) {
+                this.applyCampaignLobbyBootstrap({
+                    ...this.campaignVerifiedBootstrap,
+                    progress: response.body.progress,
+                    carUnlocks: response.body.carUnlocks ?? this.campaignVerifiedBootstrap.carUnlocks,
+                }, { paint: true });
+            } else {
+                this.refreshCampaignVerificationOverlay?.();
             }
             await this.refreshCampaignAfterAcceptedRun(stage);
             void this.resolveLeaderboardOpponentAdvanceAfterVerification?.({
@@ -1040,7 +1095,7 @@ export const campaignEngineMethods = {
 
         const error = response.body?.error || 'This run could not be verified.';
         markCampaignVerificationError(raceId, error);
-        revokePendingCampaignResult(this, raceId, entry.bestTime);
+        this.refreshCampaignVerificationOverlay?.();
         if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
             this.modal.setCombinedWinMedal?.(null);
             this.modal.setCombinedNextRaceEnabled?.(

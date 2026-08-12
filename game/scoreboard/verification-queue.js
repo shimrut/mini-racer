@@ -10,6 +10,7 @@ const VERIFICATION_STAGE_PENDING = "pending";
 const VERIFICATION_STAGE_RETRYING = "retrying";
 const VERIFICATION_STAGE_REJECTED = "rejected";
 const VERIFICATION_STAGE_ERROR = "error";
+const CAMPAIGN_EXPIRY_MESSAGE = "Result expired — race again.";
 
 const VERIFICATION_STAGE_TEXT = {
   [VERIFICATION_STAGE_SUBMITTING]: "Submitting...",
@@ -53,6 +54,28 @@ function purgeExpiredQueueState(queueState, now = Date.now()) {
   for (const bucket of QUEUE_BUCKETS) {
     for (const [entryId, entry] of Object.entries(queueState[bucket])) {
       const expiresAt = resolveEntryExpiry(entry);
+      if (bucket === "campaign" && entry?.verificationState === "error") {
+        continue;
+      }
+      if (
+        bucket === "campaign"
+        && expiresAt !== null
+        && expiresAt <= now
+        && typeof entry?.raceId === "string"
+        && entry.raceId
+      ) {
+        queueState[bucket][entryId] = {
+          ...entry,
+          replay: null,
+          verificationState: "error",
+          submissionStage: VERIFICATION_STAGE_ERROR,
+          statusText: CAMPAIGN_EXPIRY_MESSAGE,
+          nextAttemptAt: null,
+          expiredAt: new Date(now).toISOString(),
+        };
+        changed = true;
+        continue;
+      }
       if (expiresAt === null || expiresAt <= now) {
         delete queueState[bucket][entryId];
         changed = true;
@@ -422,8 +445,18 @@ export function getCampaignVerificationEntry(raceId) {
   return getEntry("campaign", raceId);
 }
 
+export function getCampaignVerificationEntries() {
+  const entries = Object.create(null);
+  for (const [raceId, entry] of Object.entries(readQueueState().campaign)) {
+    const cloned = cloneEntry(entry);
+    if (cloned) entries[raceId] = cloned;
+  }
+  return entries;
+}
+
 function isBetterCampaignCandidate(nextEntry, previousEntry) {
   if (!previousEntry) return true;
+  if (previousEntry.verificationState !== "pending") return true;
   return Number(previousEntry.bestTime) > Number(nextEntry.bestTime);
 }
 

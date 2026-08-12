@@ -272,6 +272,12 @@ flowchart LR
   progress, bests, and PB ghosts use a rolling 90-day inactivity window, while
   shared stage leaderboards remain permanent. Signing in merges verified guest
   results into the Reddit account and keeps the faster result per stage. The
+  client verification queue is only a provisional display overlay: it clears
+  only after an accepted submit returns an equal-or-better server progress row.
+  Bootstrap repairs a missing progress row from the player's strict-replay
+  leaderboard entry. An expired provisional run loses its tentative medal and
+  unlock, then keeps the compact `Result expired — race again.` footer until a
+  new valid run or verified server result resolves it.
   merge inventories every Campaign stage under renewable submission and
   progress leases, confirms ownership before each stage and before cleanup,
   repairs a missing progress row from a strict-replay leaderboard entry,

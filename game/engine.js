@@ -210,6 +210,7 @@ export class RealTimeRacer {
     this.headToHeadChallengeId = null;
     this.headToHeadLoadPending = false;
     this.campaignBootstrap = null;
+    this.campaignVerifiedBootstrap = null;
     this.campaignLobbyState = null;
     this._campaignBootstrapReady = false;
     this._campaignBootstrapPromise = null;

@@ -101,6 +101,10 @@ export function normalizeCampaignStage(stage = {}, index = 0) {
             ? stage.playerRank
             : null,
         standingsResolved: stage.standingsResolved !== false,
+        verificationError: typeof stage.verificationError === 'string'
+            && stage.verificationError.trim()
+            ? stage.verificationError.trim()
+            : null,
     };
 }
 

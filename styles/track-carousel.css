@@ -254,6 +254,16 @@ body[data-lobby-mode="campaign"] #start-overlay {
     text-transform: uppercase;
 }
 
+.track-carousel__verification-error {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--danger-color, #ff7c7c);
+    font-family: var(--header-font);
+    font-size: clamp(0.72rem, 2.2vw, 0.88rem);
+    font-weight: 800;
+    line-height: 1.1;
+}
+
 .track-carousel__spec {
     display: inline-flex;
     align-items: center;

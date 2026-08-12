@@ -244,6 +244,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             bestLapTime: null,
             campaignBootstrap: { ranked: true,
             signedIn: true, progress: {} },
+            campaignVerifiedBootstrap: { ranked: true, signedIn: true, progress: {} },
             journeys: { endAttempt: vi.fn() },
             scoreboardReplay: {
                 overflowed: false,
@@ -299,7 +300,6 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('opens the next stage on the finish rather than a round trip later', () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
-            applyCampaignLobbyBootstrap: vi.fn(),
         });
 
         context.handleCampaignWin({ lapTime: 7.0 });
@@ -315,7 +315,6 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('offers the stage this finish opened straight from the sheet', () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
-            applyCampaignLobbyBootstrap: vi.fn(),
             startCampaignNextStage: vi.fn(),
         });
 
@@ -371,7 +370,6 @@ describe('Campaign lobby and shared modal adapters', () => {
     it('closes the stage again when the server refuses the run that opened it', async () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
-            applyCampaignLobbyBootstrap: vi.fn(),
             updateCampaignFinishSnapshot: vi.fn(),
         });
         context.handleCampaignWin({ lapTime: 7.0 });
@@ -722,7 +720,11 @@ describe('Campaign lobby and shared modal adapters', () => {
             ok: true,
             body: {
                 accepted: true,
-                progress: { unlockedRaceIds: ['numbered-v1-00'] },
+                progress: {
+                    resultsByRaceId: {
+                        'numbered-v1-00': { bestTimeMs: 8250, medal: 'gold' },
+                    },
+                },
             },
         });
         campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({
@@ -760,8 +762,11 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.modal.updateModalScoreboardSnapshot).toHaveBeenCalledWith(
             expect.objectContaining({ playerRankLabel: '#1', totalCount: 3 }),
         );
-        expect(context.campaignBootstrap.progress).toEqual({
-            unlockedRaceIds: ['numbered-v1-00'],
+        expect(context.campaignBootstrap.progress).toMatchObject({
+            resultsByRaceId: {
+                'numbered-v1-00': { bestTimeMs: 8250, medal: 'gold' },
+            },
+            unlockedRaceIds: ['numbered-v1-00', 'numbered-v1-01'],
         });
         expect(standingsSession.refreshedRaceIds).toContain('numbered-v1-00');
         expect(standingsSession.snapshotByRaceId.get('numbered-v1-00')).toMatchObject({
@@ -793,6 +798,23 @@ describe('Campaign lobby and shared modal adapters', () => {
             }),
         );
         expect(context.modal.showModal).not.toHaveBeenCalled();
+    });
+
+    it('keeps an accepted run queued until the response confirms Campaign progress', async () => {
+        const context = createCampaignFinishContext();
+        const queued = queueCampaignRun(8.25);
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: { accepted: true, progress: { resultsByRaceId: {} } },
+        });
+
+        await context.processCampaignVerificationEntry(queued);
+
+        expect(getCampaignVerificationEntry('numbered-v1-00')).toMatchObject({
+            verificationState: 'pending',
+            submissionStage: 'retrying',
+            statusText: 'Saving Campaign progress...',
+        });
     });
 
     it('stops retrying a run the server refuses outright', async () => {
@@ -2311,6 +2333,34 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(lobbyUi.setCampaignPrimaryLoading).not.toHaveBeenCalled();
     });
 
+    it('shows a persistent Campaign verification error without its provisional unlock', () => {
+        enqueueCampaignVerification({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            bestTime: 8.25,
+            lapCount: 2,
+            rulesRevision: 1,
+            replay: { revision: 1, segments: [] },
+        });
+        markCampaignVerificationError('numbered-v1-00', 'Result expired — race again.');
+        const context = { ...campaignEngineMethods };
+
+        context.applyCampaignLobbyBootstrap({
+            campaignId: 'numbered-v1',
+            ranked: true,
+            signedIn: true,
+            stages: CAMPAIGN_STAGES.slice(0, 2),
+            progress: { resultsByRaceId: {}, unlockedRaceIds: ['numbered-v1-00'], complete: false },
+        });
+
+        expect(context.campaignBootstrap.progress.unlockedRaceIds).toEqual(['numbered-v1-00']);
+        expect(context.campaignLobbyState.stages[0]).toMatchObject({
+            verificationError: 'Result expired — race again.',
+            medal: null,
+        });
+        clearCampaignVerification('numbered-v1-00');
+    });
+
     it('waits for bootstrap and uses the server path when Start is pressed early', async () => {
         let resolveBootstrap;
         campaignServiceMocks.getCampaignBootstrap.mockReturnValue(new Promise((resolve) => {
@@ -2413,6 +2463,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             _campaignBootstrapReady: true,
             campaignBootstrap: { ranked: true,
             signedIn: true, progress: {} },
+            campaignVerifiedBootstrap: { ranked: true, signedIn: true, progress: {} },
             campaignLobbyState: {
                 complete: false,
                 nextStage: { id: 'numbered-v1-00' },
@@ -2558,7 +2609,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
         expect(context.syncChallengeHudPrimaryStats).toHaveBeenCalled();
         await vi.waitFor(() => {
-            expect(context.campaignBootstrap.progress).toEqual({
+            expect(context.campaignBootstrap.progress).toMatchObject({
                 startedAt: '2026-07-26T00:00:00.000Z',
             });
         });
@@ -2606,7 +2657,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         const context = createStartContext();
 
         await context.startCampaignStage();
-        context.campaignBootstrap.progress = {
+        context.campaignVerifiedBootstrap.progress = {
             resultsByRaceId: {
                 'numbered-v1-00': {
                     raceId: 'numbered-v1-00',

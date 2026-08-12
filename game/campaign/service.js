@@ -8,60 +8,13 @@ import {
     CAMPAIGN_STAGES,
     getCampaignUnlockedRaceIds,
 } from './manifest.js';
+import {
+    clearCampaignVerification,
+    getCampaignVerificationEntries,
+} from '../scoreboard/verification-queue.js';
 
 export const CAMPAIGN_REQUEST_TIMEOUT_MS = 20_000;
-
-const PENDING_RESULTS_KEY = `MiniRacerCampaignPending:${CAMPAIGN_ID}`;
-
-function readPendingResults(root = globalThis) {
-    try {
-        const raw = root?.localStorage?.getItem(PENDING_RESULTS_KEY);
-        return raw ? normalizeResults(JSON.parse(raw)) : emptyResults();
-    } catch {
-        return emptyResults();
-    }
-}
-
-function writePendingResults(results, root = globalThis) {
-    try {
-        root?.localStorage?.setItem(PENDING_RESULTS_KEY, JSON.stringify(results));
-    } catch {
-    }
-}
-
-export function recordPendingCampaignResult(raceId, { bestTimeMs, medal }, root = globalThis) {
-    const results = readPendingResults(root);
-    const previous = results[raceId];
-    if (previous && Number(previous.bestTimeMs) <= Number(bestTimeMs)) return results;
-    const next = {
-        ...results,
-        [raceId]: { raceId, bestTimeMs, medal, updatedAt: new Date().toISOString() },
-    };
-    writePendingResults(next, root);
-    return next;
-}
-
-export function clearPendingCampaignResult(raceId, root = globalThis) {
-    const results = readPendingResults(root);
-    if (!results[raceId]) return results;
-    const { [raceId]: _settled, ...rest } = results;
-    writePendingResults(rest, root);
-    return rest;
-}
-
-export function getPendingCampaignResults(root = globalThis) {
-    return readPendingResults(root);
-}
-
-export function mergePendingCampaignResults(serverResults, pendingResults) {
-    const merged = { ...normalizeResults(serverResults) };
-    for (const [raceId, pending] of Object.entries(normalizeResults(pendingResults))) {
-        const verified = merged[raceId];
-        if (verified && Number(verified.bestTimeMs) <= Number(pending.bestTimeMs)) continue;
-        merged[raceId] = pending;
-    }
-    return merged;
-}
+const LEGACY_PENDING_RESULTS_KEY = `MiniRacerCampaignPending:${CAMPAIGN_ID}`;
 
 function emptyResults() {
     return Object.create(null);
@@ -170,13 +123,20 @@ function unavailableCampaignBootstrap() {
         ranked: false,
         signedIn: false,
         stages: CAMPAIGN_STAGES,
-        progress: deriveCampaignProgress(getPendingCampaignResults()),
+        progress: deriveCampaignProgress(),
         standingsByRaceId: normalizeCampaignStandings(null),
         carUnlocks: null,
     };
 }
 
+function clearLegacyPendingCampaignResults() {
+    try {
+        globalThis.localStorage?.removeItem(LEGACY_PENDING_RESULTS_KEY);
+    } catch {}
+}
+
 export async function getCampaignBootstrap() {
+    clearLegacyPendingCampaignResults();
     if (typeof fetch !== 'function') return unavailableCampaignBootstrap();
     try {
         const response = await requestJson(campaignUrl(API_ROUTES.campaignBootstrapUrl).toString());
@@ -184,6 +144,11 @@ export async function getCampaignBootstrap() {
         const ranked = response.body.ranked === true;
         const authoritative = ranked
             && response.body.campaignProgressPromotionPending !== true;
+        const progress = deriveCampaignProgress(
+            response.body.progress?.resultsByRaceId,
+            response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
+        );
+        clearSettledCampaignVerificationMarkers(progress.resultsByRaceId);
         return {
             availability: authoritative ? 'available' : 'unavailable',
             authoritative,
@@ -191,18 +156,30 @@ export async function getCampaignBootstrap() {
             ranked,
             signedIn: response.body.signedIn === true,
             stages: Array.isArray(response.body.stages) ? response.body.stages : CAMPAIGN_STAGES,
-            progress: deriveCampaignProgress(
-                mergePendingCampaignResults(
-                    response.body.progress?.resultsByRaceId,
-                    getPendingCampaignResults(),
-                ),
-                response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
-            ),
+            progress,
             standingsByRaceId: normalizeCampaignStandings(response.body.standingsByRaceId),
             carUnlocks: response.body.carUnlocks ?? null,
         };
     } catch {
         return unavailableCampaignBootstrap();
+    }
+}
+
+function clearSettledCampaignVerificationMarkers(resultsByRaceId) {
+    const entries = getCampaignVerificationEntries();
+    for (const [raceId, entry] of Object.entries(entries)) {
+        if (entry?.verificationState !== 'error') continue;
+        const verifiedBestTimeMs = Number(resultsByRaceId?.[raceId]?.bestTimeMs);
+        const queuedBestTimeMs = Math.round(Number(entry.bestTime) * 1000);
+        if (
+            Number.isSafeInteger(verifiedBestTimeMs)
+            && verifiedBestTimeMs > 0
+            && Number.isSafeInteger(queuedBestTimeMs)
+            && queuedBestTimeMs > 0
+            && verifiedBestTimeMs <= queuedBestTimeMs
+        ) {
+            clearCampaignVerification(raceId);
+        }
     }
 }
 
