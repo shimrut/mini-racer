@@ -367,70 +367,147 @@ export class LobbyUi {
         }[mode] || 'Mini Racer lobby';
     }
 
+    getPrimaryAction() {
+        const button = this.mode === 'daily'
+            ? this.dailyPrimaryBtn
+            : this.mode === 'campaign'
+                ? this.campaignPrimaryBtn
+                : this.challengeAcceptBtn;
+        if (!button || button.hidden) return null;
+        return button;
+    }
+
+    getCarouselAction() {
+        if (this.mode !== 'daily' && this.mode !== 'campaign') return null;
+        const carousel = document.getElementById(`${this.mode}-carousel`);
+        if (!carousel || carousel.hidden) return null;
+        return carousel;
+    }
+
+    getNavRows() {
+        const toolbar = collectVisibleActionButtons(
+            document.querySelector?.('.lobby-mode-toolbar'),
+            '[data-lobby-action]',
+        );
+        const toggle = collectVisibleActionButtons(
+            document.querySelector?.('[data-lobby-mode-switch]'),
+            '[data-lobby-action]',
+        );
+        const carousel = this.getCarouselAction();
+        const start = this.getPrimaryAction();
+        return [
+            toolbar,
+            toggle,
+            carousel ? [carousel] : [],
+            start ? [start] : [],
+        ].filter((row) => row.length);
+    }
+
     getVisibleActions() {
-        const paneActions = collectVisibleActionButtons(
-            this.activePane,
-            '[data-lobby-action]',
-            { requireLaidOut: false },
-        );
-        if (this.mode === 'home') return paneActions;
-
-        const headerActions = collectVisibleActionButtons(
-            document.querySelector?.('.lobby-header'),
-            '[data-lobby-action]',
-            { requireLaidOut: false },
-        ).filter((button) => this.isHeaderActionVisible(button));
-        return [...paneActions, ...headerActions];
-    }
-
-    isHeaderActionVisible(button) {
-        if (button?.id === 'lobby-mode-standings-btn' && this.mode === 'challenge') {
-            return false;
+        if (this.mode === 'daily' || this.mode === 'campaign') {
+            return this.getNavRows().flat();
         }
-        if (
-            button?.classList?.contains?.('lobby-mode-switch__btn')
-            && this.mode !== 'daily'
-            && this.mode !== 'campaign'
-        ) {
-            return false;
-        }
-        return true;
-    }
-
-    getSelectedAction(buttons = this.getVisibleActions()) {
-        const index = this._menuKeyboardState.selectedIndex;
-        if (typeof index === 'number' && index >= 0 && index < buttons.length) {
-            return buttons[index];
-        }
-        const preferredIndex = this.getPreferredIndex(buttons);
-        return preferredIndex >= 0 ? buttons[preferredIndex] : null;
-    }
-
-    isToolbarAction(button) {
-        return Boolean(
-            button?.classList?.contains?.('lobby-mode-toolbar__action')
-            || button?.classList?.contains?.('lobby-header-action')
-        );
-    }
-
-    isModeSwitchAction(button) {
-        return Boolean(button?.classList?.contains?.('lobby-mode-switch__btn'));
-    }
-
-    isHeaderChromeAction(button) {
-        return this.isToolbarAction(button) || this.isModeSwitchAction(button);
+        return [
+            ...collectVisibleActionButtons(this.activePane, '[data-lobby-action]'),
+            ...collectVisibleActionButtons(
+                document.querySelector?.('.lobby-header'),
+                '[data-lobby-action]',
+            ),
+        ];
     }
 
     getPreferredIndex(buttons = this.getVisibleActions()) {
         if (this.mode === 'home') return 0;
-        const preferred = this.mode === 'daily'
-            ? document.getElementById('daily-challenge-start-btn')
-            : this.mode === 'campaign'
-                ? this.campaignPrimaryBtn
-                : this.challengeAcceptBtn;
-        const preferredIndex = buttons.indexOf(preferred);
-        if (preferredIndex >= 0 && !preferred?.disabled) return preferredIndex;
+        const preferredIndex = buttons.indexOf(this.getPrimaryAction());
+        if (preferredIndex >= 0) return preferredIndex;
         return buttons.findIndex((button) => !button.disabled);
+    }
+
+    getSelectedNavAction(buttons) {
+        const index = this._menuKeyboardState.selectedIndex;
+        if (typeof index === 'number' && index >= 0 && index < buttons.length) {
+            return buttons[index];
+        }
+        return this.getPrimaryAction();
+    }
+
+    shouldNavigateCarousel(buttons) {
+        if (!this._menuKeyboardState.keyboardNavActive) return true;
+        const selected = this.getSelectedNavAction(buttons);
+        return selected === this.getPrimaryAction() || selected === this.getCarouselAction();
+    }
+
+    selectNavAction(buttons, target) {
+        const nextIndex = buttons.indexOf(target);
+        if (nextIndex < 0) return;
+        this._menuKeyboardState.selectedIndex = nextIndex;
+        this._menuKeyboardState.keyboardNavActive = true;
+        applyMenuSelection(buttons, nextIndex, { container: this.overlay });
+    }
+
+    moveWithinPickerRow(event, rows, buttons, direction) {
+        const selected = this.getSelectedNavAction(buttons);
+        const row = rows.find((candidate) => candidate.includes(selected)) || [];
+        const currentIndex = row.indexOf(selected);
+        const nextIndex = findSpatialMenuIndex(row, currentIndex, direction);
+        if (nextIndex < 0) {
+            if (!this._menuKeyboardState.keyboardNavActive && selected) {
+                event.preventDefault?.();
+                event.stopPropagation?.();
+                this.selectNavAction(buttons, selected);
+            }
+            return;
+        }
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        this.selectNavAction(buttons, row[nextIndex]);
+    }
+
+    movePickerRow(event, rows, buttons, direction) {
+        const selected = this.getSelectedNavAction(buttons);
+        const rowIndex = rows.findIndex((row) => row.includes(selected));
+        const nextRowIndex = rowIndex + (direction === 'down' ? 1 : -1);
+        if (rowIndex < 0 || nextRowIndex < 0 || nextRowIndex >= rows.length) {
+            if (!this._menuKeyboardState.keyboardNavActive && selected) {
+                event.preventDefault?.();
+                event.stopPropagation?.();
+                this.selectNavAction(buttons, selected);
+            }
+            return;
+        }
+        const nextRow = rows[nextRowIndex];
+        const subset = selected ? [selected, ...nextRow] : nextRow;
+        const subsetIndex = selected ? findSpatialMenuIndex(subset, 0, direction) : -1;
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        this.selectNavAction(buttons, subsetIndex > 0 ? subset[subsetIndex] : nextRow[0]);
+    }
+
+    handlePickerKeydown(event) {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const direction = getMenuNavDirection(event.key);
+        const rows = this.getNavRows();
+        const buttons = rows.flat();
+        if (!buttons.length) return;
+
+        if (direction === 'left' || direction === 'right') {
+            if (this.shouldNavigateCarousel(buttons) && this.handleCarouselKeydown(event)) {
+                return;
+            }
+            this.moveWithinPickerRow(event, rows, buttons, direction);
+            return;
+        }
+
+        if (direction === 'up' || direction === 'down') {
+            this.movePickerRow(event, rows, buttons, direction);
+            return;
+        }
+
+        handleMenuListKeydown(event, {
+            buttons,
+            state: this._menuKeyboardState,
+            container: this.overlay,
+        });
     }
 
     resetKeyboardNav() {
@@ -466,47 +543,15 @@ export class LobbyUi {
             this.onBack?.(this.mode);
             return;
         }
-        const buttons = this.getVisibleActions();
-        const direction = getMenuNavDirection(event.key);
-        const chromeHasCue = this._menuKeyboardState.keyboardNavActive
-            && this.isHeaderChromeAction(this.getSelectedAction(buttons));
-        if (
-            (direction === 'left' || direction === 'right')
-            && !chromeHasCue
-            && this.handleCarouselKeydown(event)
-        ) {
+        if (this.mode === 'daily' || this.mode === 'campaign') {
+            this.handlePickerKeydown(event);
             return;
         }
-        if (this.movePrimaryUpToToolbar(event, buttons, direction)) return;
         handleMenuListKeydown(event, {
-            buttons,
+            buttons: this.getVisibleActions(),
             state: this._menuKeyboardState,
             container: this.overlay,
         });
-    }
-
-    movePrimaryUpToToolbar(event, buttons, direction) {
-        if (this.mode !== 'daily' && this.mode !== 'campaign') return false;
-        if (direction !== 'up') return false;
-        const selected = this.getSelectedAction(buttons);
-        if (!selected || this.isHeaderChromeAction(selected)) return false;
-
-        const toolbar = buttons.filter((button) => this.isToolbarAction(button));
-        if (!toolbar.length) return false;
-
-        const subset = [selected, ...toolbar];
-        const nextSubsetIndex = findSpatialMenuIndex(subset, 0, 'up');
-        if (nextSubsetIndex < 0) return false;
-
-        const nextIndex = buttons.indexOf(subset[nextSubsetIndex]);
-        if (nextIndex < 0) return false;
-
-        event.preventDefault?.();
-        event.stopPropagation?.();
-        this._menuKeyboardState.selectedIndex = nextIndex;
-        this._menuKeyboardState.keyboardNavActive = true;
-        applyMenuSelection(buttons, nextIndex, { container: this.overlay });
-        return true;
     }
 
     handleCarouselKeydown(event) {

@@ -6,6 +6,7 @@ import {
 } from '../game/daily-challenge/carousel-model.js';
 import { findCarouselIndex, TrackCarousel } from '../game/ui/track-carousel.js';
 import { LobbyUi } from '../game/lobby/ui.js';
+import { MENU_SELECTED_CLASS } from '../game/ui/menu-keyboard-nav.js';
 
 const NOW = Date.parse('2026-07-27T09:00:00.000Z');
 
@@ -724,7 +725,6 @@ describe('TrackCarousel selection', () => {
             medal: { hidden: true, dataset: { medalKey: '' } },
             requirement: { hidden: false },
             requirementList: { replaceChildren: vi.fn() },
-            verificationError: { hidden: true, textContent: '' },
             meta: { hidden: true },
         };
 
@@ -818,259 +818,183 @@ describe('lobby keyboard handoff to the carousels', () => {
     });
 });
 
-describe('lobby keyboard nav on Daily and Campaign', () => {
-    function keyEvent(key, overrides = {}) {
+describe('daily and campaign keyboard rows', () => {
+    function classList(initial = []) {
+        const values = new Set(initial);
         return {
-            key,
-            target: { tagName: 'BODY' },
-            preventDefault: vi.fn(),
-            stopPropagation: vi.fn(),
-            ...overrides,
+            add: (name) => values.add(name),
+            remove: (name) => values.delete(name),
+            contains: (name) => values.has(name),
+            toggle: (name, force) => {
+                if (force) values.add(name);
+                else values.delete(name);
+                return Boolean(force);
+            },
         };
     }
 
-    function makeAction(id, {
-        classes = [],
-        rect = { left: 0, top: 0, width: 80, height: 40 },
-        disabled = false,
-    } = {}) {
-        const classNames = new Set(classes);
+    function navButton(id, classNames, rect) {
         return {
             id,
-            disabled,
+            className: classNames.join(' '),
+            classList: classList(classNames),
+            disabled: false,
             hidden: false,
-            classList: {
-                add(name) { classNames.add(name); },
-                remove(name) { classNames.delete(name); },
-                contains(name) { return classNames.has(name); },
-                toggle(name, force) {
-                    if (force) classNames.add(name);
-                    else classNames.delete(name);
-                    return force;
-                },
-            },
             focus: vi.fn(),
             click: vi.fn(),
             getBoundingClientRect: () => rect,
         };
     }
 
-    function attachOverlay(lobby) {
-        Object.defineProperty(lobby, 'overlay', {
-            value: {
-                style: { display: 'flex' },
-                classList: {
-                    contains: () => false,
-                    add() {},
-                    remove() {},
+    function keyEvent(key) {
+        return {
+            key,
+            target: { tagName: 'BODY' },
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        };
+    }
+
+    function mountPicker({ startDisabled = false } = {}) {
+        const standings = navButton(
+            'lobby-mode-standings-btn',
+            ['lobby-mode-toolbar__action', 'lobby-header-action'],
+            { left: 220, top: 8, width: 40, height: 40 },
+        );
+        const garage = navButton(
+            'lobby-mode-garage-btn',
+            ['lobby-mode-toolbar__action', 'lobby-header-action'],
+            { left: 270, top: 8, width: 40, height: 40 },
+        );
+        const settings = navButton(
+            'lobby-mode-settings-btn',
+            ['lobby-mode-toolbar__action', 'lobby-header-action'],
+            { left: 320, top: 8, width: 40, height: 40 },
+        );
+        const dailySwitch = navButton(
+            'lobby-switch-daily-btn',
+            ['lobby-mode-switch__btn'],
+            { left: 8, top: 56, width: 90, height: 32 },
+        );
+        const campaignSwitch = navButton(
+            'lobby-switch-campaign-btn',
+            ['lobby-mode-switch__btn'],
+            { left: 98, top: 56, width: 90, height: 32 },
+        );
+        const carousel = navButton(
+            'daily-carousel',
+            ['track-carousel', 'track-carousel--lobby'],
+            { left: 0, top: 100, width: 360, height: 180 },
+        );
+        const start = navButton(
+            'daily-challenge-start-btn',
+            ['main-menu__item', 'main-menu__item--primary'],
+            { left: 0, top: 300, width: 360, height: 64 },
+        );
+        start.disabled = startDisabled;
+        const overlay = {
+            style: { display: 'flex' },
+            classList: classList(),
+        };
+        const toolbar = {
+            querySelectorAll: () => [standings, garage, settings],
+        };
+        const modeSwitch = {
+            querySelectorAll: () => [dailySwitch, campaignSwitch],
+        };
+        const inactive = { classList: classList() };
+        const originalDocument = global.document;
+        global.document = {
+            getElementById: (id) => ({
+                'start-overlay': overlay,
+                'lobby-daily-pane': { querySelectorAll: () => [start] },
+                'daily-challenge-start-btn': start,
+                'daily-carousel': carousel,
+                'campaign-primary-btn': null,
+                'challenge-accept-btn': null,
+                modal: inactive,
+                'settings-modal': inactive,
+                'garage-modal': inactive,
+                'daily-playlist-modal': inactive,
+            }[id] || null),
+            querySelector: (selector) => ({
+                '.lobby-mode-toolbar': toolbar,
+                '[data-lobby-mode-switch]': modeSwitch,
+                '.lobby-header': {
+                    querySelectorAll: () => [
+                        standings,
+                        garage,
+                        settings,
+                        dailySwitch,
+                        campaignSwitch,
+                    ],
                 },
+            }[selector] || null),
+        };
+        const onCarouselNavigate = vi.fn(() => true);
+        const lobby = new LobbyUi({ onCarouselNavigate });
+        lobby.mode = 'daily';
+        lobby.resetKeyboardNav();
+        return {
+            lobby,
+            onCarouselNavigate,
+            standings,
+            garage,
+            settings,
+            dailySwitch,
+            campaignSwitch,
+            carousel,
+            start,
+            restore() {
+                global.document = originalDocument;
             },
-        });
-    }
-
-    function dailyActions() {
-        return [
-            makeAction('daily-challenge-start-btn', {
-                classes: ['main-menu__item', 'main-menu__item--primary'],
-                rect: { left: 20, top: 400, width: 360, height: 64 },
-            }),
-            makeAction('lobby-switch-daily-btn', {
-                classes: ['lobby-mode-switch__btn'],
-                rect: { left: 16, top: 64, width: 104, height: 32 },
-            }),
-            makeAction('lobby-switch-campaign-btn', {
-                classes: ['lobby-mode-switch__btn'],
-                rect: { left: 120, top: 64, width: 104, height: 32 },
-            }),
-            makeAction('lobby-mode-standings-btn', {
-                classes: ['lobby-mode-toolbar__action', 'lobby-header-action'],
-                rect: { left: 260, top: 8, width: 44, height: 44 },
-            }),
-            makeAction('lobby-mode-garage-btn', {
-                classes: ['lobby-mode-toolbar__action', 'lobby-header-action'],
-                rect: { left: 312, top: 8, width: 44, height: 44 },
-            }),
-            makeAction('lobby-mode-settings-btn', {
-                classes: ['lobby-mode-toolbar__action', 'lobby-header-action'],
-                rect: { left: 364, top: 8, width: 44, height: 44 },
-            }),
-        ];
-    }
-
-    function withDocument(actions, run) {
-        const originalDocument = global.document;
-        global.document = {
-            getElementById: (id) => actions.find((action) => action.id === id) || null,
         };
+    }
+
+    it('sends left/right to the carousel until a header or mode switch is selected', () => {
+        const world = mountPicker();
         try {
-            return run();
+            world.lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(world.onCarouselNavigate).toHaveBeenCalledWith('daily', 'right');
+            expect(world.start.classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+
+            world.lobby.handleKeydown(keyEvent('ArrowUp'));
+            world.onCarouselNavigate.mockClear();
+            world.lobby.handleKeydown(keyEvent('ArrowLeft'));
+            expect(world.onCarouselNavigate).toHaveBeenCalledWith('daily', 'left');
+
+            world.lobby.handleKeydown(keyEvent('ArrowUp'));
+            world.onCarouselNavigate.mockClear();
+            world.lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(world.onCarouselNavigate).not.toHaveBeenCalled();
+            expect(world.campaignSwitch.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
         } finally {
-            global.document = originalDocument;
-        }
-    }
-
-    it('moves from Start Race up into the top-right toolbar, then left into the mode switch', () => {
-        const onCarouselNavigate = vi.fn(() => true);
-        const lobby = new LobbyUi({ onCarouselNavigate });
-        const [start, daily, campaign, standings, garage, settings] = dailyActions();
-        const actions = [start, daily, campaign, standings, garage, settings];
-        lobby.mode = 'daily';
-        attachOverlay(lobby);
-        lobby.getVisibleActions = () => actions;
-
-        withDocument(actions, () => {
-            lobby.resetKeyboardNav();
-
-            lobby.handleKeydown(keyEvent('ArrowUp'));
-            expect(standings.classList.contains('is-menu-selected')).toBe(true);
-            expect(start.classList.contains('is-menu-selected')).toBe(false);
-            expect(daily.classList.contains('is-menu-selected')).toBe(false);
-            expect(onCarouselNavigate).not.toHaveBeenCalled();
-
-            lobby.handleKeydown(keyEvent('ArrowRight'));
-            expect(garage.classList.contains('is-menu-selected')).toBe(true);
-            expect(onCarouselNavigate).not.toHaveBeenCalled();
-
-            lobby.handleKeydown(keyEvent('ArrowRight'));
-            expect(settings.classList.contains('is-menu-selected')).toBe(true);
-            expect(onCarouselNavigate).not.toHaveBeenCalled();
-
-            lobby.handleKeydown(keyEvent('ArrowLeft'));
-            lobby.handleKeydown(keyEvent('ArrowLeft'));
-            expect(standings.classList.contains('is-menu-selected')).toBe(true);
-
-            lobby.handleKeydown(keyEvent('ArrowLeft'));
-            expect(campaign.classList.contains('is-menu-selected')).toBe(true);
-            expect(onCarouselNavigate).not.toHaveBeenCalled();
-
-            lobby.handleKeydown(keyEvent('ArrowLeft'));
-            expect(daily.classList.contains('is-menu-selected')).toBe(true);
-            expect(onCarouselNavigate).not.toHaveBeenCalled();
-        });
-    });
-
-    it('keeps left/right on Start Race for the track picker', () => {
-        const onCarouselNavigate = vi.fn(() => true);
-        const lobby = new LobbyUi({ onCarouselNavigate });
-        const actions = dailyActions();
-        lobby.mode = 'daily';
-        attachOverlay(lobby);
-        lobby.getVisibleActions = () => actions;
-
-        withDocument(actions, () => {
-            lobby.resetKeyboardNav();
-            lobby.handleKeydown(keyEvent('ArrowLeft'));
-            expect(onCarouselNavigate).toHaveBeenCalledWith('daily', 'left');
-            expect(actions[0].classList.contains('is-menu-selected')).toBe(false);
-        });
-    });
-
-    it('keeps left/right on the track picker until a header control is cued', () => {
-        const onCarouselNavigate = vi.fn(() => true);
-        const lobby = new LobbyUi({ onCarouselNavigate });
-        const actions = dailyActions().slice(1);
-        lobby.mode = 'daily';
-        attachOverlay(lobby);
-        lobby.getVisibleActions = () => actions;
-
-        withDocument(actions, () => {
-            lobby.resetKeyboardNav();
-            expect(lobby._menuKeyboardState.keyboardNavActive).toBe(false);
-            lobby.handleKeydown(keyEvent('ArrowLeft'));
-            expect(onCarouselNavigate).toHaveBeenCalledWith('daily', 'left');
-            expect(actions[0].classList.contains('is-menu-selected')).toBe(false);
-        });
-    });
-
-    it('includes header actions that are not laid out yet', () => {
-        const start = {
-            id: 'daily-challenge-start-btn',
-            disabled: false,
-            hidden: false,
-            offsetParent: null,
-        };
-        const standings = {
-            id: 'lobby-mode-standings-btn',
-            disabled: false,
-            hidden: false,
-            offsetParent: null,
-        };
-        const pane = {
-            querySelectorAll: () => [start],
-        };
-        const header = {
-            querySelectorAll: () => [standings],
-        };
-        const lobby = new LobbyUi();
-        lobby.mode = 'daily';
-        Object.defineProperty(lobby, 'activePane', { get: () => pane });
-        const originalDocument = global.document;
-        global.document = {
-            querySelector: (selector) => (selector === '.lobby-header' ? header : null),
-        };
-        try {
-            expect(lobby.getVisibleActions()).toEqual([start, standings]);
-        } finally {
-            global.document = originalDocument;
+            world.restore();
         }
     });
 
-    it('keeps Home on the mode list and omits the hidden Daily toolbar', () => {
-        const daily = { id: 'lobby-home-daily-btn', disabled: false, hidden: false };
-        const standings = { id: 'lobby-mode-standings-btn', disabled: false, hidden: false };
-        const pane = { querySelectorAll: () => [daily] };
-        const header = { querySelectorAll: () => [standings] };
-        const lobby = new LobbyUi();
-        lobby.mode = 'home';
-        Object.defineProperty(lobby, 'activePane', { get: () => pane });
-        const originalDocument = global.document;
-        global.document = {
-            querySelector: (selector) => (selector === '.lobby-header' ? header : null),
-        };
+    it('keeps locked Start Race on the carousel axis and still reaches the top-right icons', () => {
+        const world = mountPicker({ startDisabled: true });
         try {
-            expect(lobby.getVisibleActions()).toEqual([daily]);
-        } finally {
-            global.document = originalDocument;
-        }
-    });
+            world.lobby.handleKeydown(keyEvent('ArrowDown'));
+            expect(world.start.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
 
-    it('omits the mode switch outside Daily and Campaign', () => {
-        const start = {
-            id: 'challenge-accept-btn',
-            disabled: false,
-            hidden: false,
-        };
-        const dailySwitch = {
-            id: 'lobby-switch-daily-btn',
-            disabled: false,
-            hidden: false,
-            classList: { contains: (name) => name === 'lobby-mode-switch__btn' },
-        };
-        const standings = {
-            id: 'lobby-mode-standings-btn',
-            disabled: false,
-            hidden: false,
-            classList: { contains: () => false },
-        };
-        const garage = {
-            id: 'lobby-mode-garage-btn',
-            disabled: false,
-            hidden: false,
-            classList: { contains: () => false },
-        };
-        const pane = { querySelectorAll: () => [start] };
-        const header = { querySelectorAll: () => [dailySwitch, standings, garage] };
-        const lobby = new LobbyUi();
-        lobby.mode = 'challenge';
-        Object.defineProperty(lobby, 'activePane', { get: () => pane });
-        const originalDocument = global.document;
-        global.document = {
-            querySelector: (selector) => (selector === '.lobby-header' ? header : null),
-        };
-        try {
-            expect(lobby.getVisibleActions()).toEqual([start, garage]);
+            world.lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(world.onCarouselNavigate).toHaveBeenCalledWith('daily', 'right');
+            expect(world.start.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+
+            world.lobby.handleKeydown(keyEvent('ArrowUp'));
+            world.lobby.handleKeydown(keyEvent('ArrowUp'));
+            world.lobby.handleKeydown(keyEvent('ArrowUp'));
+            expect(world.standings.classList.contains(MENU_SELECTED_CLASS)
+                || world.garage.classList.contains(MENU_SELECTED_CLASS)
+                || world.settings.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+
+            world.onCarouselNavigate.mockClear();
+            world.lobby.handleKeydown(keyEvent('ArrowRight'));
+            expect(world.onCarouselNavigate).not.toHaveBeenCalled();
         } finally {
-            global.document = originalDocument;
+            world.restore();
         }
     });
 });

@@ -1291,6 +1291,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             /<button id="lobby-mode-garage-btn"[\s\S]*?<\/button>/,
         )?.[0];
         expect(garageMarkup).toContain('viewBox="0 0 576 512"');
+
         const switchDailyMarkup = html.match(
             /<button id="lobby-switch-daily-btn"[\s\S]*?<\/button>/,
         )?.[0];
@@ -1302,10 +1303,16 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(css).toContain('.lobby-mode-action');
         expect(css).toMatch(
-            /\.lobby-mode-action\.is-menu-selected \.lobby-mode-action__label\s*\{[^}]*box-shadow:/s,
+            /\.lobby-mode-action__label\s*\{[^}]*display:\s*inline-block;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(css).toMatch(
-            /\.lobby-mode-switch__btn\.is-menu-selected\s*\{[^}]*box-shadow:/s,
+            /\.lobby-mode-action\.is-menu-selected \.lobby-mode-action__label\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-switch__btn\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-toolbar__action\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
         );
         expect(css).not.toContain('.lobby-utility-row');
         expect(css).not.toContain('lobby-mode-action::after');
@@ -1315,6 +1322,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
         expect(lobbyCss).toMatch(
             /\.lobby-header-action\s*\{[^}]*color:\s*#fff;[^}]*background:\s*transparent;[^}]*border:\s*0;/s,
+        );
+        expect(lobbyCss).toMatch(
+            /\.lobby-header-action\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
         );
         expect(lobbyCss).toMatch(
             /\.lobby-back-btn\s*\{[^}]*color:\s*#fff;[^}]*background:\s*none;[^}]*border:\s*0;/s,

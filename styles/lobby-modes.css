@@ -279,6 +279,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     color: #fff;
     background: transparent;
     border: 0;
+    border-radius: var(--radius-full);
     cursor: pointer;
     transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
 }
@@ -302,8 +303,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 .lobby-mode-toolbar__action:focus-visible,
 .lobby-mode-toolbar__action.is-menu-selected {
-    outline: 2px solid #fff;
-    outline-offset: 2px;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .lobby-mode-toolbar__action:active {
@@ -337,6 +337,8 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 .lobby-mode-action__label {
     display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-full);
     font-family: var(--header-font);
     font-size: clamp(1.35rem, 5vw, 1.85rem);
     font-style: italic;
@@ -348,6 +350,11 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 .lobby-mode-action.is-menu-selected .lobby-mode-action__label {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
+.track-carousel--lobby.is-menu-selected,
+.track-carousel--lobby:focus {
+    outline: none;
 }
 
 .lobby-primary-row {

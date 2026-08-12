@@ -164,6 +164,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     color: #fff;
     background: transparent;
     border: 0;
+    border-radius: var(--radius-full);
     cursor: pointer;
     transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
 }
@@ -178,8 +179,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 .lobby-header-action.is-menu-selected {
     color: #fff;
     background: transparent;
-    outline: 2px solid #fff;
-    outline-offset: 2px;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .lobby-header-action:active {
