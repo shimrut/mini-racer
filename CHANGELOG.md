@@ -1,5 +1,27 @@
 # Changelog
 
+- Bound queued Daily and Campaign results to the account that raced them. A
+  result waits for its own account instead of submitting under whoever signs in
+  next, so it can no longer be credited to the wrong leaderboard or refused as a
+  locked Campaign stage and lost, and two accounts can each hold a queued result
+  for the same race on one device.
+
+- Stopped a guest sign-in from leaving a working guest credential behind. Once a
+  promotion has completed, the server refuses the old guest identity rather than
+  relying on the browser to retire it, and hands that browser a fresh one.
+
+- Kept a profile outage from resetting the selected car. When player bootstrap
+  fails, the game shows the last confirmed cars and unlocks instead of treating
+  everything as locked, and saves nothing until the real profile answers.
+
+- Stopped an unreadable personal best from taking a fresh one with it. Cleanup
+  now happens only where the record is locked for writing, so a replacement
+  saved a moment earlier survives.
+
+- Campaign now recovers a missing ghost instead of dropping it. When a result is
+  saved but its ghost could not be, the replay is kept for three background
+  retries while the medal, rank, unlock, and Next action stay available.
+
 - Replaced ambiguous Garage Extra-car unlock text with one short requirement
   per skin: races, Gold Campaign medals, Author Campaign medals, posted Head to
   Head challenges, or beaten Head to Head challenges.

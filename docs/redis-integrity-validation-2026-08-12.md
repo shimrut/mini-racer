@@ -27,6 +27,16 @@ The two isolated Campaign runs incremented the 14 Campaign standings revisions o
 - #3: Campaign promotion now commits an account entry, sorted-set rank, and standings revision in one owned Redis transaction. Equal-entry retry states repair a missing rank instead of skipping it, and Campaign bootstrap repairs historical entry-without-rank records. Promotion leases are renewed sequentially as one group, avoiding the observed burst of concurrent Redis transactions.
 - #5: profile writes now WATCH the profile key, rebuild from the latest stored profile, and retry a conflicted transaction. This preserves a newer explicit preference and the monotonic `hasAnyData` state.
 
+## Follow-up remediation — 2026-08-12, branch `codex/remaining-integrity-fixes`
+
+These close the findings the hosted run left open, plus the residual windows it exposed. They are covered by focused and full local test runs only; none of this has been exercised against hosted Redis, and the hosted concerns recorded above (promotion-lock concurrency warnings) are untouched.
+
+- #1: queued Daily and Campaign results are stored per owner and only the confirmed owner's are processed or displayed. Submissions carry `submissionOwnerId` and the server answers a mismatch with `409 submission_identity_changed` before rate limiting or replay validation, keeping the replay. Results raced before the account was known are claimed by that session's own bootstrap; ones left by an earlier session are dropped with their provisional local best.
+- #2 residual: a promoted guest credential is now refused server-side rather than trusted to rotate. The existing promotion pointer is proof the promotion committed, and leftover guest Campaign progress is proof its migration has not finished, so a pending promotion still authorizes while a completed one is rejected everywhere and cannot be claimed or adopted back.
+- #4: the profile/bootstrap outage fallback no longer applies the all-locked default. It presents the last confirmed profile for that owner, writes no preference, and never rewrites the selected car; the real profile is retried at 5s, 30s, and 2m and on reconnect or resume.
+- #6: the lock-free PB read no longer deletes. Cleanup of an unusable record happens only on the write path, which owns that player's PB lock, so a stale reader cannot delete a replacement committed after its own read. The hosted probe above showed the primitive behavior; this change removes the path that could reach it.
+- #8: a Campaign result whose PB write reported `unavailable` keeps its replay for three background retries while its verified progress stands, matching Daily. A successful retry installs the returned record without a second request.
+
 ## Local gates
 
 Before the hosted run, 245 focused tests passed across the diagnostic, car unlock store, Campaign store, Daily store, and server route contracts. `npm run build` and `git diff --check` also passed. After capture, the normal build was restored and revalidated without the temporary diagnostic surface.

@@ -95,12 +95,15 @@ flowchart LR
 
 - `game/daily-challenge/service.js` fetches the active challenge, playlist, snapshots, and daily result submission state. Preview/mockDaily fallbacks, active-cache normalization, and share-adjacent client helpers are covered in `tests/daily-challenge.test.js`.
 - `game/storage.js` fetches player bootstrap state and falls back to local data when needed. Payload coercion, local short-circuit, and hosted failure fallback are covered in `tests/player-bootstrap-recovery.test.js`.
+- A bootstrap answer is either authoritative or a fallback, and only an authoritative one may act on the account. A hosted outage presents the last confirmed profile for that owner from `game/player/profile-cache.js` — never the all-locked default — and applies no default locks, no selected-car rewrite, and no preference save, because a resulting stock selection would survive the outage. `game/player/engine-methods.js` chases the real profile at 5s, 30s, and 2m, then only on reconnect or foreground resume. The cache holds the last three owners' normalized preference and unlock snapshots and never a guest token.
+- Queued results belong to the account that raced them. `game/player/active-owner.js` holds the owner the server named for this session, `game/scoreboard/verification-queue.js` stores entries per owner, and only the current owner's entries are processed or displayed — another account's wait for it to return, so both accounts can hold a queued result for the same race. A result finished before the bootstrap answered is claimed by that session's own answer; one left by an earlier session has no owner this session can vouch for and is dropped along with the provisional local best it set. Daily and Campaign submissions carry `submissionOwnerId`, and the server refuses a mismatch with `409 submission_identity_changed` before rate limiting or replay validation, so a paused result keeps its replay and burns no attempts.
 - `game/daily-challenge/ui.js` renders the start screen card, playlist modal, preview canvas, and challenge summary state, including local submission stages like submitting, verifying, retrying, and terminal errors.
 - `game/scoreboard/service.js` fetches leaderboard snapshots and submits best times.
 - `game/scoreboard/snapshot.js` owns the shared client-side snapshot shape, row/time normalization, empty state, and mutation-safe cache cloning used by both scoreboard and Daily GP flows.
 - `game/scoreboard/engine-methods.js` starts verification from the finish event, handles retry behavior until the competition deadline, and consumes the canonical challenge-PB record returned by an accepted submission.
 - Finish-screen RANK first paint and live updates share `applyCombinedRankValue` in `game/race/result-flow.js`, so loading shows Submitting/Verifying status text and failures keep RANK visible with the error. After the win modal opens, a synchronous queue sync paints Verifying when an entry still exists; if accept finishes with no standings snapshot, loading clears and RANK hides.
 - Daily leaderboard rows and PB ghosts are separate challenge-scoped records with the same fixed deadline: six hours after `availableUntil`. Entries retain the verified completed-lap count, and ghosts additionally bind rules revision and lap count. One server replay simulation validates the complete daily race and produces the canonical ghost. Both writes run concurrently; the leaderboard write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`.
+- A stored PB that cannot be used — corrupt, or bound to a superseded track fingerprint, rules revision, or lap count — is treated as absent by every reader, but only the write path, which owns that player's PB lock, deletes it. A lock-free reader that deleted it could destroy a compatible record committed between its own read and its delete, and the browser has already dropped the replay by then.
 - Accepted submissions return the complete canonical `trackPersonalBest` record. The client validates and installs that record before GO without another `/api/player/pb-ghost` request. A pending faster lap makes the old prepared ghost ineligible for Improve; if the canonical result is unresolved, unavailable, or malformed at GO, the attempt starts normally without a ghost and shows `GHOST UNAVAILABLE` for two seconds after GO disappears. A late valid response is cached for the next attempt and never changes a ghost during an active run.
 - Once a finish has been confirmed, the result sheet's Done action returns
   through the shared active-lobby router rather than merely resetting the race.
@@ -274,6 +277,13 @@ flowchart LR
   results into the Reddit account and keeps the faster result per stage. The
   client verification queue is only a provisional display overlay: it clears
   only after an accepted submit returns an equal-or-better server progress row.
+  When that row is confirmed but the PB write reported `unavailable`, the entry
+  stays for up to three background ghost-recovery attempts marked
+  `progressConfirmed`: the medal, rank, unlock and Next action are already final
+  and the entry no longer reads as provisional or blocks the next stage. A
+  successful retry installs the returned record without another ghost request,
+  and exhausting the attempts drops the replay while keeping every verified
+  result. An account mismatch spends no attempt.
   Bootstrap repairs a missing progress row from the player's strict-replay
   leaderboard entry. An expired provisional run loses its tentative medal and
   unlock, then keeps the compact `Result expired — race again.` footer until a
@@ -290,6 +300,14 @@ flowchart LR
   guest identity. Once both signed-in promotions succeed, bootstrap retires the
   browser guest identity and token, so a later signed-out session begins with a
   new guest instead of routing new progress through that completed pointer.
+  Because guest tokens are unexpiring signatures, retirement is also enforced
+  server-side rather than trusted to the browser: `src/server/guest-retirement.ts`
+  treats the promotion pointer as proof the promotion committed and leftover
+  Campaign progress under that guest as proof its migration has not finished, so
+  a pending promotion keeps working while a completed one is refused for every
+  request and cannot be claimed or adopted back into existence. A retired guest's
+  bootstrap answers with no player id and instructs rotation, and the browser
+  re-bootstraps once under its fresh identity.
   A direct Campaign launch keeps its first Campaign request parallel with player
   bootstrap, but an unranked or promotion-pending response is non-authoritative
   and receives one retry after identity repair; it cannot become cached empty

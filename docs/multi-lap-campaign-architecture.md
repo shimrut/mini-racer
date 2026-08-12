@@ -27,6 +27,16 @@ leaderboard, and retention rules.
   strict-replay leaderboard entry. Expired provisional results are removed from
   unlock calculation and show `Result expired — race again.` until a new valid
   run or verified server result resolves the marker.
+- A confirmed result whose PB write reported `unavailable` keeps its replay for
+  up to three background ghost-recovery attempts. The medal, rank, unlock and
+  Next action are settled immediately and the entry stops counting as
+  provisional, so the result screen is not reopened and the next stage does not
+  wait on it. A successful retry installs the returned personal best and ghost
+  directly from the response; exhausting the attempts drops the replay and keeps
+  every verified result, leaving that stage without a ghost until a faster run.
+- A queued Campaign result names the account that raced it. After an account
+  switch it waits for that account rather than submitting, so it can neither be
+  credited to the new account nor be rejected as a locked stage and lost.
 - Guest finishes are replay-verified through the normal Campaign submission
   path and ranked under the guest identity. Signing in merges those verified
   results into the Reddit account, keeping the faster result for each stage. A
@@ -39,7 +49,11 @@ leaderboard, and retention rules.
 - Campaign promotion renews every stage-submission and progress lease for the
   full merge and stops before ownership-safe release. Car-unlock promotion
   merges fields atomically and keeps a guest-to-Reddit pointer so a concurrent
-  guest achievement follows the claimed identity instead of being lost.
+  guest achievement follows the claimed identity instead of being lost. That
+  pointer is also what retires the guest: once no Campaign progress remains under
+  it, the promotion is complete and the guest credential is refused server-side,
+  so a browser that never received the retirement instruction cannot keep writing
+  into the account it merged into.
 - Campaign result posts freeze a verified result and ghost. Signed-in viewers
   may race that ghost even when the corresponding Campaign stage is locked;
   duel results never write Campaign progression, leaderboards, or PBs.
