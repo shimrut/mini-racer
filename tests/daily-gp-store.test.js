@@ -196,6 +196,9 @@ class RedisTestDouble {
       del: async (...args) => {
         commands.push(() => this.del(...args));
       },
+      set: async (...args) => {
+        commands.push(() => this.set(...args));
+      },
       hSet: async (...args) => {
         commands.push(() => this.hSet(...args));
       },
