@@ -1,7 +1,10 @@
 import { RealTimeRacer } from './engine.js';
 import { setupVisibleViewportHeight } from './ui/visible-viewport.js';
 import { resolveGameLaunchTarget } from './modes/launch-target.js';
-import { loadModeRuntime } from './modes/runtime-loader.js';
+import {
+    createModeRuntimeController,
+    clearModeRuntimeCacheForTests,
+} from './modes/runtime-loader.js';
 
 function setupMobileViewportGuards() {
     const hasTouchInput = window.matchMedia('(pointer: coarse)').matches
@@ -58,31 +61,21 @@ function setupMobileViewportGuards() {
 setupVisibleViewportHeight();
 setupMobileViewportGuards();
 
-const installedModeRuntimes = new Map();
-const ensureModeRuntime = async (mode) => {
-    const normalizedMode = mode === 'challenge' ? 'challenge' : mode;
-    if (installedModeRuntimes.has(normalizedMode)) {
-        return installedModeRuntimes.get(normalizedMode);
-    }
-    const runtime = await loadModeRuntime(normalizedMode);
-    Object.assign(RealTimeRacer.prototype, runtime.methods);
-    installedModeRuntimes.set(normalizedMode, runtime);
-    return runtime;
-};
+const modeRuntimeController = createModeRuntimeController(RealTimeRacer);
 
 async function startGame() {
     const launchTarget = resolveGameLaunchTarget();
     let resolvedLaunchTarget = launchTarget;
     try {
-        await ensureModeRuntime(launchTarget.mode);
+        await modeRuntimeController.ensure(launchTarget.mode);
     } catch (error) {
         console.error('Failed to load the selected mode runtime:', error);
         resolvedLaunchTarget = { mode: 'home', challengeId: null };
-        await ensureModeRuntime('home');
+        await modeRuntimeController.ensure('home');
     }
     new RealTimeRacer({
         launchTarget: resolvedLaunchTarget,
-        ensureModeRuntime,
+        modeRuntimeController,
     });
 }
 
@@ -91,3 +84,5 @@ void startGame().catch((error) => {
     const loaderStatus = document.getElementById('loader-status');
     if (loaderStatus) loaderStatus.textContent = 'Unable to start. Reload to retry.';
 });
+
+export { clearModeRuntimeCacheForTests, modeRuntimeController };

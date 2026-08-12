@@ -150,7 +150,12 @@ export function selectStartupGateForLaunch(
 }
 
 export class RealTimeRacer {
-  constructor({ launchTarget = null, ensureModeRuntime = null, initialTrack = null } = {}) {
+  constructor({
+    launchTarget = null,
+    modeRuntimeController = null,
+    ensureModeRuntime = null,
+    initialTrack = null,
+  } = {}) {
     this.canvas = document.getElementById("gameCanvas");
     this.setLoadingStatus(10, "Initializing Engine...");
     // The track and the car share this one canvas, so nothing renders beneath it and
@@ -217,9 +222,26 @@ export class RealTimeRacer {
     this._campaignBootstrapPromise = null;
     this._campaignBootstrapRequestId = 0;
     this.launchTarget = launchTarget || resolveGameLaunchTarget();
-    this.ensureModeRuntime = typeof ensureModeRuntime === "function"
-      ? ensureModeRuntime
-      : async () => null;
+    this.modeRuntimeController = modeRuntimeController;
+    if (typeof ensureModeRuntime === "function") {
+      this.ensureModeRuntime = ensureModeRuntime;
+      this.prefetchModeRuntime = async (mode) => {
+        if (this.modeRuntimeController) {
+          return this.modeRuntimeController.prefetch(mode);
+        }
+        return this.ensureModeRuntime(mode);
+      };
+    } else if (modeRuntimeController) {
+      this.ensureModeRuntime = (mode) => modeRuntimeController.ensure(
+        mode,
+        this.activeRaceMode,
+        this.launchTarget?.mode,
+      );
+      this.prefetchModeRuntime = (mode) => modeRuntimeController.prefetch(mode);
+    } else {
+      this.ensureModeRuntime = async () => null;
+      this.prefetchModeRuntime = async () => null;
+    }
     this.lastPlayedDailyChallenge = null;
     this.currentChallengeRun = null;
     this.trackMedalBeforeLastLapWrite = null;
@@ -928,8 +950,8 @@ export class RealTimeRacer {
 
   loadSecondaryStartupData() {
     const secondaryModes = selectModeSecondaryStartupTasks(this.launchTarget.mode);
-    this.dailyChallengeSummaryPromise = Promise.resolve(this.ensureModeRuntime("daily"))
-      .then(() => this.refreshDailyChallengeSummary?.())
+    this.dailyChallengeSummaryPromise = Promise.resolve(this.prefetchModeRuntime("daily"))
+      .then(() => this.invokeModeMethod("daily", "refreshDailyChallengeSummary"))
       .catch((error) => {
         console.error("Error loading daily challenge summary:", error);
         return null;
@@ -939,10 +961,14 @@ export class RealTimeRacer {
       });
     window.setTimeout(() => {
       for (const mode of secondaryModes) {
-        void this.ensureModeRuntime(mode)
+        void this.prefetchModeRuntime(mode)
           .then(() => {
-            if (mode === "daily") return this.prefetchDailyChallengePlaylist?.();
-            if (mode === "campaign") return this.ensureCampaignBootstrap?.();
+            if (mode === "daily") {
+              return this.invokeModeMethod("daily", "prefetchDailyChallengePlaylist");
+            }
+            if (mode === "campaign") {
+              return this.invokeModeMethod("campaign", "ensureCampaignBootstrap");
+            }
             return null;
           })
           .catch((error) => {

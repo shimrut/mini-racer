@@ -1,4 +1,6 @@
 import { redis } from '@devvit/redis';
+import { redisCompressed } from '@devvit/redis';
+import { createHash } from 'node:crypto';
 import {
     DEFAULT_TRACK_KEY,
     getTrackName,
@@ -594,6 +596,131 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
     return challenges;
 }
 
+function dailyPlayerField(playerId: string): string {
+    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
+}
+
+export async function mergeGuestDailyProgress({
+    guestPlayerId,
+    redditPlayerId,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+}): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
+    if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
+        return { merged: false, mergedChallengeIds: [] };
+    }
+
+    const playlist = await getServerDailyGpPlaylist();
+    const mergedChallengeIds: string[] = [];
+    let hasGuestEvidence = false;
+
+    for (const challenge of playlist) {
+        const competition = toDailyCompetition(challenge);
+        const track = TRACKS[challenge.trackKey];
+        if (!track) continue;
+
+        const [guestEntry, redditEntry, guestPb, redditPb, redditRankedScore] = await Promise.all([
+            readEntryByPlayerId(competition, guestPlayerId),
+            readEntryByPlayerId(competition, redditPlayerId),
+            getPlayerTrackPbRecord({
+                playerId: guestPlayerId,
+                competition,
+                track,
+            }),
+            getPlayerTrackPbRecord({
+                playerId: redditPlayerId,
+                competition,
+                track,
+            }),
+            redis.zScore(competition.leaderboardKey, redditPlayerId),
+        ]);
+
+        if (!guestEntry && !guestPb) continue;
+        hasGuestEvidence = true;
+
+        const guestWinsLeaderboard = Boolean(
+            guestEntry
+            && (!redditEntry || guestEntry.bestTimeMs < redditEntry.bestTimeMs),
+        );
+        const guestCanSupplyWinningPb = Boolean(
+            guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
+        );
+        const entryToWrite = guestWinsLeaderboard
+            ? { ...guestEntry!, playerId: redditPlayerId }
+            : (redditEntry && Number(redditRankedScore) !== redditEntry.bestTimeMs
+                ? redditEntry
+                : null);
+
+        if (entryToWrite) {
+            const accountLock = await acquireSubmissionLock(challenge.id, redditPlayerId);
+            if (!accountLock) {
+                throw new Error('Daily guest merge blocked by an in-flight Reddit submission.');
+            }
+            try {
+                const transaction = await beginOwnedRedisLockTransaction(accountLock, redis);
+                if (!transaction) {
+                    throw new Error('Daily guest merge lost the Reddit submission lock.');
+                }
+                await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
+                const results = await transaction.exec();
+                if (!Array.isArray(results) || results.length === 0) {
+                    throw new Error('Daily leaderboard copy was interrupted.');
+                }
+                if (guestWinsLeaderboard) {
+                    mergedChallengeIds.push(challenge.id);
+                }
+            } finally {
+                await releaseSubmissionLock(accountLock);
+            }
+        }
+
+        if (guestCanSupplyWinningPb) {
+            const rawGuestPb = await redisCompressed.hGet(
+                competition.pbHashKey,
+                dailyPlayerField(guestPlayerId),
+            );
+            if (!rawGuestPb) {
+                throw new Error(`Daily guest PB disappeared during promotion: ${challenge.id}`);
+            }
+            await redisCompressed.hSet(competition.pbHashKey, {
+                [dailyPlayerField(redditPlayerId)]: rawGuestPb,
+            });
+        }
+
+        if (guestEntry) {
+            const guestLock = await acquireSubmissionLock(challenge.id, guestPlayerId);
+            if (!guestLock) {
+                throw new Error('Daily guest merge blocked by an in-flight guest submission.');
+            }
+            try {
+                const cleanup = await beginOwnedRedisLockTransaction(guestLock, redis);
+                if (!cleanup) {
+                    throw new Error('Daily guest merge lost the guest submission lock.');
+                }
+                await cleanup.hDel(competition.entryHashKey, [guestPlayerId]);
+                await cleanup.zRem(competition.leaderboardKey, [guestPlayerId]);
+                await cleanup.hDel(competition.pbHashKey, [dailyPlayerField(guestPlayerId)]);
+                await cleanup.incrBy(competition.standingsRevisionKey, 1);
+                const cleanupResults = await cleanup.exec();
+                if (!Array.isArray(cleanupResults) || cleanupResults.length === 0) {
+                    throw new Error('Daily guest cleanup was interrupted.');
+                }
+            } finally {
+                await releaseSubmissionLock(guestLock);
+            }
+        }
+    }
+
+    if (!hasGuestEvidence) {
+        return { merged: false, mergedChallengeIds: [] };
+    }
+    return {
+        merged: mergedChallengeIds.length > 0,
+        mergedChallengeIds,
+    };
+}
+
 async function readOrSeedTrackPersonalBest({
     playerId,
     challenge,
@@ -856,6 +983,10 @@ export async function getServerPlayerBootstrap({
                         redditPlayerId: identity.canonicalPlayerId,
                     }),
                     mergeGuestCarUnlockProgress({
+                        guestPlayerId: `guest:${guestPlayerId}`,
+                        redditPlayerId: identity.canonicalPlayerId,
+                    }),
+                    mergeGuestDailyProgress({
                         guestPlayerId: `guest:${guestPlayerId}`,
                         redditPlayerId: identity.canonicalPlayerId,
                     }),

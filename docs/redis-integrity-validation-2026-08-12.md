@@ -37,6 +37,13 @@ These close the findings the hosted run left open, plus the residual windows it 
 - #6: the lock-free PB read no longer deletes. Cleanup of an unusable record happens only on the write path, which owns that player's PB lock, so a stale reader cannot delete a replacement committed after its own read. The hosted probe above showed the primitive behavior; this change removes the path that could reach it.
 - #8: a Campaign result whose PB write reported `unavailable` keeps its replay for three background retries while its verified progress stands, matching Daily. A successful retry installs the returned record without a second request.
 
+## Follow-up remediation — 2026-08-12, branch `fix/pressing-audit-four`
+
+- Mode warmup prefetches other mode bundles without leaving Campaign `challenge-run` helpers on the prototype when Daily is active.
+- Collision auto-restart resets multi-lap challenge progress so a crash cannot fake-finish the race.
+- Campaign **Next** and lobby unlocks use verified progress only; starting the next stage waits for confirmation and aborts when verification does not settle.
+- Reddit sign-in merges guest Daily leaderboard rows for the seven-day playlist onto the signed-in account, then deletes the guest row.
+
 ## Local gates
 
 Before the hosted run, 245 focused tests passed across the diagnostic, car unlock store, Campaign store, Daily store, and server route contracts. `npm run build` and `git diff --check` also passed. After capture, the normal build was restored and revalidated without the temporary diagnostic surface.

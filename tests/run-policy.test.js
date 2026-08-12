@@ -55,4 +55,34 @@ describe('run-policy daily challenge parity', () => {
             crashEndedRun: true
         });
     });
+
+    it('records the finish time on the first lap only after a collision restart', () => {
+        const state = {
+            status: 'playing',
+            currentTime: 40,
+            currentTrackKey: 'circuit',
+            activeRunId: '00000000-0000-4000-8000-000000000001',
+            nextCheckpointIndex: 0,
+            currentChallengeRun: {
+                objectiveType: 'multi_lap_total',
+                requiredLaps: 2,
+                completedLaps: 1,
+                lastLapAt: 20,
+            },
+        };
+        const policy = createRunPolicy({
+            challengeRun: state.currentChallengeRun,
+            mode: 'campaign',
+        });
+
+        state.currentChallengeRun.completedLaps = 0;
+        state.currentChallengeRun.lastLapAt = 0;
+        state.currentTime = 0;
+
+        const finishResult = handleFinishCrossing(state, policy, 0, 18);
+
+        expect(finishResult.winTriggered).toBeUndefined();
+        expect(state.status).toBe('playing');
+        expect(state.currentChallengeRun.completedLaps).toBe(1);
+    });
 });

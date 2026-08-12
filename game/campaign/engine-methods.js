@@ -161,13 +161,15 @@ function getCampaignNextStageTarget(engine, stage) {
     const nextStage = stageIndex < 0 ? null : CAMPAIGN_STAGES[stageIndex + 1] ?? null;
     if (!nextStage) return null;
 
+    const verifiedUnlockIds = engine.campaignVerifiedBootstrap?.progress?.unlockedRaceIds
+        || engine.campaignBootstrap?.verifiedProgress?.unlockedRaceIds
+        || [];
     const lobbyStage = engine.campaignLobbyState?.stages?.find(
         (candidate) => candidate?.id === nextStage.raceId,
     ) ?? null;
     return {
         stage: nextStage,
-        unlocked: (engine.campaignBootstrap?.progress?.unlockedRaceIds || [])
-            .includes(nextStage.raceId),
+        unlocked: verifiedUnlockIds.includes(nextStage.raceId),
         trackName: getTrackName(nextStage.trackKey, nextStage.trackKey),
         requirementLabel: lobbyStage?.unlockRequirementLabel || null,
     };
@@ -182,8 +184,9 @@ function getDefaultCampaignLobbyStage(lobbyState) {
 
 function decorateCampaignState(bootstrap) {
     const progress = bootstrap?.progress || {};
+    const verifiedProgress = bootstrap?.verifiedProgress || progress;
     const results = progress.resultsByRaceId || {};
-    const unlocked = new Set(progress.unlockedRaceIds || []);
+    const unlocked = new Set(verifiedProgress.unlockedRaceIds || []);
     const standings = bootstrap?.standingsByRaceId || {};
     const verificationErrors = bootstrap?.verificationErrors || {};
     const standingsResolved = Boolean(bootstrap?.standingsByRaceId);
@@ -242,6 +245,10 @@ function campaignResultFromVerificationEntry(stage, entry) {
 
 function buildDisplayedCampaignBootstrap(bootstrap) {
     const verifiedProgress = bootstrap?.progress || deriveCampaignProgress();
+    const verifiedDerived = deriveCampaignProgress(
+        verifiedProgress.resultsByRaceId || {},
+        verifiedProgress.startedAt ?? null,
+    );
     const resultsByRaceId = { ...(verifiedProgress.resultsByRaceId || {}) };
     const verificationErrors = Object.create(null);
     const entries = getCampaignVerificationEntries();
@@ -262,11 +269,21 @@ function buildDisplayedCampaignBootstrap(bootstrap) {
             verificationErrors[stage.raceId] = entry.statusText;
         }
     }
+    const displayDerived = deriveCampaignProgress(
+        resultsByRaceId,
+        verifiedProgress.startedAt ?? null,
+    );
     return {
         ...bootstrap,
-        progress: {
+        verifiedProgress: {
             ...verifiedProgress,
-            ...deriveCampaignProgress(resultsByRaceId, verifiedProgress.startedAt ?? null),
+            unlockedRaceIds: verifiedDerived.unlockedRaceIds,
+            complete: verifiedDerived.complete,
+        },
+        progress: {
+            ...displayDerived,
+            unlockedRaceIds: verifiedDerived.unlockedRaceIds,
+            complete: verifiedDerived.complete,
         },
         verificationErrors,
     };
@@ -590,15 +607,27 @@ export const campaignEngineMethods = {
             );
             if (!stage) return;
             const replacesCurrentRun = this.status !== 'ready';
+
+            if (confirmUnlockFor) {
+                const verificationSettled = await this.awaitCampaignVerificationSettled(
+                    confirmUnlockFor,
+                );
+                if (!verificationSettled) {
+                    this.lobbyUi?.setRaceStartError?.(
+                        'campaign',
+                        'Your last run is still being verified. Wait a moment, then try Next again.',
+                    );
+                    return;
+                }
+            }
+
             const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
             if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
 
-            const startRequest = this.awaitCampaignVerificationSettled(confirmUnlockFor)
-                .then(() => startServerCampaignRace(stage.raceId))
-                .catch((error) => {
-                    console.warn('Could not stamp the Campaign race start:', error);
-                    return null;
-                });
+            const startRequest = startServerCampaignRace(stage.raceId).catch((error) => {
+                console.warn('Could not stamp the Campaign race start:', error);
+                return null;
+            });
             this.campaignPbGhostByRaceId ??= Object.create(null);
             const cachedPersonalBest = this.campaignPbGhostByRaceId[stage.raceId];
             const ghostRequest = cachedPersonalBest

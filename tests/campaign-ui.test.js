@@ -297,7 +297,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.processVerificationQueue).toHaveBeenCalled();
     });
 
-    it('opens the next stage on the finish rather than a round trip later', () => {
+    it('shows the new time on finish but keeps the next stage locked until verification', () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
         });
@@ -309,10 +309,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             medal: 'author',
             bestTimeMs: 7000,
         });
-        expect(progress.unlockedRaceIds).toContain('numbered-v1-01');
+        expect(progress.unlockedRaceIds).not.toContain('numbered-v1-01');
     });
 
-    it('offers the stage this finish opened straight from the sheet', () => {
+    it('offers the next stage only after the server confirms the run', () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },
             startCampaignNextStage: vi.fn(),
@@ -321,13 +321,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         context.handleCampaignWin({ lapTime: 7.0 });
 
         const { nextRace } = context.modal.showModal.mock.calls[0][3];
-        expect(nextRace).toMatchObject({ label: 'Next', enabled: true });
-        expect(nextRace.ariaLabel).toBe('Race Number One');
-
-        nextRace.action();
-        expect(context.startCampaignNextStage).toHaveBeenCalledWith(
-            expect.objectContaining({ raceId: 'numbered-v1-01' }),
-        );
+        expect(nextRace).toMatchObject({ label: 'Next', enabled: false });
     });
 
     it('shows the next stage gated when the run earned nothing to open it', () => {
@@ -374,7 +368,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
         context.handleCampaignWin({ lapTime: 7.0 });
         expect(context.campaignBootstrap.progress.unlockedRaceIds)
-            .toContain('numbered-v1-01');
+            .not.toContain('numbered-v1-01');
 
         campaignServiceMocks.submitCampaignRun.mockResolvedValue({
             ok: false,
@@ -2863,7 +2857,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
     });
 
-    it('holds the next stage start stamp until the run that opened it lands', async () => {
+    it('holds the next stage start until the run that opened it is verified', async () => {
         campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
         campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
             ok: true,
@@ -2889,16 +2883,17 @@ describe('Campaign lobby and shared modal adapters', () => {
             replay: { revision: 1, segments: [] },
         });
 
-        await context.startCampaignNextStage(nextStage);
-
-        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        const startPromise = context.startCampaignNextStage(nextStage);
+        await Promise.resolve();
+        expect(context.startSequence).not.toHaveBeenCalled();
         expect(campaignServiceMocks.startServerCampaignRace).not.toHaveBeenCalled();
 
         clearCampaignVerification(CAMPAIGN_STAGES[0].raceId);
-        await vi.waitFor(() => {
-            expect(campaignServiceMocks.startServerCampaignRace)
-                .toHaveBeenCalledWith(nextStage.raceId);
-        });
+        await startPromise;
+
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(campaignServiceMocks.startServerCampaignRace)
+            .toHaveBeenCalledWith(nextStage.raceId);
         expect(context.loadCampaignLobby).not.toHaveBeenCalled();
     });
 

@@ -447,6 +447,7 @@ export const raceEngineMethods = {
     this.scoreboardReplay.reset();
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
+    this.resetChallengeRunAfterCollisionRestart();
     this.resetRunToTrackStart({
       currentTime: 0,
       relaunchDelay: this.collisionRestartDelaySec,
@@ -460,6 +461,15 @@ export const raceEngineMethods = {
     this.accumulator = 0;
     this.lastTime = this.getNow();
     this.requestRender();
+  },
+
+  resetChallengeRunAfterCollisionRestart() {
+    if (!this.currentChallengeRun) return;
+    this.currentChallengeRun.completedLaps = 0;
+    this.currentChallengeRun.lastLapAt = 0;
+    this.currentChallengeRun.bestLap = null;
+    this.currentChallengeRun.bestLapSecBeforeLastLap = null;
+    this.currentChallengeRun.recentLaps = [];
   },
 
   resetRunToTrackStart({ currentTime = 0, relaunchDelay = 0 } = {}) {

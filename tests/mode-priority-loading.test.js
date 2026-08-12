@@ -1,13 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { RealTimeRacer } from '../game/engine.js';
+import { dailyChallengeEngineMethods } from '../game/daily-challenge/engine-methods.js';
+import { challengeRunEngineMethods } from '../game/challenge-run/engine-methods.js';
 import {
     clearClientTrackRegistryForTests,
     getLoadedClientTrack,
     loadClientTrack,
     waitForClientTrackDefinition,
 } from '../game/track/client-registry.js';
-import { loadModeRuntime, clearModeRuntimeCacheForTests } from '../game/modes/runtime-loader.js';
+import { loadModeRuntime, clearModeRuntimeCacheForTests, createModeRuntimeController } from '../game/modes/runtime-loader.js';
 import {
     selectModeCriticalStartupPromises,
     selectModeSecondaryStartupTasks,
@@ -129,6 +131,30 @@ describe('mode-priority startup', () => {
         expect(challenge.methods.showCampaignLobby).toBeUndefined();
         expect(campaign.methods.prepareInitialCampaignLaunch).toBeTypeOf('function');
         expect(campaign.methods.loadChallengeLobby).toBeUndefined();
+    });
+
+    it('keeps Daily overrides on the prototype after Campaign warmup', async () => {
+        clearModeRuntimeCacheForTests();
+        const controller = createModeRuntimeController(RealTimeRacer);
+        await controller.ensure('daily');
+        expect(RealTimeRacer.prototype.applyDailyChallenge)
+            .toBe(dailyChallengeEngineMethods.applyDailyChallenge);
+        await controller.prefetch('campaign');
+        expect(RealTimeRacer.prototype.applyDailyChallenge)
+            .toBe(dailyChallengeEngineMethods.applyDailyChallenge);
+        controller.clearForTests();
+    });
+
+    it('re-applies the active mode after installing a different warmed runtime', async () => {
+        clearModeRuntimeCacheForTests();
+        const controller = createModeRuntimeController(RealTimeRacer);
+        await controller.ensure('daily', 'daily', 'daily');
+        await controller.ensure('campaign', 'daily', 'daily');
+        expect(RealTimeRacer.prototype.applyDailyChallenge)
+            .toBe(dailyChallengeEngineMethods.applyDailyChallenge);
+        expect(RealTimeRacer.prototype.applyDailyChallenge)
+            .not.toBe(challengeRunEngineMethods.applyDailyChallenge);
+        controller.clearForTests();
     });
 
     it('invokes dynamically installed mode methods with racer context and arguments', async () => {
