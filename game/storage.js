@@ -18,6 +18,11 @@ import {
   DEFAULT_CAR_UNLOCK_SNAPSHOT,
   normalizeCarUnlockSnapshot,
 } from "./car/car-unlock-policy.js";
+import {
+  readCachedPlayerProfile,
+  readLastConfirmedProfileOwnerId,
+  writeCachedPlayerProfile,
+} from "./player/profile-cache.js";
 
 async function fetchRemotePlayerProgressState() {
   const config = API_ROUTES;
@@ -78,6 +83,26 @@ function getLocalPlayerProgressState() {
     leaderboardPlayerId: getOrCreatePlayerId("player bootstrap"),
     playerPreferences: null,
     carUnlocks: DEFAULT_CAR_UNLOCK_SNAPSHOT,
+    authoritative: true,
+  };
+}
+
+/**
+ * A hosted bootstrap that never answered says nothing about this player. Presenting the all-locked
+ * default as if it were the answer resets an unlocked selection the server still recognises, so the
+ * last confirmed profile stands in and an unknown one stays unknown.
+ */
+function getHostedFallbackPlayerProgressState() {
+  const cached = readCachedPlayerProfile(readLastConfirmedProfileOwnerId());
+  return {
+    hasAnyData: cached?.hasAnyData ?? hasAnyDailyChallengeStoredData(),
+    isReturningPlayer: cached?.isReturningPlayer ?? false,
+    redditUsername: cached?.redditUsername ?? null,
+    leaderboardIdentity: getLeaderboardIdentityPreference(),
+    leaderboardPlayerId: getOrCreatePlayerId("player bootstrap"),
+    playerPreferences: cached?.playerPreferences ?? null,
+    carUnlocks: cached?.carUnlocks ?? null,
+    authoritative: false,
   };
 }
 
@@ -104,11 +129,16 @@ export async function getPlayerProgressState() {
         rotateGuestPlayerIdentity("completed guest promotion");
       }
       setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
-      return remoteState;
+      const authoritativeState = { ...remoteState, authoritative: true };
+      writeCachedPlayerProfile(
+        remoteState.leaderboardPlayerId ?? getOrCreatePlayerId("player bootstrap"),
+        authoritativeState,
+      );
+      return authoritativeState;
     }
   } catch (error) {
     console.error("Error loading player progress state:", error);
   }
 
-  return getLocalPlayerProgressState();
+  return getHostedFallbackPlayerProgressState();
 }

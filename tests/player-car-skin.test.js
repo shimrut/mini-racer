@@ -64,6 +64,26 @@ describe('player car skin', () => {
         expect(readPlayerCarSkinAssetName()).toBe(EXTRA_CAR_ASSETS.crimson);
     });
 
+    it('retires a selection the server says is locked', () => {
+        setPlayerCarUnlockSnapshot(buildCarUnlockSnapshot({ completedRace: true }));
+        writePlayerCarSkinAssetName(EXTRA_CAR_ASSETS.crimson);
+
+        setPlayerCarUnlockSnapshot(DEFAULT_CAR_UNLOCK_SNAPSHOT);
+
+        expect(JSON.parse(store.get(PLAYER_CAR_SKIN_STORAGE_KEY))).toBe(STOCK_CAR_ASSET_NAME);
+    });
+
+    it('keeps a stored selection when the unlock snapshot is not authoritative', () => {
+        setPlayerCarUnlockSnapshot(buildCarUnlockSnapshot({ completedRace: true }));
+        writePlayerCarSkinAssetName(EXTRA_CAR_ASSETS.crimson);
+
+        setPlayerCarUnlockSnapshot(DEFAULT_CAR_UNLOCK_SNAPSHOT, { authoritative: false });
+
+        expect(JSON.parse(store.get(PLAYER_CAR_SKIN_STORAGE_KEY))).toBe(EXTRA_CAR_ASSETS.crimson);
+        setPlayerCarUnlockSnapshot(buildCarUnlockSnapshot({ completedRace: true }));
+        expect(readPlayerCarSkinAssetName()).toBe(EXTRA_CAR_ASSETS.crimson);
+    });
+
     it('includes every shipped player car WebP as a selectable skin', () => {
         const names = PLAYER_CAR_SKINS.map((s) => s.assetName);
         for (const path of PLAYER_SELECTABLE_CAR_ASSETS) {

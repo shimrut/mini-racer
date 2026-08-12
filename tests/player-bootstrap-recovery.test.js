@@ -303,6 +303,65 @@ describe("guest bootstrap recovery", () => {
     expect(state.hasAnyData).toBe(true);
   });
 
+  it("marks a hosted outage as non-authoritative without claiming everything is locked", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(500));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const state = await getPlayerProgressState();
+
+    expect(state.authoritative).toBe(false);
+    expect(state.carUnlocks).toBeNull();
+    expect(state.playerPreferences).toBeNull();
+  });
+
+  it("serves the last confirmed profile for that owner when bootstrap goes down", async () => {
+    const preferences = { carSkin: "assets/cars/mr_extra_crimson.webp", trailId: "sky" };
+    const carUnlocks = {
+      unlockedAssets: ["assets/cars/mr_extra_crimson.webp"],
+      progress: { completedRace: 1 },
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createResponse(200, {
+        hasAnyData: true,
+        isReturningPlayer: true,
+        redditUsername: "RaceFan",
+        playerId: "reddit:racefan",
+        playerPreferences: preferences,
+        carUnlocks,
+      }))
+      .mockResolvedValue(createResponse(503));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    const confirmed = await getPlayerProgressState();
+    const outage = await getPlayerProgressState();
+
+    expect(confirmed.authoritative).toBe(true);
+    expect(outage.authoritative).toBe(false);
+    expect(outage.redditUsername).toBe("RaceFan");
+    expect(outage.carUnlocks.unlockedAssets)
+      .toContain("assets/cars/mr_extra_crimson.webp");
+    expect(outage.playerPreferences).toMatchObject(preferences);
+  });
+
+  it("never caches the guest token alongside the confirmed profile", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse(200, {
+      hasAnyData: true,
+      playerId: "guest:abc",
+      guestToken: "secret-token",
+      playerPreferences: { carSkin: "assets/cars/mr_extra_crimson.webp" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getPlayerProgressState } = await import("../game/storage.js");
+
+    await getPlayerProgressState();
+
+    const cached = localStorage.getItem("VectorGpPlayerProfileCache");
+    expect(cached).toContain("guest:abc");
+    expect(cached).not.toContain("secret-token");
+  });
+
   it("does not log bootstrap failures on loopback hosts", async () => {
     vi.stubGlobal("window", {
       location: {

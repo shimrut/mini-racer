@@ -352,7 +352,9 @@ export const campaignEngineMethods = {
             && displayedBootstrap.authoritative !== false
             && displayedBootstrap.availability !== 'unavailable'
         );
-        this.applyCarUnlockSnapshot?.(displayedBootstrap?.carUnlocks);
+        this.applyCarUnlockSnapshot?.(displayedBootstrap?.carUnlocks, {
+            authoritative: bootstrapReady,
+        });
         this.campaignBootstrap = displayedBootstrap;
         this._campaignBootstrapReady = bootstrapReady;
         this.campaignLobbyState = normalizeCampaignLobbyState(decorateCampaignState(displayedBootstrap));

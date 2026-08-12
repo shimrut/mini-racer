@@ -46,6 +46,7 @@ import { raceEngineMethods } from "./race/engine-methods.js";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
 import { opponentRaceEngineMethods } from "./scoreboard/opponent-race-engine-methods.js";
 import { modeRouterEngineMethods } from "./modes/engine-methods.js";
+import { playerProfileEngineMethods } from "./player/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
 import { createProceduralMusic } from "./audio/procedural-music.js";
@@ -572,29 +573,13 @@ export class RealTimeRacer {
 
     this.setLoadingStatus(30, "Fetching Profile...");
     this.playerHistoryPromise = getPlayerProgressState()
-      .then(async ({
-        hasAnyData,
-        isReturningPlayer,
-        playerPreferences,
-        redditUsername,
-        carUnlocks,
-      }) => {
+      .then(async (progressState) => {
         this.setLoadingStatus(50, "Profile Loaded...");
-        this.hasAnyData = Boolean(hasAnyData);
-        this.isReturningPlayer = Boolean(isReturningPlayer);
-        this.redditUsername = typeof redditUsername === "string" && redditUsername.trim()
-          ? redditUsername.trim()
-          : null;
-        this.applyCarUnlockSnapshot(carUnlocks);
-        if (playerPreferences) {
-          await this.applyPersistedPlayerPreferences(playerPreferences);
-        } else {
-          queuePlayerPreferencesSave();
+        const { hasAnyData, isReturningPlayer } = await this.applyPlayerProgressState(progressState);
+        if (progressState.authoritative === false) {
+          this.schedulePlayerProfileRecovery();
         }
-        return {
-          hasAnyData,
-          isReturningPlayer: this.isReturningPlayer,
-        };
+        return { hasAnyData, isReturningPlayer };
       })
       .catch((error) => {
         console.error("Error loading player history:", error);
@@ -763,8 +748,10 @@ export class RealTimeRacer {
     this.requestRender();
   }
 
-  applyCarUnlockSnapshot(snapshot) {
-    setPlayerCarUnlockSnapshot(snapshot);
+  applyCarUnlockSnapshot(snapshot, { authoritative = true } = {}) {
+    // A missing snapshot is a response that never carried unlocks, not a claim that everything is locked.
+    if (!snapshot) return;
+    setPlayerCarUnlockSnapshot(snapshot, { authoritative });
     this.garage?.refreshCarUnlocks?.();
   }
 
@@ -975,4 +962,5 @@ Object.assign(
   scoreboardEngineMethods,
   opponentRaceEngineMethods,
   modeRouterEngineMethods,
+  playerProfileEngineMethods,
 );
