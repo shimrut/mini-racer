@@ -55,7 +55,11 @@ import { getCollisionRestartDelaySec } from "./settings/collision-restart-delay-
 import { getCarProceduralAudioEnabled } from "./settings/car-audio-preference.js";
 import { getMusicEnabled } from "./settings/music-preference.js";
 import { getPbGhostEnabled } from "./settings/pb-ghost-preference.js";
-import { runInitialStartupPlan, selectModeSecondaryStartupTasks } from "./startup/coordinator.js";
+import {
+  MODE_LABELS,
+  runInitialStartupPlan,
+  selectModeSecondaryStartupTasks,
+} from "./startup/coordinator.js";
 import { PbGhost } from "./ghost/pb-ghost.js";
 import { PbGhostService } from "./ghost/pb-ghost-service.js";
 import {
@@ -629,8 +633,13 @@ export class RealTimeRacer {
       onError: ({ mode, error }) => {
         this._initialStartupFailed = true;
         console.error(`Error preparing initial ${mode} mode:`, error);
+        // Name the mode and the reason: "could not load" alone tells a player
+        // nothing about whether waiting, retrying, or coming back later helps.
+        const reason = typeof error?.message === "string" && error.message.trim()
+          ? error.message.trim()
+          : "";
         this.loadingScreen.showError(
-          "Could not load the game.",
+          [`Could not load ${MODE_LABELS[mode] ?? "the game"}.`, reason].filter(Boolean).join(" "),
           () => this.retryInitialStartup(),
         );
       },

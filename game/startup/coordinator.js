@@ -1,6 +1,6 @@
 const MODE_KEYS = new Set(['home', 'daily', 'campaign', 'challenge']);
 
-const MODE_LABELS = {
+export const MODE_LABELS = {
     home: 'Home',
     daily: 'Daily',
     campaign: 'Campaign',
