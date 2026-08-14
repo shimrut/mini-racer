@@ -2,7 +2,6 @@ import { getPlayerProgressState } from '../storage.js';
 import { queuePlayerPreferencesSave } from './preferences.js';
 import { getActivePlayerOwnerId } from './active-owner.js';
 import { claimVerificationEntriesForOwner } from '../scoreboard/verification-queue.js';
-import { rollbackLocalBestForFailedVerificationEntry } from '../scoreboard/engine-methods.js';
 
 const PROFILE_RECOVERY_DELAYS_MS = [5_000, 30_000, 120_000];
 
@@ -41,33 +40,25 @@ export const playerProfileEngineMethods = {
     },
 
     /**
-     * Results raced before the account was known belong to whoever this device's next bootstrap names.
-     * Owned results stay with that owner. Claiming also starts the sender so a recovered identity
-     * uploads the waiting run instead of leaving the finish screen on Submitting.
+     * This visit's unsigned finishes belong to this visit's bootstrap. Last visit's unsigned
+     * finishes stay on this phone's guest. Claiming starts the sender so a recovered identity
+     * uploads instead of leaving Submitting on screen.
      */
     claimQueuedResultsForOwner() {
-        const { claimed, orphaned } = claimVerificationEntriesForOwner(getActivePlayerOwnerId());
-        for (const { bucket, entry } of orphaned) {
-            if (bucket !== 'daily' || !entry) continue;
-            rollbackLocalBestForFailedVerificationEntry(this, entry);
-            this.dailyChallengeUi?.refreshDailyChallengeVerificationState?.(entry.challengeId);
-        }
-        if (orphaned.length) this.refreshCampaignVerificationOverlay?.();
-        if (claimed.length) {
-            for (const { bucket, entryId } of claimed) {
-                if (bucket === 'daily') {
-                    this.dailyChallengeUi?.refreshDailyChallengeVerificationState?.(entryId);
-                }
-            }
-            this.refreshCampaignVerificationOverlay?.();
-            const processing = this.processVerificationQueue?.();
-            if (processing && typeof processing.catch === 'function') {
-                processing.catch((error) => {
-                    console.error('Error processing claimed verification entries:', error);
-                });
+        const { claimed } = claimVerificationEntriesForOwner(getActivePlayerOwnerId());
+        for (const { bucket, entryId } of claimed) {
+            if (bucket === 'daily') {
+                this.dailyChallengeUi?.refreshDailyChallengeVerificationState?.(entryId);
             }
         }
-        return orphaned;
+        if (claimed.length) this.refreshCampaignVerificationOverlay?.();
+        const processing = this.processVerificationQueue?.();
+        if (processing && typeof processing.catch === 'function') {
+            processing.catch((error) => {
+                console.error('Error processing claimed verification entries:', error);
+            });
+        }
+        return claimed;
     },
 
     /** Fallback state is temporary by definition, so the real profile is chased until it answers. */

@@ -2,6 +2,7 @@ import {
   getActivePlayerOwnerId,
   getPlayerSessionId,
 } from "../player/active-owner.js";
+import { getOrCreatePlayerId } from "./player-identity.js";
 
 const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
@@ -205,15 +206,32 @@ function isBetterDailyCandidate(nextEntry, previousEntry) {
 
 /**
  * Two accounts can each hold a queued result for the same race on one browser, so entries are stored
- * per owner. A result raced before the account was known keeps the bare id until it is claimed.
+ * per owner. A finish before bootstrap answers is stamped with this phone's guest id, never left blank.
  */
+function getPhoneGuestOwnerId() {
+  return `guest:${getOrCreatePlayerId("verification queue")}`;
+}
+
+function resolveQueuedOwnerId() {
+  return getActivePlayerOwnerId() || getPhoneGuestOwnerId();
+}
+
 function ownedEntryKey(entryId, ownerPlayerId) {
   return ownerPlayerId ? `${ownerPlayerId}${OWNER_KEY_SEPARATOR}${entryId}` : entryId;
 }
 
+function rawEntryIdFromKey(entryKey, ownerPlayerId) {
+  if (!ownerPlayerId) return entryKey;
+  const prefix = `${ownerPlayerId}${OWNER_KEY_SEPARATOR}`;
+  return entryKey.startsWith(prefix) ? entryKey.slice(prefix.length) : entryKey;
+}
+
 function resolveEntryKey(queueState, bucket, entryId) {
-  const ownedKey = ownedEntryKey(entryId, getActivePlayerOwnerId());
+  const activeOwnerId = getActivePlayerOwnerId();
+  const ownedKey = ownedEntryKey(entryId, activeOwnerId);
   if (queueState[bucket][ownedKey]) return ownedKey;
+  const phoneGuestKey = ownedEntryKey(entryId, getPhoneGuestOwnerId());
+  if (!activeOwnerId && queueState[bucket][phoneGuestKey]) return phoneGuestKey;
   // A result raced before the account was known is still this session's until it is claimed.
   return queueState[bucket][entryId]?.ownerPlayerId ? ownedKey : entryId;
 }
@@ -250,7 +268,7 @@ function getEntry(bucket, entryId) {
   const queueState = readQueueState();
   const entry = queueState[bucket][resolveEntryKey(queueState, bucket, entryId)] || null;
   // Another owner's queued result is theirs to see, not this account's.
-  if (entry?.ownerPlayerId && !isOwnedByActivePlayer(entry)) return null;
+  if (entry?.ownerPlayerId && !isVisibleQueueEntry(entry)) return null;
   return cloneEntry(entry);
 }
 
@@ -312,6 +330,12 @@ function isOwnedByActivePlayer(entry) {
   return entry?.ownerPlayerId === activeOwnerId;
 }
 
+function isVisibleQueueEntry(entry) {
+  if (!entry?.ownerPlayerId) return true;
+  if (isOwnedByActivePlayer(entry)) return true;
+  return !getActivePlayerOwnerId() && entry.ownerPlayerId === getPhoneGuestOwnerId();
+}
+
 function getDue(bucket, now = Date.now()) {
   return Object.values(readQueueState()[bucket])
     .filter(
@@ -324,9 +348,9 @@ function getDue(bucket, now = Date.now()) {
 }
 
 /**
- * The account is only named once the bootstrap answers, which can be after a race finishes. Any
- * ownerless waiting run on this device is claimed by that answer — this visit or a later one —
- * then sent under that owner. A run that already has an owner is never retagged.
+ * Bootstrap can answer after a finish. This visit's phone-guest runs belong to that answer because
+ * the signed-in account cannot change without a reload. Last visit's phone-guest runs stay on the
+ * guest until that guest is back or the player picks Use guest progress. Nothing is deleted.
  */
 export function claimVerificationEntriesForOwner(ownerPlayerId) {
   const activeOwnerId = typeof ownerPlayerId === "string" && ownerPlayerId.trim()
@@ -334,20 +358,46 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
     : null;
   if (!activeOwnerId) return { claimed: [], orphaned: [] };
 
+  const phoneGuestId = getPhoneGuestOwnerId();
+  const sessionId = getPlayerSessionId();
   const queueState = readQueueState();
   const claimed = [];
+  let changed = false;
+
   for (const bucket of QUEUE_BUCKETS) {
-    for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
-      if (entry?.ownerPlayerId) continue;
-      delete queueState[bucket][entryKey];
-      queueState[bucket][`${activeOwnerId}${OWNER_KEY_SEPARATOR}${entryKey}`] = {
-        ...entry,
-        ownerPlayerId: activeOwnerId,
-      };
-      claimed.push({ bucket, entryId: entryKey });
+    for (const entryKey of Object.keys(queueState[bucket])) {
+      const entry = queueState[bucket][entryKey];
+      if (!entry) continue;
+
+      let currentKey = entryKey;
+      let current = entry;
+      if (!current.ownerPlayerId) {
+        const rawId = rawEntryIdFromKey(currentKey, null);
+        delete queueState[bucket][currentKey];
+        current = { ...current, ownerPlayerId: phoneGuestId };
+        currentKey = ownedEntryKey(rawId, phoneGuestId);
+        queueState[bucket][currentKey] = current;
+        changed = true;
+      }
+
+      const isThisSessionPhoneGuest = current.ownerPlayerId === phoneGuestId
+        && current.sessionId === sessionId
+        && phoneGuestId !== activeOwnerId;
+      if (!isThisSessionPhoneGuest) continue;
+
+      const rawId = rawEntryIdFromKey(currentKey, phoneGuestId);
+      delete queueState[bucket][currentKey];
+      current = { ...current, ownerPlayerId: activeOwnerId };
+      queueState[bucket][ownedEntryKey(rawId, activeOwnerId)] = current;
+      claimed.push({
+        bucket,
+        entryId: current.challengeId || current.raceId || rawId,
+      });
+      changed = true;
     }
   }
-  if (claimed.length) writeQueueState(queueState);
+
+  if (changed) writeQueueState(queueState);
   return { claimed, orphaned: [] };
 }
 
@@ -424,7 +474,7 @@ function enqueue(bucket, entryId, nextEntry, isBetterThan) {
 function pendingEntry(fields) {
   return {
     ...fields,
-    ownerPlayerId: getActivePlayerOwnerId(),
+    ownerPlayerId: resolveQueuedOwnerId(),
     sessionId: getPlayerSessionId(),
     verificationState: "pending",
     submissionStage: VERIFICATION_STAGE_SUBMITTING,
@@ -582,7 +632,7 @@ export function getCampaignVerificationEntry(raceId) {
 export function getCampaignVerificationEntries() {
   const entries = Object.create(null);
   for (const entry of Object.values(readQueueState().campaign)) {
-    if (entry?.ownerPlayerId && !isOwnedByActivePlayer(entry)) continue;
+    if (entry?.ownerPlayerId && !isVisibleQueueEntry(entry)) continue;
     const cloned = cloneEntry(entry);
     if (cloned?.raceId) entries[cloned.raceId] = cloned;
   }

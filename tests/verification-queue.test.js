@@ -28,8 +28,13 @@ import {
     getPlayerSessionId,
     setActivePlayerOwnerId
 } from '../game/player/active-owner.js';
+import { getOrCreatePlayerId } from '../game/scoreboard/player-identity.js';
 
 const OWNER = 'reddit:racer';
+
+function phoneGuestOwner() {
+    return `guest:${getOrCreatePlayerId('verification-queue test')}`;
+}
 
 const STORAGE_KEY = 'VectorGpVerificationQueue';
 
@@ -858,6 +863,17 @@ describe('verification queue', () => {
         expect(getDueDailyChallengeVerifications()).toMatchObject([{ bestTime: 30 }]);
     });
 
+    it('stamps an unsigned finish with this phone\'s guest id', () => {
+        clearActivePlayerOwnerId();
+        queueDailyRun();
+
+        const guestOwner = phoneGuestOwner();
+        expect(readStoredQueue().daily[`${guestOwner}::daily-gp-2031-05-01`]).toMatchObject({
+            ownerPlayerId: guestOwner,
+        });
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+    });
+
     it('never submits a result queued before any account was known', () => {
         clearActivePlayerOwnerId();
         queueDailyRun();
@@ -867,7 +883,7 @@ describe('verification queue', () => {
         expect(getDueDailyChallengeVerifications()).toEqual([]);
     });
 
-    it('claims this session\'s ownerless results for the account the server names', () => {
+    it('claims this session\'s unsigned results for the account the server names', () => {
         clearActivePlayerOwnerId();
         queueDailyRun();
         setActivePlayerOwnerId(OWNER);
@@ -879,21 +895,49 @@ describe('verification queue', () => {
         expect(getDueDailyChallengeVerifications()).toMatchObject([{ ownerPlayerId: OWNER }]);
     });
 
-    it('claims an ownerless result left by an earlier session instead of dropping it', () => {
+    it('keeps last visit\'s unsigned result on the phone guest instead of giving it to a later sign-in', () => {
         clearActivePlayerOwnerId();
         queueDailyRun();
+        const guestOwner = phoneGuestOwner();
+        const guestKey = `${guestOwner}::daily-gp-2031-05-01`;
         const queueState = readStoredQueue();
-        queueState.daily['daily-gp-2031-05-01'].sessionId = 'session-from-a-previous-load';
+        queueState.daily[guestKey].sessionId = 'session-from-a-previous-load';
         globalThis.window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queueState));
         setActivePlayerOwnerId(OWNER);
 
         const { claimed, orphaned } = claimVerificationEntriesForOwner(OWNER);
 
-        expect(claimed).toMatchObject([{ bucket: 'daily', entryId: 'daily-gp-2031-05-01' }]);
+        expect(claimed).toEqual([]);
         expect(orphaned).toEqual([]);
-        expect(getDueDailyChallengeVerifications()).toMatchObject([{ ownerPlayerId: OWNER }]);
-        expect(readStoredQueue().daily['daily-gp-2031-05-01']).toBeUndefined();
-        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toBeTruthy();
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+        expect(readStoredQueue().daily[guestKey]).toMatchObject({ ownerPlayerId: guestOwner });
+        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toBeUndefined();
+
+        setActivePlayerOwnerId(guestOwner);
+        expect(getDueDailyChallengeVerifications()).toMatchObject([{ ownerPlayerId: guestOwner }]);
+    });
+
+    it('adopts a leftover unnamed run onto the phone guest instead of a later sign-in', () => {
+        clearActivePlayerOwnerId();
+        queueDailyRun();
+        const guestOwner = phoneGuestOwner();
+        const guestKey = `${guestOwner}::daily-gp-2031-05-01`;
+        const queueState = readStoredQueue();
+        const entry = queueState.daily[guestKey];
+        delete queueState.daily[guestKey];
+        entry.ownerPlayerId = null;
+        entry.sessionId = 'session-from-a-previous-load';
+        queueState.daily['daily-gp-2031-05-01'] = entry;
+        globalThis.window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queueState));
+        setActivePlayerOwnerId(OWNER);
+
+        const { claimed, orphaned } = claimVerificationEntriesForOwner(OWNER);
+
+        expect(claimed).toEqual([]);
+        expect(orphaned).toEqual([]);
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+        expect(readStoredQueue().daily[guestKey]).toMatchObject({ ownerPlayerId: guestOwner });
+        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toBeUndefined();
     });
 
     it('classifies transient submission failures as retryable', () => {

@@ -1,9 +1,10 @@
 let activePlayerOwnerId = null;
 
 /**
- * One id per webview load. The signed-in account cannot change without a reload. A result queued
- * before identity answers is claimed by the next bootstrap on this device; a result that already
- * has an owner waits for that owner and is never sent under a later sign-in.
+ * One id per webview load. The signed-in account cannot change without a reload. A finish before
+ * identity answers is stamped with this phone's guest id. This visit can attach that run to the
+ * named account; a later sign-in cannot. Last visit's guest run waits for that guest or an explicit
+ * progress choice.
  */
 const PLAYER_SESSION_ID = (() => {
     const randomUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
