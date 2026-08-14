@@ -621,7 +621,7 @@ export class RealTimeRacer {
     const startupPromise = runInitialStartupPlan({
       mode: this.launchTarget.mode,
       prepareRuntime: (mode) => this.installModeRuntime(mode),
-      startGraphics: (mode) => this.loadStartupGraphics(mode),
+      startGraphics: (mode, phases) => this.loadStartupGraphics(mode, phases),
       startRaceData: (mode) => this.loadStartupRaceData(mode, { retry }),
       onPhase: ({ progress, label }) => this.loadingScreen.showPhase({ progress, label }),
       onReady: async ({ mode }) => {
@@ -695,9 +695,17 @@ export class RealTimeRacer {
   }
 
   /** Everything the player has to see to race: fonts, their track, their car. */
-  async loadStartupGraphics(mode) {
-    const trackKey = await this.resolveInitialTrackKey(mode);
+  async loadStartupGraphics(mode, { onContractPhase, onTrackPhase } = {}) {
+    // The car is named by local preferences and the fonts are already in flight, so
+    // neither has to queue behind the round trips the track key waits on. A profile
+    // that names a different skin supersedes this load rather than racing it.
     this.carAssetPromise = this.syncCarSpriteAsset();
+    const fontsReadyPromise = globalThis.document?.fonts?.ready;
+
+    onContractPhase?.();
+    const trackKey = await this.resolveInitialTrackKey(mode);
+
+    onTrackPhase?.();
     this.trackReadyPromise = trackKey
       ? this.loadTrack(trackKey, {
         loadPlayerProgress: false,
@@ -708,7 +716,7 @@ export class RealTimeRacer {
     await Promise.all([
       this.trackReadyPromise,
       this.carAssetPromise,
-      globalThis.document?.fonts?.ready,
+      fontsReadyPromise,
     ]);
   }
 

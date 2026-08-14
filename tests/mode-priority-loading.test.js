@@ -124,6 +124,35 @@ describe('mode-priority startup', () => {
         },
     );
 
+    it('moves the loader through the graphics group instead of holding one number', async () => {
+        const phases = [];
+        let releaseGraphics;
+        let reportTrackPhase;
+        const startup = runInitialStartupPlan({
+            mode: 'campaign',
+            startGraphics: (mode, { onContractPhase, onTrackPhase } = {}) => {
+                onContractPhase?.();
+                reportTrackPhase = onTrackPhase;
+                return new Promise((resolve) => { releaseGraphics = resolve; });
+            },
+            onPhase: ({ progress, label }) => phases.push([progress, label]),
+        });
+
+        await Promise.resolve();
+        expect(phases).toEqual([
+            [10, 'Loading Campaign…'],
+            [30, 'Loading Campaign data…'],
+        ]);
+
+        // The contract answered mid-wait, so the bar has to move before the group settles.
+        reportTrackPhase();
+        expect(phases.at(-1)).toEqual([65, 'Preparing the track…']);
+
+        releaseGraphics();
+        await startup;
+        expect(phases.map(([progress]) => progress)).toEqual([10, 30, 65, 85, 95]);
+    });
+
     it('keeps waiting on a stalled essential instead of revealing a lobby', async () => {
         vi.useFakeTimers();
         try {

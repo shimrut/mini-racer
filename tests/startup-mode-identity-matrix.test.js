@@ -72,4 +72,23 @@ describe('direct-mode startup identity matrix', () => {
             }
         },
     );
+
+    it('starts the car before the contract round trips the track key waits on', async () => {
+        const calls = [];
+        const racer = createRacer('campaign', 'signed-in', calls);
+
+        const graphics = racer.loadStartupGraphics('campaign');
+
+        // Local preferences name the car, so it has nothing to learn from identity or the
+        // campaign bootstrap and must not spend their round trips waiting.
+        expect(calls).toEqual(['car']);
+
+        await graphics;
+        expect(calls).toEqual([
+            'car',
+            'profile:signed-in',
+            'campaign-contract',
+            'track:campaign-track',
+        ]);
+    });
 });
