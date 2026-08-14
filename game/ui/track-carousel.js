@@ -320,6 +320,14 @@ export class TrackCarousel {
         selectedChallengeId = this.getSelectedChallengeId(),
         loading = false,
     } = {}) {
+        // Warm every card's geometry up front so swiping never lands on a blank preview.
+        // The registry dedupes, so the card that paints first pays nothing twice.
+        for (const card of cards) {
+            if (card?.trackKey && !getLoadedClientTrack(card.trackKey)) {
+                void loadClientTrack(card.trackKey).catch(() => {});
+            }
+        }
+
         const rail = this.rail;
         if (!rail) return;
 

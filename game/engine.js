@@ -93,16 +93,12 @@ export class RealTimeRacer {
     modeRuntimeController = null,
     ensureModeRuntime = null,
     initialTrack = null,
-    initialLoaderStartedAt = null,
     autoStart = true,
   } = {}) {
     this.canvas = document.getElementById("gameCanvas");
     this.loadingScreen = new LoadingScreen();
-    this.startupPhaseOwned = false;
     this.initialStartupPromise = null;
-    this.initialLoaderStartedAt = initialLoaderStartedAt;
-    this.initialChallengePresentation = null;
-    this.setLoadingStatus(10, "Initializing Engine...");
+    this.initialContractPromise = null;
     // The track and the car share this one canvas, so nothing renders beneath it and
     // the context can be opaque: the per-pixel blend a transparent canvas costs every
     // frame would buy nothing. render() draws the track first, before it transforms
@@ -369,7 +365,6 @@ export class RealTimeRacer {
         "startCampaignStage",
         this.campaignCarousel.getSelectedChallenge(),
       ),
-      onRetryCampaign: () => void this.retryInitialStartup(),
       onAcceptChallenge: () => void this.invokeModeMethod("challenge", "startHeadToHead"),
       onRetryChallenge: () => void this.invokeModeMethod("challenge", "retryHeadToHead"),
       onRenderChallengePreview: (canvas, card, options) => {
@@ -500,7 +495,6 @@ export class RealTimeRacer {
     });
     this.garage = new GarageUi({
       modal: this.modal,
-      prefetchCarSpriteAsset: (name) => this.prefetchCarSpriteAsset(name),
       onCarSkinChanged: () => {
         void this.syncCarSpriteAsset();
         if (this.status === "ready") {
@@ -603,76 +597,13 @@ export class RealTimeRacer {
     return this.carSpriteLoader.currentAssetKey;
   }
 
-  showInitialModePending(mode = this.launchTarget.mode) {
-    this.activeRaceMode = mode;
-    this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-    this.startOverlay.setInteractive(false);
-    if (mode === "daily") {
-      this.lobbyUi.showDaily();
-      this.dailyCarousel.renderStatus?.({ loading: true });
-    } else if (mode === "campaign") {
-      this.lobbyUi.showPane("campaign");
-      this.campaignCarousel.renderStatus?.({ loading: true });
-      this.lobbyUi.setCampaignPrimaryLoading?.(true);
-    } else if (mode === "challenge") {
-      const challengePresentation = this.initialChallengePresentation;
-      this.lobbyUi.showChallenge(challengePresentation
-        ? {
-          ...challengePresentation,
-          canRace: false,
-          canRetry: false,
-          challengeLoading: true,
-          statusMessage: "Syncing player identity…",
-        }
-        : {
-          available: false,
-          canRace: false,
-          canRetry: false,
-          challengeLoading: true,
-          statusMessage: "Loading challenge…",
-        });
-    } else {
-      this.lobbyUi.showHome();
-    }
-    this.startOverlay.setReady(true);
-  }
-
-  showInitialModeFailure(mode, error) {
-    this.showInitialModePending(mode);
-    if (mode === "campaign") {
-      this.campaignCarousel.renderStatus?.({ loading: false });
-      this.lobbyUi.setCampaignStartupError?.("Could not sync progress. Retry.");
-    } else if (mode === "daily") {
-      this.dailyCarousel.renderStatus?.({ loading: false });
-      this.lobbyUi.setDailyStartupError?.("Could not load the Daily challenge. Retry.");
-    } else if (mode === "challenge") {
-      const currentState = this.lobbyUi.challengeState || {};
-      this.lobbyUi.showChallenge({
-        ...currentState,
-        canRace: false,
-        canRetry: true,
-        challengeLoading: false,
-        statusMessage: error?.message || "Could not load this challenge. Try again.",
-      });
-    }
-    this.startOverlay.setInteractive(true);
-  }
-
   async displayInitialModeReady(mode) {
     if (mode === "daily") {
       this.showDailyLobby();
     } else if (mode === "campaign") {
       this.showCampaignLobby({ refresh: false });
-    } else if (mode === "challenge") {
-      if (this.initialChallengePresentation) {
-        this.lobbyUi.showChallenge({
-          ...this.initialChallengePresentation,
-          challengeLoading: false,
-        });
-      } else if (!this.initialChallengeLobbyPromise) {
-        this.showHomeLobby();
-      }
-    } else {
+    } else if (mode !== "challenge") {
+      // The Head to Head pane is already painted by the challenge load itself.
       this.showHomeLobby();
     }
     this.startOverlay.setReady(true);
@@ -682,114 +613,27 @@ export class RealTimeRacer {
   startInitialStartup({ retry = false } = {}) {
     if (this.initialStartupPromise) return this.initialStartupPromise;
     this._initialStartupFailed = false;
-    this.startupPhaseOwned = true;
-    this.lobbyUi.setDailyStartupError?.(null);
-
-    const loadPlayer = ({ handoff } = {}) => {
-      if (this.playerHistoryPromise && !retry) return this.playerHistoryPromise;
-      this.playerHistoryPromise = getPlayerProgressState({
-        onProgressSelectionRequired: () => handoff?.("selection"),
-      }).then(async (progressState) => {
-        const result = await this.applyPlayerProgressState(progressState, { loadCar: false });
-        if (progressState.authoritative === false) this.schedulePlayerProfileRecovery();
-        return result;
-      });
-      return this.playerHistoryPromise;
-    };
-
-    const loadTrackForStartup = (trackKey, options = {}) => {
-      this.trackReadyPromise = this.loadTrack(trackKey, {
-        loadPlayerProgress: false,
-        showStartOverlayOnReset: false,
-        reportLoading: false,
-        ...options,
-      });
-      return this.trackReadyPromise;
-    };
 
     const startupPromise = runInitialStartupPlan({
       mode: this.launchTarget.mode,
       prepareRuntime: (mode) => this.installModeRuntime(mode),
-      loadPlayer,
-      loadHomeTrack: () => loadTrackForStartup(DEFAULT_TRACK_KEY),
-      loadDailyContract: () => {
-        this.dailyChallengePromise = this.loadDailyChallengeCritical({
-          prepareTrack: false,
-          loadPersonalBest: false,
-          throwOnError: true,
-        });
-        return this.dailyChallengePromise;
-      },
-      loadDailyTrack: (challenge) => {
-        if (!challenge?.trackKey) throw new Error("Daily challenge has no playable track.");
-        return loadTrackForStartup(challenge.trackKey, {
-          preserveDailyChallengeContext: true,
-        });
-      },
-      loadCampaignContract: () => {
-        this.initialCampaignLaunchPromise = this.prepareInitialCampaignLaunch({
-          prepareTrack: false,
-          loadPersonalBest: false,
-        });
-        return this.initialCampaignLaunchPromise;
-      },
-      loadCampaignTrack: (launch) => {
-        if (!launch?.stage?.trackKey) throw new Error("Campaign has no playable stage.");
-        return loadTrackForStartup(launch.stage.trackKey, {
-          preserveDailyChallengeContext: true,
-        });
-      },
-      loadChallenge: (options) => {
-        if (!this.launchTarget.challengeId) throw new Error("Head to Head challenge is missing.");
-        this.initialChallengeLobbyPromise = Promise.resolve(this.loadChallengeLobby(
-          this.launchTarget.challengeId,
-          options,
-        )).then((result) => {
-          this.initialChallengePresentation = { ...this.lobbyUi.challengeState };
-          return result;
-        });
-        return this.initialChallengeLobbyPromise;
-      },
-      loadCar: () => {
-        this.carAssetPromise = this.syncCarSpriteAsset();
-        return this.carAssetPromise;
-      },
+      startGraphics: (mode) => this.loadStartupGraphics(mode),
+      startRaceData: (mode) => this.loadStartupRaceData(mode, { retry }),
       onPhase: ({ progress, label }) => this.loadingScreen.showPhase({ progress, label }),
-      onHandoff: async ({ mode, reason, fadeMs }) => {
-        if (reason !== "ready" && reason !== "error") this.showInitialModePending(mode);
-        await this.loadingScreen.dismiss({ fadeMs });
-        if (!this._appReadyReported) {
-          this._appReadyReported = true;
-          void this.journeys.appReady();
-        }
-      },
-      onReady: async ({ mode, result }) => {
+      onReady: async ({ mode }) => {
         await this.displayInitialModeReady(mode);
-        this.startupPhaseOwned = false;
-        if (mode === "daily") {
-          this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
-        } else if (mode === "campaign" && result?.stage) {
-          void this.loadInitialCampaignPersonalBest?.(result.stage);
-        }
-        const startSecondary = () => {
-          if (this._secondaryStartupStarted) return;
-          this._secondaryStartupStarted = true;
-          this.loadSecondaryStartupData();
-        };
-        if (mode === "challenge") {
-          void Promise.resolve(this.playerHistoryPromise).finally(startSecondary);
-        } else {
-          startSecondary();
-        }
+        await this.loadingScreen.dismiss();
+        void this.journeys.appReady();
+        this.loadSecondaryStartupData();
       },
       onError: ({ mode, error }) => {
         this._initialStartupFailed = true;
-        this.startupPhaseOwned = false;
         console.error(`Error preparing initial ${mode} mode:`, error);
-        this.showInitialModeFailure(mode, error);
+        this.loadingScreen.showError(
+          "Could not load the game.",
+          () => this.retryInitialStartup(),
+        );
       },
-      loaderBudgetMs: retry ? 0 : undefined,
-      startedAtMs: retry ? null : this.initialLoaderStartedAt,
     });
 
     this.initialStartupPromise = startupPromise.finally(() => {
@@ -798,17 +642,98 @@ export class RealTimeRacer {
     return this.initialStartupPromise;
   }
 
+  /**
+   * The mode's contract names the track to draw, so both startup groups share one
+   * request: whichever asks first creates it.
+   */
+  ensureInitialContract(mode) {
+    this.initialContractPromise ??= Promise.resolve().then(() => {
+      if (mode === "daily") {
+        this.dailyChallengePromise = this.loadDailyChallengeCritical({
+          prepareTrack: false,
+          throwOnError: true,
+        });
+        return this.dailyChallengePromise;
+      }
+      if (mode === "campaign") {
+        // Campaign progress decides the stage, so identity has to settle first.
+        this.initialCampaignLaunchPromise = this.loadStartupPlayer()
+          .then(() => this.prepareInitialCampaignLaunch({ prepareTrack: false }));
+        return this.initialCampaignLaunchPromise;
+      }
+      if (mode === "challenge") {
+        if (!this.launchTarget.challengeId) {
+          throw new Error("Head to Head challenge is missing.");
+        }
+        this.initialChallengeLobbyPromise = Promise.resolve(
+          this.loadChallengeLobby(this.launchTarget.challengeId),
+        );
+        return this.initialChallengeLobbyPromise;
+      }
+      return null;
+    });
+    return this.initialContractPromise;
+  }
+
+  async resolveInitialTrackKey(mode) {
+    if (mode === "home") return DEFAULT_TRACK_KEY;
+    // Head to Head prepares its target track and opponent ghost inside its own load.
+    if (mode === "challenge") return null;
+    const contract = await this.ensureInitialContract(mode);
+    const trackKey = mode === "daily" ? contract?.trackKey : contract?.stage?.trackKey;
+    if (!trackKey) throw new Error(`The ${mode} launch has no playable track.`);
+    return trackKey;
+  }
+
+  /** Everything the player has to see to race: fonts, their track, their car. */
+  async loadStartupGraphics(mode) {
+    const trackKey = await this.resolveInitialTrackKey(mode);
+    this.carAssetPromise = this.syncCarSpriteAsset();
+    this.trackReadyPromise = trackKey
+      ? this.loadTrack(trackKey, {
+        loadPlayerProgress: false,
+        showStartOverlayOnReset: false,
+        preserveDailyChallengeContext: mode !== "home",
+      })
+      : this.ensureInitialContract(mode);
+    await Promise.all([
+      this.trackReadyPromise,
+      this.carAssetPromise,
+      globalThis.document?.fonts?.ready,
+    ]);
+  }
+
+  /** The rest of the essentials: identity, the mode's contract, and this track's PB ghost. */
+  async loadStartupRaceData(mode, { retry = false } = {}) {
+    const [result] = await Promise.all([
+      this.ensureInitialContract(mode),
+      this.loadStartupPlayer({ retry }),
+    ]);
+    if (mode === "daily") {
+      this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
+      await this.initialPbGhostAssetPromise;
+    }
+    return result;
+  }
+
+  loadStartupPlayer({ retry = false } = {}) {
+    if (this.playerHistoryPromise && !retry) return this.playerHistoryPromise;
+    this.playerHistoryPromise = getPlayerProgressState().then(async (progressState) => {
+      const result = await this.applyPlayerProgressState(progressState);
+      if (progressState.authoritative === false) this.schedulePlayerProfileRecovery();
+      return result;
+    });
+    return this.playerHistoryPromise;
+  }
+
   retryInitialStartup() {
     if (!this._initialStartupFailed) return this.initialStartupPromise;
     this.initialStartupPromise = null;
-    this.lobbyUi.setCampaignPrimaryLoading?.(true);
+    this.initialContractPromise = null;
     return this.startInitialStartup({ retry: true });
   }
 
   handleDailyLobbyPrimaryAction() {
-    if (this._initialStartupFailed && this.launchTarget.mode === "daily") {
-      return this.retryInitialStartup();
-    }
     return this.invokeModeMethod(
       "daily",
       "handleStartDailyChallenge",
@@ -1018,12 +943,9 @@ export class RealTimeRacer {
     this.lastTime = performance.now();
   }
 
-  setLoadingStatus(progress, status) {
-    if (this.startupPhaseOwned) return;
-    this.loadingScreen?.update(progress, status);
-  }
-
   loadSecondaryStartupData() {
+    if (this._secondaryStartupStarted) return;
+    this._secondaryStartupStarted = true;
     const secondaryModes = selectModeSecondaryStartupTasks(this.launchTarget.mode);
     this.dailyChallengeSummaryPromise = Promise.resolve(this.prefetchModeRuntime("daily"))
       .then(() => this.invokeModeMethod("daily", "refreshDailyChallengeSummary"))

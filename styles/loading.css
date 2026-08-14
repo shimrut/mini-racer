@@ -7,7 +7,7 @@
     align-items: center;
     z-index: 9999;
     opacity: 1;
-    transition: opacity var(--loader-fade-duration, var(--dur-base)) ease-out;
+    transition: opacity var(--dur-base) ease-out;
 }
 
 body:not(.loading-active) #loading-screen {
@@ -46,6 +46,25 @@ body:not(.loading-active) #loading-screen {
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.15em;
+}
+
+#loading-screen.loader-failed .loader-progress-container,
+#loading-screen.loader-failed .loader-text {
+    display: none;
+}
+
+.loader-retry {
+    padding: 0.55rem 1.4rem;
+    font-family: var(--mono-font);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    background: none;
+    border: 1px solid var(--accent-color);
+    border-radius: var(--radius-full);
+    cursor: pointer;
 }
 
 .loader-text {

@@ -535,10 +535,6 @@ export const raceEngineMethods = {
     return this.loadCarSpriteAsset(this.getSelectedCarAssetName());
   },
 
-  prefetchCarSpriteAsset(assetName) {
-    return this.carSpriteLoader.prefetch(assetName);
-  },
-
   loadCarSpriteAsset(assetName) {
     return new Promise((resolve) => {
       this.carSpriteLoader.load(assetName, {

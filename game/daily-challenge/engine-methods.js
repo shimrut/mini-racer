@@ -438,7 +438,6 @@ export const dailyChallengeEngineMethods = {
     ]);
     if (!challenge) return null;
 
-    this.setLoadingStatus(80, "Loading Ghost...");
     try {
       return await this.prepareTrackPersonalBestGhost(challenge);
     } catch (error) {
@@ -549,10 +548,7 @@ export const dailyChallengeEngineMethods = {
     return medal;
   },
 
-  async syncReadyBackgroundTrack(
-    challenge = this.activeDailyChallenge,
-    { reportLoading = true } = {},
-  ) {
+  async syncReadyBackgroundTrack(challenge = this.activeDailyChallenge) {
     const targetTrackKey =
       typeof challenge?.trackKey === "string" && challenge.trackKey
         ? challenge.trackKey
@@ -571,10 +567,7 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
-    await this.loadTrack(targetTrackKey, {
-      loadPlayerProgress: false,
-      reportLoading,
-    });
+    await this.loadTrack(targetTrackKey, { loadPlayerProgress: false });
   },
 
   syncChallengeHudPrimaryStats() {
@@ -663,7 +656,6 @@ export const dailyChallengeEngineMethods = {
     throwOnError = false,
   } = {}) {
     try {
-      this.setLoadingStatus(40, "Checking Challenge...");
       const challenge = await getActiveDailyChallenge();
       this.currentDailyChallenge = challenge || null;
       this.activeDailyChallenge = null;

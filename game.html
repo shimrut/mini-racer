@@ -7,6 +7,8 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Mini Racer</title>
+    <link rel="preload" href="public/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="public/fonts/jetbrainsmono.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="styles.css?v=2.25">
     <link rel="icon" href="public/favicon.ico" type="image/x-icon">
 </head>
@@ -19,6 +21,7 @@
                 <div id="loader-progress-bar" class="loader-progress-bar"></div>
             </div>
             <div id="loader-status" class="loader-status">Initializing...</div>
+            <button id="loader-retry" class="loader-retry" type="button" hidden>Retry</button>
         </div>
     </div>
     <main id="game-container" role="main" aria-label="Mini Racer racing game">

@@ -1353,7 +1353,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             togglePanel,
             tabSkin: null,
             tabTrails: null,
-            prefetchCarSpriteAsset: null,
         });
 
         for (const button of buttons) {

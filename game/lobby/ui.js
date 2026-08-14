@@ -88,7 +88,6 @@ export class LobbyUi {
         onOpenStandings = null,
         onStartDaily = null,
         onStartCampaign = null,
-        onRetryCampaign = null,
         onAcceptChallenge = null,
         onRetryChallenge = null,
         onRenderChallengePreview = null,
@@ -100,7 +99,6 @@ export class LobbyUi {
         this.onOpenStandings = onOpenStandings;
         this.onStartDaily = onStartDaily;
         this.onStartCampaign = onStartCampaign;
-        this.onRetryCampaign = onRetryCampaign;
         this.onAcceptChallenge = onAcceptChallenge;
         this.onRetryChallenge = onRetryChallenge;
         this.onRenderChallengePreview = onRenderChallengePreview;
@@ -114,9 +112,7 @@ export class LobbyUi {
         this._dailySelectedBillingLabel = null;
         this._campaignSelectedBillingLabel = null;
         this._dailyStartError = null;
-        this._dailyStartupError = null;
         this._campaignStartError = null;
-        this._campaignStartupError = null;
         this._menuKeyboardState = createMenuKeyboardState();
         this._paneTransitionGeneration = 0;
         this._bound = false;
@@ -158,10 +154,6 @@ export class LobbyUi {
                 this.onStartDaily?.();
             });
         this.campaignPrimaryBtn?.addEventListener('click', () => {
-            if (this._campaignStartupError) {
-                this.onRetryCampaign?.();
-                return;
-            }
             this.clearRaceStartError('campaign');
             this.onStartCampaign?.();
         });
@@ -604,22 +596,13 @@ export class LobbyUi {
     renderDaily() {
         setSwappingText(
             this.dailyPrimaryBtn?.querySelector('.main-menu__label'),
-            this._dailyStartupError
-                ? 'Retry'
-                : (this._dailyStartError ? 'Retry Start' : 'Start Race'),
+            this._dailyStartError ? 'Retry Start' : 'Start Race',
         );
         setRaceBriefText(
             this.dailyPrimaryBtn?.querySelector('.main-menu__race-brief'),
             this._dailySelectedTrackName,
             this._dailySelectedLaps,
         );
-    }
-
-    setDailyStartupError(message = null) {
-        this._dailyStartupError = typeof message === 'string' && message.trim()
-            ? message.trim()
-            : null;
-        this.renderDaily();
     }
 
     setCampaignSelectedStage(stage = null) {
@@ -631,7 +614,6 @@ export class LobbyUi {
     }
 
     getCampaignPrimaryLabel() {
-        if (this._campaignStartupError) return 'Retry';
         if (this._campaignStartError) return 'Retry Start';
         const stage = this._campaignSelectedStage;
         if (stage) return stage.unlocked ? 'Start Race' : 'Locked';
@@ -653,9 +635,7 @@ export class LobbyUi {
         if (!this.campaignPrimaryBtn) return;
         const stage = this._campaignSelectedStage;
         this.campaignPrimaryBtn.hidden = false;
-        this.campaignPrimaryBtn.disabled = this._campaignStartupError
-            ? false
-            : this._campaignPrimaryLoading
+        this.campaignPrimaryBtn.disabled = this._campaignPrimaryLoading
             ? true
             : (stage
                 ? !stage.unlocked
@@ -673,7 +653,6 @@ export class LobbyUi {
 
     setCampaignPrimaryLoading(isLoading) {
         this._campaignPrimaryLoading = Boolean(isLoading);
-        if (this._campaignPrimaryLoading) this._campaignStartupError = null;
         const btn = this.campaignPrimaryBtn;
         if (!btn) return;
         btn.classList.toggle('is-loading', this._campaignPrimaryLoading);
@@ -694,16 +673,6 @@ export class LobbyUi {
             spinner?.remove();
             this.renderCampaign();
         }
-    }
-
-    setCampaignStartupError(message = 'Could not sync progress.') {
-        this._campaignPrimaryLoading = false;
-        this._campaignStartupError = String(message || 'Could not sync progress.');
-        const btn = this.campaignPrimaryBtn;
-        btn?.classList.remove('is-loading');
-        btn?.removeAttribute('aria-busy');
-        btn?.querySelector('.main-menu__spinner')?.remove();
-        this.renderCampaign();
     }
 
     setRaceStartError(mode, message = 'Track failed to load. Try again.') {

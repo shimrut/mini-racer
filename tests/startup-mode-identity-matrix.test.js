@@ -1,71 +1,74 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runInitialStartupPlan } from '../game/startup/coordinator.js';
+import { RealTimeRacer } from '../game/engine.js';
 
 const IDENTITIES = ['signed-in', 'guest', 'guest-upgraded'];
 const MODES = ['daily', 'campaign', 'challenge'];
 
+function createRacer(mode, identity, calls) {
+    const racer = Object.create(RealTimeRacer.prototype);
+    racer.launchTarget = { mode, challengeId: 'h2h-1' };
+    racer.initialContractPromise = null;
+    racer.loadStartupPlayer = vi.fn(async () => {
+        calls.push(`profile:${identity}`);
+        return null;
+    });
+    racer.loadDailyChallengeCritical = vi.fn(async () => {
+        calls.push('daily-contract');
+        return { trackKey: 'daily-track' };
+    });
+    racer.prepareInitialCampaignLaunch = vi.fn(async () => {
+        calls.push('campaign-contract');
+        return { stage: { raceId: 'numbered-v1-0', trackKey: 'campaign-track' } };
+    });
+    racer.loadChallengeLobby = vi.fn(async () => {
+        calls.push('challenge-contract');
+        return { challengeId: 'h2h-1' };
+    });
+    racer.loadTrack = vi.fn(async (trackKey) => calls.push(`track:${trackKey}`));
+    racer.syncCarSpriteAsset = vi.fn(async () => calls.push('car'));
+    racer.loadInitialPersonalBestGhostAsset = vi.fn(async () => calls.push('pb-ghost'));
+    return racer;
+}
+
 describe('direct-mode startup identity matrix', () => {
-    it.each(MODES.flatMap((mode) => IDENTITIES.map((identity) => [mode, identity]))) (
-        'orders %s startup for a %s player without unrelated mode work',
+    it.each(MODES.flatMap((mode) => IDENTITIES.map((identity) => [mode, identity])))(
+        'loads every %s essential for a %s player without unrelated mode work',
         async (mode, identity) => {
-            vi.useFakeTimers();
-            try {
-                const calls = [];
-                const handoffs = [];
-                const task = vi.fn((name, value = null) => async () => {
-                    calls.push(name);
-                    return value;
-                });
-                const dailyContract = task('daily-contract', { trackKey: 'daily-track' });
-                const campaignContract = task('campaign-contract', {
-                    stage: { raceId: 'numbered-v1-0', trackKey: 'campaign-track' },
-                });
-                const challengeContract = task('challenge-contract', { challengeId: 'h2h-1' });
-                const loadPlayer = async ({ handoff }) => {
-                    calls.push(`profile:${identity}`);
-                    if (identity === 'guest-upgraded') await handoff('selection');
-                    calls.push(`owner:${identity === 'guest-upgraded' ? 'signed-in' : identity}`);
-                };
+            const calls = [];
+            const racer = createRacer(mode, identity, calls);
 
-                await runInitialStartupPlan({
-                    mode,
-                    prepareRuntime: async (selectedMode) => calls.push(`runtime:${selectedMode}`),
-                    loadPlayer,
-                    loadDailyContract: dailyContract,
-                    loadDailyTrack: task('daily-track'),
-                    loadCampaignContract: campaignContract,
-                    loadCampaignTrack: task('campaign-track'),
-                    loadChallenge: challengeContract,
-                    loadCar: task('final-car'),
-                    onReady: async () => calls.push('interactive'),
-                    onHandoff: async ({ reason }) => handoffs.push(reason),
-                });
+            await Promise.all([
+                racer.loadStartupGraphics(mode),
+                racer.loadStartupRaceData(mode),
+            ]);
 
-                expect(calls.at(-1)).toBe('interactive');
-                expect(calls).toContain(`profile:${identity}`);
-                expect(calls).toContain('final-car');
-                expect(calls.indexOf('final-car')).toBeLessThan(calls.indexOf('interactive'));
-                if (mode === 'daily') {
-                    expect(calls).toContain('daily-contract');
-                    expect(calls).toContain('daily-track');
-                    expect(calls).not.toContain('campaign-contract');
-                    expect(calls).not.toContain('challenge-contract');
-                } else if (mode === 'campaign') {
-                    expect(calls.indexOf(`owner:${identity === 'guest-upgraded' ? 'signed-in' : identity}`))
-                        .toBeLessThan(calls.indexOf('campaign-contract'));
-                    expect(calls).toContain('campaign-track');
-                    expect(calls).not.toContain('daily-contract');
-                    expect(calls).not.toContain('challenge-contract');
-                } else {
-                    expect(calls.indexOf('challenge-contract'))
-                        .toBeLessThan(calls.indexOf(`profile:${identity}`));
-                    expect(calls).not.toContain('daily-contract');
-                    expect(calls).not.toContain('campaign-contract');
-                }
-                expect(handoffs).toEqual(identity === 'guest-upgraded' ? ['selection'] : ['ready']);
-                expect(vi.getTimerCount()).toBe(0);
-            } finally {
-                vi.useRealTimers();
+            // Identity and the player's car are essentials in every mode.
+            expect(calls).toContain(`profile:${identity}`);
+            expect(calls).toContain('car');
+            // One shared contract request, however many groups asked for it.
+            expect(racer.loadDailyChallengeCritical.mock.calls.length
+                + racer.prepareInitialCampaignLaunch.mock.calls.length
+                + racer.loadChallengeLobby.mock.calls.length).toBe(1);
+
+            if (mode === 'daily') {
+                expect(calls).toContain('daily-contract');
+                expect(calls).toContain('track:daily-track');
+                expect(calls).toContain('pb-ghost');
+                expect(calls).not.toContain('campaign-contract');
+                expect(calls).not.toContain('challenge-contract');
+            } else if (mode === 'campaign') {
+                // Campaign progress picks the stage, so identity settles first.
+                expect(calls.indexOf(`profile:${identity}`))
+                    .toBeLessThan(calls.indexOf('campaign-contract'));
+                expect(calls).toContain('track:campaign-track');
+                expect(calls).not.toContain('daily-contract');
+                expect(calls).not.toContain('challenge-contract');
+            } else {
+                expect(calls).toContain('challenge-contract');
+                // Head to Head prepares its own target track and opponent ghost.
+                expect(racer.loadTrack).not.toHaveBeenCalled();
+                expect(calls).not.toContain('daily-contract');
+                expect(calls).not.toContain('campaign-contract');
             }
         },
     );

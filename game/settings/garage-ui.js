@@ -26,13 +26,11 @@ export class GarageUi {
         onCarSkinChanged = null,
         onTrailStrokeStyleChanged = null,
         onPlayerPreferencesChanged = null,
-        prefetchCarSpriteAsset = null,
         modal = null,
     } = {}) {
         this.onCarSkinChanged = onCarSkinChanged;
         this.onTrailStrokeStyleChanged = onTrailStrokeStyleChanged;
         this.onPlayerPreferencesChanged = onPlayerPreferencesChanged;
-        this.prefetchCarSpriteAsset = prefetchCarSpriteAsset;
         this.modal = modal;
         this.activeGarageTab = 'skin';
         this.skinOptionButtons = new Map();
@@ -53,10 +51,6 @@ export class GarageUi {
     get trailGrid() { return document.getElementById('garage-trail-grid'); }
 
     bind() {
-        this.buildSkinGrid();
-        this.buildTrailGrid();
-        this.syncSkinSelection();
-        this.syncTrailSelection();
         this.setGarageTab(this.activeGarageTab, { focusTab: false });
         configureReusableModal(this.garageModal, {
             title: 'Garage',
@@ -70,12 +64,19 @@ export class GarageUi {
         });
         this.tabSkin?.addEventListener('click', () => this.setGarageTab('skin'));
         this.tabTrails?.addEventListener('click', () => this.setGarageTab('trails'));
+    }
 
-        if (typeof this.prefetchCarSpriteAsset === 'function') {
-            for (const { assetName } of PLAYER_CAR_SKINS) {
-                this.prefetchCarSpriteAsset(assetName);
-            }
-        }
+    /**
+     * Each option in these grids pulls its own image, so they are built the first time
+     * the Garage opens rather than competing at boot with the one car being raced.
+     */
+    buildGarageGrids() {
+        if (this._garageGridsBuilt) return;
+        this._garageGridsBuilt = true;
+        this.buildSkinGrid();
+        this.buildTrailGrid();
+        this.syncSkinSelection();
+        this.syncTrailSelection();
     }
 
     setPanelVisible(isVisible) {
@@ -84,6 +85,7 @@ export class GarageUi {
         if (!panel || !garageModal) return;
         panel.hidden = !isVisible;
         if (isVisible) {
+            this.buildGarageGrids();
             openModalElement(garageModal, () => garageModal.classList.add('active'));
         } else {
             closeModalElement(garageModal, () => garageModal.classList.remove('active'));

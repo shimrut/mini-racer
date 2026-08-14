@@ -1311,7 +1311,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       RealTimeRacer.prototype.loadInitialPersonalBestGhostAsset.call(engine),
     ).resolves.toEqual({ trackKey: challenge.trackKey });
 
-    expect(engine.setLoadingStatus).toHaveBeenCalledWith(80, "Loading Ghost...");
     expect(engine.prepareTrackPersonalBestGhost).toHaveBeenCalledWith(challenge);
   });
 

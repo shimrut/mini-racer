@@ -81,12 +81,10 @@ export const headToHeadEngineMethods = {
         if (challengeReady && typeof this.loadTrack === 'function') {
             try {
                 onTrackPhase?.();
-                this.setLoadingStatus?.(78, 'Preparing Challenge Track...');
                 await this.loadTrack(challenge.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     showStartOverlayOnReset: false,
-                    reportLoading: false,
                 });
                 if (this.activeHeadToHead?.frozenGhost) {
                     onGhostPhase?.();

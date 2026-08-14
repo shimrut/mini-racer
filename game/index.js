@@ -62,18 +62,10 @@ setupVisibleViewportHeight();
 setupMobileViewportGuards();
 
 const modeRuntimeController = createModeRuntimeController(RealTimeRacer);
-const navigationEntry = globalThis.performance?.getEntriesByType?.('navigation')?.[0];
-const initialLoaderStartedAt = Number.isFinite(navigationEntry?.startTime)
-    ? navigationEntry.startTime
-    : (globalThis.performance?.now?.() ?? Date.now());
 
 function startGame() {
     const launchTarget = resolveGameLaunchTarget();
-    return new RealTimeRacer({
-        launchTarget,
-        modeRuntimeController,
-        initialLoaderStartedAt,
-    });
+    return new RealTimeRacer({ launchTarget, modeRuntimeController });
 }
 
 try {
