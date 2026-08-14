@@ -324,9 +324,9 @@ function getDue(bucket, now = Date.now()) {
 }
 
 /**
- * The account is only named once the bootstrap answers, which can be after a race finishes. Results
- * queued in this session are claimed by that answer; anything older is from a session whose account
- * this one cannot vouch for.
+ * The account is only named once the bootstrap answers, which can be after a race finishes. Any
+ * ownerless waiting run on this device is claimed by that answer — this visit or a later one —
+ * then sent under that owner. A run that already has an owner is never retagged.
  */
 export function claimVerificationEntriesForOwner(ownerPlayerId) {
   const activeOwnerId = typeof ownerPlayerId === "string" && ownerPlayerId.trim()
@@ -335,26 +335,20 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
   if (!activeOwnerId) return { claimed: [], orphaned: [] };
 
   const queueState = readQueueState();
-  const sessionId = getPlayerSessionId();
   const claimed = [];
-  const orphaned = [];
   for (const bucket of QUEUE_BUCKETS) {
     for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
       if (entry?.ownerPlayerId) continue;
       delete queueState[bucket][entryKey];
-      if (entry?.sessionId === sessionId) {
-        queueState[bucket][`${activeOwnerId}${OWNER_KEY_SEPARATOR}${entryKey}`] = {
-          ...entry,
-          ownerPlayerId: activeOwnerId,
-        };
-        claimed.push({ bucket, entryId: entryKey });
-        continue;
-      }
-      orphaned.push({ bucket, entryId: entryKey, entry: cloneEntry(entry) });
+      queueState[bucket][`${activeOwnerId}${OWNER_KEY_SEPARATOR}${entryKey}`] = {
+        ...entry,
+        ownerPlayerId: activeOwnerId,
+      };
+      claimed.push({ bucket, entryId: entryKey });
     }
   }
-  if (claimed.length || orphaned.length) writeQueueState(queueState);
-  return { claimed, orphaned };
+  if (claimed.length) writeQueueState(queueState);
+  return { claimed, orphaned: [] };
 }
 
 /**
@@ -375,7 +369,6 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
     return { changed: false, removed: 0, moved: 0 };
   }
   const queueState = readQueueState();
-  const sessionId = getPlayerSessionId();
   let removed = 0;
   let moved = 0;
   for (const bucket of QUEUE_BUCKETS) {
@@ -389,8 +382,8 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
     }
     for (const [entryKey, entry] of entries) {
       const isGuestOwned = entry?.ownerPlayerId === guestPlayerId;
-      const isCurrentUnowned = !entry?.ownerPlayerId && entry?.sessionId === sessionId;
-      if (!isGuestOwned && !isCurrentUnowned) continue;
+      const isUnowned = !entry?.ownerPlayerId;
+      if (!isGuestOwned && !isUnowned) continue;
       if (choice === "account") {
         delete queueState[bucket][entryKey];
         removed += 1;

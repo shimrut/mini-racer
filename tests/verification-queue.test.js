@@ -879,7 +879,7 @@ describe('verification queue', () => {
         expect(getDueDailyChallengeVerifications()).toMatchObject([{ ownerPlayerId: OWNER }]);
     });
 
-    it('drops an ownerless result left by an earlier session', () => {
+    it('claims an ownerless result left by an earlier session instead of dropping it', () => {
         clearActivePlayerOwnerId();
         queueDailyRun();
         const queueState = readStoredQueue();
@@ -889,9 +889,11 @@ describe('verification queue', () => {
 
         const { claimed, orphaned } = claimVerificationEntriesForOwner(OWNER);
 
-        expect(claimed).toEqual([]);
-        expect(orphaned).toMatchObject([{ bucket: 'daily', entryId: 'daily-gp-2031-05-01' }]);
+        expect(claimed).toMatchObject([{ bucket: 'daily', entryId: 'daily-gp-2031-05-01' }]);
+        expect(orphaned).toEqual([]);
+        expect(getDueDailyChallengeVerifications()).toMatchObject([{ ownerPlayerId: OWNER }]);
         expect(readStoredQueue().daily['daily-gp-2031-05-01']).toBeUndefined();
+        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toBeTruthy();
     });
 
     it('classifies transient submission failures as retryable', () => {

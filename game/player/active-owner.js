@@ -1,9 +1,9 @@
 let activePlayerOwnerId = null;
 
 /**
- * One id per webview load. The signed-in account cannot change without a reload, so a result queued in
- * this session belongs to whichever owner this session's bootstrap confirms — while a result left over
- * from an earlier session belongs to nobody this session can name.
+ * One id per webview load. The signed-in account cannot change without a reload. A result queued
+ * before identity answers is claimed by the next bootstrap on this device; a result that already
+ * has an owner waits for that owner and is never sent under a later sign-in.
  */
 const PLAYER_SESSION_ID = (() => {
     const randomUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'

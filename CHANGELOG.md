@@ -1,5 +1,11 @@
 # Changelog
 
+- Kept a Daily or Campaign finish that happened before the game knew who the
+  player was. The time stays on the phone and is sent once this device gets an
+  identity — this visit or the next — instead of sitting on Submitting and being
+  thrown away on the following open. A run that already belongs to an account
+  is still never sent under a later sign-in.
+
 - Rebuilt initial loading around one ordered plan per launch mode. Direct Daily
   prepares its active challenge track, Campaign resolves authoritative progress
   before one bootstrap and its selected stage, and Head to Head starts the duel
@@ -33,7 +39,8 @@
   result waits for its own account instead of submitting under whoever signs in
   next, so it can no longer be credited to the wrong leaderboard or refused as a
   locked Campaign stage and lost, and two accounts can each hold a queued result
-  for the same race on one device.
+  for the same race on one device. A finish before identity answers is claimed
+  by the next named owner on this device rather than dropped on the next open.
 
 - Stopped a guest sign-in from leaving a working guest credential behind. Once a
   promotion has completed, the server refuses the old guest identity rather than

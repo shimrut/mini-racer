@@ -17,6 +17,14 @@ vi.mock('../game/player/preferences.js', async (importOriginal) => ({
 
 import { playerProfileEngineMethods } from '../game/player/engine-methods.js';
 import { buildCarUnlockSnapshot } from '../game/car/car-unlock-policy.js';
+import {
+    clearActivePlayerOwnerId,
+    setActivePlayerOwnerId,
+} from '../game/player/active-owner.js';
+import {
+    enqueueDailyChallengeVerification,
+    resetVerificationQueueForTests,
+} from '../game/scoreboard/verification-queue.js';
 
 const UNLOCKED_CAR = 'assets/cars/mr_extra_crimson.webp';
 
@@ -32,11 +40,23 @@ function createEngine(overrides = {}) {
 describe('player profile engine methods', () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        const map = new Map();
+        globalThis.window = {
+            localStorage: {
+                getItem: (key) => (map.has(key) ? map.get(key) : null),
+                setItem: (key, value) => map.set(key, String(value)),
+                removeItem: (key) => map.delete(key),
+            },
+        };
+        resetVerificationQueueForTests();
+        clearActivePlayerOwnerId();
     });
 
     afterEach(() => {
         vi.useRealTimers();
         vi.clearAllMocks();
+        clearActivePlayerOwnerId();
+        delete globalThis.window;
     });
 
     it('applies confirmed unlocks and preferences from an authoritative bootstrap', async () => {
@@ -124,6 +144,28 @@ describe('player profile engine methods', () => {
         expect(second).toBeNull();
         expect(storageMocks.getPlayerProgressState).toHaveBeenCalledTimes(1);
         engine.stopPlayerProfileRecovery();
+    });
+
+    it('starts sending claimed waiting runs once identity answers', () => {
+        enqueueDailyChallengeVerification({
+            challengeId: 'daily-gp-2031-08-14',
+            challengeDate: '2031-08-14',
+            trackKey: 'circuit',
+            bestTime: 11.111,
+            replay: { inputs: [{ frames: 1, left: false, right: false }] },
+        });
+        setActivePlayerOwnerId('guest:racer');
+        const engine = createEngine({
+            processVerificationQueue: vi.fn().mockResolvedValue(undefined),
+            dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+            refreshCampaignVerificationOverlay: vi.fn(),
+        });
+
+        engine.claimQueuedResultsForOwner();
+
+        expect(engine.dailyChallengeUi.refreshDailyChallengeVerificationState)
+            .toHaveBeenCalledWith('daily-gp-2031-08-14');
+        expect(engine.processVerificationQueue).toHaveBeenCalledTimes(1);
     });
 
     it('keeps chasing the profile when a recovery attempt throws', async () => {

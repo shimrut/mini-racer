@@ -41,18 +41,32 @@ export const playerProfileEngineMethods = {
     },
 
     /**
-     * Results raced before the account was known belong to whoever this session's bootstrap names —
-     * the signed-in account cannot change without a reload. Anything queued by an earlier session has
-     * no owner this one can vouch for, so it is dropped along with the local best it provisionally set.
+     * Results raced before the account was known belong to whoever this device's next bootstrap names.
+     * Owned results stay with that owner. Claiming also starts the sender so a recovered identity
+     * uploads the waiting run instead of leaving the finish screen on Submitting.
      */
     claimQueuedResultsForOwner() {
-        const { orphaned } = claimVerificationEntriesForOwner(getActivePlayerOwnerId());
+        const { claimed, orphaned } = claimVerificationEntriesForOwner(getActivePlayerOwnerId());
         for (const { bucket, entry } of orphaned) {
             if (bucket !== 'daily' || !entry) continue;
             rollbackLocalBestForFailedVerificationEntry(this, entry);
             this.dailyChallengeUi?.refreshDailyChallengeVerificationState?.(entry.challengeId);
         }
         if (orphaned.length) this.refreshCampaignVerificationOverlay?.();
+        if (claimed.length) {
+            for (const { bucket, entryId } of claimed) {
+                if (bucket === 'daily') {
+                    this.dailyChallengeUi?.refreshDailyChallengeVerificationState?.(entryId);
+                }
+            }
+            this.refreshCampaignVerificationOverlay?.();
+            const processing = this.processVerificationQueue?.();
+            if (processing && typeof processing.catch === 'function') {
+                processing.catch((error) => {
+                    console.error('Error processing claimed verification entries:', error);
+                });
+            }
+        }
         return orphaned;
     },
 
