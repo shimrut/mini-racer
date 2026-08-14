@@ -12,6 +12,7 @@ import {
   getOrCreatePlayerId,
   rotateGuestPlayerIdentity,
   setGuestPlayerToken,
+  toGuestOwnerId,
 } from "./scoreboard/player-identity.js";
 import { isLocalEnvironment } from "./track/environment.js";
 import {
@@ -158,11 +159,11 @@ export async function getPlayerProgressState({ onProgressSelectionRequired = nul
     }
     if (remoteState) {
       setGuestPlayerToken(remoteState.guestToken);
-      const guestPlayerId = getOrCreatePlayerId("guest progress selection");
+      const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
       const isSignedInAccount = Boolean(remoteState.redditUsername)
         && remoteState.leaderboardPlayerId?.startsWith("reddit:");
       const hasPendingGuestRuns = isSignedInAccount
-        && hasVerificationEntriesForOwner(`guest:${guestPlayerId}`);
+        && hasVerificationEntriesForOwner(guestOwnerId);
       if (remoteState.progressSelection?.required || hasPendingGuestRuns) {
         setActivePlayerOwnerId(null);
         await onProgressSelectionRequired?.(remoteState.progressSelection);
@@ -182,7 +183,7 @@ export async function getPlayerProgressState({ onProgressSelectionRequired = nul
         remoteState = normalizeRemotePlayerProgressState(selectionResult.playerState);
         setGuestPlayerToken(remoteState.guestToken);
         resolveVerificationQueueAfterGuestProgressSelection({
-          guestPlayerId: `guest:${guestPlayerId}`,
+          guestPlayerId: guestOwnerId,
           accountPlayerId: remoteState.leaderboardPlayerId,
           choice,
         });

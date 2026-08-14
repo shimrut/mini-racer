@@ -2,7 +2,7 @@ import {
   getActivePlayerOwnerId,
   getPlayerSessionId,
 } from "../player/active-owner.js";
-import { getOrCreatePlayerId } from "./player-identity.js";
+import { getPhoneGuestOwnerId } from "./player-identity.js";
 
 const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
@@ -204,18 +204,6 @@ function isBetterDailyCandidate(nextEntry, previousEntry) {
   return Number(nextEntry.bestTime) < Number(previousEntry.bestTime);
 }
 
-/**
- * Two accounts can each hold a queued result for the same race on one browser, so entries are stored
- * per owner. A finish before bootstrap answers is stamped with this phone's guest id, never left blank.
- */
-function getPhoneGuestOwnerId() {
-  return `guest:${getOrCreatePlayerId("verification queue")}`;
-}
-
-function resolveQueuedOwnerId() {
-  return getActivePlayerOwnerId() || getPhoneGuestOwnerId();
-}
-
 function ownedEntryKey(entryId, ownerPlayerId) {
   return ownerPlayerId ? `${ownerPlayerId}${OWNER_KEY_SEPARATOR}${entryId}` : entryId;
 }
@@ -224,6 +212,19 @@ function rawEntryIdFromKey(entryKey, ownerPlayerId) {
   if (!ownerPlayerId) return entryKey;
   const prefix = `${ownerPlayerId}${OWNER_KEY_SEPARATOR}`;
   return entryKey.startsWith(prefix) ? entryKey.slice(prefix.length) : entryKey;
+}
+
+function resolveQueuedOwnerId() {
+  return getActivePlayerOwnerId() || getPhoneGuestOwnerId();
+}
+
+function rekeyOwnedEntry(queueState, bucket, fromKey, entry, toOwnerId) {
+  const rawId = rawEntryIdFromKey(fromKey, entry?.ownerPlayerId);
+  delete queueState[bucket][fromKey];
+  const next = { ...entry, ownerPlayerId: toOwnerId };
+  const nextKey = ownedEntryKey(rawId, toOwnerId);
+  queueState[bucket][nextKey] = next;
+  return { nextKey, next, rawId };
 }
 
 function resolveEntryKey(queueState, bucket, entryId) {
@@ -320,9 +321,7 @@ function markTerminal(bucket, entryId, verificationState, stage, statusText) {
 }
 
 /**
- * A queued result belongs to the account that raced it. Submitting one under whoever happens to be
- * signed in now credits the wrong player, so entries for another owner wait, and an entry no owner
- * can be named for never submits at all.
+ * A queued result belongs to the account that raced it. Only the active owner's due entries are sent.
  */
 function isOwnedByActivePlayer(entry) {
   const activeOwnerId = getActivePlayerOwnerId();
@@ -356,7 +355,7 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
   const activeOwnerId = typeof ownerPlayerId === "string" && ownerPlayerId.trim()
     ? ownerPlayerId.trim()
     : null;
-  if (!activeOwnerId) return { claimed: [], orphaned: [] };
+  if (!activeOwnerId) return { claimed: [] };
 
   const phoneGuestId = getPhoneGuestOwnerId();
   const sessionId = getPlayerSessionId();
@@ -372,11 +371,13 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
       let currentKey = entryKey;
       let current = entry;
       if (!current.ownerPlayerId) {
-        const rawId = rawEntryIdFromKey(currentKey, null);
-        delete queueState[bucket][currentKey];
-        current = { ...current, ownerPlayerId: phoneGuestId };
-        currentKey = ownedEntryKey(rawId, phoneGuestId);
-        queueState[bucket][currentKey] = current;
+        ({ nextKey: currentKey, next: current } = rekeyOwnedEntry(
+          queueState,
+          bucket,
+          currentKey,
+          current,
+          phoneGuestId,
+        ));
         changed = true;
       }
 
@@ -385,20 +386,23 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
         && phoneGuestId !== activeOwnerId;
       if (!isThisSessionPhoneGuest) continue;
 
-      const rawId = rawEntryIdFromKey(currentKey, phoneGuestId);
-      delete queueState[bucket][currentKey];
-      current = { ...current, ownerPlayerId: activeOwnerId };
-      queueState[bucket][ownedEntryKey(rawId, activeOwnerId)] = current;
+      const { next, rawId } = rekeyOwnedEntry(
+        queueState,
+        bucket,
+        currentKey,
+        current,
+        activeOwnerId,
+      );
       claimed.push({
         bucket,
-        entryId: current.challengeId || current.raceId || rawId,
+        entryId: next.challengeId || next.raceId || rawId,
       });
       changed = true;
     }
   }
 
   if (changed) writeQueueState(queueState);
-  return { claimed, orphaned: [] };
+  return { claimed };
 }
 
 /**
@@ -439,14 +443,7 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
         removed += 1;
         continue;
       }
-      const rawEntryId = entryKey.startsWith(`${guestPlayerId}${OWNER_KEY_SEPARATOR}`)
-        ? entryKey.slice(`${guestPlayerId}${OWNER_KEY_SEPARATOR}`.length)
-        : entryKey;
-      delete queueState[bucket][entryKey];
-      queueState[bucket][`${accountPlayerId}${OWNER_KEY_SEPARATOR}${rawEntryId}`] = {
-        ...entry,
-        ownerPlayerId: accountPlayerId,
-      };
+      rekeyOwnedEntry(queueState, bucket, entryKey, entry, accountPlayerId);
       moved += 1;
     }
   }

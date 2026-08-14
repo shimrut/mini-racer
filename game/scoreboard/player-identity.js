@@ -1,5 +1,6 @@
 const PLAYER_ID_STORAGE_KEY = 'VectorGpScoreboardPlayerId';
 const GUEST_PLAYER_TOKEN_STORAGE_KEY = 'VectorGpGuestPlayerToken';
+const GUEST_OWNER_PREFIX = 'guest:';
 let ephemeralPlayerId = null;
 let ephemeralGuestPlayerToken = null;
 let hasEphemeralGuestPlayerToken = false;
@@ -32,6 +33,16 @@ export function getOrCreatePlayerId(logLabel = 'scoreboard') {
         ephemeralPlayerId ||= createPlayerId();
         return ephemeralPlayerId;
     }
+}
+
+export function toGuestOwnerId(playerId) {
+    if (typeof playerId !== 'string' || !playerId.trim()) return null;
+    const trimmed = playerId.trim();
+    return trimmed.startsWith(GUEST_OWNER_PREFIX) ? trimmed : `${GUEST_OWNER_PREFIX}${trimmed}`;
+}
+
+export function getPhoneGuestOwnerId() {
+    return toGuestOwnerId(getOrCreatePlayerId('player identity'));
 }
 
 export function rotateGuestPlayerIdentity(logLabel = 'scoreboard') {
