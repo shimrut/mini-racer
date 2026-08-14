@@ -18,17 +18,18 @@ export const playerProfileEngineMethods = {
         redditUsername,
         carUnlocks,
         authoritative = true,
-    } = {}) {
+    } = {}, { loadCar = true } = {}) {
         this.hasAnyData = Boolean(hasAnyData);
         this.isReturningPlayer = Boolean(isReturningPlayer);
         this.redditUsername = typeof redditUsername === 'string' && redditUsername.trim()
             ? redditUsername.trim()
             : null;
+        this.playerProfileAuthoritative = Boolean(authoritative);
         this.applyCarUnlockSnapshot?.(carUnlocks, { authoritative });
         if (authoritative) {
             this.claimQueuedResultsForOwner();
             if (playerPreferences) {
-                await this.applyPersistedPlayerPreferences(playerPreferences);
+                await this.applyPersistedPlayerPreferences(playerPreferences, { loadCar });
             } else {
                 queuePlayerPreferencesSave();
             }

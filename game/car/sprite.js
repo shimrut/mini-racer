@@ -160,6 +160,7 @@ export class CarSpriteLoader {
   #cache = new Map();
   #loadToken = 0;
   #inFlightAssetName = null;
+  #pendingSettlers = new Map();
   #currentAssetKey = null;
 
   get currentAssetKey() {
@@ -208,7 +209,7 @@ export class CarSpriteLoader {
     return record;
   }
 
-  load(assetName, { onLoaded, onError } = {}) {
+  load(assetName, { onLoaded, onError, onSuperseded } = {}) {
     if (!assetName) return;
 
     if (this.#currentAssetKey === assetName) {
@@ -224,14 +225,35 @@ export class CarSpriteLoader {
 
     const loadToken = (() => {
       if (this.#inFlightAssetName !== assetName) {
+        this.#settleSuperseded(this.#loadToken);
         this.#loadToken += 1;
         this.#inFlightAssetName = assetName;
       }
       return this.#loadToken;
     })();
 
+    let settled = false;
+    const pendingSettlers = this.#pendingSettlers.get(loadToken) || new Set();
+    const settleSuperseded = () => {
+      if (settled) return;
+      settled = true;
+      onSuperseded?.(assetName);
+    };
+    pendingSettlers.add(settleSuperseded);
+    this.#pendingSettlers.set(loadToken, pendingSettlers);
+
+    const finish = () => {
+      if (settled) return false;
+      settled = true;
+      pendingSettlers.delete(settleSuperseded);
+      if (pendingSettlers.size === 0) {
+        this.#pendingSettlers.delete(loadToken);
+      }
+      return true;
+    };
+
     const apply = (image) => {
-      if (loadToken !== this.#loadToken) return;
+      if (loadToken !== this.#loadToken || !finish()) return;
       if (this.#inFlightAssetName === assetName) {
         this.#inFlightAssetName = null;
       }
@@ -247,12 +269,19 @@ export class CarSpriteLoader {
     cachedAsset.promise
       .then((image) => apply(image))
       .catch(() => {
-        if (loadToken !== this.#loadToken) return;
+        if (loadToken !== this.#loadToken || !finish()) return;
         if (this.#inFlightAssetName === assetName) {
           this.#inFlightAssetName = null;
         }
         this.#currentAssetKey = null;
         onError?.(assetName);
       });
+  }
+
+  #settleSuperseded(loadToken) {
+    const pendingSettlers = this.#pendingSettlers.get(loadToken);
+    if (!pendingSettlers) return;
+    this.#pendingSettlers.delete(loadToken);
+    for (const settle of pendingSettlers) settle();
   }
 }

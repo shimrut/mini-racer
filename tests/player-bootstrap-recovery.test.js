@@ -413,7 +413,7 @@ describe("guest bootstrap recovery", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/player/bootstrap"),
-      { method: "GET" },
+      expect.objectContaining({ method: "GET", signal: expect.any(AbortSignal) }),
     );
     const url = new URL(fetchMock.mock.calls[0][0]);
     expect(url.searchParams.get("playerId")).toBe("old-guest-id");

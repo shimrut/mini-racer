@@ -2286,7 +2286,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             _campaignBootstrapReady: false,
             _campaignBootstrapPromise: null,
             _campaignBootstrapRequestId: 0,
-            startOverlay: { showStartOverlay: vi.fn() },
+            startOverlay: {
+                showStartOverlay: vi.fn(),
+                isStartOverlayVisible: () => true,
+            },
             lobbyUi,
             reset: vi.fn(),
             applyCampaignLobbyBootstrap: campaignEngineMethods.applyCampaignLobbyBootstrap,

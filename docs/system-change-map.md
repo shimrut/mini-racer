@@ -74,8 +74,8 @@ flowchart LR
 ### Devvit Journeys
 
 - `game/journeys/service.js` is the only client adapter for Reddit's official Devvit Journeys API. It serializes lifecycle calls, suppresses duplicate or non-increasing events, reports receipts only to the developer console, and contains SDK failures so they cannot affect loading, racing, finishing, or score submission.
-- The lobby receives its visual `is-ready` state behind the loading-screen fade so its title and controls are already present when the loader clears. Start input remains separately gated until dismissal completes; only then does the expanded game report `App.Ready`. Each explicit player intent starts one Journey attempt (`initial_start`, `track_switch`, `restart`, `retry`, or `improve`); checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, or track switches end incomplete before the next start. Mid-run track switches replace the active Journey through `replaceActive` end-then-start sequencing. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
-- `game/ui/loader.js` accepts only monotonic progress updates from parallel startup work and applies the terminal `Ready!` state at 100%, so late async callbacks cannot make the global loading bar or status regress.
+- The startup coordinator reveals either the completed lobby or the selected mode's inert Preparing/Retry surface within the global loader's 800ms budget. Start input remains gated until the selected mode's critical contract and track are ready; `App.Ready` is reported once a meaningful completed or pending surface is visible. Each explicit player intent starts one Journey attempt (`initial_start`, `track_switch`, `restart`, `retry`, or `improve`); checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, or track switches end incomplete before the next start. Mid-run track switches replace the active Journey through `replaceActive` end-then-start sequencing. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
+- `game/ui/loader.js` keeps bar progress monotonic while always showing the coordinator's current ordered phase. Dismissal removes the input-blocking class immediately and uses the shared 160ms motion token, without depending on animation frames that a hidden WebView may suspend.
 - Journey payloads contain no player ID, Reddit username, guest token, challenge ID, track key, replay, device details, or lap score. The official `/api/telemetry` router enriches events in Devvit; Mini Racer adds no custom analytics route, Redis record, retention policy, or dashboard.
 
 ### UI And Modal Flow
@@ -97,7 +97,7 @@ flowchart LR
 - `game/storage.js` fetches player bootstrap state and falls back to local data when needed. Payload coercion, local short-circuit, and hosted failure fallback are covered in `tests/player-bootstrap-recovery.test.js`.
 - A bootstrap answer is either authoritative or a fallback, and only an authoritative one may act on the account. A hosted outage presents the last confirmed profile for that owner from `game/player/profile-cache.js` — never the all-locked default — and applies no default locks, no selected-car rewrite, and no preference save, because a resulting stock selection would survive the outage. `game/player/engine-methods.js` chases the real profile at 5s, 30s, and 2m, then only on reconnect or foreground resume. The cache holds the last three owners' normalized preference and unlock snapshots and never a guest token.
 - Queued results belong to the account that raced them. `game/player/active-owner.js` holds the owner the server named for this session, `game/scoreboard/verification-queue.js` stores entries per owner, and only the current owner's entries are processed or displayed — another account's wait for it to return, so both accounts can hold a queued result for the same race. A result finished before the bootstrap answered is claimed by that session's own answer; one left by an earlier session has no owner this session can vouch for and is dropped along with the provisional local best it set. Daily and Campaign submissions carry `submissionOwnerId`, and the server refuses a mismatch with `409 submission_identity_changed` before rate limiting or replay validation, so a paused result keeps its replay and burns no attempts.
-- Reddit sign-in merges guest Campaign progress, car unlocks, and Daily leaderboard rows from the last seven playable days onto the signed-in account, keeping the faster time per challenge and deleting the leftover guest row. `mergeGuestDailyProgress` in `src/server/daily-gp-store.ts` mirrors the Campaign merge locks and copy-before-delete ordering.
+- Reddit sign-in now pauses for an explicit progress choice whenever a guest credential is present. The player chooses **Use Guest Progress** (replace the account state) or **Use Saved Progress** / **Start Fresh** (discard the guest state); there is no automatic best-of merge. `src/server/routes/player-routes.ts` exposes the idempotent selection request, while `src/server/daily-gp-store.ts` coordinates Daily, Campaign, and car-unlock replacement before retiring the guest. Player and Campaign bootstrap remain non-authoritative until the choice completes.
 - Campaign lobby unlocks and the finish-sheet **Next** action read verified server progress only. Pending verification may still paint the stage time on the sheet, but **Next** stays disabled until the server accepts the run, then the same sheet turns **Next** on and restores its click action. `startCampaignStage` refuses to stamp the next race when confirmation times out or fails.
 - Mode runtimes load in the background for prefetch, but only the active launch mode's methods stay installed on `RealTimeRacer.prototype`. `game/modes/runtime-loader.js` re-applies the active mode after warming another mode so Daily overrides are not replaced by shared `challenge-run` helpers. Switching Daily, Campaign, or Head to Head installs the newly selected mode and leaves it in place.
 - `game/daily-challenge/ui.js` renders the start screen card, playlist modal, preview canvas, and challenge summary state, including local submission stages like submitting, verifying, retrying, and terminal errors.
@@ -105,6 +105,12 @@ flowchart LR
 - `game/scoreboard/snapshot.js` owns the shared client-side snapshot shape, row/time normalization, empty state, and mutation-safe cache cloning used by both scoreboard and Daily GP flows.
 - `game/scoreboard/engine-methods.js` starts verification from the finish event, handles retry behavior until the competition deadline, and consumes the canonical challenge-PB record returned by an accepted submission.
 - Finish-screen RANK first paint and live updates share `applyCombinedRankValue` in `game/race/result-flow.js`, so loading shows Submitting/Verifying status text and failures keep RANK visible with the error. After the win modal opens, a synchronous queue sync paints Verifying when an entry still exists; if accept finishes with no standings snapshot, loading clears and RANK hides.
+- Standings opened from the finish sheet always dismiss back to that finish sheet, even if an asynchronous standings refresh replaces the temporary close-mode flag.
+- Finish-screen personal-best comparisons use like-for-like race results. A
+  multi-lap Daily finish compares its complete race total only with an earlier
+  complete total for that challenge; an intermediate lap from the current run
+  is never a fallback PB. With no earlier race, the sheet shows its empty state
+  under **Best Race** instead of fabricating a delta.
 - Daily leaderboard rows and PB ghosts are separate challenge-scoped records with the same fixed deadline: six hours after `availableUntil`. Entries retain the verified completed-lap count, and ghosts additionally bind rules revision and lap count. One server replay simulation validates the complete daily race and produces the canonical ghost. Both writes run concurrently; the leaderboard write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`.
 - A stored PB that cannot be used — corrupt, or bound to a superseded track fingerprint, rules revision, or lap count — is treated as absent by every reader, but only the write path, which owns that player's PB lock, deletes it. A lock-free reader that deleted it could destroy a compatible record committed between its own read and its delete, and the browser has already dropped the replay by then.
 - Accepted submissions return the complete canonical `trackPersonalBest` record. The client validates and installs that record before GO without another `/api/player/pb-ghost` request. A pending faster lap makes the old prepared ghost ineligible for Improve; if the canonical result is unresolved, unavailable, or malformed at GO, the attempt starts normally without a ghost and shows `GHOST UNAVAILABLE` for two seconds after GO disappears. A late valid response is cached for the next attempt and never changes a ghost during an active run.
@@ -113,7 +119,7 @@ flowchart LR
   That route preserves the raced challenge selection and repaints the Daily
   carousel from the installed canonical PB, so its earned medals are visible
   without leaving Daily and entering it again.
-- Custom-post startup resolves the playable challenge before dismissing the loading screen and prepares that challenge's PB ghost as an initial race asset. A still-valid historical post therefore loads its historical track ghost, while an expired post resolves to the current featured challenge and loads today's ghost. The first `Race Now` start preserves this prepared asset instead of clearing and preparing it again; restarts continue reusing the same frozen record.
+- Custom-post startup starts the authoritative challenge request before player-profile work and prepares that challenge's frozen ghost as a critical race asset. If it exceeds the global loader budget, the inert Head to Head pane owns the remaining challenge or identity wait; Start is enabled only after both are ready. A still-valid historical post therefore loads its historical track ghost, while an expired post resolves to the current featured challenge and loads today's ghost. The first `Race Now` start preserves this prepared asset instead of clearing and preparing it again; restarts continue reusing the same frozen record.
 - PB ghost playback uses the same interpolated render timestamp as the live car. It does not render directly from the 60 Hz fixed-step clock, so uneven or higher-refresh display frames cannot expose the ghost as repeated positions followed by jumps.
 - Tracks-to-race handoff hides the lobby immediately, resets the selected track without restoring the start overlay, and starts the countdown without awaiting PB ghost work. Ghost playback freezes when the countdown completes, allowing a canonical submission response received during the countdown to join that attempt without delaying GO.
 - `game/race/ui-modal-shell.js` owns the shared result-confirmation UI used by both the finish screen and daily standings. `game/daily-challenge/service.js` sends preview and confirm requests; the browser never composes the public comment itself.
@@ -263,10 +269,11 @@ flowchart LR
   confirmation. Starting a signed-in Campaign stage begins the lights as soon
   as its track is ready: race-start bookkeeping and the stage PB ghost fetch
   run concurrently in the background, with submission re-validating the
-  unlock. A direct Campaign launcher includes its bootstrap in the existing
-  critical startup gate, so the global loading screen stays up until the
-  player's progress, stage list, and unlocks are available; the first Campaign
-  lobby paint therefore does not show a provisional primary-action spinner.
+  unlock. A direct Campaign launcher resolves authoritative player identity
+  before one bootstrap request. If that work exceeds the global loader budget,
+  the Campaign pane owns a disabled Loading action; an unavailable or
+  non-authoritative response becomes an in-place Retry and never enables
+  provisional progress or Start.
   Campaign opened later from Home keeps its normal background refresh. The
   lobby keeps its primary action pending until bootstrap resolves rather than
   briefly guessing Start or Continue; a completed Campaign keeps a Complete
@@ -381,11 +388,12 @@ flowchart LR
   challenger and viewer avatars (generic Snoo while signed out), and labels
   the mode Head to Head. Unavailable responses remain disabled but are not
   presented as a sign-in requirement.
-- Expanded-game Head to Head startup begins the duel request immediately and
-  gates the initial screen only on that bounded request plus car and track-layer
-  readiness. Profile, Daily, and Daily PB work continue in the background and
-  cannot add another timeout, take track ownership from challenge mode, or
-  replace the frozen opponent ghost.
+- Expanded-game Head to Head startup begins the duel request before player
+  bootstrap and never requests Daily or Campaign data before the challenge pane
+  is ready. The authoritative challenge, target track, frozen opponent ghost,
+  and any required promoted-guest decision finish before Start becomes active;
+  a slow profile cannot keep the full-screen loader up because the challenge
+  pane takes over within the visual budget.
 - `head-to-head.css` owns the standalone post's race-poster visual: the
   duel and target time remain the primary reading path, the circuit stays open as
   the right-side hero, and the single Race Head to Head CTA anchors beneath it.
@@ -542,15 +550,15 @@ The browser-side API route table is `game/scoreboard/api-client.js`; player ID /
 | --- | --- | --- |
 | `@devvit/start` | Devvit integration for the Vite build | `vite.config.js` |
 | `devvit` | Local Devvit CLI for playtest, upload, and publish workflows | `package.json` scripts, `devvit.json` |
-| `vite` | Build and local packaging | `vite.config.js`, `tools/bust-client-asset-cache.js` (content-hash query on `dist/client` `game.css` / `game.js`) |
+| `vite` | Build and local packaging | `vite.config.js` (content-hashed `entryFileNames` / `chunkFileNames` / CSS names cache-bust `dist/client`; never add a `?v=` query to the entry — split chunks import it back unqueried and boot the game twice) |
 | `vitest` | Test runner | `vitest.config.js`, `npm test` |
 | `@stryker-mutator/*` | Mutation testing | `stryker.config.mjs` |
 
 `devvit.json` is also the release-content boundary. Its `sourceIgnores` policy
 keeps tests, documentation, internal notes, generated review artwork, and
 unrelated tools out of the review source archive while retaining game/server
-source and the three generator/cache-busting scripts required by `npm run
-build`. The compiled client and server uploads still include their source maps.
+source and the two asset-generator scripts required by `npm run build`. The
+compiled client and server uploads still include their source maps.
 Vite's `public/` directory is part of the WebView upload, so it must remain free
 of local metadata such as `.DS_Store`.
 
@@ -635,27 +643,36 @@ These are useful, but they are not on the critical player path:
 
 ## Startup mode-priority loading
 
-The expanded `game` entrypoint resolves the launch target before constructing
-the racer. `game/startup/coordinator.js` keeps the critical gate mode-specific:
-Daily waits for its active challenge, selected track runtime/canvas, car, and
-personal-best ghost; Campaign waits for bootstrap, the default unlocked stage,
-its track runtime/canvas, car, and available stage PB; Head to Head waits for
-the authoritative challenge response, target track runtime/canvas, car, and
-the frozen opponent ghost. A bounded gate still prevents a failed request from
-stranding the loader.
+The expanded `game` entrypoint resolves the launch target and constructs an
+inert racer shell before awaiting a deferred mode runtime. The shell starts with
+a procedural car and no external track request. `game/startup/coordinator.js`
+then owns one ordered plan: Daily starts profile and active-contract requests
+together, applies the resolved identity, and prepares only the selected Daily
+track; Campaign resolves authoritative identity (including any promoted-guest
+choice), requests Campaign bootstrap once, and prepares its default unlocked
+stage; Head to Head starts the duel request first, resolves player identity in
+parallel, and prepares the authoritative target track and frozen opponent ghost.
+Home alone requests the default track.
 
-The racer constructor treats its initial track definition as data only. Its
-`trackReadyPromise` loads the default track without profile work or a start
-overlay, builds the runtime geometry, and renders the canvas before the startup
-gate clears. Home therefore has a complete background immediately, and a
-Campaign selection made from Home cannot inherit an unbuilt blank canvas.
+The full-screen loader has an 800ms visual budget plus the shared 160ms fade.
+When critical network or track work remains, it hands off to the selected
+mode's visible, input-gated Preparing/Retry surface while the same ordered plan
+continues. This is a presentation boundary, not a fake request success or a
+global timeout. Player car images and Daily/Campaign personal-best ghosts are
+non-critical and load after the selected identity/contract; they can fall back
+or report ghost unavailability without holding either the loader or Start.
+`trackReadyPromise` is assigned to the mode-selected track preparation rather
+than an unconditional constructor load, so direct Daily, Campaign, and Head to
+Head never render the default track first.
+
 Daily and Campaign start paths use the same canvas-presence safeguard as Head
 to Head: a matching track key does not skip loading when `trackCanvas` is absent.
 Client definition chunks are bounded to 20 seconds. A failed or timed-out
 selected track never enters the countdown: Daily, Campaign, and Head to Head
 restore their lobby, clear the pending start state, and expose an in-place
-retry action. A failed initial track is contained by the startup gate instead
-of blocking racer construction indefinitely.
+retry action. A failed initial track is contained by the selected mode's
+Preparing/Retry surface after loader handoff instead of blocking racer
+construction indefinitely.
 
 Client track definitions are loaded through `game/track/client-registry.js` and
 Vite's per-definition chunks. The compatibility `game/track/tracks.js` registry
@@ -673,10 +690,27 @@ The entry module starts this asynchronous boot without top-level `await`.
 Deferred mode chunks import shared symbols from the main game chunk, so the
 entry chunk must finish evaluating before it waits for the selected mode chunk;
 otherwise both chunks wait on each other and the racer is never constructed.
+The entry and every deferred chunk must also resolve the main game chunk to the
+same browser module URL. The removed post-build cache buster changed only the
+HTML entry to `/game.js?v=<hash>`, while generated mode chunks imported plain
+`./game.js`; browsers evaluated those as different modules and constructed two
+racers. The current Vite build assigns content-hashed filenames itself, so the
+HTML entry and every deferred import reference one canonical game-module URL.
+Treat any build with multiple game-module URLs as a stop-ship packaging defect.
+The conflicting lazy chunk-to-entry URL first appeared in `ddbf60c` on
+2026-08-11, where it deadlocked startup before a racer was constructed.
+`fbe710d` removed the top-level wait at 2026-08-11 15:34:26 +03:00; that fixed
+the deadlock but allowed both URL identities to complete boot, making it the
+first revision with the duplicated racer behavior.
 The client build gives source maps a content hash because Daily, Campaign, Head
 to Head, and shared challenge code all use the source basename
 `engine-methods.js`; unique map names preserve every mode's production stack
 trace instead of overwriting three maps during the build.
+
+Deferred Daily and Campaign carousel work is eligible only while its matching
+lobby is ready, visible, and interactive. A pending Start or active race makes
+both queued and late async carousel paints ineligible, so lobby work cannot
+restore UI over the race canvas.
 
 ## Recommended Scoping Heuristic
 

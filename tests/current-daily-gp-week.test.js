@@ -5,6 +5,7 @@ const mockRedis = {
     set: vi.fn(),
     del: vi.fn(),
     hGet: vi.fn(),
+    hMGet: vi.fn(),
     hSet: vi.fn(),
     hSetNX: vi.fn(),
     hGetAll: vi.fn(),
@@ -25,6 +26,7 @@ describe('current daily gp week', () => {
         mockRedis.set.mockResolvedValue('OK');
         mockRedis.del.mockResolvedValue(undefined);
         mockRedis.hGet.mockResolvedValue(null);
+        mockRedis.hMGet.mockImplementation(async (_key, fields) => fields.map(() => null));
         mockRedis.hSet.mockResolvedValue(1);
         mockRedis.hSetNX.mockResolvedValue(1);
         mockRedis.hGetAll.mockResolvedValue({});

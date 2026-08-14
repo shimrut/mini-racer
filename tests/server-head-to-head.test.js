@@ -589,13 +589,13 @@ describe('head-to-head service', () => {
         )).toBe('1');
     });
 
-    it('stores only the viewer best duel and reports win, tie, and loss precisely', async () => {
+    it('stores the viewer best duel and refuses a run that did not beat the target', async () => {
         const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000 });
         const created = await createChallenge(service);
         const challengeId = created.body.challengeId;
         const acceptor = { ...context, username: 'ChallengerAce' };
 
-        const win = await service.submit({ challengeId, replay: {} }, acceptor);
+        const win = await service.submit({ challengeId, replay: {}, bestTimeMs: 25_000 }, acceptor);
         expect(win.body).toMatchObject({
             accepted: true,
             outcome: 'won',
@@ -605,25 +605,111 @@ describe('head-to-head service', () => {
         expect(typeof win.body.acceptToken).toBe('string');
 
         const slowerService = makeService({ validatedTimeMs: 26_000 });
-        const loss = await slowerService.submit({ challengeId, replay: {} }, acceptor);
-        expect(loss.body).toMatchObject({
-            outcome: 'lost',
-            resultLabel: 'Challenge Lost',
-            differenceMs: 360,
-            acceptToken: null,
+        const loss = await slowerService.submit({ challengeId, replay: {}, bestTimeMs: 26_000 }, acceptor);
+        expect(loss).toMatchObject({
+            status: 422,
+            body: {
+                accepted: false,
+                status: 'target_not_beaten',
+                targetTimeMs: 25_640,
+                differenceMs: 360,
+            },
         });
+        expect(loss.body.acceptToken).toBeUndefined();
 
         const tieService = makeService({ validatedTimeMs: 25_640 });
         const tie = await tieService.submit(
-            { challengeId, replay: {} },
+            { challengeId, replay: {}, bestTimeMs: 25_640 },
             { ...context, username: 'OtherRacer' },
         );
-        expect(tie.body).toMatchObject({
-            outcome: 'tie',
-            resultLabel: 'Tie',
-            differenceMs: 0,
-            acceptToken: null,
+        expect(tie).toMatchObject({
+            status: 422,
+            body: { accepted: false, status: 'target_not_beaten', differenceMs: 0 },
         });
+    });
+
+    it('refuses a slower claimed time without validating the replay', async () => {
+        const validateReplay = vi.fn(async () => ({
+            ok: true,
+            bestTimeMs: 25_000,
+            medal: 'gold',
+            ghost: { schemaVersion: 2, samples: ['viewer'] },
+        }));
+        const service = makeService({ bestTimeMs: 25_640, validateReplay });
+        const created = await createChallenge(service);
+
+        const refused = await service.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 25_641 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(refused).toMatchObject({
+            status: 422,
+            body: { accepted: false, status: 'target_not_beaten', differenceMs: 1 },
+        });
+        expect(validateReplay).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the replay when a submission carries no usable claimed time', async () => {
+        for (const bestTimeMs of [undefined, null, 0, -1, 25.5, 'fast', Number.NaN]) {
+            const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000 });
+            const created = await createChallenge(service);
+            const accepted = await service.submit(
+                { challengeId: created.body.challengeId, replay: {}, bestTimeMs },
+                { ...context, username: 'ChallengerAce' },
+            );
+            expect(accepted).toMatchObject({
+                status: 200,
+                body: { accepted: true, outcome: 'won' },
+            });
+        }
+    });
+
+    it('still refuses a slower run that arrives without a claimed time', async () => {
+        const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 26_000 });
+        const created = await createChallenge(service);
+
+        const refused = await service.submit(
+            { challengeId: created.body.challengeId, replay: {} },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(refused).toMatchObject({
+            status: 422,
+            body: { accepted: false, status: 'target_not_beaten', differenceMs: 360 },
+        });
+    });
+
+    it('refuses a claimed win the replay does not support', async () => {
+        const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 26_000 });
+        const created = await createChallenge(service);
+
+        const refused = await service.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 1 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(refused).toMatchObject({
+            status: 422,
+            body: { accepted: false, status: 'target_not_beaten', differenceMs: 360 },
+        });
+    });
+
+    it('leaves no unlock or receipt behind a run that did not beat the target', async () => {
+        const created = await createChallenge(makeService({ bestTimeMs: 25_640 }));
+        const slowerService = makeService({ validatedTimeMs: 26_000 });
+        hashes.clear();
+        strings.clear();
+
+        await slowerService.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 26_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect([...hashes.keys()].filter((key) => key.startsWith('miniracer:car-unlocks:v1:')))
+            .toEqual([]);
+        expect([...strings.keys()].filter((key) => key.startsWith('miniracer:head-to-head:accept:')))
+            .toEqual([]);
     });
 
     it('lets a guest load and submit a challenge result', async () => {
@@ -648,7 +734,7 @@ describe('head-to-head service', () => {
         });
 
         const submitted = await service.submit(
-            { challengeId: created.body.challengeId, replay: {} },
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 25_000 },
             guestContext,
         );
         expect(submitted).toMatchObject({
@@ -663,7 +749,7 @@ describe('head-to-head service', () => {
     it('limits signed-in Head to Head submissions globally before post lookup and replay validation', async () => {
         const validateReplay = vi.fn(async () => ({
             ok: true,
-            bestTimeMs: 26_000,
+            bestTimeMs: 25_000,
             medal: 'gold',
             ghost: { schemaVersion: 2, samples: ['viewer'] },
         }));
@@ -679,6 +765,7 @@ describe('head-to-head service', () => {
             await expect(service.submit({
                 challengeId: created.body.challengeId,
                 replay: {},
+                bestTimeMs: 25_000,
             }, submitContext)).resolves.toMatchObject({ status: 200 });
         }
 
@@ -687,6 +774,7 @@ describe('head-to-head service', () => {
         const blocked = await service.submit({
             challengeId: created.body.challengeId,
             replay: {},
+            bestTimeMs: 25_000,
         }, submitContext);
 
         expect(blocked).toMatchObject({
@@ -709,7 +797,7 @@ describe('head-to-head service', () => {
         const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
         const validateReplay = vi.fn(async () => ({
             ok: true,
-            bestTimeMs: 26_000,
+            bestTimeMs: 25_000,
             medal: 'gold',
             ghost: { schemaVersion: 2, samples: ['viewer'] },
         }));
@@ -731,6 +819,7 @@ describe('head-to-head service', () => {
             await expect(service.submit({
                 challengeId: created.body.challengeId,
                 replay: {},
+                bestTimeMs: 25_000,
             }, submitContext(attempt % 2))).resolves.toMatchObject({ status: 200 });
         }
 
@@ -739,6 +828,7 @@ describe('head-to-head service', () => {
         const blocked = await service.submit({
             challengeId: created.body.challengeId,
             replay: {},
+            bestTimeMs: 25_000,
         }, submitContext(1));
 
         expect(blocked.status).toBe(429);
@@ -781,7 +871,7 @@ describe('head-to-head service', () => {
             challengerAvatarUrl: 'https://i.redd.it/RaceFan.png',
         });
 
-        const ownSubmit = await service.submit({ challengeId, replay: {} }, context);
+        const ownSubmit = await service.submit({ challengeId, replay: {}, bestTimeMs: 25_000 }, context);
         expect(ownSubmit.status).toBe(403);
         expect(ownSubmit.body.status).toBe('own_challenge');
 

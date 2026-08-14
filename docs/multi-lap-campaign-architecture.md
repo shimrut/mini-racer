@@ -83,6 +83,10 @@ leaderboard, and retention rules.
 - Medal targets are the one-lap targets multiplied by the lap count.
 - At every intermediate finish-line crossing, the game flashes the medal
   earned by the player's cumulative race pace at that point.
+- The result sheet compares complete race totals only. On a player's first
+  multi-lap attempt there is no PB delta; a lap completed inside that attempt
+  cannot become the fallback comparison for the final total. Multi-lap result
+  copy says **Best Race**.
 - Daily ranking, expiry, sharing, podiums, and post history remain Daily-only.
 
 ### Campaign

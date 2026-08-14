@@ -24,29 +24,32 @@ import {
   writeCachedPlayerProfile,
 } from "./player/profile-cache.js";
 import { setActivePlayerOwnerId } from "./player/active-owner.js";
+import { requestGuestProgressSelection } from "./player/guest-progress-selection.js";
+import {
+  hasVerificationEntriesForOwner,
+  resolveVerificationQueueAfterGuestProgressSelection,
+} from "./scoreboard/verification-queue.js";
+import { clearDailyChallengeStoredData } from "./daily-challenge/storage.js";
+import { clearTrackLastLapMedals } from "./medals/last-lap-medal-storage.js";
 
-async function fetchRemotePlayerProgressState() {
-  const config = API_ROUTES;
-  if (!config?.playerBootstrapUrl || typeof fetch !== "function") {
-    return null;
+export const PLAYER_BOOTSTRAP_TIMEOUT_MS = 8_000;
+
+async function fetchPlayerBootstrap(url) {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), PLAYER_BOOTSTRAP_TIMEOUT_MS)
+    : null;
+  try {
+    return await fetch(url, {
+      method: "GET",
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
   }
+}
 
-  const url = new URL(config.playerBootstrapUrl, window.location.origin);
-  url.searchParams.set("playerId", getOrCreatePlayerId("player bootstrap"));
-  const guestToken = getGuestPlayerToken();
-  if (guestToken) {
-    url.searchParams.set("guestToken", guestToken);
-  }
-
-  const response = await fetch(url.toString(), { method: "GET" });
-
-  if (!response.ok) {
-    const error = new Error(`Player bootstrap failed: ${response.status}`);
-    error.status = response.status;
-    throw error;
-  }
-
-  const payload = await response.json();
+function normalizeRemotePlayerProgressState(payload) {
   return {
     hasAnyData: Boolean(payload?.hasAnyData),
     isReturningPlayer: Boolean(payload?.isReturningPlayer),
@@ -71,7 +74,34 @@ async function fetchRemotePlayerProgressState() {
         : null,
     carUnlocks: normalizeCarUnlockSnapshot(payload?.carUnlocks),
     retireGuestIdentity: Boolean(payload?.retireGuestIdentity),
+    progressSelection: payload?.progressSelection && typeof payload.progressSelection === "object"
+      ? payload.progressSelection
+      : null,
   };
+}
+
+async function fetchRemotePlayerProgressState() {
+  const config = API_ROUTES;
+  if (!config?.playerBootstrapUrl || typeof fetch !== "function") {
+    return null;
+  }
+
+  const url = new URL(config.playerBootstrapUrl, window.location.origin);
+  url.searchParams.set("playerId", getOrCreatePlayerId("player bootstrap"));
+  const guestToken = getGuestPlayerToken();
+  if (guestToken) {
+    url.searchParams.set("guestToken", guestToken);
+  }
+
+  const response = await fetchPlayerBootstrap(url.toString());
+
+  if (!response.ok) {
+    const error = new Error(`Player bootstrap failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return normalizeRemotePlayerProgressState(await response.json());
 }
 
 function getLocalPlayerProgressState() {
@@ -109,7 +139,7 @@ function getHostedFallbackPlayerProgressState() {
   };
 }
 
-export async function getPlayerProgressState() {
+export async function getPlayerProgressState({ onProgressSelectionRequired = null } = {}) {
   if (isLocalEnvironment()) {
     return getLocalPlayerProgressState();
   }
@@ -128,6 +158,39 @@ export async function getPlayerProgressState() {
     }
     if (remoteState) {
       setGuestPlayerToken(remoteState.guestToken);
+      const guestPlayerId = getOrCreatePlayerId("guest progress selection");
+      const isSignedInAccount = Boolean(remoteState.redditUsername)
+        && remoteState.leaderboardPlayerId?.startsWith("reddit:");
+      const hasPendingGuestRuns = isSignedInAccount
+        && hasVerificationEntriesForOwner(`guest:${guestPlayerId}`);
+      if (remoteState.progressSelection?.required || hasPendingGuestRuns) {
+        setActivePlayerOwnerId(null);
+        await onProgressSelectionRequired?.(remoteState.progressSelection);
+        const selectionResult = await requestGuestProgressSelection(
+          remoteState.progressSelection || {
+            required: true,
+            guestHasProgress: true,
+            accountHasProgress: Boolean(remoteState.hasAnyData),
+            guestSummary: { hasDailyResults: true, campaignResults: 0, unlocks: false },
+            accountSummary: { hasDailyResults: false, campaignResults: 0, unlocks: false },
+          },
+        );
+        const choice = selectionResult?.choice;
+        if (!selectionResult?.playerState) {
+          throw new Error("Guest progress selection did not return account state.");
+        }
+        remoteState = normalizeRemotePlayerProgressState(selectionResult.playerState);
+        setGuestPlayerToken(remoteState.guestToken);
+        resolveVerificationQueueAfterGuestProgressSelection({
+          guestPlayerId: `guest:${guestPlayerId}`,
+          accountPlayerId: remoteState.leaderboardPlayerId,
+          choice,
+        });
+        clearDailyChallengeStoredData();
+        const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
+        clearDailyChallengeClientCaches();
+        clearTrackLastLapMedals();
+      }
       if (remoteState.retireGuestIdentity) {
         rotateGuestPlayerIdentity("completed guest promotion");
         // The server refused a spent guest credential: this browser needs a fresh identity before it owns anything again.

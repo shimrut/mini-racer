@@ -49,6 +49,7 @@ import {
   resolveTrackPresentation,
   TRACK_PRESENTATION_SURFACES,
 } from "../track/presentation.js";
+import { isLobbyPaintEligible } from "../lobby/deferred-work.js";
 
 function isDailyChallengeStillPlayable(challenge) {
   if (!challenge || typeof challenge !== "object") return false;
@@ -548,7 +549,10 @@ export const dailyChallengeEngineMethods = {
     return medal;
   },
 
-  async syncReadyBackgroundTrack(challenge = this.activeDailyChallenge) {
+  async syncReadyBackgroundTrack(
+    challenge = this.activeDailyChallenge,
+    { reportLoading = true } = {},
+  ) {
     const targetTrackKey =
       typeof challenge?.trackKey === "string" && challenge.trackKey
         ? challenge.trackKey
@@ -569,6 +573,7 @@ export const dailyChallengeEngineMethods = {
 
     await this.loadTrack(targetTrackKey, {
       loadPlayerProgress: false,
+      reportLoading,
     });
   },
 
@@ -652,14 +657,18 @@ export const dailyChallengeEngineMethods = {
     });
   },
 
-  async loadDailyChallengeCritical() {
+  async loadDailyChallengeCritical({
+    prepareTrack = true,
+    loadPersonalBest = true,
+    throwOnError = false,
+  } = {}) {
     try {
       this.setLoadingStatus(40, "Checking Challenge...");
       const challenge = await getActiveDailyChallenge();
       this.currentDailyChallenge = challenge || null;
       this.activeDailyChallenge = null;
       this.setDailyChallengeLobbySummary(challenge);
-      if (challenge) {
+      if (challenge && loadPersonalBest) {
         try {
           await this.refreshTrackPersonalBestSummaries([challenge]);
           this.setDailyChallengeLobbySummary(challenge);
@@ -667,14 +676,15 @@ export const dailyChallengeEngineMethods = {
           console.error("Error loading track personal best:", error);
         }
       }
-      await this.syncReadyBackgroundTrack(challenge);
+      if (prepareTrack) await this.syncReadyBackgroundTrack(challenge);
       return challenge;
     } catch (error) {
       console.error("Error loading daily challenge:", error);
       this.currentDailyChallenge = null;
       this.activeDailyChallenge = null;
-      await this.syncReadyBackgroundTrack(null);
+      if (prepareTrack) await this.syncReadyBackgroundTrack(null);
       this.dailyChallengeUi.setDailyChallengeSummary(null);
+      if (throwOnError) throw error;
       return null;
     }
   },
@@ -1087,7 +1097,7 @@ export const dailyChallengeEngineMethods = {
     selectedChallengeId = this.selectedDailyChallengeId,
     loading = false,
   } = {}) {
-    if (!this.dailyCarousel) return;
+    if (!this.dailyCarousel || !isLobbyPaintEligible(this, "daily")) return;
     const cards = buildDailyCarouselCards(
       decorateChallengesWithTrackPersonalBests(this, challenges),
       { getSnapshot: (challengeId) => getCachedDailyChallengeSnapshot(challengeId) },
@@ -1311,13 +1321,15 @@ export const dailyChallengeEngineMethods = {
         : null;
     const previousPersonalBestSec = storedTrackBestSec != null
         ? storedTrackBestSec
-        : Number.isFinite(runBestBeforeLastLap)
-          ? runBestBeforeLastLap
-          : sessionPrevSec != null
-            ? sessionPrevSec
-            : Number.isFinite(this.bestLapTime)
-              ? this.bestLapTime
-              : null;
+        : challenge.objectiveType === "multi_lap_total"
+          ? (Number.isFinite(sessionPrevSec) ? sessionPrevSec : undefined)
+          : Number.isFinite(runBestBeforeLastLap)
+            ? runBestBeforeLastLap
+            : sessionPrevSec != null
+              ? sessionPrevSec
+              : Number.isFinite(this.bestLapTime)
+                ? this.bestLapTime
+                : null;
     const deltaToPersonalBest =
       previousPersonalBestSec === undefined
         ? undefined
@@ -1456,6 +1468,7 @@ export const dailyChallengeEngineMethods = {
         lapMedal,
         previousTrackMedal,
         previousPersonalBestSec,
+        bestSummaryLabel: getDailyChallengeCopyLabels(challenge).bestSummaryLabel,
         trackKey: challenge.trackKey,
         lapCheckpointTimes,
         pbCheckpointTimes: comparisonCheckpointTimes,

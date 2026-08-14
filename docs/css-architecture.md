@@ -284,7 +284,7 @@ For structural or cross-file changes:
 
 1. Run `npm test`.
 2. Run `npm run build`.
-3. Confirm generated `game.html` still references one `/game.css`.
+3. Confirm generated `game.html` references exactly one content-hashed game CSS file.
 4. Smoke-check loading, lobby, race HUD, pause, results, standings, tracks,
    garage, settings and sharing at desktop, narrow mobile and short landscape
    sizes.

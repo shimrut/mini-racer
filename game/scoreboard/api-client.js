@@ -9,6 +9,7 @@ const API_BASE_URL = '/api';
 export const API_ROUTES = Object.freeze({
     apiBaseUrl: API_BASE_URL,
     playerBootstrapUrl: `${API_BASE_URL}/player/bootstrap`,
+    playerProgressSelectionUrl: `${API_BASE_URL}/player/progress-selection`,
     playerIdentityUrl: `${API_BASE_URL}/player/identity`,
     playerPreferencesUrl: `${API_BASE_URL}/player/preferences`,
     playerTrackPbsUrl: `${API_BASE_URL}/player/track-pbs`,

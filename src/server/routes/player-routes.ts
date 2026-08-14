@@ -8,6 +8,7 @@ type PlayerPayload = {
 export type PlayerRouteDependencies = {
     getRequestUsername(): string | null;
     getServerPlayerBootstrap(input: Record<string, unknown>): Promise<PlayerPayload>;
+    selectServerGuestProgress(input: Record<string, unknown>): Promise<PlayerPayload>;
     updateServerPlayerIdentity(input: Record<string, unknown>): Promise<PlayerPayload>;
     updateServerPlayerPreferences(input: Record<string, unknown>): Promise<PlayerPayload>;
 };
@@ -47,6 +48,31 @@ export function registerPlayerRoutes(
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer player bootstrap:', error);
             res.status(500).json({ error: 'Player bootstrap failed' });
+        }
+    });
+
+    app.post('/api/player/progress-selection', async (req, res) => {
+        try {
+            const { playerId, guestToken, choice } = req.body ?? {};
+            const payload = await dependencies.selectServerGuestProgress({
+                playerId,
+                guestToken,
+                choice,
+                redditUsername: dependencies.getRequestUsername(),
+            });
+            if (!payload.playerId) {
+                sendPlayerAuthorizationFailure(res, { playerId, guestToken });
+                return;
+            }
+            res.status(200).json(payload);
+        } catch (error) {
+            const statusCode = Number(error?.statusCode);
+            if (statusCode === 401 || statusCode === 409 || statusCode === 503) {
+                res.status(statusCode).json({ error: error.message });
+                return;
+            }
+            console.error('Failed to select Reddit Mini Racer guest progress:', error);
+            res.status(500).json({ error: 'Guest progress selection failed' });
         }
     });
 

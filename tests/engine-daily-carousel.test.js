@@ -74,6 +74,11 @@ const CHALLENGES = DAY_TRACKS.map((trackKey, index) => challenge(
 function createEngine(overrides = {}) {
     const render = vi.fn();
     const engine = {
+        activeRaceMode: 'daily',
+        status: 'ready',
+        startButtonPending: false,
+        startOverlay: { isStartOverlayVisible: () => true },
+        lobbyUi: { getMode: () => 'daily' },
         dailyCarousel: {
             render,
             selectChallenge: vi.fn(() => true),
@@ -86,6 +91,14 @@ function createEngine(overrides = {}) {
         refreshTrackPersonalBestSummaries: vi.fn(async () => ({})),
         setDailyChallengeLobbySummary: vi.fn(),
         ...overrides,
+    };
+    engine.startOverlay = {
+        isStartOverlayVisible: () => true,
+        ...overrides.startOverlay,
+    };
+    engine.lobbyUi = {
+        getMode: () => 'daily',
+        ...overrides.lobbyUi,
     };
     engine.paintDailyCarousel = dailyChallengeEngineMethods.paintDailyCarousel.bind(engine);
     return { engine, render };
@@ -293,8 +306,11 @@ describe('daily carousel engine wiring', () => {
         const engine = {
             status: 'ready',
             currentChallengeRun: null,
-            startOverlay: { showStartOverlay: vi.fn() },
-            lobbyUi: { showDaily: vi.fn() },
+            startOverlay: {
+                showStartOverlay: vi.fn(),
+                isStartOverlayVisible: () => true,
+            },
+            lobbyUi: { showDaily: vi.fn(), getMode: () => 'daily' },
             reset: vi.fn(),
             refreshDailyCarousel,
         };
@@ -310,6 +326,56 @@ describe('daily carousel engine wiring', () => {
         expect(refreshDailyCarousel).toHaveBeenCalledWith({ selectChallengeId: 'daily-2' });
     });
 
+    it('drops the deferred Daily paint once race start is pending', () => {
+        const refreshDailyCarousel = vi.fn();
+        const engine = {
+            status: 'ready',
+            currentChallengeRun: null,
+            startButtonPending: false,
+            startOverlay: {
+                showStartOverlay: vi.fn(),
+                isStartOverlayVisible: () => true,
+            },
+            lobbyUi: { showDaily: vi.fn(), getMode: () => 'daily' },
+            reset: vi.fn(),
+            refreshDailyCarousel,
+        };
+
+        modeRouterEngineMethods.showDailyLobby.call(engine);
+        frameCallbacks.shift()(0);
+        engine.startButtonPending = true;
+        frameCallbacks.shift()(16);
+
+        expect(refreshDailyCarousel).not.toHaveBeenCalled();
+    });
+
+    it('does not repaint the Daily carousel after the race begins', () => {
+        const { engine, render } = createEngine({ status: 'playing' });
+
+        dailyChallengeEngineMethods.paintDailyCarousel.call(engine, CHALLENGES);
+
+        expect(render).not.toHaveBeenCalled();
+    });
+
+    it('does not let a late Daily response repaint over a running race', async () => {
+        let resolvePersonalBests;
+        playlistState.cached = CHALLENGES;
+        const personalBests = new Promise((resolve) => {
+            resolvePersonalBests = resolve;
+        });
+        const { engine, render } = createEngine({
+            refreshTrackPersonalBestSummaries: vi.fn(() => personalBests),
+        });
+
+        const refresh = dailyChallengeEngineMethods.refreshDailyCarousel.call(engine);
+        expect(render).toHaveBeenCalledTimes(1);
+        engine.status = 'playing';
+        resolvePersonalBests({});
+        await refresh;
+
+        expect(render).toHaveBeenCalledTimes(1);
+    });
+
     it('returns to the Daily pane on the day that was just raced', () => {
         const refreshDailyCarousel = vi.fn();
         const engine = {
@@ -317,8 +383,11 @@ describe('daily carousel engine wiring', () => {
             activeRaceMode: 'daily',
             currentChallengeRun: null,
             selectedDailyChallengeId: 'daily-2',
-            startOverlay: { showStartOverlay: vi.fn() },
-            lobbyUi: { showDaily: vi.fn() },
+            startOverlay: {
+                showStartOverlay: vi.fn(),
+                isStartOverlayVisible: () => true,
+            },
+            lobbyUi: { showDaily: vi.fn(), getMode: () => 'daily' },
             reset: vi.fn(),
             refreshDailyCarousel,
         };
@@ -344,8 +413,11 @@ describe('daily carousel engine wiring', () => {
             trackPersonalBestByTrackKey: {
                 [CHALLENGES[0].id]: { bestTime: 1 },
             },
-            startOverlay: { showStartOverlay: vi.fn() },
-            lobbyUi: { showDaily: vi.fn() },
+            startOverlay: {
+                showStartOverlay: vi.fn(),
+                isStartOverlayVisible: () => true,
+            },
+            lobbyUi: { showDaily: vi.fn(), getMode: () => 'daily' },
             reset: vi.fn(function reset() {
                 this.activeDailyChallenge = null;
                 this.currentChallengeRun = null;
@@ -374,8 +446,11 @@ describe('daily carousel engine wiring', () => {
             lastPlayedDailyChallenge: CHALLENGES[3],
             selectedDailyChallengeId: 'daily-0',
             currentChallengeRun: { challengeId: 'daily-3' },
-            startOverlay: { showStartOverlay: vi.fn() },
-            lobbyUi: { showDaily: vi.fn() },
+            startOverlay: {
+                showStartOverlay: vi.fn(),
+                isStartOverlayVisible: () => true,
+            },
+            lobbyUi: { showDaily: vi.fn(), getMode: () => 'daily' },
             reset: vi.fn(function reset() {
                 this.activeDailyChallenge = null;
                 this.currentChallengeRun = null;

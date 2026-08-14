@@ -19,7 +19,7 @@ export const CAR_UNLOCK_REQUIREMENTS = Object.freeze({
     [EXTRA_CAR_ASSETS.crimson]: Object.freeze({
         progressKey: 'completedRace',
         required: 1,
-        label: 'You need to complete 1 race to unlock this skin.',
+        label: 'You need to win 1 Daily or Campaign race to unlock this skin.',
     }),
     [EXTRA_CAR_ASSETS.gold]: Object.freeze({
         progressKey: 'campaignGoldOrBetter',

@@ -1,3 +1,14 @@
+export function isLobbyPaintEligible(engine, expectedMode) {
+    return Boolean(
+        engine
+        && engine.activeRaceMode === expectedMode
+        && engine.status === 'ready'
+        && engine.startButtonPending !== true
+        && engine.startOverlay?.isStartOverlayVisible?.() === true
+        && engine.lobbyUi?.getMode?.() === expectedMode
+    );
+}
+
 export function deferLobbyWorkUntilAfterPaint(engine, expectedMode, work) {
     if (!engine || typeof work !== 'function') return null;
     const token = (engine._deferredLobbyWorkToken || 0) + 1;
@@ -5,7 +16,7 @@ export function deferLobbyWorkUntilAfterPaint(engine, expectedMode, work) {
 
     const runIfCurrent = () => {
         if (engine._deferredLobbyWorkToken !== token) return;
-        if (engine.activeRaceMode !== expectedMode) return;
+        if (!isLobbyPaintEligible(engine, expectedMode)) return;
         work();
     };
 

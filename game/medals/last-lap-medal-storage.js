@@ -47,3 +47,11 @@ export function writeTrackLastLapMedal(trackKey, medal) {
     }
     writeMap(map);
 }
+
+export function clearTrackLastLapMedals() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+        window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+    }
+}

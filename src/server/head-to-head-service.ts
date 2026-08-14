@@ -132,6 +132,7 @@ type ChallengeViewer = {
     username: string | null;
     displayName: string;
     signedIn: boolean;
+    progressSelectionPending: boolean;
 };
 
 async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promise<ChallengeViewer> {
@@ -148,6 +149,7 @@ async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promis
         username,
         displayName: username || (identity.canonicalPlayerId ? 'Guest racer' : 'You'),
         signedIn: Boolean(username),
+        progressSelectionPending: identity.guestStatus === 'guest_promotion_pending',
     };
 }
 
@@ -866,6 +868,16 @@ export function createHeadToHeadService(
                 },
             };
         }
+        if (viewer.progressSelectionPending) {
+            return {
+                status: 409,
+                body: {
+                    accepted: false,
+                    status: 'progress_selection_required',
+                    error: 'Choose which progress to keep before submitting a Head to Head result.',
+                },
+            };
+        }
         const rateLimit = await checkHeadToHeadSubmissionRateLimit(
             submissionRateLimitIdentity(viewer, context),
         );
@@ -894,6 +906,25 @@ export function createHeadToHeadService(
                 },
             };
         }
+        const claimedTimeMs = Number(input.bestTimeMs);
+        const targetNotBeaten = (differenceMs: number) => ({
+            status: 422,
+            body: {
+                accepted: false,
+                status: 'target_not_beaten',
+                error: 'This run did not beat the challenge time.',
+                targetTimeMs: challenge.targetTimeMs,
+                differenceMs,
+            },
+        });
+        if (
+            Number.isInteger(claimedTimeMs)
+            && claimedTimeMs > 0
+            && claimedTimeMs >= challenge.targetTimeMs
+        ) {
+            return targetNotBeaten(claimedTimeMs - challenge.targetTimeMs);
+        }
+
         const verified = await dependencies.validateReplay(challenge, input.replay);
         if (
             !verified.ok
@@ -905,15 +936,15 @@ export function createHeadToHeadService(
             return { status: 422, body: { status: 'invalid_replay', error: 'This challenge run could not be verified.' } };
         }
         const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
-        const outcome = differenceMs < 0 ? 'won' : differenceMs === 0 ? 'tie' : 'lost';
-        await recordCompletedRace(viewer.playerId);
-        if (outcome === 'won') {
-            await recordHeadToHeadWin(viewer.playerId, challengeId);
+        if (differenceMs >= 0) {
+            return targetNotBeaten(differenceMs);
         }
+        await recordCompletedRace(viewer.playerId);
+        await recordHeadToHeadWin(viewer.playerId, challengeId);
 
         // Nothing about a Head to Head outlives its post, so a short-lived receipt carries the verified time to the brag comment it earns.
         let acceptToken: string | null = null;
-        if (challenge.postId && outcome === 'won') {
+        if (challenge.postId) {
             acceptToken = createId();
             await writeHeadToHeadAccept(acceptToken, {
                 challengeId,
@@ -934,12 +965,8 @@ export function createHeadToHeadService(
             body: {
                 status: 'accepted',
                 accepted: true,
-                outcome,
-                resultLabel: outcome === 'won'
-                    ? 'Challenge Won'
-                    : outcome === 'tie'
-                        ? 'Tie'
-                        : 'Challenge Lost',
+                outcome: 'won',
+                resultLabel: 'Challenge Won',
                 bestTimeMs: verified.bestTimeMs,
                 targetTimeMs: challenge.targetTimeMs,
                 differenceMs,

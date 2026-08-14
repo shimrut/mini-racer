@@ -12,11 +12,10 @@ export class LoadingScreen {
     if (this.isComplete) return;
 
     const safePercent = Math.min(Math.max(0, percent), 100);
-    if (safePercent < this.highestProgress) return;
-    this.highestProgress = safePercent;
+    this.highestProgress = Math.max(this.highestProgress, safePercent);
     
     if (this.progressBar) {
-      this.progressBar.style.width = `${safePercent}%`;
+      this.progressBar.style.width = `${this.highestProgress}%`;
     }
     
     if (this.statusText && status) {
@@ -24,19 +23,21 @@ export class LoadingScreen {
     }
 
     if (this.element) {
-      this.element.setAttribute("aria-valuenow", Math.round(safePercent));
+      this.element.setAttribute("aria-valuenow", Math.round(this.highestProgress));
     }
   }
 
-  async dismiss() {
+  showPhase({ progress, label } = {}) {
+    this.update(progress, label);
+  }
+
+  async dismiss({ fadeMs = 160 } = {}) {
     if (this.isComplete) return;
+    const safeFadeMs = Math.max(0, Number(fadeMs) || 0);
     this.update(100, "Ready!");
     this.isComplete = true;
-
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
+    this.element?.style?.setProperty("--loader-fade-duration", `${safeFadeMs}ms`);
     document.body.classList.remove(this.activeClass);
-    
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, safeFadeMs));
   }
 }

@@ -35,9 +35,11 @@ describe('head to head client service', () => {
             await submitHeadToHeadRun({
                 challengeId: 'challenge-1',
                 replay: { inputs: [] },
+                bestTimeMs: 7_500,
             });
             const submitBody = JSON.parse(globalThis.fetch.mock.calls[1][1].body);
             expect(submitBody.postId).toBe('t3_challenge1');
+            expect(submitBody.bestTimeMs).toBe(7_500);
         } finally {
             globalThis.location = originalLocation;
             globalThis.devvit = originalDevvit;

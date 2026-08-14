@@ -223,10 +223,23 @@ export async function resolveAuthorizedPlayerIdentity({
 }): Promise<ResolvedPlayerIdentity> {
     const safeUsername = sanitizeRedditUsername(redditUsername);
     if (safeUsername) {
+        const normalizedGuestToken = typeof guestToken === 'string' && guestToken.trim()
+            ? guestToken.trim()
+            : null;
+        const verifiedGuestPlayerId = normalizedGuestToken
+            ? await verifyGuestPlayerToken(normalizedGuestToken)
+            : null;
+        const guestIdentity = verifiedGuestPlayerId
+            ? `guest:${verifiedGuestPlayerId}`
+            : null;
+        const guestStatus = guestIdentity
+            ? (await resolveGuestIdentityStatus(guestIdentity)).status
+            : undefined;
         return {
             canonicalPlayerId: `reddit:${safeUsername.toLowerCase()}`,
-            guestPlayerId: null,
-            guestToken: null,
+            guestPlayerId: verifiedGuestPlayerId,
+            guestToken: verifiedGuestPlayerId ? normalizedGuestToken : null,
+            guestStatus,
         };
     }
 

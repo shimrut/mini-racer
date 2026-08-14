@@ -56,7 +56,7 @@ describe('player profile engine methods', () => {
         expect(engine.applyCarUnlockSnapshot)
             .toHaveBeenCalledWith(carUnlocks, { authoritative: true });
         expect(engine.applyPersistedPlayerPreferences)
-            .toHaveBeenCalledWith({ carSkin: UNLOCKED_CAR });
+            .toHaveBeenCalledWith({ carSkin: UNLOCKED_CAR }, { loadCar: true });
         expect(preferencesMocks.queuePlayerPreferencesSave).not.toHaveBeenCalled();
     });
 

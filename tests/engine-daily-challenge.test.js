@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  addCampaignBootstrapToStartupGate,
-  RealTimeRacer,
-  selectStartupGateForLaunch,
-  startInitialHeadToHeadLaunch,
-  waitForStartupGate,
-} from "../game/engine.js";
+import { RealTimeRacer } from "../game/engine.js";
 import { CarSpriteLoader, getCarAssetNameForPresetConfig, getCarAssetUrlCandidates } from "../game/car/sprite.js";
 import { readTrackLastLapMedal } from "../game/medals/last-lap-medal-storage.js";
 import {
@@ -15,116 +9,6 @@ import {
 } from "../game/scoreboard/verification-queue.js";
 
 describe("RealTimeRacer daily challenge modal payload", () => {
-  it("holds the critical startup gate on Campaign bootstrap", async () => {
-    let resolveBootstrap;
-    const bootstrap = new Promise((resolve) => {
-      resolveBootstrap = resolve;
-    });
-    const ensureCampaignBootstrap = vi.fn(() => bootstrap);
-    const startupPromises = addCampaignBootstrapToStartupGate(
-      [Promise.resolve("assets ready")],
-      { mode: "campaign" },
-      ensureCampaignBootstrap,
-    );
-    let startupSettled = false;
-    const startup = Promise.allSettled(startupPromises).then(() => {
-      startupSettled = true;
-    });
-
-    await Promise.resolve();
-    expect(startupSettled).toBe(false);
-    expect(ensureCampaignBootstrap).toHaveBeenCalledWith({ forceRefresh: true });
-
-    resolveBootstrap({ stages: [], progress: {} });
-    await startup;
-    expect(startupSettled).toBe(true);
-  });
-
-  it("does not add Campaign bootstrap to non-Campaign startup", () => {
-    const startupPromises = [Promise.resolve("assets ready")];
-    const ensureCampaignBootstrap = vi.fn();
-
-    expect(addCampaignBootstrapToStartupGate(
-      startupPromises,
-      { mode: "home" },
-      ensureCampaignBootstrap,
-    )).toBe(startupPromises);
-    expect(ensureCampaignBootstrap).not.toHaveBeenCalled();
-  });
-
-  it("retries a non-authoritative direct Campaign bootstrap after player identity is ready", async () => {
-    let resolvePlayerHistory;
-    const playerHistory = new Promise((resolve) => {
-      resolvePlayerHistory = resolve;
-    });
-    const ensureCampaignBootstrap = vi.fn()
-      .mockResolvedValueOnce({ authoritative: false, ranked: false })
-      .mockResolvedValueOnce({ authoritative: true, ranked: true });
-    const startupPromises = addCampaignBootstrapToStartupGate(
-      [playerHistory],
-      { mode: "campaign" },
-      ensureCampaignBootstrap,
-      playerHistory,
-    );
-
-    await Promise.resolve();
-    expect(ensureCampaignBootstrap).toHaveBeenCalledTimes(1);
-    resolvePlayerHistory({ leaderboardPlayerId: "guest:repaired" });
-    await Promise.allSettled(startupPromises);
-
-    expect(ensureCampaignBootstrap).toHaveBeenCalledTimes(2);
-  });
-
-  it("starts one direct Head to Head request without gating on unrelated startup work", async () => {
-    const unrelatedStartup = new Promise(() => {});
-    const loadChallengeLobby = vi.fn().mockResolvedValue(undefined);
-    const challengePromise = startInitialHeadToHeadLaunch(
-      { mode: "challenge", challengeId: "challenge-1" },
-      loadChallengeLobby,
-    );
-    const startupPromises = selectStartupGateForLaunch(
-      [unrelatedStartup],
-      { mode: "challenge", challengeId: "challenge-1" },
-      challengePromise,
-      [Promise.resolve("car"), Promise.resolve("track")],
-    );
-
-    expect(loadChallengeLobby).toHaveBeenCalledTimes(1);
-    expect(loadChallengeLobby).toHaveBeenCalledWith("challenge-1");
-    await expect(Promise.allSettled(startupPromises)).resolves.toHaveLength(3);
-  });
-
-  it("releases the startup gate when a critical dependency hangs", async () => {
-    vi.useFakeTimers();
-    try {
-      let startupSettled = false;
-      const startup = waitForStartupGate([
-        new Promise(() => {}),
-      ], 20_000).then(() => {
-        startupSettled = true;
-      });
-
-      await vi.advanceTimersByTimeAsync(19_999);
-      expect(startupSettled).toBe(false);
-
-      await vi.advanceTimersByTimeAsync(1);
-      await startup;
-      expect(startupSettled).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("releases the startup gate immediately when dependencies settle", async () => {
-    vi.useFakeTimers();
-    try {
-      await waitForStartupGate([Promise.resolve("ready")], 20_000);
-      expect(vi.getTimerCount()).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("compares intermediate laps using cumulative elapsed pace at equivalent PB boundaries", () => {
     const showLapFlash = vi.fn();
     const engine = {
@@ -539,6 +423,106 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     showModal.mock.calls[0][3].secondaryAction();
     expect(returnToActiveLobby).toHaveBeenCalledTimes(1);
     expect(endAttempt).toHaveBeenCalledWith({ complete: true });
+  });
+
+  it("does not compare a first multi-lap race total against lap one", () => {
+    const showModal = vi.fn();
+    const engine = {
+      isValidatedWinData: () => true,
+      currentChallengeRun: {
+        completedLaps: 2,
+        recentLaps: [{ lapNumber: 1, time: 9.764 }, { lapNumber: 2, time: 9.062 }],
+        bestLapSecBeforeLastLap: 9.764,
+      },
+      activeDailyChallenge: {
+        id: "daily-first-multi-lap",
+        trackKey: "circuit",
+        objectiveType: "multi_lap_total",
+        objectiveParams: { lapCount: 2 },
+      },
+      status: "playing",
+      journeys: { endAttempt: vi.fn() },
+      currentRunPolicy: { bestResultComparator: "time" },
+      dailyChallengeBestResult: null,
+      trackPersonalBestResult: null,
+      bestLapTime: 9.062,
+      cachedSpeed: 0,
+      sessionBestLapSecByTrackKey: {},
+      sessionBestCheckpointTimesByTrackKey: {},
+      hud: {
+        syncHud: vi.fn(),
+        setBestTime: vi.fn(),
+        setHudPersonalBestsOpenAllowed: vi.fn(),
+      },
+      dailyChallengeUi: {
+        getDailyChallengeScoreboardSnapshot: vi.fn(() => null),
+      },
+      modal: { showModal, modalMsg: null },
+      restartDailyChallenge: vi.fn(),
+      returnToActiveLobby: vi.fn(),
+      enqueueDailyChallengeVerificationSubmission: vi.fn(),
+      scoreboardReplay: { getPayload: vi.fn(() => ({ inputs: [] })) },
+    };
+
+    RealTimeRacer.prototype.handleDailyChallengeWin.call(engine, {
+      lapTime: 18.826,
+      completedLaps: 2,
+    });
+
+    expect(showModal.mock.calls[0][2]).toEqual(expect.objectContaining({
+      lapTime: 18.826,
+      bestSummaryLabel: "Best Race",
+      previousPersonalBestSec: undefined,
+      deltaToPersonalBest: undefined,
+    }));
+  });
+
+  it("compares a multi-lap total against an earlier session race total", () => {
+    const showModal = vi.fn();
+    const engine = {
+      isValidatedWinData: () => true,
+      currentChallengeRun: {
+        completedLaps: 2,
+        recentLaps: [{ lapNumber: 1, time: 9.764 }, { lapNumber: 2, time: 9.062 }],
+        bestLapSecBeforeLastLap: 9.764,
+      },
+      activeDailyChallenge: {
+        id: "daily-repeat-multi-lap",
+        trackKey: "circuit",
+        objectiveType: "multi_lap_total",
+        objectiveParams: { lapCount: 2 },
+      },
+      status: "playing",
+      journeys: { endAttempt: vi.fn() },
+      currentRunPolicy: { bestResultComparator: "time" },
+      dailyChallengeBestResult: null,
+      trackPersonalBestResult: null,
+      bestLapTime: 9.062,
+      cachedSpeed: 0,
+      sessionBestLapSecByTrackKey: { "daily-repeat-multi-lap": 19.5 },
+      sessionBestCheckpointTimesByTrackKey: {},
+      hud: {
+        syncHud: vi.fn(),
+        setBestTime: vi.fn(),
+        setHudPersonalBestsOpenAllowed: vi.fn(),
+      },
+      dailyChallengeUi: {
+        getDailyChallengeScoreboardSnapshot: vi.fn(() => null),
+      },
+      modal: { showModal, modalMsg: null },
+      restartDailyChallenge: vi.fn(),
+      returnToActiveLobby: vi.fn(),
+      enqueueDailyChallengeVerificationSubmission: vi.fn(),
+      scoreboardReplay: { getPayload: vi.fn(() => ({ inputs: [] })) },
+    };
+
+    RealTimeRacer.prototype.handleDailyChallengeWin.call(engine, {
+      lapTime: 18.826,
+      completedLaps: 2,
+    });
+
+    expect(showModal.mock.calls[0][2].previousPersonalBestSec).toBe(19.5);
+    expect(showModal.mock.calls[0][2].deltaToPersonalBest).toBeCloseTo(-0.674);
   });
 
   it("syncs Verifying status from the queue after the finish modal opens", () => {

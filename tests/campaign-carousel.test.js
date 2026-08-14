@@ -197,9 +197,18 @@ describe('campaign carousel card model', () => {
 });
 
 describe('campaign carousel engine wiring', () => {
+    const lobbyPaintState = {
+        activeRaceMode: 'campaign',
+        status: 'ready',
+        startButtonPending: false,
+        startOverlay: { isStartOverlayVisible: () => true },
+        lobbyUi: { getMode: () => 'campaign' },
+    };
+
     it('opens on the stage the campaign is asking for', () => {
         const render = vi.fn();
         const engine = {
+            ...lobbyPaintState,
             campaignCarousel: { render },
             campaignLobbyState: campaignState([{ unlocked: true }, { unlocked: true }]),
             _campaignBootstrapReady: true,
@@ -217,6 +226,7 @@ describe('campaign carousel engine wiring', () => {
     it('opens a finished campaign on its last stage, not back at Stage 00', () => {
         const render = vi.fn();
         const engine = {
+            ...lobbyPaintState,
             campaignCarousel: { render },
             campaignLobbyState: campaignState([
                 { unlocked: true, medal: 'gold', bestTimeMs: 18_400 },
@@ -235,6 +245,7 @@ describe('campaign carousel engine wiring', () => {
     it('keeps the stage the player picked over the campaign default', () => {
         const render = vi.fn();
         const engine = {
+            ...lobbyPaintState,
             campaignCarousel: { render },
             campaignLobbyState: campaignState([{ unlocked: true }, { unlocked: true }]),
             selectedCampaignStageId: 'numbered-v1-01',
@@ -249,12 +260,39 @@ describe('campaign carousel engine wiring', () => {
     it('paints as loading until the bootstrap resolves', () => {
         const render = vi.fn();
         campaignEngineMethods.paintCampaignCarousel.call({
+            ...lobbyPaintState,
             campaignCarousel: { render },
             campaignLobbyState: campaignState(),
             _campaignBootstrapReady: false,
         });
 
         expect(render.mock.calls[0][1].loading).toBe(true);
+    });
+
+    it('does not paint the Campaign carousel while a race is running', () => {
+        const render = vi.fn();
+        campaignEngineMethods.paintCampaignCarousel.call({
+            ...lobbyPaintState,
+            campaignCarousel: { render },
+            campaignLobbyState: campaignState(),
+            status: 'playing',
+            _campaignBootstrapReady: true,
+        });
+
+        expect(render).not.toHaveBeenCalled();
+    });
+
+    it('does not paint the Campaign carousel once race start is pending', () => {
+        const render = vi.fn();
+        campaignEngineMethods.paintCampaignCarousel.call({
+            ...lobbyPaintState,
+            campaignCarousel: { render },
+            campaignLobbyState: campaignState(),
+            startButtonPending: true,
+            _campaignBootstrapReady: true,
+        });
+
+        expect(render).not.toHaveBeenCalled();
     });
 
     it('points the primary button at whichever stage is centred', () => {

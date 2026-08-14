@@ -20,7 +20,8 @@ import {
     markDailyChallengeVerificationPending,
     markDailyChallengeVerificationRejected,
     resetVerificationQueueForTests,
-    claimVerificationEntriesForOwner
+    claimVerificationEntriesForOwner,
+    resolveVerificationQueueAfterGuestProgressSelection
 } from '../game/scoreboard/verification-queue.js';
 import {
     clearActivePlayerOwnerId,
@@ -79,6 +80,35 @@ describe('verification queue', () => {
         expect(getDailyChallengeVerificationEntry('challenge-1')).toBe(null);
         expect(getDueDailyChallengeVerifications()).toEqual([]);
         expect(getNextVerificationAttemptAt()).toBe(null);
+    });
+
+    it('moves only the selected guest queue into the signed-in owner', () => {
+        setActivePlayerOwnerId('guest:guest-choice');
+        enqueueDailyChallengeVerification({
+            challengeId: 'guest-race',
+            bestTime: 12,
+            replay: REPLAY,
+        });
+        setActivePlayerOwnerId(OWNER);
+        enqueueDailyChallengeVerification({
+            challengeId: 'account-race',
+            bestTime: 11,
+            replay: REPLAY,
+        });
+
+        const result = resolveVerificationQueueAfterGuestProgressSelection({
+            guestPlayerId: 'guest:guest-choice',
+            accountPlayerId: OWNER,
+            choice: 'guest',
+        });
+
+        expect(result.moved).toBe(1);
+        expect(result.removed).toBe(1);
+        expect(getDailyChallengeVerificationEntry('guest-race')).toMatchObject({
+            ownerPlayerId: OWNER,
+            bestTime: 12,
+        });
+        expect(getDailyChallengeVerificationEntry('account-race')).toBeNull();
     });
 
     it('derives legacy expiry from challengeDate or daily-gp challenge ids', () => {

@@ -105,7 +105,7 @@ describe('car unlock policy', () => {
 
     it('states every unlock requirement in one specific sentence', () => {
         const expected = [
-            [EXTRA_CAR_ASSETS.crimson, 'You need to complete 1 race to unlock this skin.'],
+            [EXTRA_CAR_ASSETS.crimson, 'You need to win 1 Daily or Campaign race to unlock this skin.'],
             [EXTRA_CAR_ASSETS.gold, 'You need 5 Gold Campaign medals to unlock this skin.'],
             [EXTRA_CAR_ASSETS.blaze, 'You need 10 Gold Campaign medals to unlock this skin.'],
             [EXTRA_CAR_ASSETS.surge, 'You need 5 Author Campaign medals to unlock this skin.'],

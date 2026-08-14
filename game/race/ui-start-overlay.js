@@ -192,6 +192,7 @@ export class StartOverlay {
 
     setInteractive(isInteractive) {
         this._isInteractive = Boolean(isInteractive);
+        if (this.startGroup) this.startGroup.inert = !this._isInteractive;
         if (this._isInteractive) {
             requestAnimationFrame(() => this.focusPrimaryAction());
         }

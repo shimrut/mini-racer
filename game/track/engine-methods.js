@@ -116,6 +116,7 @@ export const trackEngineMethods = {
       preserveDailyChallengeContext = false,
       preserveRaceComparisonTarget = false,
       showStartOverlayOnReset = true,
+      reportLoading = true,
     } = {},
   ) {
     const requestId = ++this.trackLoadRequestId;
@@ -135,12 +136,12 @@ export const trackEngineMethods = {
       qualityLevel: this.qualityLevel,
       frameSkip: this.frameSkip,
     });
-    this.setLoadingStatus(60, "Building Track...");
+    if (reportLoading) this.setLoadingStatus(60, "Building Track...");
     this.activeGeometry.outer = runtime.outer;
     this.activeGeometry.inner = runtime.inner;
     this.collisionSegments = runtime.collisionSegments;
     this.collisionHash = runtime.collisionHash;
-    this.setLoadingStatus(75, "Syncing Graphics...");
+    if (reportLoading) this.setLoadingStatus(75, "Syncing Graphics...");
     await this.refreshTrackPresentation();
     if (requestId !== this.trackLoadRequestId) return;
 

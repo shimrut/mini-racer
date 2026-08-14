@@ -438,6 +438,43 @@ describe('ui modal content helpers', () => {
 
         global.document = originalDocument;
     });
+
+    it('labels a first multi-lap result as a race with no fabricated PB delta', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div class="stat-floating-item combined-stat--pb-delta">
+                    <div id="combined-best-lap"></div>
+                    <div id="combined-stat-label-2"></div>
+                </div>
+                <div id="combined-next-medal-stat"></div>
+                <div id="combined-next-medal-icon-slot"></div>
+                <div id="combined-next-medal-time"></div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+
+        component.renderCombinedResults(container, {
+            time: 18.826,
+            bestLap: 9.062,
+            bestSummaryLabel: 'Best Race',
+            previousPersonalBestSec: undefined,
+            deltaToPersonalBest: undefined,
+        });
+
+        expect(container.querySelector('#combined-stat-label-2').textContent).toBe('BEST RACE');
+        expect(container.querySelector('#combined-best-lap').textContent).toBe('No lap times yet');
+        expect(container.textContent).not.toContain('+9.062s');
+
+        global.document = originalDocument;
+    });
 });
 
 describe('leaderboard row patching', () => {

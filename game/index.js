@@ -62,27 +62,26 @@ setupVisibleViewportHeight();
 setupMobileViewportGuards();
 
 const modeRuntimeController = createModeRuntimeController(RealTimeRacer);
+const navigationEntry = globalThis.performance?.getEntriesByType?.('navigation')?.[0];
+const initialLoaderStartedAt = Number.isFinite(navigationEntry?.startTime)
+    ? navigationEntry.startTime
+    : (globalThis.performance?.now?.() ?? Date.now());
 
-async function startGame() {
+function startGame() {
     const launchTarget = resolveGameLaunchTarget();
-    let resolvedLaunchTarget = launchTarget;
-    try {
-        await modeRuntimeController.ensure(launchTarget.mode);
-    } catch (error) {
-        console.error('Failed to load the selected mode runtime:', error);
-        resolvedLaunchTarget = { mode: 'home', challengeId: null };
-        await modeRuntimeController.ensure('home');
-    }
-    new RealTimeRacer({
-        launchTarget: resolvedLaunchTarget,
+    return new RealTimeRacer({
+        launchTarget,
         modeRuntimeController,
+        initialLoaderStartedAt,
     });
 }
 
-void startGame().catch((error) => {
+try {
+    startGame();
+} catch (error) {
     console.error('Failed to start Mini Racer:', error);
     const loaderStatus = document.getElementById('loader-status');
     if (loaderStatus) loaderStatus.textContent = 'Unable to start. Reload to retry.';
-});
+}
 
 export { clearModeRuntimeCacheForTests, modeRuntimeController };

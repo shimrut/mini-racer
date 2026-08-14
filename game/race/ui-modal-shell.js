@@ -1101,6 +1101,7 @@ export class ModalShell {
             challengeVerdict: lapData.challengeVerdict ?? null,
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
+            bestSummaryLabel: lapData.bestSummaryLabel,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
             trackKey: lapData.trackKey || this.getCurrentTrackKey(),
             lapCount: lapData.requiredLaps ?? lapData.completedLaps ?? 1,
@@ -1516,7 +1517,7 @@ export class ModalShell {
     }
 
     dismissRunsView() {
-        if (this._runsViewMode === 'close') {
+        if (this._runsViewMode === 'close' && this._runsReturnView !== 'combined') {
             const closeAction = this._runsCloseAction;
             runModalHandoff(() => {
                 this.closeModal();

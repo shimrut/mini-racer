@@ -357,6 +357,67 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
   return { claimed, orphaned };
 }
 
+/**
+ * Resolves queued local runs when a Reddit sign-in chooses which progress source survives.
+ * Pending replays are never merged across owners: choosing guest replaces the account queue,
+ * while choosing account removes the guest/current-session queue.
+ */
+export function resolveVerificationQueueAfterGuestProgressSelection({
+  guestPlayerId,
+  accountPlayerId,
+  choice,
+} = {}) {
+  if (
+    typeof guestPlayerId !== "string" || !guestPlayerId.trim()
+    || typeof accountPlayerId !== "string" || !accountPlayerId.trim()
+    || (choice !== "guest" && choice !== "account")
+  ) {
+    return { changed: false, removed: 0, moved: 0 };
+  }
+  const queueState = readQueueState();
+  const sessionId = getPlayerSessionId();
+  let removed = 0;
+  let moved = 0;
+  for (const bucket of QUEUE_BUCKETS) {
+    const entries = Object.entries(queueState[bucket]);
+    if (choice === "guest") {
+      for (const [entryKey, entry] of entries) {
+        if (entry?.ownerPlayerId !== accountPlayerId) continue;
+        delete queueState[bucket][entryKey];
+        removed += 1;
+      }
+    }
+    for (const [entryKey, entry] of entries) {
+      const isGuestOwned = entry?.ownerPlayerId === guestPlayerId;
+      const isCurrentUnowned = !entry?.ownerPlayerId && entry?.sessionId === sessionId;
+      if (!isGuestOwned && !isCurrentUnowned) continue;
+      if (choice === "account") {
+        delete queueState[bucket][entryKey];
+        removed += 1;
+        continue;
+      }
+      const rawEntryId = entryKey.startsWith(`${guestPlayerId}${OWNER_KEY_SEPARATOR}`)
+        ? entryKey.slice(`${guestPlayerId}${OWNER_KEY_SEPARATOR}`.length)
+        : entryKey;
+      delete queueState[bucket][entryKey];
+      queueState[bucket][`${accountPlayerId}${OWNER_KEY_SEPARATOR}${rawEntryId}`] = {
+        ...entry,
+        ownerPlayerId: accountPlayerId,
+      };
+      moved += 1;
+    }
+  }
+  const changed = removed > 0 || moved > 0;
+  if (changed) writeQueueState(queueState);
+  return { changed, removed, moved };
+}
+
+export function hasVerificationEntriesForOwner(ownerPlayerId) {
+  if (typeof ownerPlayerId !== "string" || !ownerPlayerId.trim()) return false;
+  return Object.values(readQueueState())
+    .some((bucket) => Object.values(bucket).some((entry) => entry?.ownerPlayerId === ownerPlayerId));
+}
+
 function enqueue(bucket, entryId, nextEntry, isBetterThan) {
   let didEnqueue = false;
   const { entry, persisted } = updateEntry(bucket, entryId, (previousEntry) => {

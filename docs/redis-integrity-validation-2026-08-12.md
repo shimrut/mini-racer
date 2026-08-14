@@ -44,6 +44,12 @@ These close the findings the hosted run left open, plus the residual windows it 
 - Campaign **Next** and lobby unlocks use verified progress only; starting the next stage waits for confirmation and aborts when verification does not settle. After the server accepts the run, the open finish sheet turns **Next** on and restores its click action.
 - Reddit sign-in merges guest Daily leaderboard rows for the seven-day playlist onto the signed-in account, then deletes the guest row. Copy and delete hold both players' Daily submission locks, matching Campaign merge.
 
+## Guest progress choice — 2026-08-13
+
+- Automatic guest promotion was removed from both player and Campaign bootstrap. A signed-in browser with a guest credential receives a non-authoritative choice payload and must select guest progress or saved account progress before ranked state is applied.
+- The selection coordinator records the first choice, retries idempotently, replaces or discards Daily/Campaign/car-unlock state as selected, and retires the guest only after all domains complete. A pending selection keeps the guest source and credential alive.
+- Local tests and the production build cover the client prompt and replacement paths. Hosted Reddit/Redis validation remains outstanding; no hosted identity or data was touched by this branch.
+
 ## Local gates
 
 Before the hosted run, 245 focused tests passed across the diagnostic, car unlock store, Campaign store, Daily store, and server route contracts. `npm run build` and `git diff --check` also passed. After capture, the normal build was restored and revalidated without the temporary diagnostic surface.

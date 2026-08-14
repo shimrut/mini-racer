@@ -36,7 +36,12 @@ function toRaceChallenge(stage) {
 }
 
 export const headToHeadEngineMethods = {
-    async loadChallengeLobby(challengeId = null, { outcome = null, bestTimeMs = null } = {}) {
+    async loadChallengeLobby(challengeId = null, {
+        outcome = null,
+        bestTimeMs = null,
+        onTrackPhase = null,
+        onGhostPhase = null,
+    } = {}) {
         this.headToHeadChallengeId = challengeId;
         cancelDeferredLobbyWork(this);
         if (this.status !== 'ready' || this.currentChallengeRun) {
@@ -75,13 +80,16 @@ export const headToHeadEngineMethods = {
             && Boolean(challenge);
         if (challengeReady && typeof this.loadTrack === 'function') {
             try {
+                onTrackPhase?.();
                 this.setLoadingStatus?.(78, 'Preparing Challenge Track...');
                 await this.loadTrack(challenge.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     showStartOverlayOnReset: false,
+                    reportLoading: false,
                 });
                 if (this.activeHeadToHead?.frozenGhost) {
+                    onGhostPhase?.();
                     const prepareGhost = this.pbGhost.prepareOpponent || this.pbGhost.prepare;
                     prepareGhost?.call(this.pbGhost, {
                         bestTimeMs: challenge.targetTimeMs,
@@ -244,10 +252,10 @@ export const headToHeadEngineMethods = {
         const localDifferenceMs = finalTimeMs !== null && targetTimeMs !== null
             ? finalTimeMs - targetTimeMs
             : null;
-        const beatsTarget = localDifferenceMs !== null && localDifferenceMs < 0;
+        const settlesLocally = localDifferenceMs !== null && localDifferenceMs >= 0;
 
         const openPendingFinish = ({
-            phase = beatsTarget ? 'won' : 'pending',
+            phase = 'pending',
             error = null,
         } = {}) => {
             this.modal.showModal(
@@ -290,18 +298,16 @@ export const headToHeadEngineMethods = {
                 campaignAction: () => this.showCampaignLobby(),
             });
         };
-        const revokeWinActions = () => {
-            if (!beatsTarget) return;
-            this.modal.clearChallengeWinActions?.({
-                restartAction: () => this.restartActiveRace(),
-            });
-        };
-
         const stillOnThisFinish = () => (
             this._headToHeadFinishAttempt === finishAttempt
             && this.status === 'won'
             && this.activeHeadToHead?.challengeId === challenge.challengeId
         );
+
+        if (settlesLocally) {
+            openPendingFinish({ phase: localDifferenceMs === 0 ? 'tie' : 'lost' });
+            return;
+        }
 
         if (submissionBlockedReason) {
             openPendingFinish({
@@ -312,16 +318,13 @@ export const headToHeadEngineMethods = {
         }
 
         openPendingFinish();
-        if (beatsTarget) applyWinActions();
 
         void (async () => {
             if (!stillOnThisFinish()) return;
-            if (!beatsTarget) {
-                this.modal.updateChallengeFinishHero?.({
-                    phase: 'pending',
-                    statusText: verifyingStatus,
-                });
-            }
+            this.modal.updateChallengeFinishHero?.({
+                phase: 'pending',
+                statusText: verifyingStatus,
+            });
 
             let confirmationFailed = false;
             let response = { ok: false, body: { error: 'This run could not be verified.' } };
@@ -329,6 +332,7 @@ export const headToHeadEngineMethods = {
                 response = await submitHeadToHeadRun({
                     challengeId: challenge.challengeId,
                     replay,
+                    bestTimeMs: finalTimeMs,
                 });
             } catch (submitError) {
                 confirmationFailed = true;
@@ -347,7 +351,17 @@ export const headToHeadEngineMethods = {
             const outcome = accepted ? response.body?.outcome : null;
 
             if (!accepted) {
-                revokeWinActions();
+                const serverDifferenceMs = Number(response.body?.differenceMs);
+                if (
+                    response.body?.status === 'target_not_beaten'
+                    && Number.isFinite(serverDifferenceMs)
+                ) {
+                    this.modal.updateChallengeFinishHero?.({
+                        phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
+                        verdict: buildVerdict(serverDifferenceMs),
+                    });
+                    return;
+                }
                 this.modal.updateChallengeFinishHero?.({
                     phase: 'error',
                     error: confirmationFailed
@@ -378,7 +392,6 @@ export const headToHeadEngineMethods = {
                 applyWinActions();
                 return;
             }
-            revokeWinActions();
             this.modal.updateChallengeFinishHero?.({
                 phase: outcome === 'tie' ? 'tie' : 'lost',
                 verdict,

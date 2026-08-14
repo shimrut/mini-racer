@@ -13,11 +13,11 @@ Vite copies everything under `public/` into `dist/client`, even when no page or 
 - `.DS_Store` files under `public/` are copied as well, so the release-pipeline
   test now fails if any reappear.
 
-The unused tracked assets were removed. Local draft logos and the duplicate medal draft were preserved under ignored `local-assets/`, outside Vite's public copy path. Stray `.DS_Store` files were removed from the shipped asset tree. Devvit's publish source archive separately excludes tests, docs, internal notes, generated review artwork, and non-build tooling through `devvit.json`; the three scripts invoked by the production build remain included.
+The unused tracked assets were removed. Local draft logos and the duplicate medal draft were preserved under ignored `local-assets/`, outside Vite's public copy path. Stray `.DS_Store` files were removed from the shipped asset tree. Devvit's publish source archive separately excludes tests, docs, internal notes, generated review artwork, and non-build tooling through `devvit.json`; the two asset-generator scripts invoked by the production build remain included.
 
 ### 2. No-op HTML entrypoint rewrite
 
-`fixDevvitHtmlEntrypoints()` in `vite.config.js` searches for old HTML strings such as `?v=1.90`. The current source uses different versions, and the Devvit Vite plugin already emits `/default.js`, `/default.css`, `/game.js`, and `/game.css`. The custom plugin now reads and rewrites the files without changing them.
+`fixDevvitHtmlEntrypoints()` in `vite.config.js` searched for old HTML strings such as `?v=1.90`. At the time of this review the Devvit Vite plugin emitted stable asset names, so the custom plugin read and rewrote files without changing them. The current build overrides those names with Vite content hashes so HTML entries and lazy imports use one canonical module URL.
 
 The custom rewrite plugin was removed. The production build still emits the
 configured HTML entrypoints and generated asset names; each named Devvit

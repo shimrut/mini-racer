@@ -557,6 +557,9 @@ export const raceEngineMethods = {
           this.campaignCarousel?.refreshPreviews?.();
           resolve(this.carSprite);
         },
+        onSuperseded: () => {
+          resolve(this.carSprite);
+        },
       });
     });
   },

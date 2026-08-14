@@ -3176,7 +3176,7 @@ describe('server daily gp store submissions', () => {
             });
         });
 
-        it('still returns a bootstrap when a concurrent Campaign claim holds the merge lock', async () => {
+        it('pauses bootstrap for an explicit guest progress choice', async () => {
             const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
             const defaultGet = mockRedis.get.getMockImplementation();
             mockRedis.get.mockImplementation(async (key) => (
@@ -3202,10 +3202,8 @@ describe('server daily gp store submissions', () => {
 
             expect(payload.playerId).toBe('reddit:mergeracer');
             expect(payload.guestToken).toBe(guestToken);
-            expect(consoleError).toHaveBeenCalledWith(
-                'Player guest progress claim failed:',
-                expect.objectContaining({ message: 'Campaign merge is already in progress.' }),
-            );
+            expect(payload.progressSelection?.required ?? false).toBe(false);
+            expect(consoleError).not.toHaveBeenCalled();
             consoleError.mockRestore();
         });
 

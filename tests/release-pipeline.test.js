@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const packageJson = JSON.parse(
@@ -34,14 +34,17 @@ describe('release pipeline', () => {
         ]));
     });
 
-    it('keeps the cache-busting production build authoritative for Devvit releases', () => {
+    it('uses canonical content-hashed module filenames for Devvit releases', () => {
         const buildScript = packageJson.scripts.build;
-        const viteBuildIndex = buildScript.indexOf('vite build');
-        const cacheBustIndex = buildScript.indexOf('node tools/bust-client-asset-cache.js');
 
         expect(devvitConfig.scripts.build).toBe('npm run build');
-        expect(viteBuildIndex).toBeGreaterThanOrEqual(0);
-        expect(cacheBustIndex).toBeGreaterThan(viteBuildIndex);
+        expect(buildScript).toContain('vite build');
+        expect(buildScript).not.toContain('bust-client-asset-cache');
+        expect(viteConfigSource).toContain("entryFileNames: '[name]-[hash].js'");
+        expect(viteConfigSource).toContain("chunkFileNames: '[name]-[hash].js'");
+        expect(viteConfigSource).toContain("'[name]-[hash][extname]'");
+        expect(existsSync(new URL('../tools/bust-client-asset-cache.js', import.meta.url)))
+            .toBe(false);
     });
 
     it('keeps dynamically split mode source maps from overwriting each other', () => {
@@ -67,10 +70,10 @@ describe('release pipeline', () => {
             'vitest.config.js',
         ]));
         expect(devvitConfig.sourceIgnores).toEqual(expect.arrayContaining([
-            '!tools/bust-client-asset-cache.js',
             '!tools/generate-player-car-assets.js',
             '!tools/generate-share-images.js',
         ]));
+        expect(devvitConfig.sourceIgnores).not.toContain('!tools/bust-client-asset-cache.js');
     });
 
     it('keeps macOS metadata out of the WebView public asset tree', () => {

@@ -1,5 +1,34 @@
 # Changelog
 
+- Rebuilt initial loading around one ordered plan per launch mode. Direct Daily
+  prepares its active challenge track, Campaign resolves authoritative progress
+  before one bootstrap and its selected stage, and Head to Head starts the duel
+  request first without unrelated mode work. The global loading screen now hands
+  off to the selected mode within 960ms including fade; PB ghosts and car images
+  cannot hold it, promoted-guest choice happens after handoff, and superseded car
+  loads always settle instead of forcing the former 20-second escape path. The
+  deadline includes pre-coordinator startup time, a fast Head to Head response
+  survives a slower identity sync, and Daily request failures now expose Retry
+  without substituting the Home track.
+
+- Fixed the game booting twice in the released build. The cache-busting `?v=`
+  query was only added to the entry script, so the lazily loaded mode runtimes
+  imported the entry back without it and the browser ran a second copy of the
+  whole game: the carousel rendered twice, the music played twice staggered, two
+  race loops shared one canvas, and the lobby could reappear over a race already
+  in progress. Bundles are now cache-busted by file name instead, and deferred
+  carousel work is discarded as soon as race start begins.
+
+- Fixed Standings opened from a completed race closing to the bare race canvas.
+  Closing that view now restores the finish sheet.
+
+- Fixed first-time multi-lap Daily results showing the final lap as a red
+  personal-best deficit. Multi-lap finishes now compare complete race totals
+  only, label the comparison **Best Race**, and show the empty first-race state
+  when there is no earlier race total.
+
+- Replaced automatic guest sign-in merging with an explicit progress choice. Players can keep guest progress or use their saved account state/start fresh; the unselected state is discarded only after the chosen operation completes.
+
 - Bound queued Daily and Campaign results to the account that raced them. A
   result waits for its own account instead of submitting under whoever signs in
   next, so it can no longer be credited to the wrong leaderboard or refused as a

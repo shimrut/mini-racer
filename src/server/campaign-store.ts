@@ -36,7 +36,7 @@ import { getPlayerTrackPbRecord } from './pb-ghost-store.js';
 import { redisCompressed } from '@devvit/redis';
 import {
     getCarUnlockSnapshot,
-    mergeGuestCarUnlockProgress,
+    readGuestPromotionTarget,
     recordCompletedRace,
 } from './car-unlock-store.js';
 import {
@@ -335,6 +335,10 @@ export async function getCampaignResultsForCarUnlocks(
     return (await readProgress(playerId)).resultsByRaceId;
 }
 
+export async function getCampaignProgressForSelection(playerId: string): Promise<CampaignProgress> {
+    return readProgress(playerId);
+}
+
 function publicProgress(progress: CampaignProgress) {
     const unlockedRaceIds = getCampaignUnlockedRaceIds(progress.resultsByRaceId);
     return {
@@ -476,46 +480,31 @@ export async function getServerCampaignBootstrap({
     if (canonicalPlayerId?.startsWith('reddit:')) {
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
         if (guestPlayerId) {
-            const [campaignPromotion, carUnlockPromotion] = await Promise.allSettled([
-                mergeGuestCampaignProgress({
-                    guestPlayerId: `guest:${guestPlayerId}`,
-                    redditPlayerId: canonicalPlayerId,
-                }),
-                mergeGuestCarUnlockProgress({
-                    guestPlayerId: `guest:${guestPlayerId}`,
-                    redditPlayerId: canonicalPlayerId,
-                }),
-            ]);
-            campaignProgressPromotionPending = campaignPromotion.status === 'rejected';
-            guestPromotionPending = campaignProgressPromotionPending
-                || carUnlockPromotion.status === 'rejected';
-            for (const promotion of [campaignPromotion, carUnlockPromotion]) {
-                if (promotion.status !== 'rejected') continue;
-                guestPromotionPending = true;
-                // A failed claim must not cost the player their bootstrap; the guest keys survive for the next load.
-                console.error('Campaign guest progress claim failed:', promotion.reason);
-            }
+            const promotedTo = await readGuestPromotionTarget(`guest:${guestPlayerId}`);
+            guestPromotionPending = !promotedTo;
+            campaignProgressPromotionPending = guestPromotionPending;
         }
     }
 
-    const progress = canonicalPlayerId
+    const progress = canonicalPlayerId && !guestPromotionPending
         ? await readProgress(canonicalPlayerId).then((current) => (
             repairCampaignProgressFromLeaderboard(canonicalPlayerId, current)
         ))
         : emptyProgress();
-    if (canonicalPlayerId) await repairCampaignStandingsFromEntries(canonicalPlayerId);
-    const standingsByRaceId = await readCampaignStandingsByRaceId(canonicalPlayerId);
-    const carUnlocks = canonicalPlayerId
+    if (canonicalPlayerId && !guestPromotionPending) await repairCampaignStandingsFromEntries(canonicalPlayerId);
+    const standingsByRaceId = await readCampaignStandingsByRaceId(canonicalPlayerId && !guestPromotionPending ? canonicalPlayerId : null);
+    const carUnlocks = canonicalPlayerId && !guestPromotionPending
         ? await getCarUnlockSnapshot(canonicalPlayerId, progress.resultsByRaceId)
         : null;
     return {
         status: 200,
         body: {
             campaignId: CAMPAIGN_ID,
-            ranked: Boolean(canonicalPlayerId),
+            ranked: Boolean(canonicalPlayerId && !guestPromotionPending),
             signedIn: Boolean(canonicalPlayerId?.startsWith('reddit:')),
             guestPromotionPending,
             campaignProgressPromotionPending,
+            progressSelectionRequired: guestPromotionPending,
             stages: CAMPAIGN_STAGES,
             progress: publicProgress(progress),
             standingsByRaceId,
@@ -537,6 +526,15 @@ export async function startServerCampaignRace({
 } = {}) {
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     if (!identity.canonicalPlayerId) return identityRequired();
+    if (identity.guestStatus === 'guest_promotion_pending') {
+        return {
+            status: 409,
+            body: {
+                error: 'Choose which progress to keep before starting a ranked Campaign race.',
+                reason: 'progress_selection_required',
+            },
+        };
+    }
     await cleanupExpiredCampaignGuestsBestEffort();
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { error: 'Campaign race not found.' } };
@@ -654,6 +652,16 @@ export async function submitServerCampaignRun({
         return {
             status: 401,
             body: { accepted: false, error: 'Player identity is required to submit Campaign results.' },
+        };
+    }
+    if (identity.guestStatus === 'guest_promotion_pending') {
+        return {
+            status: 409,
+            body: {
+                accepted: false,
+                error: 'Choose which progress to keep before submitting a ranked Campaign result.',
+                reason: 'progress_selection_required',
+            },
         };
     }
     // Checked before the stage lock, so a result queued under another account is never mistaken for a locked stage.
@@ -818,9 +826,11 @@ export async function getServerHeadToHeadSource({
 export async function mergeGuestCampaignProgress({
     guestPlayerId,
     redditPlayerId,
+    replace = false,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
+    replace?: boolean;
 }): Promise<{ merged: boolean; mergedRaceIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         return { merged: false, mergedRaceIds: [] };
@@ -866,7 +876,9 @@ export async function mergeGuestCampaignProgress({
             readProgress(guestPlayerId),
             readProgress(redditPlayerId),
         ]);
-        const mergedResults = { ...redditProgress.resultsByRaceId };
+        const mergedResults = replace
+            ? Object.create(null)
+            : { ...redditProgress.resultsByRaceId };
         const mergedRaceIds: string[] = [];
         let hasGuestEvidence = Boolean(
             guestProgress.startedAt
@@ -910,38 +922,58 @@ export async function mergeGuestCampaignProgress({
                 redditProgress.resultsByRaceId[stage.raceId],
                 redditEntryResult,
             );
-            const guestWins = Boolean(
-                guestResult
-                && (!redditResult || guestResult.bestTimeMs < redditResult.bestTimeMs),
-            );
-            const guestCanSupplyWinningPb = Boolean(
-                guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
-            );
-            const bestResult = fasterCampaignResult(redditResult, guestResult);
-            if (bestResult) {
-                mergedResults[stage.raceId] = bestResult;
+            const guestWins = replace
+                ? Boolean(guestResult)
+                : Boolean(
+                    guestResult
+                    && (!redditResult || guestResult.bestTimeMs < redditResult.bestTimeMs),
+                );
+            const guestCanSupplyWinningPb = replace
+                ? Boolean(guestPb)
+                : Boolean(guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs));
+            const selectedResult = replace ? guestResult : fasterCampaignResult(redditResult, guestResult);
+            if (selectedResult) {
+                mergedResults[stage.raceId] = selectedResult;
             }
             if (guestWins && guestResult) {
                 mergedRaceIds.push(stage.raceId);
             }
-            const guestEntryWins = Boolean(
-                guestEntry
-                && guestEntryResult
-                && (!redditEntryResult || guestEntry.bestTimeMs < redditEntryResult.bestTimeMs)
-            );
-            const entryToWrite = guestEntryWins
-                ? { ...guestEntry!, playerId: redditPlayerId }
-                : (redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs
+            const guestEntryWins = replace
+                ? Boolean(guestEntry && guestEntryResult)
+                : Boolean(
+                    guestEntry
+                    && guestEntryResult
+                    && (!redditEntryResult || guestEntry.bestTimeMs < redditEntryResult.bestTimeMs)
+                );
+            const entryToWrite = replace && guestResult && !guestEntry
+                ? {
+                    playerId: redditPlayerId,
+                    trackKey: stage.trackKey,
+                    bestTimeMs: guestResult.bestTimeMs,
+                    updatedAt: guestResult.updatedAt,
+                    completedLaps: stage.lapCount,
+                    checkpointTimesSec: guestResult.checkpointTimesSec,
+                    validationMethod: 'strict-replay' as const,
+                }
+                : guestEntryWins
+                    ? { ...guestEntry!, playerId: redditPlayerId }
+                : (!replace && redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs
                     ? redditEntry
                     : null);
-            if (entryToWrite) {
+            if (entryToWrite || replace) {
                 const accountEntryLock = locks.find((lock) => (
                     lock.key === competitionSubmissionLockKey(redditCompetition, redditPlayerId)
                 ));
                 if (!accountEntryLock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
                 const transaction = await beginOwnedRedisLockTransaction(accountEntryLock, redis);
                 if (!transaction) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-                await writeEntry(redditCompetition, redditPlayerId, entryToWrite, transaction);
+                if (entryToWrite) {
+                    await writeEntry(redditCompetition, redditPlayerId, entryToWrite, transaction);
+                } else {
+                    await transaction.hDel(redditCompetition.entryHashKey, [redditPlayerId]);
+                    await transaction.zRem(redditCompetition.leaderboardKey, [redditPlayerId]);
+                    await transaction.incrBy(redditCompetition.standingsRevisionKey, 1);
+                }
                 const results = await transaction.exec();
                 if (!Array.isArray(results) || results.length === 0) {
                     throw new CampaignProgressBusyError('Campaign leaderboard copy was interrupted.');
@@ -958,16 +990,20 @@ export async function mergeGuestCampaignProgress({
                 await redisCompressed.hSet(redditCompetition.pbHashKey, {
                     [playerField(redditPlayerId)]: rawGuestPb,
                 });
+            } else if (replace) {
+                await redisCompressed.hDel(redditCompetition.pbHashKey, [playerField(redditPlayerId)]);
             }
         }
 
-        if (!hasGuestEvidence) return { merged: false, mergedRaceIds: [] };
+        if (!hasGuestEvidence && !replace) return { merged: false, mergedRaceIds: [] };
 
         await confirmMergeOwnership();
         const nowIso = new Date().toISOString();
         await writeProgressWithOwnedLock(redditPlayerId, {
             campaignId: CAMPAIGN_ID,
-            startedAt: redditProgress.startedAt || guestProgress.startedAt || nowIso,
+            startedAt: replace
+                ? (guestProgress.startedAt || null)
+                : (redditProgress.startedAt || guestProgress.startedAt || nowIso),
             resultsByRaceId: mergedResults,
             updatedAt: nowIso,
         }, redditProgressLock);
@@ -999,6 +1035,52 @@ export async function mergeGuestCampaignProgress({
         for (const lock of [...locks].reverse()) {
             await releaseRedisLock(lock, redis).catch((error) => {
                 console.error('Campaign merge lock cleanup failed:', error);
+            });
+        }
+    }
+}
+
+export async function discardGuestCampaignProgress({
+    guestPlayerId,
+}: {
+    guestPlayerId: string;
+}): Promise<boolean> {
+    if (!guestPlayerId.startsWith('guest:')) return false;
+    const locks: RedisLock[] = [];
+    try {
+        for (const key of CAMPAIGN_STAGES.flatMap((stage) => {
+            const competition = competitionFor(stage, null);
+            return [
+                competitionSubmissionLockKey(competition, guestPlayerId),
+            ];
+        }).concat(progressLockKey(guestPlayerId)).sort()) {
+            const lock = await acquireRedisLock(key, SUBMISSION_LOCK_TTL_MS, redis);
+            if (!lock) throw new CampaignProgressBusyError('Campaign discard is already in progress.');
+            locks.push(lock);
+        }
+        const progressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId));
+        if (!progressLock) throw new CampaignProgressBusyError('Campaign discard lock was lost.');
+        const hadProgress = Boolean(await redis.get(progressKey(guestPlayerId)));
+        const transaction = await beginOwnedRedisLockTransaction(progressLock, redis);
+        if (!transaction) throw new CampaignProgressBusyError('Campaign discard lock was lost.');
+        for (const stage of CAMPAIGN_STAGES) {
+            const competition = competitionFor(stage, guestPlayerId);
+            await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
+            await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
+            await transaction.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
+            await transaction.incrBy(competition.standingsRevisionKey, 1);
+        }
+        await transaction.del(progressKey(guestPlayerId));
+        await transaction.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, [guestPlayerId]);
+        const results = await transaction.exec();
+        if (!Array.isArray(results) || results.length === 0) {
+            throw new CampaignProgressBusyError('Campaign discard was interrupted.');
+        }
+        return hadProgress;
+    } finally {
+        for (const lock of [...locks].reverse()) {
+            await releaseRedisLock(lock, redis).catch((error) => {
+                console.error('Campaign discard lock cleanup failed:', error);
             });
         }
     }

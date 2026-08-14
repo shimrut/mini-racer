@@ -75,6 +75,15 @@ export function hasAnyDailyChallengeStoredData() {
   return Object.keys(map).length > 0;
 }
 
+export function clearDailyChallengeStoredData() {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    window.localStorage.removeItem(DAILY_CHALLENGE_STORAGE_KEY);
+  } catch (error) {
+    console.error("Error clearing daily challenge storage:", error);
+  }
+}
+
 export function getDailyChallengeData(challengeId) {
   if (!challengeId) return null;
   const challengeMap = readDailyChallengeMap();

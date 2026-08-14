@@ -16,6 +16,85 @@
     contain: layout paint;
 }
 
+.guest-progress-selection {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: rgba(2, 6, 23, 0.94);
+    color: var(--text-color);
+}
+
+.guest-progress-selection__card {
+    width: min(100%, 30rem);
+    padding: clamp(1.5rem, 5vw, 2.25rem);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.38);
+}
+
+.guest-progress-selection h2 {
+    margin: 0 0 0.75rem;
+    text-align: center;
+    letter-spacing: 0.12em;
+}
+
+.guest-progress-selection__message,
+.guest-progress-selection__status {
+    margin: 0.75rem 0 1rem;
+    text-align: center;
+}
+
+.guest-progress-selection__sources {
+    display: grid;
+    gap: 0.65rem;
+    margin: 1.25rem 0;
+}
+
+.guest-progress-selection__source {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+}
+
+.guest-progress-selection__source span {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.guest-progress-selection__actions {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.guest-progress-selection__button {
+    min-height: 3rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-full);
+    background: rgba(51, 65, 85, 0.86);
+    color: var(--text-color);
+    font: inherit;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+}
+
+.guest-progress-selection__button--primary {
+    background: var(--accent-color);
+    color: var(--bg-color);
+}
+
+.guest-progress-selection__button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
 .modal.active {
     opacity: 1;
     pointer-events: all;

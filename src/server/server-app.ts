@@ -9,6 +9,7 @@ import {
     getServerPlayerPbGhost,
     getServerPlayerTrackPbSummaries,
     getServerPlayerBootstrap,
+    selectServerGuestProgress,
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
     updateServerPlayerPreferences,
@@ -82,6 +83,7 @@ function registerProductionRoutes(app: express.Application): void {
     registerPlayerRoutes(app, {
         getRequestUsername,
         getServerPlayerBootstrap: (input) => getServerPlayerBootstrap(input),
+        selectServerGuestProgress: (input) => selectServerGuestProgress(input),
         updateServerPlayerIdentity: (input) => updateServerPlayerIdentity(input),
         updateServerPlayerPreferences: (input) => updateServerPlayerPreferences(input),
     });

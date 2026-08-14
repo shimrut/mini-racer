@@ -15,6 +15,7 @@ const {
     updateModalLeaderboardDayOptions,
     configureRunsModalHeader,
     updateModalRunSummary,
+    dismissRunsView,
     bindLeaderboardPagination,
     bindLeaderboardDaySwipe,
     _wireLeaderboardRowShare,
@@ -22,6 +23,34 @@ const {
     _showLeaderboardOpponentConfirmation,
     _leaderboardShareBestOption,
 } = ModalShell.prototype;
+
+describe('standings return flow', () => {
+    it('returns to the finish sheet when its standings view is dismissed', () => {
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        global.requestAnimationFrame = (callback) => callback();
+        const context = {
+            _runsViewMode: 'close',
+            _runsReturnView: 'combined',
+            closeModal: vi.fn(),
+            showMainModalView: vi.fn(),
+            activateModalFocusTrap: vi.fn(),
+            modal: {},
+        };
+
+        try {
+            dismissRunsView.call(context);
+
+            expect(context.showMainModalView).toHaveBeenCalledOnce();
+            expect(context.closeModal).not.toHaveBeenCalled();
+
+            context._runsReturnView = 'main';
+            dismissRunsView.call(context);
+            expect(context.closeModal).toHaveBeenCalledOnce();
+        } finally {
+            global.requestAnimationFrame = originalRequestAnimationFrame;
+        }
+    });
+});
 
 function withLeaderboardIntroMethods(context = {}) {
     return {

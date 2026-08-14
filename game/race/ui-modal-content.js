@@ -615,6 +615,7 @@ export class ModalContentUi {
         challengeVerdict = null,
         previousPersonalBestSec = undefined,
         deltaToPersonalBest = undefined,
+        bestSummaryLabel = 'Best Lap',
         previousTrackMedal = null,
         trackKey = null,
         lapCount = 1,
@@ -671,7 +672,7 @@ export class ModalContentUi {
             label2El.hidden = false;
             label2El.removeAttribute('hidden');
             label2El.removeAttribute('aria-hidden');
-            label2El.textContent = 'BEST LAP';
+            label2El.textContent = String(bestSummaryLabel || 'Best Lap').toUpperCase();
         }
         applyCombinedRankValue({
             rankValueEl,

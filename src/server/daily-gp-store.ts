@@ -67,12 +67,18 @@ import {
 } from './redis-lock.js';
 import {
     getCarUnlockSnapshot,
+    discardGuestCarUnlockProgress,
+    hasCarUnlockProgress,
     mergeGuestCarUnlockProgress,
+    readGuestPromotionTarget,
     recordCompletedRace,
+    retireEmptyGuestIdentity,
     type CarUnlockSnapshot,
 } from './car-unlock-store.js';
 import {
+    discardGuestCampaignProgress,
     getCampaignResultsForCarUnlocks,
+    getCampaignProgressForSelection,
     mergeGuestCampaignProgress,
 } from './campaign-store.js';
 import {
@@ -106,7 +112,42 @@ type PlayerBootstrapPayload = {
     lastSeenAt: string | null;
     carUnlocks: CarUnlockSnapshot | null;
     retireGuestIdentity: boolean;
+    progressSelection?: GuestProgressSelection | null;
 };
+
+export type GuestProgressSelection = {
+    required: boolean;
+    guestHasProgress: boolean;
+    accountHasProgress: boolean;
+    guestSummary: { hasDailyResults: boolean; campaignResults: number; unlocks: boolean };
+    accountSummary: { hasDailyResults: boolean; campaignResults: number; unlocks: boolean };
+    choice?: 'guest' | 'account';
+};
+
+type GuestProgressSelectionRecord = {
+    guestPlayerId: string;
+    redditPlayerId: string;
+    choice: 'guest' | 'account';
+    status: 'pending' | 'completed';
+    updatedAt: string;
+    completedDomains: string[];
+};
+
+function guestProgressSelectionKey(guestPlayerId: string, redditPlayerId: string): string {
+    return `dailygp:guest-progress-selection:v1:${createHash('sha256')
+        .update(`${guestPlayerId}:${redditPlayerId}`, 'utf8')
+        .digest('base64url')}`;
+}
+
+function guestProgressSelectionLockKey(guestPlayerId: string, redditPlayerId: string): string {
+    return `${guestProgressSelectionKey(guestPlayerId, redditPlayerId)}:lock`;
+}
+
+function guestProgressSelectionPendingKey(guestPlayerId: string): string {
+    return `dailygp:guest-progress-selection-pending:v1:${createHash('sha256')
+        .update(guestPlayerId, 'utf8')
+        .digest('base64url')}`;
+}
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';
@@ -544,7 +585,9 @@ async function readDailyMergeState(
             competition,
             track,
         }),
-        redis.zScore(competition.leaderboardKey, redditPlayerId),
+        typeof redis.zScore === 'function'
+            ? redis.zScore(competition.leaderboardKey, redditPlayerId)
+            : Promise.resolve(null),
     ]);
     return { guestEntry, redditEntry, guestPb, redditPb, redditRankedScore };
 }
@@ -640,12 +683,24 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
     const challenges: DailyGpChallenge[] = [];
     const activeChallenge = await getServerDailyGpChallenge();
 
-    for (let offset = 0; offset < DAILY_GP_PLAYLIST_DAYS; offset += 1) {
-        const challengeDate = getUtcDayStart(todayIndex - offset).toISOString().slice(0, 10);
-        const challengeId = createDailyChallengeId(challengeDate);
+    const challengeIds = Array.from({ length: DAILY_GP_PLAYLIST_DAYS }, (_unused, offset) => (
+        createDailyChallengeId(getUtcDayStart(todayIndex - offset).toISOString().slice(0, 10))
+    ));
+    // Every challenge lives in one history hash, so the whole window is one read instead of one per day.
+    const storedIds = challengeIds.filter((challengeId) => challengeId !== activeChallenge.id);
+    const storedRaw = storedIds.length > 0
+        ? await redis.hMGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, storedIds)
+        : [];
+    const storedById = new Map(storedIds.map((challengeId, index) => [
+        challengeId,
+        parseStoredChallenge(typeof storedRaw[index] === 'string' ? storedRaw[index] : null),
+    ]));
+
+    for (const challengeId of challengeIds) {
         const challenge = challengeId === activeChallenge.id
             ? activeChallenge
-            : await readStoredOrBackfilledDailyGpChallenge(challengeId);
+            // A day missing from history is backfilled and persisted, exactly as the per-day read did.
+            : storedById.get(challengeId) ?? await readStoredOrBackfilledDailyGpChallenge(challengeId);
         if (challenge && isDailyGpChallengePlayable(challenge, now)) {
             challenges.push(challenge);
         }
@@ -661,9 +716,11 @@ function dailyPlayerField(playerId: string): string {
 export async function mergeGuestDailyProgress({
     guestPlayerId,
     redditPlayerId,
+    replace = false,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
+    replace?: boolean;
 }): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         return { merged: false, mergedChallengeIds: [] };
@@ -684,8 +741,13 @@ export async function mergeGuestDailyProgress({
             guestPlayerId,
             redditPlayerId,
         );
-        if (!peeked.guestEntry && !peeked.guestPb) continue;
-        hasGuestEvidence = true;
+        if (
+            !peeked.guestEntry
+            && !peeked.guestPb
+            && !peeked.redditEntry
+            && !peeked.redditPb
+        ) continue;
+        hasGuestEvidence ||= Boolean(peeked.guestEntry || peeked.guestPb);
 
         const locks = await acquireDailyMergeLocks(
             challenge.id,
@@ -705,22 +767,34 @@ export async function mergeGuestDailyProgress({
                 guestPlayerId,
                 redditPlayerId,
             );
-            if (!guestEntry && !guestPb) continue;
+            if (!guestEntry && !guestPb && !replace) continue;
 
-            const guestWinsLeaderboard = Boolean(
-                guestEntry
-                && (!redditEntry || guestEntry.bestTimeMs < redditEntry.bestTimeMs),
-            );
-            const guestCanSupplyWinningPb = Boolean(
-                guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
-            );
-            const entryToWrite = guestWinsLeaderboard
-                ? { ...guestEntry!, playerId: redditPlayerId }
-                : (redditEntry && Number(redditRankedScore) !== redditEntry.bestTimeMs
-                    ? redditEntry
-                    : null);
+            const guestWinsLeaderboard = replace
+                ? Boolean(guestEntry)
+                : Boolean(
+                    guestEntry
+                    && (!redditEntry || guestEntry.bestTimeMs < redditEntry.bestTimeMs),
+                );
+            const guestCanSupplyWinningPb = replace
+                ? Boolean(guestPb)
+                : Boolean(guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs));
+            const entryToWrite = replace && !guestEntry && guestPb
+                ? {
+                    playerId: redditPlayerId,
+                    trackKey: challenge.trackKey,
+                    bestTimeMs: guestPb.bestTimeMs,
+                    updatedAt: guestPb.updatedAt,
+                    completedLaps: challenge.objectiveParams.lapCount,
+                    checkpointTimesSec: guestPb.checkpointTimesSec,
+                    validationMethod: 'strict-replay' as const,
+                }
+                : guestWinsLeaderboard
+                    ? { ...guestEntry!, playerId: redditPlayerId }
+                    : (!replace && redditEntry && Number(redditRankedScore) !== redditEntry.bestTimeMs
+                        ? redditEntry
+                        : null);
 
-            if (entryToWrite) {
+            if (entryToWrite || replace) {
                 const accountLock = dailyMergeLockForPlayer(
                     locks,
                     challenge.id,
@@ -733,7 +807,16 @@ export async function mergeGuestDailyProgress({
                 if (!transaction) {
                     throw new Error('Daily guest merge lost the Reddit submission lock.');
                 }
-                await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
+                if (entryToWrite) {
+                    await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
+                } else {
+                    await transaction.hDel(competition.entryHashKey, [redditPlayerId]);
+                    await transaction.zRem(competition.leaderboardKey, [redditPlayerId]);
+                    await transaction.incrBy(competition.standingsRevisionKey, 1);
+                }
+                if (replace && !guestPb) {
+                    await transaction.hDel(competition.pbHashKey, [dailyPlayerField(redditPlayerId)]);
+                }
                 const results = await transaction.exec();
                 if (!Array.isArray(results) || results.length === 0) {
                     throw new Error('Daily leaderboard copy was interrupted.');
@@ -790,6 +873,296 @@ export async function mergeGuestDailyProgress({
         merged: mergedChallengeIds.length > 0,
         mergedChallengeIds,
     };
+}
+
+export async function discardGuestDailyProgress({
+    guestPlayerId,
+}: {
+    guestPlayerId: string;
+}): Promise<boolean> {
+    if (!guestPlayerId.startsWith('guest:')) return false;
+    const playlist = await getServerDailyGpPlaylist();
+    let discarded = false;
+    for (const challenge of playlist) {
+        const competition = toDailyCompetition(challenge);
+        const track = TRACKS[challenge.trackKey];
+        if (!track) continue;
+        const state = await readDailyMergeState(competition, track, guestPlayerId, guestPlayerId);
+        if (!state.guestEntry && !state.guestPb) continue;
+        discarded = true;
+        const lock = await acquireRedisLock(
+            createSubmissionLockKey(challenge.id, guestPlayerId),
+            DAILY_GP_SUBMISSION_LOCK_TTL_MS,
+            redis,
+        );
+        if (!lock) throw new Error('Daily guest discard is already in progress.');
+        try {
+            const transaction = await beginOwnedRedisLockTransaction(lock, redis);
+            if (!transaction) throw new Error('Daily guest discard lock was lost.');
+            await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
+            await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
+            await transaction.hDel(competition.pbHashKey, [dailyPlayerField(guestPlayerId)]);
+            await transaction.incrBy(competition.standingsRevisionKey, 1);
+            const results = await transaction.exec();
+            if (!Array.isArray(results) || results.length === 0) {
+                throw new Error('Daily guest discard was interrupted.');
+            }
+        } finally {
+            await releaseSubmissionLock(lock);
+        }
+    }
+    return discarded;
+}
+
+/** Days this identity has a standing or a PB on. Every day is an independent key space, so they are read as one batch. */
+async function countDailyProgressResults(
+    playerId: string,
+    playlist: DailyGpChallenge[],
+): Promise<number> {
+    const perChallenge = await Promise.all(playlist.map(async (challenge) => {
+        const track = TRACKS[challenge.trackKey];
+        if (!track) return false;
+        const competition = toDailyCompetition(challenge);
+        const [entry, pb] = await Promise.all([
+            readEntryByPlayerId(competition, playerId),
+            getPlayerTrackPbRecord({ playerId, competition, track }),
+        ]);
+        return Boolean(entry || pb);
+    }));
+    return perChallenge.filter(Boolean).length;
+}
+
+/**
+ * Progress evidence that costs three reads instead of a per-day walk of the Daily playlist.
+ * Every accepted Daily, Campaign and Head to Head run writes a race-completed unlock event that
+ * never expires, so an empty unlock record is proof no run was ever stored under this identity.
+ * The profile flag is Daily-only and outlives the 7-day playlist, so it says whether that progress
+ * includes Daily runs without pricing in one read per day.
+ */
+async function readProgressEvidence(playerId: string) {
+    const [campaign, unlocks, profile] = await Promise.all([
+        getCampaignProgressForSelection(playerId),
+        hasCarUnlockProgress(playerId),
+        readPlayerProfile(playerId),
+    ]);
+    const campaignResults = Object.keys(campaign.resultsByRaceId).length;
+    return {
+        campaignResults,
+        hasDailyResults: Boolean(profile?.hasAnyData),
+        unlocks,
+        hasProgress: Boolean(
+            campaignResults
+            || campaign.startedAt
+            || unlocks
+            || profile?.hasAnyData,
+        ),
+    };
+}
+
+function toProgressSummary(evidence: Awaited<ReturnType<typeof readProgressEvidence>>) {
+    return {
+        hasDailyResults: evidence.hasDailyResults,
+        campaignResults: evidence.campaignResults,
+        unlocks: evidence.unlocks,
+    };
+}
+
+export async function getGuestProgressSelection({
+    guestPlayerId,
+    redditPlayerId,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+}): Promise<GuestProgressSelection> {
+    const key = guestProgressSelectionKey(guestPlayerId, redditPlayerId);
+    const existing = await redis.get(key);
+    if (existing) {
+        try {
+            const record = JSON.parse(existing) as GuestProgressSelectionRecord;
+            if (record.status === 'completed') {
+                return {
+                    required: false,
+                    guestHasProgress: false,
+                    accountHasProgress: true,
+                    guestSummary: { hasDailyResults: false, campaignResults: 0, unlocks: false },
+                    accountSummary: { hasDailyResults: false, campaignResults: 0, unlocks: false },
+                    choice: record.choice,
+                };
+            }
+        } catch {
+            // A malformed record is treated as unresolved and is safely replaced by a new choice.
+        }
+    }
+    const [guestEvidence, accountEvidence] = await Promise.all([
+        readProgressEvidence(guestPlayerId),
+        readProgressEvidence(redditPlayerId),
+    ]);
+    // Cheap evidence can only understate the guest, and understating it retires an identity that still
+    // owns runs, so a guest that looks empty is confirmed against the playlist before that can happen.
+    // The account is never scanned: it is not the identity at risk, and its Daily state is display only.
+    const guestHasProgress = guestEvidence.hasProgress
+        || await countDailyProgressResults(
+            guestPlayerId,
+            await getServerDailyGpPlaylist(),
+        ) > 0;
+    const guestSummary = {
+        ...toProgressSummary(guestEvidence),
+        hasDailyResults: guestEvidence.hasDailyResults || (guestHasProgress && !guestEvidence.hasProgress),
+    };
+    const accountSummary = toProgressSummary(accountEvidence);
+    if (guestHasProgress) {
+        await redis.set(guestProgressSelectionPendingKey(guestPlayerId), '1', {
+            expiration: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        });
+    }
+    return {
+        required: guestHasProgress,
+        guestHasProgress,
+        accountHasProgress: accountEvidence.hasProgress,
+        guestSummary,
+        accountSummary,
+    };
+}
+
+export async function selectGuestProgress({
+    guestPlayerId,
+    redditPlayerId,
+    choice,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+    choice: unknown;
+}): Promise<{ status: 'completed'; choice: 'guest' | 'account' }> {
+    if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
+        throw new Error('Guest progress selection requires a guest and Reddit identity.');
+    }
+    if (choice !== 'guest' && choice !== 'account') {
+        throw new Error('Guest progress selection is invalid.');
+    }
+    const key = guestProgressSelectionKey(guestPlayerId, redditPlayerId);
+    const currentRaw = await redis.get(key);
+    let currentRecord: GuestProgressSelectionRecord | null = null;
+    if (currentRaw) {
+        try {
+            currentRecord = JSON.parse(currentRaw) as GuestProgressSelectionRecord;
+            if (currentRecord.choice !== choice) {
+                const conflict = new Error('A different guest progress choice was already made.');
+                (conflict as Error & { statusCode?: number }).statusCode = 409;
+                throw conflict;
+            }
+            if (currentRecord.status === 'completed') return { status: 'completed', choice };
+        } catch (error) {
+            if ((error as Error & { statusCode?: number }).statusCode === 409) throw error;
+        }
+    }
+    const lock = await acquireRedisLock(
+        guestProgressSelectionLockKey(guestPlayerId, redditPlayerId),
+        60_000,
+        redis,
+    );
+    if (!lock) {
+        const busy = new Error('Guest progress selection is already in progress.');
+        (busy as Error & { statusCode?: number }).statusCode = 503;
+        throw busy;
+    }
+    try {
+        const record: GuestProgressSelectionRecord = {
+            guestPlayerId,
+            redditPlayerId,
+            choice,
+            status: 'pending',
+            updatedAt: new Date().toISOString(),
+            completedDomains: Array.isArray(currentRecord?.completedDomains)
+                ? currentRecord.completedDomains
+                : [],
+        };
+        const saveRecord = async (next: GuestProgressSelectionRecord) => {
+            await redis.set(key, JSON.stringify(next), {
+                expiration: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            });
+        };
+        await saveRecord(record);
+        await redis.set(guestProgressSelectionPendingKey(guestPlayerId), '1', {
+            expiration: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        });
+        if (choice === 'guest') {
+            if (!record.completedDomains?.includes('campaign')) {
+                await mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId, replace: true });
+                record.completedDomains = [...record.completedDomains, 'campaign'];
+                await saveRecord(record);
+            }
+            if (!record.completedDomains?.includes('daily')) {
+                await mergeGuestDailyProgress({ guestPlayerId, redditPlayerId, replace: true });
+                record.completedDomains = [...record.completedDomains, 'daily'];
+                await saveRecord(record);
+            }
+            if (!record.completedDomains?.includes('unlocks')) {
+                await mergeGuestCarUnlockProgress({ guestPlayerId, redditPlayerId, replace: true });
+                record.completedDomains = [...record.completedDomains, 'unlocks'];
+                await saveRecord(record);
+            }
+        } else {
+            if (!record.completedDomains?.includes('campaign')) {
+                await discardGuestCampaignProgress({ guestPlayerId });
+                record.completedDomains = [...record.completedDomains, 'campaign'];
+                await saveRecord(record);
+            }
+            if (!record.completedDomains?.includes('daily')) {
+                await discardGuestDailyProgress({ guestPlayerId });
+                record.completedDomains = [...record.completedDomains, 'daily'];
+                await saveRecord(record);
+            }
+            if (!record.completedDomains?.includes('unlocks')) {
+                await discardGuestCarUnlockProgress({ guestPlayerId, redditPlayerId });
+                record.completedDomains = [...record.completedDomains, 'unlocks'];
+                await saveRecord(record);
+            }
+        }
+        await saveRecord({ ...record, status: 'completed', updatedAt: new Date().toISOString() });
+        await redis.del(guestProgressSelectionPendingKey(guestPlayerId));
+        return { status: 'completed', choice };
+    } catch (error) {
+        console.error('Guest progress selection failed:', error);
+        throw error;
+    } finally {
+        await releaseRedisLock(lock, redis);
+    }
+}
+
+export async function selectServerGuestProgress({
+    playerId,
+    redditUsername,
+    guestToken,
+    choice,
+}: {
+    playerId?: unknown;
+    redditUsername?: unknown;
+    guestToken?: unknown;
+    choice?: unknown;
+}): Promise<PlayerBootstrapPayload> {
+    const safeUsername = sanitizeRedditUsername(redditUsername);
+    const verifiedGuestPlayerId = await verifyGuestPlayerToken(guestToken);
+    if (!safeUsername || !verifiedGuestPlayerId) {
+        const error = new Error('Guest progress selection requires a signed-in Reddit account and valid guest token.');
+        (error as Error & { statusCode?: number }).statusCode = 401;
+        throw error;
+    }
+    const normalizedPlayerId = typeof playerId === 'string' ? playerId.trim() : '';
+    if (normalizedPlayerId && normalizedPlayerId !== verifiedGuestPlayerId) {
+        const error = new Error('Guest progress selection identity changed.');
+        (error as Error & { statusCode?: number }).statusCode = 401;
+        throw error;
+    }
+    await selectGuestProgress({
+        guestPlayerId: `guest:${verifiedGuestPlayerId}`,
+        redditPlayerId: `reddit:${safeUsername.toLowerCase()}`,
+        choice,
+    });
+    return getServerPlayerBootstrap({
+        playerId: normalizedPlayerId || verifiedGuestPlayerId,
+        redditUsername: safeUsername,
+        guestToken,
+    });
 }
 
 async function readOrSeedTrackPersonalBest({
@@ -860,7 +1233,6 @@ export async function getServerPlayerTrackPbSummaries({
     if (!identity.canonicalPlayerId) {
         return { playerId: null, trackPbs: {} };
     }
-
     const requestedIds = Array.isArray(challengeIds)
         ? [...new Set(challengeIds.filter((value): value is string => (
             typeof value === 'string' && Boolean(value)
@@ -991,6 +1363,7 @@ export async function getServerPlayerBootstrap({
     let previousProfile: DailyGpPlayerProfile | null = null;
     let profile: DailyGpPlayerProfile | null = null;
     let retireGuestIdentity = identity.guestStatus === 'guest_identity_retired';
+    let progressSelection: GuestProgressSelection | null = null;
 
     // Claiming or adopting a retired guest id would resurrect a credential whose progress already moved to an account.
     const retiredGuestId = !identity.canonicalPlayerId
@@ -1045,32 +1418,40 @@ export async function getServerPlayerBootstrap({
 
     if (identity.canonicalPlayerId.startsWith('reddit:')) {
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
-        let guestPromotionComplete = true;
         if (guestPlayerId) {
-            try {
-                await Promise.all([
-                    mergeGuestCampaignProgress({
-                        guestPlayerId: `guest:${guestPlayerId}`,
-                        redditPlayerId: identity.canonicalPlayerId,
-                    }),
-                    mergeGuestCarUnlockProgress({
-                        guestPlayerId: `guest:${guestPlayerId}`,
-                        redditPlayerId: identity.canonicalPlayerId,
-                    }),
-                    mergeGuestDailyProgress({
-                        guestPlayerId: `guest:${guestPlayerId}`,
-                        redditPlayerId: identity.canonicalPlayerId,
-                    }),
-                ]);
-            } catch (error) {
-                // Campaign's bootstrap claims the same guest progress and the merge refuses to run twice; losing that race must not cost this bootstrap.
-                guestPromotionComplete = false;
-                console.error('Player guest progress claim failed:', error);
+            const promotedTo = await readGuestPromotionTarget(`guest:${guestPlayerId}`);
+            if (promotedTo) {
+                retireGuestIdentity = true;
+            } else {
+                progressSelection = await getGuestProgressSelection({
+                    guestPlayerId: `guest:${guestPlayerId}`,
+                    redditPlayerId: identity.canonicalPlayerId,
+                });
+                if (!progressSelection.required) {
+                    if (progressSelection.guestHasProgress === false && !progressSelection.choice) {
+                        await retireEmptyGuestIdentity({
+                            guestPlayerId: `guest:${guestPlayerId}`,
+                            redditPlayerId: identity.canonicalPlayerId,
+                        });
+                    }
+                    retireGuestIdentity = true;
+                } else {
+                    return {
+                        playerId: identity.canonicalPlayerId,
+                        guestToken: typeof guestToken === 'string' ? guestToken.trim() : null,
+                        redditUsername: safeRequestRedditUsername,
+                        leaderboardIdentity: 'reddit',
+                        playerPreferences: null,
+                        hasAnyData: false,
+                        isReturningPlayer: false,
+                        firstSeenAt: null,
+                        lastSeenAt: null,
+                        carUnlocks: null,
+                        retireGuestIdentity: false,
+                        progressSelection,
+                    };
+                }
             }
-        }
-        retireGuestIdentity ||= Boolean(guestPlayerId && guestPromotionComplete);
-        if (guestPlayerId && !guestPromotionComplete) {
-            identity.guestToken = typeof guestToken === 'string' ? guestToken.trim() : null;
         }
     }
 
@@ -1124,6 +1505,7 @@ export async function getServerPlayerBootstrap({
         lastSeenAt: profile.lastSeenAt,
         carUnlocks,
         retireGuestIdentity,
+        ...(progressSelection?.required ? { progressSelection } : {}),
     };
 }
 
@@ -1357,6 +1739,16 @@ export async function submitServerDailyGpRun({
             body: {
                 accepted: false,
                 error: 'Invalid Mini Racer submission.',
+            },
+        };
+    }
+    if (identity.guestStatus === 'guest_promotion_pending') {
+        return {
+            status: 409,
+            body: {
+                accepted: false,
+                error: 'Choose which progress to keep before submitting a ranked Daily result.',
+                reason: 'progress_selection_required',
             },
         };
     }

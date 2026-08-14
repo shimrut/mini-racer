@@ -820,6 +820,27 @@ export function getCachedDailyChallengePlaylist() {
     return getUsableCachedDailyPlaylist();
 }
 
+export function clearDailyChallengeClientCaches() {
+    dailyPlaylistCache = { challenges: null, expiresAt: 0, promise: null };
+    dailySnapshotCache.clear();
+    dailySnapshotInflight.clear();
+    dailyPlaylistStorageHydrated = false;
+    dailySnapshotStorageHydrated = false;
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    for (const key of [
+        ACTIVE_DAILY_CACHE_KEY,
+        DAILY_PLAYLIST_CACHE_KEY,
+        DAILY_SNAPSHOT_CACHE_KEY,
+        DAILY_START_OVERRIDE_KEY,
+    ]) {
+        try {
+            window.localStorage.removeItem(key);
+        } catch (error) {
+            console.error('Error clearing Daily client cache:', error);
+        }
+    }
+}
+
 async function loadDailyChallengeSnapshot({
     challengeId,
     limit = DEFAULT_DAILY_LIMIT,

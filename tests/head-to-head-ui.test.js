@@ -97,6 +97,121 @@ describe('Head to Head lobby and finish', () => {
         expect(storedWins.size).toBe(0);
     });
 
+    it.each([
+        ['a missing replay', { getPayload: vi.fn(() => null) }],
+        ['a stalled run', null],
+    ])('settles a losing run without a replay validation despite %s', async (_label, replayStub) => {
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                challengerUsername: 'shimroot',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            rankedSubmissionBlockedReason: replayStub
+                ? null
+                : 'Leaderboard rank disabled because the run had severe frame stalls.',
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: replayStub
+                ?? { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero: vi.fn(),
+                setChallengeWinActions: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            expect.objectContaining({
+                challengeConfirmPhase: 'lost',
+                challengeConfirmError: null,
+                challengeVerdict: { opponentName: 'shimroot', deltaSec: 0.4 },
+            }),
+            expect.anything(),
+        );
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
+        expect(context.modal.setChallengeWinActions).not.toHaveBeenCalled();
+    });
+
+    it('asks the server to decide when the finish cannot be compared locally', async () => {
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: null,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: true,
+            body: { accepted: true, outcome: 'lost', differenceMs: 400 },
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+
+        await vi.waitFor(() => {
+            expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
+        });
+        expect(context.modal.updateChallengeFinishHero).toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'lost' }),
+        );
+    });
+
+    it('sends the finish time it claims alongside the replay', async () => {
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero: vi.fn(),
+                setChallengeWinActions: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            showDailyLobby: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: true,
+            body: { accepted: true, outcome: 'won', differenceMs: -500 },
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.5 });
+
+        await vi.waitFor(() => {
+            expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledWith(
+                expect.objectContaining({ challengeId: 'challenge-1', bestTimeMs: 7_500 }),
+            );
+        });
+    });
+
     it('does not strand a Head to Head finish when confirmation fails', async () => {
         const modalMsg = { style: {}, textContent: '' };
         const updateChallengeFinishHero = vi.fn();
@@ -125,7 +240,7 @@ describe('Head to Head lobby and finish', () => {
 
         await headToHeadEngineMethods.handleHeadToHeadWin.call(
             context,
-            { lapTime: 8.25 },
+            { lapTime: 7.75 },
         );
 
         expect(context.modal.showModal).toHaveBeenCalledTimes(1);
@@ -133,7 +248,7 @@ describe('Head to Head lobby and finish', () => {
             'Challenge complete',
             null,
             expect.objectContaining({
-                lapTime: 8.25,
+                lapTime: 7.75,
                 lapMedal: null,
                 challengeFinish: true,
                 challengeConfirmPhase: 'pending',
@@ -159,7 +274,7 @@ describe('Head to Head lobby and finish', () => {
         expect(context.modal.showModal).toHaveBeenCalledTimes(1);
     });
 
-    it('patches medal hero in place: pending then won/lost/tie; Brag only after verified win', async () => {
+    it('patches the hero in place for a claimed win and settles lost/tie without submitting', async () => {
         const modalMsg = { style: {}, textContent: '' };
         const baseContext = {
             activeHeadToHead: {
@@ -176,10 +291,12 @@ describe('Head to Head lobby and finish', () => {
             settings: { openSettings: vi.fn() },
         };
 
-        const pendingLap = expect.objectContaining({
+        const settledLap = (phase, deltaSec) => expect.objectContaining({
             lapMedal: null,
             challengeFinish: true,
-            challengeConfirmPhase: 'pending',
+            challengeConfirmPhase: phase,
+            challengeConfirmStatus: null,
+            challengeVerdict: { opponentName: 'shimroot', deltaSec },
             showGlobalLeaderboard: false,
         });
         const pendingOptions = expect.objectContaining({
@@ -218,13 +335,16 @@ describe('Head to Head lobby and finish', () => {
             'Challenge complete',
             null,
             expect.objectContaining({
-                lapMedal: 'challenge',
+                lapMedal: null,
                 challengeFinish: true,
-                challengeConfirmPhase: 'won',
+                challengeConfirmPhase: 'pending',
                 challengeVerdict: { opponentName: 'shimroot', deltaSec: -0.5 },
                 showGlobalLeaderboard: false,
             }),
             pendingOptions,
+        );
+        expect(winUpdateHero).toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'pending' }),
         );
         await vi.waitFor(() => {
             expect(winUpdateHero).toHaveBeenCalledWith({
@@ -232,22 +352,12 @@ describe('Head to Head lobby and finish', () => {
                 verdict: { opponentName: 'shimroot', deltaSec: -0.5 },
             });
         });
-        expect(winUpdateHero).not.toHaveBeenCalledWith(
-            expect.objectContaining({ phase: 'pending' }),
-        );
         expect(winShowModal).toHaveBeenCalledTimes(1);
+
+        headToHeadServiceMocks.submitHeadToHeadRun.mockReset();
 
         const lossShowModal = vi.fn();
         const lossUpdateHero = vi.fn();
-        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
-            ok: true,
-            body: {
-                accepted: true,
-                outcome: 'lost',
-                resultLabel: 'Challenge Lost',
-                differenceMs: 400,
-            },
-        });
         await headToHeadEngineMethods.handleHeadToHeadWin.call(
             {
                 ...baseContext,
@@ -263,28 +373,13 @@ describe('Head to Head lobby and finish', () => {
         expect(lossShowModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
-            pendingLap,
+            settledLap('lost', 0.4),
             pendingOptions,
         );
-        await vi.waitFor(() => {
-            expect(lossUpdateHero).toHaveBeenCalledWith({
-                phase: 'lost',
-                verdict: { opponentName: 'shimroot', deltaSec: 0.4 },
-            });
-        });
-        expect(lossShowModal).toHaveBeenCalledTimes(1);
+        expect(lossUpdateHero).not.toHaveBeenCalled();
 
         const tieShowModal = vi.fn();
         const tieUpdateHero = vi.fn();
-        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
-            ok: true,
-            body: {
-                accepted: true,
-                outcome: 'tie',
-                resultLabel: 'Tie',
-                differenceMs: 0,
-            },
-        });
         await headToHeadEngineMethods.handleHeadToHeadWin.call(
             {
                 ...baseContext,
@@ -297,13 +392,15 @@ describe('Head to Head lobby and finish', () => {
             { lapTime: 8 },
         );
         expect(tieShowModal).toHaveBeenCalledTimes(1);
-        await vi.waitFor(() => {
-            expect(tieUpdateHero).toHaveBeenCalledWith({
-                phase: 'tie',
-                verdict: { opponentName: 'shimroot', deltaSec: 0 },
-            });
-        });
-        expect(tieShowModal).toHaveBeenCalledTimes(1);
+        expect(tieShowModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            settledLap('tie', 0),
+            pendingOptions,
+        );
+        expect(tieUpdateHero).not.toHaveBeenCalled();
+
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
     });
 
     it('swaps the placeholder share request for the accept token a verified win returns', async () => {
@@ -378,17 +475,17 @@ describe('Head to Head lobby and finish', () => {
             ok: true,
             body: {
                 accepted: true,
-                outcome: 'lost',
-                resultLabel: 'Challenge Lost',
-                differenceMs: 400,
+                outcome: 'won',
+                resultLabel: 'Challenge Won',
+                differenceMs: -500,
             },
         });
 
-        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.5 });
 
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledWith(
-                expect.objectContaining({ phase: 'lost' }),
+                expect.objectContaining({ phase: 'won' }),
             );
         });
         expect(updateChallengeFinishHero).not.toHaveBeenCalledWith(
@@ -439,7 +536,7 @@ describe('Head to Head lobby and finish', () => {
                 campaignAction: expect.any(Function),
             });
         });
-        expect(setChallengeWinActions).toHaveBeenCalledTimes(2);
+        expect(setChallengeWinActions).toHaveBeenCalledTimes(1);
         const { dailyAction, campaignAction } = setChallengeWinActions.mock.calls.at(-1)[0];
         dailyAction();
         campaignAction();
@@ -489,7 +586,7 @@ describe('Head to Head lobby and finish', () => {
             },
         });
 
-        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.9 });
         context.status = 'racing';
         await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.4 });
         await vi.waitFor(() => {
@@ -521,11 +618,12 @@ describe('Head to Head lobby and finish', () => {
     });
 
     it.each([
-        ['lost', { accepted: true, outcome: 'lost', differenceMs: 400 }],
-        ['tie', { accepted: true, outcome: 'tie', differenceMs: 0 }],
-        ['unverified', { accepted: false, error: 'This run could not be verified.' }],
-    ])('keeps the retry path on a %s finish', async (_label, body) => {
+        ['lost', 8.4, 'lost', null],
+        ['tie', 8, 'tie', null],
+        ['unverified', 7.5, 'error', { accepted: false, error: 'This run could not be verified.' }],
+    ])('keeps the retry path on a %s finish', async (_label, lapTime, expectedPhase, body) => {
         const setChallengeWinActions = vi.fn();
+        const clearChallengeWinActions = vi.fn();
         const updateChallengeFinishHero = vi.fn();
         const context = {
             activeHeadToHead: {
@@ -541,6 +639,7 @@ describe('Head to Head lobby and finish', () => {
                 showModal: vi.fn(),
                 updateChallengeFinishHero,
                 setChallengeWinActions,
+                clearChallengeWinActions,
             },
             restartActiveRace: vi.fn(),
             loadChallengeLobby: vi.fn(),
@@ -549,20 +648,28 @@ describe('Head to Head lobby and finish', () => {
             showCampaignLobby: vi.fn(),
             settings: { openSettings: vi.fn() },
         };
-        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body });
+        if (body) headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body });
 
-        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime });
 
-        await vi.waitFor(() => {
-            expect(updateChallengeFinishHero).toHaveBeenCalledWith(
-                expect.objectContaining({ phase: expect.stringMatching(/lost|tie|error/) }),
-            );
-        });
-        expect(setChallengeWinActions).not.toHaveBeenCalled();
+        if (body) {
+            await vi.waitFor(() => {
+                expect(updateChallengeFinishHero).toHaveBeenCalledWith(
+                    expect.objectContaining({ phase: expectedPhase }),
+                );
+            });
+            expect(setChallengeWinActions).not.toHaveBeenCalled();
+        } else {
+            expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
+            expect(updateChallengeFinishHero).not.toHaveBeenCalled();
+            expect(setChallengeWinActions).not.toHaveBeenCalled();
+        }
         expect(context.modal.showModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
-            expect.anything(),
+            body
+                ? expect.anything()
+                : expect.objectContaining({ challengeConfirmPhase: expectedPhase }),
             expect.objectContaining({ restartAction: expect.any(Function) }),
         );
     });

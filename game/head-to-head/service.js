@@ -87,11 +87,11 @@ export async function getHeadToHead(challengeId) {
     return requestJson(url.toString());
 }
 
-export async function submitHeadToHeadRun({ challengeId, replay }) {
+export async function submitHeadToHeadRun({ challengeId, replay, bestTimeMs }) {
     return requestJson(API_ROUTES.headToHeadSubmitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(challengePostIdentityBody({ challengeId, replay })),
+        body: JSON.stringify(challengePostIdentityBody({ challengeId, replay, bestTimeMs })),
     });
 }
 

@@ -11,7 +11,9 @@ import {
 } from '../game/track/client-registry.js';
 import { loadModeRuntime, clearModeRuntimeCacheForTests, createModeRuntimeController } from '../game/modes/runtime-loader.js';
 import {
-    selectModeCriticalStartupPromises,
+    INITIAL_LOADER_BUDGET_MS,
+    INITIAL_LOADER_MAX_MS,
+    runInitialStartupPlan,
     selectModeSecondaryStartupTasks,
 } from '../game/startup/coordinator.js';
 
@@ -19,10 +21,11 @@ describe('mode-priority startup', () => {
     it('starts mode loading after the entry module can finish evaluating', () => {
         const entrySource = readFileSync(new URL('../game/index.js', import.meta.url), 'utf8');
 
-        expect(entrySource).toContain('async function startGame()');
-        expect(entrySource).toContain('void startGame().catch(');
+        expect(entrySource).toContain('function startGame()');
+        expect(entrySource).toContain('return new RealTimeRacer({');
         expect(entrySource).not.toMatch(/^await ensureModeRuntime/m);
         expect(entrySource).not.toMatch(/^const initialTrack = await loadClientTrack/m);
+        expect(entrySource).not.toContain('await modeRuntimeController.ensure(launchTarget.mode)');
     });
 
     it('builds the initial track canvas before resolving track readiness', () => {
@@ -36,10 +39,11 @@ describe('mode-priority startup', () => {
             'utf8',
         );
 
-        expect(engineSource).toContain(
-            'this.trackReadyPromise = this.loadTrack(DEFAULT_TRACK_KEY, {',
-        );
-        expect(engineSource).not.toContain('this.trackReadyPromise = Promise.resolve();');
+        expect(engineSource).toContain('this.trackReadyPromise = Promise.resolve(null);');
+        expect(engineSource).toContain('loadDailyTrack: (challenge) => {');
+        expect(engineSource).toContain('if (!challenge?.trackKey) throw new Error(');
+        expect(engineSource).toContain('loadCampaignTrack: (launch) => {');
+        expect(engineSource).not.toContain('this.loadTrack(DEFAULT_TRACK_KEY, {\n      loadPlayerProgress: false');
         expect(engineSource).toContain('from "./head-to-head/service.js"');
         expect(engineSource).not.toContain(
             'invokeModeMethod("challenge", "previewHeadToHead"',
@@ -88,41 +92,169 @@ describe('mode-priority startup', () => {
         }
     });
 
-    it('keeps each mode gate focused on its race-ready dependencies', () => {
-        const values = {
-            playerHistory: Promise.resolve('profile'),
-            carAsset: Promise.resolve('car'),
-            trackReady: Promise.resolve('track'),
-            dailyChallenge: Promise.resolve('daily'),
-            personalBestGhost: Promise.resolve('ghost'),
-            campaignLaunch: Promise.resolve('campaign'),
-            challengeLobby: Promise.resolve('challenge'),
-        };
+    it.each([
+        ['daily', ['runtime:daily', 'player', 'daily', 'daily-track', 'car', 'ready:daily', 'handoff:ready']],
+        ['campaign', ['runtime:campaign', 'player', 'campaign', 'campaign-track', 'car', 'ready:campaign', 'handoff:ready']],
+        ['challenge', ['runtime:challenge', 'challenge', 'player', 'car', 'ready:challenge', 'handoff:ready']],
+    ])('runs the %s startup plan with only its ordered dependencies', async (mode, expected) => {
+        const calls = [];
+        await runInitialStartupPlan({
+            mode,
+            prepareRuntime: async (selected) => calls.push(`runtime:${selected}`),
+            loadPlayer: async () => calls.push('player'),
+            loadHomeTrack: async () => calls.push('home-track'),
+            loadDailyContract: async () => {
+                calls.push('daily');
+                return { trackKey: 'daily-track' };
+            },
+            loadDailyTrack: async () => calls.push('daily-track'),
+            loadCampaignContract: async () => {
+                calls.push('campaign');
+                return { stage: { trackKey: 'campaign-track' } };
+            },
+            loadCampaignTrack: async () => calls.push('campaign-track'),
+            loadChallenge: async () => calls.push('challenge'),
+            loadCar: async () => calls.push('car'),
+            onReady: async ({ mode: selected }) => calls.push(`ready:${selected}`),
+            onHandoff: async ({ reason }) => calls.push(`handoff:${reason}`),
+        });
+        await Promise.resolve();
 
-        expect(selectModeCriticalStartupPromises('daily', values)).toEqual([
-            values.playerHistory,
-            values.dailyChallenge,
-            values.personalBestGhost,
-            values.carAsset,
-            values.trackReady,
-        ]);
-        expect(selectModeCriticalStartupPromises('campaign', values)).toEqual([
-            values.playerHistory,
-            values.campaignLaunch,
-            values.carAsset,
-            values.trackReady,
-        ]);
-        expect(selectModeCriticalStartupPromises('challenge', values)).toEqual([
-            values.challengeLobby,
-            values.carAsset,
-            values.trackReady,
-        ]);
+        expect(calls).toEqual(expected);
+        expect(calls).not.toContain(mode === 'daily' ? 'campaign' : 'daily');
+    });
+
+    it('hands a stalled startup to the selected mode before one second', async () => {
+        vi.useFakeTimers();
+        try {
+            let finishRuntime;
+            const onHandoff = vi.fn();
+            const startup = runInitialStartupPlan({
+                mode: 'daily',
+                prepareRuntime: () => new Promise((resolve) => { finishRuntime = resolve; }),
+                onHandoff,
+            });
+
+            await vi.advanceTimersByTimeAsync(INITIAL_LOADER_BUDGET_MS - 1);
+            expect(onHandoff).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(1);
+            expect(onHandoff).toHaveBeenCalledWith({
+                mode: 'daily',
+                reason: 'budget',
+                fadeMs: expect.any(Number),
+            });
+
+            finishRuntime();
+            await startup;
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('uses the absolute navigation deadline when startup begins late', async () => {
+        vi.useFakeTimers();
+        try {
+            const onHandoff = vi.fn();
+            let finishRuntime;
+            const startedAtMs = performance.now() - 900;
+            const startup = runInitialStartupPlan({
+                mode: 'campaign',
+                startedAtMs,
+                prepareRuntime: () => new Promise((resolve) => { finishRuntime = resolve; }),
+                onHandoff,
+            });
+
+            await vi.advanceTimersByTimeAsync(0);
+            expect(onHandoff).toHaveBeenCalledWith({
+                mode: 'campaign',
+                reason: 'budget',
+                fadeMs: INITIAL_LOADER_MAX_MS - 900,
+            });
+
+            finishRuntime();
+            await startup;
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('restores a prepared Head to Head challenge after identity handoff', async () => {
+        const readyPresentation = {
+            available: true,
+            canRace: true,
+            canRetry: false,
+            challengeLoading: false,
+            trackKey: 'numberOne',
+            statusMessage: '',
+        };
+        const racer = Object.create(RealTimeRacer.prototype);
+        racer.initialChallengePresentation = readyPresentation;
+        racer.initialChallengeLobbyPromise = Promise.resolve();
+        racer.activeHeadToHead = { challengeId: 'h2h-1' };
+        racer.hasAnyData = true;
+        racer.isReturningPlayer = true;
+        racer.startOverlay = {
+            showStartOverlay: vi.fn(),
+            setInteractive: vi.fn(),
+            setReady: vi.fn(),
+        };
+        racer.lobbyUi = { showChallenge: vi.fn() };
+
+        racer.showInitialModePending('challenge');
+        expect(racer.lobbyUi.showChallenge).toHaveBeenLastCalledWith(expect.objectContaining({
+            trackKey: 'numberOne',
+            canRace: false,
+            challengeLoading: true,
+            statusMessage: 'Syncing player identity…',
+        }));
+
+        await racer.displayInitialModeReady('challenge');
+        expect(racer.lobbyUi.showChallenge).toHaveBeenLastCalledWith(expect.objectContaining({
+            trackKey: 'numberOne',
+            canRace: true,
+            challengeLoading: false,
+        }));
+        expect(racer.startOverlay.setInteractive).toHaveBeenLastCalledWith(true);
+    });
+
+    it('routes a failed direct Daily action to startup retry', () => {
+        const racer = Object.create(RealTimeRacer.prototype);
+        racer._initialStartupFailed = true;
+        racer.launchTarget = { mode: 'daily' };
+        racer.retryInitialStartup = vi.fn(() => 'retrying');
+        racer.invokeModeMethod = vi.fn();
+
+        expect(racer.handleDailyLobbyPrimaryAction()).toBe('retrying');
+        expect(racer.retryInitialStartup).toHaveBeenCalledTimes(1);
+        expect(racer.invokeModeMethod).not.toHaveBeenCalled();
+    });
+
+    it('does not hold mode readiness on a stalled cosmetic car image', async () => {
+        let resolveCar;
+        const onReady = vi.fn();
+        const startup = runInitialStartupPlan({
+            mode: 'daily',
+            prepareRuntime: vi.fn(),
+            loadPlayer: vi.fn(),
+            loadDailyContract: vi.fn(() => ({ trackKey: 'numberOne' })),
+            loadDailyTrack: vi.fn(),
+            loadCar: vi.fn(() => new Promise((resolve) => { resolveCar = resolve; })),
+            onReady,
+        });
+
+        await startup;
+        expect(onReady).toHaveBeenCalledTimes(1);
+        resolveCar();
     });
 
     it('defers the other mode runtimes until the selected lobby is ready', () => {
+        const engineSource = readFileSync(new URL('../game/engine.js', import.meta.url), 'utf8');
+
         expect(selectModeSecondaryStartupTasks('daily')).toEqual(['campaign']);
         expect(selectModeSecondaryStartupTasks('campaign')).toEqual(['daily']);
         expect(selectModeSecondaryStartupTasks('challenge')).toEqual(['daily', 'campaign']);
+        expect(engineSource.indexOf('this.startOverlay.setInteractive(true)'))
+            .toBeLessThan(engineSource.indexOf('this.loadSecondaryStartupData();'));
     });
 
     it('loads mode code independently of the selected mode', async () => {

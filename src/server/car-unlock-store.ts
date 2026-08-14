@@ -107,6 +107,13 @@ async function readEventFields(
     return client.hGetAll(playerKey(playerId));
 }
 
+export async function hasCarUnlockProgress(
+    playerId: string,
+    client: RedisClient = redis,
+): Promise<boolean> {
+    return Object.keys(await readEventFields(playerId, client)).length > 0;
+}
+
 export async function recordCompletedRace(
     playerId: string,
     client: RedisClient = redis,
@@ -181,10 +188,12 @@ export async function mergeGuestCarUnlockProgress({
     guestPlayerId,
     redditPlayerId,
     client = redis,
+    replace = false,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     client?: RedisClient;
+    replace?: boolean;
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         return false;
@@ -198,7 +207,10 @@ export async function mergeGuestCarUnlockProgress({
         const hadGuestProgress = Object.keys(fields).length > 0;
         const transaction = await beginOwnedRedisLockTransaction(lock, client);
         if (!transaction) throw new Error('Car unlock promotion lock was lost.');
-        if (hadGuestProgress) {
+        if (replace) {
+            await transaction.del(playerKey(redditPlayerId));
+            if (hadGuestProgress) await transaction.hSet(playerKey(redditPlayerId), fields);
+        } else if (hadGuestProgress) {
             await transaction.hSet(playerKey(redditPlayerId), fields);
         }
         await transaction.set(promotionKey(guestPlayerId), redditPlayerId);
@@ -208,6 +220,58 @@ export async function mergeGuestCarUnlockProgress({
             throw new Error('Car unlock promotion was interrupted.');
         }
         return hadGuestProgress;
+    } finally {
+        await releaseRedisLock(lock, client);
+    }
+}
+
+export async function discardGuestCarUnlockProgress({
+    guestPlayerId,
+    redditPlayerId,
+    client = redis,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+    client?: RedisClient;
+}): Promise<boolean> {
+    if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) return false;
+    const lock = await acquirePromotionLock(guestPlayerId, client);
+    try {
+        const hadGuestProgress = Object.keys(await client.hGetAll(playerKey(guestPlayerId))).length > 0;
+        const transaction = await beginOwnedRedisLockTransaction(lock, client);
+        if (!transaction) throw new Error('Car unlock discard lock was lost.');
+        await transaction.set(promotionKey(guestPlayerId), redditPlayerId);
+        await transaction.del(playerKey(guestPlayerId));
+        const results = await transaction.exec();
+        if (!Array.isArray(results) || results.length === 0) {
+            throw new Error('Car unlock discard was interrupted.');
+        }
+        return hadGuestProgress;
+    } finally {
+        await releaseRedisLock(lock, client);
+    }
+}
+
+export async function retireEmptyGuestIdentity({
+    guestPlayerId,
+    redditPlayerId,
+    client = redis,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+    client?: RedisClient;
+}): Promise<void> {
+    if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) return;
+    const lock = await acquirePromotionLock(guestPlayerId, client);
+    try {
+        if (await client.get(promotionKey(guestPlayerId))) return;
+        const transaction = await beginOwnedRedisLockTransaction(lock, client);
+        if (!transaction) throw new Error('Empty guest retirement lock was lost.');
+        await transaction.set(promotionKey(guestPlayerId), redditPlayerId);
+        const results = await transaction.exec();
+        if (!Array.isArray(results) || results.length === 0) {
+            throw new Error('Empty guest retirement was interrupted.');
+        }
     } finally {
         await releaseRedisLock(lock, client);
     }

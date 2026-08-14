@@ -19,7 +19,6 @@
     "stryker.config.mjs",
     "tests/",
     "tools/*",
-    "!tools/bust-client-asset-cache.js",
     "!tools/generate-player-car-assets.js",
     "!tools/generate-share-images.js",
     "vite.mapmaker.config.js",

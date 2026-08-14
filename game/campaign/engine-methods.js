@@ -17,7 +17,10 @@ import {
 } from './service.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
 import { buildCampaignCarouselCards } from './carousel-model.js';
-import { deferLobbyWorkUntilAfterPaint } from '../lobby/deferred-work.js';
+import {
+    deferLobbyWorkUntilAfterPaint,
+    isLobbyPaintEligible,
+} from '../lobby/deferred-work.js';
 import {
     clearCampaignVerification,
     createVerificationSnapshot,
@@ -459,14 +462,13 @@ export const campaignEngineMethods = {
         return promise;
     },
 
-    async prepareInitialCampaignLaunch() {
-        let bootstrap = await this.ensureCampaignBootstrap({ forceRefresh: true });
-        if (
-            bootstrap?.authoritative === false
-            && this.playerHistoryPromise
-        ) {
-            await this.playerHistoryPromise;
-            bootstrap = await this.ensureCampaignBootstrap({ forceRefresh: true });
+    async prepareInitialCampaignLaunch({
+        prepareTrack = true,
+        loadPersonalBest = true,
+    } = {}) {
+        const bootstrap = await this.ensureCampaignBootstrap({ forceRefresh: true });
+        if (bootstrap?.authoritative === false || bootstrap?.availability === 'unavailable') {
+            throw new Error('Campaign progress is not authoritative.');
         }
         const lobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
         const stage = getDefaultCampaignLobbyStage(lobbyState);
@@ -475,12 +477,22 @@ export const campaignEngineMethods = {
         this.activeRaceMode = 'campaign';
         this.activeCampaignStage = stage;
         this.selectedCampaignStageId = stage.raceId;
-        await this.loadTrack(stage.trackKey, {
-            loadPlayerProgress: false,
-            preserveDailyChallengeContext: true,
-            showStartOverlayOnReset: false,
-        });
+        if (prepareTrack) {
+            await this.loadTrack(stage.trackKey, {
+                loadPlayerProgress: false,
+                preserveDailyChallengeContext: true,
+                showStartOverlayOnReset: false,
+            });
+        }
 
+        const personalBest = loadPersonalBest
+            ? await this.loadInitialCampaignPersonalBest(stage)
+            : null;
+        return { stage, personalBest };
+    },
+
+    async loadInitialCampaignPersonalBest(stage = this.activeCampaignStage) {
+        if (!stage?.raceId) return null;
         this.campaignPbGhostByRaceId ??= Object.create(null);
         let response = null;
         try {
@@ -491,7 +503,7 @@ export const campaignEngineMethods = {
         const personalBest = response?.ok ? response.body?.personalBest : null;
         this.campaignPbGhostByRaceId[stage.raceId] = personalBest || null;
         if (personalBest) this.applyCampaignPersonalBest(stage, personalBest);
-        return { stage, personalBest };
+        return personalBest;
     },
 
     async loadCampaignLobby({ show = true } = {}) {
@@ -538,7 +550,7 @@ export const campaignEngineMethods = {
     },
 
     paintCampaignCarousel() {
-        if (!this.campaignCarousel) return;
+        if (!this.campaignCarousel || !isLobbyPaintEligible(this, 'campaign')) return;
         const cards = buildCampaignCarouselCards(this.campaignLobbyState);
         this.campaignCarousel.render(cards, {
             selectedChallengeId: this.selectedCampaignStageId
