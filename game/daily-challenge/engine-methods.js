@@ -36,6 +36,7 @@ import {
 } from "./service.js";
 import { buildDailyCarouselCards } from "./carousel-model.js";
 import { createVerificationSnapshot, getDailyChallengeVerificationEntry, getVerificationSnapshotFromQueueEntry } from "../scoreboard/verification-queue.js";
+import { runAfterPlayerIdentityReady } from "../player/identity-recovery.js";
 import { getMedalForRaceTime } from "../medals/medal-timing.js";
 import {
   readTrackLastLapMedal,
@@ -1359,19 +1360,19 @@ export const dailyChallengeEngineMethods = {
     const runSubmissionBlockedReason = this.rankedSubmissionBlockedReason || null;
     const replayPayload = this.scoreboardReplay.getPayload(requiredLaps);
     let submissionError = runSubmissionBlockedReason;
-    let didEnqueue = true;
+    const previousBestSnapshot = isDailyBest && Number.isFinite(previousDailyBest?.bestTime)
+      ? {
+          bestTime: Number(previousDailyBest.bestTime),
+          completedLaps: Number.isFinite(previousDailyBest.completedLaps)
+            ? previousDailyBest.completedLaps
+            : null,
+          checkpointTimesSec: Array.isArray(previousDailyBest.checkpointTimesSec)
+            ? previousDailyBest.checkpointTimesSec
+            : null,
+        }
+      : null;
+
     if (isDailyBest) {
-      const previousBestSnapshot = Number.isFinite(previousDailyBest?.bestTime)
-        ? {
-            bestTime: Number(previousDailyBest.bestTime),
-            completedLaps: Number.isFinite(previousDailyBest.completedLaps)
-              ? previousDailyBest.completedLaps
-              : null,
-            checkpointTimesSec: Array.isArray(previousDailyBest.checkpointTimesSec)
-              ? previousDailyBest.checkpointTimesSec
-              : null,
-          }
-        : null;
       const saved = saveDailyChallengeBestTime(
         challenge,
         finalTime,
@@ -1386,7 +1387,133 @@ export const dailyChallengeEngineMethods = {
           : this.scoreboardReplay.overflowed
             ? "Run too long to rank."
             : "Submission replay was unavailable for this run.");
-      didEnqueue = submissionError
+    }
+
+    const presentDailyFinish = (didEnqueue) => {
+      if (isDailyBest && (submissionError || !didEnqueue)) {
+        const restored = restoreDailyChallengeBestAfterFailedSubmission(
+          challenge,
+          previousBestSnapshot,
+        );
+        this.dailyChallengeBestResult = restored ? { ...restored } : null;
+      }
+
+      const optimisticVerificationSnapshot = submissionError || !didEnqueue
+        ? {
+            ...createVerificationSnapshot({
+              verificationState: "error",
+              isLoading: false,
+              submissionStage: "error",
+              statusText: submissionError || "Couldn't rank this run. Try again.",
+            }),
+            currentPlayerRow: {
+              isCurrentPlayer: true,
+              bestTime: finalTime,
+              rank: null,
+              displayName: "You",
+            },
+          }
+        : {
+            ...createVerificationSnapshot({
+              verificationState: "pending",
+              isLoading: true,
+              submissionStage: "submitting",
+            }),
+            currentPlayerRow: {
+              isCurrentPlayer: true,
+              bestTime: finalTime,
+              rank: null,
+              displayName: "You",
+            },
+          };
+
+      const comparison = this.getRaceComparisonResult?.(finalTime) ?? null;
+      const comparisonCheckpointTimes = comparison?.target.checkpointTimesSec
+        ?? priorPbCheckpointTimes;
+      const comparisonFinishSec = comparison?.target.finishTimeSec
+        ?? priorPbFinishSec;
+      const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(challenge.id);
+      this.modal.showModal(
+        "Daily challenge complete",
+        null,
+        {
+          lapTime: finalTime,
+          bestTime: this.bestLapTime,
+          deltaToPersonalBest,
+          completedLaps,
+          requiredLaps,
+          isNewBest,
+          primaryStatLabel:
+            getDailyChallengeCopyLabels(challenge).primaryStatLabel,
+          variant: null,
+          scoreboardSnapshot: isDailyBest
+            ? optimisticVerificationSnapshot
+            : existingScoreboardSnapshot,
+          scoreboardChallengeId: challenge.id,
+          scoreboardTrackKey: challenge.trackKey,
+          showGlobalLeaderboard: false,
+          allowLeaderboardOpen: true,
+          lapMedal,
+          previousTrackMedal,
+          previousPersonalBestSec,
+          bestSummaryLabel: getDailyChallengeCopyLabels(challenge).bestSummaryLabel,
+          trackKey: challenge.trackKey,
+          lapCheckpointTimes,
+          pbCheckpointTimes: comparisonCheckpointTimes,
+          pbFinishSec: comparisonFinishSec,
+          raceComparisonTarget: comparison?.target ?? null,
+          comparisonOutcome: comparison?.outcome ?? null,
+          deltaToComparison: comparison?.deltaSec ?? null,
+        },
+        {
+          ...createModalActions({
+            modalKind: "win",
+            primaryActionLabel: "Retry",
+            secondaryActionLabel: "Done",
+            secondaryAction: () => this.returnToActiveLobby(),
+          }),
+          restartAction: () => this.restartDailyChallenge({ reason: "improve" }),
+          settingsAction: () => this.settings.openSettings(),
+          shareRequest: {
+            source: "finish",
+            challengeId: challenge.id,
+            replay: replayPayload ? { ...replayPayload } : null,
+          },
+        },
+      );
+      if (this.modal.modalMsg) {
+        this.modal.modalMsg.style.display = "";
+        this.modal.modalMsg.textContent = `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
+      }
+
+      this.configureLeaderboardOpponentFinish?.({
+        mode: "daily",
+        race: challenge,
+        finalTime,
+        comparison,
+        waitForVerification: Boolean(isDailyBest && didEnqueue && !submissionError),
+      });
+
+      if (isDailyBest && didEnqueue && !submissionError) {
+        const verificationEntry = getDailyChallengeVerificationEntry(challenge.id);
+        if (verificationEntry) {
+          this.modal.updateModalScoreboardSnapshot?.(
+            {
+              ...getVerificationSnapshotFromQueueEntry(verificationEntry),
+              currentPlayerRow: {
+                isCurrentPlayer: true,
+                bestTime: finalTime,
+                rank: null,
+                displayName: "You",
+              },
+            },
+          );
+        }
+      }
+    };
+
+    const enqueueDailyBest = () => {
+      const didEnqueue = submissionError
         ? false
         : this.enqueueDailyChallengeVerificationSubmission({
             challenge,
@@ -1397,127 +1524,14 @@ export const dailyChallengeEngineMethods = {
             previousBest: previousBestSnapshot,
             isTrackPbCandidate: isNewBest,
           });
-      if (submissionError || !didEnqueue) {
-        const restored = restoreDailyChallengeBestAfterFailedSubmission(
-          challenge,
-          previousBestSnapshot,
-        );
-        this.dailyChallengeBestResult = restored ? { ...restored } : null;
-      }
+      presentDailyFinish(didEnqueue);
+    };
+
+    if (isDailyBest && !submissionError) {
+      runAfterPlayerIdentityReady(this, enqueueDailyBest);
+      return;
     }
-
-    const optimisticVerificationSnapshot = submissionError || !didEnqueue
-      ? {
-          ...createVerificationSnapshot({
-            verificationState: "error",
-            isLoading: false,
-            submissionStage: "error",
-            statusText: submissionError || "Couldn't rank this run. Try again.",
-          }),
-          currentPlayerRow: {
-            isCurrentPlayer: true,
-            bestTime: finalTime,
-            rank: null,
-            displayName: "You",
-          },
-        }
-      : {
-          ...createVerificationSnapshot({
-            verificationState: "pending",
-            isLoading: true,
-            submissionStage: "submitting",
-          }),
-          currentPlayerRow: {
-            isCurrentPlayer: true,
-            bestTime: finalTime,
-            rank: null,
-            displayName: "You",
-          },
-        };
-
-    const comparison = this.getRaceComparisonResult?.(finalTime) ?? null;
-    const comparisonCheckpointTimes = comparison?.target.checkpointTimesSec
-      ?? priorPbCheckpointTimes;
-    const comparisonFinishSec = comparison?.target.finishTimeSec
-      ?? priorPbFinishSec;
-    const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(challenge.id);
-    this.modal.showModal(
-      "Daily challenge complete",
-      null,
-      {
-        lapTime: finalTime,
-        bestTime: this.bestLapTime,
-        deltaToPersonalBest,
-        completedLaps,
-        requiredLaps,
-        isNewBest,
-        primaryStatLabel:
-          getDailyChallengeCopyLabels(challenge).primaryStatLabel,
-        variant: null,
-        scoreboardSnapshot: isDailyBest
-          ? optimisticVerificationSnapshot
-          : existingScoreboardSnapshot,
-        scoreboardChallengeId: challenge.id,
-        scoreboardTrackKey: challenge.trackKey,
-        showGlobalLeaderboard: false,
-        allowLeaderboardOpen: true,
-        lapMedal,
-        previousTrackMedal,
-        previousPersonalBestSec,
-        bestSummaryLabel: getDailyChallengeCopyLabels(challenge).bestSummaryLabel,
-        trackKey: challenge.trackKey,
-        lapCheckpointTimes,
-        pbCheckpointTimes: comparisonCheckpointTimes,
-        pbFinishSec: comparisonFinishSec,
-        raceComparisonTarget: comparison?.target ?? null,
-        comparisonOutcome: comparison?.outcome ?? null,
-        deltaToComparison: comparison?.deltaSec ?? null,
-      },
-      {
-        ...createModalActions({
-          modalKind: "win",
-          primaryActionLabel: "Retry",
-          secondaryActionLabel: "Done",
-          secondaryAction: () => this.returnToActiveLobby(),
-        }),
-        restartAction: () => this.restartDailyChallenge({ reason: "improve" }),
-        settingsAction: () => this.settings.openSettings(),
-        shareRequest: {
-          source: "finish",
-          challengeId: challenge.id,
-          replay: replayPayload ? { ...replayPayload } : null,
-        },
-      },
-    );
-    if (this.modal.modalMsg) {
-      this.modal.modalMsg.style.display = "";
-      this.modal.modalMsg.textContent = `${getDailyChallengeTrackName(challenge)} • ${getDailyChallengeObjectiveLabel(challenge)}`;
-    }
-
-    this.configureLeaderboardOpponentFinish?.({
-      mode: "daily",
-      race: challenge,
-      finalTime,
-      comparison,
-      waitForVerification: Boolean(isDailyBest && didEnqueue && !submissionError),
-    });
-
-    if (isDailyBest && didEnqueue && !submissionError) {
-      const verificationEntry = getDailyChallengeVerificationEntry(challenge.id);
-      if (verificationEntry) {
-        this.modal.updateModalScoreboardSnapshot?.(
-          {
-            ...getVerificationSnapshotFromQueueEntry(verificationEntry),
-            currentPlayerRow: {
-              isCurrentPlayer: true,
-              bestTime: finalTime,
-              rank: null,
-              displayName: "You",
-            },
-          },
-        );
-      }
-    }
+    presentDailyFinish(false);
 
   },
 

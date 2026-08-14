@@ -1,4 +1,5 @@
 import { getMedalForRaceTime, isStandardMedalTier } from '../medals/medal-timing.js';
+import { runAfterPlayerIdentityReady } from '../player/identity-recovery.js';
 import { normalizeCampaignLobbyState } from '../lobby/service.js';
 import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
 import { mergeLeaderboardPages } from '../scoreboard/ui.js';
@@ -1001,48 +1002,50 @@ export const campaignEngineMethods = {
             return;
         }
 
-        const { enqueued } = enqueueCampaignVerification({
-            raceId: stage.raceId,
-            trackKey: stage.trackKey,
-            bestTime: finalTime,
-            lapCount: stage.lapCount,
-            rulesRevision: stage.rulesRevision,
-            replay,
-        });
-
-        if (enqueued) this.refreshCampaignVerificationOverlay?.();
-
-        this.showCampaignFinish(stage, {
-            finalTime,
-            medal,
-            previousMedal,
-            shareRequest: {
-                kind: 'head-to-head',
-                source: 'campaign',
+        runAfterPlayerIdentityReady(this, () => {
+            const { enqueued } = enqueueCampaignVerification({
                 raceId: stage.raceId,
-            },
-            scoreboardSnapshot: enqueued
-                ? campaignPendingSnapshot(finalTime)
-                : campaignErrorSnapshot(finalTime, null),
-        });
-        this.configureLeaderboardOpponentFinish?.({
-            mode: 'campaign',
-            race: stage,
-            finalTime,
-            comparison: this.getRaceComparisonResult?.(finalTime) ?? null,
-            waitForVerification: Boolean(enqueued),
-        });
-
-        if (!enqueued) return;
-        const processing = this.processVerificationQueue?.();
-        if (processing && typeof processing.catch === 'function') {
-            void processing.catch((error) => {
-                console.error('Error processing Campaign verification queue:', error);
-                this.scheduleVerificationQueueProcessing?.(getVerificationRetryDelayMs());
+                trackKey: stage.trackKey,
+                bestTime: finalTime,
+                lapCount: stage.lapCount,
+                rulesRevision: stage.rulesRevision,
+                replay,
             });
-        } else {
-            this.scheduleVerificationQueueProcessing?.(0);
-        }
+
+            if (enqueued) this.refreshCampaignVerificationOverlay?.();
+
+            this.showCampaignFinish(stage, {
+                finalTime,
+                medal,
+                previousMedal,
+                shareRequest: {
+                    kind: 'head-to-head',
+                    source: 'campaign',
+                    raceId: stage.raceId,
+                },
+                scoreboardSnapshot: enqueued
+                    ? campaignPendingSnapshot(finalTime)
+                    : campaignErrorSnapshot(finalTime, null),
+            });
+            this.configureLeaderboardOpponentFinish?.({
+                mode: 'campaign',
+                race: stage,
+                finalTime,
+                comparison: this.getRaceComparisonResult?.(finalTime) ?? null,
+                waitForVerification: Boolean(enqueued),
+            });
+
+            if (!enqueued) return;
+            const processing = this.processVerificationQueue?.();
+            if (processing && typeof processing.catch === 'function') {
+                void processing.catch((error) => {
+                    console.error('Error processing Campaign verification queue:', error);
+                    this.scheduleVerificationQueueProcessing?.(getVerificationRetryDelayMs());
+                });
+            } else {
+                this.scheduleVerificationQueueProcessing?.(0);
+            }
+        });
     },
 
     updateCampaignFinishSnapshot(raceId, snapshot) {

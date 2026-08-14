@@ -1,9 +1,9 @@
-import { getPlayerProgressState } from '../storage.js';
 import { queuePlayerPreferencesSave } from './preferences.js';
 import { getActivePlayerOwnerId } from './active-owner.js';
 import { claimVerificationEntriesForOwner } from '../scoreboard/verification-queue.js';
+import { recoverPlayerIdentity as chasePlayerIdentity, runAfterPlayerIdentityReady as whenPlayerIdentityReady } from './identity-recovery.js';
 
-const PROFILE_RECOVERY_DELAYS_MS = [5_000, 30_000, 120_000];
+const PROFILE_RECOVERY_DELAYS_MS = [0, 30_000, 120_000];
 
 export const playerProfileEngineMethods = {
     /**
@@ -60,6 +60,14 @@ export const playerProfileEngineMethods = {
         return claimed;
     },
 
+    recoverPlayerIdentity() {
+        return chasePlayerIdentity(this);
+    },
+
+    runAfterPlayerIdentityReady(work) {
+        whenPlayerIdentityReady(this, work);
+    },
+
     /** Fallback state is temporary by definition, so the real profile is chased until it answers. */
     schedulePlayerProfileRecovery() {
         if (this._playerProfileRecovery) return null;
@@ -83,14 +91,7 @@ export const playerProfileEngineMethods = {
             if (recovery.running || this._playerProfileRecovery !== recovery) return;
             recovery.running = true;
             try {
-                const state = await getPlayerProgressState();
-                if (state?.authoritative === true) {
-                    this.stopPlayerProfileRecovery();
-                    await this.applyPlayerProgressState(state);
-                    return;
-                }
-            } catch (error) {
-                console.error('Error recovering player profile state:', error);
+                if (await this.recoverPlayerIdentity()) return;
             } finally {
                 recovery.running = false;
             }

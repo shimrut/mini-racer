@@ -111,7 +111,7 @@ describe('player profile engine methods', () => {
             .mockResolvedValueOnce({ authoritative: true, carUnlocks, playerPreferences: null });
 
         engine.schedulePlayerProfileRecovery();
-        await vi.advanceTimersByTimeAsync(5_000);
+        await vi.advanceTimersByTimeAsync(0);
         expect(storageMocks.getPlayerProgressState).toHaveBeenCalledTimes(1);
         expect(engine.applyCarUnlockSnapshot).not.toHaveBeenCalled();
 
@@ -127,7 +127,7 @@ describe('player profile engine methods', () => {
         storageMocks.getPlayerProgressState.mockResolvedValue({ authoritative: false });
 
         engine.schedulePlayerProfileRecovery();
-        await vi.advanceTimersByTimeAsync(5_000 + 30_000 + 120_000 + 600_000);
+        await vi.advanceTimersByTimeAsync(30_000 + 120_000 + 600_000);
 
         expect(storageMocks.getPlayerProgressState).toHaveBeenCalledTimes(3);
     });
@@ -138,7 +138,7 @@ describe('player profile engine methods', () => {
 
         const first = engine.schedulePlayerProfileRecovery();
         const second = engine.schedulePlayerProfileRecovery();
-        await vi.advanceTimersByTimeAsync(5_000);
+        await vi.advanceTimersByTimeAsync(0);
 
         expect(first).not.toBeNull();
         expect(second).toBeNull();
@@ -176,7 +176,7 @@ describe('player profile engine methods', () => {
             .mockResolvedValueOnce({ authoritative: true, carUnlocks: null, playerPreferences: null });
 
         engine.schedulePlayerProfileRecovery();
-        await vi.advanceTimersByTimeAsync(5_000);
+        await vi.advanceTimersByTimeAsync(0);
         await vi.advanceTimersByTimeAsync(30_000);
 
         expect(storageMocks.getPlayerProgressState).toHaveBeenCalledTimes(2);
