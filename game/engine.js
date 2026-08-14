@@ -735,7 +735,7 @@ export class RealTimeRacer {
 
   loadStartupPlayer({ retry = false } = {}) {
     if (this.playerHistoryPromise && !retry) return this.playerHistoryPromise;
-    this.playerHistoryPromise = getPlayerProgressState().then(async (progressState) => {
+    this.playerHistoryPromise = getPlayerProgressState({ promptOnSyncFailure: true }).then(async (progressState) => {
       const result = await this.applyPlayerProgressState(progressState);
       if (progressState.authoritative === false) this.schedulePlayerProfileRecovery();
       return result;

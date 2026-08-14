@@ -1,4 +1,5 @@
 import { API_ROUTES, getGuestPlayerToken, getOrCreatePlayerId } from '../scoreboard/api-client.js';
+import { presentPlayerChoiceOverlay } from './player-choice-overlay.js';
 
 export const PROGRESS_SELECTION_TIMEOUT_MS = 15_000;
 
@@ -9,13 +10,15 @@ function summaryText(summary) {
     return `${daily} · ${campaign} Campaign result${campaign === 1 ? '' : 's'} · ${unlocks}`;
 }
 
-function optionButton(label, source) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `guest-progress-selection__button${source === 'guest' ? ' guest-progress-selection__button--primary' : ''}`;
-    button.dataset.choice = source;
-    button.textContent = label;
-    return button;
+function sourceBlock(label, detail) {
+    const source = document.createElement('div');
+    source.className = 'guest-progress-selection__source';
+    const heading = document.createElement('strong');
+    heading.textContent = label;
+    const summary = document.createElement('span');
+    summary.textContent = detail;
+    source.append(heading, summary);
+    return source;
 }
 
 export function requestGuestProgressSelection(selection) {
@@ -24,59 +27,38 @@ export function requestGuestProgressSelection(selection) {
     }
 
     return new Promise((resolve) => {
-        const root = document.createElement('div');
-        root.className = 'guest-progress-selection';
-        root.setAttribute('role', 'dialog');
-        root.setAttribute('aria-modal', 'true');
-        root.setAttribute('aria-labelledby', 'guest-progress-selection-title');
-
-        const card = document.createElement('section');
-        card.className = 'guest-progress-selection__card';
-        const title = document.createElement('h2');
-        title.id = 'guest-progress-selection-title';
-        title.textContent = 'CHOOSE YOUR PROGRESS';
-        const message = document.createElement('p');
-        message.className = 'guest-progress-selection__message';
-        message.textContent = 'You signed in while this browser had guest progress. Choose which progress to keep.';
-
         const sources = document.createElement('div');
         sources.className = 'guest-progress-selection__sources';
-        const guestSource = document.createElement('div');
-        guestSource.className = 'guest-progress-selection__source';
-        guestSource.innerHTML = '<strong>Guest progress</strong>';
-        const guestSummary = document.createElement('span');
-        guestSummary.textContent = summaryText(selection?.guestSummary);
-        guestSource.appendChild(guestSummary);
-        const accountSource = document.createElement('div');
-        accountSource.className = 'guest-progress-selection__source';
-        accountSource.innerHTML = '<strong>Saved account progress</strong>';
-        const accountSummary = document.createElement('span');
-        accountSummary.textContent = selection?.accountHasProgress
-            ? summaryText(selection?.accountSummary)
-            : 'No saved account progress';
-        accountSource.appendChild(accountSummary);
-        sources.append(guestSource, accountSource);
-
-        const actions = document.createElement('div');
-        actions.className = 'guest-progress-selection__actions';
-        const guestButton = optionButton('USE GUEST PROGRESS', 'guest');
-        const accountButton = optionButton(
-            selection?.accountHasProgress ? 'USE SAVED PROGRESS' : 'START FRESH',
-            'account',
+        sources.append(
+            sourceBlock('Guest progress', summaryText(selection?.guestSummary)),
+            sourceBlock(
+                'Saved account progress',
+                selection?.accountHasProgress
+                    ? summaryText(selection?.accountSummary)
+                    : 'No saved account progress',
+            ),
         );
-        actions.append(guestButton, accountButton);
-        const status = document.createElement('p');
-        status.className = 'guest-progress-selection__status';
-        status.setAttribute('aria-live', 'polite');
 
-        card.append(title, message, sources, actions, status);
-        root.appendChild(card);
-        document.body.appendChild(root);
+        const overlay = presentPlayerChoiceOverlay({
+            titleId: 'guest-progress-selection-title',
+            title: 'CHOOSE YOUR PROGRESS',
+            message: 'You signed in while this browser had guest progress. Choose which progress to keep.',
+            extraNodes: [sources],
+            actions: [
+                { label: 'USE GUEST PROGRESS', choice: 'guest', primary: true },
+                {
+                    label: selection?.accountHasProgress ? 'USE SAVED PROGRESS' : 'START FRESH',
+                    choice: 'account',
+                },
+            ],
+        });
+
+        const guestButton = overlay.buttons.find((button) => button.dataset.choice === 'guest');
+        const accountButton = overlay.buttons.find((button) => button.dataset.choice === 'account');
 
         const choose = async (choice) => {
-            guestButton.disabled = true;
-            accountButton.disabled = true;
-            status.textContent = 'Saving your choice…';
+            overlay.setBusy(true);
+            overlay.setStatus('Saving your choice…');
             const controller = typeof AbortController === 'function' ? new AbortController() : null;
             const timeoutId = controller
                 ? setTimeout(() => controller.abort(), PROGRESS_SELECTION_TIMEOUT_MS)
@@ -96,20 +78,18 @@ export function requestGuestProgressSelection(selection) {
                 if (!response.ok) {
                     throw new Error(body?.error || `Could not save your choice (${response.status}).`);
                 }
-                root.remove();
+                overlay.remove();
                 resolve({ choice, playerState: body });
             } catch (error) {
-                guestButton.disabled = false;
-                accountButton.disabled = false;
-                status.textContent = error?.name === 'AbortError'
+                overlay.setBusy(false);
+                overlay.setStatus(error?.name === 'AbortError'
                     ? 'Saving took too long. Try again.'
-                    : error?.message || 'Could not save your choice. Try again.';
+                    : error?.message || 'Could not save your choice. Try again.');
             } finally {
                 if (timeoutId !== null) clearTimeout(timeoutId);
             }
         };
-        guestButton.addEventListener('click', () => void choose('guest'));
-        accountButton.addEventListener('click', () => void choose('account'));
-        guestButton.focus?.();
+        guestButton?.addEventListener('click', () => void choose('guest'));
+        accountButton?.addEventListener('click', () => void choose('account'));
     });
 }

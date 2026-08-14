@@ -19,7 +19,7 @@
 .guest-progress-selection {
     position: fixed;
     inset: 0;
-    /* Above #loading-screen: this choice is an essential the loader is waiting on. */
+    /* Above #loading-screen: guest progress and server-sync failure wait here. */
     z-index: 10000;
     display: flex;
     align-items: center;

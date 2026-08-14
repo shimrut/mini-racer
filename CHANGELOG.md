@@ -1,5 +1,9 @@
 # Changelog
 
+- If identity cannot be confirmed at launch, the game now asks before
+  continuing. **Retry Sync** tries again. **Continue Offline** uses the last
+  saved account on this phone, the same as the previous outage path.
+
 - Fixed multi-lap retry comparisons treating lap 1 as a full race. After a
   finished 2- or 3-lap run, the next attempt's first-lap flash now compares
   against that same lap from the earlier race, not the previous total.

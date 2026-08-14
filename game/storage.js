@@ -26,6 +26,7 @@ import {
 } from "./player/profile-cache.js";
 import { setActivePlayerOwnerId } from "./player/active-owner.js";
 import { requestGuestProgressSelection } from "./player/guest-progress-selection.js";
+import { requestServerSyncFailureChoice } from "./player/server-sync-failure.js";
 import {
   hasVerificationEntriesForOwner,
   resolveVerificationQueueAfterGuestProgressSelection,
@@ -105,6 +106,19 @@ async function fetchRemotePlayerProgressState() {
   return normalizeRemotePlayerProgressState(await response.json());
 }
 
+async function fetchHostedPlayerProgressState() {
+  try {
+    return await fetchRemotePlayerProgressState();
+  } catch (error) {
+    if (error?.status !== 401) {
+      throw error;
+    }
+    // Keep the player id and drop only the token: the id is the only handle on this guest's progress, and the server re-issues a token for it.
+    setGuestPlayerToken(null);
+    return await fetchRemotePlayerProgressState();
+  }
+}
+
 function getLocalPlayerProgressState() {
   const hasAnyData = hasAnyDailyChallengeStoredData();
   // Local development has no server to name an owner, so it owns its own namespace and keeps its queue working.
@@ -140,82 +154,103 @@ function getHostedFallbackPlayerProgressState() {
   };
 }
 
-export async function getPlayerProgressState({ onProgressSelectionRequired = null } = {}) {
+async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelectionRequired = null } = {}) {
+  setGuestPlayerToken(remoteState.guestToken);
+  const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
+  const isSignedInAccount = Boolean(remoteState.redditUsername)
+    && remoteState.leaderboardPlayerId?.startsWith("reddit:");
+  const hasPendingGuestRuns = isSignedInAccount
+    && hasVerificationEntriesForOwner(guestOwnerId);
+  if (remoteState.progressSelection?.required || hasPendingGuestRuns) {
+    setActivePlayerOwnerId(null);
+    await onProgressSelectionRequired?.(remoteState.progressSelection);
+    const selectionResult = await requestGuestProgressSelection(
+      remoteState.progressSelection || {
+        required: true,
+        guestHasProgress: true,
+        accountHasProgress: Boolean(remoteState.hasAnyData),
+        guestSummary: { hasDailyResults: true, campaignResults: 0, unlocks: false },
+        accountSummary: { hasDailyResults: false, campaignResults: 0, unlocks: false },
+      },
+    );
+    const choice = selectionResult?.choice;
+    if (!selectionResult?.playerState) {
+      throw new Error("Guest progress selection did not return account state.");
+    }
+    remoteState = normalizeRemotePlayerProgressState(selectionResult.playerState);
+    setGuestPlayerToken(remoteState.guestToken);
+    resolveVerificationQueueAfterGuestProgressSelection({
+      guestPlayerId: guestOwnerId,
+      accountPlayerId: remoteState.leaderboardPlayerId,
+      choice,
+    });
+    clearDailyChallengeStoredData();
+    const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
+    clearDailyChallengeClientCaches();
+    clearTrackLastLapMedals();
+  }
+  if (remoteState.retireGuestIdentity) {
+    rotateGuestPlayerIdentity("completed guest promotion");
+    // The server refused a spent guest credential: this browser needs a fresh identity before it owns anything again.
+    if (!remoteState.leaderboardPlayerId) {
+      const rebootstrapped = await fetchRemotePlayerProgressState();
+      if (rebootstrapped) {
+        setGuestPlayerToken(rebootstrapped.guestToken);
+        remoteState = rebootstrapped;
+      }
+    }
+  }
+  setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
+  // Without a player id the server did not recognise anyone, so nothing here may be treated as this account's state.
+  if (!remoteState.leaderboardPlayerId) {
+    return { ...remoteState, authoritative: false };
+  }
+  const authoritativeState = { ...remoteState, authoritative: true };
+  setActivePlayerOwnerId(remoteState.leaderboardPlayerId);
+  writeCachedPlayerProfile(remoteState.leaderboardPlayerId, authoritativeState);
+  return authoritativeState;
+}
+
+export async function getPlayerProgressState({
+  onProgressSelectionRequired = null,
+  promptOnSyncFailure = false,
+} = {}) {
   if (isLocalEnvironment()) {
     return getLocalPlayerProgressState();
   }
 
-  try {
-    let remoteState;
+  while (true) {
     try {
-      remoteState = await fetchRemotePlayerProgressState();
-    } catch (error) {
-      if (error?.status !== 401) {
-        throw error;
-      }
-      // Keep the player id and drop only the token: the id is the only handle on this guest's progress, and the server re-issues a token for it.
-      setGuestPlayerToken(null);
-      remoteState = await fetchRemotePlayerProgressState();
-    }
-    if (remoteState) {
-      setGuestPlayerToken(remoteState.guestToken);
-      const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
-      const isSignedInAccount = Boolean(remoteState.redditUsername)
-        && remoteState.leaderboardPlayerId?.startsWith("reddit:");
-      const hasPendingGuestRuns = isSignedInAccount
-        && hasVerificationEntriesForOwner(guestOwnerId);
-      if (remoteState.progressSelection?.required || hasPendingGuestRuns) {
-        setActivePlayerOwnerId(null);
-        await onProgressSelectionRequired?.(remoteState.progressSelection);
-        const selectionResult = await requestGuestProgressSelection(
-          remoteState.progressSelection || {
-            required: true,
-            guestHasProgress: true,
-            accountHasProgress: Boolean(remoteState.hasAnyData),
-            guestSummary: { hasDailyResults: true, campaignResults: 0, unlocks: false },
-            accountSummary: { hasDailyResults: false, campaignResults: 0, unlocks: false },
-          },
-        );
-        const choice = selectionResult?.choice;
-        if (!selectionResult?.playerState) {
-          throw new Error("Guest progress selection did not return account state.");
-        }
-        remoteState = normalizeRemotePlayerProgressState(selectionResult.playerState);
-        setGuestPlayerToken(remoteState.guestToken);
-        resolveVerificationQueueAfterGuestProgressSelection({
-          guestPlayerId: guestOwnerId,
-          accountPlayerId: remoteState.leaderboardPlayerId,
-          choice,
+      const remoteState = await fetchHostedPlayerProgressState();
+      if (remoteState) {
+        return await finalizeHostedPlayerProgressState(remoteState, {
+          onProgressSelectionRequired,
         });
-        clearDailyChallengeStoredData();
-        const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
-        clearDailyChallengeClientCaches();
-        clearTrackLastLapMedals();
       }
-      if (remoteState.retireGuestIdentity) {
-        rotateGuestPlayerIdentity("completed guest promotion");
-        // The server refused a spent guest credential: this browser needs a fresh identity before it owns anything again.
-        if (!remoteState.leaderboardPlayerId) {
-          const rebootstrapped = await fetchRemotePlayerProgressState();
-          if (rebootstrapped) {
-            setGuestPlayerToken(rebootstrapped.guestToken);
-            remoteState = rebootstrapped;
-          }
-        }
-      }
-      setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
-      // Without a player id the server did not recognise anyone, so nothing here may be treated as this account's state.
-      if (!remoteState.leaderboardPlayerId) {
-        return { ...remoteState, authoritative: false };
-      }
-      const authoritativeState = { ...remoteState, authoritative: true };
-      setActivePlayerOwnerId(remoteState.leaderboardPlayerId);
-      writeCachedPlayerProfile(remoteState.leaderboardPlayerId, authoritativeState);
-      return authoritativeState;
+    } catch (error) {
+      console.error("Error loading player progress state:", error);
     }
-  } catch (error) {
-    console.error("Error loading player progress state:", error);
-  }
 
-  return getHostedFallbackPlayerProgressState();
+    if (!promptOnSyncFailure) {
+      return getHostedFallbackPlayerProgressState();
+    }
+
+    const decision = await requestServerSyncFailureChoice({
+      retry: fetchHostedPlayerProgressState,
+    });
+    if (decision?.action === "synced" && decision.remoteState) {
+      try {
+        return await finalizeHostedPlayerProgressState(decision.remoteState, {
+          onProgressSelectionRequired,
+        });
+      } catch (error) {
+        console.error("Error loading player progress state:", error);
+        continue;
+      }
+    }
+    if (decision?.action === "retry") {
+      continue;
+    }
+    return getHostedFallbackPlayerProgressState();
+  }
 }
