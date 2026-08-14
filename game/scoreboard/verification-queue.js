@@ -3,6 +3,7 @@ import {
   getPlayerSessionId,
 } from "../player/active-owner.js";
 import { getPhoneGuestOwnerId } from "./player-identity.js";
+import { readLastConfirmedProfileOwnerId } from "../player/profile-cache.js";
 
 const VERIFICATION_QUEUE_STORAGE_KEY = "VectorGpVerificationQueue";
 const DEFAULT_RETRY_DELAY_MS = 30_000;
@@ -214,8 +215,12 @@ function rawEntryIdFromKey(entryKey, ownerPlayerId) {
   return entryKey.startsWith(prefix) ? entryKey.slice(prefix.length) : entryKey;
 }
 
+function readKnownPhoneOwnerId() {
+  return readLastConfirmedProfileOwnerId() || getPhoneGuestOwnerId();
+}
+
 function resolveQueuedOwnerId() {
-  return getActivePlayerOwnerId() || getPhoneGuestOwnerId();
+  return getActivePlayerOwnerId() || readKnownPhoneOwnerId();
 }
 
 function rekeyOwnedEntry(queueState, bucket, fromKey, entry, toOwnerId) {
@@ -231,9 +236,10 @@ function resolveEntryKey(queueState, bucket, entryId) {
   const activeOwnerId = getActivePlayerOwnerId();
   const ownedKey = ownedEntryKey(entryId, activeOwnerId);
   if (queueState[bucket][ownedKey]) return ownedKey;
-  const phoneGuestKey = ownedEntryKey(entryId, getPhoneGuestOwnerId());
-  if (!activeOwnerId && queueState[bucket][phoneGuestKey]) return phoneGuestKey;
-  // A result raced before the account was known is still this session's until it is claimed.
+  if (!activeOwnerId) {
+    const knownKey = ownedEntryKey(entryId, readKnownPhoneOwnerId());
+    if (queueState[bucket][knownKey]) return knownKey;
+  }
   return queueState[bucket][entryId]?.ownerPlayerId ? ownedKey : entryId;
 }
 
@@ -332,7 +338,7 @@ function isOwnedByActivePlayer(entry) {
 function isVisibleQueueEntry(entry) {
   if (!entry?.ownerPlayerId) return true;
   if (isOwnedByActivePlayer(entry)) return true;
-  return !getActivePlayerOwnerId() && entry.ownerPlayerId === getPhoneGuestOwnerId();
+  return !getActivePlayerOwnerId() && entry.ownerPlayerId === readKnownPhoneOwnerId();
 }
 
 function getDue(bucket, now = Date.now()) {
@@ -347,9 +353,9 @@ function getDue(bucket, now = Date.now()) {
 }
 
 /**
- * Bootstrap can answer after a finish. This visit's phone-guest runs belong to that answer because
- * the signed-in account cannot change without a reload. Last visit's phone-guest runs stay on the
- * guest until that guest is back or the player picks Use guest progress. Nothing is deleted.
+ * A finish before bootstrap answers is stamped with who this phone already is. This visit may attach
+ * a first-time guest run to the named account. A later sign-in does not take another owner's run.
+ * Leftover unnamed runs become this phone's guest id so they are never deleted.
  */
 export function claimVerificationEntriesForOwner(ownerPlayerId) {
   const activeOwnerId = typeof ownerPlayerId === "string" && ownerPlayerId.trim()

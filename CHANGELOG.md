@@ -5,10 +5,10 @@
   against that same lap from the earlier race, not the previous total.
 
 - Kept a Daily or Campaign finish that happened before the game knew who the
-  player was. The time is stamped to this phone's guest id and is never thrown
-  away on the next open. This visit can send it once identity answers. A later
-  Reddit sign-in does not take it; that needs Use guest progress. A run that
-  already belongs to an account is still never sent under a later sign-in.
+  player was. The time is stamped with who this phone already is — the last
+  confirmed account, or a guest id if none — and is never thrown away on the
+  next open. A later Reddit sign-in does not take it. A first-time guest run
+  from this visit can still attach once identity answers.
 
 - Rebuilt initial loading around one ordered plan per launch mode. Direct Daily
   prepares its active challenge track, Campaign resolves authoritative progress
@@ -44,9 +44,7 @@
   next, so it can no longer be credited to the wrong leaderboard or refused as a
   locked Campaign stage and lost, and two accounts can each hold a queued result
   for the same race on one device. A finish before identity answers is stamped
-  to this phone's guest id and kept; this visit may attach it to the named
-  account, and a later sign-in does not take it unless the player chooses
-  guest progress.
+  with who this phone already is and kept. A later sign-in does not take it.
 
 - Stopped a guest sign-in from leaving a working guest credential behind. Once a
   promotion has completed, the server refuses the old guest identity rather than

@@ -40,9 +40,8 @@ export const playerProfileEngineMethods = {
     },
 
     /**
-     * This visit's unsigned finishes belong to this visit's bootstrap. Last visit's unsigned
-     * finishes stay on this phone's guest. Claiming starts the sender so a recovered identity
-     * uploads instead of leaving Submitting on screen.
+     * First-time guest finishes from this visit attach to this visit's bootstrap. Runs already
+     * stamped with who this phone was keep that owner. Claiming starts the sender.
      */
     claimQueuedResultsForOwner() {
         const { claimed } = claimVerificationEntriesForOwner(getActivePlayerOwnerId());

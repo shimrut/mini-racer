@@ -29,6 +29,7 @@ import {
     setActivePlayerOwnerId
 } from '../game/player/active-owner.js';
 import { getPhoneGuestOwnerId } from '../game/scoreboard/player-identity.js';
+import { writeCachedPlayerProfile } from '../game/player/profile-cache.js';
 
 const OWNER = 'reddit:racer';
 
@@ -868,6 +869,32 @@ describe('verification queue', () => {
             ownerPlayerId: guestOwner,
         });
         expect(getDueDailyChallengeVerifications()).toEqual([]);
+    });
+
+    it('stamps an unsigned finish with the last confirmed player on this phone', () => {
+        writeCachedPlayerProfile(OWNER, { hasAnyData: true });
+        clearActivePlayerOwnerId();
+        queueDailyRun();
+
+        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toMatchObject({
+            ownerPlayerId: OWNER,
+        });
+        setActivePlayerOwnerId(OWNER);
+        expect(getDueDailyChallengeVerifications()).toMatchObject([{ ownerPlayerId: OWNER }]);
+        expect(claimVerificationEntriesForOwner(OWNER).claimed).toEqual([]);
+    });
+
+    it('does not give a last-confirmed unsigned run to a later sign-in', () => {
+        writeCachedPlayerProfile(OWNER, { hasAnyData: true });
+        clearActivePlayerOwnerId();
+        queueDailyRun();
+        setActivePlayerOwnerId('reddit:someone-else');
+
+        expect(getDueDailyChallengeVerifications()).toEqual([]);
+        expect(claimVerificationEntriesForOwner('reddit:someone-else').claimed).toEqual([]);
+        expect(readStoredQueue().daily[`${OWNER}::daily-gp-2031-05-01`]).toMatchObject({
+            ownerPlayerId: OWNER,
+        });
     });
 
     it('never submits a result queued before any account was known', () => {
