@@ -2478,6 +2478,46 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
+    it('launches Campaign on the manifest stage behind the default lobby stage', async () => {
+        const [firstStage] = CAMPAIGN_STAGES;
+        campaignServiceMocks.getCampaignBootstrap.mockResolvedValue({
+            availability: 'available',
+            authoritative: true,
+            campaignId: 'numbered-v1',
+            ranked: true,
+            signedIn: true,
+            stages: CAMPAIGN_STAGES,
+            progress: { resultsByRaceId: {}, unlockedRaceIds: [firstStage.raceId] },
+        });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
+            ok: true,
+            body: { personalBest: null },
+        });
+        const context = {
+            campaignBootstrap: null,
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            applyCampaignLobbyBootstrap: vi.fn(),
+            applyCampaignPersonalBest: vi.fn(),
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+            loadInitialCampaignPersonalBest: campaignEngineMethods.loadInitialCampaignPersonalBest,
+            prepareInitialCampaignLaunch: campaignEngineMethods.prepareInitialCampaignLaunch,
+        };
+
+        const launch = await context.prepareInitialCampaignLaunch({ prepareTrack: false });
+
+        // The loader derives the track it draws from this stage, so a launch that
+        // resolves to null leaves startup with no playable track at all.
+        expect(launch?.stage).toMatchObject({
+            raceId: firstStage.raceId,
+            trackKey: firstStage.trackKey,
+        });
+        expect(context.activeCampaignStage?.raceId).toBe(firstStage.raceId);
+        expect(context.selectedCampaignStageId).toBe(firstStage.raceId);
+        expect(campaignServiceMocks.getCampaignPbGhost).toHaveBeenCalledWith(firstStage.raceId);
+    });
+
     it('leaves the primary spinner to a start that is already running', async () => {
         const lobbyUi = {
             showCampaign: vi.fn(),

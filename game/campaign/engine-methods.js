@@ -471,7 +471,10 @@ export const campaignEngineMethods = {
             throw new Error('Campaign progress is not authoritative.');
         }
         const lobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
-        const stage = getDefaultCampaignLobbyStage(lobbyState);
+        // A lobby stage carries its race id as `id`, and everything downstream of the
+        // launch reads `raceId` off the manifest stage, so resolve it the way starting
+        // a stage from the lobby does.
+        const stage = getCampaignStage(getDefaultCampaignLobbyStage(lobbyState)?.id);
         if (!stage?.trackKey || !stage?.raceId) return null;
 
         this.activeRaceMode = 'campaign';
