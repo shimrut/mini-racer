@@ -62,6 +62,48 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     }));
   });
 
+  it("does not flash a first-lap delta against the previous race total", () => {
+    const showLapFlash = vi.fn();
+    const engine = {
+      currentChallengeRun: {
+        completedLaps: 0,
+        recentLaps: [],
+        bestLap: null,
+        requiredLaps: 2,
+      },
+      activeDailyChallenge: {
+        id: "daily-two-lap",
+        trackKey: "circuit",
+        objectiveType: "multi_lap_total",
+        objectiveParams: { lapCount: 2 },
+      },
+      currentTrackKey: "circuit",
+      activePersonalBestPaceBaseline: {
+        finishTimeSec: 33,
+        lapCompletionTimesSec: [33],
+      },
+      getActiveRacePaceBaseline:
+        RealTimeRacer.prototype.getActiveRacePaceBaseline,
+      hud: { showLapFlash },
+      _resetLapTrailAfterIntermediateLap: vi.fn(),
+      updateDailyChallengeHud: vi.fn(),
+      requestRender: vi.fn(),
+    };
+
+    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 10, {
+      elapsedTimeSec: 10,
+      completedLaps: 1,
+      requiredLaps: 2,
+      isFinalLap: false,
+    });
+
+    expect(showLapFlash).toHaveBeenCalledWith(expect.objectContaining({
+      lapNumber: 1,
+      elapsedTimeSec: 10,
+      deltaVsBest: null,
+    }));
+  });
+
   it("keeps the challenge date in the lobby summary for post-bound standings", () => {
     const setDailyChallengeSummary = vi.fn();
     const challenge = {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createPersonalBestPaceBaseline,
   deriveLapCompletionTimesSecFromGhost,
+  getLapPaceDeltaSec,
 } from '../game/ghost/pb-pace.js';
 import { normalizeLapCompletionTimesSec } from '../game/shared/lap-completion-times.js';
 
@@ -114,5 +115,86 @@ describe('PB pace baselines', () => {
     expect(Object.isFrozen(baseline)).toBe(true);
     expect(Object.isFrozen(baseline.checkpointTimesSec)).toBe(true);
     expect(Object.isFrozen(baseline.lapCompletionTimesSec)).toBe(true);
+  });
+
+  it('keeps multi-lap boundaries when the caller omits lap count but the PB record has it', () => {
+    expect(createPersonalBestPaceBaseline({
+      bestTimeMs: 33_000,
+      lapCount: 2,
+      checkpointTimesSec: [4, 16],
+      lapCompletionTimesSec: [16, 33],
+    }, TRACK, 1)).toMatchObject({
+      finishTimeSec: 33,
+      lapCompletionTimesSec: [16, 33],
+    });
+  });
+
+  it('pads only a missing final lap when earlier boundaries are real', () => {
+    const record = {
+      bestTimeMs: 4000,
+      samples: [
+        { timeMs: 0, x: 0, y: 0, angle: 0 },
+        { timeMs: 1000, x: 6, y: 0, angle: 0 },
+        { timeMs: 2000, x: -1, y: 0, angle: 0 },
+        { timeMs: 3000, x: 6, y: 0, angle: 0 },
+        { timeMs: 4000, x: 6, y: 0, angle: 0 },
+      ],
+    };
+
+    const boundaries = deriveLapCompletionTimesSecFromGhost(record, TRACK, 2);
+    expect(boundaries).toHaveLength(2);
+    expect(boundaries[0]).toBeCloseTo(13 / 7);
+    expect(boundaries[1]).toBe(4);
+  });
+
+  it('does not treat the race finish as lap one when intermediate crossings are missing', () => {
+    const record = {
+      bestTimeMs: 4000,
+      samples: [
+        { timeMs: 0, x: 0, y: 0, angle: 0 },
+        { timeMs: 1000, x: 6, y: 0, angle: 0 },
+        { timeMs: 3000, x: 6, y: 0, angle: 0 },
+        { timeMs: 4000, x: -1, y: 0, angle: 0 },
+      ],
+    };
+
+    expect(deriveLapCompletionTimesSecFromGhost(record, TRACK, 2)).toBeNull();
+    expect(createPersonalBestPaceBaseline(record, TRACK, 2)).toMatchObject({
+      finishTimeSec: 4,
+      lapCompletionTimesSec: [],
+    });
+  });
+
+  it('does not compare an intermediate lap against the full race time', () => {
+    expect(getLapPaceDeltaSec({
+      elapsedTimeSec: 10,
+      lapNumber: 1,
+      requiredLaps: 2,
+      isFinalLap: false,
+      paceBaseline: {
+        finishTimeSec: 33,
+        lapCompletionTimesSec: [33],
+      },
+    })).toBeNull();
+    expect(getLapPaceDeltaSec({
+      elapsedTimeSec: 10,
+      lapNumber: 1,
+      requiredLaps: 2,
+      isFinalLap: false,
+      paceBaseline: {
+        finishTimeSec: 33,
+        lapCompletionTimesSec: [32.999, 33],
+      },
+    })).toBeNull();
+    expect(getLapPaceDeltaSec({
+      elapsedTimeSec: 10,
+      lapNumber: 1,
+      requiredLaps: 2,
+      isFinalLap: false,
+      paceBaseline: {
+        finishTimeSec: 33,
+        lapCompletionTimesSec: [11, 33],
+      },
+    })).toBeCloseTo(-1);
   });
 });

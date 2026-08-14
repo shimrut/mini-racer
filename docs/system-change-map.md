@@ -110,7 +110,10 @@ flowchart LR
   multi-lap Daily finish compares its complete race total only with an earlier
   complete total for that challenge; an intermediate lap from the current run
   is never a fallback PB. With no earlier race, the sheet shows its empty state
-  under **Best Race** instead of fabricating a delta.
+  under **Best Race** instead of fabricating a delta. In-race lap flashes use
+  the equivalent lap of that same earlier race, never the full race total. An
+  accepted Daily PB is installed with that race's lap count, including when the
+  queued result is the only challenge identity available.
 - Daily leaderboard rows and PB ghosts are separate challenge-scoped records with the same fixed deadline: six hours after `availableUntil`. Entries retain the verified completed-lap count, and ghosts additionally bind rules revision and lap count. One server replay simulation validates the complete daily race and produces the canonical ghost. Both writes run concurrently; the leaderboard write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`.
 - A stored PB that cannot be used — corrupt, or bound to a superseded track fingerprint, rules revision, or lap count — is treated as absent by every reader, but only the write path, which owns that player's PB lock, deletes it. A lock-free reader that deleted it could destroy a compatible record committed between its own read and its delete, and the browser has already dropped the replay by then.
 - Accepted submissions return the complete canonical `trackPersonalBest` record. The client validates and installs that record before GO without another `/api/player/pb-ghost` request. A pending faster lap makes the old prepared ghost ineligible for Improve; if the canonical result is unresolved, unavailable, or malformed at GO, the attempt starts normally without a ghost and shows `GHOST UNAVAILABLE` for two seconds after GO disappears. A late valid response is cached for the next attempt and never changes a ghost during an active run.

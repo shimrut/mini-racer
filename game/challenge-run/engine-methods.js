@@ -6,7 +6,7 @@ import {
     getDailyChallengeRequiredLaps,
 } from '../daily-challenge/labels.js';
 import { normalizeCheckpointTimesSec } from '../shared/checkpoint-times.js';
-import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
+import { createPersonalBestPaceBaseline, getLapPaceDeltaSec } from '../ghost/pb-pace.js';
 import { getMedalForRaceTime } from '../medals/medal-timing.js';
 import { writeTrackLastLapMedal } from '../medals/last-lap-medal-storage.js';
 import { getLoadedClientTrack } from '../track/client-registry.js';
@@ -151,15 +151,21 @@ export const challengeRunEngineMethods = {
         const raceElapsedTime = Number.isFinite(elapsedTimeSec)
             ? elapsedTimeSec
             : this.currentTime;
+        const requiredLapCount = Number.isInteger(requiredLaps)
+            ? requiredLaps
+            : this.currentChallengeRun.requiredLaps;
         const paceBaseline = this.getActiveRacePaceBaseline?.()
             ?? this.raceComparisonTarget
             ?? this.activePersonalBestPaceBaseline
             ?? null;
-        const pbLapBoundarySec = paceBaseline?.lapCompletionTimesSec?.[lapNumber - 1];
         const lapRecord = buildLapRecord(lapNumber, lapTime, null);
-        lapRecord.deltaVsBest = Number.isFinite(pbLapBoundarySec)
-            ? raceElapsedTime - pbLapBoundarySec
-            : null;
+        lapRecord.deltaVsBest = getLapPaceDeltaSec({
+            elapsedTimeSec: raceElapsedTime,
+            lapNumber,
+            requiredLaps: requiredLapCount,
+            isFinalLap,
+            paceBaseline,
+        });
         pushRecentLap(this.currentChallengeRun.recentLaps, lapRecord);
         this.currentChallengeRun.bestLapSecBeforeLastLap = this.currentChallengeRun.bestLap?.time ?? null;
         if (!this.currentChallengeRun.bestLap || lapTime < this.currentChallengeRun.bestLap.time) {
@@ -173,9 +179,7 @@ export const challengeRunEngineMethods = {
                 isBest: false,
                 isNewBest: false,
                 completedLaps: lapNumber,
-                requiredLaps: Number.isInteger(requiredLaps)
-                    ? requiredLaps
-                    : this.currentChallengeRun.requiredLaps,
+                requiredLaps: requiredLapCount,
                 elapsedTimeSec: raceElapsedTime,
             });
             this._resetLapTrailAfterIntermediateLap();

@@ -1,4 +1,4 @@
-const LAP_FINISH_TOLERANCE_SEC = 0.002;
+export const LAP_FINISH_TOLERANCE_SEC = 0.002;
 
 export function normalizeLapCompletionTimesSec(finishTimeSec, raw, lapCount) {
   const expectedLapCount = Math.trunc(Number(lapCount));

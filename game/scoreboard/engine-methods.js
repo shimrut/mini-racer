@@ -24,6 +24,23 @@ import {
 } from "../daily-challenge/service.js";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
 
+function challengeFromDailyVerificationEntry(engine, entry) {
+  const active = engine?.activeDailyChallenge;
+  if (active?.id === entry?.challengeId) return active;
+  const completedLaps = Number.isInteger(entry?.completedLaps)
+    ? Math.max(1, Math.trunc(entry.completedLaps))
+    : null;
+  return {
+    id: entry.challengeId,
+    challengeDate: entry.challengeDate,
+    trackKey: entry.trackKey,
+    objectiveType: entry.objectiveType,
+    ...(completedLaps > 1
+      ? { objectiveParams: { lapCount: completedLaps } }
+      : {}),
+  };
+}
+
 function previousBestFromVerificationEntry(entry) {
   if (!Number.isFinite(entry?.previousBestTime)) return null;
   return {
@@ -270,12 +287,7 @@ export const scoreboardEngineMethods = {
 
     if (result?.ok && body?.accepted && Number.isFinite(body?.bestTimeMs)) {
       this.applyCarUnlockSnapshot?.(body.carUnlocks);
-      const challenge = {
-        id: entry.challengeId,
-        challengeDate: entry.challengeDate,
-        trackKey: entry.trackKey,
-        objectiveType: entry.objectiveType,
-      };
+      const challenge = challengeFromDailyVerificationEntry(this, entry);
       setDailyChallengeBestTime(
         challenge,
         body.bestTimeMs / 1000,

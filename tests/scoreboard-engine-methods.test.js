@@ -398,6 +398,69 @@ describe("scoreboard engine verification retries", () => {
     expect(prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
   });
 
+  it("keeps the multi-lap race identity when installing an accepted PB", async () => {
+    const challengeId = "daily-canonical-two-lap";
+    enqueueDailyChallengeVerification({
+      challengeId,
+      bestTime: 33,
+      completedLaps: 2,
+      replay: REPLAY,
+      objectiveType: "multi_lap_total",
+      trackKey: "circuit",
+    });
+    const entry = getDailyChallengeVerificationEntry(challengeId);
+    const canonical = {
+      trackKey: "circuit",
+      bestTimeMs: 33000,
+      lapCount: 2,
+      lapCompletionTimesSec: [16, 33],
+      checkpointTimesSec: [4, 16],
+      updatedAt: "2026-08-14T20:00:00.000Z",
+      ghost: {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: 50,
+        origin: [0, 0, 0],
+        deltas: [100, 100, 0],
+      },
+    };
+    const installCanonicalTrackPersonalBestGhost = vi.fn();
+    const engine = {
+      installCanonicalTrackPersonalBestGhost,
+      prepareTrackPersonalBestGhost: vi.fn(),
+      resolveTrackPersonalBestGhostPending: vi.fn(),
+      pbGhostService: { invalidate: vi.fn() },
+      dailyChallengeUi: { refreshDailyChallengeVerificationState: vi.fn() },
+      leaderboards: { refreshDailyChallengeAfterAcceptedSubmission: vi.fn() },
+      modal: {
+        matchesModalScoreboardContext: vi.fn(() => false),
+        updateModalScoreboardSnapshot: vi.fn(),
+      },
+    };
+
+    await scoreboardEngineMethods.handleDailyChallengeVerificationResult.call(engine, entry, {
+      ok: true,
+      status: 200,
+      body: {
+        accepted: true,
+        improved: true,
+        bestTimeMs: 33000,
+        trackPbPersistenceStatus: "stored",
+        trackPersonalBest: canonical,
+      },
+    });
+
+    expect(installCanonicalTrackPersonalBestGhost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: challengeId,
+        trackKey: "circuit",
+        objectiveType: "multi_lap_total",
+        objectiveParams: { lapCount: 2 },
+      }),
+      canonical,
+    );
+  });
+
   it("keeps the replay queued and retries when PB persistence fails", async () => {
     const challengeId = "daily-pb-unavailable";
     enqueueDailyChallengeVerification({

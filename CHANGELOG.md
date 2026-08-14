@@ -1,5 +1,9 @@
 # Changelog
 
+- Fixed multi-lap retry comparisons treating lap 1 as a full race. After a
+  finished 2- or 3-lap run, the next attempt's first-lap flash now compares
+  against that same lap from the earlier race, not the previous total.
+
 - Kept a Daily or Campaign finish that happened before the game knew who the
   player was. The time is stamped to this phone's guest id and is never thrown
   away on the next open. This visit can send it once identity answers. A later
