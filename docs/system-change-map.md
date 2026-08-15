@@ -74,7 +74,7 @@ flowchart LR
 ### Devvit Journeys
 
 - `game/journeys/service.js` is the only client adapter for Reddit's official Devvit Journeys API. It serializes lifecycle calls, suppresses duplicate or non-increasing events, reports receipts only to the developer console, and contains SDK failures so they cannot affect loading, racing, finishing, or score submission.
-- The startup coordinator reveals either the completed lobby or the selected mode's inert Preparing/Retry surface within the global loader's 800ms budget. Start input remains gated until the selected mode's critical contract and track are ready; `App.Ready` is reported once a meaningful completed or pending surface is visible. Each explicit player intent starts one Journey attempt (`initial_start`, `track_switch`, `restart`, `retry`, or `improve`); checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, or track switches end incomplete before the next start. Mid-run track switches replace the active Journey through `replaceActive` end-then-start sequencing. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
+- The startup coordinator reveals the selected mode's lobby after that mode's contract and track are ready. Start input remains gated until those are ready; `App.Ready` is reported once that lobby is visible. Each explicit player intent starts one Journey attempt (`initial_start`, `track_switch`, `restart`, `retry`, or `improve`); checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, or track switches end incomplete before the next start. Mid-run track switches replace the active Journey through `replaceActive` end-then-start sequencing. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
 - `game/ui/loader.js` keeps bar progress monotonic while always showing the coordinator's current ordered phase. Dismissal removes the input-blocking class immediately and uses the shared 160ms motion token, without depending on animation frames that a hidden WebView may suspend.
 - Journey payloads contain no player ID, Reddit username, guest token, challenge ID, track key, replay, device details, or lap score. The official `/api/telemetry` router enriches events in Devvit; Mini Racer adds no custom analytics route, Redis record, retention policy, or dashboard.
 
@@ -649,21 +649,18 @@ These are useful, but they are not on the critical player path:
 The expanded `game` entrypoint resolves the launch target and constructs an
 inert racer shell before awaiting a deferred mode runtime. The shell starts with
 a procedural car and no external track request. `game/startup/coordinator.js`
-then owns one ordered plan: Daily starts profile and active-contract requests
-together, applies the resolved identity, and prepares only the selected Daily
-track; Campaign resolves authoritative identity (including any promoted-guest
-choice), requests Campaign bootstrap once, and prepares its default unlocked
-stage; Head to Head starts the duel request first, resolves player identity in
-parallel, and prepares the authoritative target track and frozen opponent ghost.
-Home alone requests the default track.
+then owns one ordered plan per launch mode. Daily and Head to Head start
+their server requests and the account request while the selected mode file is
+still downloading, then prepare only that mode’s track. Campaign starts the
+account request during that download, then asks for campaign progress after
+identity has settled and prepares its default unlocked stage. Home alone
+requests the default track.
 
-The full-screen loader has an 800ms visual budget plus the shared 160ms fade.
-When critical network or track work remains, it hands off to the selected
-mode's visible, input-gated Preparing/Retry surface while the same ordered plan
-continues. This is a presentation boundary, not a fake request success or a
-global timeout. Player car images and Daily/Campaign personal-best ghosts are
-non-critical and load after the selected identity/contract; they can fall back
-or report ghost unavailability without holding either the loader or Start.
+The splash stays up until the selected mode’s contract and track are ready,
+then fades with the shared 160ms motion token. Player car images and
+Daily/Campaign personal-best ghosts start after the track is named; they can
+fall back or report ghost unavailability without holding either the splash or
+Start.
 `trackReadyPromise` is assigned to the mode-selected track preparation rather
 than an unconditional constructor load, so direct Daily, Campaign, and Head to
 Head never render the default track first.

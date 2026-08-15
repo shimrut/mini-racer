@@ -1,5 +1,12 @@
 # Changelog
 
+- Daily, Campaign, and Head to Head keep one splash until that mode’s lobby
+  is ready. Daily and Head to Head start their server requests, and the
+  account request, while that mode’s extra file is still downloading.
+  Campaign starts the account request then, and asks for campaign progress
+  only after identity has settled. Personal-best ghosts and the car image
+  start after the track is named and do not keep the splash up.
+
 - If identity cannot be confirmed at launch, the game now asks before
   continuing. **Retry Sync** tries again. **Continue Offline** uses the last
   saved account on this phone, then retries identity once in the background

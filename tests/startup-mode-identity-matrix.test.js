@@ -42,7 +42,8 @@ describe('direct-mode startup identity matrix', () => {
                 racer.loadStartupRaceData(mode),
             ]);
 
-            // Identity and the player's car are essentials in every mode.
+            // Identity is an essential in every mode. The car starts with graphics
+            // but does not have to finish before the splash can hide.
             expect(calls).toContain(`profile:${identity}`);
             expect(calls).toContain('car');
             // One shared contract request, however many groups asked for it.
@@ -90,5 +91,28 @@ describe('direct-mode startup identity matrix', () => {
             'campaign-contract',
             'track:campaign-track',
         ]);
+    });
+
+    it('does not hold Daily graphics on a car image that has not arrived', async () => {
+        const racer = createRacer('daily', 'signed-in', []);
+        racer.syncCarSpriteAsset = vi.fn(() => new Promise(() => {}));
+
+        await racer.loadStartupGraphics('daily');
+    });
+
+    it('does not hold Daily race data on a ghost that has not arrived', async () => {
+        const racer = createRacer('daily', 'signed-in', []);
+        racer.loadInitialPersonalBestGhostAsset = vi.fn(() => new Promise(() => {}));
+
+        await racer.loadStartupRaceData('daily');
+        expect(racer.loadInitialPersonalBestGhostAsset).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts the Campaign ghost after the stage is known without waiting for it', async () => {
+        const racer = createRacer('campaign', 'signed-in', []);
+        racer.loadInitialCampaignPersonalBest = vi.fn(() => new Promise(() => {}));
+
+        await racer.loadStartupRaceData('campaign');
+        expect(racer.loadInitialCampaignPersonalBest).toHaveBeenCalledTimes(1);
     });
 });

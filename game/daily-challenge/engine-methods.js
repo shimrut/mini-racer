@@ -657,7 +657,16 @@ export const dailyChallengeEngineMethods = {
     throwOnError = false,
   } = {}) {
     try {
-      const challenge = await getActiveDailyChallenge();
+      const pending = this.initialDailyChallengeRequestPromise ?? getActiveDailyChallenge();
+      this.initialDailyChallengeRequestPromise = pending;
+      let challenge;
+      try {
+        challenge = await pending;
+      } finally {
+        if (this.initialDailyChallengeRequestPromise === pending) {
+          this.initialDailyChallengeRequestPromise = null;
+        }
+      }
       this.currentDailyChallenge = challenge || null;
       this.activeDailyChallenge = null;
       this.setDailyChallengeLobbySummary(challenge);

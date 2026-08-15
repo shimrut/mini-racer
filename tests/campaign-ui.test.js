@@ -2518,6 +2518,39 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(campaignServiceMocks.getCampaignPbGhost).toHaveBeenCalledWith(firstStage.raceId);
     });
 
+    it('returns the Campaign stage without waiting for the ghost', async () => {
+        const [firstStage] = CAMPAIGN_STAGES;
+        campaignServiceMocks.getCampaignBootstrap.mockResolvedValue({
+            availability: 'available',
+            authoritative: true,
+            campaignId: 'numbered-v1',
+            ranked: true,
+            signedIn: true,
+            stages: CAMPAIGN_STAGES,
+            progress: { resultsByRaceId: {}, unlockedRaceIds: [firstStage.raceId] },
+        });
+        campaignServiceMocks.getCampaignPbGhost.mockReturnValue(new Promise(() => {}));
+        const context = {
+            campaignBootstrap: null,
+            _campaignBootstrapReady: false,
+            _campaignBootstrapPromise: null,
+            _campaignBootstrapRequestId: 0,
+            applyCampaignLobbyBootstrap: vi.fn(),
+            applyCampaignPersonalBest: vi.fn(),
+            ensureCampaignBootstrap: campaignEngineMethods.ensureCampaignBootstrap,
+            loadInitialCampaignPersonalBest: campaignEngineMethods.loadInitialCampaignPersonalBest,
+            prepareInitialCampaignLaunch: campaignEngineMethods.prepareInitialCampaignLaunch,
+        };
+
+        const launch = await context.prepareInitialCampaignLaunch({
+            prepareTrack: false,
+            loadPersonalBest: false,
+        });
+
+        expect(launch?.stage?.trackKey).toBe(firstStage.trackKey);
+        expect(campaignServiceMocks.getCampaignPbGhost).not.toHaveBeenCalled();
+    });
+
     it('leaves the primary spinner to a start that is already running', async () => {
         const lobbyUi = {
             showCampaign: vi.fn(),

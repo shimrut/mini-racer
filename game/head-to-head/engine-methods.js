@@ -49,7 +49,15 @@ export const headToHeadEngineMethods = {
         }
         let response;
         try {
-            response = await getHeadToHead(challengeId);
+            const pending = this.initialHeadToHeadRequestPromise ?? getHeadToHead(challengeId);
+            this.initialHeadToHeadRequestPromise = pending;
+            try {
+                response = await pending;
+            } finally {
+                if (this.initialHeadToHeadRequestPromise === pending) {
+                    this.initialHeadToHeadRequestPromise = null;
+                }
+            }
         } catch (error) {
             console.error('Failed to load Head to Head challenge:', error);
             response = {

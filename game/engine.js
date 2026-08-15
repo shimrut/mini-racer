@@ -75,11 +75,13 @@ import {
 } from "./player/preferences.js";
 import {
   confirmDailyChallengeShare,
+  getActiveDailyChallenge,
   previewDailyChallengeShare,
 } from "./daily-challenge/service.js";
 import {
   confirmHeadToHeadBrag,
   createHeadToHead,
+  getHeadToHead,
   previewHeadToHead,
   previewHeadToHeadBrag,
 } from "./head-to-head/service.js";
@@ -103,6 +105,8 @@ export class RealTimeRacer {
     this.loadingScreen = new LoadingScreen();
     this.initialStartupPromise = null;
     this.initialContractPromise = null;
+    this.initialDailyChallengeRequestPromise = null;
+    this.initialHeadToHeadRequestPromise = null;
     // The track and the car share this one canvas, so nothing renders beneath it and
     // the context can be opaque: the per-pixel blend a transparent canvas costs every
     // frame would buy nothing. render() draws the track first, before it transforms
@@ -617,6 +621,7 @@ export class RealTimeRacer {
   startInitialStartup({ retry = false } = {}) {
     if (this.initialStartupPromise) return this.initialStartupPromise;
     this._initialStartupFailed = false;
+    this.startInitialModeFetches({ retry });
 
     const startupPromise = runInitialStartupPlan({
       mode: this.launchTarget.mode,
@@ -660,6 +665,7 @@ export class RealTimeRacer {
       if (mode === "daily") {
         this.dailyChallengePromise = this.loadDailyChallengeCritical({
           prepareTrack: false,
+          loadPersonalBest: false,
           throwOnError: true,
         });
         return this.dailyChallengePromise;
@@ -667,7 +673,10 @@ export class RealTimeRacer {
       if (mode === "campaign") {
         // Campaign progress decides the stage, so identity has to settle first.
         this.initialCampaignLaunchPromise = this.loadStartupPlayer()
-          .then(() => this.prepareInitialCampaignLaunch({ prepareTrack: false }));
+          .then(() => this.prepareInitialCampaignLaunch({
+            prepareTrack: false,
+            loadPersonalBest: false,
+          }));
         return this.initialCampaignLaunchPromise;
       }
       if (mode === "challenge") {
@@ -694,7 +703,7 @@ export class RealTimeRacer {
     return trackKey;
   }
 
-  /** Everything the player has to see to race: fonts, their track, their car. */
+  /** Track and fonts. The car starts here but does not hold the splash. */
   async loadStartupGraphics(mode, { onContractPhase, onTrackPhase } = {}) {
     // The car is named by local preferences and the fonts are already in flight, so
     // neither has to queue behind the round trips the track key waits on. A profile
@@ -715,12 +724,11 @@ export class RealTimeRacer {
       : this.ensureInitialContract(mode);
     await Promise.all([
       this.trackReadyPromise,
-      this.carAssetPromise,
       fontsReadyPromise,
     ]);
   }
 
-  /** The rest of the essentials: identity, the mode's contract, and this track's PB ghost. */
+  /** Account plus the selected mode's contract. Ghosts start here; they do not hold the splash. */
   async loadStartupRaceData(mode, { retry = false } = {}) {
     const [result] = await Promise.all([
       this.ensureInitialContract(mode),
@@ -728,9 +736,23 @@ export class RealTimeRacer {
     ]);
     if (mode === "daily") {
       this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
-      await this.initialPbGhostAssetPromise;
+    } else if (mode === "campaign" && result?.stage) {
+      this.initialPbGhostAssetPromise = this.loadInitialCampaignPersonalBest?.(result.stage);
     }
     return result;
+  }
+
+  /** Starts Daily/Head to Head and account requests while the selected mode file is still arriving. */
+  startInitialModeFetches({ retry = false } = {}) {
+    const mode = this.launchTarget?.mode;
+    this.loadStartupPlayer({ retry });
+    if (mode === "daily") {
+      this.initialDailyChallengeRequestPromise ??= getActiveDailyChallenge();
+      return;
+    }
+    if (mode === "challenge" && this.launchTarget?.challengeId) {
+      this.initialHeadToHeadRequestPromise ??= getHeadToHead(this.launchTarget.challengeId);
+    }
   }
 
   loadStartupPlayer({ retry = false } = {}) {
@@ -747,6 +769,8 @@ export class RealTimeRacer {
     if (!this._initialStartupFailed) return this.initialStartupPromise;
     this.initialStartupPromise = null;
     this.initialContractPromise = null;
+    this.initialDailyChallengeRequestPromise = null;
+    this.initialHeadToHeadRequestPromise = null;
     return this.startInitialStartup({ retry: true });
   }
 

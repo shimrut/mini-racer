@@ -42,6 +42,8 @@ describe('mode-priority startup', () => {
         expect(engineSource).toContain("throw new Error(`The ${mode} launch has no playable track.`)");
         expect(engineSource).not.toContain('this.loadTrack(DEFAULT_TRACK_KEY, {\n      loadPlayerProgress: false');
         expect(engineSource).toContain('from "./head-to-head/service.js"');
+        expect(engineSource.indexOf('this.startInitialModeFetches'))
+            .toBeLessThan(engineSource.indexOf('runInitialStartupPlan({'));
         expect(engineSource).not.toContain(
             'invokeModeMethod("challenge", "previewHeadToHead"',
         );
