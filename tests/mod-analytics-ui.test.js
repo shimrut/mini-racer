@@ -28,9 +28,9 @@ describe('moderator analytics page', () => {
                 challengeFinishes: 0,
             },
             windows: [
-                { days: 7, uniquePlayers: 11 },
-                { days: 14, uniquePlayers: 18 },
-                { days: 30, uniquePlayers: 29 },
+                { days: 7, uniquePlayers: 11, playerDays: 14 },
+                { days: 14, uniquePlayers: 18, playerDays: 22 },
+                { days: 30, uniquePlayers: 29, playerDays: 40 },
             ],
             days: [
                 { date: '2026-08-14', uniquePlayers: 3, newPlayers: 0, returningPlayers: 3 },
@@ -51,7 +51,11 @@ describe('moderator analytics page', () => {
         expect(window.document.getElementById('analytics-today').textContent).toContain('Returning');
         expect(window.document.getElementById('analytics-tracks').textContent).toContain('Classic Circuit');
         expect(window.document.getElementById('analytics-tracks').textContent).toContain('None yet');
+        expect(window.document.getElementById('analytics-windows').textContent).toContain('player-days');
+        expect(window.document.getElementById('analytics-trend').textContent).toContain('Unique players');
+        expect(window.document.querySelector('.analytics-chart')).toBeTruthy();
         expect(window.document.getElementById('analytics-days').textContent).toContain('2026-08-15');
+        expect(window.document.querySelector('.analytics-table')).toBeTruthy();
     });
 
     it('locks the page when the summary is forbidden', async () => {

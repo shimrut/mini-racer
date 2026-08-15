@@ -13,20 +13,23 @@
 <body>
     <main class="analytics-shell" aria-labelledby="analytics-title">
         <header class="analytics-header">
-            <p class="brand-lockup" aria-label="Mini Racer">
-                <span class="brand-lockup__mini">Mini</span>
-                <span class="brand-lockup__racer">Racer</span>
-            </p>
-            <h1 id="analytics-title">Analytics</h1>
+            <div>
+                <p class="brand-lockup" aria-label="Mini Racer">
+                    <span class="brand-lockup__mini">Mini</span>
+                    <span class="brand-lockup__racer">Racer</span>
+                </p>
+                <h1 id="analytics-title">Analytics</h1>
+            </div>
             <p id="analytics-range" class="analytics-range">Last 45 days</p>
         </header>
 
         <p id="analytics-status" class="analytics-status" role="status">Loading summary…</p>
 
-        <section id="analytics-windows" class="analytics-windows" aria-label="Unique players" hidden></section>
-        <section id="analytics-today" class="analytics-today" aria-label="Today" hidden></section>
+        <section id="analytics-windows" class="analytics-kpis" aria-label="Unique players" hidden></section>
+        <section id="analytics-today" class="analytics-split" aria-label="Today" hidden></section>
+        <section id="analytics-trend" class="analytics-card" aria-label="Unique players over time" hidden></section>
         <section id="analytics-tracks" class="analytics-tracks" aria-label="Tracks" hidden></section>
-        <section id="analytics-days" class="analytics-days" aria-label="Daily counts" hidden></section>
+        <section id="analytics-days" class="analytics-card" aria-label="Daily counts" hidden></section>
     </main>
 </body>
 
