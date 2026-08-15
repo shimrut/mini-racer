@@ -4,7 +4,6 @@ const LOADER_FADE_MS = 160;
 export class LoadingScreen {
   constructor() {
     this.element = document.getElementById("loading-screen");
-    this.progressBar = document.getElementById("loader-progress-bar");
     this.statusText = document.getElementById("loader-status");
     this.retryButton = document.getElementById("loader-retry");
     this.activeClass = "loading-active";
@@ -12,26 +11,18 @@ export class LoadingScreen {
     this.isComplete = false;
   }
 
-  update(percent, status) {
-    if (this.isComplete) return;
-
-    const safePercent = Math.min(Math.max(0, percent), 100);
-
-    if (this.progressBar) {
-      this.progressBar.style.width = `${safePercent}%`;
-    }
-
-    if (this.statusText && status) {
-      this.statusText.textContent = status;
-    }
-
-    if (this.element) {
-      this.element.setAttribute("aria-valuenow", Math.round(safePercent));
-    }
+  setStatus(status) {
+    if (this.isComplete || !status) return;
+    if (this.statusText) this.statusText.textContent = status;
+    this.element?.setAttribute("aria-valuetext", status);
   }
 
-  showPhase({ progress, label } = {}) {
-    this.update(progress, label);
+  update(_percent, status) {
+    this.setStatus(status);
+  }
+
+  showPhase({ label } = {}) {
+    this.setStatus(label);
   }
 
   /**
@@ -40,8 +31,9 @@ export class LoadingScreen {
    */
   showError(message, onRetry) {
     if (this.isComplete) return;
-    if (this.statusText) this.statusText.textContent = message;
+    this.setStatus(message);
     this.element?.classList?.add(this.failedClass);
+    this.element?.setAttribute("aria-busy", "false");
     if (!this.retryButton) return;
     this.retryButton.hidden = false;
     if (this._retryHandler) {
@@ -56,13 +48,16 @@ export class LoadingScreen {
 
   clearError() {
     this.element?.classList?.remove(this.failedClass);
+    this.element?.setAttribute("aria-busy", "true");
     if (this.retryButton) this.retryButton.hidden = true;
   }
 
   async dismiss() {
     if (this.isComplete) return;
-    this.update(100, "Ready!");
+    this.setStatus("Ready!");
     this.isComplete = true;
+    this.element?.setAttribute("aria-busy", "false");
+    this.element?.setAttribute("aria-valuenow", "100");
     document.body.classList.remove(this.activeClass);
     await new Promise((resolve) => setTimeout(resolve, LOADER_FADE_MS));
   }

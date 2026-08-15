@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LoadingScreen } from "../game/ui/loader.js";
 
@@ -7,7 +8,6 @@ function createLoadingScreen() {
     style: { setProperty: vi.fn() },
     classList: { add: vi.fn(), remove: vi.fn() },
   };
-  const progressBar = { style: {} };
   const statusText = { textContent: "" };
   const retryButton = {
     hidden: true,
@@ -17,7 +17,6 @@ function createLoadingScreen() {
   };
   const nodes = {
     "loading-screen": element,
-    "loader-progress-bar": progressBar,
     "loader-status": statusText,
     "loader-retry": retryButton,
   };
@@ -27,7 +26,7 @@ function createLoadingScreen() {
     getElementById: vi.fn((id) => nodes[id] ?? null),
   });
 
-  return { screen: new LoadingScreen(), element, progressBar, statusText, retryButton };
+  return { screen: new LoadingScreen(), element, statusText, retryButton };
 }
 
 describe("LoadingScreen", () => {
@@ -35,33 +34,30 @@ describe("LoadingScreen", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the phase the startup plan last reported", () => {
-    const { screen, progressBar, statusText } = createLoadingScreen();
+  it("shows the phase label without driving the bar from that percent", () => {
+    const { screen, statusText, element } = createLoadingScreen();
 
-    screen.update(40, "Loading graphics...");
+    screen.showPhase({ progress: 30, label: "Loading Daily data…" });
 
-    expect(progressBar.style.width).toBe("40%");
-    expect(statusText.textContent).toBe("Loading graphics...");
-
-    screen.update(75, "Loading race data...");
-
-    expect(progressBar.style.width).toBe("75%");
-    expect(statusText.textContent).toBe("Loading race data...");
+    expect(statusText.textContent).toBe("Loading Daily data…");
+    expect(element.setAttribute).toHaveBeenCalledWith("aria-valuetext", "Loading Daily data…");
+    expect(document.getElementById).not.toHaveBeenCalledWith("loader-progress-bar");
   });
 
-  it("finishes at 100 percent when dismissed", async () => {
+  it("finishes with Ready when dismissed", async () => {
     vi.stubGlobal("setTimeout", (callback) => {
       callback();
       return 1;
     });
-    const { screen, progressBar, statusText } = createLoadingScreen();
+    const { screen, statusText, element } = createLoadingScreen();
 
-    screen.update(95, "Displaying Daily...");
+    screen.showPhase({ progress: 95, label: "Displaying Daily..." });
     await screen.dismiss();
 
-    expect(progressBar.style.width).toBe("100%");
     expect(statusText.textContent).toBe("Ready!");
     expect(screen.isComplete).toBe(true);
+    expect(element.setAttribute).toHaveBeenCalledWith("aria-busy", "false");
+    expect(element.setAttribute).toHaveBeenCalledWith("aria-valuenow", "100");
     expect(document.body.classList.remove).toHaveBeenCalledWith("loading-active");
   });
 
@@ -82,5 +78,17 @@ describe("LoadingScreen", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(retryButton.hidden).toBe(true);
     expect(element.classList.remove).toHaveBeenCalledWith("loader-failed");
+  });
+
+  it("lets CSS own the bar crawl in one place", () => {
+    const css = readFileSync(new URL("../styles/loading.css", import.meta.url), "utf8");
+    const loaderSource = readFileSync(new URL("../game/ui/loader.js", import.meta.url), "utf8");
+
+    expect(css).toContain("loaderBarCrawl");
+    expect(css).toContain("loaderBarCreep");
+    expect(css).toContain("--loader-bar-held");
+    expect(css).toContain("prefers-reduced-motion");
+    expect(loaderSource).not.toContain("progressBar");
+    expect(loaderSource).not.toContain("requestAnimationFrame");
   });
 });

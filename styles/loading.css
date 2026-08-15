@@ -1,4 +1,5 @@
 #loading-screen {
+    --loader-bar-held: 0.88;
     position: fixed;
     inset: 0;
     background: radial-gradient(circle at center, var(--bg-surface) 0%, var(--bg-color) 100%);
@@ -33,10 +34,41 @@ body:not(.loading-active) #loading-screen {
 
 .loader-progress-bar {
     position: absolute;
-    inset: 0 auto 0 0;
-    width: 0%;
+    inset: 0;
+    width: 100%;
     background: var(--accent-color);
-    transition: width 0.3s ease-out;
+    transform: scaleX(0);
+    transform-origin: left center;
+    /* Starting values: 1.8s glide to 88%, then 12s crawl to 96%. */
+    animation:
+        loaderBarCrawl 1.8s var(--ease-glide) forwards,
+        loaderBarCreep 12s 1.8s linear forwards;
+}
+
+body:not(.loading-active) #loading-screen .loader-progress-bar {
+    animation: none;
+    transform: scaleX(1);
+    transition: transform var(--dur-base) ease-out;
+}
+
+@keyframes loaderBarCrawl {
+    from {
+        transform: scaleX(0);
+    }
+
+    to {
+        transform: scaleX(var(--loader-bar-held));
+    }
+}
+
+@keyframes loaderBarCreep {
+    from {
+        transform: scaleX(var(--loader-bar-held));
+    }
+
+    to {
+        transform: scaleX(0.96);
+    }
 }
 
 .loader-status {
@@ -82,5 +114,23 @@ body:not(.loading-active) #loading-screen {
     50% {
         opacity: 0.85;
         transform: scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loader-progress-bar {
+        animation: none;
+        transform: scaleX(0);
+        transition: none;
+    }
+
+    body:not(.loading-active) #loading-screen .loader-progress-bar {
+        animation: none;
+        transition: none;
+        transform: scaleX(1);
+    }
+
+    .loader-text {
+        animation: none;
     }
 }

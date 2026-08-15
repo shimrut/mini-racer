@@ -251,7 +251,8 @@ against it rather than against a hand-typed number.
 The band stops at 200ms because these cover a state change rather than perform
 one. Durations above it are deliberate moments — the boot curtain, the medal
 entrance, the spinner and loader loops — and stay written out at their own site,
-where the number is the point. `ease` and `ease-out` remain the plain keywords
+where the number is the point. The splash bar crawl (1.8s to 88%, then 12s to
+96%) lives in `styles/loading.css` so it can keep moving while startup waits. `ease` and `ease-out` remain the plain keywords
 for colour and opacity; the curve tokens are for things that move.
 
 `styles-architecture.test.js` fails on any transition or animation duration at

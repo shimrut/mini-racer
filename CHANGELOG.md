@@ -1,5 +1,9 @@
 # Changelog
 
+- The splash bar now crawls on its own so a server wait does not look frozen.
+  The status line still names the real step. The splash still does not hide
+  until that mode can be shown.
+
 - Daily, Campaign, and Head to Head keep one splash until that mode’s lobby
   is ready. Daily and Head to Head start their server requests, and the
   account request, while that mode’s extra file is still downloading.
