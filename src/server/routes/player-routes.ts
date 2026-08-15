@@ -2,6 +2,7 @@ import type { Application, Response } from 'express';
 
 type PlayerPayload = {
     playerId: string | null;
+    firstSeenAt?: string | null;
     playerPreferences?: unknown;
 };
 
@@ -11,6 +12,7 @@ export type PlayerRouteDependencies = {
     selectServerGuestProgress(input: Record<string, unknown>): Promise<PlayerPayload>;
     updateServerPlayerIdentity(input: Record<string, unknown>): Promise<PlayerPayload>;
     updateServerPlayerPreferences(input: Record<string, unknown>): Promise<PlayerPayload>;
+    recordPlayerPresence?(playerId: string, firstSeenAt?: string | null): void;
 };
 
 function hasPlayerCredential(value: unknown): boolean {
@@ -44,6 +46,7 @@ export function registerPlayerRoutes(
                 sendPlayerAuthorizationFailure(res, { playerId, guestToken });
                 return;
             }
+            dependencies.recordPlayerPresence?.(payload.playerId, payload.firstSeenAt);
             res.status(200).json(payload);
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer player bootstrap:', error);

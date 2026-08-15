@@ -190,7 +190,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 
 ### Devvit Journeys playtest
 
-- [ ] `journeys` permission and the official `/api/telemetry` route are present, with no custom analytics route, store, dashboard, or Redis record.
+- [ ] `journeys` permission and the official `/api/telemetry` route are present. Custom moderator summary uses `/api/analytics/summary` and the restored `dailygp:analytics:*` Redis keys only, never Journey payloads.
 - [ ] `App.Ready` fires once after the expanded lobby becomes interactive; preview, Daily launcher, Campaign launcher, and podium entrypoints do not fire it.
 - [ ] Explicit Start/Retry/Improve/Restart begins an attempt with the matching Journey start reason, checkpoint progress never moves backward, pause/resume use fixed actions, and valid/incomplete endings match the race lifecycle.
 - [ ] Journey payloads contain no player identity, guest token, challenge or track identifier, replay data, device details, or lap score.

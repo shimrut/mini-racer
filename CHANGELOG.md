@@ -1,5 +1,10 @@
 # Changelog
 
+- Restored a minimal moderator analytics summary. It reuses the old daily
+  Redis keys, counts unique people from player bootstrap, and counts Daily
+  finishes, Campaign starts, and Head to Head creates/finishes. Mods open it
+  from **Open Mini Racer analytics**. Counts expire after 45 days.
+
 - Finish-sheet ghost comparisons now show **VS #rank** and a signed gap
   (`+` slower, `-` faster) instead of the opponent name and WON/LOST BY.
   After beating that ghost, **Improve** starts a normal personal-best run

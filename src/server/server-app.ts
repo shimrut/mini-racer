@@ -45,8 +45,18 @@ import {
     readAllDailyPodiumAutopostSubscriptions,
 } from './daily-podium-autopost-store.js';
 import { ensureMiniRacerLauncherPostForSubreddit } from './launcher-post-service.js';
-import { resolveMenuTargetSubredditName } from './moderator-access.js';
+import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator-access.js';
+import {
+    getServerAnalyticsSummary,
+    recordAnalyticsPlayBestEffort,
+    recordAnalyticsPresenceBestEffort,
+} from './analytics-store.js';
+import {
+    ensureModeratorAnalyticsPostForSubreddit,
+    resolveAnalyticsToolSubredditName,
+} from './moderator-analytics-post.js';
 import { registerPlayerRoutes } from './routes/player-routes.js';
+import { registerAnalyticsRoutes } from './routes/analytics-routes.js';
 import { registerCompetitionRoutes } from './routes/competition-routes.js';
 import { registerShareRoutes } from './routes/share-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
@@ -80,8 +90,14 @@ const headToHeadService = createHeadToHeadService({
 });
 
 function registerProductionRoutes(app: express.Application): void {
+    registerAnalyticsRoutes(app, {
+        resolveAnalyticsToolSubredditName,
+        assertModeratorForSubreddit,
+        getServerAnalyticsSummary: () => getServerAnalyticsSummary(),
+    });
     registerPlayerRoutes(app, {
         getRequestUsername,
+        recordPlayerPresence: recordAnalyticsPresenceBestEffort,
         getServerPlayerBootstrap: (input) => getServerPlayerBootstrap(input),
         selectServerGuestProgress: (input) => selectServerGuestProgress(input),
         updateServerPlayerIdentity: (input) => updateServerPlayerIdentity(input),
@@ -101,6 +117,9 @@ function registerProductionRoutes(app: express.Application): void {
         getRequestUsername,
         getRequestRateLimitIdentity,
         getServerCampaignBootstrap: (input) => getServerCampaignBootstrap(input),
+        recordCampaignStart: (trackKey) => (
+            recordAnalyticsPlayBestEffort('campaign', 'start', trackKey)
+        ),
         startServerCampaignRace: (input) => startServerCampaignRace(input),
         getServerCampaignSnapshot: (input) => getServerCampaignSnapshot(input),
         submitServerCampaignRun: (input) => submitServerCampaignRun(input),
@@ -135,6 +154,9 @@ function registerProductionRoutes(app: express.Application): void {
         getServerDailyGpChallenge,
         getServerDailyGpPlaylist,
         getServerDailyGpSnapshot: (input) => getServerDailyGpSnapshot(input),
+        recordDailyFinish: (trackKey) => (
+            recordAnalyticsPlayBestEffort('daily', 'finish', trackKey)
+        ),
         submitServerDailyGpRun: (input) => submitServerDailyGpRun(input),
         isDailyGpChallengePlayable,
     });
@@ -160,6 +182,7 @@ function registerProductionRoutes(app: express.Application): void {
         deleteDailyPodiumAutopostSubscription,
         readAllDailyAutopostSubscriptions,
         readAllDailyPodiumAutopostSubscriptions,
+        ensureModeratorAnalyticsPostForSubreddit,
     });
 }
 

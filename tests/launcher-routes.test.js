@@ -25,6 +25,10 @@ function createRouteHarness(overrides = {}) {
         deleteDailyPodiumAutopostSubscription: vi.fn(),
         readAllDailyAutopostSubscriptions: vi.fn(async () => []),
         readAllDailyPodiumAutopostSubscriptions: vi.fn(async () => []),
+        ensureModeratorAnalyticsPostForSubreddit: vi.fn(async () => ({
+            created: false,
+            postUrl: 'https://reddit.com/analytics',
+        })),
         ...overrides,
     };
     registerInternalRoutes(app, dependencies);

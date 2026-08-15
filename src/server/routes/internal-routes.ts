@@ -48,6 +48,7 @@ export type InternalRouteDependencies = {
     deleteDailyPodiumAutopostSubscription(subredditName: string): Promise<void>;
     readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]>;
     readAllDailyPodiumAutopostSubscriptions(): Promise<DailyPodiumAutopostSubscription[]>;
+    ensureModeratorAnalyticsPostForSubreddit(subredditName: string): Promise<PostResult>;
 };
 
 function createMenuToast(text: string, appearance: 'neutral' | 'success' = 'neutral') {
@@ -160,6 +161,39 @@ export function registerInternalRoutes(
         '/internal/menu/launcher-lobby-create',
         'lobby',
         'Lobby launcher post',
+    );
+
+    registerMenuAction(
+        app,
+        dependencies,
+        '/internal/menu/mod-analytics-open',
+        {
+            missingContextMessage: 'Reddit did not provide a subreddit context for this tool.',
+            failureLogMessage: 'Failed to open moderator analytics tool:',
+            failureToastPrefix: 'Could not open Mini Racer analytics',
+        },
+        async (subredditName, res) => {
+            const result = await dependencies.ensureModeratorAnalyticsPostForSubreddit(
+                subredditName,
+            );
+
+            if (!result.postUrl) {
+                res.json(createMenuToast(
+                    `Mini Racer analytics could not open for r/${subredditName}.`,
+                ));
+                return;
+            }
+
+            res.json({
+                showToast: {
+                    text: result.created
+                        ? `Mini Racer analytics is ready for r/${subredditName}.`
+                        : `Opening Mini Racer analytics for r/${subredditName}.`,
+                    appearance: 'success',
+                },
+                navigateTo: result.postUrl,
+            });
+        },
     );
 
     registerMenuAction(

@@ -6,7 +6,7 @@
 an ordered manifest whose imports are bundled into the production `game.css`.
 
 Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
-`head-to-head.css`)
+`head-to-head.css`, `mod-analytics.css`)
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the

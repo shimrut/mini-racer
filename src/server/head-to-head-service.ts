@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
+import { recordAnalyticsPlayBestEffort } from './analytics-store.js';
 import { getTrackName } from '../../game/track/catalog.js';
 import {
     CAMPAIGN_ID,
@@ -773,6 +774,7 @@ export function createHeadToHeadService(
                 saved.trackKey,
             );
             await redis.del(previewKey(token));
+            recordAnalyticsPlayBestEffort('challenge', 'create', saved.trackKey);
             return {
                 status: 200,
                 body: {
@@ -941,6 +943,7 @@ export function createHeadToHeadService(
         }
         await recordCompletedRace(viewer.playerId);
         await recordHeadToHeadWin(viewer.playerId, challengeId);
+        recordAnalyticsPlayBestEffort('challenge', 'finish', challenge.trackKey);
 
         // Nothing about a Head to Head outlives its post, so a short-lived receipt carries the verified time to the brag comment it earns.
         let acceptToken: string | null = null;

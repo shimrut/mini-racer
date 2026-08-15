@@ -12,6 +12,13 @@ const redis = {
     del: vi.fn(async (key) => strings.delete(key)),
     expire: vi.fn(async () => true),
     expireTime: vi.fn(async () => Math.floor(Date.now() / 1000) + 60),
+    hIncrBy: vi.fn(async (key, field, amount) => {
+        const hash = hashes.get(key) ?? new Map();
+        const next = Number(hash.get(field) || 0) + amount;
+        hash.set(field, String(next));
+        hashes.set(key, hash);
+        return next;
+    }),
     incrBy: vi.fn(async (key, amount) => {
         const next = Number(strings.get(key) || 0) + amount;
         strings.set(key, String(next));
