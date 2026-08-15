@@ -467,6 +467,58 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(endAttempt).toHaveBeenCalledWith({ complete: true });
   });
 
+  it("starts Improve without the beaten ghost after taking first", () => {
+    const showModal = vi.fn();
+    const handleStartDailyChallenge = vi.fn();
+    const restartDailyChallenge = vi.fn();
+    const challenge = {
+      id: "daily-1",
+      trackKey: "circuit",
+      objectiveType: "fastest_lap",
+    };
+
+    RealTimeRacer.prototype.handleDailyChallengeWin.call(
+      {
+        isValidatedWinData: () => true,
+        currentChallengeRun: { completedLaps: 1 },
+        activeDailyChallenge: challenge,
+        status: "playing",
+        journeys: { endAttempt: vi.fn() },
+        currentRunPolicy: { bestResultComparator: "time" },
+        dailyChallengeBestResult: null,
+        bestLapTime: 9.3,
+        cachedSpeed: 0,
+        hud: {
+          syncHud: vi.fn(),
+          setBestTime: vi.fn(),
+          setHudPersonalBestsOpenAllowed: vi.fn(),
+        },
+        dailyChallengeUi: {
+          getDailyChallengeScoreboardSnapshot: vi.fn(() => null),
+        },
+        modal: { showModal, modalMsg: null },
+        getRaceComparisonResult: () => ({
+          outcome: "won",
+          deltaSec: -0.061,
+          target: { displayName: "Rival", rank: 1, finishTimeSec: 9.361 },
+        }),
+        handleStartDailyChallenge,
+        restartDailyChallenge,
+        returnToActiveLobby: vi.fn(),
+        enqueueDailyChallengeVerificationSubmission: vi.fn(),
+        scoreboardReplay: { getPayload: vi.fn(() => ({ inputs: [] })) },
+      },
+      {
+        lapTime: 9.3,
+        completedLaps: 1,
+      },
+    );
+
+    showModal.mock.calls[0][3].restartAction();
+    expect(handleStartDailyChallenge).toHaveBeenCalledWith(challenge);
+    expect(restartDailyChallenge).not.toHaveBeenCalled();
+  });
+
   it("does not compare a first multi-lap race total against lap one", () => {
     const showModal = vi.fn();
     const engine = {
@@ -781,7 +833,10 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       reset,
     });
 
-    expect(reset).toHaveBeenCalledWith(true, { preserveDailyChallenge: true });
+    expect(reset).toHaveBeenCalledWith(true, {
+      preserveDailyChallenge: true,
+      preserveRaceComparisonTarget: true,
+    });
     expect(endAttempt).toHaveBeenCalledWith({ complete: false });
     expect(startAttempt).toHaveBeenCalledWith({ reason: "restart" });
   });
@@ -801,6 +856,10 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     );
 
     expect(startAttempt).toHaveBeenCalledWith({ reason: "improve" });
+    expect(reset).toHaveBeenCalledWith(true, {
+      preserveDailyChallenge: true,
+      preserveRaceComparisonTarget: false,
+    });
   });
 
   it("clears daily challenge race context when leaving a challenge run", () => {

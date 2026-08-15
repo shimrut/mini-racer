@@ -906,7 +906,9 @@ export const campaignEngineMethods = {
                     secondaryActionLabel: 'Campaign',
                     secondaryAction: () => this.showCampaignLobby(),
                 }),
-                restartAction: () => this.restartActiveRace(),
+                restartAction: comparison?.outcome === 'won'
+                    ? () => void this.startCampaignStage(stage)
+                    : () => this.restartActiveRace(),
                 settingsAction: () => this.settings.openSettings(),
                 shareRequest,
                 nextRace: nextTarget

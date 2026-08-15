@@ -2,6 +2,8 @@
 
 - Finish-sheet ghost comparisons now show **VS #rank** and a signed gap
   (`+` slower, `-` faster) instead of the opponent name and WON/LOST BY.
+  After beating that ghost, **Improve** starts a normal personal-best run
+  instead of racing the same frozen rank again.
 
 - Replaced the Head to Head poster helmets with italic uppercase **VS.**
   (white V, red S) between the two racers.

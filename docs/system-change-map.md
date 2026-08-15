@@ -110,7 +110,9 @@ flowchart LR
   **VS #rank** and a signed gap (`+0.243s` slower, `-0.243s` faster, `0.000s`
   tied). The opponent name and won/lost copy stay off that row so it matches
   RANK. Personal-best comparisons stay on the same slot when no opponent was
-  raced.
+  raced. After a win, Improve starts the same Daily or Campaign race without
+  that frozen ghost, so the sheet does not keep showing VS #1 after you have
+  taken first.
 - Finish-screen personal-best comparisons use like-for-like race results. A
   multi-lap Daily finish compares its complete race total only with an earlier
   complete total for that challenge; an intermediate lap from the current run

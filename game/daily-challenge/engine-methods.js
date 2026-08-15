@@ -1481,7 +1481,11 @@ export const dailyChallengeEngineMethods = {
             secondaryActionLabel: "Done",
             secondaryAction: () => this.returnToActiveLobby(),
           }),
-          restartAction: () => this.restartDailyChallenge({ reason: "improve" }),
+          restartAction: comparison?.outcome === "won"
+            ? () => this.handleStartDailyChallenge(challenge)
+            : () => this.restartDailyChallenge({
+              reason: comparison?.target ? "opponent-retry" : "improve",
+            }),
           settingsAction: () => this.settings.openSettings(),
           shareRequest: {
             source: "finish",
@@ -1553,7 +1557,10 @@ export const dailyChallengeEngineMethods = {
 
     void this.journeys?.endAttempt?.({ complete: false });
     void this.journeys?.startAttempt?.({ reason });
-    this.reset(true, { preserveDailyChallenge: true });
+    this.reset(true, {
+      preserveDailyChallenge: true,
+      preserveRaceComparisonTarget: reason !== "improve",
+    });
   },
 
   async startDailyChallengeAgainstOpponent(challenge, target) {

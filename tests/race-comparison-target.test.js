@@ -422,6 +422,7 @@ describe('leaderboard race comparison target', () => {
         deltaSec: -0.25,
       }),
       openCampaignStandings: vi.fn(),
+      startCampaignStage: vi.fn(),
       restartActiveRace: vi.fn(),
       showCampaignLobby: vi.fn(),
       settings: { openSettings: vi.fn() },
@@ -447,5 +448,12 @@ describe('leaderboard race comparison target', () => {
       pbCheckpointTimes: [4, 8],
       pbFinishSec: 12,
     });
+    showModal.mock.calls[0][3].restartAction();
+    expect(engine.startCampaignStage).toHaveBeenCalledWith({
+      raceId: 'numbered-v1-00',
+      trackKey: 'circuit',
+      lapCount: 1,
+    });
+    expect(engine.restartActiveRace).not.toHaveBeenCalled();
   });
 });
