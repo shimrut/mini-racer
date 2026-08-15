@@ -139,6 +139,8 @@ describe('track runtime integrity', () => {
             'squareDeal',
             'doubleHook',
             'doubleCrest',
+            'heartsQueen',
+            'aceSpades',
         ]);
         const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -176,7 +178,7 @@ describe('track runtime integrity', () => {
             '2a272e53a4cc50320fc07daff2784898aef5c761c5301cb684aefd9d1cabb270',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '89f1279533bb0556687dafe8440f6b756cdf7a2a0965febf36b36872a1831378',
+            '053e9a1b820e7da95c2c214c0ba0e04a82847f4c13da877d67833effc04d2b32',
         );
     });
 

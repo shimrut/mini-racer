@@ -86,6 +86,8 @@ import crossCurrent from './definitions/cross-current.js';
 import squareDeal from './definitions/square-deal.js';
 import doubleHook from './definitions/double-hook.js';
 import doubleCrest from './definitions/double-crest.js';
+import heartsQueen from './definitions/hearts-queen.js';
+import aceSpades from './definitions/ace-spades.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -177,6 +179,8 @@ const TRACK_GEOMETRY = {
     squareDeal,
     doubleHook,
     doubleCrest,
+    heartsQueen,
+    aceSpades,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

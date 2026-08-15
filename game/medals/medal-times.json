@@ -526,5 +526,17 @@
     "gold": 10.05,
     "silver": 10.49,
     "bronze": 10.94
+  },
+  "heartsQueen": {
+    "author": 7.05,
+    "gold": 7.21,
+    "silver": 7.44,
+    "bronze": 7.75
+  },
+  "aceSpades": {
+    "author": 9.71,
+    "gold": 9.96,
+    "silver": 10.23,
+    "bronze": 10.58
   }
 }

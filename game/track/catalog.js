@@ -87,6 +87,8 @@ export const TRACK_CATALOG = {
     squareDeal: { name: "Square Deal" },
     doubleHook: { name: "Double Hook" },
     doubleCrest: { name: "Double Crest" },
+    heartsQueen: { name: "Queen of Hearts" },
+    aceSpades: { name: "Ace of Spades" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -164,6 +166,8 @@ export const TRACK_SCHEDULE_KEYS = [
     'squareDeal',
     'doubleHook',
     'doubleCrest',
+    'heartsQueen',
+    'aceSpades',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

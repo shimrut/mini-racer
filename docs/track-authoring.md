@@ -85,7 +85,8 @@ start/finish line and snaps onto that line's center axis when moved.
    `tests/track-runtime-integrity.test.js`. Preserve the preceding registry
    fingerprint as a subset assertion so adding a track cannot hide changes to
    existing track geometry. The current approved fingerprint includes the
-   intentional Mistfall Circuit outer-boundary shape committed in `c4da688`.
+   intentional Mistfall Circuit outer-boundary shape committed in `c4da688`,
+   plus Queen of Hearts and Ace of Spades at the end of the Daily schedule.
 7. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
 
 The repository-writing endpoint exists only in the dedicated local Mapmaker

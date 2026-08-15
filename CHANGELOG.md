@@ -1,5 +1,8 @@
 # Changelog
 
+- Added **Queen of Hearts** and **Ace of Spades** to the Daily rotation after
+  Double Crest. Existing published days are unchanged.
+
 - The splash bar now crawls on its own so a server wait does not look frozen.
   The status line still names the real step. The splash still does not hide
   until that mode can be shown.
