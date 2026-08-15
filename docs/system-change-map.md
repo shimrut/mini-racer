@@ -106,6 +106,11 @@ flowchart LR
 - `game/scoreboard/engine-methods.js` starts verification from the finish event, handles retry behavior until the competition deadline, and consumes the canonical challenge-PB record returned by an accepted submission.
 - Finish-screen RANK first paint and live updates share `applyCombinedRankValue` in `game/race/result-flow.js`, so loading shows Submitting/Verifying status text and failures keep RANK visible with the error. After the win modal opens, a synchronous queue sync paints Verifying when an entry still exists; if accept finishes with no standings snapshot, loading clears and RANK hides.
 - Standings opened from the finish sheet always dismiss back to that finish sheet, even if an asynchronous standings refresh replaces the temporary close-mode flag.
+- Finish-screen opponent comparisons reuse the personal-best delta slot:
+  **VS #rank** and a signed gap (`+0.243s` slower, `-0.243s` faster, `0.000s`
+  tied). The opponent name and won/lost copy stay off that row so it matches
+  RANK. Personal-best comparisons stay on the same slot when no opponent was
+  raced.
 - Finish-screen personal-best comparisons use like-for-like race results. A
   multi-lap Daily finish compares its complete race total only with an earlier
   complete total for that challenge; an intermediate lap from the current run

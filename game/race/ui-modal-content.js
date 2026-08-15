@@ -782,25 +782,22 @@ export class ModalContentUi {
         }
         if (bestLapEl) {
             if (raceComparisonTarget && comparisonOutcome) {
-                const opponentName = String(raceComparisonTarget.displayName || 'Opponent');
                 if (label2El) {
                     label2El.textContent = Number.isFinite(raceComparisonTarget.rank)
-                        ? `VS #${raceComparisonTarget.rank} ${opponentName}`
-                        : `VS ${opponentName}`;
+                        ? `VS #${raceComparisonTarget.rank}`
+                        : 'VS';
                 }
-                const deltaText = Number.isFinite(deltaToComparison)
-                    ? `${Math.abs(deltaToComparison).toFixed(3)}s`
-                    : '';
-                bestLapEl.textContent = comparisonOutcome === 'won'
-                    ? `WON${deltaText ? ` BY ${deltaText}` : ''}`
-                    : comparisonOutcome === 'tie'
-                        ? 'TIED'
-                        : `LOST${deltaText ? ` BY ${deltaText}` : ''}`;
+                const deltaDisplay = buildModalDeltaDisplay({
+                    deltaToBest: Number.isFinite(deltaToComparison) ? deltaToComparison : null,
+                });
+                bestLapEl.textContent = deltaDisplay.text;
                 bestLapEl.classList.remove('is-gain', 'is-loss', 'combined-stat-value--placeholder');
-                bestLapEl.classList.add(
-                    'combined-stat-value--pb-delta',
-                    comparisonOutcome === 'won' ? 'is-gain' : 'is-loss',
-                );
+                bestLapEl.classList.add('combined-stat-value--pb-delta');
+                if (deltaDisplay.valueClass === 'modal-stat-value--delta-negative') {
+                    bestLapEl.classList.add('is-gain');
+                } else if (deltaDisplay.valueClass === 'modal-stat-value--delta-positive') {
+                    bestLapEl.classList.add('is-loss');
+                }
             } else {
                 this._applyCombinedWinPbDelta(
                     bestLapEl,

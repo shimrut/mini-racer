@@ -475,6 +475,78 @@ describe('ui modal content helpers', () => {
 
         global.document = originalDocument;
     });
+
+    it('shows a ghost comparison as VS rank and a signed gap, not a won/lost sentence', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div class="stat-floating-item combined-stat--pb-delta">
+                    <div id="combined-best-lap"></div>
+                    <div id="combined-stat-label-2"></div>
+                </div>
+                <div id="combined-next-medal-stat"></div>
+                <div id="combined-next-medal-icon-slot"></div>
+                <div id="combined-next-medal-time"></div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+        const labelEl = container.querySelector('#combined-stat-label-2');
+        const deltaEl = container.querySelector('#combined-best-lap');
+
+        component.renderCombinedResults(container, {
+            time: 9.604,
+            raceComparisonTarget: { displayName: 'ALFREAD_IO', rank: 1 },
+            comparisonOutcome: 'lost',
+            deltaToComparison: 0.243,
+        });
+        expect(labelEl.textContent).toBe('VS #1');
+        expect(deltaEl.textContent).toBe('+0.243s');
+        expect(deltaEl.classList.contains('is-loss')).toBe(true);
+        expect(deltaEl.classList.contains('is-gain')).toBe(false);
+        expect(container.textContent).not.toContain('LOST');
+        expect(container.textContent).not.toContain('ALFREAD_IO');
+
+        component.renderCombinedResults(container, {
+            time: 9.361,
+            raceComparisonTarget: { displayName: 'ALFREAD_IO', rank: 2 },
+            comparisonOutcome: 'won',
+            deltaToComparison: -0.243,
+        });
+        expect(labelEl.textContent).toBe('VS #2');
+        expect(deltaEl.textContent).toBe('-0.243s');
+        expect(deltaEl.classList.contains('is-gain')).toBe(true);
+        expect(deltaEl.classList.contains('is-loss')).toBe(false);
+        expect(container.textContent).not.toContain('WON');
+
+        component.renderCombinedResults(container, {
+            time: 9.604,
+            raceComparisonTarget: { displayName: 'ALFREAD_IO', rank: 1 },
+            comparisonOutcome: 'tie',
+            deltaToComparison: 0,
+        });
+        expect(labelEl.textContent).toBe('VS #1');
+        expect(deltaEl.textContent).toBe('0.000s');
+        expect(deltaEl.classList.contains('is-gain')).toBe(false);
+        expect(deltaEl.classList.contains('is-loss')).toBe(false);
+
+        component.renderCombinedResults(container, {
+            time: 9.361,
+            raceComparisonTarget: { displayName: 'ALFREAD_IO' },
+            comparisonOutcome: 'won',
+            deltaToComparison: -0.25,
+        });
+        expect(labelEl.textContent).toBe('VS');
+        expect(deltaEl.textContent).toBe('-0.250s');
+
+        global.document = originalDocument;
+    });
 });
 
 describe('leaderboard row patching', () => {

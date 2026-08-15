@@ -1,5 +1,8 @@
 # Changelog
 
+- Finish-sheet ghost comparisons now show **VS #rank** and a signed gap
+  (`+` slower, `-` faster) instead of the opponent name and WON/LOST BY.
+
 - Replaced the Head to Head poster helmets with italic uppercase **VS.**
   (white V, red S) between the two racers.
 
