@@ -483,7 +483,7 @@ describe('game stylesheet architecture', () => {
         expect(ui).toContain('preview.append(previewArt, gate)');
         expect(ui).toContain('gate.append(previewLock)');
         expect(ui).toContain('requirement.append(requirementList)');
-        expect(ui).toContain('foot.append(requirement, meta, medal)');
+        expect(ui).toContain('foot.append(requirement, meta, verificationError, medal)');
         expect(ui).toContain('meta.append(bestCell, rank)');
         expect(ui).toContain('createPersonalBestIcon');
         expect(ui).toContain("viewBox', '0 0 448 512'");

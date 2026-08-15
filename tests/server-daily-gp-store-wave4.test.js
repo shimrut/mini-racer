@@ -94,6 +94,7 @@ describe('server daily gp store wave4', () => {
             multi: vi.fn().mockResolvedValue(undefined),
             unwatch: vi.fn().mockResolvedValue(undefined),
             del: vi.fn(),
+            set: vi.fn(),
             hSet: vi.fn(),
             zAdd: vi.fn(),
             expire: vi.fn(),

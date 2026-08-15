@@ -98,6 +98,7 @@ describe('daily-gp-store mutation kills', () => {
             multi: vi.fn().mockResolvedValue(undefined),
             unwatch: vi.fn().mockResolvedValue(undefined),
             del: vi.fn(),
+            set: vi.fn(),
             hSet: vi.fn(),
             zAdd: vi.fn(),
             expire: vi.fn(),

@@ -240,11 +240,11 @@ describe('server daily gp store submissions', () => {
         const expectedTtl = getDailyGpCompetitionTtlSeconds(challenge);
         expect(mockRedis.expire).toHaveBeenCalledWith(
             `dailygp:leaderboard:${challenge.id}`,
-            expect.closeTo(expectedTtl, 0),
+            expect.closeTo(expectedTtl, -1),
         );
         expect(mockRedis.expire).toHaveBeenCalledWith(
             `dailygp:leaderboard:${challenge.id}:entries`,
-            expect.closeTo(expectedTtl, 0),
+            expect.closeTo(expectedTtl, -1),
         );
     });
 

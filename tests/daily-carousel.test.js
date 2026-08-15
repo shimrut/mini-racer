@@ -726,6 +726,7 @@ describe('TrackCarousel selection', () => {
             requirement: { hidden: false },
             requirementList: { replaceChildren: vi.fn() },
             meta: { hidden: true },
+            verificationError: { hidden: true, textContent: '' },
         };
 
         carousel.paintFoot({
@@ -744,6 +745,8 @@ describe('TrackCarousel selection', () => {
         expect(parts.rankValue.hidden).toBe(false);
         expect(parts.rankValue.textContent).toBe('#4');
         expect(parts.rankMedal.hidden).toBe(true);
+        expect(parts.verificationError.hidden).toBe(true);
+        expect(parts.meta.hidden).toBe(false);
         expect(parts.rank.setAttribute).toHaveBeenCalledWith(
             'aria-label',
             'Circuit standings. Your rank: #4',

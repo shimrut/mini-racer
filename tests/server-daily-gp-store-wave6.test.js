@@ -78,6 +78,16 @@ describe('server daily gp store wave6', () => {
         mockRedis.zCard.mockResolvedValue(0);
         mockRedis.zRange.mockResolvedValue([]);
         mockRedis.zRank.mockResolvedValue(undefined);
+        mockRedis.watch.mockImplementation(() => ({
+            multi: vi.fn().mockResolvedValue(undefined),
+            unwatch: vi.fn().mockResolvedValue(undefined),
+            del: vi.fn(),
+            set: vi.fn(),
+            hSet: vi.fn(),
+            zAdd: vi.fn(),
+            expire: vi.fn(),
+            exec: vi.fn().mockResolvedValue([1]),
+        }));
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: true,
             run: {
