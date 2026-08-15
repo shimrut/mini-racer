@@ -52,7 +52,7 @@ body {
     --type-time: calc(var(--u) * 9);
 
     --size-avatar: calc(var(--u) * 10);
-    --size-helmet: calc(var(--u) * 3);
+    --type-vs: calc(var(--u) * 4.2);
     --space-tight: calc(var(--u) * 0.9);
     --space-block: calc(var(--u) * 1.8);
     --space-section: calc(var(--u) * 2.6);
@@ -156,26 +156,26 @@ body {
     white-space: nowrap;
 }
 
-.challenge-duel__helmets {
+.challenge-duel__vs {
     display: flex;
-    align-items: center;
-    gap: calc(var(--u) * 0.5);
-    margin-top: calc((var(--size-avatar) - var(--size-helmet)) / 2);
-}
-
-.challenge-helmet {
-    width: var(--size-helmet);
-    height: var(--size-helmet);
     flex: none;
+    align-items: center;
+    height: var(--size-avatar);
+    color: var(--text-color);
+    font-size: var(--type-vs);
+    font-weight: 900;
+    font-style: italic;
+    line-height: 0.8;
+    letter-spacing: -0.06em;
+    text-transform: uppercase;
 }
 
-.challenge-helmet--challenger {
+.challenge-duel__vs-v {
     color: var(--text-color);
 }
 
-.challenge-helmet--viewer {
+.challenge-duel__vs-s {
     color: var(--accent-color);
-    transform: scaleX(-1);
 }
 
 .challenge-headline {
@@ -383,7 +383,7 @@ h1.challenge-track-name,
 @media (max-width: 620px) and (max-height: 620px) and (min-width: 420px) {
     .challenge-shell {
         --size-avatar: calc(var(--u) * 7);
-        --size-helmet: calc(var(--u) * 2.4);
+        --type-vs: calc(var(--u) * 3.4);
         --type-time: calc(var(--u) * 6);
     }
 

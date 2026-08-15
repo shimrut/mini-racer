@@ -398,7 +398,8 @@ flowchart LR
   a slow profile cannot keep the full-screen loader up because the challenge
   pane takes over within the visual budget.
 - `head-to-head.css` owns the standalone post's race-poster visual: the
-  duel and target time remain the primary reading path, the circuit stays open as
+  duel and target time remain the primary reading path, italic uppercase VS.
+  (white V, red S) sits between the two avatars, the circuit stays open as
   the right-side hero, and the single Race Head to Head CTA anchors beneath it.
   Desktop uses a split brief/track composition; compact widths keep the trace
   contained below the brief without introducing an inline scroll surface. Preserve

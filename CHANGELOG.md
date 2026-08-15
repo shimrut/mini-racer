@@ -1,5 +1,8 @@
 # Changelog
 
+- Replaced the Head to Head poster helmets with italic uppercase **VS.**
+  (white V, red S) between the two racers.
+
 - Added **Queen of Hearts** and **Ace of Spades** to the Daily rotation after
   Double Crest. Existing published days are unchanged.
 
