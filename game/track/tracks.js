@@ -88,6 +88,14 @@ import doubleHook from './definitions/double-hook.js';
 import doubleCrest from './definitions/double-crest.js';
 import heartsQueen from './definitions/hearts-queen.js';
 import aceSpades from './definitions/ace-spades.js';
+import twistedLadder from './definitions/twisted-ladder.js';
+import hairpinHook from './definitions/hairpin-hook.js';
+import dragonLoop from './definitions/dragon-loop.js';
+import thorsHammer from './definitions/thors-hammer.js';
+import questionMark from './definitions/question-mark.js';
+import nestedRun from './definitions/nested-run.js';
+import mountainPeak from './definitions/mountain-peak.js';
+import sharkFin from './definitions/shark-fin.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -181,6 +189,14 @@ const TRACK_GEOMETRY = {
     doubleCrest,
     heartsQueen,
     aceSpades,
+    twistedLadder,
+    hairpinHook,
+    dragonLoop,
+    thorsHammer,
+    questionMark,
+    nestedRun,
+    mountainPeak,
+    sharkFin,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

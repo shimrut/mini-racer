@@ -538,5 +538,53 @@
     "gold": 9.96,
     "silver": 10.23,
     "bronze": 10.58
+  },
+  "twistedLadder": {
+    "author": 17.27,
+    "gold": 17.62,
+    "silver": 17.91,
+    "bronze": 18.35
+  },
+  "hairpinHook": {
+    "author": 10.22,
+    "gold": 10.51,
+    "silver": 10.85,
+    "bronze": 11.19
+  },
+  "dragonLoop": {
+    "author": 8.61,
+    "gold": 8.93,
+    "silver": 9.28,
+    "bronze": 9.56
+  },
+  "thorsHammer": {
+    "author": 10.35,
+    "gold": 10.55,
+    "silver": 10.75,
+    "bronze": 10.95
+  },
+  "questionMark": {
+    "author": 11.56,
+    "gold": 11.91,
+    "silver": 12.23,
+    "bronze": 12.52
+  },
+  "nestedRun": {
+    "author": 13.21,
+    "gold": 13.53,
+    "silver": 13.89,
+    "bronze": 14.15
+  },
+  "mountainPeak": {
+    "author": 9.18,
+    "gold": 9.54,
+    "silver": 10.02,
+    "bronze": 10.61
+  },
+  "sharkFin": {
+    "author": 15.71,
+    "gold": 16.09,
+    "silver": 16.48,
+    "bronze": 16.82
   }
 }

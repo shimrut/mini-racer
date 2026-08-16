@@ -89,6 +89,14 @@ export const TRACK_CATALOG = {
     doubleCrest: { name: "Double Crest" },
     heartsQueen: { name: "Queen of Hearts" },
     aceSpades: { name: "Ace of Spades" },
+    twistedLadder: { name: "Twisted Ladder" },
+    hairpinHook: { name: "Hairpin Hook" },
+    dragonLoop: { name: "Dragon Loop" },
+    thorsHammer: { name: "Thor's Hammer" },
+    questionMark: { name: "Question Mark" },
+    nestedRun: { name: "Nested Run" },
+    mountainPeak: { name: "Mountain Peak" },
+    sharkFin: { name: "Shark Fin" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -168,6 +176,14 @@ export const TRACK_SCHEDULE_KEYS = [
     'doubleCrest',
     'heartsQueen',
     'aceSpades',
+    'twistedLadder',
+    'hairpinHook',
+    'dragonLoop',
+    'thorsHammer',
+    'questionMark',
+    'nestedRun',
+    'mountainPeak',
+    'sharkFin',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

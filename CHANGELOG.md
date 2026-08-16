@@ -1,5 +1,11 @@
 # Changelog
 
+- Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
+  Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested
+  Run**, **Mountain Peak**, and **Shark Fin**. Question Mark's third checkpoint
+  has been widened to span the full corridor — it stopped 0.13 short of the
+  inner wall.
+
 - Restored a 45-day moderator analytics dashboard. It reuses the old daily
   Redis keys, counts unique people from player bootstrap, and counts Daily
   finishes, Campaign starts, and Head to Head creates/finishes. Mods open it

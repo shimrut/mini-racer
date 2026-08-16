@@ -141,6 +141,14 @@ describe('track runtime integrity', () => {
             'doubleCrest',
             'heartsQueen',
             'aceSpades',
+            'twistedLadder',
+            'hairpinHook',
+            'dragonLoop',
+            'thorsHammer',
+            'questionMark',
+            'nestedRun',
+            'mountainPeak',
+            'sharkFin',
         ]);
         const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -175,10 +183,10 @@ describe('track runtime integrity', () => {
                 .map((trackKey) => [trackKey, TRACKS[trackKey]]),
         );
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
-            '2a272e53a4cc50320fc07daff2784898aef5c761c5301cb684aefd9d1cabb270',
+            '2835aa8e12848f18df32725370f93af486477be964617a0fb1f4ecb5fe63db16',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '053e9a1b820e7da95c2c214c0ba0e04a82847f4c13da877d67833effc04d2b32',
+            '65c594a25e4f1d30149786797e9895898df94fe6b128d6b6b952e535f5cb66ec',
         );
     });
 

@@ -50,8 +50,8 @@ export default {
     startPos: Point(17.87, 16.595),
     startAngle: -0.769,
     checkpoints: [
-        { p1: Point(46.984, 21.474), p2: Point(41.47, 21.499) },
-        { p1: Point(32.435, 61.31), p2: Point(28.497, 58.333) },
-        { p1: Point(15.01, 37.22), p2: Point(19.256, 40.651) }
+        { p1: Point(46.983, 21.218), p2: Point(41.466, 21.393) },
+        { p1: Point(33.004, 61.355), p2: Point(28.568, 58.25) },
+        { p1: Point(14.844, 37.279), p2: Point(19.08, 40.816) }
     ]
 };
