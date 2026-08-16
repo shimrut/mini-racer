@@ -30,7 +30,10 @@
 - Restored a 45-day moderator analytics dashboard. It reuses the old daily
   Redis keys, counts unique people from player bootstrap, and counts Daily
   finishes, Campaign starts, and Head to Head creates/finishes. Mods open it
-  from **Open Mini Racer analytics**.
+  from **Open Mini Racer analytics**. The headline numbers carry a
+  day-over-day change and a 14-day sparkline, the daily chart stacks new
+  against returning players and names the day on hover, and the breakdown
+  table keeps its header in view while it scrolls.
 
 - Finish-sheet ghost comparisons now show **VS #rank** and a signed gap
   (`+` slower, `-` faster) instead of the opponent name and WON/LOST BY.

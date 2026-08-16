@@ -9,8 +9,12 @@ Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
 `head-to-head.css`, `mod-analytics.css`)
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The moderator analytics page is a dense
-dashboard: KPI cards, a unique-player bar chart, ranked track bars, and a
-daily table. The Head to Head surface uses a responsive
+dashboard: a stat-tile row with day-over-day deltas and sparklines, a stacked
+new/returning column chart with a hover readout, reach and play-mix panels,
+ranked track bars, and a sticky-header daily table. Its two series are the red
+accent (returning) and `#0e9bd6` (new) — a pair checked for colour-vision
+separation against the `#0f172a` panel; marks carry the series colour and text
+never does. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the
 verified track trace remains an open hero on the right, and the CTA anchors below
 that trace. Its brand uses the shared stacked Mini/Racer lockup, the duel row

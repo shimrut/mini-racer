@@ -20,16 +20,26 @@
                 </p>
                 <h1 id="analytics-title">Analytics</h1>
             </div>
-            <p id="analytics-range" class="analytics-range">Last 45 days</p>
+            <div class="analytics-header__range">
+                <p id="analytics-range" class="analytics-range">Last 45 days</p>
+                <p class="analytics-range__note">Unique players, UTC days</p>
+            </div>
         </header>
 
         <p id="analytics-status" class="analytics-status" role="status">Loading summary…</p>
 
-        <section id="analytics-windows" class="analytics-kpis" aria-label="Unique players" hidden></section>
-        <section id="analytics-today" class="analytics-split" aria-label="Today" hidden></section>
-        <section id="analytics-trend" class="analytics-card" aria-label="Unique players over time" hidden></section>
-        <section id="analytics-tracks" class="analytics-tracks" aria-label="Tracks" hidden></section>
-        <section id="analytics-days" class="analytics-card" aria-label="Daily counts" hidden></section>
+        <section id="analytics-windows" class="analytics-kpis" aria-label="Today at a glance" hidden></section>
+
+        <div id="analytics-main" class="analytics-main" hidden>
+            <section id="analytics-trend" class="analytics-card" aria-label="Players per day"></section>
+            <div class="analytics-main__side">
+                <section id="analytics-reach" class="analytics-card" aria-label="Unique reach"></section>
+                <section id="analytics-today" class="analytics-card" aria-label="Plays today"></section>
+            </div>
+        </div>
+
+        <section id="analytics-tracks" class="analytics-tracks" aria-label="Most played tracks" hidden></section>
+        <section id="analytics-days" class="analytics-card" aria-label="Daily breakdown" hidden></section>
     </main>
 </body>
 
