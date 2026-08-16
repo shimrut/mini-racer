@@ -7,6 +7,7 @@ import {
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
+    getDailyChallengeExpiry,
     getDailyChallengeModeSelectObjectiveLine,
     getDailyChallengeModifierBadges,
     getDailyChallengeModifierLabel,
@@ -150,6 +151,40 @@ describe('daily-challenge service', () => {
         })).toBe('3d');
 
         vi.useRealTimers();
+    });
+
+    it('getDailyChallengeExpiry dates the run-out and asks to be redrawn when the wording can change', () => {
+        const week = {
+            startsAt: '2026-06-02T00:00:00.000Z',
+            endsAt: '2026-06-03T00:00:00.000Z',
+            availableUntil: '2026-06-09T00:00:00.000Z',
+        };
+        const DAY_MS = 24 * 60 * 60 * 1000;
+
+        // A dated label only changes when the track drops into its last day, so
+        // that is exactly how long the one pending timer waits.
+        expect(getDailyChallengeExpiry(week, Date.parse('2026-06-02T10:00:00.000Z'))).toEqual({
+            label: 'Expires on Jun 09',
+            refreshMs: Date.parse('2026-06-09T00:00:00.000Z')
+                - Date.parse('2026-06-02T10:00:00.000Z') - DAY_MS,
+        });
+        expect(getDailyChallengeExpiry(week, Date.parse('2026-06-08T14:00:00.000Z'))).toEqual({
+            label: 'Expires in 10h',
+            refreshMs: 60 * 1000,
+        });
+        expect(getDailyChallengeExpiry(week, Date.parse('2026-06-08T23:18:30.000Z'))).toEqual({
+            label: 'Expires in 42m',
+            refreshMs: 60 * 1000,
+        });
+        // Nothing left to count down to, so nothing is scheduled.
+        expect(getDailyChallengeExpiry(week, Date.parse('2026-06-09T00:00:00.000Z'))).toEqual({
+            label: 'Expired',
+            refreshMs: null,
+        });
+        expect(getDailyChallengeExpiry({ startsAt: week.startsAt }, Date.now())).toEqual({
+            label: '',
+            refreshMs: null,
+        });
     });
 
     it('getDailyChallengeCardStatus derives featured, available, and expired states from challenge timing', () => {

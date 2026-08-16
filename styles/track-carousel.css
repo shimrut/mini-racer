@@ -114,10 +114,44 @@ body[data-lobby-mode="campaign"] #start-overlay {
 }
 
 /* Prev/Next flank the schematic in row 1, so the rows below it read as one
-   block about the selected track: its position in the rail, then its record. */
+   block about the selected track: how long it lasts, its position in the rail,
+   then its record. */
 .track-carousel--lobby {
     grid-template-rows: minmax(0, 1fr) 1.25rem 4rem;
     row-gap: clamp(0.25rem, 1.2vh, 0.75rem);
+}
+
+/* Daily is the only mode whose tracks run out, so only its carousel carries the
+   line — and the row stays reserved so moving between days never shifts it. */
+.track-carousel--lobby:has(.track-carousel__expiry) {
+    grid-template-rows: minmax(0, 1fr) 1.1rem 1.25rem 4rem;
+}
+
+.track-carousel--lobby .track-carousel__expiry {
+    grid-area: 2 / 1;
+    align-self: center;
+    margin: 0;
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-align: center;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.track-carousel--lobby .track-carousel__expiry[hidden] {
+    display: none;
+}
+
+.track-carousel--lobby:has(.track-carousel__expiry) .track-carousel__navigation {
+    grid-area: 3 / 1;
+}
+
+.track-carousel--lobby:has(.track-carousel__expiry) .track-carousel__card-foot {
+    grid-area: 4 / 1;
 }
 
 .track-carousel__navigation {
@@ -128,9 +162,14 @@ body[data-lobby-mode="campaign"] #start-overlay {
     min-width: 0;
 }
 
+/* The padding is there for the keyboard cue in `lobby-modes.css`: the ring
+   needs room around the digits, and reserving it in both states keeps the row
+   from shifting when selection arrives. */
 .track-carousel__count {
     grid-column: 2;
     min-width: 4.5rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-full);
     color: var(--text-dim);
     font-family: var(--mono-font);
     font-size: 0.72rem;
@@ -641,6 +680,14 @@ body[data-lobby-mode="campaign"] #start-overlay {
 
     .track-carousel--lobby {
         grid-template-rows: minmax(0, 1fr) 1.1rem 3.6rem;
+    }
+
+    .track-carousel--lobby:has(.track-carousel__expiry) {
+        grid-template-rows: minmax(0, 1fr) 1rem 1.1rem 3.6rem;
+    }
+
+    .track-carousel--lobby .track-carousel__expiry {
+        font-size: 0.63rem;
     }
 
     .track-carousel__card-foot {

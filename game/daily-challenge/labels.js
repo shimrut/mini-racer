@@ -1,4 +1,5 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 
 export function isDailyChallengeLapCount(value) {
     return Number.isInteger(value) && value >= 1 && value <= 3;
@@ -96,6 +97,36 @@ export function formatDailyChallengeRemainingDuration(remainingMs) {
     const days = Math.floor(totalHours / 24);
     const hours = totalHours % 24;
     return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+}
+
+// The lobby always bills the day the track leaves the playlist, even while it
+// is still today's featured pick — a card that only says "Featured" tells a
+// player nothing about how long they have left on it.
+//
+// `refreshMs` comes back from the same branch that picked the wording, so the
+// two can never disagree: a date only needs redrawing when the track drops into
+// its last day, and a countdown only needs redrawing when its minute turns.
+// That is one pending timer at a time and no work in between.
+export function getDailyChallengeExpiry(challenge, nowMs = Date.now()) {
+    const untilMs = Date.parse(challenge?.availableUntil || '');
+    if (!Number.isFinite(untilMs)) return { label: '', refreshMs: null };
+
+    const remainingMs = untilMs - nowMs;
+    if (remainingMs <= 0) return { label: 'Expired', refreshMs: null };
+
+    if (remainingMs < DAY_MS) {
+        const remainingLabel = formatDailyChallengeRemainingDuration(remainingMs);
+        return {
+            label: remainingLabel ? `Expires in ${remainingLabel}` : 'Expires today',
+            refreshMs: MINUTE_MS,
+        };
+    }
+
+    const formattedDate = formatDailyChallengeStatusDate(challenge?.availableUntil);
+    return {
+        label: formattedDate ? `Expires on ${formattedDate}` : '',
+        refreshMs: remainingMs - DAY_MS,
+    };
 }
 
 export function getDailyChallengeCardStatus(challenge, nowMs = Date.now()) {

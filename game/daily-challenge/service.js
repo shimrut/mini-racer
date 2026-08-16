@@ -33,6 +33,7 @@ export {
     formatDailyChallengeStatusDate,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
+    getDailyChallengeExpiry,
     getDailyChallengeModeSelectObjectiveLine,
     getDailyChallengeModifierBadges,
     getDailyChallengeModifierLabel,

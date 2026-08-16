@@ -19,6 +19,14 @@
   **BEST LAP** / **BEST RACE** — it has shown a signed gap to the PB, not a lap
   time, for a while now.
 
+- The lobby mode menu now sits on the left, lined up under the **MINI RACER**
+  wordmark. Keyboard navigation onto a track carousel also highlights its
+  **x / y** counter, so the selected row is visible. The Daily subhead bills
+  the selected track name instead of the day, matching Campaign, with the lap
+  count under it. Daily also gets a line of its own above the track counter
+  saying when the selected track drops off the playlist — a date, or a
+  countdown on its last day.
+
 - Restored a 45-day moderator analytics dashboard. It reuses the old daily
   Redis keys, counts unique people from player bootstrap, and counts Daily
   finishes, Campaign starts, and Head to Head creates/finishes. Mods open it

@@ -237,8 +237,10 @@ body[data-lobby-mode="daily"] .lobby-mode-selection,
 body[data-lobby-mode="campaign"] .lobby-mode-selection {
     grid-column: 3;
     display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.28rem;
     min-height: 1.1rem;
     margin: 0;
     color: var(--text-dim);
@@ -250,6 +252,17 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection {
     text-align: right;
     text-transform: uppercase;
     white-space: nowrap;
+}
+
+/* The track is what the header is billing; the lap count is a detail under it. */
+.lobby-mode-selection__laps {
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+}
+
+.lobby-mode-selection__laps[hidden] {
+    display: none;
 }
 
 body[data-lobby-mode="challenge"] .lobby-panes,
@@ -319,16 +332,19 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 .lobby-mode-menu {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 0.5rem;
     width: 100%;
 }
 
+/* The labels sit under the wordmark, so the row is pulled left by its own
+   padding to line the letters up with the "MINI" of the title. */
 .lobby-mode-action {
     position: relative;
     isolation: isolate;
     display: block;
     width: max-content;
+    margin-inline-start: -0.85rem;
     padding: 0.65rem 0.85rem;
     color: var(--text-color);
     text-align: left;
@@ -356,6 +372,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 .track-carousel--lobby.is-menu-selected,
 .track-carousel--lobby:focus {
     outline: none;
+}
+
+/* Keyboard nav selects the carousel as a whole, so the cue goes on the "x / y"
+   counter — the one part of it the arrow keys change — instead of ringing the
+   whole poster. */
+.track-carousel--lobby.is-menu-selected .track-carousel__count {
+    color: var(--text-color);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .lobby-primary-row {

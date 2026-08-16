@@ -230,6 +230,7 @@ export class TrackCarousel {
         onSelect = null,
         onOpenLeaderboard = null,
         onSettle = null,
+        resolveExpiry = null,
         getPreviewCarImage = null,
         getPreviewCarAssetKey = null,
         getPreviewCarWorldSize = null,
@@ -239,6 +240,8 @@ export class TrackCarousel {
         this.onSelect = onSelect;
         this.onOpenLeaderboard = onOpenLeaderboard;
         this.onSettle = onSettle;
+        this.resolveExpiry = resolveExpiry;
+        this._expiryTimer = null;
         this.getPreviewCarImage = getPreviewCarImage;
         this.getPreviewCarAssetKey = getPreviewCarAssetKey;
         this.getPreviewCarWorldSize = getPreviewCarWorldSize;
@@ -264,6 +267,7 @@ export class TrackCarousel {
     get nextBtn() { return this.element('next'); }
     get navigation() { return this.element('navigation'); }
     get countLabel() { return this.element('count'); }
+    get expiryLine() { return this.element('expiry'); }
     get status() { return this.element('status'); }
 
     bind() {
@@ -515,6 +519,28 @@ export class TrackCarousel {
         if (renderPreview) this.renderPreview(parts.canvas, card);
     }
 
+    // Only Daily resolves an expiry; the campaign carousel passes no resolver
+    // and has no element for it, so this is a no-op there. The repaint the
+    // resolver asks for replaces itself, so at most one timer is ever pending.
+    paintExpiry(card) {
+        if (this._expiryTimer) {
+            clearTimeout(this._expiryTimer);
+            this._expiryTimer = null;
+        }
+        const line = this.expiryLine;
+        if (!line) return;
+
+        const { label = '', refreshMs = null } = this.resolveExpiry?.(card) || {};
+        line.textContent = label;
+        line.hidden = !label;
+        if (Number.isFinite(refreshMs) && refreshMs > 0) {
+            this._expiryTimer = setTimeout(
+                () => this.paintExpiry(this.getSelectedCard()),
+                refreshMs,
+            );
+        }
+    }
+
     paintFoot(card) {
         if (!this._footParts || !card) return;
         const parts = this._footParts;
@@ -716,6 +742,7 @@ export class TrackCarousel {
         if (card) {
             this.paintFoot(card);
         }
+        this.paintExpiry(card);
 
         this.updateProximity();
     }

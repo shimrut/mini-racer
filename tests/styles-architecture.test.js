@@ -176,6 +176,13 @@ describe('game stylesheet architecture', () => {
         expect(lobbyModeStyles).toMatch(
             /body\[data-lobby-mode="daily"\] \.lobby-mode-selection,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-mode-selection\s*\{[^}]*text-align:\s*right;[^}]*text-transform:\s*uppercase;/s,
         );
+        // Track over laps: the stack has to keep its right edge on the rule.
+        expect(lobbyModeStyles).toMatch(
+            /body\[data-lobby-mode="daily"\] \.lobby-mode-selection,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-mode-selection\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-end;/s,
+        );
+        expect(lobbyModeStyles).toMatch(
+            /\.lobby-mode-selection__laps\s*\{[^}]*color:\s*var\(--text-muted\);[^}]*font-size:\s*0\.6rem;/s,
+        );
     });
 
     it('keeps the wordmark a real button without letting the UA restyle it', () => {
@@ -436,6 +443,20 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__navigation\s*\{[^}]*grid-area:\s*2 \/ 1;[^}]*display:\s*grid;/s,
         );
+        // Daily adds a row of its own above the counter for the expiry, and
+        // pushes the counter and the record down a row to make space.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby:has\(\.track-carousel__expiry\)\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 1\.1rem 1\.25rem 4rem;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby \.track-carousel__expiry\s*\{[^}]*grid-area:\s*2 \/ 1;[^}]*font-family:\s*var\(--mono-font\);[^}]*text-align:\s*center;[^}]*text-transform:\s*uppercase;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby:has\(\.track-carousel__expiry\) \.track-carousel__navigation\s*\{[^}]*grid-area:\s*3 \/ 1;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby:has\(\.track-carousel__expiry\) \.track-carousel__card-foot\s*\{[^}]*grid-area:\s*4 \/ 1;/s,
+        );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby \.track-carousel__card-foot\s*\{[^}]*grid-area:\s*3 \/ 1;/s,
         );
@@ -451,6 +472,13 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).not.toContain('.track-carousel__nav-label');
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__count\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*text-align:\s*center;/s,
+        );
+        // Keyboard nav selects the whole carousel, so the counter carries the cue.
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__count\s*\{[^}]*padding:\s*0\.2rem 0\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
+        );
+        expect(lobbyModeStyles).toMatch(
+            /\.track-carousel--lobby\.is-menu-selected \.track-carousel__count\s*\{[^}]*color:\s*var\(--text-color\);[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
         );
         expect(lobbyModeStyles).toMatch(
             /\.lobby-mode-toolbar__action\s*\{[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*width:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*height:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*min-width:\s*2\.75rem;[^}]*min-height:\s*2\.75rem;/s,

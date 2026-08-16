@@ -36,6 +36,15 @@ describe('daily carousel card model', () => {
         expect(formatDailyCarouselDayLabel({ id: 'no-date' }, NOW)).toBe('Daily');
     });
 
+    it('keeps the challenge on the card so the expiry can be read live', () => {
+        const source = challenge({ availableUntil: '2026-08-03T00:00:00.000Z' });
+        const [card] = buildDailyCarouselCards([source], { nowMs: NOW });
+
+        // The label is resolved at paint time, not frozen into the card here.
+        expect(card.challenge).toBe(source);
+        expect(card.expiryLabel).toBeUndefined();
+    });
+
     it('falls back to startsAt when the challenge has no date key', () => {
         expect(getDailyChallengeDateKey({ startsAt: '2026-07-25T00:00:00.000Z' }))
             .toBe('2026-07-25');
@@ -273,6 +282,75 @@ function stubRailRebuild(carousel, rail) {
         _parts: {},
     }));
 }
+
+describe('TrackCarousel expiry line', () => {
+    function stubExpiryLine(carousel, resolveExpiry) {
+        const line = { textContent: '', hidden: true };
+        Object.defineProperty(carousel, 'expiryLine', { get: () => line });
+        carousel.resolveExpiry = resolveExpiry;
+        return line;
+    }
+
+    it('follows the selected day and clears when there is nothing to say', () => {
+        const { carousel } = createStubbedCarousel(2);
+        const line = stubExpiryLine(carousel, (card) => ({
+            c0: { label: 'Expires on Aug 03', refreshMs: null },
+            c1: { label: 'Expires in 15h', refreshMs: null },
+        }[card?.challengeId] || { label: '', refreshMs: null }));
+
+        carousel.applySelectionClasses();
+        expect(line.textContent).toBe('Expires on Aug 03');
+        expect(line.hidden).toBe(false);
+
+        carousel._selectedIndex = 1;
+        carousel.applySelectionClasses();
+        expect(line.textContent).toBe('Expires in 15h');
+
+        carousel._selectedIndex = -1;
+        carousel.applySelectionClasses();
+        expect(line.textContent).toBe('');
+        expect(line.hidden).toBe(true);
+    });
+
+    it('keeps one pending redraw at a time, at the interval the label asks for', () => {
+        vi.useFakeTimers();
+        try {
+            const { carousel } = createStubbedCarousel(1);
+            let remainingMinutes = 3;
+            const line = stubExpiryLine(carousel, () => ({
+                label: `Expires in ${remainingMinutes}m`,
+                refreshMs: remainingMinutes > 0 ? 60 * 1000 : null,
+            }));
+
+            carousel.applySelectionClasses();
+            expect(line.textContent).toBe('Expires in 3m');
+            expect(vi.getTimerCount()).toBe(1);
+
+            remainingMinutes = 2;
+            vi.advanceTimersByTime(60 * 1000);
+            expect(line.textContent).toBe('Expires in 2m');
+            expect(vi.getTimerCount()).toBe(1);
+
+            // A repaint from elsewhere must not leave a second timer behind.
+            carousel.applySelectionClasses();
+            expect(vi.getTimerCount()).toBe(1);
+
+            remainingMinutes = 0;
+            vi.advanceTimersByTime(60 * 1000);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does nothing without a line or a resolver, as Campaign has neither', () => {
+        const { carousel } = createStubbedCarousel(2);
+        Object.defineProperty(carousel, 'expiryLine', { get: () => null });
+
+        expect(() => carousel.applySelectionClasses()).not.toThrow();
+        expect(carousel._expiryTimer).toBe(null);
+    });
+});
 
 describe('TrackCarousel selection', () => {
     it('steps with A/D and arrows and stops at both ends', () => {

@@ -38,6 +38,27 @@ function setAvatar(element, url, label) {
     applyAvatar(element, url, { alt: label, genericClass: 'challenge-avatar--generic' });
 }
 
+// The subhead bills the selected track over its lap count. Both lines live in
+// the one paragraph so the stack stays right-aligned against the rule.
+function setSubheadSelection(element, trackName, laps) {
+    if (!element) return;
+    const safeTrackName = typeof trackName === 'string' ? trackName.trim() : '';
+    const safeLaps = Number.isInteger(laps) && laps > 0 ? laps : null;
+    const lapsLabel = safeLaps === null ? '' : formatLapsLabel(safeLaps);
+    element.hidden = !safeTrackName;
+
+    const trackElement = element.querySelector?.('.lobby-mode-selection__track');
+    const lapsElement = element.querySelector?.('.lobby-mode-selection__laps');
+    if (!trackElement || !lapsElement) {
+        element.textContent = safeTrackName;
+        return;
+    }
+    trackElement.textContent = safeTrackName;
+    // Laps without a track name would read as a stray number, so they follow it.
+    lapsElement.hidden = !safeTrackName || safeLaps === null;
+    lapsElement.textContent = lapsElement.hidden ? '' : lapsLabel;
+}
+
 function setRaceBriefText(element, trackName, laps) {
     if (!element) return;
     const safeTrackName = typeof trackName === 'string' ? trackName.trim() : '';
@@ -109,7 +130,6 @@ export class LobbyUi {
         this._campaignSelectedStage = null;
         this._dailySelectedTrackName = null;
         this._dailySelectedLaps = null;
-        this._dailySelectedBillingLabel = null;
         this._campaignSelectedBillingLabel = null;
         this._dailyStartError = null;
         this._campaignStartError = null;
@@ -326,26 +346,29 @@ export class LobbyUi {
             track.hidden = true;
             track.textContent = '';
         }
+        // Daily and Campaign both bill the selected track here; the day label
+        // stays on the card, where it is what tells the days apart.
         const billingLabel = this.mode === 'daily'
-            ? this._dailySelectedBillingLabel
+            ? this._dailySelectedTrackName?.trim() || null
             : this.mode === 'campaign'
                 ? this._campaignSelectedBillingLabel
                 : this.mode === 'challenge'
                     ? this.challengeState?.trackName?.trim() || null
                     : null;
+        const billingLaps = this.mode === 'daily'
+            ? this._dailySelectedLaps
+            : this.mode === 'campaign'
+                ? this.getCampaignPrimaryLaps()
+                : this.mode === 'challenge'
+                    ? this.challengeState?.laps ?? null
+                    : null;
         if (this.mode === 'home') {
             if (rule) rule.hidden = true;
-            if (selection) {
-                selection.hidden = true;
-                selection.textContent = '';
-            }
+            setSubheadSelection(selection, null, null);
             return;
         }
         if (rule) rule.hidden = false;
-        if (selection) {
-            selection.hidden = !billingLabel;
-            selection.textContent = billingLabel || '';
-        }
+        setSubheadSelection(selection, billingLabel, billingLaps);
     }
 
     getMode() {
@@ -586,9 +609,6 @@ export class LobbyUi {
         this._dailySelectedLaps = Number.isInteger(card?.laps)
             ? card.laps
             : (Number.isInteger(challenge?.laps) ? challenge.laps : null);
-        this._dailySelectedBillingLabel = typeof card?.billingLabel === 'string'
-            ? card.billingLabel.trim() || null
-            : null;
         this.syncLobbySubheadDetail();
         this.renderDaily();
     }

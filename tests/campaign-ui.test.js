@@ -95,7 +95,9 @@ function createElement(tagName = 'div') {
             }
             if (selector === '.main-menu__race-brief-track'
                 || selector === '.main-menu__race-brief-separator'
-                || selector === '.main-menu__race-brief-laps') {
+                || selector === '.main-menu__race-brief-laps'
+                || selector === '.lobby-mode-selection__track'
+                || selector === '.lobby-mode-selection__laps') {
                 return this.children.find((child) => child.className === selector.slice(1)) || null;
             }
             if (selector === '.main-menu__spinner' || selector === '.modal-rank-spinner') {
@@ -1186,7 +1188,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             /id="lobby-challenge-pane"[\s\S]*lobby-pane-heading__eyebrow/,
         );
         expect(css).toMatch(
-            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-end;/s,
+            /\.lobby-mode-menu\s*\{[^}]*align-items:\s*flex-start;/s,
+        );
+        expect(css).toMatch(
+            /\.lobby-mode-action\s*\{[^}]*margin-inline-start:\s*-0\.85rem;/s,
         );
         expect(css).toMatch(
             /\.lobby-pane\.main-menu\s*\{[^}]*margin-top:\s*auto;/s,
@@ -1654,6 +1659,12 @@ describe('Campaign lobby and shared modal adapters', () => {
         rule.hidden = true;
         const selection = createElement('p');
         selection.hidden = true;
+        const selectionTrack = createElement('span');
+        selectionTrack.className = 'lobby-mode-selection__track';
+        const selectionLaps = createElement('span');
+        selectionLaps.className = 'lobby-mode-selection__laps';
+        selectionLaps.hidden = true;
+        selection.append(selectionTrack, selectionLaps);
         const overlay = createElement('div');
         const panes = {
             home: createElement('section'),
@@ -1697,7 +1708,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             { trackName: 'Classic Circuit', objectiveParams: { lapCount: 1 } },
             { trackName: 'Classic Circuit', laps: 1, billingLabel: 'Today' },
         );
-        expect(selection.textContent).toBe('Today');
+        expect(selectionTrack.textContent).toBe('Classic Circuit');
+        expect(selectionTrack.textContent).not.toBe('Today');
+        expect(selectionLaps.textContent).toBe('1 Lap');
+        expect(selectionLaps.hidden).toBe(false);
         expect(selection.hidden).toBe(false);
 
         lobby.showCampaign();
@@ -1713,10 +1727,11 @@ describe('Campaign lobby and shared modal adapters', () => {
             numberLabel: '10',
             trackName: 'Imaginary Number',
             unlocked: true,
-            laps: 1,
+            laps: 3,
         });
-        expect(selection.textContent).toBe('Imaginary Number');
-        expect(selection.textContent).not.toBe('Stage 10');
+        expect(selectionTrack.textContent).toBe('Imaginary Number');
+        expect(selectionTrack.textContent).not.toBe('Stage 10');
+        expect(selectionLaps.textContent).toBe('3 Laps');
         expect(selection.hidden).toBe(false);
 
         lobby.showChallenge({
@@ -1734,7 +1749,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(track.hidden).toBe(true);
         expect(rule.hidden).toBe(false);
         expect(selection.hidden).toBe(false);
-        expect(selection.textContent).toBe('Number One');
+        expect(selectionTrack.textContent).toBe('Number One');
+        expect(selectionLaps.textContent).toBe('1 Lap');
         expect(body.dataset.lobbyMode).toBe('challenge');
 
         lobby.showHome();
@@ -1743,6 +1759,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(track.hidden).toBe(true);
         expect(rule.hidden).toBe(true);
         expect(selection.hidden).toBe(true);
+        expect(selectionTrack.textContent).toBe('');
+        expect(selectionLaps.hidden).toBe(true);
+        expect(selectionLaps.textContent).toBe('');
         expect(body.dataset.lobbyMode).toBe('home');
         expect(body.dataset.lobbyHomeReturned).toBe('true');
         expect(modeCss).toMatch(

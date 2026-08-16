@@ -76,6 +76,7 @@ import {
 import {
   confirmDailyChallengeShare,
   getActiveDailyChallenge,
+  getDailyChallengeExpiry,
   previewDailyChallengeShare,
 } from "./daily-challenge/service.js";
 import {
@@ -325,6 +326,7 @@ export class RealTimeRacer {
       onSelect: (challenge, card) => this.handleDailyCarouselSelect(challenge, card),
       onOpenLeaderboard: (challenge) => this.openDailyCarouselStandings(challenge),
       onSettle: (card) => this.handleDailyCarouselSettled(card),
+      resolveExpiry: (card) => getDailyChallengeExpiry(card?.challenge),
       getPreviewCarImage: () => (
         this.carSpriteAssetKey ? this.carSprite : null
       ),
