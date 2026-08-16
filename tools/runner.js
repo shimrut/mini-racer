@@ -3,6 +3,19 @@ import { getIntersection } from '../game/track/geometry.js';
 
 const DT = 1 / 60;
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
+// Nudge inward-cast rays off the wall they start on so they do not hit it.
+const NORMAL_PROBE = 0.01;
+// How close to a wall corner a crossing has to be before it counts as the two
+// segments simply meeting there. Well under the car's 0.55 width, so a fold big
+// enough to drive into is still caught.
+const SEAM_TOLERANCE = 0.2;
+// Steps taken along an inward ray when looking for the roomiest spot on it.
+const GUIDE_RAY_STEPS = 16;
+// How hard a guide candidate is penalised for sitting away from the last pick.
+const CONTINUITY_WEIGHT = 0.6;
+// Cap on how far inward a guide point may sit, as a multiple of the track's
+// median wall-to-wall reach.
+const MAX_OFFSET_SLACK = 0.75;
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -45,16 +58,6 @@ function pointInPolygon(point, polygon) {
 
 function isFinitePoint(point) {
     return point && Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function signedArea(points) {
-    let area = 0;
-    for (let i = 0; i < points.length; i++) {
-        const current = points[i];
-        const next = points[(i + 1) % points.length];
-        area += current.x * next.y - next.x * current.y;
-    }
-    return area / 2;
 }
 
 function rotateArray(points, startIndex) {
@@ -252,7 +255,12 @@ function polygonsSelfIntersect(points) {
             if (sameSegment || adjacent || wrapAdjacent) {
                 continue;
             }
-            if (getIntersection(a1, a2, b1, b2)) {
+            const hit = getIntersection(a1, a2, b1, b2);
+            // Only a crossing through the middle of both segments folds a wall.
+            // Two segments meeting at a corner also "intersect", and a polygon
+            // that repeats its first vertex as its last, or closes a hair away
+            // from it, puts such a corner outside the adjacency window above.
+            if (hit && [a1, a2, b1, b2].every((end) => distance(hit, end) > SEAM_TOLERANCE)) {
                 return true;
             }
         }
@@ -525,6 +533,119 @@ function createBotProfiles(botCount) {
     });
 }
 
+function nearestPointOnPolygon(point, polygon) {
+    let best = { distance: Infinity, closest: { ...point } };
+    for (let i = 0; i < polygon.length; i++) {
+        const result = distanceToSegment(point, polygon[i], polygon[(i + 1) % polygon.length]);
+        if (result.distance < best.distance) {
+            best = result;
+        }
+    }
+    return best;
+}
+
+// Distance from a guide candidate to the nearest wall, or 0 when the candidate
+// left the drivable corridor — off-track points otherwise score a wide berth
+// from the middle of the infield.
+function guideClearance(walls, point) {
+    const onTrack = pointInPolygon(point, walls.outer) && !pointInPolygon(point, walls.inner);
+    return onTrack ? nearestWallDistance(walls, point).distance : 0;
+}
+
+function inwardNormalAt(outerFlow, index, outer, inner) {
+    const previous = outerFlow[(index - 1 + outerFlow.length) % outerFlow.length];
+    const next = outerFlow[(index + 1) % outerFlow.length];
+    const tangent = directionBetween(previous, next);
+    const candidates = [
+        { x: -tangent.y, y: tangent.x },
+        { x: tangent.y, y: -tangent.x }
+    ];
+    const point = outerFlow[index];
+    return candidates.find((normal) => {
+        const probe = { x: point.x + normal.x * NORMAL_PROBE, y: point.y + normal.y * NORMAL_PROBE };
+        return pointInPolygon(probe, outer) && !pointInPolygon(probe, inner);
+    }) || null;
+}
+
+// Every spot the guide could sit for one outer wall sample: the midpoint to the
+// closest inner point, plus steps along the inward ray up to the first wall the
+// ray meets. `maxOffset` keeps a ray fired down a long straight from parking the
+// guide half a track away.
+function guideCandidates(outerFlow, index, walls, reach, maxOffset) {
+    const point = outerFlow[index];
+    const candidates = [midpoint(point, nearestPointOnPolygon(point, walls.inner).closest)];
+    const normal = inwardNormalAt(outerFlow, index, walls.outer, walls.inner);
+
+    if (normal) {
+        const from = { x: point.x + normal.x * NORMAL_PROBE, y: point.y + normal.y * NORMAL_PROBE };
+        const to = { x: point.x + normal.x * reach, y: point.y + normal.y * reach };
+        const hits = [
+            ...linePolygonIntersections({ p1: from, p2: to }, walls.outer),
+            ...linePolygonIntersections({ p1: from, p2: to }, walls.inner)
+        ];
+        if (hits.length) {
+            const span = Math.min(hits.reduce((closest, hit) => Math.min(closest, distance(point, hit)), Infinity), maxOffset);
+            for (let step = 1; step < GUIDE_RAY_STEPS; step++) {
+                const travelled = (step / GUIDE_RAY_STEPS) * span;
+                candidates.push({ x: point.x + normal.x * travelled, y: point.y + normal.y * travelled });
+            }
+        }
+    }
+
+    const scored = candidates
+        .map((candidate) => ({ point: candidate, clearance: guideClearance(walls, candidate) }))
+        .filter((candidate) => candidate.clearance > 0);
+    return scored.length ? scored : [{ point: candidates[0], clearance: 0 }];
+}
+
+function medianOf(values) {
+    const sorted = values.slice().sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)] ?? 0;
+}
+
+// Trace the drivable corridor once around the track. Walking the outer wall and
+// pairing each sample with its closest inner point is the cheap version of this,
+// but that pairing jumps to the far lobe wherever a track crosses or doubles
+// back on itself, so the guide teleports across a wall. Walk the samples in
+// order instead and, at each one, take the candidate with the most room around
+// it that also sits near the previous pick. (Matching the two resampled walls by
+// index — the original approach — is worse still: the walls have different
+// perimeters, so the pairing drifts out of phase and drags the guide straight
+// across the infield.)
+function buildCenterline(outer, inner, sampleCount) {
+    if (outer.length < 3 || inner.length < 3) {
+        return resampleClosedPolygon(outer.length >= 3 ? outer : inner, sampleCount);
+    }
+
+    const walls = { outer, inner };
+    const outerFlow = resampleClosedPolygon(outer, sampleCount);
+    const reach = perimeterOfClosed(outer);
+    const maxOffset = medianOf(outerFlow.map((point) => nearestPointOnPolygon(point, inner).distance)) * MAX_OFFSET_SLACK;
+    const candidates = outerFlow.map((point, index) => guideCandidates(outerFlow, index, walls, reach, maxOffset));
+
+    // Start where the corridor is widest, so the walk never anchors on an
+    // ambiguous first pick.
+    const seedIndex = candidates.reduce((best, entry, index) => (
+        entry[0].clearance > candidates[best][0].clearance ? index : best
+    ), 0);
+
+    const traced = new Array(sampleCount);
+    let previous = candidates[seedIndex].reduce((best, entry) => (entry.clearance > best.clearance ? entry : best)).point;
+    for (let step = 0; step < sampleCount; step++) {
+        const index = (seedIndex + step) % sampleCount;
+        const pick = candidates[index].reduce((best, entry) => {
+            const score = entry.clearance - distance(entry.point, previous) * CONTINUITY_WEIGHT;
+            return score > best.score ? { ...entry, score } : best;
+        }, { point: null, clearance: 0, score: -Infinity });
+        traced[index] = pick.point;
+        previous = pick.point;
+    }
+
+    // The samples are evenly spaced along the outer wall, not along the guide, so
+    // resample once more so every progress step covers the same distance.
+    return resampleClosedPolygon(traced, sampleCount);
+}
+
 function prepareTrack(track, requestedSamples) {
     const cornerRadius = Number.isFinite(track.cornerRadius) ? track.cornerRadius : 3;
     const outer = smoothPoly(track.outer || [], cornerRadius);
@@ -538,17 +659,8 @@ function prepareTrack(track, requestedSamples) {
         900
     );
 
-    let outerFlow = resampleClosedPolygon(outer, sampleCount);
-    let innerFlow = resampleClosedPolygon(inner, sampleCount);
-    if (outerFlow.length && innerFlow.length && signedArea(outerFlow) * signedArea(innerFlow) > 0) {
-        innerFlow = innerFlow.slice().reverse();
-    }
-
-    outerFlow = rotateToNearest(outerFlow, startMid);
-    innerFlow = rotateToNearest(innerFlow, startMid);
-
-    let centerline = outerFlow.map((point, index) => midpoint(point, innerFlow[index]));
-    let widths = outerFlow.map((point, index) => distance(point, innerFlow[index]));
+    let centerline = buildCenterline(outer, inner, sampleCount);
+    centerline = rotateToNearest(centerline, startMid);
     const startDir = {
         x: Math.cos(Number.isFinite(track.startAngle) ? track.startAngle : 0),
         y: Math.sin(Number.isFinite(track.startAngle) ? track.startAngle : 0)
@@ -558,10 +670,7 @@ function prepareTrack(track, requestedSamples) {
         const probeDirection = directionBetween(centerline[0], centerline[6]);
         const dot = probeDirection.x * startDir.x + probeDirection.y * startDir.y;
         if (dot < 0) {
-            outerFlow = rotateToNearest(outerFlow.slice().reverse(), startMid);
-            innerFlow = rotateToNearest(innerFlow.slice().reverse(), startMid);
-            centerline = outerFlow.map((point, index) => midpoint(point, innerFlow[index]));
-            widths = outerFlow.map((point, index) => distance(point, innerFlow[index]));
+            centerline = rotateToNearest(centerline.slice().reverse(), startMid);
         }
     }
 
@@ -571,10 +680,15 @@ function prepareTrack(track, requestedSamples) {
         const tangent = directionBetween(prev, next);
         return { x: -tangent.y, y: tangent.x };
     });
-    const centerlineClearances = centerline.map((point) => {
-        const clearance = nearestWallDistance({ outer, inner }, point).distance;
-        return { x: clearance, y: 0 };
-    });
+    const wallGaps = centerline.map((point) => ({
+        outer: nearestPointOnPolygon(point, outer).distance,
+        inner: nearestPointOnPolygon(point, inner).distance
+    }));
+    const centerlineClearances = wallGaps.map((gap) => ({ x: Math.min(gap.outer, gap.inner), y: 0 }));
+    // Reach to one wall plus reach to the other, rather than twice the nearer
+    // one: a guide point is rarely dead centre, and doubling the short side
+    // reports a pinch that is not there.
+    const widths = wallGaps.map((gap) => gap.outer + gap.inner);
 
     const checkpointPoints = (track.checkpoints || []).flatMap((checkpoint) => [checkpoint.p1, checkpoint.p2]);
     const bounds = getBounds(outer, inner, track.startPos, track.startLine?.p1, track.startLine?.p2, checkpointPoints);
@@ -583,8 +697,6 @@ function prepareTrack(track, requestedSamples) {
         track,
         outer,
         inner,
-        outerFlow,
-        innerFlow,
         centerline,
         centerlineNormals,
         centerlineClearances,
@@ -1004,7 +1116,10 @@ function buildSummary(report) {
 }
 
 async function loadTracksFresh() {
-    const module = await import(`../game/track/tracks.js?v=${Date.now()}`);
+    // The timestamp pulls in edits made since the page loaded, so the lab picks
+    // up a track you just saved from the mapmaker. Vite refuses to pre-bundle an
+    // import it cannot read statically, hence the ignore comment.
+    const module = await import(/* @vite-ignore */ `../game/track/tracks.js?v=${Date.now()}`);
     return module.TRACKS;
 }
 
@@ -1224,7 +1339,9 @@ class RunnerApp {
         const crashCount = report.simulation ? report.simulation.aggregate.crashes : 0;
         const scrapeCount = report.simulation ? report.simulation.aggregate.scrapes : 0;
 
-        this.issueTotalPill.textContent = `${report.issues.length} issue${report.issues.length === 1 ? '' : 's'}`;
+        // The clean-pass card is an info note, not a problem to count.
+        const issueCount = report.issues.filter((issue) => issue.severity !== 'info').length;
+        this.issueTotalPill.textContent = `${issueCount} issue${issueCount === 1 ? '' : 's'}`;
         this.issueTotalPill.className = 'pill';
         if (report.issues.some((issue) => issue.severity === 'error')) {
             this.issueTotalPill.classList.add('pill-danger');

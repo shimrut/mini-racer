@@ -6,6 +6,15 @@
   has been widened to span the full corridor — it stopped 0.13 short of the
   inner wall.
 
+- Runner Lab validation bots now actually drive the track. The guide they
+  follow used to pair the two walls by sample index — the walls have different
+  perimeters, so the pairing drifted out of phase and cut across the infield,
+  and every bot on every map crashed within the first few seconds. It now
+  traces the corridor instead, and reports width from both walls rather than
+  doubling the nearer one, so narrow-section warnings match the real gap. The
+  page also loads its tracks under `npm run mapmaker`, where the cache-busting
+  import used to fail outright.
+
 - Restored a 45-day moderator analytics dashboard. It reuses the old daily
   Redis keys, counts unique people from player bootstrap, and counts Daily
   finishes, Campaign starts, and Head to Head creates/finishes. Mods open it
