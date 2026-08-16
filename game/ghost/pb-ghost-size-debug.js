@@ -597,3 +597,24 @@ export function shouldCapturePbGhostSize() {
     return false;
   }
 }
+
+// Lives here rather than on the engine so the shipped build drops it with the
+// rest of this module: a minifier cannot remove an unreferenced class method.
+export function exposePbGhostSizeDebugHooks(engine) {
+  window.__PB_GHOST_SIZE_DEBUG__ = Object.freeze({
+    enabled: () => Boolean(engine.pbGhostSizeCapture),
+    enable: () => {
+      try {
+        window.localStorage?.setItem(PB_GHOST_SIZE_ENABLED_STORAGE_KEY, '1');
+      } catch (_error) {
+      }
+      engine.pbGhostSizeCapture ??= new PbGhostSizeCapture();
+      return true;
+    },
+    getReports: () => engine.pbGhostSizeCapture?.getReports?.() || [],
+    getLastReport: () => engine.pbGhostSizeCapture?.getLastReport?.() || null,
+    getLargestReport: () => getLargestPbGhostSizeReport(
+      engine.pbGhostSizeCapture?.getReports?.() || [],
+    ),
+  });
+}

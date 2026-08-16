@@ -6,6 +6,7 @@ import {
     TRACK_PRESENTATION_SURFACES,
 } from './game/track/presentation.js';
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
+import { exposeHeadToHeadLauncherTestHooks } from './game/debug/launcher-hooks.js';
 import {
     getGuestPlayerToken,
     getOrCreatePlayerId,
@@ -395,18 +396,7 @@ async function boot() {
         openOwnChallenge: openHomeAsRedirect,
     });
     applyHeadToHeadAccessState(button, message, access);
-    globalThis.render_game_to_text = () => JSON.stringify({
-        screen: 'head-to-head-preview',
-        challengeId: challenge.challengeId,
-        challengerUsername: challenge.challengerUsername,
-        trackKey: challenge.trackKey,
-        lapCount: challenge.lapCount,
-        targetTimeMs: challenge.targetTimeMs,
-        signedIn: access.signedIn,
-        canRace: access.canRace,
-        ownChallenge: access.ownChallenge === true,
-    });
-    globalThis.advanceTime = () => {};
+    exposeHeadToHeadLauncherTestHooks(challenge, access);
 }
 
 if (typeof document !== 'undefined') {

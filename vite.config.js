@@ -1,9 +1,26 @@
 import { defineConfig } from 'vite';
 import { devvit } from '@devvit/start/vite';
+import { DEBUG_MODULE_STUBS } from './tools/debug-module-stubs.js';
+
+// Swap each developer-tooling module for its no-op stub so the code is not in
+// the bundle to reach. See `tools/debug-module-stubs.js` for why a runtime gate
+// cannot do this. `npm test` and local runs load the real modules.
+function stripDebugModules() {
+    return {
+        name: 'mini-racer-strip-debug-modules',
+        enforce: 'pre',
+        resolveId(source) {
+            if (source.endsWith('.stub.js')) return null;
+            const match = DEBUG_MODULE_STUBS.find((entry) => source.endsWith(entry.suffix));
+            return match ? match.stubPath : null;
+        },
+    };
+}
 
 export default defineConfig({
     root: '.',
     plugins: [
+        stripDebugModules(),
         devvit({
             client: {
                 build: {

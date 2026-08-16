@@ -16,6 +16,7 @@ tools/*
 !tools/analyze-unused-css.js
 !tools/bust-client-asset-cache.js
 !tools/vitest-global-setup.js
+!tools/debug-module-stubs.js
 !tools/mapmaker.html
 !tools/mapmaker.js
 !tools/mapmaker.css

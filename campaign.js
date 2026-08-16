@@ -1,4 +1,5 @@
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
+import { exposeCampaignLauncherTestHooks } from './game/debug/launcher-hooks.js';
 
 export async function openCampaignGame(event, {
     requestLaunchTarget = requestGameLaunchTarget,
@@ -31,11 +32,7 @@ export function bindCampaignRaceButton(
 
 function bootCampaignLauncher() {
     bindCampaignRaceButton();
-    globalThis.render_game_to_text = () => JSON.stringify({
-        screen: 'campaign-launcher',
-        destination: 'campaign',
-    });
-    globalThis.advanceTime = () => {};
+    exposeCampaignLauncherTestHooks();
 }
 
 if (typeof document !== 'undefined') {

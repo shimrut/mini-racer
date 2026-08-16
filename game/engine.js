@@ -63,11 +63,11 @@ import {
 import { PbGhost } from "./ghost/pb-ghost.js";
 import { PbGhostService } from "./ghost/pb-ghost-service.js";
 import {
-  getLargestPbGhostSizeReport,
-  PB_GHOST_SIZE_ENABLED_STORAGE_KEY,
+  exposePbGhostSizeDebugHooks,
   PbGhostSizeCapture,
   shouldCapturePbGhostSize,
 } from "./ghost/pb-ghost-size-debug.js";
+import { exposeTestHooks } from "./debug/test-hooks.js";
 import { JourneyService } from "./journeys/service.js";
 import {
   applyPlayerPreferences,
@@ -581,13 +581,10 @@ export class RealTimeRacer {
     });
 
     this.resize();
-    this.exposePbGhostSizeDebugHooks();
+    // Both are no-op stubs in the shipped build; see `vite.config.js`.
+    exposePbGhostSizeDebugHooks(this);
     if (shouldExposeDebugHooks()) {
-      this.exposeTestHooks();
-    } else {
-      delete window.__RACER_DEBUG__;
-      delete window.render_game_to_text;
-      delete window.advanceTime;
+      exposeTestHooks(this);
     }
 
     this.lastTime = this.getNow();
@@ -860,104 +857,6 @@ export class RealTimeRacer {
   }
 
 
-  exposeTestHooks() {
-    const renderGameToText = () => this.renderGameToText();
-    const advanceTime = (ms) => this.advanceTime(ms);
-    const getPbGhostSizeReports = () => (
-      this.pbGhostSizeCapture?.getReports?.() || []
-    );
-    const getLastPbGhostSizeReport = () => (
-      this.pbGhostSizeCapture?.getLastReport?.() || null
-    );
-    const getLargestPbGhostSizeReportForDebug = () => (
-      getLargestPbGhostSizeReport(this.pbGhostSizeCapture?.getReports?.() || [])
-    );
-
-    window.__RACER_DEBUG__ = Object.freeze({
-      renderGameToText,
-      advanceTime,
-      getPbGhostSizeReports,
-      getLastPbGhostSizeReport,
-      getLargestPbGhostSizeReport: getLargestPbGhostSizeReportForDebug,
-    });
-    window.render_game_to_text = renderGameToText;
-    window.advanceTime = advanceTime;
-  }
-
-  exposePbGhostSizeDebugHooks() {
-    window.__PB_GHOST_SIZE_DEBUG__ = Object.freeze({
-      enabled: () => Boolean(this.pbGhostSizeCapture),
-      enable: () => {
-        try {
-          window.localStorage?.setItem(PB_GHOST_SIZE_ENABLED_STORAGE_KEY, '1');
-        } catch (_error) {
-        }
-        this.pbGhostSizeCapture ??= new PbGhostSizeCapture();
-        return true;
-      },
-      getReports: () => this.pbGhostSizeCapture?.getReports?.() || [],
-      getLastReport: () => this.pbGhostSizeCapture?.getLastReport?.() || null,
-      getLargestReport: () => getLargestPbGhostSizeReport(
-        this.pbGhostSizeCapture?.getReports?.() || [],
-      ),
-    });
-  }
-
-  renderGameToText() {
-    return JSON.stringify({
-      coordinateSystem:
-        "origin top-left, x increases right, y increases down, units are track-grid cells",
-      mode: this.status,
-      lobbyMode: this.lobbyUi?.getMode?.() || null,
-      raceMode: this.activeRaceMode,
-      startupUi: {
-        loadingActive: document.body.classList.contains("loading-active"),
-        overlayReady: this.startOverlay?.startOverlay?.classList?.contains?.("is-ready") || false,
-        interactive: this.startOverlay?._isInteractive === true,
-      },
-      track: this.currentTrackKey,
-      player: {
-        x: Number(this.pos.x.toFixed(2)),
-        y: Number(this.pos.y.toFixed(2)),
-        angle: Number(this.angle.toFixed(3)),
-        angularVelocity: Number(this.angularVelocity.toFixed(3)),
-        velocityX: Number(this.velocity.x.toFixed(2)),
-        velocityY: Number(this.velocity.y.toFixed(2)),
-        speed: Number(this.cachedSpeed.toFixed(2)),
-        wallImpactCooldownSec: Number((Number(this.wallImpactCooldownRemaining) || 0).toFixed(3)),
-        wallContactActive: Boolean(this.wallContactActive),
-        wallContactReleaseSec: Number((Number(this.wallContactReleaseRemaining) || 0).toFixed(3)),
-      },
-      lapTime: Number(this.currentTime.toFixed(3)),
-      challenge: this.currentChallengeRun
-        ? {
-            completedLaps: this.currentChallengeRun.completedLaps || 0,
-            requiredLaps: this.currentChallengeRun.requiredLaps || 1,
-            currentLap: Math.min(
-              (this.currentChallengeRun.completedLaps || 0) + 1,
-              this.currentChallengeRun.requiredLaps || 1,
-            ),
-            intermediateMedalFlash:
-              this.hud?.lapFlash?.classList?.contains?.("visible")
-                ? this.hud?.lapFlashMedal?.dataset?.medal || null
-                : null,
-          }
-        : null,
-      campaignRaceId: this.activeCampaignStage?.raceId || null,
-      playerChallengeId: this.activeHeadToHead?.challengeId || null,
-      raceComparison: this.raceComparisonTarget
-        ? {
-            displayName: this.raceComparisonTarget.displayName,
-            finishTimeSec: this.raceComparisonTarget.finishTimeSec,
-            rank: this.raceComparisonTarget.rank,
-            carAssetName: this.raceComparisonTarget.carAssetName,
-          }
-        : null,
-      startLine: this.currentTrack.startLine,
-      routeTracePoints: this.routeTrace.length,
-      liveParticles: this.particles.length,
-    });
-  }
 
   advanceTime(ms) {
     const totalSteps = Math.max(1, Math.round(ms / (this.FIXED_DT * 1000)));
