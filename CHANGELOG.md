@@ -15,6 +15,10 @@
   page also loads its tracks under `npm run mapmaker`, where the cache-busting
   import used to fail outright.
 
+- The finish sheet's personal-best stat is now labelled **VS PB** instead of
+  **BEST LAP** / **BEST RACE** — it has shown a signed gap to the PB, not a lap
+  time, for a while now.
+
 - Restored a 45-day moderator analytics dashboard. It reuses the old daily
   Redis keys, counts unique people from player bootstrap, and counts Daily
   finishes, Campaign starts, and Head to Head creates/finishes. Mods open it

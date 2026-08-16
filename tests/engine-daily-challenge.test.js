@@ -565,7 +565,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
     expect(showModal.mock.calls[0][2]).toEqual(expect.objectContaining({
       lapTime: 18.826,
-      bestSummaryLabel: "Best Race",
+      primaryStatLabel: "Race Time",
       previousPersonalBestSec: undefined,
       deltaToPersonalBest: undefined,
     }));

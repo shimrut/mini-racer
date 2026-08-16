@@ -45,7 +45,6 @@ export function getDailyChallengeCopyLabels(challenge) {
         return {
             hudPrimaryLabel: 'RACE',
             primaryStatLabel: 'Race Time',
-            bestSummaryLabel: 'Best Race',
             modeSelectLine: 'Best race time'
         };
     }
@@ -53,7 +52,6 @@ export function getDailyChallengeCopyLabels(challenge) {
     return {
         hudPrimaryLabel: 'LAP',
         primaryStatLabel: 'Lap Time',
-        bestSummaryLabel: 'Best Lap',
         modeSelectLine: 'Best lap time'
     };
 }

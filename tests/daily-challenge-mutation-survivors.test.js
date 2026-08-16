@@ -404,7 +404,6 @@ describe('daily-challenge mutation survivors', () => {
         expect(getDailyChallengeCopyLabels({})).toEqual({
             hudPrimaryLabel: 'LAP',
             primaryStatLabel: 'Lap Time',
-            bestSummaryLabel: 'Best Lap',
             modeSelectLine: 'Best lap time',
         });
     });

@@ -615,7 +615,6 @@ export class ModalContentUi {
         challengeVerdict = null,
         previousPersonalBestSec = undefined,
         deltaToPersonalBest = undefined,
-        bestSummaryLabel = 'Best Lap',
         previousTrackMedal = null,
         trackKey = null,
         lapCount = 1,
@@ -672,7 +671,10 @@ export class ModalContentUi {
             label2El.hidden = false;
             label2El.removeAttribute('hidden');
             label2El.removeAttribute('aria-hidden');
-            label2El.textContent = String(bestSummaryLabel || 'Best Lap').toUpperCase();
+            // The slot below this label is always a signed gap to the personal
+            // best, never a lap time, so the label reads as a comparison in the
+            // same shape as the ghost's "VS #1".
+            label2El.textContent = 'VS PB';
         }
         applyCombinedRankValue({
             rankValueEl,

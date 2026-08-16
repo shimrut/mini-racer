@@ -113,7 +113,6 @@ describe('daily-challenge service', () => {
         expect(getDailyChallengeCopyLabels({ objectiveType: 'single_lap_fastest' })).toEqual({
             hudPrimaryLabel: 'LAP',
             primaryStatLabel: 'Lap Time',
-            bestSummaryLabel: 'Best Lap',
             modeSelectLine: 'Best lap time'
         });
     });
@@ -1674,7 +1673,6 @@ describe('daily-challenge service', () => {
         })).toEqual({
             hudPrimaryLabel: 'RACE',
             primaryStatLabel: 'Race Time',
-            bestSummaryLabel: 'Best Race',
             modeSelectLine: 'Best race time',
         });
 

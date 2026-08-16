@@ -439,7 +439,7 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
-    it('labels a first multi-lap result as a race with no fabricated PB delta', () => {
+    it('labels the delta slot as VS PB with no fabricated PB delta on a first result', () => {
         const originalDocument = global.document;
         const dom = new JSDOM(`
             <div id="combined">
@@ -464,12 +464,11 @@ describe('ui modal content helpers', () => {
         component.renderCombinedResults(container, {
             time: 18.826,
             bestLap: 9.062,
-            bestSummaryLabel: 'Best Race',
             previousPersonalBestSec: undefined,
             deltaToPersonalBest: undefined,
         });
 
-        expect(container.querySelector('#combined-stat-label-2').textContent).toBe('BEST RACE');
+        expect(container.querySelector('#combined-stat-label-2').textContent).toBe('VS PB');
         expect(container.querySelector('#combined-best-lap').textContent).toBe('No lap times yet');
         expect(container.textContent).not.toContain('+9.062s');
 

@@ -1101,7 +1101,6 @@ export class ModalShell {
             challengeVerdict: lapData.challengeVerdict ?? null,
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
-            bestSummaryLabel: lapData.bestSummaryLabel,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
             trackKey: lapData.trackKey || this.getCurrentTrackKey(),
             lapCount: lapData.requiredLaps ?? lapData.completedLaps ?? 1,

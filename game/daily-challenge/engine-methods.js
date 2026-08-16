@@ -1465,7 +1465,6 @@ export const dailyChallengeEngineMethods = {
           lapMedal,
           previousTrackMedal,
           previousPersonalBestSec,
-          bestSummaryLabel: getDailyChallengeCopyLabels(challenge).bestSummaryLabel,
           trackKey: challenge.trackKey,
           lapCheckpointTimes,
           pbCheckpointTimes: comparisonCheckpointTimes,
