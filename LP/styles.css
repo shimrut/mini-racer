@@ -230,3 +230,224 @@ body {
         transform: none;
     }
 }
+
+/* =========================================================================
+   About — same lobby as the homepage. Track stays put; type scrolls over it.
+   ========================================================================= */
+
+body.page-about {
+    --text-muted: #64748b;
+    --mono-font: "JetBrains Mono", ui-monospace, monospace;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.page-about .shell {
+    justify-content: flex-start;
+    align-items: flex-start;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+}
+
+.page-about .track,
+.page-about .veil {
+    position: fixed;
+}
+
+.page-about .track {
+    inset: 0 0 0 18%;
+    object-fit: contain;
+    object-position: center;
+}
+
+.page-about .veil {
+    background:
+        linear-gradient(90deg, rgb(2, 6, 23) 0%, rgb(2, 6, 23) 22%, rgba(2, 6, 23, 0.82) 32%, rgba(2, 6, 23, 0.28) 48%, rgba(2, 6, 23, 0.12) 100%),
+        linear-gradient(180deg, rgba(2, 6, 23, 0.16) 0%, transparent 45%, rgba(2, 6, 23, 0.52) 100%);
+}
+
+.page-about .panel {
+    height: auto;
+    min-height: calc(var(--screen-fill-height) - var(--shell-pad-top) - var(--shell-pad-bottom));
+    max-height: none;
+    width: min(30rem, calc(100vw - 2.5rem));
+    margin: 0;
+    margin-left: clamp(1.25rem, 7vw, 5.5rem);
+    gap: 1.15rem;
+    padding-bottom: 0.5rem;
+}
+
+.page-about .brand {
+    padding-bottom: 0.25rem;
+}
+
+.page-about .title {
+    pointer-events: auto;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.page-about .title:hover .title__racer,
+.page-about .title:focus-visible .title__racer {
+    color: #ff3e3e;
+}
+
+.page-about .title__mini {
+    font-size: clamp(2.15rem, 10vw, 3.15rem);
+}
+
+.page-about .title__racer {
+    font-size: clamp(3.15rem, 15vw, 5.15rem);
+}
+
+.lede {
+    margin: 0;
+    max-width: 22rem;
+    font-size: clamp(1.15rem, 3.2vw, 1.4rem);
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    text-transform: uppercase;
+    text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+    animation: paneIn 180ms ease-out 0.18s both;
+}
+
+.lede__sub {
+    margin: -0.4rem 0 0;
+    max-width: 24rem;
+    font-size: 0.95rem;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text-dim);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+    animation: paneIn 180ms ease-out 0.24s both;
+}
+
+.facts {
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    animation: paneIn 180ms ease-out 0.3s both;
+}
+
+.fact__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0.85rem;
+}
+
+.fact__name {
+    margin: 0;
+    font-size: clamp(1.35rem, 5vw, 1.85rem);
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    text-transform: uppercase;
+    text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+.fact__meta {
+    flex-shrink: 0;
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--text-dim);
+}
+
+.fact__note {
+    margin: 0.35rem 0 0;
+    max-width: 24rem;
+    font-size: 0.95rem;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text-dim);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.closing {
+    margin: 0;
+    max-width: 24rem;
+    font-size: 0.95rem;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text-dim);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+    animation: paneIn 180ms ease-out 0.36s both;
+}
+
+.closing + .closing {
+    margin-top: -0.55rem;
+}
+
+.page-about .modes {
+    animation: paneIn 180ms ease-out 0.42s both;
+}
+
+.note {
+    margin: 0;
+    font-family: var(--mono-font);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    animation: paneIn 180ms ease-out 0.48s both;
+}
+
+.note a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.note a:hover,
+.note a:focus-visible {
+    color: var(--text-color);
+}
+
+:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+}
+
+@media (max-width: 48rem) {
+    .page-about .track {
+        inset: 0;
+        object-position: center;
+        opacity: 0.35;
+    }
+
+    .page-about .veil {
+        background: linear-gradient(180deg, rgba(2, 6, 23, 0.82) 0%, rgba(2, 6, 23, 0.9) 100%);
+    }
+
+    .page-about .panel {
+        margin-left: 1rem;
+        width: min(30rem, calc(100vw - 2rem));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lede,
+    .lede__sub,
+    .facts,
+    .closing,
+    .page-about .modes,
+    .note {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+}
