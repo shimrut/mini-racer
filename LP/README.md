@@ -16,7 +16,7 @@ Canonical host: **https://miniracer.club/**. That origin is hard-coded in the ca
 | `llms.txt` | Plain-text summary of the game for answer engines. Keep it in sync with `about.html`. |
 | `track.png`, `og.png`, `favicon.png`, `apple-touch-icon.png` | Generated — see below. |
 
-About is the same lobby as the homepage: Mini / Racer lockup, italic uppercase mode names, the track sitting to the right of the copy. No panels, no pill button. Copy stays short, active and honest. No spec tables, no FAQ.
+About is the Daily / Campaign screen from the game: track behind an 80% navy blur, compact Mini / Racer wordmark, `ABOUT` plus a hairline, the copy where the carousel sits, and the red Race pill at the bottom. Copy stays short, active and honest. No spec tables, no FAQ.
 
 ## Set the links
 

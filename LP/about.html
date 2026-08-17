@@ -31,7 +31,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Outfit:wght@400;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 
     <script type="application/ld+json">
@@ -71,7 +71,7 @@
 </head>
 
 <body class="page-about">
-    <main class="shell is-ready" aria-labelledby="about-lede">
+    <div class="game-stage">
         <img
             class="track"
             src="track.png"
@@ -81,60 +81,72 @@
             decoding="async"
             fetchpriority="high"
         >
-        <div class="veil" aria-hidden="true"></div>
-
-        <div class="panel">
-            <header class="brand">
-                <a class="title" href="index.html" aria-label="Mini Racer home">
-                    <span class="title__mini">Mini</span>
-                    <span class="title__racer">Racer</span>
-                </a>
-            </header>
-
-            <h1 id="about-lede" class="lede">A new track every day, one car, one clock.</h1>
-            <p class="lede__sub">Free racing that runs inside a Reddit post. Nothing to install.</p>
-
-            <ul class="facts">
-                <li class="fact">
-                    <div class="fact__head">
-                        <h2 class="fact__name">Daily</h2>
-                        <span class="fact__meta">00:00 UTC</span>
+        <main class="start-overlay is-ready" aria-labelledby="about-lede">
+            <div class="start-group">
+                <header class="lobby-header">
+                    <a class="lobby-title" href="index.html" aria-label="Mini Racer home">
+                        <span class="lobby-title__mini">Mini</span>
+                        <span class="lobby-title__racer">Racer</span>
+                    </a>
+                    <div class="lobby-subhead">
+                        <p class="lobby-mode-label">About</p>
+                        <span class="lobby-subhead__rule" aria-hidden="true"></span>
                     </div>
-                    <p class="fact__note">One track for everyone. The last seven days stay open, each with its own leaderboard.</p>
-                </li>
-                <li class="fact">
-                    <div class="fact__head">
-                        <h2 class="fact__name">Campaign</h2>
-                        <span class="fact__meta">14 stages</span>
-                    </div>
-                    <p class="fact__note">Permanent stages ending on Golden Ratio. Medals unlock the next one.</p>
-                </li>
-                <li class="fact">
-                    <div class="fact__head">
-                        <h2 class="fact__name">Head to Head</h2>
-                        <span class="fact__meta">1 v 1</span>
-                    </div>
-                    <p class="fact__note">Race a frozen ghost of someone else's verified run, and beat their time.</p>
-                </li>
-            </ul>
+                </header>
 
-            <p class="closing">
-                You only steer — A and D, the arrows, or either side of the screen. The throttle never lets up,
-                so the whole game is your line. Walls scrape you; they don't end the lap.
-            </p>
-            <p class="closing">
-                The server re-drives every ranked lap before it lands on the board, to the millisecond. Your best
-                lap comes back as a ghost to chase.
-            </p>
+                <section class="about-pane">
+                    <div class="about-copy">
+                        <h1 id="about-lede" class="about-lede">A new track every day, one car, one clock.</h1>
+                        <p class="about-lede__sub">Free racing that runs inside a Reddit post. Nothing to install.</p>
 
-            <nav class="modes" aria-label="Play Mini Racer">
-                <a class="mode" href="index.html">
-                    <span class="mode__label">Race</span>
-                </a>
-            </nav>
-            <p class="note">No install · No account needed · <a href="https://www.reddit.com/r/MiniRacerGame/" target="_blank" rel="noopener noreferrer">r/MiniRacerGame</a></p>
-        </div>
-    </main>
+                        <ul class="about-modes">
+                            <li>
+                                <div class="about-modes__head">
+                                    <h2 class="about-modes__name">Daily</h2>
+                                    <span class="about-modes__meta">00:00 UTC</span>
+                                </div>
+                                <p class="about-modes__note">One track for everyone. The last seven days stay open, each with its own leaderboard.</p>
+                            </li>
+                            <li>
+                                <div class="about-modes__head">
+                                    <h2 class="about-modes__name">Campaign</h2>
+                                    <span class="about-modes__meta">14 stages</span>
+                                </div>
+                                <p class="about-modes__note">Permanent stages ending on Golden Ratio. Medals unlock the next one.</p>
+                            </li>
+                            <li>
+                                <div class="about-modes__head">
+                                    <h2 class="about-modes__name">Head to Head</h2>
+                                    <span class="about-modes__meta">1 v 1</span>
+                                </div>
+                                <p class="about-modes__note">Race a frozen ghost of someone else's verified run, and beat their time.</p>
+                            </li>
+                        </ul>
+
+                        <p class="about-note">
+                            You only steer — A and D, the arrows, or either side of the screen. The throttle never lets up,
+                            so the whole game is your line. Walls scrape you; they don't end the lap.
+                        </p>
+                        <p class="about-note">
+                            The server re-drives every ranked lap before it lands on the board, to the millisecond. Your best
+                            lap comes back as a ghost to chase.
+                        </p>
+                    </div>
+
+                    <div class="lobby-primary-row">
+                        <a class="main-menu__item main-menu__item--primary" href="index.html">
+                            <span class="main-menu__label">Race</span>
+                            <span class="main-menu__race-brief">
+                                <span class="main-menu__race-brief-track">No install</span>
+                                <span class="main-menu__race-brief-separator" aria-hidden="true">·</span>
+                                <span class="main-menu__race-brief-laps">No account</span>
+                            </span>
+                        </a>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
 </body>
 
 </html>
