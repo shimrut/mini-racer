@@ -232,316 +232,243 @@ body {
 }
 
 /* =========================================================================
-   About — Daily/Campaign lobby screen: overlay on the track, compact
-   wordmark, mode subhead, copy in the carousel slot, red Race pill.
-   Values copied from the game lobby (foundation, start-overlay, mode title,
-   subhead, primary race button).
+   About — a page, in the game's materials.
+   Night navy, Outfit italic names, mono clocks, the schematic as an object.
+   Not a lobby, not a modal, not type on a blurred track.
    ========================================================================= */
 
 body.page-about {
-    --bg-color-darker: #010410;
     --text-muted: #64748b;
-    --border-default: rgba(255, 255, 255, 0.12);
     --mono-font: "JetBrains Mono", ui-monospace, monospace;
-    --radius-full: 999px;
-    --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
-    --dur-base: 160ms;
-    --start-overlay-pad-top: clamp(1rem, 5vh, 3rem);
-    --start-overlay-pad-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+    --about-pad: clamp(1.25rem, 5vw, 3.5rem);
+    --about-measure: min(40rem, 100%);
+    --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
-.page-about .game-stage {
+.about-hero {
     position: relative;
     isolation: isolate;
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 0;
-    height: 100vh;
-    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: var(--about-pad);
+    padding-bottom: max(var(--about-pad), env(safe-area-inset-bottom));
     overflow: hidden;
 }
 
-.page-about .track {
+.about-hero__track {
     position: absolute;
     inset: 0;
     z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 48% 42%;
+    pointer-events: none;
 }
 
-.page-about .start-overlay {
+@media (min-aspect-ratio: 1.15 / 1) {
+    .about-hero__track {
+        object-fit: contain;
+        object-position: center;
+    }
+}
+
+.about-hero__veil {
     position: absolute;
     inset: 0;
     z-index: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding-top: var(--start-overlay-pad-top);
-    padding-bottom: var(--start-overlay-pad-bottom);
-    overflow: hidden;
-    background: rgba(2, 6, 23, 0.8);
-    backdrop-filter: blur(4px) saturate(0.9);
-    -webkit-backdrop-filter: blur(4px) saturate(0.9);
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(2, 6, 23, 0.45) 0%, rgba(2, 6, 23, 0.08) 38%, rgba(2, 6, 23, 0.2) 68%, rgba(2, 6, 23, 0.92) 100%);
 }
 
-.page-about .start-group {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    align-items: stretch;
+.about-hero__frame {
     position: relative;
-    width: min(30rem, calc(100vw - 2rem));
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    width: var(--about-measure);
     max-width: 100%;
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    gap: 1rem;
-    margin: 0 auto;
 }
 
-.page-about .lobby-header {
+.about-mark {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    flex-shrink: 0;
-    width: 100%;
-    padding-bottom: 0;
-}
-
-.page-about .lobby-title {
-    display: flex;
-    flex-direction: column;
-    align-self: flex-start;
+    width: max-content;
     margin: 0;
-    --lobby-title-cap: clamp(1.5rem, 8.5vw, 3rem);
-    font-size: min(var(--lobby-title-cap), 8vh);
-    line-height: 0.86;
-    font-family: var(--header-font);
+    line-height: 0.82;
     font-weight: 900;
     font-style: italic;
-    letter-spacing: -0.02em;
     text-transform: uppercase;
     text-decoration: none;
     color: var(--text-color);
     text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.page-about .lobby-title__mini {
-    font-size: 0.62em;
+.about-mark__mini {
+    font-size: clamp(2.6rem, 12vw, 4.5rem);
     letter-spacing: -0.02em;
+    animation: slideInLeft 0.5s var(--ease-glide) both;
 }
 
-.page-about .lobby-title__racer {
-    font-size: 1em;
-    letter-spacing: -0.02em;
+.about-mark__racer {
+    font-size: clamp(3.8rem, 18vw, 7.5rem);
+    letter-spacing: -0.04em;
     color: var(--accent-color);
+    animation: slideInRight 0.6s var(--ease-glide) 0.1s both;
 }
 
-.page-about .lobby-title:hover .lobby-title__racer,
-.page-about .lobby-title:focus-visible .lobby-title__racer {
+.about-mark:hover .about-mark__racer,
+.about-mark:focus-visible .about-mark__racer {
     color: #ff3e3e;
 }
 
-.page-about .lobby-subhead {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: clamp(0.5rem, 2.5vw, 0.85rem);
-    width: 100%;
-    margin-top: 0.75rem;
-}
-
-.page-about .lobby-mode-label {
+.about-hero__line {
     margin: 0;
-    color: var(--text-dim);
-    font-family: var(--mono-font);
-    font-size: 0.68rem;
-    font-style: normal;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
-.page-about .lobby-subhead__rule {
-    display: block;
-    width: 100%;
-    height: 1px;
-    background: var(--border-default);
-}
-
-.page-about .about-pane {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
-    flex: 1 1 auto;
-    align-self: stretch;
-    min-height: 0;
-    gap: 0;
-    animation: paneIn var(--dur-base) var(--ease-settle) both;
-}
-
-.page-about .about-copy {
-    min-height: 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.85rem;
-    padding: 0.25rem 0 1rem;
-}
-
-.page-about .about-lede {
-    margin: 0;
-    font-size: clamp(1.15rem, 3.4vw, 1.45rem);
+    max-width: 12em;
+    font-size: clamp(1.35rem, 4.2vw, 2rem);
     font-style: italic;
     font-weight: 900;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
     text-transform: uppercase;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
 }
 
-.page-about .about-lede__sub {
-    margin: 0;
-    font-size: 0.92rem;
-    font-weight: 400;
-    line-height: 1.45;
-    color: var(--text-dim);
+.about-main {
+    background: var(--bg-color);
 }
 
-.page-about .about-modes {
+.about-grid {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
-    margin: 0.35rem 0 0;
-    padding: 0;
-    list-style: none;
+    width: var(--about-measure);
+    margin: 0 auto;
+    padding: clamp(3.5rem, 10vh, 6.5rem) var(--about-pad) 0;
+    box-sizing: border-box;
 }
 
-.page-about .about-modes__head {
+.about-stint + .about-stint {
+    margin-top: clamp(2.25rem, 6vh, 3.75rem);
+    padding-top: clamp(2.25rem, 6vh, 3.75rem);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.about-stint__head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 1rem;
 }
 
-.page-about .about-modes__name {
+.about-stint__name {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: clamp(2.4rem, 9vw, 4.25rem);
     font-style: italic;
     font-weight: 900;
-    letter-spacing: 0.05em;
-    line-height: 1.05;
+    letter-spacing: -0.04em;
+    line-height: 0.88;
     text-transform: uppercase;
 }
 
-.page-about .about-modes__meta {
+.about-stint__clock {
+    margin: 0;
     flex-shrink: 0;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-family: var(--mono-font);
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.16em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.page-about .about-modes__note,
-.page-about .about-note {
-    margin: 0.25rem 0 0;
-    font-size: 0.88rem;
-    font-weight: 400;
-    line-height: 1.45;
-    color: var(--text-dim);
-}
-
-.page-about .about-note + .about-note {
-    margin-top: 0.55rem;
-}
-
-.page-about .lobby-primary-row {
-    display: grid;
-    width: 95%;
-    margin-inline: auto;
-    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
-}
-
-.page-about .main-menu__item--primary {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.3rem;
-    width: 100%;
-    margin: 0;
-    padding: 1.25rem 1.25rem;
-    background: var(--accent-color);
-    border: none;
-    border-radius: var(--radius-full);
-    color: #fff;
-    font-family: var(--header-font);
-    font-size: 1.5rem;
-    font-style: italic;
-    font-weight: 900;
-    letter-spacing: 0.05em;
-    text-decoration: none;
-}
-
-.page-about .main-menu__item--primary:hover,
-.page-about .main-menu__item--primary:focus-visible {
-    background: #ff3e3e;
-}
-
-.page-about .main-menu__label {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    line-height: 0.9;
-    text-transform: uppercase;
-}
-
-.page-about .main-menu__race-brief {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.45rem;
-    color: rgba(255, 255, 255, 0.78);
-    font-family: var(--header-font);
-    font-size: 0.7rem;
-    font-style: normal;
-    font-weight: 700;
-    letter-spacing: 0.04em;
     line-height: 1;
     text-transform: uppercase;
 }
 
-.page-about .main-menu__race-brief-track {
+.about-stint__line {
+    margin: 0.85rem 0 0;
+    max-width: 28rem;
+    font-size: 1.05rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text-dim);
+}
+
+.about-plate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: min(52vh, 28rem);
+    margin: clamp(3.5rem, 10vh, 6.5rem) 0 0;
+    padding: 0;
+    overflow: hidden;
+    background: #010410;
+}
+
+.about-plate__track {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+.about-machine {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: var(--about-measure);
+    margin: 0 auto;
+    padding: clamp(3.5rem, 10vh, 6.5rem) var(--about-pad) 0;
+}
+
+.about-machine p {
+    margin: 0;
+    max-width: 28rem;
+    font-size: 1.15rem;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--text-color);
+}
+
+.about-go {
+    width: var(--about-measure);
+    margin: 0 auto;
+    padding: clamp(3.5rem, 10vh, 6.5rem) var(--about-pad) max(var(--about-pad), env(safe-area-inset-bottom));
+}
+
+.about-go a {
+    display: inline-block;
+    font-size: clamp(3.2rem, 12vw, 6rem);
+    font-style: italic;
     font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 0.86;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--accent-color);
 }
 
-.page-about .main-menu__race-brief-separator {
-    color: rgba(255, 255, 255, 0.6);
+.about-go a:hover,
+.about-go a:focus-visible {
+    color: #ff3e3e;
 }
 
-.page-about .lobby-title:focus-visible,
-.page-about .main-menu__item--primary:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-}
-
-@media (prefers-reduced-transparency: reduce) {
-    .page-about .start-overlay {
-        background: rgba(2, 6, 23, 0.94);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-    }
+.about-mark:focus-visible,
+.about-go a:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 6px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .page-about .about-pane {
+    .about-mark__mini,
+    .about-mark__racer {
         animation: none;
     }
 }
