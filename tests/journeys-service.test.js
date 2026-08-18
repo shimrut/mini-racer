@@ -171,4 +171,41 @@ describe("JourneyService", () => {
     );
     warn.mockRestore();
   });
+
+  it("reports the race start under the mode being raced right now", async () => {
+    const client = createClient();
+    const onRaceStart = vi.fn();
+    let activeRaceMode = "daily";
+    const service = new JourneyService({
+      client,
+      receiptLogger: vi.fn(),
+      resolveMode: () => activeRaceMode,
+      onRaceStart,
+    });
+
+    await service.startAttempt({ reason: "initial_start" });
+    expect(onRaceStart).toHaveBeenLastCalledWith("daily");
+
+    activeRaceMode = "campaign";
+    await service.startAttempt({ reason: "restart", replaceActive: true });
+    expect(onRaceStart).toHaveBeenLastCalledWith("campaign");
+    expect(onRaceStart).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not report a start that its own guards refused", async () => {
+    const client = createClient();
+    const onRaceStart = vi.fn();
+    const service = new JourneyService({
+      client,
+      receiptLogger: vi.fn(),
+      resolveMode: () => "daily",
+      onRaceStart,
+    });
+
+    await service.startAttempt({ reason: "initial_start" });
+    await service.startAttempt({ reason: "initial_start" });
+    await service.startAttempt({ reason: "not_a_reason" });
+
+    expect(onRaceStart).toHaveBeenCalledTimes(1);
+  });
 });
