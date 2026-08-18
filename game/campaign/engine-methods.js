@@ -674,7 +674,7 @@ export const campaignEngineMethods = {
             this.applyDailyChallenge(toRaceChallenge(stage));
             this.activeRaceMode = 'campaign';
             if (cachedPersonalBest) this.applyCampaignPersonalBest(stage, cachedPersonalBest);
-            void this.journeys?.startAttempt?.({ reason: 'initial_start' });
+            void this.journeys?.startAttempt?.({ mode: 'campaign', reason: 'initial_start' });
             await raceStartTransition;
             this.startSequence();
 

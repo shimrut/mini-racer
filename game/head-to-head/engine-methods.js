@@ -203,7 +203,7 @@ export const headToHeadEngineMethods = {
             this.bestLapTime = null;
             this.applyDailyChallenge(toRaceChallenge(stage));
             this.activeRaceMode = 'challenge';
-            void this.journeys?.startAttempt?.({ reason: 'initial_start' });
+            void this.journeys?.startAttempt?.({ mode: 'challenge', reason: 'initial_start' });
             this.startSequence();
         } catch (error) {
             console.error('Could not start Head to Head race:', error);

@@ -838,7 +838,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       preserveRaceComparisonTarget: true,
     });
     expect(endAttempt).toHaveBeenCalledWith({ complete: false });
-    expect(startAttempt).toHaveBeenCalledWith({ reason: "restart" });
+    expect(startAttempt).toHaveBeenCalledWith({ mode: "daily", reason: "restart" });
   });
 
   it("passes improve intent when restarting from the win screen", () => {
@@ -855,7 +855,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       { reason: "improve" },
     );
 
-    expect(startAttempt).toHaveBeenCalledWith({ reason: "improve" });
+    expect(startAttempt).toHaveBeenCalledWith({ mode: "daily", reason: "improve" });
     expect(reset).toHaveBeenCalledWith(true, {
       preserveDailyChallenge: true,
       preserveRaceComparisonTarget: false,
@@ -1147,6 +1147,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();
     expect(engine.journeys.startAttempt).toHaveBeenCalledWith({
+      mode: "daily",
       reason: "track_switch",
       replaceActive: false,
     });
@@ -1188,6 +1189,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();
     expect(engine.journeys.startAttempt).toHaveBeenCalledWith({
+      mode: "daily",
       reason: "track_switch",
       replaceActive: true,
     });

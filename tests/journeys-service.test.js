@@ -172,22 +172,15 @@ describe("JourneyService", () => {
     warn.mockRestore();
   });
 
-  it("reports the race start under the mode being raced right now", async () => {
+  it("reports the race start under the mode its caller named", async () => {
     const client = createClient();
     const onRaceStart = vi.fn();
-    let activeRaceMode = "daily";
-    const service = new JourneyService({
-      client,
-      receiptLogger: vi.fn(),
-      resolveMode: () => activeRaceMode,
-      onRaceStart,
-    });
+    const service = new JourneyService({ client, receiptLogger: vi.fn(), onRaceStart });
 
-    await service.startAttempt({ reason: "initial_start" });
+    await service.startAttempt({ mode: "daily", reason: "initial_start" });
     expect(onRaceStart).toHaveBeenLastCalledWith("daily");
 
-    activeRaceMode = "campaign";
-    await service.startAttempt({ reason: "restart", replaceActive: true });
+    await service.startAttempt({ mode: "campaign", reason: "restart", replaceActive: true });
     expect(onRaceStart).toHaveBeenLastCalledWith("campaign");
     expect(onRaceStart).toHaveBeenCalledTimes(2);
   });
@@ -195,16 +188,11 @@ describe("JourneyService", () => {
   it("does not report a start that its own guards refused", async () => {
     const client = createClient();
     const onRaceStart = vi.fn();
-    const service = new JourneyService({
-      client,
-      receiptLogger: vi.fn(),
-      resolveMode: () => "daily",
-      onRaceStart,
-    });
+    const service = new JourneyService({ client, receiptLogger: vi.fn(), onRaceStart });
 
-    await service.startAttempt({ reason: "initial_start" });
-    await service.startAttempt({ reason: "initial_start" });
-    await service.startAttempt({ reason: "not_a_reason" });
+    await service.startAttempt({ mode: "daily", reason: "initial_start" });
+    await service.startAttempt({ mode: "daily", reason: "initial_start" });
+    await service.startAttempt({ mode: "daily", reason: "not_a_reason" });
 
     expect(onRaceStart).toHaveBeenCalledTimes(1);
   });

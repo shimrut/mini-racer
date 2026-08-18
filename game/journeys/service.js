@@ -20,12 +20,10 @@ export class JourneyService {
   constructor({
     client = telemetry,
     receiptLogger = logReceipt,
-    resolveMode = () => null,
     onRaceStart = reportRaceStart,
   } = {}) {
     this.client = client;
     this.receiptLogger = receiptLogger;
-    this.resolveMode = resolveMode;
     this.onRaceStart = onRaceStart;
     this.appReadyReported = false;
     this.attemptActive = false;
@@ -55,14 +53,14 @@ export class JourneyService {
     return this.enqueue("app_ready", () => this.client.appReady());
   }
 
-  startAttempt({ reason = "initial_start", replaceActive = false } = {}) {
+  startAttempt({ reason = "initial_start", replaceActive = false, mode = null } = {}) {
     if (!JOURNEY_START_REASONS.has(reason)) return this.operationQueue;
 
     const endingActive = this.attemptActive && replaceActive;
     if (this.attemptActive && !replaceActive) return this.operationQueue;
 
     const closeStaleJourney = !this.hasStartedAttemptOnPage && !endingActive;
-    this.onRaceStart?.(this.resolveMode());
+    this.onRaceStart?.(mode);
     this.hasStartedAttemptOnPage = true;
     this.attemptActive = true;
     this.highestProgress = 0;

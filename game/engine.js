@@ -216,11 +216,7 @@ export class RealTimeRacer {
     this.pbGhostSizeCapture = (shouldExposeDebugHooks() || shouldCapturePbGhostSize())
       ? new PbGhostSizeCapture()
       : null;
-    this.journeys = new JourneyService({
-      // The mode being raced now, not the one the app opened with: a campaign race
-      // launched from a Daily post would otherwise be reported as a Daily start too.
-      resolveMode: () => this.activeRaceMode ?? null,
-    });
+    this.journeys = new JourneyService();
     this.preparedPbGhostChallengeId = null;
     this.pbGhostSelectionChallengeId = null;
     this.pbGhostSelectionGeneration = 0;

@@ -944,6 +944,7 @@ export const dailyChallengeEngineMethods = {
       }
       this.applyDailyChallenge(challenge);
       void this.journeys?.startAttempt?.({
+        mode: "daily",
         reason: resolveJourneyStartReason({ replacesCurrentRun }),
         replaceActive: replaceActiveJourney,
       });
@@ -1555,7 +1556,7 @@ export const dailyChallengeEngineMethods = {
     if (!this.activeDailyChallenge) return;
 
     void this.journeys?.endAttempt?.({ complete: false });
-    void this.journeys?.startAttempt?.({ reason });
+    void this.journeys?.startAttempt?.({ mode: "daily", reason });
     this.reset(true, {
       preserveDailyChallenge: true,
       preserveRaceComparisonTarget: reason !== "improve",

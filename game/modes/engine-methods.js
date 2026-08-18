@@ -80,7 +80,7 @@ export const modeRouterEngineMethods = {
         }
         if (!this.currentChallengeRun) return;
         void this.journeys?.endAttempt?.({ complete: false });
-        void this.journeys?.startAttempt?.({ reason: 'restart' });
+        void this.journeys?.startAttempt?.({ mode: this.activeRaceMode, reason: 'restart' });
         this.reset(true, { preserveDailyChallenge: true, showStartOverlay: false });
     },
 

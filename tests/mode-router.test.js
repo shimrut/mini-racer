@@ -82,7 +82,7 @@ describe('mode router', () => {
             preserveDailyChallenge: true,
             showStartOverlay: false,
         });
-        expect(campaign.journeys.startAttempt).toHaveBeenCalledWith({ reason: 'restart' });
+        expect(campaign.journeys.startAttempt).toHaveBeenCalledWith({ mode: 'campaign', reason: 'restart' });
     });
 
     it('does not restart a non-Daily mode with no active run', () => {
