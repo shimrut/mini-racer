@@ -1,5 +1,6 @@
 import { redis } from '@devvit/redis';
 import { readContextSubredditName } from './request-context.js';
+import { readPlayerProfile } from './competition-identity.js';
 import {
     DAILY_GP_REDIS_TTL_SECONDS,
     DAY_MS,
@@ -212,6 +213,32 @@ export function emptyAnalyticsDay(date: string): AnalyticsDay {
 }
 
 /**
+ * The ledger is the authority on new vs returning, not the player profile: a profile is
+ * recreated when a guest signs in, which booked month-old players as brand new. But an
+ * empty ledger would report every established player as new on the day it ships, so the
+ * first claim backfills itself from the account's own first-seen date.
+ *
+ * Returns true only for a player with no earlier history anywhere.
+ */
+async function claimFirstSeen(scope: string, playerId: string, date: string): Promise<boolean> {
+    if (!(await redis.hSetNX(firstSeenKey(scope), playerId, date))) return false;
+
+    let knownSince: string | null = null;
+    try {
+        const profile = await readPlayerProfile(playerId);
+        const seen = typeof profile?.firstSeenAt === 'string' ? profile.firstSeenAt.slice(0, 10) : '';
+        knownSince = /^\d{4}-\d{2}-\d{2}$/.test(seen) ? seen : null;
+    } catch (error) {
+        // An unreadable profile only costs this player a "new" label, never their race.
+        logAnalyticsFailure('first-seen backfill', error);
+    }
+
+    if (!knownSince || knownSince >= date) return true;
+    await redis.hSet(firstSeenKey(scope), { [playerId]: knownSince });
+    return false;
+}
+
+/**
  * A player is marked once per bucket. The mark itself carries the new/returning verdict,
  * so every figure on the page derives from one hash and the totals cannot drift apart.
  */
@@ -224,11 +251,9 @@ async function markPlayerPresence(
     const month = toMonth(date);
     const modeField = `${mode}:${player.id}`;
 
-    // The first-seen ledger decides new vs returning, not the player profile: a profile is
-    // recreated when a guest signs in, which booked month-old players as brand new.
     const mark: PlayerMark = player.isGuest
         ? PLAYER_GUEST
-        : (await redis.hSetNX(firstSeenKey(scope), player.id, date))
+        : (await claimFirstSeen(scope, player.id, date))
             ? PLAYER_NEW
             : PLAYER_RETURNING;
 

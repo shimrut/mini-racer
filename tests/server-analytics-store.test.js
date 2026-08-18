@@ -16,6 +16,12 @@ const mockRedis = {
         hashes.set(key, hash);
         return next;
     }),
+    hSet: vi.fn(async (key, entries) => {
+        const hash = hashes.get(key) ?? new Map();
+        for (const [field, value] of Object.entries(entries)) hash.set(field, value);
+        hashes.set(key, hash);
+        return Object.keys(entries).length;
+    }),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
     expire: vi.fn(async () => true),
 };
@@ -23,6 +29,11 @@ const mockRedis = {
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('../src/server/request-context.ts', () => ({
     readContextSubredditName: () => 'mini_racer',
+}));
+
+const profiles = new Map();
+vi.mock('../src/server/competition-identity.ts', () => ({
+    readPlayerProfile: async (playerId) => profiles.get(playerId) ?? null,
 }));
 
 const SUBREDDIT = 'mini_racer';
@@ -43,6 +54,7 @@ function modeFor(bucket, mode) {
 describe('server analytics store', () => {
     beforeEach(() => {
         hashes.clear();
+        profiles.clear();
         vi.clearAllMocks();
     });
 
@@ -217,6 +229,46 @@ describe('server analytics store', () => {
 
         expect(summary.today.challengeCreates).toBe(1);
         expect(summary.today.players).toBe(0);
+    });
+
+    it('treats an account that raced before the ledger existed as returning', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+        profiles.set('reddit:veteran', { firstSeenAt: '2026-06-02T10:00:00.000Z' });
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:veteran',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.today).toMatchObject({ players: 1, newPlayers: 0, returningPlayers: 1 });
+    });
+
+    it('still counts a genuinely first-time account as new', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+        profiles.set('reddit:rookie', { firstSeenAt: '2026-08-15T08:00:00.000Z' });
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:rookie',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.today).toMatchObject({ players: 1, newPlayers: 1, returningPlayers: 0 });
     });
 
     it('swallows redis failures so gameplay callers stay unblocked', async () => {

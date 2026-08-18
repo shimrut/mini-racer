@@ -41,8 +41,11 @@
   kept for 13 months. Unique reach and the per-track breakdown are gone — the
   first answered nothing, and the second could not tell 1 player driving 1000
   laps from 1000 players driving one. Mods still open it from **Open Mini
-  Racer analytics**. Existing analytics keys are not migrated: the old ones
-  measured something else and expire on their own.
+  Racer analytics**. The old analytics keys are not migrated — they measured
+  something else and expire on their own — but new versus returning is not
+  starting blind: the first time an account races, the ledger backfills itself
+  from that account's own first-seen date, so established players are reported
+  as returning rather than appearing new on the day this shipped.
 
 - Finish-sheet ghost comparisons now show **VS #rank** and a signed gap
   (`+` slower, `-` faster) instead of the opponent name and WON/LOST BY.
