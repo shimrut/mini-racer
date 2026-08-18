@@ -15,7 +15,6 @@ export type CompetitionRouteDependencies = {
     getServerDailyGpSnapshot(input: Record<string, unknown>): Promise<unknown>;
     submitServerDailyGpRun(input: Record<string, unknown>): Promise<ServiceResult>;
     isDailyGpChallengePlayable(challenge: DailyGpChallenge): boolean;
-    recordDailyFinish?(trackKey: unknown): void;
 };
 
 function parseOptionalInteger(value: unknown): number | undefined {
@@ -120,9 +119,6 @@ export function registerCompetitionRoutes(
                 const body = result.body && typeof result.body === 'object'
                     ? result.body as { accepted?: unknown }
                     : null;
-                if (body?.accepted === true) {
-                    dependencies.recordDailyFinish?.((req.body ?? {}).trackKey);
-                }
             }
             res.status(result.status).json(result.body);
         } catch (error) {

@@ -1,4 +1,5 @@
 import { telemetry } from "@devvit/analytics/client/reddit";
+import { reportRaceStart } from "./race-start-report.js";
 
 const JOURNEY_INTERACTIONS = new Set(["pause", "resume"]);
 
@@ -16,9 +17,16 @@ function logReceipt(eventName, receipt) {
 }
 
 export class JourneyService {
-  constructor({ client = telemetry, receiptLogger = logReceipt } = {}) {
+  constructor({
+    client = telemetry,
+    receiptLogger = logReceipt,
+    resolveMode = () => null,
+    onRaceStart = reportRaceStart,
+  } = {}) {
     this.client = client;
     this.receiptLogger = receiptLogger;
+    this.resolveMode = resolveMode;
+    this.onRaceStart = onRaceStart;
     this.appReadyReported = false;
     this.attemptActive = false;
     this.hasStartedAttemptOnPage = false;
@@ -54,6 +62,7 @@ export class JourneyService {
     if (this.attemptActive && !replaceActive) return this.operationQueue;
 
     const closeStaleJourney = !this.hasStartedAttemptOnPage && !endingActive;
+    this.onRaceStart?.(this.resolveMode());
     this.hasStartedAttemptOnPage = true;
     this.attemptActive = true;
     this.highestProgress = 0;

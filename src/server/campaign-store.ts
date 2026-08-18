@@ -47,6 +47,7 @@ import {
     type RedisLock,
     type RedisLockLease,
 } from './redis-lock.js';
+import { recordAnalyticsRaceBestEffort } from './analytics-store.js';
 
 type CampaignMedal = 'bronze' | 'silver' | 'gold' | 'author';
 
@@ -556,6 +557,7 @@ export async function startServerCampaignRace({
         }
         throw error;
     }
+    recordAnalyticsRaceBestEffort('campaign', 'start', identity.canonicalPlayerId);
     return { status: 200, body: { race: stage, progress: publicProgress(startedProgress) } };
 }
 
@@ -689,6 +691,7 @@ export async function submitServerCampaignRun({
     if (outcome.status !== 200 || !(outcome.body as { accepted?: boolean }).accepted) {
         return outcome;
     }
+    recordAnalyticsRaceBestEffort('campaign', 'finish', identity.canonicalPlayerId);
 
     const body = outcome.body as {
         accepted: true;

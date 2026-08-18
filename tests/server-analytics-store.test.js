@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DAILY_GP_REDIS_TTL_SECONDS } from '../src/server/daily-gp-model.ts';
 
 const hashes = new Map();
 const mockRedis = {
@@ -22,8 +21,24 @@ const mockRedis = {
 };
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
+vi.mock('../src/server/request-context.ts', () => ({
+    readContextSubredditName: () => 'mini_racer',
+}));
 
-const now = new Date('2026-08-15T12:00:00.000Z');
+const SUBREDDIT = 'mini_racer';
+const day = (iso) => new Date(iso);
+
+async function store() {
+    return import('../src/server/analytics-store.ts');
+}
+
+function dayFor(summary, date) {
+    return summary.days.find((entry) => entry.date === date);
+}
+
+function modeFor(bucket, mode) {
+    return bucket.modes.find((entry) => entry.mode === mode);
+}
 
 describe('server analytics store', () => {
     beforeEach(() => {
@@ -31,150 +46,190 @@ describe('server analytics store', () => {
         vi.clearAllMocks();
     });
 
-    it('counts a player once per UTC day and classifies new vs returning from firstSeenAt', async () => {
-        const {
-            recordAnalyticsPresence,
-            getServerAnalyticsSummary,
-        } = await import('../src/server/analytics-store.ts');
+    it('counts a signed-in player once per day however many races they start', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
 
-        await recordAnalyticsPresence({
-            playerId: 'reddit:racefan',
-            firstSeenAt: '2026-08-15T01:00:00.000Z',
-            now,
-        });
-        await recordAnalyticsPresence({
-            playerId: 'reddit:racefan',
-            firstSeenAt: '2026-08-15T01:00:00.000Z',
-            now,
-        });
-        await recordAnalyticsPresence({
-            playerId: 'guest:otter',
-            firstSeenAt: '2026-07-01T00:00:00.000Z',
-            now,
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+            await recordAnalyticsRace({
+                mode: 'daily',
+                action: 'start',
+                playerId: 'reddit:racefan',
+                subredditName: SUBREDDIT,
+                now: day('2026-08-15T09:00:00.000Z'),
+            });
+        }
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
         });
 
-        expect(mockRedis.hSetNX).toHaveBeenCalledWith(
-            'dailygp:analytics:2026-08-15:players',
-            'reddit:racefan',
-            '1',
-        );
-        expect(mockRedis.expire).toHaveBeenCalledWith(
-            'dailygp:analytics:2026-08-15:counters',
-            DAILY_GP_REDIS_TTL_SECONDS,
-        );
-
-        const summary = await getServerAnalyticsSummary({ now });
-        expect(summary.today).toMatchObject({
-            date: '2026-08-15',
-            uniquePlayers: 2,
-            newPlayers: 1,
-            returningPlayers: 1,
-        });
-        expect(summary.windows).toEqual([
-            expect.objectContaining({ days: 7, uniquePlayers: 2, playerDays: 2 }),
-            expect.objectContaining({ days: 14, uniquePlayers: 2, playerDays: 2 }),
-            expect.objectContaining({ days: 30, uniquePlayers: 2, playerDays: 2 }),
-        ]);
+        expect(summary.today).toMatchObject({ players: 1, newPlayers: 1, returningPlayers: 0 });
+        expect(modeFor(summary.today, 'daily')).toMatchObject({ players: 1, starts: 4, finishes: 0 });
     });
 
-    it('unions unique players across retained days without double-counting', async () => {
-        const {
-            recordAnalyticsPresence,
-            getServerAnalyticsSummary,
-        } = await import('../src/server/analytics-store.ts');
+    it('classifies a player as returning on any day after their first, from its own ledger', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
 
-        await recordAnalyticsPresence({
-            playerId: 'reddit:racefan',
-            firstSeenAt: '2026-08-01T00:00:00.000Z',
-            now: new Date('2026-08-14T12:00:00.000Z'),
-        });
-        await recordAnalyticsPresence({
-            playerId: 'reddit:racefan',
-            firstSeenAt: '2026-08-01T00:00:00.000Z',
-            now,
-        });
-        await recordAnalyticsPresence({
-            playerId: 'guest:new',
-            firstSeenAt: '2026-08-15T00:00:00.000Z',
-            now,
-        });
-
-        const summary = await getServerAnalyticsSummary({ now });
-        expect(summary.windows.find((window) => window.days === 7)).toMatchObject({
-            uniquePlayers: 2,
-            playerDays: 3,
-        });
-    });
-
-    it('records daily, campaign, and challenge plays on known tracks only', async () => {
-        const {
-            recordAnalyticsPlay,
-            getServerAnalyticsSummary,
-        } = await import('../src/server/analytics-store.ts');
-
-        await recordAnalyticsPlay({
+        await recordAnalyticsRace({
             mode: 'daily',
-            action: 'finish',
-            trackKey: 'circuit',
-            now,
+            action: 'start',
+            playerId: 'reddit:racefan',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-14T09:00:00.000Z'),
         });
-        await recordAnalyticsPlay({
+        await recordAnalyticsRace({
             mode: 'campaign',
             action: 'start',
-            trackKey: 'numberZero',
-            now,
-        });
-        await recordAnalyticsPlay({
-            mode: 'challenge',
-            action: 'create',
-            trackKey: 'circuit',
-            now,
-        });
-        await recordAnalyticsPlay({
-            mode: 'challenge',
-            action: 'finish',
-            trackKey: 'circuit',
-            now,
-        });
-        await recordAnalyticsPlay({
-            mode: 'daily',
-            action: 'finish',
-            trackKey: 'not-a-track',
-            now,
-        });
-        await recordAnalyticsPlay({
-            mode: 'daily',
-            action: 'start',
-            trackKey: 'circuit',
-            now,
+            playerId: 'reddit:racefan',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
         });
 
-        const summary = await getServerAnalyticsSummary({ now });
-        expect(summary.today).toMatchObject({
-            dailyFinishes: 1,
-            campaignStarts: 1,
-            challengeCreates: 1,
-            challengeFinishes: 1,
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
         });
-        expect(summary.tracks.daily).toEqual([
-            { trackKey: 'circuit', trackName: 'Classic Circuit', count: 1 },
-        ]);
-        expect(summary.tracks.campaign).toEqual([
-            { trackKey: 'numberZero', trackName: 'Number Zero', count: 1 },
-        ]);
-        expect(summary.tracks.challenge).toEqual([
-            { trackKey: 'circuit', trackName: 'Classic Circuit', count: 2 },
-        ]);
+
+        expect(dayFor(summary, '2026-08-14')).toMatchObject({ newPlayers: 1, returningPlayers: 0 });
+        expect(dayFor(summary, '2026-08-15')).toMatchObject({ newPlayers: 0, returningPlayers: 1 });
+    });
+
+    it('keeps signed-out visitors out of the player count and reports them separately', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'guest:abc',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:racefan',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.today).toMatchObject({ players: 1, guestPlayers: 1 });
+        expect(modeFor(summary.today, 'daily').players).toBe(1);
+    });
+
+    it('ignores a raw storage id that is not a canonical identity', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: '0f8c-not-canonical',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.today).toMatchObject({ players: 0, guestPlayers: 0 });
+        expect(modeFor(summary.today, 'daily').starts).toBe(0);
+    });
+
+    it('reports the same start and finish events for every mode', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+        const now = day('2026-08-15T09:00:00.000Z');
+
+        for (const mode of ['daily', 'campaign', 'challenge']) {
+            await recordAnalyticsRace({ mode, action: 'start', playerId: 'reddit:a', subredditName: SUBREDDIT, now });
+            await recordAnalyticsRace({ mode, action: 'start', playerId: 'reddit:b', subredditName: SUBREDDIT, now });
+            await recordAnalyticsRace({ mode, action: 'finish', playerId: 'reddit:a', subredditName: SUBREDDIT, now });
+        }
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        for (const mode of ['daily', 'campaign', 'challenge']) {
+            expect(modeFor(summary.today, mode)).toMatchObject({ players: 2, starts: 2, finishes: 1 });
+        }
+        expect(summary.today.players).toBe(2);
+    });
+
+    it('dedupes a player across the days of a month', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+
+        for (const date of ['2026-08-10', '2026-08-11', '2026-08-15']) {
+            await recordAnalyticsRace({
+                mode: 'daily',
+                action: 'start',
+                playerId: 'reddit:racefan',
+                subredditName: SUBREDDIT,
+                now: day(`${date}T09:00:00.000Z`),
+            });
+        }
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+        const august = summary.months.find((month) => month.month === '2026-08');
+
+        expect(august).toMatchObject({ players: 1, newPlayers: 1, returningPlayers: 0 });
+        expect(modeFor(august, 'daily').players).toBe(1);
+    });
+
+    it('keeps one subreddit out of another subreddit summary', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+        const now = day('2026-08-15T09:00:00.000Z');
+
+        await recordAnalyticsRace({ mode: 'daily', action: 'start', playerId: 'reddit:a', subredditName: 'mini_racer', now });
+        await recordAnalyticsRace({ mode: 'daily', action: 'start', playerId: 'reddit:b', subredditName: 'other_sub', now });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: 'mini_racer',
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.today.players).toBe(1);
+    });
+
+    it('records a challenge creation without counting it as a race', async () => {
+        const { recordAnalyticsChallengeCreate, getServerAnalyticsSummary } = await store();
+
+        await recordAnalyticsChallengeCreate({
+            playerId: 'reddit:racefan',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.today.challengeCreates).toBe(1);
+        expect(summary.today.players).toBe(0);
     });
 
     it('swallows redis failures so gameplay callers stay unblocked', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { recordAnalyticsRace } = await store();
         mockRedis.hSetNX.mockRejectedValueOnce(new Error('redis down'));
-        const { recordAnalyticsPresence } = await import('../src/server/analytics-store.ts');
-        await expect(recordAnalyticsPresence({
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await expect(recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
             playerId: 'reddit:racefan',
-            firstSeenAt: '2026-08-15T00:00:00.000Z',
-            now,
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
         })).resolves.toBeUndefined();
     });
 });

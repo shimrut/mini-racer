@@ -89,15 +89,7 @@ h1 {
     font-family: var(--mono);
     font-size: 0.8rem;
     color: var(--ink);
-}
-
-.analytics-range,
-.analytics-range__note,
-.analytics-status,
-.analytics-note,
-.analytics-card__note,
-.analytics-kpi__hint,
-.analytics-reach__hint {
+}.analytics-range, .analytics-range__note, .analytics-status, .analytics-note, .analytics-card__note, .analytics-kpi__hint {
     margin: 0;
     color: var(--muted);
     font-size: 0.78rem;
@@ -114,13 +106,9 @@ h1 {
 
 .analytics-status[data-state="error"] {
     color: var(--accent);
-}
+}/* Cards */
 
-/* Cards */
-
-.analytics-card,
-.analytics-kpi,
-.analytics-panel {
+.analytics-card, .analytics-kpi {
     padding: 0.9rem 1rem 1rem;
     background: var(--panel);
     border: 1px solid var(--line);
@@ -269,11 +257,6 @@ h1 {
 
 #analytics-trend .analytics-plot {
     margin: auto 0;
-}
-
-.analytics-main__side {
-    display: grid;
-    gap: 0.75rem;
 }
 
 .analytics-legend {
@@ -455,97 +438,6 @@ h1 {
     opacity: 0.55;
 }
 
-.analytics-reach,
-.analytics-plays {
-    display: grid;
-    gap: 0.7rem;
-}
-
-.analytics-reach__row,
-.analytics-plays__row {
-    display: grid;
-    gap: 0.32rem;
-}
-
-.analytics-reach__head,
-.analytics-plays__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    font-size: 0.85rem;
-}
-
-.analytics-reach__span,
-.analytics-plays__label {
-    color: var(--muted);
-}
-
-.analytics-reach__head .analytics-count,
-.analytics-plays__head .analytics-count {
-    font-size: 1rem;
-}
-
-.analytics-reach__hint {
-    font-size: 0.72rem;
-}
-
-/* Track rankings */
-
-.analytics-tracks {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
-}
-
-.analytics-panel {
-    display: flex;
-    flex-direction: column;
-}
-
-.analytics-ranks {
-    display: grid;
-    gap: 0.6rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.analytics-ranks__row {
-    display: grid;
-    gap: 0.3rem;
-}
-
-.analytics-ranks__head {
-    display: flex;
-    align-items: baseline;
-    gap: 0.55rem;
-    font-size: 0.85rem;
-}
-
-.analytics-ranks__place {
-    width: 0.9rem;
-    flex: none;
-    color: var(--faint);
-    font-family: var(--mono);
-    font-size: 0.72rem;
-}
-
-.analytics-ranks__name {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-}
-
-.analytics-ranks__head .analytics-count {
-    margin-left: auto;
-}
-
-.analytics-panel .analytics-note {
-    margin-top: 0.7rem;
-    font-size: 0.72rem;
-}
-
 /* Daily table */
 
 .analytics-table-wrap {
@@ -580,7 +472,9 @@ h1 {
     white-space: nowrap;
 }
 
-.analytics-table thead th {
+/* Only the long daily table is worth pinning: on a three-row table the pinned
+   header just sits on top of the first row of data. */
+.analytics-table--sticky thead th {
     position: sticky;
     top: 1.5rem;
     z-index: 1;
@@ -645,16 +539,6 @@ h1 {
     .analytics-main {
         grid-template-columns: minmax(0, 1fr);
     }
-
-    .analytics-main__side {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-@media (max-width: 820px) {
-    .analytics-tracks {
-        grid-template-columns: 1fr;
-    }
 }
 
 @media (max-width: 620px) {
@@ -667,10 +551,6 @@ h1 {
     }
 
     .analytics-kpis,
-    .analytics-main__side {
-        grid-template-columns: 1fr;
-    }
-
     .analytics-card__head {
         flex-wrap: wrap;
     }

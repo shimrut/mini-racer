@@ -98,6 +98,7 @@ export {
     parseStoredPlayerProfile,
     salvagePlayerPreferences,
 } from './competition-identity.js';
+import { recordAnalyticsRace, recordAnalyticsRaceBestEffort } from './analytics-store.js';
 export { parseStoredEntry } from './competition-leaderboard.js';
 
 type PlayerBootstrapPayload = {
@@ -1925,6 +1926,7 @@ export async function submitServerDailyGpRun({
     }
     const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
     await recordCompletedRace(normalizedPlayerId);
+    recordAnalyticsRaceBestEffort('daily', 'finish', normalizedPlayerId);
     return {
         status: 200,
         body: {
@@ -1945,4 +1947,20 @@ export async function submitServerDailyGpRun({
             carUnlocks: await readPlayerCarUnlocks(normalizedPlayerId),
         },
     };
+}
+
+export async function recordServerRaceStart({
+    mode,
+    playerId,
+    redditUsername,
+    guestToken,
+}: {
+    mode?: unknown;
+    playerId?: unknown;
+    redditUsername?: unknown;
+    guestToken?: unknown;
+} = {}): Promise<void> {
+    const identity = await resolveAuthorizedPlayerIdentity({ playerId, redditUsername, guestToken });
+    if (!identity.canonicalPlayerId) return;
+    await recordAnalyticsRace({ mode, action: 'start', playerId: identity.canonicalPlayerId });
 }

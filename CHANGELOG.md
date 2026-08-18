@@ -27,13 +27,22 @@
   saying when the selected track drops off the playlist — a date, or a
   countdown on its last day.
 
-- Restored a 45-day moderator analytics dashboard. It reuses the old daily
-  Redis keys, counts unique people from player bootstrap, and counts Daily
-  finishes, Campaign starts, and Head to Head creates/finishes. Mods open it
-  from **Open Mini Racer analytics**. The headline numbers carry a
-  day-over-day change and a 14-day sparkline, the daily chart stacks new
-  against returning players and names the day on hover, and the breakdown
-  table keeps its header in view while it scrolls.
+- Rebuilt the moderator analytics dashboard around a player count that can be
+  trusted. A player is now a signed-in Reddit account that **started a race**,
+  counted once per UTC day — not an app open, which inflated the old number
+  past Devvit's own `app_ready`. New versus returning comes from an analytics
+  first-seen ledger rather than the player profile, so signing in no longer
+  books a month-old player as brand new. Signed-out visitors are reported on
+  their own line and never folded into the total: one person can be many
+  browser ids. Every mode now reports the same two events, **starts** and
+  **finishes**, so Daily, Campaign, and Challenge rows compare directly and
+  carry a completion rate. Counts are scoped per subreddit instead of being
+  shared across every install. Uniques are also deduped per calendar month and
+  kept for 13 months. Unique reach and the per-track breakdown are gone — the
+  first answered nothing, and the second could not tell 1 player driving 1000
+  laps from 1000 players driving one. Mods still open it from **Open Mini
+  Racer analytics**. Existing analytics keys are not migrated: the old ones
+  measured something else and expire on their own.
 
 - Finish-sheet ghost comparisons now show **VS #rank** and a signed gap
   (`+` slower, `-` faster) instead of the opponent name and WON/LOST BY.

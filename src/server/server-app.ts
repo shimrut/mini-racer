@@ -9,6 +9,7 @@ import {
     getServerPlayerPbGhost,
     getServerPlayerTrackPbSummaries,
     getServerPlayerBootstrap,
+    recordServerRaceStart,
     selectServerGuestProgress,
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
@@ -48,8 +49,6 @@ import { ensureMiniRacerLauncherPostForSubreddit } from './launcher-post-service
 import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator-access.js';
 import {
     getServerAnalyticsSummary,
-    recordAnalyticsPlayBestEffort,
-    recordAnalyticsPresenceBestEffort,
 } from './analytics-store.js';
 import {
     ensureModeratorAnalyticsPostForSubreddit,
@@ -94,10 +93,11 @@ function registerProductionRoutes(app: express.Application): void {
         resolveAnalyticsToolSubredditName,
         assertModeratorForSubreddit,
         getServerAnalyticsSummary: () => getServerAnalyticsSummary(),
+        getRequestUsername,
+        recordRaceStart: (input) => recordServerRaceStart(input),
     });
     registerPlayerRoutes(app, {
         getRequestUsername,
-        recordPlayerPresence: recordAnalyticsPresenceBestEffort,
         getServerPlayerBootstrap: (input) => getServerPlayerBootstrap(input),
         selectServerGuestProgress: (input) => selectServerGuestProgress(input),
         updateServerPlayerIdentity: (input) => updateServerPlayerIdentity(input),
@@ -117,9 +117,6 @@ function registerProductionRoutes(app: express.Application): void {
         getRequestUsername,
         getRequestRateLimitIdentity,
         getServerCampaignBootstrap: (input) => getServerCampaignBootstrap(input),
-        recordCampaignStart: (trackKey) => (
-            recordAnalyticsPlayBestEffort('campaign', 'start', trackKey)
-        ),
         startServerCampaignRace: (input) => startServerCampaignRace(input),
         getServerCampaignSnapshot: (input) => getServerCampaignSnapshot(input),
         submitServerCampaignRun: (input) => submitServerCampaignRun(input),
@@ -154,9 +151,6 @@ function registerProductionRoutes(app: express.Application): void {
         getServerDailyGpChallenge,
         getServerDailyGpPlaylist,
         getServerDailyGpSnapshot: (input) => getServerDailyGpSnapshot(input),
-        recordDailyFinish: (trackKey) => (
-            recordAnalyticsPlayBestEffort('daily', 'finish', trackKey)
-        ),
         submitServerDailyGpRun: (input) => submitServerDailyGpRun(input),
         isDailyGpChallengePlayable,
     });

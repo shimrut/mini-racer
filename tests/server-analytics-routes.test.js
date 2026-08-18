@@ -3,8 +3,6 @@ import { createServerApp } from '../src/server/server-app.ts';
 import { registerAnalyticsRoutes } from '../src/server/routes/analytics-routes.ts';
 import { registerInternalRoutes } from '../src/server/routes/internal-routes.ts';
 import { registerPlayerRoutes } from '../src/server/routes/player-routes.ts';
-import { registerCampaignRoutes } from '../src/server/routes/campaign-routes.ts';
-import { registerCompetitionRoutes } from '../src/server/routes/competition-routes.ts';
 
 const openServers = new Set();
 
@@ -36,6 +34,8 @@ describe('analytics route contracts', () => {
             resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
             assertModeratorForSubreddit,
             getServerAnalyticsSummary,
+            getRequestUsername: () => 'RaceFan',
+            recordRaceStart: vi.fn(),
         }));
 
         const response = await fetch(`${baseUrl}/api/analytics/summary`);
@@ -52,6 +52,8 @@ describe('analytics route contracts', () => {
                 throw new Error('Moderator access required for r/MiniRacer.');
             },
             getServerAnalyticsSummary: vi.fn(),
+            getRequestUsername: () => 'RaceFan',
+            recordRaceStart: vi.fn(),
         }));
 
         const response = await fetch(`${baseUrl}/api/analytics/summary`);
@@ -61,92 +63,85 @@ describe('analytics route contracts', () => {
         });
     });
 
-    it('records presence, campaign starts, daily finishes, and opens the analytics post', async () => {
-        const recordPlayerPresence = vi.fn();
-        const recordCampaignStart = vi.fn();
-        const recordDailyFinish = vi.fn();
+    it('records a client-reported race start for the modes that have no server start', async () => {
+        const recordRaceStart = vi.fn(async () => {});
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
+            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
+            assertModeratorForSubreddit: vi.fn(),
+            getServerAnalyticsSummary: vi.fn(),
+            getRequestUsername: () => 'RaceFan',
+            recordRaceStart,
+        }));
+
+        const started = await fetch(`${baseUrl}/api/analytics/race-start`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ mode: 'daily', playerId: 'guest-1', guestToken: 'token-1' }),
+        });
+
+        expect(started.status).toBe(204);
+        await vi.waitFor(() => expect(recordRaceStart).toHaveBeenCalledWith({
+            mode: 'daily',
+            playerId: 'guest-1',
+            guestToken: 'token-1',
+            redditUsername: 'RaceFan',
+        }));
+    });
+
+    it('refuses a campaign race start so the server-side start is not double counted', async () => {
+        const recordRaceStart = vi.fn(async () => {});
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
+            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
+            assertModeratorForSubreddit: vi.fn(),
+            getServerAnalyticsSummary: vi.fn(),
+            getRequestUsername: () => 'RaceFan',
+            recordRaceStart,
+        }));
+
+        const response = await fetch(`${baseUrl}/api/analytics/race-start`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ mode: 'campaign', playerId: 'guest-1' }),
+        });
+
+        expect(response.status).toBe(400);
+        expect(recordRaceStart).not.toHaveBeenCalled();
+    });
+
+    it('no longer counts a player from the bootstrap request', async () => {
+        const baseUrl = await startApp((app) => registerPlayerRoutes(app, {
+            getRequestUsername: () => 'RaceFan',
+            getServerPlayerBootstrap: async () => ({ playerId: 'reddit:racefan' }),
+            selectServerGuestProgress: vi.fn(),
+            updateServerPlayerIdentity: vi.fn(),
+            updateServerPlayerPreferences: vi.fn(),
+        }));
+
+        const bootstrap = await fetch(`${baseUrl}/api/player/bootstrap?playerId=guest-1`);
+        expect(bootstrap.status).toBe(200);
+        expect(await bootstrap.json()).toEqual({ playerId: 'reddit:racefan' });
+    });
+
+    it('opens the analytics post from the moderator menu', async () => {
         const ensureModeratorAnalyticsPostForSubreddit = vi.fn(async () => ({
             created: false,
             postUrl: 'https://reddit.com/analytics',
         }));
-        const baseUrl = await startApp((app) => {
-            registerPlayerRoutes(app, {
-                getRequestUsername: () => 'RaceFan',
-                recordPlayerPresence,
-                getServerPlayerBootstrap: async () => ({
-                    playerId: 'reddit:racefan',
-                    firstSeenAt: '2026-08-01T00:00:00.000Z',
-                }),
-                selectServerGuestProgress: vi.fn(),
-                updateServerPlayerIdentity: vi.fn(),
-                updateServerPlayerPreferences: vi.fn(),
-            });
-            registerCampaignRoutes(app, {
-                getRequestUsername: () => 'RaceFan',
-                getRequestRateLimitIdentity: () => 'request',
-                recordCampaignStart,
-                getServerCampaignBootstrap: vi.fn(),
-                startServerCampaignRace: async () => ({
-                    status: 200,
-                    body: { race: { trackKey: 'numberZero' } },
-                }),
-                getServerCampaignSnapshot: vi.fn(),
-                submitServerCampaignRun: vi.fn(),
-                getServerCampaignPbGhost: vi.fn(),
-            });
-            registerCompetitionRoutes(app, {
-                getRequestUsername: () => 'RaceFan',
-                getRequestRateLimitIdentity: () => 'request',
-                recordDailyFinish,
-                getPostBoundDailyGpChallenge: vi.fn(),
-                getServerDailyGpChallenge: vi.fn(),
-                getServerDailyGpPlaylist: vi.fn(),
-                getServerDailyGpSnapshot: vi.fn(),
-                submitServerDailyGpRun: async () => ({
-                    status: 200,
-                    body: { accepted: true },
-                }),
-                isDailyGpChallengePlayable: () => true,
-            });
-            registerInternalRoutes(app, {
-                resolveMenuTargetSubredditName: async () => 'MiniRacer',
-                getServerDailyGpChallenge: vi.fn(),
-                getServerFinalDailyGpPodium: vi.fn(),
-                ensureDailyMiniRacerPostForSubreddit: vi.fn(),
-                ensureMiniRacerLauncherPostForSubreddit: vi.fn(),
-                enableDailyAutopost: vi.fn(),
-                deleteDailyAutopostSubscription: vi.fn(),
-                ensureDailyMiniRacerPodiumPostForSubreddit: vi.fn(),
-                enableDailyPodiumAutopost: vi.fn(),
-                deleteDailyPodiumAutopostSubscription: vi.fn(),
-                readAllDailyAutopostSubscriptions: vi.fn(),
-                readAllDailyPodiumAutopostSubscriptions: vi.fn(),
-                ensureModeratorAnalyticsPostForSubreddit,
-            });
-        });
-
-        const bootstrap = await fetch(`${baseUrl}/api/player/bootstrap?playerId=guest-1`);
-        expect(bootstrap.status).toBe(200);
-        expect(recordPlayerPresence).toHaveBeenCalledWith(
-            'reddit:racefan',
-            '2026-08-01T00:00:00.000Z',
-        );
-
-        const campaign = await fetch(`${baseUrl}/api/campaign/start`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ raceId: 'numbered-v1-00' }),
-        });
-        expect(campaign.status).toBe(200);
-        expect(recordCampaignStart).toHaveBeenCalledWith('numberZero');
-
-        const daily = await fetch(`${baseUrl}/api/daily/submit`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ trackKey: 'circuit' }),
-        });
-        expect(daily.status).toBe(200);
-        expect(recordDailyFinish).toHaveBeenCalledWith('circuit');
+        const baseUrl = await startApp((app) => registerInternalRoutes(app, {
+            resolveMenuTargetSubredditName: async () => 'MiniRacer',
+            getServerDailyGpChallenge: vi.fn(),
+            getServerFinalDailyGpPodium: vi.fn(),
+            ensureDailyMiniRacerPostForSubreddit: vi.fn(),
+            ensureMiniRacerLauncherPostForSubreddit: vi.fn(),
+            enableDailyAutopost: vi.fn(),
+            deleteDailyAutopostSubscription: vi.fn(),
+            ensureDailyMiniRacerPodiumPostForSubreddit: vi.fn(),
+            enableDailyPodiumAutopost: vi.fn(),
+            deleteDailyPodiumAutopostSubscription: vi.fn(),
+            readAllDailyAutopostSubscriptions: vi.fn(),
+            readAllDailyPodiumAutopostSubscriptions: vi.fn(),
+            ensureModeratorAnalyticsPostForSubreddit,
+        }));
 
         const menu = await fetch(`${baseUrl}/internal/menu/mod-analytics-open`, {
             method: 'POST',

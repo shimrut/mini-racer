@@ -12,67 +12,87 @@ function analyticsDom() {
     return new JSDOM(html, { url: 'http://localhost' });
 }
 
+function modes({ daily = {}, campaign = {}, challenge = {} } = {}) {
+    return [
+        { mode: 'daily', starts: 0, finishes: 0, players: 0, ...daily },
+        { mode: 'campaign', starts: 0, finishes: 0, players: 0, ...campaign },
+        { mode: 'challenge', starts: 0, finishes: 0, players: 0, ...challenge },
+    ];
+}
+
 function summaryFixture(overrides = {}) {
+    const today = {
+        date: '2026-08-15',
+        players: 4,
+        newPlayers: 1,
+        returningPlayers: 3,
+        guestPlayers: 2,
+        challengeCreates: 1,
+        modes: modes({
+            daily: { starts: 6, finishes: 3, players: 4 },
+            campaign: { starts: 5, finishes: 5, players: 2 },
+        }),
+    };
     return {
         from: '2026-07-02',
         to: '2026-08-15',
-        today: {
-            date: '2026-08-15',
-            uniquePlayers: 4,
-            newPlayers: 1,
-            returningPlayers: 3,
-            dailyFinishes: 2,
-            campaignStarts: 5,
-            challengeCreates: 1,
-            challengeFinishes: 0,
-        },
-        windows: [
-            { days: 7, uniquePlayers: 11, playerDays: 14 },
-            { days: 14, uniquePlayers: 18, playerDays: 22 },
-            { days: 30, uniquePlayers: 29, playerDays: 40 },
-        ],
+        today,
         days: [
-            { date: '2026-08-14', uniquePlayers: 3, newPlayers: 0, returningPlayers: 3, dailyFinishes: 1 },
             {
-                date: '2026-08-15',
-                uniquePlayers: 4,
-                newPlayers: 1,
-                returningPlayers: 3,
-                dailyFinishes: 2,
-                campaignStarts: 5,
-                challengeCreates: 1,
-                challengeFinishes: 0,
+                date: '2026-08-14',
+                players: 2,
+                newPlayers: 0,
+                returningPlayers: 2,
+                guestPlayers: 1,
+                challengeCreates: 0,
+                modes: modes({ daily: { starts: 2, finishes: 1, players: 2 } }),
+            },
+            today,
+        ],
+        months: [
+            {
+                month: '2026-07',
+                players: 20,
+                newPlayers: 20,
+                returningPlayers: 0,
+                guestPlayers: 9,
+                challengeCreates: 3,
+                modes: modes({ daily: { players: 18 } }),
+            },
+            {
+                month: '2026-08',
+                players: 29,
+                newPlayers: 11,
+                returningPlayers: 18,
+                guestPlayers: 12,
+                challengeCreates: 4,
+                modes: modes({ daily: { players: 27 } }),
             },
         ],
-        tracks: {
-            daily: [{ trackName: 'Classic Circuit', count: 2 }],
-            campaign: [],
-            challenge: [{ trackName: 'Classic Circuit', count: 1 }],
-        },
         ...overrides,
     };
 }
 
 describe('moderator analytics page', () => {
-    it('renders headline tiles, the chart, tracks, and daily rows', () => {
+    it('renders headline tiles, the chart, modes, months, and daily rows', () => {
         const { window } = analyticsDom();
         renderAnalyticsSummary(window.document, summaryFixture());
         const { document } = window;
 
         expect(document.getElementById('analytics-range').textContent).toBe('2026-07-02 to 2026-08-15');
-        expect(document.getElementById('analytics-windows').textContent).toContain('Active players today');
+        expect(document.getElementById('analytics-windows').textContent).toContain('Players today');
+        expect(document.getElementById('analytics-windows').textContent).toContain('Signed out today');
         expect(document.getElementById('analytics-windows').textContent).toContain('4');
-        expect(document.getElementById('analytics-reach').textContent).toContain('29');
-        expect(document.getElementById('analytics-reach').textContent).toContain('days played per player');
-        expect(document.getElementById('analytics-today').textContent).toContain('Daily finishes');
+        expect(document.getElementById('analytics-modes').textContent).toContain('Modes today');
+        expect(document.getElementById('analytics-modes').textContent).toContain('Challenge');
+        expect(document.getElementById('analytics-months').textContent).toContain('29');
+        expect(document.getElementById('analytics-months').textContent).toContain('2026-07');
         expect(document.getElementById('analytics-trend').textContent).toContain('Returning');
         expect(document.querySelector('.analytics-chart')).toBeTruthy();
         expect(document.querySelectorAll('.analytics-chart__hit')).toHaveLength(2);
-        expect(document.getElementById('analytics-tracks').textContent).toContain('Classic Circuit');
-        expect(document.getElementById('analytics-tracks').textContent).toContain('None yet');
         expect(document.getElementById('analytics-days').textContent).toContain('Aug 15');
         expect(document.querySelector('.analytics-table')).toBeTruthy();
-        expect(document.querySelector('.analytics-table__today th').textContent).toBe('Aug 15');
+        expect(document.querySelector('#analytics-days .analytics-table__today th').textContent).toBe('Aug 15');
     });
 
     it('reports the day-over-day direction on each tile', () => {
@@ -81,7 +101,7 @@ describe('moderator analytics page', () => {
         const deltas = [...window.document.querySelectorAll('.analytics-kpi__delta')]
             .map((node) => `${node.dataset.direction}:${node.textContent}`);
 
-        expect(deltas[0]).toContain('up:▲ 1');
+        expect(deltas[0]).toContain('up:▲ 2');
         expect(deltas[0]).toContain('vs yesterday');
         expect(deltas.some((delta) => delta.startsWith('flat'))).toBe(false);
     });
@@ -89,7 +109,7 @@ describe('moderator analytics page', () => {
     it('drops the chart when a single day is stored', () => {
         const { window } = analyticsDom();
         renderAnalyticsSummary(window.document, summaryFixture({
-            days: [{ date: '2026-08-15', uniquePlayers: 4, newPlayers: 1, returningPlayers: 3 }],
+            days: [{ date: '2026-08-15', players: 4, newPlayers: 1, returningPlayers: 3, modes: modes() }],
         }));
 
         expect(window.document.querySelector('.analytics-chart')).toBeNull();
@@ -98,19 +118,19 @@ describe('moderator analytics page', () => {
         expect(window.document.getElementById('analytics-days').textContent).toContain('Aug 15');
     });
 
-    it('renders an empty subreddit without days or tracks', () => {
+    it('renders an empty subreddit without days or months', () => {
         const { window } = analyticsDom();
         renderAnalyticsSummary(window.document, {
             from: '2026-07-02',
             to: '2026-08-15',
             today: {},
-            windows: [],
             days: [],
-            tracks: { daily: [], campaign: [], challenge: [] },
+            months: [],
         });
 
         expect(window.document.getElementById('analytics-windows').textContent).toContain('0');
-        expect(window.document.getElementById('analytics-reach').textContent).toContain('No windows yet');
+        expect(window.document.getElementById('analytics-months').textContent).toContain('No months recorded yet');
+        expect(window.document.getElementById('analytics-modes').textContent).toContain('No races today');
         expect(window.document.getElementById('analytics-days').textContent).toContain('No stored days yet');
         expect(window.document.getElementById('analytics-main').hidden).toBe(false);
     });
@@ -136,8 +156,8 @@ describe('moderator analytics page', () => {
         renderAnalyticsMessage(window.document, 'Could not load the summary.');
         renderAnalyticsSummary(window.document, summaryFixture());
 
-        for (const id of ['analytics-windows', 'analytics-main', 'analytics-trend', 'analytics-reach',
-            'analytics-today', 'analytics-tracks', 'analytics-days']) {
+        for (const id of ['analytics-windows', 'analytics-main', 'analytics-trend', 'analytics-modes',
+            'analytics-months', 'analytics-days']) {
             expect(window.document.getElementById(id).hidden).toBe(false);
         }
     });

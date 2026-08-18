@@ -22,7 +22,7 @@
             </div>
             <div class="analytics-header__range">
                 <p id="analytics-range" class="analytics-range">Last 45 days</p>
-                <p class="analytics-range__note">Unique players, UTC days</p>
+                <p class="analytics-range__note">Signed-in players who raced, UTC days</p>
             </div>
         </header>
 
@@ -32,13 +32,10 @@
 
         <div id="analytics-main" class="analytics-main" hidden>
             <section id="analytics-trend" class="analytics-card" aria-label="Players per day"></section>
-            <div class="analytics-main__side">
-                <section id="analytics-reach" class="analytics-card" aria-label="Unique reach"></section>
-                <section id="analytics-today" class="analytics-card" aria-label="Plays today"></section>
-            </div>
+            <section id="analytics-modes" class="analytics-card" aria-label="Modes today"></section>
         </div>
 
-        <section id="analytics-tracks" class="analytics-tracks" aria-label="Most played tracks" hidden></section>
+        <section id="analytics-months" class="analytics-card" aria-label="Players per month" hidden></section>
         <section id="analytics-days" class="analytics-card" aria-label="Daily breakdown" hidden></section>
     </main>
 </body>

@@ -1,17 +1,16 @@
 const SUMMARY_URL = '/api/analytics/summary';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SPARK_DAYS = 14;
-const TRACK_ROWS = 6;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SECTION_IDS = [
     'analytics-windows',
     'analytics-main',
     'analytics-trend',
-    'analytics-reach',
-    'analytics-today',
-    'analytics-tracks',
+    'analytics-modes',
+    'analytics-months',
     'analytics-days',
 ];
+const MODE_LABELS = { daily: 'Daily', campaign: 'Campaign', challenge: 'Challenge' };
 
 function setText(node, value) {
     if (node) node.textContent = value;
@@ -24,14 +23,6 @@ function toCount(value) {
 
 function formatCount(value) {
     return toCount(value).toLocaleString('en-US');
-}
-
-function formatAverage(value) {
-    const average = Number(value);
-    if (!Number.isFinite(average)) return '0';
-    return average >= 100
-        ? Math.round(average).toLocaleString('en-US')
-        : String(Math.round(average * 10) / 10);
 }
 
 function percent(part, total) {
@@ -99,18 +90,6 @@ function trend(current, previous) {
     return { direction: 'flat', text: '– 0' };
 }
 
-function averageTrend(current, previous) {
-    const change = Math.round((current - previous) * 10) / 10;
-    if (change > 0) return { direction: 'up', text: `▲ ${formatAverage(change)}` };
-    if (change < 0) return { direction: 'down', text: `▼ ${formatAverage(-change)}` };
-    return { direction: 'flat', text: '– 0' };
-}
-
-function mean(values) {
-    if (values.length === 0) return 0;
-    return values.reduce((total, value) => total + toCount(value), 0) / values.length;
-}
-
 function renderSparkline(doc, values, series) {
     const width = 128;
     const height = 34;
@@ -166,47 +145,46 @@ function createStatTile(doc, { label, value, delta, deltaNote, hint, spark, seri
     return tile;
 }
 
-function renderHeadline(doc, summary, days) {
+function renderHeadline(doc, days) {
     const today = days[days.length - 1] ?? {};
     const yesterday = days[days.length - 2] ?? {};
     const recent = days.slice(-SPARK_DAYS);
-    const activeToday = toCount(today.uniquePlayers);
-    const newToday = toCount(today.newPlayers);
-    const weekAverage = mean(days.slice(-7).map((day) => day.uniquePlayers));
-    const priorWeekAverage = mean(days.slice(-14, -7).map((day) => day.uniquePlayers));
+    const players = toCount(today.players);
+    const newPlayers = toCount(today.newPlayers);
 
     return [
         createStatTile(doc, {
-            label: 'Active players today',
-            value: formatCount(activeToday),
-            delta: trend(activeToday, yesterday.uniquePlayers),
+            label: 'Players today',
+            value: formatCount(players),
+            delta: trend(players, yesterday.players),
             deltaNote: 'vs yesterday',
-            spark: recent.map((day) => day.uniquePlayers),
+            hint: 'Signed-in accounts that started a race',
+            spark: recent.map((day) => day.players),
             hero: true,
         }),
         createStatTile(doc, {
             label: 'New players today',
-            value: formatCount(newToday),
-            delta: trend(newToday, yesterday.newPlayers),
+            value: formatCount(newPlayers),
+            delta: trend(newPlayers, yesterday.newPlayers),
             deltaNote: 'vs yesterday',
-            hint: `${Math.round(percent(newToday, activeToday))}% of today's players`,
+            hint: `${Math.round(percent(newPlayers, players))}% of today's players`,
             spark: recent.map((day) => day.newPlayers),
             series: 'new',
         }),
         createStatTile(doc, {
-            label: 'Daily race finishes',
-            value: formatCount(today.dailyFinishes),
-            delta: trend(today.dailyFinishes, yesterday.dailyFinishes),
+            label: 'Returning today',
+            value: formatCount(today.returningPlayers),
+            delta: trend(today.returningPlayers, yesterday.returningPlayers),
             deltaNote: 'vs yesterday',
-            spark: recent.map((day) => day.dailyFinishes),
+            spark: recent.map((day) => day.returningPlayers),
         }),
         createStatTile(doc, {
-            label: 'Avg players per day',
-            value: formatAverage(weekAverage),
-            delta: averageTrend(weekAverage, priorWeekAverage),
-            deltaNote: 'vs prior 7 days',
-            hint: `${formatCount(summary?.windows?.[0]?.uniquePlayers)} unique this week`,
-            spark: recent.map((day) => day.uniquePlayers),
+            label: 'Signed out today',
+            value: formatCount(today.guestPlayers),
+            delta: trend(today.guestPlayers, yesterday.guestPlayers),
+            deltaNote: 'vs yesterday',
+            hint: 'Not counted as players — one person can be many',
+            spark: recent.map((day) => day.guestPlayers),
         }),
     ];
 }
@@ -356,122 +334,114 @@ function chartLegend(doc) {
     return legend;
 }
 
-function renderReach(doc, windows) {
-    const nodes = [cardHeading(doc, 'Unique reach', 'Players seen at least once')];
-    if (windows.length === 0) {
-        nodes.push(element(doc, 'p', 'analytics-note', 'No windows yet'));
+function modeRow(doc, mode) {
+    const starts = toCount(mode?.starts);
+    const finishes = toCount(mode?.finishes);
+    const row = element(doc, 'tr');
+    const name = element(doc, 'th', undefined, MODE_LABELS[mode?.mode] ?? 'Unknown');
+    name.scope = 'row';
+    row.append(
+        name,
+        element(doc, 'td', undefined, formatCount(mode?.players)),
+        element(doc, 'td', undefined, formatCount(starts)),
+        element(doc, 'td', undefined, formatCount(finishes)),
+        element(doc, 'td', undefined, starts > 0 ? `${Math.round(percent(finishes, starts))}%` : '—'),
+    );
+    return row;
+}
+
+// Every mode reports the same two events over the same day, which is the only way
+// one mode's number means anything next to another's.
+function renderModes(doc, days) {
+    const today = days[days.length - 1] ?? {};
+    const modes = Array.isArray(today.modes) ? today.modes : [];
+    const nodes = [cardHeading(doc, 'Modes today', 'Same events, same day, so the rows compare')];
+    if (modes.length === 0) {
+        nodes.push(element(doc, 'p', 'analytics-note', 'No races today'));
         return nodes;
     }
-    const max = Math.max(...windows.map((row) => toCount(row?.uniquePlayers)), 1);
-    const list = element(doc, 'div', 'analytics-reach');
-    for (const row of windows) {
-        const unique = toCount(row?.uniquePlayers);
-        const playerDays = toCount(row?.playerDays);
-        const item = element(doc, 'div', 'analytics-reach__row');
-        const head = element(doc, 'div', 'analytics-reach__head');
-        head.append(
-            element(doc, 'span', 'analytics-reach__span', `${formatCount(row?.days)} days`),
-            element(doc, 'span', 'analytics-count', formatCount(unique)),
-        );
-        const track = element(doc, 'div', 'analytics-bar');
-        const fill = element(doc, 'div', 'analytics-bar__fill');
-        fill.style.width = `${percent(unique, max)}%`;
-        track.append(fill);
-        item.append(
-            head,
-            track,
-            element(doc, 'p', 'analytics-reach__hint', unique > 0
-                ? `${formatAverage(playerDays / unique)} days played per player`
-                : 'No players yet'),
-        );
-        list.append(item);
+
+    const table = element(doc, 'table', 'analytics-table');
+    const head = element(doc, 'thead');
+    const labels = element(doc, 'tr');
+    for (const label of ['Mode', 'Players', 'Starts', 'Finishes', 'Completed']) {
+        const cell = element(doc, 'th', undefined, label);
+        cell.scope = 'col';
+        labels.append(cell);
     }
-    nodes.push(list);
+    head.append(labels);
+
+    const body = element(doc, 'tbody');
+    for (const mode of modes) body.append(modeRow(doc, mode));
+    table.append(head, body);
+
+    const wrap = element(doc, 'div', 'analytics-table-wrap');
+    wrap.append(table);
+    nodes.push(wrap);
+    if (toCount(today.challengeCreates) > 0) {
+        const created = toCount(today.challengeCreates);
+        nodes.push(element(doc, 'p', 'analytics-note', `${formatCount(created)} challenge${created === 1 ? '' : 's'} created today`));
+    }
     return nodes;
 }
 
-function renderPlays(doc, days) {
-    const today = days[days.length - 1] ?? {};
-    const week = days.slice(-7);
-    const rows = [
-        ['Daily finishes', 'dailyFinishes'],
-        ['Campaign starts', 'campaignStarts'],
-        ['Challenges created', 'challengeCreates'],
-        ['Challenges finished', 'challengeFinishes'],
-    ];
-    const max = Math.max(...rows.map(([, key]) => toCount(today[key])), 1);
-    const list = element(doc, 'div', 'analytics-plays');
+function renderMonths(doc, months) {
+    const nodes = [cardHeading(doc, 'Players per month', 'Each player counted once per month')];
+    if (months.length === 0) {
+        nodes.push(element(doc, 'p', 'analytics-note', 'No months recorded yet'));
+        return nodes;
+    }
 
-    for (const [label, key] of rows) {
-        const count = toCount(today[key]);
-        const average = mean(week.map((day) => day[key]));
-        const row = element(doc, 'div', 'analytics-plays__row');
-        const head = element(doc, 'div', 'analytics-plays__head');
-        head.append(
-            element(doc, 'span', 'analytics-plays__label', label),
-            element(doc, 'span', 'analytics-count', formatCount(count)),
+    const table = element(doc, 'table', 'analytics-table');
+    const head = element(doc, 'thead');
+    const labels = element(doc, 'tr');
+    for (const [label, grouped] of [
+        ['Month', false], ['Players', false], ['New', false], ['Returning', false],
+        ['Daily', true], ['Campaign', false], ['Challenge', false],
+    ]) {
+        const cell = element(doc, 'th', grouped ? 'analytics-table__divide' : undefined, label);
+        cell.scope = 'col';
+        labels.append(cell);
+    }
+    head.append(labels);
+
+    const body = element(doc, 'tbody');
+    const latest = months[months.length - 1]?.month;
+    for (const month of [...months].reverse()) {
+        const row = element(doc, 'tr');
+        if (month?.month && month.month === latest) row.className = 'analytics-table__today';
+        const name = element(doc, 'th', undefined, month?.month ?? 'Unknown');
+        name.scope = 'row';
+        row.append(name);
+        const byMode = new Map(
+            (Array.isArray(month?.modes) ? month.modes : []).map((mode) => [mode?.mode, mode?.players]),
         );
-        const track = element(doc, 'div', 'analytics-bar');
-        const fill = element(doc, 'div', 'analytics-bar__fill');
-        fill.style.width = `${percent(count, max)}%`;
-        track.append(fill);
-        if (average > 0) {
-            const marker = element(doc, 'span', 'analytics-bar__marker');
-            marker.style.left = `${percent(average, max)}%`;
-            marker.title = `7-day average ${formatAverage(average)}`;
-            track.append(marker);
+        const cells = [
+            [month?.players, false],
+            [month?.newPlayers, false],
+            [month?.returningPlayers, false],
+            [byMode.get('daily'), true],
+            [byMode.get('campaign'), false],
+            [byMode.get('challenge'), false],
+        ];
+        for (const [value, grouped] of cells) {
+            row.append(element(doc, 'td', grouped ? 'analytics-table__divide' : undefined, formatCount(value)));
         }
-        row.append(head, track);
-        list.append(row);
+        body.append(row);
     }
-    return [cardHeading(doc, 'Plays today', 'Marker shows the 7-day average'), list];
-}
+    table.append(head, body);
 
-function renderTrackPanel(doc, title, tracks) {
-    const panel = element(doc, 'article', 'analytics-panel');
-    const list = Array.isArray(tracks) ? tracks : [];
-    const total = list.reduce((sum, track) => sum + toCount(track?.count), 0);
-    panel.append(cardHeading(doc, title, total > 0 ? `${formatCount(total)} plays` : undefined));
-
-    if (list.length === 0) {
-        panel.append(element(doc, 'p', 'analytics-note', 'None yet'));
-        return panel;
-    }
-
-    const max = Math.max(...list.map((track) => toCount(track?.count)), 1);
-    const rows = element(doc, 'ol', 'analytics-ranks');
-    list.slice(0, TRACK_ROWS).forEach((track, index) => {
-        const name = typeof track?.trackName === 'string' && track.trackName.trim()
-            ? track.trackName.trim()
-            : 'Unknown track';
-        const count = toCount(track?.count);
-        const row = element(doc, 'li', 'analytics-ranks__row');
-        const head = element(doc, 'div', 'analytics-ranks__head');
-        head.append(
-            element(doc, 'span', 'analytics-ranks__place', String(index + 1)),
-            element(doc, 'span', 'analytics-ranks__name', name),
-            element(doc, 'span', 'analytics-count', formatCount(count)),
-        );
-        const track_ = element(doc, 'div', 'analytics-bar');
-        const fill = element(doc, 'div', 'analytics-bar__fill');
-        fill.style.width = `${percent(count, max)}%`;
-        track_.append(fill);
-        row.append(head, track_);
-        rows.append(row);
-    });
-    panel.append(rows);
-
-    if (list.length > TRACK_ROWS) {
-        panel.append(element(doc, 'p', 'analytics-note', `+${formatCount(list.length - TRACK_ROWS)} more tracks`));
-    }
-    return panel;
+    const wrap = element(doc, 'div', 'analytics-table-wrap');
+    wrap.append(table);
+    nodes.push(wrap);
+    return nodes;
 }
 
 function renderDailyTable(doc, days) {
-    const table = element(doc, 'table', 'analytics-table');
+    const table = element(doc, 'table', 'analytics-table analytics-table--sticky');
     const head = element(doc, 'thead');
     const groups = element(doc, 'tr', 'analytics-table__groups');
-    for (const [label, span, grouped] of [['', 1, false], ['Players', 3, false], ['Plays', 4, true]]) {
+    for (const [label, span, grouped] of [['', 1, false], ['Players', 4, false], ['Races started', 3, true]]) {
         const cell = element(doc, 'th', grouped ? 'analytics-table__divide' : undefined, label);
         cell.colSpan = span;
         cell.scope = 'colgroup';
@@ -479,8 +449,8 @@ function renderDailyTable(doc, days) {
     }
     const labels = element(doc, 'tr');
     for (const [label, grouped] of [
-        ['Date', false], ['Active', false], ['New', false], ['Returning', false],
-        ['Daily', true], ['Campaign', false], ['Created', false], ['Finished', false],
+        ['Date', false], ['Players', false], ['New', false], ['Returning', false], ['Signed out', false],
+        ['Daily', true], ['Campaign', false], ['Challenge', false],
     ]) {
         const cell = element(doc, 'th', grouped ? 'analytics-table__divide' : undefined, label);
         cell.scope = 'col';
@@ -497,14 +467,17 @@ function renderDailyTable(doc, days) {
         date.scope = 'row';
         date.title = typeof day?.date === 'string' ? day.date : '';
         row.append(date);
+        const byMode = new Map(
+            (Array.isArray(day?.modes) ? day.modes : []).map((mode) => [mode?.mode, mode?.starts]),
+        );
         const cells = [
-            [day?.uniquePlayers, false],
+            [day?.players, false],
             [day?.newPlayers, false],
             [day?.returningPlayers, false],
-            [day?.dailyFinishes, true],
-            [day?.campaignStarts, false],
-            [day?.challengeCreates, false],
-            [day?.challengeFinishes, false],
+            [day?.guestPlayers, false],
+            [byMode.get('daily'), true],
+            [byMode.get('campaign'), false],
+            [byMode.get('challenge'), false],
         ];
         for (const [value, grouped] of cells) {
             row.append(element(doc, 'td', grouped ? 'analytics-table__divide' : undefined, formatCount(value)));
@@ -530,12 +503,11 @@ export function renderAnalyticsSummary(root, summary) {
     const range = root.getElementById('analytics-range');
     const windows = root.getElementById('analytics-windows');
     const trendNode = root.getElementById('analytics-trend');
-    const reachNode = root.getElementById('analytics-reach');
-    const todayNode = root.getElementById('analytics-today');
-    const tracksNode = root.getElementById('analytics-tracks');
+    const modesNode = root.getElementById('analytics-modes');
+    const monthsNode = root.getElementById('analytics-months');
     const daysNode = root.getElementById('analytics-days');
-    const windowRows = Array.isArray(summary?.windows) ? summary.windows : [];
     const stored = Array.isArray(summary?.days) ? summary.days : [];
+    const months = Array.isArray(summary?.months) ? summary.months : [];
     const days = stored.length > 0
         ? stored
         : [summary?.today && typeof summary.today === 'object' ? summary.today : {}];
@@ -544,7 +516,7 @@ export function renderAnalyticsSummary(root, summary) {
     setText(status, '');
     status?.removeAttribute('data-state');
 
-    windows.replaceChildren(...renderHeadline(root, summary, days));
+    windows.replaceChildren(...renderHeadline(root, days));
 
     const trendHead = cardHeading(root, 'Players per day', `${formatCount(stored.length)} days recorded`);
     if (stored.length < 2) {
@@ -555,14 +527,8 @@ export function renderAnalyticsSummary(root, summary) {
         trendNode.replaceChildren(trendHead, renderPlayersChart(root, stored));
     }
 
-    reachNode.replaceChildren(...renderReach(root, windowRows));
-    todayNode.replaceChildren(...renderPlays(root, days));
-
-    tracksNode.replaceChildren(
-        renderTrackPanel(root, 'Daily tracks', summary?.tracks?.daily),
-        renderTrackPanel(root, 'Campaign tracks', summary?.tracks?.campaign),
-        renderTrackPanel(root, 'Challenge tracks', summary?.tracks?.challenge),
-    );
+    modesNode.replaceChildren(...renderModes(root, days));
+    monthsNode.replaceChildren(...renderMonths(root, months));
 
     const dayHead = cardHeading(root, 'Daily breakdown', 'Newest first');
     if (stored.length === 0) {

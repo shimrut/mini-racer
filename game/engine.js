@@ -216,7 +216,9 @@ export class RealTimeRacer {
     this.pbGhostSizeCapture = (shouldExposeDebugHooks() || shouldCapturePbGhostSize())
       ? new PbGhostSizeCapture()
       : null;
-    this.journeys = new JourneyService();
+    this.journeys = new JourneyService({
+      resolveMode: () => this.launchTarget?.mode ?? null,
+    });
     this.preparedPbGhostChallengeId = null;
     this.pbGhostSelectionChallengeId = null;
     this.pbGhostSelectionGeneration = 0;

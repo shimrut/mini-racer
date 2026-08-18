@@ -13,7 +13,6 @@ export type CampaignRouteDependencies = {
     getServerCampaignSnapshot(input: Record<string, unknown>): Promise<ServiceResult>;
     submitServerCampaignRun(input: Record<string, unknown>): Promise<ServiceResult>;
     getServerCampaignPbGhost(input: Record<string, unknown>): Promise<ServiceResult>;
-    recordCampaignStart?(trackKey: unknown): void;
 };
 
 function parseOptionalInteger(value: unknown): number | undefined {
@@ -50,12 +49,6 @@ export function registerCampaignRoutes(
                 ...(req.body ?? {}),
                 redditUsername: dependencies.getRequestUsername(),
             });
-            if (result.status === 200) {
-                const body = result.body && typeof result.body === 'object'
-                    ? result.body as { race?: { trackKey?: unknown } }
-                    : null;
-                dependencies.recordCampaignStart?.(body?.race?.trackKey);
-            }
             send(res, result);
         } catch (error) {
             console.error('Failed to start Mini Racer Campaign race:', error);
