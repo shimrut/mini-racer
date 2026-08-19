@@ -56,9 +56,8 @@ const CHORD_PROGRESSION_LENGTH = RACE_CHORDS.length;
 
 let registeredApi = null;
 const FRAME_SYNC_INTERVAL_SEC = 0.1;
-// Matches car-effects-audio: a 'running' context keeps a real-time audio thread
-// rendering silence, which blocks SoC idle even with the scheduler stopped.
-const IDLE_AUDIO_SUSPEND_MS = 250;
+// Suspend freezes the graph mid-echo, so outlast the 0.38-feedback delay line.
+const IDLE_AUDIO_SUSPEND_MS = 1500;
 
 export function userGesturePrepareMusic() {
     registeredApi?.prepareOnUserGesture?.();
@@ -121,8 +120,8 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         musicFilter.frequency.setValueAtTime(15000, ctx.currentTime);
         musicFilter.Q.value = 1.0;
 
-        musicGain.connect(musicFilter);
-        musicFilter.connect(externalOutput || ctx.destination);
+        musicFilter.connect(musicGain);
+        musicGain.connect(externalOutput || ctx.destination);
 
         delayNode = ctx.createDelay(1.0);
         delayFeedback = ctx.createGain();
@@ -439,8 +438,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             clearInterval(schedulerIntervalId);
             schedulerIntervalId = null;
         }
-        // The delay line feeds back at 0.38, so the graph never decays to true
-        // silence on its own. Park the context instead of leaving it running.
         scheduleIdleSuspend();
     }
 
@@ -471,11 +468,12 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         const g = musicGain.gain;
         g.cancelScheduledValues(time);
         if (enabled) {
-            const cur = Math.min(0.28, Math.max(0, g.value));
+            // Unity, not a mix level: every voice velocity is already tuned against it.
+            const cur = Math.min(1, Math.max(0, g.value));
             g.setValueAtTime(cur, time);
-            g.setTargetAtTime(0.28, time, 0.06);
+            g.setTargetAtTime(1, time, 0.06);
         } else {
-            g.setValueAtTime(0, time);
+            g.setTargetAtTime(0, time, 0.02);
         }
     }
 
@@ -533,9 +531,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             tabHidden = Boolean(hidden);
             if (hidden) {
                 stop();
-                // Backgrounded: park immediately rather than waiting out the idle delay.
-                clearIdleSuspendTimer();
-                if (ctx && !externalCtx && ctx.state === 'running') void ctx.suspend();
             } else {
                 ensureSchedulerRunning();
             }
@@ -563,7 +558,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
                 const t = ctx.currentTime;
                 const g = musicGain.gain;
                 g.cancelScheduledValues(t);
-                g.setValueAtTime(0, t);
+                g.setTargetAtTime(0, t, 0.02);
             }
         },
 
