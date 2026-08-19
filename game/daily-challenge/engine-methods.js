@@ -26,7 +26,7 @@ import {
   cacheDailyChallengePlaylist,
   DAILY_PLAYLIST_DAYS,
   getCachedDailyChallengePlaylist,
-  getMissingDailyChallengeSnapshotIds,
+  getDailyChallengeSnapshotIdsToFetch,
   getCachedDailyChallengeSnapshot,
   getDailyChallengePlaylist,
   getDailyChallengeSnapshot,
@@ -1022,10 +1022,11 @@ export const dailyChallengeEngineMethods = {
       console.error("Error loading playlist personal bests:", error);
     }
 
-    const missingSnapshotIds = getMissingDailyChallengeSnapshotIds(
+    // The modal lists every day at once, so every rank on the list is asked for.
+    const snapshotIdsToFetch = getDailyChallengeSnapshotIdsToFetch(
       loadedChallenges.map((challenge) => challenge?.id).filter(Boolean),
     );
-    for (const challengeId of missingSnapshotIds) {
+    for (const challengeId of snapshotIdsToFetch) {
       try {
         await getDailyChallengeSnapshot({ challengeId });
       } catch (error) {
@@ -1048,9 +1049,7 @@ export const dailyChallengeEngineMethods = {
       || this.currentDailyChallenge?.id
       || null;
 
-    let challenges = this.currentDailyChallenge
-      ? cacheDailyChallengePlaylist([this.currentDailyChallenge])
-      : getCachedDailyChallengePlaylist();
+    let challenges = this.dailyCarouselChallenges();
     this.paintDailyCarousel(challenges, {
       selectedChallengeId: preferredId,
       loading: true,
@@ -1082,17 +1081,40 @@ export const dailyChallengeEngineMethods = {
       console.error("Error loading playlist personal bests:", error);
     }
 
-    const missingSnapshotIds = getMissingDailyChallengeSnapshotIds(
-      challenges.map((challenge) => challenge?.id).filter(Boolean),
+    if (isStale()) return;
+    // Only the card on screen shows a rank, so only that day is asked for. A day
+    // the player never swipes to costs nothing, and the answer repaints the rail
+    // through the snapshot subscription rather than through this pass.
+    await this.ensureDailyCarouselRank(
+      carousel.getSelectedChallengeId?.() || preferredId,
     );
-    for (const challengeId of missingSnapshotIds) {
-      try {
-        await getDailyChallengeSnapshot({ challengeId });
-      } catch (error) {
-        console.error("Error loading daily challenge snapshot:", error);
-      }
-      if (isStale()) return;
-      this.paintDailyCarousel(challenges);
+  },
+
+  /** The days the rail is built from: the loaded day first, else the saved list. */
+  dailyCarouselChallenges() {
+    return this.currentDailyChallenge
+      ? cacheDailyChallengePlaylist([this.currentDailyChallenge])
+      : getCachedDailyChallengePlaylist();
+  },
+
+  /** Repaints the rail from the saved snapshots, without asking the server. */
+  repaintDailyCarouselFromCache() {
+    if (!this.dailyCarousel) return;
+    this.paintDailyCarousel(this.dailyCarouselChallenges());
+  },
+
+  /**
+   * Asks for one day's standings. The service answers from its own copy once the
+   * server has confirmed that day in this session, so every entry point -- first
+   * paint, a settled swipe, a resume -- can call this without counting requests.
+   */
+  async ensureDailyCarouselRank(challengeId) {
+    if (!challengeId) return null;
+    try {
+      return await getDailyChallengeSnapshot({ challengeId });
+    } catch (error) {
+      console.error("Error loading daily challenge snapshot:", error);
+      return null;
     }
   },
 
@@ -1126,6 +1148,7 @@ export const dailyChallengeEngineMethods = {
     if (this.status === "playing" || this.status === "starting") return;
     if (!this.startOverlay?.isStartOverlayVisible?.()) return;
     this.prewarmDailyPlaylistTracks([challenge], { requireModal: false });
+    void this.ensureDailyCarouselRank(challenge.id);
   },
 
   openDailyCarouselStandings(challenge) {

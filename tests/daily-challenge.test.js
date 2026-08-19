@@ -17,7 +17,7 @@ import {
     getDailyChallengeSnapshot,
     getCachedDailyChallengeSnapshot,
     getDailyChallengeTrackName,
-    getMissingDailyChallengeSnapshotIds,
+    getDailyChallengeSnapshotIdsToFetch,
     cacheDailyChallengePlaylist,
     getCachedDailyChallengePlaylist,
     isDailyChallengeStoredResultForChallenge,
@@ -973,7 +973,7 @@ describe('daily-challenge service', () => {
             totalCount: 0,
         }));
 
-        expect(getMissingDailyChallengeSnapshotIds([
+        expect(getDailyChallengeSnapshotIdsToFetch([
             cachedId,
             missingId,
             missingId,
@@ -981,7 +981,7 @@ describe('daily-challenge service', () => {
             12,
             null,
         ])).toEqual([missingId]);
-        expect(getMissingDailyChallengeSnapshotIds('nope')).toEqual([]);
+        expect(getDailyChallengeSnapshotIdsToFetch('nope')).toEqual([]);
 
         await prefetchDailyChallengeSnapshots([cachedId, missingId, missingId]);
         expect(fetch).toHaveBeenCalledTimes(1);

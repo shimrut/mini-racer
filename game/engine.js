@@ -74,10 +74,13 @@ import {
   queuePlayerPreferencesSave,
 } from "./player/preferences.js";
 import {
+  clearDailyChallengeSnapshotFreshness,
   confirmDailyChallengeShare,
   getActiveDailyChallenge,
   getDailyChallengeExpiry,
+  getDailyChallengeSnapshot,
   previewDailyChallengeShare,
+  subscribeToDailyChallengeSnapshots,
 } from "./daily-challenge/service.js";
 import {
   confirmHeadToHeadBrag,
@@ -340,6 +343,13 @@ export class RealTimeRacer {
         ) / CONFIG.gridSize,
       }),
     });
+    // The rail paints the rank it was given, so a day that takes a new snapshot --
+    // from the standings, from a verified run, from a swipe -- repaints here. The
+    // paint itself is dropped unless the Daily lobby is the visible screen.
+    subscribeToDailyChallengeSnapshots(() => {
+      if (this.activeRaceMode !== "daily") return;
+      void this.invokeModeMethod("daily", "repaintDailyCarouselFromCache");
+    });
     this.campaignCarousel = new TrackCarousel({
       idPrefix: "campaign-carousel",
       onSelect: (stage) => this.handleCampaignCarouselSelect(stage),
@@ -569,7 +579,19 @@ export class RealTimeRacer {
           this.activeDailyChallenge?.id ||
           this.dailyChallengeUi?.getSummary?.()?.challengeId ||
           null;
+        // Standings move while the app sits in the background, so every saved
+        // snapshot needs the server again before it can stand in for a request.
+        clearDailyChallengeSnapshotFreshness();
         void this.leaderboards?.refreshDailyChallengeAfterResume?.(challengeId);
+        const visibleChallengeId =
+          this.dailyCarousel?.getSelectedChallengeId?.() || challengeId;
+        if (this.activeRaceMode === "daily" && visibleChallengeId) {
+          void this.invokeModeMethod(
+            "daily",
+            "ensureDailyCarouselRank",
+            visibleChallengeId,
+          );
+        }
       }
     });
     window.addEventListener("online", () => {
@@ -735,6 +757,14 @@ export class RealTimeRacer {
     ]);
     if (mode === "daily") {
       this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
+      // The rank of the day the player lands on, asked for while the track is still
+      // loading, so the first card carries a real number. The splash never waits on
+      // it: a late answer repaints the card through the snapshot subscription.
+      if (result?.id) {
+        void getDailyChallengeSnapshot({ challengeId: result.id }).catch((error) => {
+          console.error("Error loading the opening daily challenge standings:", error);
+        });
+      }
     } else if (mode === "campaign" && result?.stage) {
       this.initialPbGhostAssetPromise = this.loadInitialCampaignPersonalBest?.(result.stage);
     }

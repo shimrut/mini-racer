@@ -6,7 +6,7 @@ import {
     formatDailyChallengeStatusDate,
     getDailyChallengeCardStatus,
     getDailyChallengeRequiredLaps,
-    getMissingDailyChallengeSnapshotIds,
+    getDailyChallengeSnapshotIdsToFetch,
     isCachedActiveChallengeStillCurrent,
     isDailyChallengeStoredResultForChallenge,
     normalizeDailyChallenge,
@@ -272,9 +272,9 @@ describe('exported daily-challenge helpers — mutation kills', () => {
         expect(expired).toEqual({ key: 'expired', label: 'Expired' });
     });
 
-    it('getMissingDailyChallengeSnapshotIds filters non-strings and empty ids', () => {
-        expect(getMissingDailyChallengeSnapshotIds(['a', '', 1, null, 'b'])).toEqual(['a', 'b']);
-        expect(getMissingDailyChallengeSnapshotIds(['a', 'a'])).toEqual(['a']);
+    it('getDailyChallengeSnapshotIdsToFetch filters non-strings and empty ids', () => {
+        expect(getDailyChallengeSnapshotIdsToFetch(['a', '', 1, null, 'b'])).toEqual(['a', 'b']);
+        expect(getDailyChallengeSnapshotIdsToFetch(['a', 'a'])).toEqual(['a']);
     });
 });
 

@@ -14,7 +14,7 @@ import {
     getDailyChallengePlaylist,
     getDailyChallengeRequiredLaps,
     getDailyChallengeSnapshot,
-    getMissingDailyChallengeSnapshotIds,
+    getDailyChallengeSnapshotIdsToFetch,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
     prefetchDailyChallengeSnapshots,
@@ -346,7 +346,7 @@ describe('daily-challenge service wave6', () => {
     });
 
     it('deduplicates missing snapshot ids before prefetch (L602-L606)', async () => {
-        expect(getMissingDailyChallengeSnapshotIds(['dup-a', 'dup-a', '', 42, 'dup-b']))
+        expect(getDailyChallengeSnapshotIdsToFetch(['dup-a', 'dup-a', '', 42, 'dup-b']))
             .toEqual(['dup-a', 'dup-b']);
 
         fetch.mockResolvedValue(createJsonResponse({
@@ -360,7 +360,7 @@ describe('daily-challenge service wave6', () => {
         await prefetchDailyChallengeSnapshots(['dup-a', 'dup-a', '', 42, 'dup-b']);
 
         expect(fetch).toHaveBeenCalledTimes(2);
-        expect(getMissingDailyChallengeSnapshotIds(['dup-a', 'dup-b'])).toEqual([]);
+        expect(getDailyChallengeSnapshotIdsToFetch(['dup-a', 'dup-b'])).toEqual([]);
     });
 
     it('rejects submit payloads below the minimum daily time (L988-L990)', async () => {

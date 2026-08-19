@@ -9,7 +9,7 @@ import {
     getDailyChallengeModeSelectObjectiveLine,
     getDailyChallengePlaylist,
     getDailyChallengeSnapshot,
-    getMissingDailyChallengeSnapshotIds,
+    getDailyChallengeSnapshotIdsToFetch,
     isDailyChallengeStoredResultForChallenge,
     prefetchDailyChallengeSnapshots,
     previewDailyChallengeShare,
@@ -377,7 +377,7 @@ describe('daily-challenge service wave 2', () => {
         await getDailyChallengeSnapshot({ challengeId: cached.id, forceRefresh: true });
         fetch.mockClear();
 
-        expect(getMissingDailyChallengeSnapshotIds([cached.id, missing.id, cached.id]))
+        expect(getDailyChallengeSnapshotIdsToFetch([cached.id, missing.id, cached.id]))
             .toEqual(['prefetch-missing']);
 
         await prefetchDailyChallengeSnapshots([cached.id, missing.id]);

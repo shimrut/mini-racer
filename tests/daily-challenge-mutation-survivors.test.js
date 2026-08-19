@@ -17,7 +17,7 @@ import {
     getDailyChallengeSnapshot,
     getDailyChallengeTrackName,
     formatDailyChallengeBestLabel,
-    getMissingDailyChallengeSnapshotIds,
+    getDailyChallengeSnapshotIdsToFetch,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
     prefetchDailyChallengeSnapshots,
@@ -595,7 +595,7 @@ describe('daily-challenge mutation survivors', () => {
         await prefetchDailyChallengeSnapshots([challengeId, challengeId, '']);
 
         expect(fetch).not.toHaveBeenCalled();
-        expect(getMissingDailyChallengeSnapshotIds([challengeId, ''])).toEqual([]);
+        expect(getDailyChallengeSnapshotIdsToFetch([challengeId, ''])).toEqual([]);
     });
 
     it('accepts submit payloads exactly at the minimum and maximum allowed times', async () => {

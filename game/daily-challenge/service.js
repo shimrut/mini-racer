@@ -61,6 +61,11 @@ let dailyPlaylistCache = {
 };
 const dailySnapshotCache = new Map();
 const dailySnapshotInflight = new Map();
+// Challenge ids the server has answered in this session. A saved snapshot paints
+// at once, but standings keep moving while the app is closed, so it only stands
+// in for a request once the server has confirmed it here.
+const dailySnapshotAnsweredIds = new Set();
+const dailySnapshotListeners = new Set();
 let dailyPlaylistStorageHydrated = false;
 let dailySnapshotStorageHydrated = false;
 
@@ -609,8 +614,35 @@ function writeCachedDailySnapshot(challengeId, snapshot) {
         snapshot: cloneScoreboardSnapshot(snapshot),
         expiresAt: resolveDailySnapshotCacheExpiresAt(challengeId)
     });
+    dailySnapshotAnsweredIds.add(challengeId);
     writeDailySnapshotCacheStorage();
     syncDailyChallengeStoredBestFromSnapshot(challengeId, snapshot);
+    notifyDailySnapshotListeners(challengeId);
+}
+
+function notifyDailySnapshotListeners(challengeId) {
+    for (const listener of [...dailySnapshotListeners]) {
+        try {
+            listener(challengeId);
+        } catch (error) {
+            console.error('Error handling daily challenge snapshot update:', error);
+        }
+    }
+}
+
+/**
+ * Tells the caller which challenge just took a new snapshot, so a screen that
+ * shows a rank repaints instead of holding the copy it painted earlier.
+ */
+export function subscribeToDailyChallengeSnapshots(listener) {
+    if (typeof listener !== 'function') return () => {};
+    dailySnapshotListeners.add(listener);
+    return () => dailySnapshotListeners.delete(listener);
+}
+
+/** Marks every saved snapshot as needing the server again, without dropping it. */
+export function clearDailyChallengeSnapshotFreshness() {
+    dailySnapshotAnsweredIds.clear();
 }
 
 function syncDailyChallengeStoredBestFromSnapshot(challengeId, snapshot) {
@@ -661,11 +693,16 @@ export function getCachedDailyChallengeSnapshot(challengeId) {
     return readCachedDailySnapshot(challengeId);
 }
 
-export function getMissingDailyChallengeSnapshotIds(challengeIds = []) {
+function canReuseDailySnapshot(challengeId) {
+    if (!dailySnapshotAnsweredIds.has(challengeId)) return false;
+    return Boolean(readCachedDailySnapshot(challengeId));
+}
+
+export function getDailyChallengeSnapshotIdsToFetch(challengeIds = []) {
     return [...new Set(
         (Array.isArray(challengeIds) ? challengeIds : [])
             .filter((challengeId) => typeof challengeId === 'string' && challengeId)
-    )].filter((challengeId) => !readCachedDailySnapshot(challengeId));
+    )].filter((challengeId) => !canReuseDailySnapshot(challengeId));
 }
 
 export function getDailyChallengeTrackName(challenge) {
@@ -825,6 +862,7 @@ export function clearDailyChallengeClientCaches() {
     dailyPlaylistCache = { challenges: null, expiresAt: 0, promise: null };
     dailySnapshotCache.clear();
     dailySnapshotInflight.clear();
+    dailySnapshotAnsweredIds.clear();
     dailyPlaylistStorageHydrated = false;
     dailySnapshotStorageHydrated = false;
     if (typeof window === 'undefined' || !window.localStorage) return;
@@ -894,9 +932,10 @@ export async function getDailyChallengeSnapshot({
     const isFirstPage = safeOffset === 0;
 
     if (!forceRefresh && isFirstPage) {
-        const cachedSnapshot = readCachedDailySnapshot(challengeId);
-        if (cachedSnapshot) {
-            return cachedSnapshot;
+        // A snapshot the server has already answered for in this session stands in for
+        // the request. One the app started with does not: it can be a day old.
+        if (canReuseDailySnapshot(challengeId)) {
+            return readCachedDailySnapshot(challengeId);
         }
         const inflight = dailySnapshotInflight.get(requestKey);
         if (inflight) {
@@ -931,7 +970,7 @@ export async function getDailyChallengeSnapshot({
 }
 
 export async function prefetchDailyChallengeSnapshots(challengeIds = []) {
-    const uniqueIds = getMissingDailyChallengeSnapshotIds(challengeIds);
+    const uniqueIds = getDailyChallengeSnapshotIdsToFetch(challengeIds);
 
     if (!uniqueIds.length) return;
 

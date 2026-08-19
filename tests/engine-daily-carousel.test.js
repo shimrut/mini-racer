@@ -36,7 +36,7 @@ vi.mock('../game/daily-challenge/service.js', async (importOriginal) => {
         getCachedDailyChallengeSnapshot: vi.fn(
             (challengeId) => playlistState.snapshots.get(challengeId) || null,
         ),
-        getMissingDailyChallengeSnapshotIds: vi.fn((ids) => (
+        getDailyChallengeSnapshotIdsToFetch: vi.fn((ids) => (
             ids.filter((id) => !playlistState.snapshots.has(id))
         )),
         getDailyChallengeSnapshot: vi.fn(async ({ challengeId }) => {
@@ -72,17 +72,27 @@ const CHALLENGES = DAY_TRACKS.map((trackKey, index) => challenge(
 ));
 
 function createEngine(overrides = {}) {
-    const render = vi.fn();
+    // The real rail holds the card it is on, and falls back to the first one.
+    const carousel = { selectedChallengeId: null };
+    const render = vi.fn((cards = [], options = {}) => {
+        if (options.selectedChallengeId) {
+            carousel.selectedChallengeId = options.selectedChallengeId;
+            return;
+        }
+        carousel.selectedChallengeId ??= cards[0]?.challengeId ?? null;
+    });
     const engine = {
         activeRaceMode: 'daily',
         status: 'ready',
         startButtonPending: false,
         startOverlay: { isStartOverlayVisible: () => true },
         lobbyUi: { getMode: () => 'daily' },
+        prewarmDailyPlaylistTracks: vi.fn(),
         dailyCarousel: {
             render,
             selectChallenge: vi.fn(() => true),
             getSelectedChallenge: vi.fn(() => null),
+            getSelectedChallengeId: vi.fn(() => carousel.selectedChallengeId),
         },
         selectedDailyChallengeId: null,
         currentDailyChallenge: null,
@@ -101,6 +111,10 @@ function createEngine(overrides = {}) {
         ...overrides.lobbyUi,
     };
     engine.paintDailyCarousel = dailyChallengeEngineMethods.paintDailyCarousel.bind(engine);
+    engine.dailyCarouselChallenges =
+        dailyChallengeEngineMethods.dailyCarouselChallenges.bind(engine);
+    engine.ensureDailyCarouselRank =
+        dailyChallengeEngineMethods.ensureDailyCarouselRank.bind(engine);
     return { engine, render };
 }
 
@@ -185,19 +199,54 @@ describe('daily carousel engine wiring', () => {
         expect(render.mock.calls[0][1].selectedChallengeId).toBe('daily-0');
     });
 
-    it('fills in each missing rank and repaints as it lands', async () => {
+    it('asks for the rank of the day on screen and for no other', async () => {
         playlistState.cached = CHALLENGES;
         playlistState.fetched = CHALLENGES;
         playlistState.snapshots.set('daily-0', { playerRankLabel: '#1' });
-        const { engine, render } = createEngine();
+        const { engine } = createEngine({ selectedDailyChallengeId: 'daily-2' });
 
         await dailyChallengeEngineMethods.refreshDailyCarousel.call(engine);
 
-        expect(playlistState.fetchedSnapshotIds).toEqual(['daily-1', 'daily-2', 'daily-3']);
-        const finalCards = render.mock.calls.at(-1)[0];
-        expect(finalCards.map((card) => card.rankLabel))
-            .toEqual(['#1', '#7', '#7', '#7']);
-        expect(finalCards.every((card) => card.rankPending === false)).toBe(true);
+        expect(playlistState.fetchedSnapshotIds).toEqual(['daily-2']);
+    });
+
+    it('asks for the day it opens on even when a rank is already saved', async () => {
+        playlistState.cached = CHALLENGES;
+        playlistState.fetched = CHALLENGES;
+        playlistState.snapshots.set('daily-0', { playerRankLabel: '#1' });
+        const { engine } = createEngine();
+
+        await dailyChallengeEngineMethods.refreshDailyCarousel.call(engine);
+
+        expect(playlistState.fetchedSnapshotIds).toEqual(['daily-0']);
+    });
+
+    it('asks for the rank of the card a swipe settles on', () => {
+        playlistState.cached = CHALLENGES;
+        const { engine } = createEngine();
+
+        dailyChallengeEngineMethods.handleDailyCarouselSettled.call(engine, {
+            challenge: CHALLENGES[1],
+        });
+
+        expect(playlistState.fetchedSnapshotIds).toEqual(['daily-1']);
+    });
+
+    it('repaints the rail from the saved snapshots without asking again', () => {
+        playlistState.cached = CHALLENGES;
+        playlistState.snapshots.set('daily-0', { playerRankLabel: '#4' });
+        const { engine, render } = createEngine();
+        engine.repaintDailyCarouselFromCache =
+            dailyChallengeEngineMethods.repaintDailyCarouselFromCache.bind(engine);
+
+        engine.repaintDailyCarouselFromCache();
+
+        expect(render.mock.calls.at(-1)[0][0]).toMatchObject({
+            challengeId: 'daily-0',
+            rankLabel: '#4',
+            rankPending: false,
+        });
+        expect(playlistState.fetchedSnapshotIds).toEqual([]);
     });
 
     it('drops a superseded refresh so a stale playlist cannot repaint', async () => {
