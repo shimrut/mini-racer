@@ -29,30 +29,19 @@ function getCachedValue(cache, key) {
     return value;
 }
 
-function trimCache(cache, limit, onEvict = null) {
+function trimCache(cache, limit) {
     while (cache.size > limit) {
-        const oldestKey = cache.keys().next().value;
-        const oldestValue = cache.get(oldestKey);
-        cache.delete(oldestKey);
-        onEvict?.(oldestValue, oldestKey);
+        cache.delete(cache.keys().next().value);
     }
 }
 
-function cacheValue(cache, key, value, limit, onEvict = null) {
+function cacheValue(cache, key, value, limit) {
     if (cache.has(key)) {
         cache.delete(key);
     }
     cache.set(key, value);
-    trimCache(cache, limit, onEvict);
+    trimCache(cache, limit);
     return value;
-}
-
-function releaseCanvasAsset(canvasAsset) {
-    if (!canvasAsset?.canvas) return;
-
-    canvasAsset.canvas.width = 0;
-    canvasAsset.canvas.height = 0;
-    canvasAsset.canvas = null;
 }
 
 export function getTrackPreviewGeometry(trackKey, track, options = {}) {
@@ -85,7 +74,15 @@ export function getTrackCanvasAsset(trackKey, track, options = {}) {
     if (!canvasAsset) {
         const geometry = getTrackPreviewGeometry(trackKey, track, options);
         canvasAsset = buildTrackCanvas(track, geometry, options.presentation || null);
-        cacheValue(canvasCache, key, canvasAsset, CANVAS_CACHE_LIMIT, releaseCanvasAsset);
+        // Evict the entry, but do not touch the canvas it holds. The engine keeps the
+        // canvas object itself for the whole race and never reads the cache again, so
+        // its entry ages to the oldest slot while the race runs. Resizing the canvas to
+        // 0x0 here to free memory therefore blanked the track of the active race: the
+        // engine still held a truthy canvas, the visible slice measured 0 wide, and the
+        // draw step skipped it without an error, so the car and the trail stayed on an
+        // empty background. Dropping the reference is enough. The browser frees the
+        // pixels once the race stops using the canvas.
+        cacheValue(canvasCache, key, canvasAsset, CANVAS_CACHE_LIMIT);
     }
     return canvasAsset;
 }
