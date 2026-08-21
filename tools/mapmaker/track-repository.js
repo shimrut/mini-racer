@@ -11,8 +11,15 @@ import {
     getTrackModuleFilename,
     isValidTrackKey,
 } from './track-source.js';
+import {
+    BIOME_NAMES,
+    isBiomeName,
+    pickBiomeForTrackKey,
+} from '../../game/track/biomes.js';
 
 const CATALOG_BLOCK_RE = /export const TRACK_CATALOG = \{\n[\s\S]*?\n\};/;
+const CATALOG_ENTRY_RE = /^\s{4}([A-Za-z_$][A-Za-z0-9_$]*): \{ name: ("(?:[^"\\]|\\.)*")(?:, biome: ("(?:[^"\\]|\\.)*"))? \},$/gm;
+const CATALOG_ENTRY_LINE_RE = /^\s{4}[A-Za-z_$][A-Za-z0-9_$]*: \{/gm;
 const SCHEDULE_BLOCK_RE = /export const TRACK_SCHEDULE_KEYS = \[\n[\s\S]*?\n\];/;
 const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
 
@@ -28,6 +35,15 @@ function assertDestination(destination) {
     }
 }
 
+function assertBiome(biome) {
+    if (biome === 'random') {
+        throw new Error('Biome must be a settled biome, not random. Resolve it before saving.');
+    }
+    if (!isBiomeName(biome)) {
+        throw new Error(`Biome must be one of: ${BIOME_NAMES.join(', ')}.`);
+    }
+}
+
 export function parseTrackCatalogSource(source) {
     const catalogMatch = source.match(CATALOG_BLOCK_RE);
     const scheduleMatch = source.match(SCHEDULE_BLOCK_RE);
@@ -36,9 +52,9 @@ export function parseTrackCatalogSource(source) {
     }
 
     const namesByKey = {};
-    const entryRe = /^\s{4}([A-Za-z_$][A-Za-z0-9_$]*): \{ name: (.+) \},$/gm;
-    for (const match of catalogMatch[0].matchAll(entryRe)) {
-        const [, trackKey, rawName] = match;
+    const biomesByKey = {};
+    for (const match of catalogMatch[0].matchAll(CATALOG_ENTRY_RE)) {
+        const [, trackKey, rawName, rawBiome] = match;
         const name = JSON.parse(rawName);
         if (typeof name !== 'string' || !name.trim()) {
             throw new Error(`Catalog track ${trackKey} needs a non-empty name.`);
@@ -47,6 +63,23 @@ export function parseTrackCatalogSource(source) {
             throw new Error(`Catalog track ${trackKey} is duplicated.`);
         }
         namesByKey[trackKey] = name;
+        if (rawBiome !== undefined) {
+            const biome = JSON.parse(rawBiome);
+            assertBiome(biome);
+            biomesByKey[trackKey] = biome;
+        }
+    }
+
+    // Every catalog line must parse. An entry this file cannot read would drop out
+    // of catalogKeys, and the next save would rewrite catalog.js and tracks.js
+    // without that track, deleting it from the game with no error.
+    const entryLineCount = [...catalogMatch[0].matchAll(CATALOG_ENTRY_LINE_RE)].length;
+    if (entryLineCount !== Object.keys(namesByKey).length) {
+        throw new Error(
+            `Track catalog has ${entryLineCount} entries but only `
+            + `${Object.keys(namesByKey).length} could be read. Fix the malformed entry `
+            + 'before saving, or the track it names will be dropped.'
+        );
     }
 
     const scheduleKeys = [...scheduleMatch[0].matchAll(/^\s{4}'([^']+)',$/gm)]
@@ -66,17 +99,20 @@ export function parseTrackCatalogSource(source) {
 
     return {
         namesByKey,
+        biomesByKey,
         catalogKeys: Object.keys(namesByKey),
         scheduleKeys,
     };
 }
 
-function generateCatalogBlock(catalogKeys, namesByKey) {
+function generateCatalogBlock(catalogKeys, namesByKey, biomesByKey = {}) {
     return [
         'export const TRACK_CATALOG = {',
-        ...catalogKeys.map((trackKey) => (
-            `    ${trackKey}: { name: ${JSON.stringify(namesByKey[trackKey])} },`
-        )),
+        ...catalogKeys.map((trackKey) => {
+            const biome = biomesByKey[trackKey];
+            const biomeSource = biome ? `, biome: ${JSON.stringify(biome)}` : '';
+            return `    ${trackKey}: { name: ${JSON.stringify(namesByKey[trackKey])}${biomeSource} },`;
+        }),
         '};',
     ].join('\n');
 }
@@ -154,9 +190,15 @@ export function buildTrackRepositoryUpdate({
     originalTrackKey = null,
     trackName,
     destination = 'daily',
+    biome = null,
 }) {
     assertTrackKey(trackKey);
     assertDestination(destination);
+    // A null biome means "keep whatever the catalog already holds". Treating it as
+    // a reset would let any half-landed caller quietly wipe settled biomes.
+    if (biome !== null) {
+        assertBiome(biome);
+    }
     if (originalTrackKey !== null) {
         assertTrackKey(originalTrackKey, 'Original track key');
     }
@@ -167,6 +209,7 @@ export function buildTrackRepositoryUpdate({
 
     const {
         namesByKey,
+        biomesByKey,
         catalogKeys,
         scheduleKeys,
     } = parseTrackCatalogSource(catalogSource);
@@ -196,6 +239,10 @@ export function buildTrackRepositoryUpdate({
             nextScheduleKeys[scheduleIndex] = trackKey;
         }
         delete namesByKey[originalTrackKey];
+        if (Object.prototype.hasOwnProperty.call(biomesByKey, originalTrackKey)) {
+            biomesByKey[trackKey] = biomesByKey[originalTrackKey];
+            delete biomesByKey[originalTrackKey];
+        }
         removedFilename = getTrackModuleFilename(originalTrackKey);
     } else if (!targetExists) {
         action = 'created';
@@ -203,18 +250,25 @@ export function buildTrackRepositoryUpdate({
     }
 
     namesByKey[trackKey] = normalizedName;
+    if (biome !== null) {
+        biomesByKey[trackKey] = biome;
+    }
     applyScheduleDestination(nextScheduleKeys, trackKey, destination);
 
     const orderedNamesByKey = Object.fromEntries(
         nextCatalogKeys.map((key) => [key, namesByKey[key]]),
     );
     const nextCatalogSource = catalogSource
-        .replace(CATALOG_BLOCK_RE, generateCatalogBlock(nextCatalogKeys, orderedNamesByKey))
+        .replace(
+            CATALOG_BLOCK_RE,
+            generateCatalogBlock(nextCatalogKeys, orderedNamesByKey, biomesByKey),
+        )
         .replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(nextScheduleKeys));
 
     return {
         action,
         destination,
+        biome: biomesByKey[trackKey] ?? null,
         scheduleIndex: nextScheduleKeys.indexOf(trackKey),
         scheduleLength: nextScheduleKeys.length,
         filename: getTrackModuleFilename(trackKey),
@@ -230,6 +284,7 @@ export function applyTrackRepositoryUpdate({
     originalTrackKey = null,
     trackName,
     destination = 'daily',
+    biome = null,
     track,
 }) {
     const resolvedRoot = resolve(rootDir);
@@ -243,6 +298,7 @@ export function applyTrackRepositoryUpdate({
         originalTrackKey,
         trackName,
         destination,
+        biome,
     });
     const definitionFilename = getTrackModuleFilename(trackKey);
     assertSafeDefinitionFilename(definitionFilename);
@@ -290,9 +346,42 @@ export function applyTrackRepositoryUpdate({
     return {
         action: update.action,
         destination: update.destination,
+        biome: update.biome,
         filename: definitionFilename,
         removedFilename: update.removedFilename,
         scheduleIndex: update.scheduleIndex,
         scheduleLength: update.scheduleLength,
     };
+}
+
+/**
+ * Settles a biome on every catalog entry that has none, without touching entries
+ * that already do. Pure and idempotent: run it again after a batch of new tracks
+ * lands and only the new ones move.
+ */
+export function buildCatalogBiomeBackfill({ catalogSource, pinned = {} }) {
+    const {
+        namesByKey,
+        biomesByKey,
+        catalogKeys,
+        scheduleKeys,
+    } = parseTrackCatalogSource(catalogSource);
+
+    const assignments = [];
+    for (const trackKey of catalogKeys) {
+        if (Object.prototype.hasOwnProperty.call(biomesByKey, trackKey)) continue;
+        const biome = pinned[trackKey] ?? pickBiomeForTrackKey(trackKey);
+        assertBiome(biome);
+        biomesByKey[trackKey] = biome;
+        assignments.push({ trackKey, biome, pinned: trackKey in pinned });
+    }
+
+    const nextCatalogSource = catalogSource
+        .replace(
+            CATALOG_BLOCK_RE,
+            generateCatalogBlock(catalogKeys, namesByKey, biomesByKey),
+        )
+        .replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(scheduleKeys));
+
+    return { catalogSource: nextCatalogSource, assignments };
 }

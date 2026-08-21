@@ -1,5 +1,6 @@
 import { applyTrackRepositoryUpdate } from './track-repository.js';
 import { isValidTrackKey } from './track-source.js';
+import { BIOME_NAMES, isBiomeName } from '../../game/track/biomes.js';
 
 const ENDPOINT = '/__mapmaker/save-track';
 const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
@@ -74,11 +75,23 @@ function normalizeSavePayload(payload) {
         throw new Error('Track geometry payload is required.');
     }
 
+    // A missing biome keeps the catalog's current value. Only a settled name is
+    // accepted, so 'random' can never reach disk.
+    const rawBiome = payload.biome;
+    const biome = rawBiome == null || rawBiome === '' ? null : String(rawBiome).trim();
+    if (biome === 'random') {
+        throw new Error('Biome must be a settled biome, not random. Resolve it before saving.');
+    }
+    if (biome !== null && !isBiomeName(biome)) {
+        throw new Error(`Biome must be one of: ${BIOME_NAMES.join(', ')}.`);
+    }
+
     return {
         trackKey,
         originalTrackKey,
         trackName,
         destination,
+        biome,
         track: payload.track,
     };
 }
@@ -113,6 +126,7 @@ export function mapmakerTrackAuthoringPlugin() {
                         originalTrackKey: payload.originalTrackKey,
                         trackName: payload.trackName,
                         destination: payload.destination,
+                        biome: payload.biome,
                         track: payload.track,
                     });
                     writeJson(response, 200, result);

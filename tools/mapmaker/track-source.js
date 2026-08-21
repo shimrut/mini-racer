@@ -152,12 +152,13 @@ export function generateTrackModuleSource(track) {
     ].join('\n');
 }
 
-export function generateTrackIntegrationSnippet(trackKey, trackName) {
+export function generateTrackIntegrationSnippet(trackKey, trackName, biome = null) {
     const filename = getTrackModuleFilename(trackKey);
     const importName = `${trackKey}Geometry`;
+    const biomeSource = biome ? `, biome: ${JSON.stringify(biome)}` : '';
     return [
         '// TRACK_CATALOG metadata',
-        `${trackKey}: { name: ${JSON.stringify(trackName)} },`,
+        `${trackKey}: { name: ${JSON.stringify(trackName)}${biomeSource} },`,
         '',
         '// tracks.js static import',
         `import ${importName} from './definitions/${filename}';`,

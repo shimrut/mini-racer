@@ -11,9 +11,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
     applyTrackRepositoryUpdate,
+    buildCatalogBiomeBackfill,
     buildTrackRepositoryUpdate,
     parseTrackCatalogSource,
 } from '../tools/mapmaker/track-repository.js';
+import { isBiomeName, pickBiomeForTrackKey } from '../game/track/biomes.js';
 
 const CATALOG_SOURCE = `export const TRACK_CATALOG = {
     circuit: { name: "Classic Circuit" },
@@ -32,6 +34,11 @@ export function hasTrack(trackKey) {
     return Object.prototype.hasOwnProperty.call(TRACK_CATALOG, trackKey);
 }
 `;
+
+const MIXED_BIOME_CATALOG_SOURCE = CATALOG_SOURCE.replace(
+    '    sunlitTemple: { name: "Sunlit Temple" },',
+    '    sunlitTemple: { name: "Sunlit Temple", biome: "basalt" },',
+);
 
 const TRACK = {
     outer: [
@@ -252,5 +259,144 @@ describe('Mapmaker track repository integration', () => {
             .toContain("import sunriseTemple from './definitions/sunrise-temple.js';");
         expect(readFileSync(join(trackRoot, 'tracks.js'), 'utf8'))
             .toContain("import numberZero from './definitions/number-zero.js';");
+    });
+});
+
+describe('Mapmaker catalog biomes', () => {
+    it('reads catalogs that mix tracks with and without a biome', () => {
+        const parsed = parseTrackCatalogSource(MIXED_BIOME_CATALOG_SOURCE);
+
+        expect(parsed.catalogKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
+        expect(parsed.biomesByKey).toEqual({ sunlitTemple: 'basalt' });
+        expect(parsed.namesByKey.sunlitTemple).toBe('Sunlit Temple');
+    });
+
+    it('leaves a biome-less catalog byte-identical when no biome is supplied', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'circuit',
+            originalTrackKey: 'circuit',
+            trackName: 'Classic Circuit',
+            destination: 'daily',
+        });
+
+        expect(update.catalogSource).toBe(CATALOG_SOURCE);
+        expect(update.biome).toBeNull();
+    });
+
+    it('writes a settled biome into the catalog entry', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'circuit',
+            originalTrackKey: 'circuit',
+            trackName: 'Classic Circuit',
+            destination: 'daily',
+            biome: 'basalt',
+        });
+
+        expect(update.catalogSource).toContain('circuit: { name: "Classic Circuit", biome: "basalt" },');
+        expect(update.biome).toBe('basalt');
+    });
+
+    it('keeps the stored biome when a save supplies none', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: MIXED_BIOME_CATALOG_SOURCE,
+            trackKey: 'sunlitTemple',
+            originalTrackKey: 'sunlitTemple',
+            trackName: 'Sunlit Temple',
+            destination: 'daily',
+        });
+
+        expect(update.catalogSource).toContain('sunlitTemple: { name: "Sunlit Temple", biome: "basalt" },');
+        expect(update.biome).toBe('basalt');
+    });
+
+    it('carries the biome across a rename instead of dropping it', () => {
+        const update = buildTrackRepositoryUpdate({
+            catalogSource: MIXED_BIOME_CATALOG_SOURCE,
+            trackKey: 'templeReborn',
+            originalTrackKey: 'sunlitTemple',
+            trackName: 'Temple Reborn',
+            destination: 'daily',
+        });
+
+        expect(update.action).toBe('renamed');
+        expect(update.catalogSource).toContain('templeReborn: { name: "Temple Reborn", biome: "basalt" },');
+        expect(update.catalogSource).not.toContain('sunlitTemple');
+        expect(update.biome).toBe('basalt');
+    });
+
+    it('refuses an unsettled or unknown biome', () => {
+        const save = (biome) => () => buildTrackRepositoryUpdate({
+            catalogSource: CATALOG_SOURCE,
+            trackKey: 'circuit',
+            originalTrackKey: 'circuit',
+            trackName: 'Classic Circuit',
+            destination: 'daily',
+            biome,
+        });
+
+        expect(save('random')).toThrow(/not random/);
+        expect(save('swamplands')).toThrow(/Biome must be one of/);
+    });
+
+    it('refuses a catalog entry it cannot read instead of dropping the track', () => {
+        const malformed = CATALOG_SOURCE.replace(
+            '    numberZero: { name: "Number Zero" },',
+            '    numberZero: { name: "Number Zero", skin: "wet" },',
+        );
+
+        expect(() => parseTrackCatalogSource(malformed)).toThrow(/could be read/);
+    });
+});
+
+describe('Mapmaker catalog biome backfill', () => {
+    it('settles a biome on every entry that has none', () => {
+        const { catalogSource, assignments } = buildCatalogBiomeBackfill({
+            catalogSource: CATALOG_SOURCE,
+        });
+
+        expect(assignments.map((entry) => entry.trackKey)).toEqual([
+            'circuit',
+            'sunlitTemple',
+            'numberZero',
+        ]);
+        expect(assignments.every((entry) => isBiomeName(entry.biome))).toBe(true);
+        expect(parseTrackCatalogSource(catalogSource).biomesByKey).toEqual({
+            circuit: pickBiomeForTrackKey('circuit'),
+            sunlitTemple: pickBiomeForTrackKey('sunlitTemple'),
+            numberZero: pickBiomeForTrackKey('numberZero'),
+        });
+    });
+
+    it('never overwrites a biome a track already settled on', () => {
+        const { catalogSource, assignments } = buildCatalogBiomeBackfill({
+            catalogSource: MIXED_BIOME_CATALOG_SOURCE,
+        });
+
+        expect(assignments.map((entry) => entry.trackKey)).toEqual(['circuit', 'numberZero']);
+        expect(catalogSource).toContain('sunlitTemple: { name: "Sunlit Temple", biome: "basalt" },');
+    });
+
+    it('honours pinned tracks over the hashed pick', () => {
+        const { catalogSource, assignments } = buildCatalogBiomeBackfill({
+            catalogSource: CATALOG_SOURCE,
+            pinned: { circuit: 'basalt' },
+        });
+
+        expect(catalogSource).toContain('circuit: { name: "Classic Circuit", biome: "basalt" },');
+        expect(assignments.find((entry) => entry.trackKey === 'circuit')).toEqual({
+            trackKey: 'circuit',
+            biome: 'basalt',
+            pinned: true,
+        });
+    });
+
+    it('changes nothing on a second run', () => {
+        const first = buildCatalogBiomeBackfill({ catalogSource: CATALOG_SOURCE });
+        const second = buildCatalogBiomeBackfill({ catalogSource: first.catalogSource });
+
+        expect(second.catalogSource).toBe(first.catalogSource);
+        expect(second.assignments).toEqual([]);
     });
 });

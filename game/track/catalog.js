@@ -195,3 +195,7 @@ export function hasTrack(trackKey) {
 export function getTrackName(trackKey, fallback = 'Unknown Track') {
     return hasTrack(trackKey) ? TRACK_CATALOG[trackKey].name : fallback;
 }
+
+export function getTrackBiome(trackKey) {
+    return hasTrack(trackKey) ? (TRACK_CATALOG[trackKey].biome ?? null) : null;
+}
