@@ -21,7 +21,7 @@
  * the shadow baked under the track instead.
  */
 
-import { createSeededRandom } from './seeded-random.js';
+import { createSeededRandom, hashSeed } from './seeded-random.js';
 
 /** Field bounds are rounded out to this grid so the field edge does not chase the
  * last decimal of a measured track bound. What the ground looks like does not
@@ -35,16 +35,17 @@ const FIELD_SNAP = 200;
  */
 const FIELD_MARGIN = 2000;
 
-/** How finely the height field is read. Smaller means smoother contours and more
- * geometry; 200px keeps a contour smooth at race zoom. */
-const SAMPLE_STEP = 200;
+/** How finely the height field is read. This has to be well under the shortest
+ * contour wavelength below, or the contours come out faceted. */
+const SAMPLE_STEP = 70;
 
 /** Contours are grouped into tiles this many samples wide, so off-screen ground
  * can be skipped without splitting a fill into thousands of small ones. */
-const TILE_SAMPLES = 8;
+const TILE_SAMPLES = 12;
 
-/** Heights at which the ground steps up a tone. Each sits inside the one before. */
-const TERRAIN_LEVELS = [-0.18, 0.12, 0.42, 0.68];
+/** How much of the ground each tone covers, largest first. Each tone sits inside
+ * the one below it, so these shrink. */
+const TERRAIN_COVERAGE = [0.62, 0.42, 0.24, 0.10];
 
 const TIER_TERRAIN = 0;
 const TIER_ROCKS = 1;
@@ -70,41 +71,75 @@ function range(random, low, high) {
 }
 
 /**
- * A smooth height field.
+ * A smooth height field, built from layered value noise.
  *
- * Two long waves running in different directions give the ground its grain, and
- * three slow ripples warp them so the contours wander instead of striping. The
- * field is continuous everywhere, which is what makes the contours join up.
+ * Noise, not waves. Waves make stripes: every contour runs the same way and the
+ * ground reads as a diagonal edge sliding past. Layered noise makes landmasses
+ * with wandering edges and enclosed pockets, which is what a place looks like
+ * from above. The coordinates are stretched along one axis so the ground still
+ * has a grain rather than looking equally lumpy in all directions.
+ *
+ * Each lattice point is hashed from its own integer coordinates, so the field is
+ * defined everywhere in world space and does not shift when the field edge moves.
  */
-function createTerrainField(random) {
-    const firstAngle = random() * Math.PI;
-    const secondAngle = random() * Math.PI;
-    const firstLength = range(random, 2600, 5200);
-    const secondLength = range(random, 3800, 7200);
-    const warps = [0, 1, 2].map(() => ({
-        frequencyX: range(random, 0.4, 1.3) / 1000,
-        frequencyY: range(random, 0.4, 1.3) / 1000,
-        phaseX: random() * Math.PI * 2,
-        phaseY: random() * Math.PI * 2,
-        amplitude: range(random, 0.5, 1.4)
-    }));
+function createTerrainField(seedKey) {
+    const salt = hashSeed(seedKey) | 0;
+    const octaves = [
+        { cell: 640, amplitude: 1, salt: salt ^ 0x9e3779b9 },
+        { cell: 310, amplitude: 0.52, salt: salt ^ 0x85ebca6b },
+        { cell: 148, amplitude: 0.26, salt: salt ^ 0xc2b2ae35 }
+    ];
+    const total = octaves.reduce((sum, octave) => sum + octave.amplitude, 0);
 
-    const firstCos = Math.cos(firstAngle);
-    const firstSin = Math.sin(firstAngle);
-    const secondCos = Math.cos(secondAngle);
-    const secondSin = Math.sin(secondAngle);
+    const grainAngle = (hashSeed(`${seedKey}:grain`) % 1000) / 1000 * Math.PI;
+    const grainCos = Math.cos(grainAngle);
+    const grainSin = Math.sin(grainAngle);
+    const STRETCH = 1.9;
 
-    return (x, y) => {
-        let warp = 0;
-        for (const ripple of warps) {
-            warp += ripple.amplitude
-                * Math.sin(x * ripple.frequencyX + ripple.phaseX)
-                * Math.sin(y * ripple.frequencyY + ripple.phaseY);
-        }
-        const first = Math.sin(((x * firstCos + y * firstSin) / firstLength) * Math.PI * 2 + warp);
-        const second = Math.sin(((x * secondCos + y * secondSin) / secondLength) * Math.PI * 2 + warp * 0.6);
-        return first * 0.62 + second * 0.38;
+    const lattice = (ix, iy, octaveSalt) => {
+        let h = octaveSalt ^ Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263);
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
     };
+    const ease = (t) => t * t * (3 - 2 * t);
+
+    return (worldX, worldY) => {
+        // Stretch along the grain direction so landforms run slightly one way.
+        const x = (worldX * grainCos + worldY * grainSin) / STRETCH;
+        const y = -worldX * grainSin + worldY * grainCos;
+
+        let height = 0;
+        for (const octave of octaves) {
+            const fx = x / octave.cell;
+            const fy = y / octave.cell;
+            const ix = Math.floor(fx);
+            const iy = Math.floor(fy);
+            const tx = ease(fx - ix);
+            const ty = ease(fy - iy);
+            const topLeft = lattice(ix, iy, octave.salt);
+            const topRight = lattice(ix + 1, iy, octave.salt);
+            const bottomLeft = lattice(ix, iy + 1, octave.salt);
+            const bottomRight = lattice(ix + 1, iy + 1, octave.salt);
+            const top = topLeft + (topRight - topLeft) * tx;
+            const bottom = bottomLeft + (bottomRight - bottomLeft) * tx;
+            height += ((top + (bottom - top) * ty) * 2 - 1) * octave.amplitude;
+        }
+        return height / total;
+    };
+}
+
+/**
+ * Picks the heights to step the ground up at.
+ *
+ * Reading them off the field's own distribution rather than fixing them means
+ * every track gets the same balance of terraces, whatever shape its noise took.
+ */
+function resolveTerrainLevels(heights, toneCount) {
+    const sorted = Float32Array.from(heights).sort();
+    return TERRAIN_COVERAGE.slice(0, toneCount).map((covered) => {
+        const index = Math.min(sorted.length - 1, Math.floor((1 - covered) * sorted.length));
+        return sorted[index];
+    });
 }
 
 /**
@@ -240,7 +275,7 @@ function buildTerrainLayer(samples, area, level, styleIndex) {
  * A rock: a dark slab with one lit facet, the way the reference art draws them.
  */
 function buildRock(random, centerX, centerY) {
-    const radius = range(random, 14, 34);
+    const radius = range(random, 26, 58);
     const sides = Math.floor(range(random, 5, 8));
     const spin = random() * Math.PI * 2;
     const squash = range(random, 0.55, 0.85);
@@ -346,8 +381,7 @@ export function buildBiomeBackdrop(presentation, bounds, seedKey) {
         maxY: snapUp(bounds.maxY) + FIELD_MARGIN
     };
 
-    const random = createSeededRandom(`${seedKey}:terrain`);
-    const field = createTerrainField(random);
+    const field = createTerrainField(`${seedKey}:terrain`);
     const samples = sampleTerrain(field, area);
 
     const terrainTones = presentation.biomeTerrainColors || [];
@@ -364,8 +398,7 @@ export function buildBiomeBackdrop(presentation, bounds, seedKey) {
     // Low levels first: each higher tone sits inside the one below, so filling in
     // order steps the ground up one terrace at a time.
     const terrain = [];
-    TERRAIN_LEVELS.forEach((level, index) => {
-        if (index >= terrainTones.length) return;
+    resolveTerrainLevels(samples.heights, terrainTones.length).forEach((level, index) => {
         terrain.push(...buildTerrainLayer(samples, area, level, index));
     });
 
