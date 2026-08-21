@@ -13,6 +13,7 @@
     "kill:watchers": "pkill -f \"$PWD/node_modules/.bin/vite build --watch\" 2>/dev/null || true",
     "launch": "npm run test && devvit publish",
     "login": "devvit login",
+    "backfill:biomes": "node tools/backfill-track-biomes.js",
     "mapmaker": "vite --config vite.mapmaker.config.js --host 127.0.0.1",
     "predev": "npm run --silent kill:watchers && npm run generate:car-assets && npm run generate:share-images",
     "pretest": "npm run generate:car-assets && npm run generate:share-images",

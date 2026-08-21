@@ -7,6 +7,7 @@ import {
     TRACK_CATALOG,
     TRACK_SCHEDULE_KEYS,
 } from '../game/track/catalog.js';
+import { isBiomeName } from '../game/track/biomes.js';
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { CONFIG } from '../game/config.js';
@@ -86,6 +87,10 @@ describe('track runtime integrity', () => {
         Object.entries(TRACK_CATALOG).forEach(([trackKey, metadata]) => {
             expect(metadata.name.trim(), `${trackKey} needs a player-facing name`).not.toBe('');
             expect(TRACKS[trackKey]?.name).toBe(metadata.name);
+            expect(
+                isBiomeName(metadata.biome),
+                `${trackKey} needs a known biome, got ${JSON.stringify(metadata.biome)}`,
+            ).toBe(true);
         });
     });
 
