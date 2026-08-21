@@ -1,8 +1,17 @@
 import { CONFIG } from '../game/config.js';
-import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
+import { TRACK_SCHEDULE_KEYS, getTrackBiome } from '../game/track/catalog.js';
+import {
+    BIOME_NAMES,
+    getBiomeLabel,
+    isBiomeName,
+    isBiomePainted,
+    pickRandomBiome,
+} from '../game/track/biomes.js';
+import { buildBiomeBackdrop, drawBiomeBackdrop } from '../game/track/backdrop.js';
 import {
     drawTrackBoundaries,
     drawTrackFinishLine,
+    drawTrackSurfaceShadow,
     fillTrackPresentation,
 } from '../game/track/canvas.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
@@ -24,6 +33,7 @@ import {
 } from './mapmaker/track-source.js';
 
 const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
+const RANDOM_BIOME_VALUE = 'random';
 const SCHEDULED_TRACK_KEYS = new Set(TRACK_SCHEDULE_KEYS);
 
 const TOOL_LABELS = {
@@ -362,6 +372,9 @@ class MapmakerApp {
         this.trackNameInput = document.getElementById('track-name-input');
         this.trackDestinationSelect = document.getElementById('track-destination-select');
         this.trackDestinationHint = document.getElementById('track-destination-hint');
+        this.trackBiomeSelect = document.getElementById('track-biome-select');
+        this.trackBiomeHint = document.getElementById('track-biome-hint');
+        this.rerollBiomeBtn = document.getElementById('reroll-biome-btn');
         this.cornerRadiusSelect = document.getElementById('corner-radius-select');
         this.lineSmoothingInput = document.getElementById('line-smoothing-input');
         this.drawMetricsLabel = document.getElementById('draw-metrics-label');
@@ -396,6 +409,12 @@ class MapmakerApp {
             checkpointIndex: 0,
             drag: null,
             dirtyTrackKeys: new Set(),
+            // The biome lives in the catalog, not in the track definition, so the
+            // cloned tracks do not carry it. Read it the way destination is read.
+            biomeByKey: new Map(
+                Object.keys(TRACKS).map((trackKey) => [trackKey, getTrackBiome(trackKey)]),
+            ),
+            rolledBiomeByKey: new Map(),
             originalTrackKeyByKey: new Map(
                 Object.keys(TRACKS).map((trackKey) => [trackKey, trackKey]),
             ),
@@ -414,6 +433,7 @@ class MapmakerApp {
         };
 
         this.bindEvents();
+        this.populateBiomeOptions();
         this.populateTrackSelect();
         this.loadTrack(initialTrackKey);
         this.resizeCanvas();
@@ -586,6 +606,15 @@ class MapmakerApp {
                     ? 'Marked track for Daily Challenge.'
                     : 'Marked track as Campaign only.',
             );
+        });
+
+        this.trackBiomeSelect.addEventListener('change', () => {
+            this.syncBiomeHint();
+            this.markDirty(`Set biome to ${getBiomeLabel(this.getSelectedBiome())}.`);
+        });
+
+        this.rerollBiomeBtn.addEventListener('click', () => {
+            this.rerollBiome();
         });
 
         this.cornerRadiusSelect.addEventListener('change', () => {
@@ -797,6 +826,79 @@ class MapmakerApp {
         return 'campaign';
     }
 
+    populateBiomeOptions() {
+        if (!this.trackBiomeSelect) return;
+
+        const options = [`<option value="${RANDOM_BIOME_VALUE}">Random</option>`];
+        for (const biome of BIOME_NAMES) {
+            const label = isBiomePainted(biome)
+                ? getBiomeLabel(biome)
+                : `${getBiomeLabel(biome)} — flat for now`;
+            options.push(`<option value="${biome}">${label}</option>`);
+        }
+        this.trackBiomeSelect.innerHTML = options.join('');
+    }
+
+    getStoredBiomeForTrackKey(trackKey) {
+        const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey);
+        return this.state.biomeByKey.get(trackKey)
+            ?? (originalTrackKey ? this.state.biomeByKey.get(originalTrackKey) : null)
+            ?? null;
+    }
+
+    /**
+     * The biome that would be written if the track were saved now. Random is a
+     * control state only: it settles here on a real biome, so 'random' can never
+     * leave the editor.
+     */
+    getSelectedBiome(trackKey = this.state.selectedTrackKey) {
+        const value = this.trackBiomeSelect?.value;
+        if (isBiomeName(value)) return value;
+
+        let rolled = this.state.rolledBiomeByKey.get(trackKey);
+        if (!isBiomeName(rolled)) {
+            rolled = pickRandomBiome(this.getStoredBiomeForTrackKey(trackKey));
+            this.state.rolledBiomeByKey.set(trackKey, rolled);
+        }
+        return rolled;
+    }
+
+    rerollBiome() {
+        const trackKey = this.state.selectedTrackKey;
+        const next = pickRandomBiome(this.getSelectedBiome(trackKey));
+        this.state.rolledBiomeByKey.set(trackKey, next);
+        this.trackBiomeSelect.value = RANDOM_BIOME_VALUE;
+        this.syncBiomeHint();
+        this.markDirty(`Rolled biome ${getBiomeLabel(next)}.`);
+    }
+
+    syncBiomeControl(trackKey = this.state.selectedTrackKey) {
+        if (!this.trackBiomeSelect) return;
+
+        const stored = this.getStoredBiomeForTrackKey(trackKey);
+        this.trackBiomeSelect.value = isBiomeName(stored) ? stored : RANDOM_BIOME_VALUE;
+        this.syncBiomeHint();
+    }
+
+    syncBiomeHint() {
+        if (!this.trackBiomeHint) return;
+
+        const isRandom = this.trackBiomeSelect?.value === RANDOM_BIOME_VALUE;
+        const biome = this.getSelectedBiome();
+        const label = getBiomeLabel(biome);
+        if (this.rerollBiomeBtn) {
+            this.rerollBiomeBtn.disabled = !isRandom;
+        }
+
+        if (isRandom) {
+            this.trackBiomeHint.textContent = `Saves as ${label}. Reroll for a different one.`;
+            return;
+        }
+        this.trackBiomeHint.textContent = isBiomePainted(biome)
+            ? `${label} draws its own ground, laid out from this track's key.`
+            : `${label} draws the plain background for now.`;
+    }
+
     getSelectedDestination() {
         const value = this.trackDestinationSelect.value;
         return TRACK_DESTINATIONS.has(value) ? value : 'daily';
@@ -832,6 +934,7 @@ class MapmakerApp {
         this.trackKeyInput.value = trackKey;
         this.trackNameInput.value = this.track.name;
         this.syncDestinationControl(trackKey);
+        this.syncBiomeControl(trackKey);
         this.syncCornerRadiusControl();
         this.syncLineSmoothingControl();
         this.syncDrawWidthControls();
@@ -2154,6 +2257,55 @@ class MapmakerApp {
         this.ctx.restore();
     }
 
+    getPreviewPresentation() {
+        return resolveTrackPresentation(this.state.selectedTrackKey, {
+            biome: this.getSelectedBiome(),
+        });
+    }
+
+    /**
+     * Rebuilds the ground only when the track or its biome changes. draw() runs on
+     * every pointer move while dragging a handle, and the ground is a few hundred
+     * paths, so rebuilding it per frame would be felt.
+     */
+    getPreviewBackdrop(presentation) {
+        if (presentation.backgroundStyle !== 'biome' || !this.hasTrackGeometry()) {
+            return null;
+        }
+
+        const gridSize = CONFIG.gridSize;
+        const points = [...this.track.outer, ...this.track.inner];
+        const bounds = points.reduce((box, point) => ({
+            minX: Math.min(box.minX, point.x * gridSize),
+            minY: Math.min(box.minY, point.y * gridSize),
+            maxX: Math.max(box.maxX, point.x * gridSize),
+            maxY: Math.max(box.maxY, point.y * gridSize),
+        }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+
+        const cacheKey = presentation.key;
+        if (this.previewBackdrop?.key !== cacheKey) {
+            this.previewBackdrop = {
+                key: cacheKey,
+                backdrop: buildBiomeBackdrop(presentation, bounds, cacheKey),
+            };
+        }
+        return this.previewBackdrop.backdrop;
+    }
+
+    drawBiomeGround(viewport) {
+        const presentation = this.getPreviewPresentation();
+        if (presentation.backgroundStyle !== 'biome') return;
+
+        // The maker works in grid units; the ground is measured in world pixels.
+        drawBiomeBackdrop(this.ctx, viewport.width, viewport.height, {
+            offsetX: viewport.offsetX,
+            offsetY: viewport.offsetY,
+            scale: viewport.scale / CONFIG.gridSize,
+            presentation,
+            backdrop: this.getPreviewBackdrop(presentation),
+        });
+    }
+
     drawRaceTrackPreview(viewport) {
         const geometry = buildTrackGeometry({
             outer: this.track.outer,
@@ -2164,7 +2316,7 @@ class MapmakerApp {
             return;
         }
 
-        const presentation = resolveTrackPresentation(this.state.selectedTrackKey);
+        const presentation = this.getPreviewPresentation();
         const outerPath = this.buildScreenPath(geometry.outer, viewport);
         const innerPath = this.buildScreenPath(geometry.inner, viewport);
         const surfacePath = new Path2D();
@@ -2174,6 +2326,7 @@ class MapmakerApp {
         const curbWidth = clamp(viewport.scale * 0.18, 2, 6);
         const finishWidth = clamp(viewport.scale * 0.35, 4, 12);
 
+        drawTrackSurfaceShadow(this.ctx, surfacePath, presentation);
         fillTrackPresentation(
             this.ctx,
             surfacePath,
@@ -2476,6 +2629,7 @@ class MapmakerApp {
         this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         this.ctx.clearRect(0, 0, viewport.width, viewport.height);
 
+        this.drawBiomeGround(viewport);
         this.drawGrid(viewport);
 
         if (this.hasTrackGeometry()) {
@@ -2561,7 +2715,11 @@ class MapmakerApp {
     }
 
     async copyTrackIntegration() {
-        const text = generateTrackIntegrationSnippet(this.state.selectedTrackKey, this.track.name);
+        const text = generateTrackIntegrationSnippet(
+            this.state.selectedTrackKey,
+            this.track.name,
+            this.getSelectedBiome(),
+        );
         try {
             if (navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(text);
@@ -2604,6 +2762,7 @@ class MapmakerApp {
         const trackKey = this.state.selectedTrackKey;
         const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey) ?? null;
         const destination = this.getSelectedDestination();
+        const biome = this.getSelectedBiome(trackKey);
         const currentlyScheduled = Boolean(
             (originalTrackKey && SCHEDULED_TRACK_KEYS.has(originalTrackKey))
             || SCHEDULED_TRACK_KEYS.has(trackKey),
@@ -2612,7 +2771,7 @@ class MapmakerApp {
             originalTrackKey
             && originalTrackKey !== trackKey
             && !window.confirm(
-                `Rename ${originalTrackKey} to ${trackKey}? This will delete the old definition file and replace its catalog, schedule, import, and registry entries.`,
+                `Rename ${originalTrackKey} to ${trackKey}? This will delete the old definition file and replace its catalog, schedule, import, and registry entries. The track's ground is laid out from its key, so it will look different.`,
             )
         ) {
             return;
@@ -2638,6 +2797,7 @@ class MapmakerApp {
                     originalTrackKey,
                     trackName: this.track.name,
                     destination,
+                    biome,
                     track: this.track,
                 }),
             });
@@ -2647,6 +2807,14 @@ class MapmakerApp {
             }
 
             this.state.originalTrackKeyByKey.set(trackKey, trackKey);
+            const savedBiome = isBiomeName(result.biome) ? result.biome : biome;
+            this.state.biomeByKey.set(trackKey, savedBiome);
+            this.state.rolledBiomeByKey.delete(trackKey);
+            if (originalTrackKey && originalTrackKey !== trackKey) {
+                this.state.biomeByKey.delete(originalTrackKey);
+                this.state.rolledBiomeByKey.delete(originalTrackKey);
+            }
+            this.syncBiomeControl(trackKey);
             if (destination === 'daily') {
                 SCHEDULED_TRACK_KEYS.add(trackKey);
                 if (originalTrackKey && originalTrackKey !== trackKey) {
@@ -2669,7 +2837,7 @@ class MapmakerApp {
                 ? ` Removed ${result.removedFilename}.`
                 : '';
             this.markSaved(
-                `Saved and integrated ${result.filename}.${scheduleText}${renameText}`,
+                `Saved and integrated ${result.filename} in ${getBiomeLabel(savedBiome)}.${scheduleText}${renameText}`,
             );
         } catch (error) {
             console.error(error);
