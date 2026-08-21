@@ -33,6 +33,8 @@ export class TrackLayerRenderer {
     trackCanvas,
     trackCanvasOrigin,
     presentation,
+    backdrop = null,
+    detailTier = 2,
     container,
     fallbackWidth = 0,
     fallbackHeight = 0,
@@ -79,6 +81,8 @@ export class TrackLayerRenderer {
       { x: worldLeft, y: worldTop },
       zoom,
       presentation || {},
+      backdrop,
+      detailTier,
     );
     if (sourceWidth <= 0 || sourceHeight <= 0) return;
 

@@ -1,3 +1,4 @@
+import { resolveBackdropDetailTier } from "./backdrop.js";
 import {
   getTrackCanvasAsset,
   getTrackRuntimeAsset,
@@ -49,6 +50,7 @@ export const trackEngineMethods = {
     );
     this.trackCanvas = trackCanvasRuntime.canvas;
     this.trackCanvasOrigin = trackCanvasRuntime.origin;
+    this.trackBackdrop = trackCanvasRuntime.backdrop;
     this.requestRender();
   },
 
@@ -205,6 +207,8 @@ export const trackEngineMethods = {
       trackCanvas: this.trackCanvas,
       trackCanvasOrigin: this.trackCanvasOrigin,
       presentation: this.currentTrackPresentation,
+      backdrop: this.trackBackdrop,
+      detailTier: resolveBackdropDetailTier(this.qualityLevel, this.frameSkip),
       container: this.container,
       fallbackWidth: this.canvas.width,
       fallbackHeight: this.canvas.height,

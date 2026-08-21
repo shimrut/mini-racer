@@ -155,6 +155,7 @@ export class RealTimeRacer {
     this.collisionSegments = [];
     this.collisionHash = null;
     this.trackCanvasOrigin = { x: 0, y: 0 };
+    this.trackBackdrop = null;
 
     this.status = "ready";
     this.currentTime = 0;

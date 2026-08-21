@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
 import { createSeededRandom } from './seeded-random.js';
+import { drawBiomeBackdrop } from './backdrop.js';
 
 function drawDesertBackdrop(ctx, width, height, presentation = {}) {
     ctx.fillStyle = presentation.offTrackColor || '#8d6a3b';
@@ -92,6 +93,27 @@ function drawTireBarrier(ctx, x, y, angle, presentation) {
     ctx.restore();
 }
 
+/**
+ * Lifts the track off the ground it sits on.
+ *
+ * The caster is filled in the track colour rather than black, so the antialiased
+ * seam left where the surface is painted over it reads as asphalt, not as a dark
+ * fringe. The even-odd rule leaves the infield a hole, so the shadow also falls
+ * inward from the inner wall onto the same ground that runs outside the track.
+ */
+export function drawTrackSurfaceShadow(ctx, surfacePath, presentation = {}) {
+    if (!presentation.trackShadowColor) return;
+
+    ctx.save();
+    ctx.shadowColor = presentation.trackShadowColor;
+    ctx.shadowBlur = presentation.trackShadowBlur ?? 0;
+    ctx.shadowOffsetX = presentation.trackShadowOffsetX ?? 0;
+    ctx.shadowOffsetY = presentation.trackShadowOffsetY ?? 0;
+    ctx.fillStyle = presentation.trackColor || CONFIG.trackColor;
+    ctx.fill(surfacePath, 'evenodd');
+    ctx.restore();
+}
+
 function buildClosedPath(points, mapPoint) {
     const path = new Path2D();
     let mappedPoint = mapPoint(points[0]);
@@ -114,7 +136,28 @@ export function drawPresentationBackground(ctx, width, height, presentation = {}
     ctx.fillRect(0, 0, width, height);
 }
 
-export function drawViewportPresentationBackground(ctx, width, height, camera = { x: 0, y: 0 }, zoom = 1, presentation = {}) {
+export function drawViewportPresentationBackground(
+    ctx,
+    width,
+    height,
+    camera = { x: 0, y: 0 },
+    zoom = 1,
+    presentation = {},
+    backdrop = null,
+    detailTier = 2
+) {
+    if (presentation.backgroundStyle === 'biome') {
+        drawBiomeBackdrop(ctx, width, height, {
+            offsetX: -camera.x * zoom,
+            offsetY: -camera.y * zoom,
+            scale: zoom,
+            presentation,
+            backdrop,
+            detailTier
+        });
+        return;
+    }
+
     if (presentation.backgroundStyle === 'desert') {
         drawDesertBackdrop(ctx, width, height, presentation, { camera, zoom });
         return;
@@ -379,6 +422,11 @@ function getDebrisOutwardExtent(presentation) {
         + strokeWidth / 2;
 }
 
+function getTrackShadowOutwardExtent(presentation) {
+    return (presentation.trackShadowBlur ?? 0)
+        + Math.hypot(presentation.trackShadowOffsetX ?? 0, presentation.trackShadowOffsetY ?? 0);
+}
+
 export function getTrackCanvasPadding(presentation = {}) {
     let extent = 0;
 
@@ -398,6 +446,9 @@ export function getTrackCanvasPadding(presentation = {}) {
     }
     if (presentation.debrisStyle === 'outer-drift') {
         extent = Math.max(extent, getDebrisOutwardExtent(presentation));
+    }
+    if (presentation.trackShadowColor) {
+        extent = Math.max(extent, getTrackShadowOutwardExtent(presentation));
     }
 
     return Math.ceil(extent + TRACK_CANVAS_PADDING_SAFETY);
@@ -467,6 +518,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     const outerPath = buildClosedPath(outer, mapTrackPoint);
     const innerPath = buildClosedPath(inner, mapTrackPoint);
 
+    drawTrackSurfaceShadow(ctx, surfacePath, presentation);
     fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, canvas.width, canvas.height, presentation);
 
     const startLine = track.startLine;
@@ -518,5 +570,5 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     drawOuterDebris(ctx, outer, mapTrackPoint, presentation);
     drawInnerDebris(ctx, inner, mapTrackPoint, presentation);
 
-    return { canvas, origin };
+    return { canvas, origin, bounds: { minX, minY, maxX, maxY } };
 }

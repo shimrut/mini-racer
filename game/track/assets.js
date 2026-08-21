@@ -1,4 +1,5 @@
 import { buildTrackCanvas } from './canvas.js';
+import { buildBiomeBackdrop } from './backdrop.js';
 import { buildCollisionRuntime, buildTrackGeometry } from './runtime.js';
 
 const geometryCache = new Map();
@@ -73,7 +74,17 @@ export function getTrackCanvasAsset(trackKey, track, options = {}) {
     let canvasAsset = getCachedValue(canvasCache, key);
     if (!canvasAsset) {
         const geometry = getTrackPreviewGeometry(trackKey, track, options);
-        canvasAsset = buildTrackCanvas(track, geometry, options.presentation || null);
+        const built = buildTrackCanvas(track, geometry, options.presentation || null);
+        // The ground rides in the same cache entry as the bitmap, so the LRU bounds
+        // its memory too. The presentation key names both the track and its biome.
+        canvasAsset = {
+            ...built,
+            backdrop: buildBiomeBackdrop(
+                options.presentation || null,
+                built.bounds,
+                options.presentation?.key || trackKey,
+            ),
+        };
         // Evict the entry, but do not touch the canvas it holds. The engine keeps the
         // canvas object itself for the whole race and never reads the cache again, so
         // its entry ages to the oldest slot while the race runs. Resizing the canvas to
