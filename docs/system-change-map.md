@@ -67,14 +67,22 @@ flowchart LR
 - `game/track/runtime.js` turns track shapes into smoothed geometry and collision segments.
 - `game/track/assets.js` caches geometry, runtime collision data, rendered track
   canvases, and each track's deterministic environment. The environment uses
-  the already-smoothed walls but remains separate from collision data.
+  the already-smoothed walls only for local clearance and remains separate from
+  collision data.
 - `game/track/environment-field.js` builds a spatial distance index over both
   walls, low-frequency seeded noise, and Poisson-style prop distributions.
-  `game/track/backdrop.js` turns those samples into Path2D contour, transition,
-  runoff, feature, and prop layers. `game/track/layer.js` renders base terrain
+  `game/track/backdrop.js` first turns world-coordinate noise into Path2D terrain
+  and uses seeded stratified world cells for biome-scale semantic regions, then
+  clusters prop candidates inside those regions. Compound grove silhouettes,
+  angular ridge/rock layers, snowdrift lines, and dune crests keep each geography
+  readable at race zoom even on reduced-detail frames. Circuit geometry changes
+  only the compact 60–100px shoulder/transition
+  masks and rejects nearby props; it never reshapes terrain, feature regions, or
+  the underlying prop candidate layout. `game/track/layer.js` renders base terrain
   before the cached track slice and excluded props afterward; cars and HUD keep
   their existing later phases. The cached track bitmap itself adds only one
-  subtle large-scale asphalt gradient and a clipped dark edge inside the kerbs.
+  subtle large-scale asphalt gradient and a clipped dark edge inside the kerbs;
+  the biome track shadow is deliberately faint so it cannot read as another halo.
 - `game/track/engine-methods.js` owns track loading, resize behavior, and track presentation refresh.
 - Track creation and integration steps are documented in `docs/track-authoring.md`.
 - Developer tooling is removed at build time, not gated at runtime. `tools/debug-module-stubs.js` lists each developer-only module, and `vite.config.js` resolves every one of them to a no-op `.stub.js` for the client build, so none of that code reaches `dist/client`. A runtime check could not do this: the client is in the player's hands, so a hostname or storage gate can be spoofed by serving or patching the bundle, and a minifier will not drop an unreferenced class method. This is why the hooks live in their own modules rather than on the engine class. `tests/debug-module-stubs.test.js` fails if a stub stops covering its module's exports or if engine/launcher code assigns a debug global directly.

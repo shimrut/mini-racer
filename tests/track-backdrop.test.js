@@ -61,10 +61,18 @@ function boxSignature(items) {
 }
 
 function propSignature(items) {
-    return items.map((item) => `${item.type}:${item.x.toFixed(3)}:${item.y.toFixed(3)}`).join('|');
+    return items.map((item) => `${item.type || item.regionType || ''}:${item.x.toFixed(3)}:${item.y.toFixed(3)}`).join('|');
 }
 
-describe('track-derived biome environment', () => {
+function featureSignature(items) {
+    return items.map((item) => [
+        item.semanticType || item.type,
+        item.minX.toFixed(3), item.minY.toFixed(3),
+        item.maxX.toFixed(3), item.maxY.toFixed(3),
+    ].join(':')).join('|');
+}
+
+describe('world-first biome environment', () => {
     beforeAll(() => {
         vi.stubGlobal('Path2D', class {
             moveTo() {}
@@ -102,17 +110,31 @@ describe('track-derived biome environment', () => {
         expect(propSignature(second.props)).not.toBe(propSignature(first.props));
     });
 
-    it('reacts to changed track geometry with a stable seed', () => {
-        const shiftedInner = {
-            ...GEOMETRY,
-            inner: GEOMETRY.inner.map((point) => ({ x: point.x + 150, y: point.y + 80 })),
-        };
+    it('keeps world terrain, regions, features, and prop candidates independent of geometry', () => {
         const first = build('track:forest:geometry', GEOMETRY);
-        const second = build('track:forest:geometry', shiftedInner);
+        const acceptedCandidate = first.propCandidates.find((candidate) => first.props.some(
+            (prop) => prop.x === candidate.x && prop.y === candidate.y,
+        ));
+        const { x, y } = acceptedCandidate;
+        const exclusionGeometry = {
+            outer: [
+                { x: x - 120, y: y - 120 }, { x: x + 120, y: y - 120 },
+                { x: x + 120, y: y + 120 }, { x: x - 120, y: y + 120 },
+            ],
+            inner: [
+                { x: x + 70, y: y + 70 }, { x: x + 100, y: y + 70 },
+                { x: x + 100, y: y + 100 }, { x: x + 70, y: y + 100 },
+            ],
+        };
+        const second = build('track:forest:geometry', exclusionGeometry);
 
-        expect(second.distanceIndex.query(500, 300, 4000).distance)
-            .not.toBe(first.distanceIndex.query(500, 300, 4000).distance);
-        expect(second.distanceIndex).not.toBeNull();
+        expect(boxSignature(second.terrain)).toBe(boxSignature(first.terrain));
+        expect(featureSignature(second.regions)).toBe(featureSignature(first.regions));
+        expect(featureSignature(second.features)).toBe(featureSignature(first.features));
+        expect(propSignature(second.propCandidates)).toBe(propSignature(first.propCandidates));
+        expect(boxSignature(second.transition)).not.toBe(boxSignature(first.transition));
+        expect(boxSignature(second.runoff)).not.toBe(boxSignature(first.runoff));
+        expect(propSignature(second.props)).not.toBe(propSignature(first.props));
     });
 
     it('uses three to five configured contour shades plus the biome base', () => {
@@ -134,6 +156,38 @@ describe('track-derived biome environment', () => {
         const widths = [0.08, 0.31, 0.57, 0.83]
             .map((along) => backdrop.resolveRunoffWidth({ along }));
         expect(new Set(widths.map((width) => width.toFixed(4))).size).toBeGreaterThan(1);
+        expect(backdrop.trackLocalExtent.min).toBeGreaterThanOrEqual(60);
+        expect(backdrop.trackLocalExtent.max).toBeLessThanOrEqual(100);
+    });
+
+    it('creates biome-scale semantic regions before clustered props', () => {
+        const expectedRegions = {
+            forest: ['forest-grove', 'forest-clearing', 'forest-rock-group'],
+            mountains: ['mountain-ridge', 'boulder-field', 'mountain-tree-line'],
+            arctic: ['snowdrift', 'frozen-lake', 'arctic-rock-cluster'],
+            beach: ['water-body', 'dune-field', 'beach-rock-cluster'],
+        };
+        const expectedFeatures = {
+            forest: ['forest-canopy', 'forest-canopy-highlight'],
+            mountains: ['mountain-ridge-lines', 'mountain-rock-field'],
+            arctic: ['snowdrift-lines', 'ice-cracks'],
+            beach: ['wet-sand', 'dune-crests'],
+        };
+
+        Object.entries(expectedRegions).forEach(([biome, expected]) => {
+            const backdrop = buildBiomeBackdrop(
+                getBiomePresentation(biome),
+                BOUNDS,
+                `world:${biome}`,
+                { geometry: GEOMETRY, worldScale: 1 },
+            );
+            const types = new Set(backdrop.regions.map((region) => region.type));
+            expected.forEach((type) => expect(types.has(type)).toBe(true));
+            const featureTypes = new Set(backdrop.features.map((feature) => feature.semanticType));
+            expectedFeatures[biome].forEach((type) => expect(featureTypes.has(type)).toBe(true));
+            const clustered = backdrop.propCandidates.filter((point) => point.regionType);
+            expect(clustered.length).toBeGreaterThan(backdrop.propCandidates.length * 0.7);
+        });
     });
 
     it('keeps props Poisson-spaced and outside track, runoff, and transition clearance', () => {

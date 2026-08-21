@@ -9,6 +9,7 @@ import {
     BIOME_CONFIGS,
     BIOME_NAMES,
     getBiomeConfig,
+    getBiomePresentation,
     isBiomePainted
 } from '../game/track/biomes.js';
 
@@ -254,6 +255,13 @@ describe('track presentation biomes', () => {
             expect(config.terrainStyle).toBeTruthy();
             expect(config.features.length).toBeGreaterThan(0);
             expect(config.props.length).toBeGreaterThan(0);
+            expect(config.runoffWidth - config.runoffVariation + config.transitionWidth)
+                .toBeGreaterThanOrEqual(60);
+            expect(config.runoffWidth + config.runoffVariation + config.transitionWidth)
+                .toBeLessThanOrEqual(100);
+            const presentation = getBiomePresentation(config.id);
+            expect(presentation.trackShadowBlur).toBeLessThanOrEqual(8);
+            expect(presentation.trackShadowOffsetY).toBeLessThanOrEqual(2);
         });
     });
 

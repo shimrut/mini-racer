@@ -1,15 +1,17 @@
 # Changelog
 
-- Tracks now generate a complete environment from their smoothed circuit
-  geometry and track key. Forest, Mountains, Arctic, and Beach each configure
-  their own 3–5-shade terrain, variable shoulder/runoff, sparse clustered
-  vector props, and biome features such as rock formations, frozen ponds, or
-  shoreline where space allows. Contours react to distance and direction from
-  the circuit instead of acting as background wallpaper; props are kept off the
-  track, kerbs, and immediate runoff. Asphalt keeps its existing shape and adds
-  only a broad tonal shift and thin dark kerb-side edge. Everything is cached,
-  culled, deterministic, and asset-free; track geometry, kerbs, cars, controls,
-  HUD, physics, and gameplay are unchanged.
+- Tracks now sit inside a deterministic world-space environment instead of
+  generating enlarged copies of the circuit. Forest groves and clearings,
+  mountain ridges, Arctic snowdrifts and lakes, and Beach water, wet sand, and
+  dunes are laid out before the track is considered. Seeded regional coverage and
+  compound grove, ridge, drift, and dune details keep each biome readable at race
+  zoom. Props cluster inside those regions and are only removed where the circuit
+  needs clearance. Track distance
+  affects a compact 60–100px shoulder and transition, while the terrain and large
+  features continue unchanged beneath it. Asphalt keeps its existing shape and
+  adds only a broad tonal shift and thin dark kerb-side edge. Everything remains
+  cached, culled, deterministic, and asset-free; track geometry, kerbs, cars,
+  controls, HUD, physics, and gameplay are unchanged.
 
 - Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
   Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested

@@ -9,7 +9,6 @@ const FIELD_SNAP = 200;
 const FIELD_MARGIN = 2000;
 const SAMPLE_STEP = 72;
 const TILE_SAMPLES = 12;
-const TRACK_INFLUENCE_DISTANCE = 760;
 
 const TIER_ESSENTIAL_PROPS = 0;
 const TIER_MAJOR_PROPS = 1;
@@ -21,15 +20,6 @@ function snapDown(value) {
 
 function snapUp(value) {
     return Math.ceil(value / FIELD_SNAP) * FIELD_SNAP;
-}
-
-function clamp01(value) {
-    return Math.max(0, Math.min(1, value));
-}
-
-function smoothstep(value) {
-    const clamped = clamp01(value);
-    return clamped * clamped * (3 - 2 * clamped);
 }
 
 function range(random, low, high) {
@@ -184,24 +174,22 @@ function sampleEnvironment(config, area, seedKey, distanceIndex) {
     const noise = createEnvironmentNoise(`${seedKey}:terrain`);
     const contourScale = 820 * (config.contourScale || 1);
     const resolveRunoffWidth = createRunoffWidthResolver(config, seedKey);
-    const transitionWidth = config.transitionWidth ?? 150;
+    const transitionWidth = config.transitionWidth ?? 46;
 
     for (let row = 0; row < rows; row += 1) {
         const y = area.minY + row * SAMPLE_STEP;
         for (let column = 0; column < columns; column += 1) {
             const x = area.minX + column * SAMPLE_STEP;
             const index = row * columns + column;
-            const nearest = distanceIndex?.query(x, y, TRACK_INFLUENCE_DISTANCE) || null;
-            const distance = nearest?.distance ?? TRACK_INFLUENCE_DISTANCE * 2;
+            const localDistance = (config.runoffWidth ?? 32)
+                + (config.runoffVariation ?? 8)
+                + transitionWidth;
+            const nearest = distanceIndex?.query(x, y, localDistance) || null;
+            const distance = nearest?.distance ?? localDistance * 2;
             const runoffWidth = resolveRunoffWidth(nearest);
             const organic = noise(x, y, contourScale);
-            const trackParallel = nearest
-                ? noise(nearest.along * contourScale * 5.4, distance * 1.35, contourScale * 0.72)
-                : organic;
-            const influence = smoothstep(1 - distance / TRACK_INFLUENCE_DISTANCE);
-            const blended = organic * (1 - influence * 0.58) + trackParallel * influence * 0.58;
             terrain[index] = shapeTerrainValue(
-                blended,
+                organic,
                 config.terrainStyle,
                 x,
                 y,
@@ -355,12 +343,21 @@ function buildProp(point, config) {
             definition.type === 'rock-formation' ? 3 : 1,
         );
     }
+    const isBiomeDefiningProp = (
+        (point.regionType === 'forest-grove' && definition.type === 'pine')
+        || (point.regionType === 'mountain-ridge' && definition.type === 'rock-formation')
+        || (point.regionType === 'arctic-rock-cluster' && definition.type === 'snowy-rock')
+        || (point.regionType === 'beach-rock-cluster' && definition.type === 'rock')
+    );
     return {
         ...built,
         x: point.x,
         y: point.y,
         type: definition.type,
-        priority: random(),
+        // Keep each biome's defining silhouette in the lowest detail tier. The
+        // candidates stay bounded and viewport-culled, so this preserves the
+        // geography read without bringing every small prop back on slow frames.
+        priority: isBiomeDefiningProp ? 1 : random(),
         minX: point.x - built.radius,
         minY: point.y - built.radius,
         maxX: point.x + built.radius,
@@ -384,147 +381,375 @@ function buildBlob(random, x, y, radiusX, radiusY, sides = 14) {
     return path;
 }
 
-function buildSecondaryFeatures(config, area, seedKey, distanceIndex, resolveRunoffWidth) {
+function buildWorldFeatures(config, area, seedKey) {
     const features = [];
-    const transitionWidth = config.transitionWidth ?? 150;
-    const acceptsFeature = (x, y, clearance) => {
-        if (distanceIndex?.containsTrack(x, y)) return false;
-        const nearest = distanceIndex?.query(x, y, 1600) || null;
-        if (distanceIndex && !nearest) return false;
-        return !nearest || nearest.distance > resolveRunoffWidth(nearest) + transitionWidth + clearance;
+    const regions = [];
+    const areaSize = (area.maxX - area.minX) * (area.maxY - area.minY);
+    const regionCount = (squarePixelsPerRegion, minimum, maximum) => Math.max(
+        minimum,
+        Math.min(maximum, Math.round(areaSize / squarePixelsPerRegion)),
+    );
+    const addRegions = (suffix, targetCount, spacing, create) => {
+        // Stratified world cells give large geography even coverage without
+        // consulting the circuit. Uniform rejection left screen-sized holes,
+        // making a Forest or Mountain race sometimes show no defining region.
+        const cellSize = Math.max(spacing, Math.sqrt(areaSize / targetCount));
+        const firstCellX = Math.floor(area.minX / cellSize);
+        const lastCellX = Math.floor(area.maxX / cellSize);
+        const firstCellY = Math.floor(area.minY / cellSize);
+        const lastCellY = Math.floor(area.maxY / cellSize);
+        for (let cellY = firstCellY; cellY <= lastCellY; cellY += 1) {
+            for (let cellX = firstCellX; cellX <= lastCellX; cellX += 1) {
+                const cellSeed = `${seedKey}:region:${suffix}:${cellX}:${cellY}`;
+                const random = createSeededRandom(cellSeed);
+                const point = {
+                    x: (cellX + range(random, 0.2, 0.8)) * cellSize,
+                    y: (cellY + range(random, 0.2, 0.8)) * cellSize,
+                    seed: cellSeed,
+                };
+                if (point.x < area.minX || point.x > area.maxX
+                    || point.y < area.minY || point.y > area.maxY) continue;
+                create(point, random);
+            }
+        }
     };
-    const addFeaturePoints = (suffix, targetCount, spacing, clearance, build) => {
-        const points = sampleEnvironmentProps({
-            seedKey: `${seedKey}:feature:${suffix}`,
-            area,
-            minDistance: spacing,
-            targetCount,
-            clustering: 0.18,
-            clusterRadius: spacing * 0.8,
-            accept: (x, y) => acceptsFeature(x, y, clearance),
-            createCandidate: distanceIndex
-                ? (random) => distanceIndex.sampleNearBoundary(
-                    random,
-                    transitionWidth + clearance + 120,
-                    Math.min(1450, transitionWidth + clearance + 760),
-                )
-                : null,
+    const addRegion = (point, type, radiusX, radiusY, propTypes = []) => {
+        const region = {
+            x: point.x,
+            y: point.y,
+            type,
+            radiusX,
+            radiusY,
+            propTypes,
+            seed: point.seed,
+            minX: point.x - radiusX * 1.2,
+            minY: point.y - radiusY * 1.2,
+            maxX: point.x + radiusX * 1.2,
+            maxY: point.y + radiusY * 1.2,
+        };
+        regions.push(region);
+        return region;
+    };
+    const addFill = (region, random, fillStyle, sides = 16, scale = 1) => {
+        features.push({
+            path: buildBlob(
+                random,
+                region.x,
+                region.y,
+                region.radiusX * scale,
+                region.radiusY * scale,
+                sides,
+            ),
+            fillStyle,
+            semanticType: region.type,
+            minX: region.x - region.radiusX * scale * 1.2,
+            minY: region.y - region.radiusY * scale * 1.2,
+            maxX: region.x + region.radiusX * scale * 1.2,
+            maxY: region.y + region.radiusY * scale * 1.2,
         });
-        for (const point of points) build(point);
+    };
+    const addForestCanopy = (region, random) => {
+        const body = new Path2D();
+        const accent = new Path2D();
+        const treeCount = Math.round(range(random, 11, 18));
+        for (let tree = 0; tree < treeCount; tree += 1) {
+            const angle = random() * Math.PI * 2;
+            const radius = Math.sqrt(random());
+            const x = region.x + Math.cos(angle) * region.radiusX * radius * 0.72;
+            const y = region.y + Math.sin(angle) * region.radiusY * radius * 0.68;
+            const scale = range(random, 0.78, 1.16);
+            const tiers = [
+                { top: -31, half: 17, bottom: 3 },
+                { top: -18, half: 22, bottom: 17 },
+                { top: -4, half: 27, bottom: 31 },
+            ];
+            tiers.forEach((tier, index) => addPolygon(index === 0 ? accent : body, [
+                { x, y: y + tier.top * scale },
+                { x: x + tier.half * scale, y: y + tier.bottom * scale },
+                { x: x - tier.half * scale, y: y + tier.bottom * scale },
+            ]));
+        }
+        const bounds = {
+            minX: region.x - region.radiusX,
+            minY: region.y - region.radiusY,
+            maxX: region.x + region.radiusX,
+            maxY: region.y + region.radiusY,
+        };
+        features.push({
+            path: body,
+            fillStyle: '#071412',
+            semanticType: 'forest-canopy',
+            ...bounds,
+        });
+        features.push({
+            path: accent,
+            fillStyle: '#255245',
+            semanticType: 'forest-canopy-highlight',
+            ...bounds,
+        });
+    };
+    const addRegionRidges = (
+        region,
+        random,
+        strokeStyle,
+        semanticType,
+        { count = 3, lineWidth = 3, amplitude = 0.14 } = {},
+    ) => {
+        const path = new Path2D();
+        const rotation = random() * Math.PI * 2;
+        for (let ridge = 0; ridge < count; ridge += 1) {
+            const offset = (ridge - (count - 1) / 2) * region.radiusY * 0.28;
+            for (let step = 0; step <= 8; step += 1) {
+                const amount = step / 8;
+                const localX = (amount * 2 - 1) * region.radiusX * 0.76;
+                const localY = offset
+                    + Math.sin(amount * Math.PI * 2 + ridge * 0.8) * region.radiusY * amplitude;
+                const point = transformPoint(region.x, region.y, rotation, 1, localX, localY);
+                if (step === 0) path.moveTo(point.x, point.y);
+                else path.lineTo(point.x, point.y);
+            }
+        }
+        features.push({
+            path,
+            strokeStyle,
+            lineWidth,
+            semanticType,
+            minX: region.minX,
+            minY: region.minY,
+            maxX: region.maxX,
+            maxY: region.maxY,
+        });
+    };
+    const addMountainRocks = (region, random) => {
+        const body = new Path2D();
+        const accent = new Path2D();
+        const count = Math.round(range(random, 6, 11));
+        for (let rock = 0; rock < count; rock += 1) {
+            const angle = random() * Math.PI * 2;
+            const radius = Math.sqrt(random());
+            const x = region.x + Math.cos(angle) * region.radiusX * radius * 0.68;
+            const y = region.y + Math.sin(angle) * region.radiusY * radius * 0.62;
+            const size = range(random, 18, 34);
+            const sides = Math.round(range(random, 5, 8));
+            const points = [];
+            for (let side = 0; side < sides; side += 1) {
+                const sideAngle = side / sides * Math.PI * 2;
+                points.push({
+                    x: x + Math.cos(sideAngle) * size * range(random, 0.8, 1.15),
+                    y: y + Math.sin(sideAngle) * size * range(random, 0.55, 0.82),
+                });
+            }
+            addPolygon(body, points);
+            addPolygon(accent, [points[0], points[1], { x, y }]);
+        }
+        features.push({
+            path: body,
+            fillStyle: '#0c1424',
+            semanticType: 'mountain-rock-field',
+            minX: region.minX,
+            minY: region.minY,
+            maxX: region.maxX,
+            maxY: region.maxY,
+        });
+        features.push({
+            path: accent,
+            fillStyle: '#40506a',
+            semanticType: 'mountain-rock-highlight',
+            minX: region.minX,
+            minY: region.minY,
+            maxX: region.maxX,
+            maxY: region.maxY,
+        });
     };
 
-    if (config.id === 'arctic') {
-        addFeaturePoints('pond', 7, 760, 330, (point) => {
-            const random = createSeededRandom(point.seed);
-            const radiusX = range(random, 130, 260);
-            const radiusY = range(random, 70, 150);
-            features.push({
-                path: buildBlob(random, point.x, point.y, radiusX, radiusY, 16),
-                fillStyle: '#a9cfdb',
-                minX: point.x - radiusX * 1.2,
-                minY: point.y - radiusY * 1.2,
-                maxX: point.x + radiusX * 1.2,
-                maxY: point.y + radiusY * 1.2,
+    if (config.id === 'forest') {
+        addRegions('grove', regionCount(1_250_000, 12, 36), 620, (point, random) => {
+            const region = addRegion(
+                point,
+                'forest-grove',
+                range(random, 380, 650),
+                range(random, 300, 520),
+                ['pine', 'shrub'],
+            );
+            addFill(region, random, config.groundColors[1], 18);
+            addForestCanopy(region, random);
+        });
+        addRegions('clearing', regionCount(5_000_000, 4, 10), 920, (point, random) => {
+            const region = addRegion(
+                point,
+                'forest-clearing',
+                range(random, 180, 340),
+                range(random, 140, 280),
+            );
+            addFill(region, random, config.groundColors[3], 17);
+        });
+        addRegions('rock-group', regionCount(3_000_000, 4, 14), 720, (point, random) => {
+            addRegion(point, 'forest-rock-group', range(random, 150, 260), range(random, 120, 210), ['rock']);
+        });
+    } else if (config.id === 'mountains') {
+        addRegions('ridge', regionCount(1_500_000, 12, 32), 720, (point, random) => {
+            const region = addRegion(
+                point,
+                'mountain-ridge',
+                range(random, 620, 1100),
+                range(random, 220, 420),
+                ['rock-formation', 'boulder'],
+            );
+            addFill(region, random, config.groundColors[1], 8);
+            addFill(region, random, config.groundColors[3], 7, 0.63);
+            addRegionRidges(region, random, '#40506a', 'mountain-ridge-lines', {
+                count: 2,
+                lineWidth: 4,
+                amplitude: 0.18,
             });
+            addMountainRocks(region, random);
+        });
+        addRegions('boulder-field', regionCount(2_800_000, 6, 18), 700, (point, random) => {
+            addRegion(point, 'boulder-field', range(random, 220, 380), range(random, 170, 300), ['boulder']);
+        });
+        addRegions('sparse-trees', regionCount(5_000_000, 3, 10), 980, (point, random) => {
+            addRegion(point, 'mountain-tree-line', range(random, 240, 390), range(random, 170, 290), ['pine']);
+        });
+    } else if (config.id === 'arctic') {
+        addRegions('snowdrift', regionCount(1_300_000, 12, 34), 620, (point, random) => {
+            const region = addRegion(
+                point,
+                'snowdrift',
+                range(random, 480, 800),
+                range(random, 180, 340),
+                ['snowy-rock', 'ice-chip'],
+            );
+            addFill(region, random, config.groundColors[1], 18);
+            addRegionRidges(region, random, 'rgba(247, 252, 253, 0.62)', 'snowdrift-lines', {
+                count: 3,
+                lineWidth: 3,
+                amplitude: 0.12,
+            });
+        });
+        addRegions('lake', regionCount(6_000_000, 3, 8), 960, (point, random) => {
+            const region = addRegion(
+                point,
+                'frozen-lake',
+                range(random, 220, 430),
+                range(random, 120, 250),
+            );
+            addFill(region, random, '#a9cfdb', 18);
             const cracks = new Path2D();
-            for (let crack = 0; crack < 3; crack += 1) {
-                const startX = point.x + range(random, -radiusX * 0.5, radiusX * 0.5);
-                const startY = point.y + range(random, -radiusY * 0.45, radiusY * 0.45);
+            for (let crack = 0; crack < 4; crack += 1) {
+                const startX = point.x + range(random, -region.radiusX * 0.45, region.radiusX * 0.45);
+                const startY = point.y + range(random, -region.radiusY * 0.4, region.radiusY * 0.4);
                 cracks.moveTo(startX, startY);
-                cracks.lineTo(startX + range(random, -55, 55), startY + range(random, -26, 26));
-                cracks.lineTo(startX + range(random, -92, 92), startY + range(random, -46, 46));
+                cracks.lineTo(startX + range(random, -60, 60), startY + range(random, -28, 28));
+                cracks.lineTo(startX + range(random, -105, 105), startY + range(random, -52, 52));
             }
             features.push({
                 path: cracks,
                 strokeStyle: '#87b4c3',
                 lineWidth: 2,
-                minX: point.x - radiusX,
-                minY: point.y - radiusY,
-                maxX: point.x + radiusX,
-                maxY: point.y + radiusY,
+                semanticType: 'ice-cracks',
+                minX: region.minX,
+                minY: region.minY,
+                maxX: region.maxX,
+                maxY: region.maxY,
             });
+        });
+        addRegions('rock-cluster', regionCount(3_000_000, 5, 14), 760, (point, random) => {
+            addRegion(point, 'arctic-rock-cluster', range(random, 170, 290), range(random, 130, 230), ['snowy-rock']);
         });
     } else if (config.id === 'beach') {
-        addFeaturePoints('shoreline', 4, 1200, 620, (point) => {
-            const random = createSeededRandom(point.seed);
-            const radiusX = range(random, 260, 520);
-            const radiusY = range(random, 150, 300);
-            features.push({
-                path: buildBlob(random, point.x, point.y, radiusX, radiusY, 18),
-                fillStyle: '#416f7b',
-                minX: point.x - radiusX * 1.2,
-                minY: point.y - radiusY * 1.2,
-                maxX: point.x + radiusX * 1.2,
-                maxY: point.y + radiusY * 1.2,
-            });
-            features.push({
-                path: buildBlob(random, point.x, point.y, radiusX * 0.8, radiusY * 0.78, 18),
-                fillStyle: '#5b8790',
-                minX: point.x - radiusX,
-                minY: point.y - radiusY,
-                maxX: point.x + radiusX,
-                maxY: point.y + radiusY,
+        addRegions('water', regionCount(8_000_000, 2, 7), 1250, (point, random) => {
+            const region = addRegion(
+                point,
+                'water-body',
+                range(random, 700, 1200),
+                range(random, 400, 650),
+            );
+            addFill(region, random, '#b4935d', 20, 1.14);
+            features[features.length - 1].semanticType = 'wet-sand';
+            addFill(region, random, '#416f7b', 20);
+            addFill(region, random, '#5b8790', 20, 0.76);
+        });
+        addRegions('dune', regionCount(1_500_000, 12, 32), 560, (point, random) => {
+            const region = addRegion(
+                point,
+                'dune-field',
+                range(random, 450, 750),
+                range(random, 170, 300),
+                ['rock', 'pebble'],
+            );
+            addFill(region, random, config.groundColors[2], 18);
+            addRegionRidges(region, random, 'rgba(247, 220, 166, 0.52)', 'dune-crests', {
+                count: 3,
+                lineWidth: 3,
+                amplitude: 0.16,
             });
         });
-    } else if (config.id === 'mountains') {
-        addFeaturePoints('elevation', 6, 900, 350, (point) => {
-            const random = createSeededRandom(point.seed);
-            const radiusX = range(random, 150, 280);
-            const radiusY = range(random, 90, 180);
-            features.push({
-                path: buildBlob(random, point.x, point.y, radiusX, radiusY, 8),
-                fillStyle: config.groundColors[1],
-                minX: point.x - radiusX * 1.2,
-                minY: point.y - radiusY * 1.2,
-                maxX: point.x + radiusX * 1.2,
-                maxY: point.y + radiusY * 1.2,
-            });
+        addRegions('pebble-cluster', regionCount(2_800_000, 6, 16), 650, (point, random) => {
+            addRegion(point, 'beach-rock-cluster', range(random, 150, 260), range(random, 110, 200), ['rock', 'pebble']);
         });
     }
-    return features;
+
+    return { features, regions };
 }
 
-function buildProps(config, area, seedKey, distanceIndex, resolveRunoffWidth) {
-    if (!config.props?.length) return [];
+function buildProps(config, area, seedKey, regions, distanceIndex, resolveRunoffWidth) {
+    if (!config.props?.length) return { candidates: [], accepted: [] };
     const width = area.maxX - area.minX;
     const height = area.maxY - area.minY;
     const targetCount = Math.min(
         config.maxProps ?? 320,
         Math.max(18, Math.round((width * height / 1000000) * config.propDensity * 10)),
     );
-    const transitionWidth = config.transitionWidth ?? 150;
+    const transitionWidth = config.transitionWidth ?? 46;
     const conservativeRadius = config.maxPropRadius ?? 64;
     const clearance = config.propClearance ?? 42;
+    const propRegions = regions.filter((region) => region.propTypes.length > 0);
     const points = sampleEnvironmentProps({
         seedKey: `${seedKey}:props`,
         area,
         minDistance: config.propSpacing ?? (config.id === 'forest' ? 155 : 205),
         targetCount,
-        clustering: config.clustering,
-        clusterRadius: config.clusterRadius ?? 420,
-        createCandidate: distanceIndex
-            ? (random) => distanceIndex.sampleNearBoundary(
-                random,
-                transitionWidth + conservativeRadius + clearance + 28,
-                920,
-            )
-            : null,
-        accept(x, y) {
-            if (distanceIndex?.containsTrack(x, y)) return false;
-            const nearest = distanceIndex?.query(x, y, 980) || null;
-            if (distanceIndex && !nearest) return false;
-            return !nearest || nearest.distance > (
-                resolveRunoffWidth(nearest)
-                + transitionWidth
-                + conservativeRadius
-                + clearance
-            );
+        clustering: 0,
+        createCandidate(random) {
+            if (propRegions.length === 0) return null;
+            const region = propRegions[Math.floor(random() * propRegions.length)];
+            const radius = Math.sqrt(random());
+            const angle = random() * Math.PI * 2;
+            return {
+                x: region.x + Math.cos(angle) * region.radiusX * radius,
+                y: region.y + Math.sin(angle) * region.radiusY * radius,
+                regionType: region.type,
+                propTypes: region.propTypes,
+            };
         },
     });
-    return points.map((point) => buildProp(point, config));
+    const maxExclusionDistance = (config.runoffWidth ?? 32)
+        + (config.runoffVariation ?? 8)
+        + transitionWidth
+        + conservativeRadius
+        + clearance;
+    const accepted = points.filter((point) => {
+        if (distanceIndex?.containsTrack(point.x, point.y)) return false;
+        const nearest = distanceIndex?.query(point.x, point.y, maxExclusionDistance) || null;
+        return !nearest || nearest.distance > (
+            resolveRunoffWidth(nearest)
+            + transitionWidth
+            + conservativeRadius
+            + clearance
+        );
+    });
+    return {
+        candidates: points,
+        accepted: accepted.map((point) => buildProp(point, {
+            ...config,
+            props: point.propTypes?.length
+                ? config.props.filter((definition) => point.propTypes.includes(definition.type))
+                : config.props,
+        })),
+    };
 }
 
-/** Builds one deterministic environment around the smoothed circuit geometry. */
+/** Builds one deterministic world, then applies only track-local masks and prop exclusion. */
 export function buildBiomeBackdrop(presentation, bounds, seedKey, {
     geometry = null,
     worldScale = 1,
@@ -551,17 +776,12 @@ export function buildBiomeBackdrop(presentation, bounds, seedKey, {
     });
     const transition = buildScalarLayer(samples.transition, dimensions, area, 0, config.transitionColor);
     const runoff = buildScalarLayer(samples.runoff, dimensions, area, 0, config.runoffColor);
-    const features = buildSecondaryFeatures(
+    const worldFeatures = buildWorldFeatures(config, area, seedKey);
+    const propLayout = buildProps(
         config,
         area,
         seedKey,
-        distanceIndex,
-        samples.resolveRunoffWidth,
-    );
-    const props = buildProps(
-        config,
-        area,
-        seedKey,
+        worldFeatures.regions,
         distanceIndex,
         samples.resolveRunoffWidth,
     );
@@ -571,12 +791,22 @@ export function buildBiomeBackdrop(presentation, bounds, seedKey, {
         terrain,
         transition,
         runoff,
-        features,
-        props,
+        features: worldFeatures.features,
+        regions: worldFeatures.regions,
+        propCandidates: propLayout.candidates,
+        props: propLayout.accepted,
         groundColor: config.groundColors[0],
         configId: config.id,
         distanceIndex,
         resolveRunoffWidth: samples.resolveRunoffWidth,
+        trackLocalExtent: {
+            min: (config.runoffWidth ?? 32)
+                - (config.runoffVariation ?? 8)
+                + (config.transitionWidth ?? 46),
+            max: (config.runoffWidth ?? 32)
+                + (config.runoffVariation ?? 8)
+                + (config.transitionWidth ?? 46),
+        },
     };
 }
 

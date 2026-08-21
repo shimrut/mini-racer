@@ -100,8 +100,8 @@ function cellKey(x, y) {
 
 /**
  * Spatial index over the smoothed inner and outer circuit walls. The environment
- * uses it for runoff widths, track-reactive contours, and prop exclusion without
- * changing collision or gameplay geometry.
+ * uses it only for local runoff widths and prop exclusion without changing
+ * collision, gameplay geometry, or the world terrain field.
  */
 export function buildTrackDistanceIndex(geometry, scale = 1, cellSize = 280) {
     if (!geometry?.outer?.length || !geometry?.inner?.length) return null;
@@ -179,18 +179,6 @@ export function buildTrackDistanceIndex(geometry, scale = 1, cellSize = 280) {
         outer,
         inner,
         query,
-        sampleNearBoundary(random, minDistance, maxDistance) {
-            const segment = segments[Math.floor(random() * segments.length)];
-            const amount = random();
-            const centerX = segment.start.x + segment.dx * amount;
-            const centerY = segment.start.y + segment.dy * amount;
-            const offset = minDistance + random() * Math.max(0, maxDistance - minDistance);
-            const direction = random() < 0.5 ? -1 : 1;
-            return {
-                x: centerX + (-segment.dy / segment.length) * offset * direction,
-                y: centerY + (segment.dx / segment.length) * offset * direction,
-            };
-        },
         containsTrack(x, y) {
             return pointInPolygon(x, y, outer) && !pointInPolygon(x, y, inner);
         },
@@ -246,20 +234,28 @@ export function sampleEnvironmentProps({
     for (let attempt = 0; attempt < maxAttempts && points.length < targetCount; attempt += 1) {
         let x;
         let y;
+        let candidateMetadata = null;
         if (clusterCenters.length > 0 && random() < clustering) {
             const center = clusterCenters[Math.floor(random() * clusterCenters.length)];
             const radius = Math.sqrt(random()) * clusterRadius;
             const angle = random() * Math.PI * 2;
             x = center.x + Math.cos(angle) * radius;
             y = center.y + Math.sin(angle) * radius;
+            candidateMetadata = center;
         } else {
             const candidate = createCandidate?.(random);
             x = candidate?.x ?? (area.minX + random() * (area.maxX - area.minX));
             y = candidate?.y ?? (area.minY + random() * (area.maxY - area.minY));
+            candidateMetadata = candidate;
         }
         if (x < area.minX || x > area.maxX || y < area.minY || y > area.maxY) continue;
         if (!accept(x, y)) continue;
-        const point = { x, y, seed: `${seedKey}:${attempt}` };
+        const point = {
+            ...(candidateMetadata || {}),
+            x,
+            y,
+            seed: `${seedKey}:${attempt}`,
+        };
         if (!isFarEnough(grid, point, minDistance, gridSize)) continue;
         points.push(point);
         const key = cellKey(Math.floor(x / gridSize), Math.floor(y / gridSize));

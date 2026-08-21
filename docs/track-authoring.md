@@ -15,13 +15,17 @@ every consumer load the large geometry registry.
 - `game/track/biomes.js`
   Owns the immutable, configuration-driven biome definitions. Forest,
   Mountains, Arctic, and Beach declare palettes, runoff, contour scale, prop
-  density/clustering, and simple procedural prop types. Legacy catalog names
+  density/clustering, large semantic feature types, and simple procedural prop types. Legacy catalog names
   resolve to one of those canonical configurations without rewriting saved
   track metadata.
 - `game/track/backdrop.js`
-  Builds the base terrain, track-reactive contours, secondary features,
-  variable runoff, and Poisson-spaced props once per track. It draws the base
-  below the cached track and the excluded props above it.
+  Builds deterministic world-space terrain and large biome regions before it
+  considers circuit geometry. Seeded stratified cells prevent screen-sized gaps
+  between defining groves, ridges, snowdrifts, and dunes; their compound vector
+  details remain readable in the lowest detail tier. It then applies only a compact
+  variable shoulder and transition around the walls and removes prop candidates
+  that violate track clearance. It draws the world below the cached track and
+  accepted props above it.
 - `game/track/environment-field.js`
   Owns seeded low-frequency value noise, the spatial distance index over the
   smoothed inner/outer walls, and non-grid prop sampling. This is rendering
@@ -88,10 +92,12 @@ start/finish line and snaps onto that line's center axis when moved.
    the biome shown, so `random` is never stored. The biome lives in
    `TRACK_CATALOG`, not in the definition module.
 
-   The environment is built from the smoothed track walls plus the track key,
-   so the same saved track is stable while geometry edits or a rename produce a
-   new deterministic layout. Mapmaker uses the same environment inputs as a
-   race and rebuilds the preview after wall edits.
+   The environment seed comes from the track presentation key. Terrain, biome
+   regions, and the underlying clustered prop layout use only that seed plus
+   world coordinates, so wall edits do not bend the landscape around the circuit.
+   Wall edits rebuild only the local shoulder/transition masks and prop exclusion.
+   Renaming changes the key and therefore settles a new deterministic world.
+   Mapmaker uses the same environment inputs as a race.
 3. New Daily Challenge tracks are appended as the final
    `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
    When extending an existing branch, keep the existing catalog and schedule

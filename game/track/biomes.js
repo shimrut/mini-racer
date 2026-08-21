@@ -25,9 +25,9 @@ export const BIOME_CONFIGS = Object.freeze({
         groundColors: ['#0a191b', '#102326', '#152d2d', '#1b3532', '#223c36'],
         runoffColor: '#263735',
         transitionColor: '#172b2b',
-        runoffWidth: 58,
-        runoffVariation: 16,
-        transitionWidth: 145,
+        runoffWidth: 28,
+        runoffVariation: 6,
+        transitionWidth: 44,
         contourCount: 5,
         contourScale: 1.05,
         propDensity: 0.72,
@@ -43,7 +43,7 @@ export const BIOME_CONFIGS = Object.freeze({
             { type: 'tree-groves', density: 0.65, minDistanceFromTrack: 34, style: 'clustered' }
         ],
         props: [
-            { type: 'pine', shape: 'layered-triangle', color: '#142c2a', accentColor: '#1e3b35', weight: 0.58, minScale: 0.84, maxScale: 1.12, maxRotation: 0.1, cluster: true },
+            { type: 'pine', shape: 'layered-triangle', color: '#071412', accentColor: '#255245', weight: 0.58, minScale: 0.84, maxScale: 1.12, maxRotation: 0.1, cluster: true },
             { type: 'rock', shape: 'faceted', color: '#253433', accentColor: '#314440', size: 'small', weight: 0.18, minScale: 0.72, maxScale: 1.15, maxRotation: 0.32, cluster: false },
             { type: 'shrub', shape: 'soft-clump', color: '#1c3631', accentColor: '#28443b', weight: 0.24, minScale: 0.78, maxScale: 1.08, maxRotation: 0.24, cluster: true }
         ]
@@ -53,9 +53,9 @@ export const BIOME_CONFIGS = Object.freeze({
         groundColors: ['#080e1b', '#10192b', '#151f32', '#1b273d', '#222f46'],
         runoffColor: '#222b38',
         transitionColor: '#141d2c',
-        runoffWidth: 72,
-        runoffVariation: 22,
-        transitionWidth: 175,
+        runoffWidth: 34,
+        runoffVariation: 8,
+        transitionWidth: 50,
         contourCount: 4,
         contourScale: 1.32,
         propDensity: 0.36,
@@ -71,7 +71,7 @@ export const BIOME_CONFIGS = Object.freeze({
             { type: 'elevation-faces', density: 0.34, scale: 1.7, style: 'faceted' }
         ],
         props: [
-            { type: 'rock-formation', shape: 'angular-cluster', color: '#172238', accentColor: '#26344d', weight: 0.4, minScale: 1.05, maxScale: 1.45, maxRotation: 0.24, cluster: true },
+            { type: 'rock-formation', shape: 'angular-cluster', color: '#0c1424', accentColor: '#33435f', weight: 0.4, minScale: 1.05, maxScale: 1.45, maxRotation: 0.24, cluster: true },
             { type: 'boulder', shape: 'faceted', color: '#1b263b', accentColor: '#2d3a52', weight: 0.42, minScale: 0.82, maxScale: 1.3, maxRotation: 0.4, cluster: false },
             { type: 'pine', shape: 'layered-triangle', color: '#101d2a', accentColor: '#1b2b39', distribution: 'sparse', weight: 0.18, minScale: 0.72, maxScale: 0.95, maxRotation: 0.08, cluster: false }
         ]
@@ -81,9 +81,9 @@ export const BIOME_CONFIGS = Object.freeze({
         groundColors: ['#dcebf0', '#d2e4ea', '#c7dce5', '#bcd2dc', '#aec7d3'],
         runoffColor: '#c3d5dc',
         transitionColor: '#cfdee4',
-        runoffWidth: 68,
-        runoffVariation: 18,
-        transitionWidth: 170,
+        runoffWidth: 30,
+        runoffVariation: 7,
+        transitionWidth: 46,
         contourCount: 5,
         contourScale: 1.18,
         propDensity: 0.3,
@@ -109,9 +109,9 @@ export const BIOME_CONFIGS = Object.freeze({
         groundColors: ['#c9a96e', '#d1b47b', '#d7bd86', '#bea066', '#b4935d'],
         runoffColor: '#b99b68',
         transitionColor: '#c2a66f',
-        runoffWidth: 62,
-        runoffVariation: 20,
-        transitionWidth: 160,
+        runoffWidth: 29,
+        runoffVariation: 7,
+        transitionWidth: 45,
         contourCount: 4,
         contourScale: 1.24,
         propDensity: 0.38,
@@ -196,10 +196,10 @@ function createBiomePresentation(config) {
         biomeRockColor: config.groundColors[1],
         biomeRockLitColor: config.groundColors[2],
         biomeDecalColor: config.groundColors[3],
-        trackShadowColor: 'rgba(0, 0, 0, 0.68)',
-        trackShadowBlur: 24,
+        trackShadowColor: 'rgba(0, 0, 0, 0.2)',
+        trackShadowBlur: 8,
         trackShadowOffsetX: 0,
-        trackShadowOffsetY: 6
+        trackShadowOffsetY: 2
     });
 }
 
