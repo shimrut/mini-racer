@@ -13,9 +13,11 @@
 import { hashSeed } from './seeded-random.js';
 
 /**
- * The dark rock biome the reference art is drawn from: near-black ground, two
- * tiers of low-contrast landform, rock clusters and faint decal grids. Colors
- * stay in the navy family the cars and curbs already live in.
+ * The dark rock biome the reference art is drawn from: near-black ground stepped
+ * up through four close tones of terrain, with faceted rocks and faint marker
+ * grids on top. The steps are small on purpose. The contour is meant to be read
+ * as shape, not as contrast, and the curbs stay the only saturated thing on
+ * screen.
  *
  * It deliberately sets no trackColor, curb or boundary stroke. A biome changes
  * the ground the track sits on, not the track.
@@ -24,14 +26,15 @@ const BASALT_PRESENTATION = Object.freeze({
     backgroundStyle: 'biome',
     // The ground runs under the track, so the infield must not paint over it.
     infieldColor: 'transparent',
-    biomeGround: '#0b1220',
-    biomeBlobColors: Object.freeze(['#101a2c', '#152238']),
-    biomeRockColor: '#1b2a42',
-    biomeDecalColor: '#131e31',
-    trackShadowColor: 'rgba(2, 6, 16, 0.55)',
-    trackShadowBlur: 20,
+    biomeGround: '#0a0f17',
+    biomeTerrainColors: Object.freeze(['#0e141e', '#121926', '#161f2e', '#1a2436']),
+    biomeRockColor: '#212b3a',
+    biomeRockLitColor: '#2b3648',
+    biomeDecalColor: '#161e2b',
+    trackShadowColor: 'rgba(0, 0, 0, 0.6)',
+    trackShadowBlur: 22,
     trackShadowOffsetX: 0,
-    trackShadowOffsetY: 5
+    trackShadowOffsetY: 6
 });
 
 /**
