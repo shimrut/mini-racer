@@ -184,7 +184,13 @@ describe('track presentation biomes', () => {
         expect(presentation.backgroundStyle).toBe('biome');
         // The ground runs under the track, so the infield must not cover it.
         expect(presentation.infieldColor).toBe('transparent');
-        expect(presentation.biomeGround).toBeTruthy();
+        expect(presentation.biomeGround).toBe('#080e1b');
+        expect(presentation.biomeTerrainColors).toEqual([
+            'rgba(16, 25, 43, 0.45)',
+            'rgba(21, 31, 50, 0.33)',
+            'rgba(27, 39, 61, 0.24)',
+            'rgba(34, 47, 70, 0.15)'
+        ]);
     });
 
     it('leaves the track surface, curbs and finish line alone', () => {

@@ -1,10 +1,9 @@
 /**
  * The ground a biome track is set on.
  *
- * The ground is terrain, not scattered shapes. A smooth height field runs across
- * the whole track, and each biome tone fills everything above one height. Because
- * a higher band always sits inside a lower one, filling them from low to high
- * terraces the ground into long flowing contours, the way a contour map reads.
+ * The ground is terrain, not scattered shapes. A smooth directional field runs
+ * across the whole track, and each biome tone fills everything above one height.
+ * Filling those tones from low to high forms broad, gently wandering ribbons.
  * Rocks and marker grids are then scattered on top of that.
  *
  * The field and the scatter are both anchored to absolute world coordinates and
@@ -43,20 +42,18 @@ const SAMPLE_STEP = 70;
  * can be skipped without splitting a fill into thousands of small ones. */
 const TILE_SAMPLES = 12;
 
-/** How much of the ground each tone covers, largest first. Each tone sits inside
- * the one below it, so these shrink. */
-const TERRAIN_COVERAGE = [0.62, 0.42, 0.24, 0.10];
+/** Fixed world-space levels keep the ribbons stable when measured bounds change. */
+const TERRAIN_LEVELS = [-0.48, -0.12, 0.20, 0.48];
 
 const TIER_TERRAIN = 0;
 const TIER_ROCKS = 1;
 const TIER_DECALS = 2;
 
-// Densities are set from the reference art: about three rock formations and four
-// marker grids in view at once on a wide screen.
-const ROCK_CELL = 560;
-const ROCK_CHANCE = 0.6;
-const DECAL_CELL = 620;
-const DECAL_CHANCE = 0.55;
+// Small, sparse details let the directional terrain remain the dominant read.
+const ROCK_CELL = 440;
+const ROCK_CHANCE = 0.65;
+const DECAL_CELL = 520;
+const DECAL_CHANCE = 0.6;
 
 function snapDown(value) {
     return Math.floor(value / FIELD_SNAP) * FIELD_SNAP;
@@ -71,75 +68,39 @@ function range(random, low, high) {
 }
 
 /**
- * A smooth height field, built from layered value noise.
- *
- * Noise, not waves. Waves make stripes: every contour runs the same way and the
- * ground reads as a diagonal edge sliding past. Layered noise makes landmasses
- * with wandering edges and enclosed pockets, which is what a place looks like
- * from above. The coordinates are stretched along one axis so the ground still
- * has a grain rather than looking equally lumpy in all directions.
- *
- * Each lattice point is hashed from its own integer coordinates, so the field is
- * defined everywhere in world space and does not shift when the field edge moves.
+ * A broad ribbon field whose phase and direction come from the track seed.
+ * Coordinates are absolute, while slow along-ribbon bends keep the terrain from
+ * reading as repeated straight stripes.
  */
 function createTerrainField(seedKey) {
-    const salt = hashSeed(seedKey) | 0;
-    const octaves = [
-        { cell: 640, amplitude: 1, salt: salt ^ 0x9e3779b9 },
-        { cell: 310, amplitude: 0.52, salt: salt ^ 0x85ebca6b },
-        { cell: 148, amplitude: 0.26, salt: salt ^ 0xc2b2ae35 }
-    ];
-    const total = octaves.reduce((sum, octave) => sum + octave.amplitude, 0);
-
     const grainAngle = (hashSeed(`${seedKey}:grain`) % 1000) / 1000 * Math.PI;
     const grainCos = Math.cos(grainAngle);
     const grainSin = Math.sin(grainAngle);
-    const STRETCH = 1.9;
-
-    const lattice = (ix, iy, octaveSalt) => {
-        let h = octaveSalt ^ Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263);
-        h = Math.imul(h ^ (h >>> 13), 1274126177);
-        return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-    };
-    const ease = (t) => t * t * (3 - 2 * t);
+    const seededUnit = (suffix) => (hashSeed(`${seedKey}:${suffix}`) % 10000) / 10000;
+    const phase = seededUnit('phase') * Math.PI * 2;
+    const bendPhase = seededUnit('bend') * Math.PI * 2;
+    const depthPhase = seededUnit('depth') * Math.PI * 2;
+    const wavelength = 900 + seededUnit('width') * 300;
+    const crossAngle = grainAngle
+        + (0.28 + seededUnit('cross-angle') * 0.18) * Math.PI;
+    const crossCos = Math.cos(crossAngle);
+    const crossSin = Math.sin(crossAngle);
+    const crossWavelength = 1700 + seededUnit('cross-width') * 700;
 
     return (worldX, worldY) => {
-        // Stretch along the grain direction so landforms run slightly one way.
-        const x = (worldX * grainCos + worldY * grainSin) / STRETCH;
-        const y = -worldX * grainSin + worldY * grainCos;
-
-        let height = 0;
-        for (const octave of octaves) {
-            const fx = x / octave.cell;
-            const fy = y / octave.cell;
-            const ix = Math.floor(fx);
-            const iy = Math.floor(fy);
-            const tx = ease(fx - ix);
-            const ty = ease(fy - iy);
-            const topLeft = lattice(ix, iy, octave.salt);
-            const topRight = lattice(ix + 1, iy, octave.salt);
-            const bottomLeft = lattice(ix, iy + 1, octave.salt);
-            const bottomRight = lattice(ix + 1, iy + 1, octave.salt);
-            const top = topLeft + (topRight - topLeft) * tx;
-            const bottom = bottomLeft + (bottomRight - bottomLeft) * tx;
-            height += ((top + (bottom - top) * ty) * 2 - 1) * octave.amplitude;
-        }
-        return height / total;
+        const along = worldX * grainCos + worldY * grainSin;
+        const across = -worldX * grainSin + worldY * grainCos;
+        const bend = Math.sin(along / 1900 * Math.PI * 2 + bendPhase) * 135
+            + Math.sin(along / 4100 * Math.PI * 2 + depthPhase) * 80;
+        const ribbon = Math.sin((across + bend) / wavelength * Math.PI * 2 + phase);
+        const crossAlong = worldX * crossCos + worldY * crossSin;
+        const crossAcross = -worldX * crossSin + worldY * crossCos;
+        const crossBend = Math.sin(crossAlong / 4600 * Math.PI * 2 + phase) * 170;
+        const depth = Math.sin(
+            (crossAcross + crossBend) / crossWavelength * Math.PI * 2 + depthPhase,
+        ) * 0.44;
+        return (ribbon + depth) / 1.44;
     };
-}
-
-/**
- * Picks the heights to step the ground up at.
- *
- * Reading them off the field's own distribution rather than fixing them means
- * every track gets the same balance of terraces, whatever shape its noise took.
- */
-function resolveTerrainLevels(heights, toneCount) {
-    const sorted = Float32Array.from(heights).sort();
-    return TERRAIN_COVERAGE.slice(0, toneCount).map((covered) => {
-        const index = Math.min(sorted.length - 1, Math.floor((1 - covered) * sorted.length));
-        return sorted[index];
-    });
 }
 
 /**
@@ -275,7 +236,7 @@ function buildTerrainLayer(samples, area, level, styleIndex) {
  * A rock: a dark slab with one lit facet, the way the reference art draws them.
  */
 function buildRock(random, centerX, centerY) {
-    const radius = range(random, 26, 58);
+    const radius = range(random, 18, 38);
     const sides = Math.floor(range(random, 5, 8));
     const spin = random() * Math.PI * 2;
     const squash = range(random, 0.55, 0.85);
@@ -398,7 +359,7 @@ export function buildBiomeBackdrop(presentation, bounds, seedKey) {
     // Low levels first: each higher tone sits inside the one below, so filling in
     // order steps the ground up one terrace at a time.
     const terrain = [];
-    resolveTerrainLevels(samples.heights, terrainTones.length).forEach((level, index) => {
+    TERRAIN_LEVELS.slice(0, terrainTones.length).forEach((level, index) => {
         terrain.push(...buildTerrainLayer(samples, area, level, index));
     });
 

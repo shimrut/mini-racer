@@ -68,14 +68,13 @@ describe('biome backdrop', () => {
         expect(buildBiomeBackdrop(BIOME_PRESENTATION, null, 'circuit')).toBeNull();
     });
 
-    it('terraces the ground into one tone per height, each inside the one below', () => {
+    it('builds broad directional terrain in four nested low-contrast tones', () => {
         const backdrop = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
         const tonesUsed = [...new Set(backdrop.terrain.map((tile) => tile.styleIndex))].sort();
 
         expect(tonesUsed).toEqual([0, 1, 2, 3]);
 
-        // A higher tone sits inside the one below it, so it can never cover more
-        // ground. That nesting is what makes the contours read as terraces.
+        // Higher thresholds remain nested, while the field turns them into ribbons.
         const areaOf = (styleIndex) => backdrop.terrain
             .filter((tile) => tile.styleIndex === styleIndex).length;
         expect(areaOf(1)).toBeLessThanOrEqual(areaOf(0));

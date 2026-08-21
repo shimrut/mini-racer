@@ -13,11 +13,10 @@
 import { hashSeed } from './seeded-random.js';
 
 /**
- * The dark rock biome the reference art is drawn from: near-black ground stepped
- * up through four close tones of terrain, with faceted rocks and faint marker
- * grids on top. The steps are small on purpose. The contour is meant to be read
- * as shape, not as contrast, and the curbs stay the only saturated thing on
- * screen.
+ * The dark rock biome the reference art is drawn from: near-black ground crossed
+ * by four close, translucent terrain tones, with small faceted rocks and faint
+ * marker grids on top. The contour is read as atmospheric shape, not contrast,
+ * and the curbs stay the only saturated thing on screen.
  *
  * It deliberately sets no trackColor, curb or boundary stroke. A biome changes
  * the ground the track sits on, not the track.
@@ -26,13 +25,18 @@ const BASALT_PRESENTATION = Object.freeze({
     backgroundStyle: 'biome',
     // The ground runs under the track, so the infield must not paint over it.
     infieldColor: 'transparent',
-    biomeGround: '#121724',
-    biomeTerrainColors: Object.freeze(['#191f2d', '#202737', '#272f41', '#2e374b']),
-    biomeRockColor: '#394356',
-    biomeRockLitColor: '#454f64',
-    biomeDecalColor: '#212936',
-    trackShadowColor: 'rgba(0, 0, 0, 0.6)',
-    trackShadowBlur: 22,
+    biomeGround: '#080e1b',
+    biomeTerrainColors: Object.freeze([
+        'rgba(16, 25, 43, 0.45)',
+        'rgba(21, 31, 50, 0.33)',
+        'rgba(27, 39, 61, 0.24)',
+        'rgba(34, 47, 70, 0.15)'
+    ]),
+    biomeRockColor: '#121a2b',
+    biomeRockLitColor: '#1a2438',
+    biomeDecalColor: 'rgba(46, 60, 86, 0.20)',
+    trackShadowColor: 'rgba(0, 0, 0, 0.68)',
+    trackShadowBlur: 24,
     trackShadowOffsetX: 0,
     trackShadowOffsetY: 6
 });
