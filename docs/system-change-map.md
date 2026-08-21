@@ -69,18 +69,18 @@ flowchart LR
   canvases, and each track's deterministic environment. The environment uses
   the already-smoothed walls only for local clearance and remains separate from
   collision data.
-- `game/track/environment-field.js` builds a spatial distance index over both
-  walls, low-frequency seeded noise, and Poisson-style prop distributions.
-  `game/track/backdrop.js` first turns world-coordinate noise into Path2D terrain
-  and uses seeded stratified world cells for biome-scale semantic regions, then
-  clusters prop candidates inside those regions. Compound grove silhouettes,
-  angular ridge/rock layers, snowdrift lines, and dune crests keep each geography
-  readable at race zoom even on reduced-detail frames. Circuit geometry changes
-  only the compact 60–100px shoulder/transition
-  masks and rejects nearby props; it never reshapes terrain, feature regions, or
-  the underlying prop candidate layout. `game/track/layer.js` renders base terrain
-  before the cached track slice and excluded props afterward; cars and HUD keep
-  their existing later phases. The cached track bitmap itself adds only one
+- `game/track/environment-field.js` builds the spatial distance index over both
+  walls. The deferred Mountains, Arctic, and Beach renderer also keeps its
+  existing seeded noise and prop sampling there.
+  `game/track/forest-scenery.js` owns Forest's authored primitive library, three
+  composition recipes, track-bounds/major-corner analysis, deterministic
+  transforms, footprint clearance, palette variation, and distance-only
+  30-60px shoulder. `game/track/backdrop.js` selects that path for Forest and
+  Forest-backed legacy names without running the old noise/contour/Poisson path.
+  `game/track/layer.js` renders Forest ground masses, complete tree groups, rocks,
+  vegetation, and shoulder before the cached track slice; there is no Forest prop
+  scatter pass after the track. Cars and HUD keep their existing later phases.
+  The cached track bitmap itself adds only one
   subtle large-scale asphalt gradient and a clipped dark edge inside the kerbs;
   the biome track shadow is deliberately faint so it cannot read as another halo.
 - `game/track/engine-methods.js` owns track loading, resize behavior, and track presentation refresh.

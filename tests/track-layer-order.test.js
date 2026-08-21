@@ -25,7 +25,7 @@ function createContext() {
 }
 
 describe('track layer environment order', () => {
-    it('renders base terrain, track bitmap, then environmental props', () => {
+  it('renders authored Forest features, then shoulder, then track with nothing after it', () => {
         const ctx = createContext();
         const renderer = new TrackLayerRenderer(ctx);
         const propPath = { id: 'prop' };
@@ -43,25 +43,28 @@ describe('track layer environment order', () => {
                 biomeGround: '#base',
             },
             backdrop: {
+                configId: 'forest',
+                compositionRecipe: 'FOREST_A',
                 groundColor: '#base',
-                terrain: [],
-                transition: [],
-                runoff: [],
-                features: [],
-                props: [{
+                largeFeatures: [{
                     minX: 40,
                     minY: 40,
                     maxX: 80,
                     maxY: 80,
-                    priority: 1,
-                    layers: [{ path: propPath, style: '#prop' }],
+                    layers: [{ path: propPath, style: '#large' }],
                 }],
+                mediumFeatures: [{ minX: 40, minY: 40, maxX: 80, maxY: 80, layers: [{ path: propPath, style: '#medium' }] }],
+                smallFeatures: [{ minX: 40, minY: 40, maxX: 80, maxY: 80, layers: [{ path: propPath, style: '#small' }] }],
+                shoulder: { tiles: [{ minX: 40, minY: 40, maxX: 80, maxY: 80, path: propPath, style: '#shoulder' }] },
+                props: [],
             },
             detailTier: 2,
             container: { clientWidth: 320, clientHeight: 200 },
         });
 
-        expect(ctx.operations).toEqual(['base', 'track', 'fill:#prop']);
+        expect(ctx.operations).toEqual([
+          'base', 'fill:#large', 'fill:#medium', 'fill:#small', 'fill:#shoulder', 'track',
+        ]);
         expect(ctx.drawImage).toHaveBeenCalledOnce();
     });
 

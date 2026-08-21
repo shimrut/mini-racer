@@ -14,22 +14,27 @@ every consumer load the large geometry registry.
   and `getTrackBiome()`.
 - `game/track/biomes.js`
   Owns the immutable, configuration-driven biome definitions. Forest,
-  Mountains, Arctic, and Beach declare palettes, runoff, contour scale, prop
-  density/clustering, large semantic feature types, and simple procedural prop types. Legacy catalog names
-  resolve to one of those canonical configurations without rewriting saved
-  track metadata.
+  Mountains, Arctic, and Beach declare their palettes and renderer inputs.
+  Legacy catalog names resolve to one of those canonical configurations without
+  rewriting saved track metadata.
+- `game/track/forest-scenery.js`
+  Owns the first authored biome: three ground-mass primitives, three complete
+  forest-cluster primitives, two rock formations, small vegetation groups, and
+  three reusable composition recipes. The seed chooses only the recipe,
+  primitive, position, rotation, scale, mirroring, palette variation, and layer.
+  Tree and rock arrangements inside a primitive are authored, not regenerated.
 - `game/track/backdrop.js`
-  Builds deterministic world-space terrain and large biome regions before it
-  considers circuit geometry. Seeded stratified cells prevent screen-sized gaps
-  between defining groves, ridges, snowdrifts, and dunes; their compound vector
-  details remain readable in the lowest detail tier. It then applies only a compact
-  variable shoulder and transition around the walls and removes prop candidates
-  that violate track clearance. It draws the world below the cached track and
-  accepted props above it.
+  Selects the environment renderer and draws it in world space. Forest analyzes
+  the track bounds and major corners, applies an authored recipe in broad
+  composition zones, rejects any complete primitive that conflicts with the
+  road/kerb/shoulder exclusion, and draws one irregular 30-60px shoulder. Its
+  masses, tree groups, rocks, and vegetation all stay below the cached track.
+  Mountains, Arctic, and Beach temporarily retain the earlier noise/contour and
+  prop-distribution path while Forest is visually validated.
 - `game/track/environment-field.js`
-  Owns seeded low-frequency value noise, the spatial distance index over the
-  smoothed inner/outer walls, and non-grid prop sampling. This is rendering
-  data only and does not participate in collision or simulation.
+  Owns the spatial distance index over the smoothed inner/outer walls. It also
+  retains seeded value noise and prop sampling only for the deferred biome path.
+  This is rendering data and does not participate in collision or simulation.
 - `game/track/definitions/<track-slug>.js`
   Owns one track's boundaries, start position, start line, checkpoints, and
   geometry-specific options.
@@ -92,12 +97,12 @@ start/finish line and snaps onto that line's center axis when moved.
    the biome shown, so `random` is never stored. The biome lives in
    `TRACK_CATALOG`, not in the definition module.
 
-   The environment seed comes from the track presentation key. Terrain, biome
-   regions, and the underlying clustered prop layout use only that seed plus
-   world coordinates, so wall edits do not bend the landscape around the circuit.
-   Wall edits rebuild only the local shoulder/transition masks and prop exclusion.
-   Renaming changes the key and therefore settles a new deterministic world.
-   Mapmaker uses the same environment inputs as a race.
+   The environment seed comes from the track presentation key. For Forest, the
+   same seed and geometry always select the same authored recipe and transforms;
+   a wall edit recomposes only where a complete primitive would violate road,
+   kerb, shoulder, or major-corner clearance. Renaming changes the key and
+   therefore settles a new deterministic composition. Mapmaker uses the same
+   environment inputs as a race.
 3. New Daily Challenge tracks are appended as the final
    `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
    When extending an existing branch, keep the existing catalog and schedule

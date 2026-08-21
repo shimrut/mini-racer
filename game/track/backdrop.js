@@ -4,6 +4,10 @@ import {
     createEnvironmentNoise,
     sampleEnvironmentProps,
 } from './environment-field.js';
+import {
+    buildAuthoredForestScenery,
+    sampleForestShoulder,
+} from './forest-scenery.js';
 
 const FIELD_SNAP = 200;
 const FIELD_MARGIN = 2000;
@@ -116,7 +120,7 @@ function addCellAboveLevel(path, level, x0, y0, x1, y1, topLeft, topRight, botto
 }
 
 function buildScalarLayer(values, dimensions, area, level, style) {
-    const { columns, rows } = dimensions;
+    const { columns, rows, sampleStep = SAMPLE_STEP } = dimensions;
     const tiles = [];
     for (let tileRow = 0; tileRow < rows - 1; tileRow += TILE_SAMPLES) {
         for (let tileColumn = 0; tileColumn < columns - 1; tileColumn += TILE_SAMPLES) {
@@ -125,7 +129,7 @@ function buildScalarLayer(values, dimensions, area, level, style) {
             const path = new Path2D();
             let painted = false;
             for (let row = tileRow; row < lastRow; row += 1) {
-                const y0 = area.minY + row * SAMPLE_STEP;
+                const y0 = area.minY + row * sampleStep;
                 for (let column = tileColumn; column < lastColumn; column += 1) {
                     const index = row * columns + column;
                     const corners = [
@@ -135,14 +139,14 @@ function buildScalarLayer(values, dimensions, area, level, style) {
                         values[index + columns],
                     ];
                     if (corners.every((value) => value < level)) continue;
-                    const x0 = area.minX + column * SAMPLE_STEP;
+                    const x0 = area.minX + column * sampleStep;
                     addCellAboveLevel(
                         path,
                         level,
                         x0,
                         y0,
-                        x0 + SAMPLE_STEP,
-                        y0 + SAMPLE_STEP,
+                        x0 + sampleStep,
+                        y0 + sampleStep,
                         corners[0],
                         corners[1],
                         corners[2],
@@ -155,10 +159,10 @@ function buildScalarLayer(values, dimensions, area, level, style) {
             tiles.push({
                 path,
                 style,
-                minX: area.minX + tileColumn * SAMPLE_STEP,
-                minY: area.minY + tileRow * SAMPLE_STEP,
-                maxX: area.minX + lastColumn * SAMPLE_STEP,
-                maxY: area.minY + lastRow * SAMPLE_STEP,
+                minX: area.minX + tileColumn * sampleStep,
+                minY: area.minY + tileRow * sampleStep,
+                maxX: area.minX + lastColumn * sampleStep,
+                maxY: area.minY + lastRow * sampleStep,
             });
         }
     }
@@ -166,8 +170,9 @@ function buildScalarLayer(values, dimensions, area, level, style) {
 }
 
 function sampleEnvironment(config, area, seedKey, distanceIndex) {
-    const columns = Math.round((area.maxX - area.minX) / SAMPLE_STEP) + 1;
-    const rows = Math.round((area.maxY - area.minY) / SAMPLE_STEP) + 1;
+    const sampleStep = config.sampleStep ?? SAMPLE_STEP;
+    const columns = Math.round((area.maxX - area.minX) / sampleStep) + 1;
+    const rows = Math.round((area.maxY - area.minY) / sampleStep) + 1;
     const terrain = new Float32Array(columns * rows);
     const transition = new Float32Array(columns * rows);
     const runoff = new Float32Array(columns * rows);
@@ -177,9 +182,9 @@ function sampleEnvironment(config, area, seedKey, distanceIndex) {
     const transitionWidth = config.transitionWidth ?? 46;
 
     for (let row = 0; row < rows; row += 1) {
-        const y = area.minY + row * SAMPLE_STEP;
+        const y = area.minY + row * sampleStep;
         for (let column = 0; column < columns; column += 1) {
-            const x = area.minX + column * SAMPLE_STEP;
+            const x = area.minX + column * sampleStep;
             const index = row * columns + column;
             const localDistance = (config.runoffWidth ?? 32)
                 + (config.runoffVariation ?? 8)
@@ -201,7 +206,7 @@ function sampleEnvironment(config, area, seedKey, distanceIndex) {
         }
     }
 
-    return { terrain, transition, runoff, columns, rows, resolveRunoffWidth };
+    return { terrain, transition, runoff, columns, rows, sampleStep, resolveRunoffWidth };
 }
 
 function transformPoint(centerX, centerY, rotation, scale, x, y) {
@@ -766,8 +771,70 @@ export function buildBiomeBackdrop(presentation, bounds, seedKey, {
         maxY: snapUp(bounds.maxY) + FIELD_MARGIN,
     };
     const distanceIndex = buildTrackDistanceIndex(geometry, worldScale);
+    if (config.id === 'forest') {
+        const shoulderSamples = sampleForestShoulder({
+            seedKey: `${seedKey}:forest-shoulder`,
+            area,
+            distanceIndex,
+        });
+        const dimensions = {
+            columns: shoulderSamples.columns,
+            rows: shoulderSamples.rows,
+            sampleStep: shoulderSamples.sampleStep,
+        };
+        const shoulderTiles = buildScalarLayer(
+            shoulderSamples.values,
+            dimensions,
+            area,
+            0,
+            config.runoffColor,
+        );
+        const compositionMargin = 520;
+        const compositionArea = {
+            minX: Math.max(area.minX, bounds.minX - compositionMargin),
+            minY: Math.max(area.minY, bounds.minY - compositionMargin),
+            maxX: Math.min(area.maxX, bounds.maxX + compositionMargin),
+            maxY: Math.min(area.maxY, bounds.maxY + compositionMargin),
+        };
+        const composition = buildAuthoredForestScenery({
+            seedKey,
+            area,
+            compositionArea,
+            distanceIndex,
+        });
+        const shoulder = {
+            source: 'distance-only',
+            tiles: shoulderTiles,
+            minWidth: 30,
+            maxWidth: 60,
+            resolveWidth: shoulderSamples.resolveWidth,
+        };
+        return {
+            field: area,
+            ...composition,
+            shoulder,
+            // Compatibility aliases for viewport culling and older callers. Forest
+            // drawing uses the authored fields above and never paints these twice.
+            terrain: composition.largeFeatures,
+            transition: [],
+            runoff: shoulderTiles,
+            features: [...composition.mediumFeatures, ...composition.smallFeatures],
+            regions: [],
+            propCandidates: [],
+            props: [],
+            groundColor: config.groundColors[0],
+            configId: config.id,
+            distanceIndex,
+            resolveRunoffWidth: shoulderSamples.resolveWidth,
+            trackLocalExtent: { min: 30, max: 60 },
+        };
+    }
     const samples = sampleEnvironment(config, area, seedKey, distanceIndex);
-    const dimensions = { columns: samples.columns, rows: samples.rows };
+    const dimensions = {
+        columns: samples.columns,
+        rows: samples.rows,
+        sampleStep: samples.sampleStep,
+    };
     const terrainColors = config.groundColors.slice(1, config.contourCount);
     const levels = createContourLevels(terrainColors.length);
     const terrain = [];
@@ -846,6 +913,14 @@ function drawFeatures(ctx, features, visible) {
     let painted = 0;
     for (const feature of features) {
         if (!isVisible(feature, visible.minX, visible.minY, visible.maxX, visible.maxY)) continue;
+        if (feature.layers) {
+            for (const layer of feature.layers) {
+                ctx.fillStyle = layer.style;
+                ctx.fill(layer.path);
+            }
+            painted += 1;
+            continue;
+        }
         if (feature.fillStyle) {
             ctx.fillStyle = feature.fillStyle;
             ctx.fill(feature.path);
@@ -877,6 +952,14 @@ export function drawBiomeBackdropBase(ctx, width, height, {
     ctx.fillRect(0, 0, width, height);
     if (!backdrop || scale <= 0) return 0;
     const visible = prepareTransform(ctx, width, height, offsetX, offsetY, scale);
+    if (backdrop.configId === 'forest' && backdrop.compositionRecipe) {
+        let painted = drawFeatures(ctx, backdrop.largeFeatures, visible);
+        painted += drawFeatures(ctx, backdrop.mediumFeatures, visible);
+        painted += drawFeatures(ctx, backdrop.smallFeatures, visible);
+        painted += drawTiles(ctx, backdrop.shoulder.tiles, visible);
+        ctx.restore();
+        return painted;
+    }
     let painted = drawTiles(ctx, backdrop.terrain, visible);
     painted += drawFeatures(ctx, backdrop.features, visible);
     painted += drawTiles(ctx, backdrop.transition, visible);
@@ -893,6 +976,7 @@ export function drawBiomeBackdropProps(ctx, width, height, {
     detailTier = TIER_ALL_PROPS,
 } = {}) {
     if (!backdrop || scale <= 0) return 0;
+    if (backdrop.configId === 'forest' && backdrop.compositionRecipe) return 0;
     const visible = prepareTransform(ctx, width, height, offsetX, offsetY, scale);
     let painted = 0;
     for (const prop of backdrop.props) {

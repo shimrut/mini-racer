@@ -7,6 +7,13 @@ import {
     resolveBackdropDetailTier,
 } from '../game/track/backdrop.js';
 import { getBiomeConfig, getBiomePresentation } from '../game/track/biomes.js';
+import {
+    buildAuthoredForestScenery,
+    FOREST_CLUSTER_TEMPLATES,
+    FOREST_COMPOSITION_RECIPES,
+    FOREST_GROUND_MASS_TEMPLATES,
+    FOREST_ROCK_FORMATION_TEMPLATES,
+} from '../game/track/forest-scenery.js';
 
 const BIOME_PRESENTATION = {
     backgroundStyle: 'biome',
@@ -92,83 +99,148 @@ describe('world-first biome environment', () => {
         expect(buildBiomeBackdrop(BIOME_PRESENTATION, null, 'missing')).toBeNull();
     });
 
+    it('has the exact first-iteration authored Forest library and recipe counts', () => {
+        expect(FOREST_GROUND_MASS_TEMPLATES).toHaveLength(3);
+        expect(FOREST_CLUSTER_TEMPLATES).toHaveLength(3);
+        expect(FOREST_ROCK_FORMATION_TEMPLATES).toHaveLength(2);
+        expect(FOREST_COMPOSITION_RECIPES.map((recipe) => recipe.id)).toEqual([
+            'FOREST_A', 'FOREST_B', 'FOREST_C',
+        ]);
+    });
+
     it('is deterministic for identical geometry, seed, and biome', () => {
         const first = build();
         const second = build();
 
-        expect(boxSignature(second.terrain)).toBe(boxSignature(first.terrain));
-        expect(boxSignature(second.transition)).toBe(boxSignature(first.transition));
-        expect(boxSignature(second.runoff)).toBe(boxSignature(first.runoff));
-        expect(propSignature(second.props)).toBe(propSignature(first.props));
+        expect(second.compositionRecipe).toBe(first.compositionRecipe);
+        expect(featureSignature(second.largeFeatures)).toBe(featureSignature(first.largeFeatures));
+        expect(featureSignature(second.mediumFeatures)).toBe(featureSignature(first.mediumFeatures));
+        expect(featureSignature(second.smallFeatures)).toBe(featureSignature(first.smallFeatures));
+        expect(boxSignature(second.shoulder.tiles)).toBe(boxSignature(first.shoulder.tiles));
     });
 
-    it('changes terrain and props when the seed changes', () => {
+    it('changes authored transforms when the seed changes', () => {
         const first = build('track:forest:a');
         const second = build('track:forest:b');
 
-        expect(boxSignature(second.terrain)).not.toBe(boxSignature(first.terrain));
-        expect(propSignature(second.props)).not.toBe(propSignature(first.props));
+        expect(featureSignature(second.largeFeatures)).not.toBe(featureSignature(first.largeFeatures));
+        expect(featureSignature(second.mediumFeatures)).not.toBe(featureSignature(first.mediumFeatures));
     });
 
-    it('keeps world terrain, regions, features, and prop candidates independent of geometry', () => {
-        const first = build('track:forest:geometry', GEOMETRY);
-        const acceptedCandidate = first.propCandidates.find((candidate) => first.props.some(
-            (prop) => prop.x === candidate.x && prop.y === candidate.y,
-        ));
-        const { x, y } = acceptedCandidate;
-        const exclusionGeometry = {
-            outer: [
-                { x: x - 120, y: y - 120 }, { x: x + 120, y: y - 120 },
-                { x: x + 120, y: y + 120 }, { x: x - 120, y: y + 120 },
-            ],
-            inner: [
-                { x: x + 70, y: y + 70 }, { x: x + 100, y: y + 70 },
-                { x: x + 100, y: y + 100 }, { x: x + 70, y: y + 100 },
-            ],
+    it('keeps recipe-zone placement independent of outer-wall point sequence', () => {
+        const rotate = (points, amount) => [...points.slice(amount), ...points.slice(0, amount)];
+        const reorderedGeometry = {
+            outer: rotate(GEOMETRY.outer, 2),
+            inner: rotate(GEOMETRY.inner, 1),
         };
-        const second = build('track:forest:geometry', exclusionGeometry);
+        const first = build('track:forest:sequence', GEOMETRY);
+        const second = build('track:forest:sequence', reorderedGeometry);
 
-        expect(boxSignature(second.terrain)).toBe(boxSignature(first.terrain));
-        expect(featureSignature(second.regions)).toBe(featureSignature(first.regions));
-        expect(featureSignature(second.features)).toBe(featureSignature(first.features));
-        expect(propSignature(second.propCandidates)).toBe(propSignature(first.propCandidates));
-        expect(boxSignature(second.transition)).not.toBe(boxSignature(first.transition));
-        expect(boxSignature(second.runoff)).not.toBe(boxSignature(first.runoff));
-        expect(propSignature(second.props)).not.toBe(propSignature(first.props));
+        expect(featureSignature(second.largeFeatures)).toBe(featureSignature(first.largeFeatures));
+        expect(featureSignature(second.mediumFeatures)).toBe(featureSignature(first.mediumFeatures));
+        expect(featureSignature(second.smallFeatures)).toBe(featureSignature(first.smallFeatures));
     });
 
-    it('uses three to five configured contour shades plus the biome base', () => {
-        const backdrop = build();
-        const config = getBiomeConfig('forest');
-        const terrainStyles = new Set(backdrop.terrain.map((tile) => tile.style));
+    it('handles null geometry and an area too small for any anchor', () => {
+        const withoutGeometry = build('track:forest:no-geometry', null);
+        expect(withoutGeometry.trackAnalysis).toEqual({ bounds: null, majorCorners: [] });
+        expect(withoutGeometry.largeFeatures.length).toBeGreaterThan(0);
 
-        expect(terrainStyles.size).toBe(config.contourCount - 1);
-        expect(terrainStyles.size).toBeGreaterThanOrEqual(3);
-        expect(terrainStyles.size).toBeLessThanOrEqual(5);
-        expect(backdrop.groundColor).toBe(config.groundColors[0]);
+        expect(() => buildAuthoredForestScenery({
+            seedKey: 'track:forest:no-anchors',
+            area: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+            distanceIndex: null,
+        })).not.toThrow();
+        const empty = buildAuthoredForestScenery({
+            seedKey: 'track:forest:no-anchors',
+            area: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+            distanceIndex: null,
+        });
+        expect(empty.largeFeatures).toEqual([]);
+        expect(empty.mediumFeatures).toEqual([]);
+        expect(empty.smallFeatures).toEqual([]);
     });
 
-    it('builds transition terrain and runoff, with seeded width variation', () => {
+    it('exposes the authored composition contract with recipe feature ranges', () => {
         const backdrop = build();
-        expect(backdrop.transition.length).toBeGreaterThan(0);
-        expect(backdrop.runoff.length).toBeGreaterThan(0);
+
+        expect(['FOREST_A', 'FOREST_B', 'FOREST_C']).toContain(backdrop.compositionRecipe);
+        expect(backdrop.largeFeatures.length).toBeGreaterThanOrEqual(6);
+        expect(backdrop.largeFeatures.length).toBeLessThanOrEqual(10);
+        expect(backdrop.mediumFeatures.length).toBeGreaterThanOrEqual(5);
+        expect(backdrop.mediumFeatures.length).toBeLessThanOrEqual(8);
+        const rocks = backdrop.smallFeatures.filter((feature) => feature.kind === 'forest-rock-formation');
+        const vegetation = backdrop.smallFeatures.filter((feature) => feature.kind === 'forest-vegetation-cluster');
+        expect(rocks.length).toBeGreaterThanOrEqual(3);
+        expect(rocks.length).toBeLessThanOrEqual(5);
+        expect(vegetation.length).toBeGreaterThanOrEqual(3);
+        expect(vegetation.length).toBeLessThanOrEqual(5);
+        expect(backdrop.props).toEqual([]);
+        expect(backdrop.propCandidates).toEqual([]);
+    });
+
+    it('analyzes the world-pixel track bounds and separated major corners', () => {
+        const { trackAnalysis } = build();
+
+        expect(trackAnalysis.bounds).toEqual(BOUNDS);
+        expect(trackAnalysis.majorCorners.length).toBeGreaterThanOrEqual(3);
+        for (let index = 0; index < trackAnalysis.majorCorners.length; index += 1) {
+            expect(trackAnalysis.majorCorners[index].curvature).toBeGreaterThan(0);
+            for (let other = index + 1; other < trackAnalysis.majorCorners.length; other += 1) {
+                expect(Math.hypot(
+                    trackAnalysis.majorCorners[index].x - trackAnalysis.majorCorners[other].x,
+                    trackAnalysis.majorCorners[index].y - trackAnalysis.majorCorners[other].y,
+                )).toBeGreaterThan(175);
+            }
+        }
+    });
+
+    it('associates clusters and details with authored ground groups using subtle palette variation', () => {
+        const backdrop = build();
+        const overlapsAny = (feature, anchors) => anchors.some((anchor) => (
+            Math.hypot(feature.x - anchor.x, feature.y - anchor.y)
+                < feature.footprintRadius + anchor.footprintRadius
+        ));
+
+        backdrop.mediumFeatures.forEach((feature) => expect(overlapsAny(feature, backdrop.largeFeatures)).toBe(true));
+        backdrop.smallFeatures.forEach((feature) => expect(overlapsAny(feature, backdrop.mediumFeatures)).toBe(true));
+        backdrop.largeFeatures.forEach((feature) => {
+            expect(feature.layers).toHaveLength(1);
+            expect(typeof feature.layers[0].style).toBe('string');
+        });
+        const paletteIndexes = new Set([
+            ...backdrop.largeFeatures,
+            ...backdrop.mediumFeatures,
+            ...backdrop.smallFeatures,
+        ].map((feature) => feature.paletteIndex));
+        expect(paletteIndexes.size).toBeGreaterThan(1);
+    });
+
+    it('builds exactly one gradually irregular 30-60px shoulder', () => {
+        const backdrop = build();
+        expect(backdrop.shoulder).toEqual(expect.objectContaining({
+            source: 'distance-only', minWidth: 30, maxWidth: 60,
+        }));
+        expect(backdrop.shoulder.tiles.length).toBeGreaterThan(0);
+        expect(backdrop.transition).toEqual([]);
 
         const widths = [0.08, 0.31, 0.57, 0.83]
-            .map((along) => backdrop.resolveRunoffWidth({ along }));
+            .map((along) => backdrop.shoulder.resolveWidth({ along }));
         expect(new Set(widths.map((width) => width.toFixed(4))).size).toBeGreaterThan(1);
-        expect(backdrop.trackLocalExtent.min).toBeGreaterThanOrEqual(60);
-        expect(backdrop.trackLocalExtent.max).toBeLessThanOrEqual(100);
+        widths.forEach((width) => {
+            expect(width).toBeGreaterThanOrEqual(30);
+            expect(width).toBeLessThanOrEqual(60);
+        });
+        expect(backdrop.trackLocalExtent).toEqual({ min: 30, max: 60 });
     });
 
-    it('creates biome-scale semantic regions before clustered props', () => {
+    it('preserves the legacy authored coverage for non-Forest biomes', () => {
         const expectedRegions = {
-            forest: ['forest-grove', 'forest-clearing', 'forest-rock-group'],
             mountains: ['mountain-ridge', 'boulder-field', 'mountain-tree-line'],
             arctic: ['snowdrift', 'frozen-lake', 'arctic-rock-cluster'],
             beach: ['water-body', 'dune-field', 'beach-rock-cluster'],
         };
         const expectedFeatures = {
-            forest: ['forest-canopy', 'forest-canopy-highlight'],
             mountains: ['mountain-ridge-lines', 'mountain-rock-field'],
             arctic: ['snowdrift-lines', 'ice-cracks'],
             beach: ['wet-sand', 'dune-crests'],
@@ -187,30 +259,27 @@ describe('world-first biome environment', () => {
             expectedFeatures[biome].forEach((type) => expect(featureTypes.has(type)).toBe(true));
             const clustered = backdrop.propCandidates.filter((point) => point.regionType);
             expect(clustered.length).toBeGreaterThan(backdrop.propCandidates.length * 0.7);
+            expect(backdrop.terrain.length).toBeGreaterThan(0);
+            expect(backdrop.transition.length).toBeGreaterThan(0);
+            expect(backdrop.props.length).toBeGreaterThan(0);
         });
     });
 
-    it('keeps props Poisson-spaced and outside track, runoff, and transition clearance', () => {
+    it('keeps every authored footprint outside the track and shoulder', () => {
         const backdrop = build();
-        const config = getBiomeConfig('forest');
-        expect(backdrop.props.length).toBeGreaterThan(0);
-
-        for (let i = 0; i < backdrop.props.length; i += 1) {
-            const prop = backdrop.props[i];
-            expect(backdrop.distanceIndex.containsTrack(prop.x, prop.y)).toBe(false);
-            const nearest = backdrop.distanceIndex.query(prop.x, prop.y, 4000);
+        const featureGroups = [
+            [backdrop.largeFeatures, 100],
+            [backdrop.mediumFeatures, 64],
+            [backdrop.smallFeatures.filter((feature) => feature.kind === 'forest-rock-formation'), 62],
+            [backdrop.smallFeatures.filter((feature) => feature.kind === 'forest-vegetation-cluster'), 58],
+        ];
+        for (const [features, clearance] of featureGroups) {
+          for (const feature of features) {
+            expect(backdrop.distanceIndex.containsTrack(feature.x, feature.y)).toBe(false);
+            const nearest = backdrop.distanceIndex.query(feature.x, feature.y, 4000);
             expect(nearest).not.toBeNull();
-            expect(nearest.distance).toBeGreaterThan(
-                backdrop.resolveRunoffWidth(nearest)
-                + config.transitionWidth
-                + config.maxPropRadius
-                + config.propClearance,
-            );
-            for (let j = i + 1; j < backdrop.props.length; j += 1) {
-                const other = backdrop.props[j];
-                expect(Math.hypot(prop.x - other.x, prop.y - other.y))
-                    .toBeGreaterThanOrEqual(config.propSpacing - 0.0001);
-            }
+            expect(nearest.distance).toBeGreaterThan(feature.footprintRadius + clearance);
+          }
         }
     });
 
@@ -220,8 +289,9 @@ describe('world-first biome environment', () => {
             ...backdrop.terrain,
             ...backdrop.transition,
             ...backdrop.runoff,
-            ...backdrop.features,
-            ...backdrop.props,
+            ...backdrop.largeFeatures,
+            ...backdrop.mediumFeatures,
+            ...backdrop.smallFeatures,
         ]) {
             expect(Number.isFinite(item.minX)).toBe(true);
             expect(Number.isFinite(item.minY)).toBe(true);
@@ -232,7 +302,7 @@ describe('world-first biome environment', () => {
         }
     });
 
-    it('draws base and props separately, and drops props by detail tier', () => {
+    it('draws all Forest features in the base pass and no individual props after track', () => {
         const backdrop = build();
         const full = createRecordingContext();
         const reduced = createRecordingContext();
@@ -253,14 +323,12 @@ describe('world-first biome environment', () => {
         const terrainProps = drawBiomeBackdropProps(terrainOnly.ctx, width, height, { ...options, detailTier: 0 });
 
         expect(basePainted).toBeGreaterThan(0);
-        expect(fullProps).toBeGreaterThan(0);
-        expect(reducedProps).toBeGreaterThan(0);
-        expect(reducedProps).toBeLessThanOrEqual(fullProps);
-        expect(terrainProps).toBeGreaterThan(0);
-        expect(terrainProps).toBeLessThanOrEqual(reducedProps);
+        expect(fullProps).toBe(0);
+        expect(reducedProps).toBe(0);
+        expect(terrainProps).toBe(0);
         expect(full.calls.fillRect).toBe(1);
-        expect(full.calls.save).toBe(2);
-        expect(full.calls.restore).toBe(2);
+        expect(full.calls.save).toBe(1);
+        expect(full.calls.restore).toBe(1);
     });
 
     it('keeps the combined painter compatible and covers an empty backdrop', () => {
