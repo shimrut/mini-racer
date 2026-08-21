@@ -46,11 +46,14 @@ describe('track presentation resolver', () => {
         ]);
     });
 
-    it('uses the same base color for the infield and outer runoff on regular tracks', () => {
-        const presentation = resolveTrackPresentation('circuit', {
+    it('uses the same base color for the infield and outer runoff on tracks with a flat biome', () => {
+        // Sunlit Temple is set in forest, which paints nothing yet, so it still
+        // resolves to the plain background every track used to have.
+        const presentation = resolveTrackPresentation('sunlitTemple', {
             surface: TRACK_PRESENTATION_SURFACES.RACE
         });
 
+        expect(presentation.key).toBe('track:sunlitTemple:default');
         expect(presentation.infieldColor).toBe(presentation.offTrackColor);
     });
 
@@ -168,5 +171,95 @@ describe('track presentation resolver', () => {
         });
 
         expect(presentation.key).toBe('track:kettleRun:default');
+    });
+});
+
+describe('track presentation biomes', () => {
+    it('paints the biome background on the track it is set on', () => {
+        const presentation = resolveTrackPresentation('circuit', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE
+        });
+
+        expect(presentation.key).toBe('track:circuit:biome:basalt');
+        expect(presentation.backgroundStyle).toBe('biome');
+        // The ground runs under the track, so the infield must not cover it.
+        expect(presentation.infieldColor).toBe('transparent');
+        expect(presentation.biomeGround).toBeTruthy();
+    });
+
+    it('leaves the track surface, curbs and finish line alone', () => {
+        const biomeTrack = resolveTrackPresentation('circuit', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE
+        });
+        const flatTrack = resolveTrackPresentation('sunlitTemple', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE
+        });
+
+        expect(biomeTrack.trackColor).toBe(flatTrack.trackColor);
+        expect(biomeTrack.curbRed).toBe(flatTrack.curbRed);
+        expect(biomeTrack.curbWhite).toBe(flatTrack.curbWhite);
+        expect(biomeTrack.showCurbs).toBe(true);
+    });
+
+    it('keeps every surface except the race on the schematic presentation', () => {
+        [
+            TRACK_PRESENTATION_SURFACES.TRACK_PICKER,
+            TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+            TRACK_PRESENTATION_SURFACES.SHARE
+        ].forEach((surface) => {
+            const presentation = resolveTrackPresentation('circuit', { surface });
+
+            expect(presentation.key).toBe('track:circuit:default');
+            expect(presentation.backgroundStyle).toBe('flat');
+        });
+    });
+
+    it('leaves the presentation key untouched for a biome that paints nothing', () => {
+        const presentation = resolveTrackPresentation('kettleRun', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE
+        });
+
+        expect(presentation.key).toBe('track:kettleRun:default');
+        expect(presentation.backgroundStyle).toBe('flat');
+    });
+
+    it('lets a caller preview a biome the track has not been saved with', () => {
+        const presentation = resolveTrackPresentation('sunlitTemple', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE,
+            biome: 'basalt'
+        });
+
+        expect(presentation.key).toBe('track:sunlitTemple:biome:basalt');
+        expect(presentation.backgroundStyle).toBe('biome');
+    });
+
+    it('falls back to the plain background for a biome it does not know', () => {
+        const presentation = resolveTrackPresentation('circuit', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE,
+            biome: 'swamplands'
+        });
+
+        expect(presentation.key).toBe('track:circuit:default');
+        expect(presentation.backgroundStyle).toBe('flat');
+    });
+
+    it('lets an event skin win over the biome underneath it', () => {
+        const presentation = resolveTrackPresentation('circuit', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE,
+            event: { key: 'daily-challenge', trackKey: 'circuit', skin: 'desert' },
+            biome: 'basalt'
+        });
+
+        // Classic Circuit has no desert skin, so the biome still stands.
+        expect(presentation.key).toBe('track:circuit:biome:basalt');
+
+        const skinned = resolveTrackPresentation('kettleRun', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE,
+            event: { key: 'daily-challenge', trackKey: 'kettleRun', skin: 'desert' },
+            biome: 'basalt'
+        });
+
+        expect(skinned.key).toBe('event:daily-challenge:kettleRun:desert');
+        expect(skinned.backgroundStyle).toBe('desert');
     });
 });

@@ -1,4 +1,6 @@
 import { CONFIG } from '../config.js';
+import { getTrackBiome } from './catalog.js';
+import { getBiomePresentation, isBiomeName } from './biomes.js';
 
 export const TRACK_PRESENTATION_SURFACES = Object.freeze({
     RACE: 'race',
@@ -85,6 +87,19 @@ function getForcedPresentationEventTrackKey() {
     }
 }
 
+/** Lets `?biome=<name>` preview any biome on any track without editing the catalog. */
+function getForcedPresentationBiome() {
+    if (typeof window === 'undefined' || !window.location?.search) return null;
+
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const forcedBiome = params.get('biome');
+        return isBiomeName(forcedBiome) ? forcedBiome : null;
+    } catch (error) {
+        return null;
+    }
+}
+
 function getForcedPresentationEventSkin(trackKey) {
     if (typeof window !== 'undefined' && window.location?.search) {
         try {
@@ -130,11 +145,22 @@ export function createDailyChallengePresentationEvent(challenge) {
 
 export function resolveTrackPresentation(trackKey, {
     surface = TRACK_PRESENTATION_SURFACES.RACE,
-    event = null
+    event = null,
+    biome = null
 } = {}) {
+    // Biomes paint the race only. The track picker, podium, share images and the
+    // custom post draw a schematic that stays readable at card size.
+    const resolvedBiome = biome ?? getForcedPresentationBiome() ?? getTrackBiome(trackKey);
+    const biomePresentation = surface === TRACK_PRESENTATION_SURFACES.RACE
+        ? getBiomePresentation(resolvedBiome)
+        : null;
+
     const basePresentation = {
         ...DEFAULT_TRACK_PRESENTATION,
-        key: getDefaultPresentationKey(trackKey || 'default')
+        ...biomePresentation,
+        key: biomePresentation
+            ? `track:${trackKey}:biome:${resolvedBiome}`
+            : getDefaultPresentationKey(trackKey || 'default')
     };
 
     if (!trackKey || !event || event.trackKey !== trackKey) {
