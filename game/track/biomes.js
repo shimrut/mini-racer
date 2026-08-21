@@ -64,13 +64,10 @@ export const BIOME_LABELS = Object.freeze({
     city: 'City'
 });
 
-/**
- * Presentation per biome. Only basalt is painted so far; the rest resolve to the
- * default flat background, so a track set to them looks exactly as it does today.
- */
-const BIOME_PRESENTATIONS = Object.freeze({
-    basalt: BASALT_PRESENTATION
-});
+// Known biomes share this treatment until distinct art exists, but retain separate cache keys.
+const BIOME_PRESENTATIONS = Object.freeze(Object.fromEntries(
+    BIOME_NAMES.map((biomeName) => [biomeName, BASALT_PRESENTATION])
+));
 
 export const DEFAULT_BIOME = 'basalt';
 
@@ -87,7 +84,7 @@ export function getBiomeLabel(biomeName) {
     return BIOME_LABELS[biomeName] || 'Unknown';
 }
 
-/** The presentation fields a biome contributes, or null when it paints nothing. */
+/** The presentation fields a known biome contributes, or null for an unknown biome. */
 export function getBiomePresentation(biomeName) {
     return BIOME_PRESENTATIONS[biomeName] || null;
 }

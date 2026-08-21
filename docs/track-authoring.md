@@ -15,7 +15,9 @@ every consumer load the large geometry registry.
 - `game/track/biomes.js`
   Owns the list of biomes and the presentation each one paints. Imports nothing
   but the seeded random stream, so the map maker's Node save plumbing and the
-  backfill tool read the same list the game renders from.
+  backfill tool read the same list the game renders from. Until distinct biome
+  art is added, every known biome shares the dark reference ground treatment;
+  its saved identity and per-track cache key still remain distinct.
 - `game/track/backdrop.js`
   Builds a biome's ground once per track and draws the part the viewport can
   see.

@@ -5,6 +5,7 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES
 } from '../game/track/presentation.js';
+import { BIOME_NAMES, isBiomePainted } from '../game/track/biomes.js';
 
 describe('track presentation resolver', () => {
     it('supports a local query override so event skins can be tested without changing server rotation', () => {
@@ -36,7 +37,7 @@ describe('track presentation resolver', () => {
             surface: TRACK_PRESENTATION_SURFACES.RACE
         });
 
-        expect(presentation.key).toBe('track:kettleRun:default');
+        expect(presentation.key).toBe('track:kettleRun:biome:city');
     });
 
     it('lists only the supported daily challenge skins for Kettle Run', () => {
@@ -46,15 +47,14 @@ describe('track presentation resolver', () => {
         ]);
     });
 
-    it('uses the same base color for the infield and outer runoff on tracks with a flat biome', () => {
-        // Sunlit Temple is set in forest, which paints nothing yet, so it still
-        // resolves to the plain background every track used to have.
+    it('uses the reference ground treatment for a non-Basalt catalog biome', () => {
         const presentation = resolveTrackPresentation('sunlitTemple', {
             surface: TRACK_PRESENTATION_SURFACES.RACE
         });
 
-        expect(presentation.key).toBe('track:sunlitTemple:default');
-        expect(presentation.infieldColor).toBe(presentation.offTrackColor);
+        expect(presentation.key).toBe('track:sunlitTemple:biome:forest');
+        expect(presentation.backgroundStyle).toBe('biome');
+        expect(presentation.infieldColor).toBe('transparent');
     });
 
     it('activates the desert event skin for Kettle Run without changing the base track', () => {
@@ -90,7 +90,7 @@ describe('track presentation resolver', () => {
         expect(presentation.debrisFillProbability).toBe(0.72);
         expect(presentation.finishLineColor).toBe('#f6e7c5');
         expect(presentation.finishLineAltColor).toBe('#5b4127');
-        expect(resolveTrackPresentation('kettleRun').key).toBe('track:kettleRun:default');
+        expect(resolveTrackPresentation('kettleRun').key).toBe('track:kettleRun:biome:city');
     });
 
     it('activates the Kettle Run event skin for the daily challenge preview only on the matching track', () => {
@@ -126,7 +126,7 @@ describe('track presentation resolver', () => {
             trackKey: 'kettleRun',
             skin: 'unknown'
         });
-        expect(presentation.key).toBe('track:kettleRun:default');
+        expect(presentation.key).toBe('track:kettleRun:biome:city');
     });
 
     it('does not leak the daily event skin into the normal track picker preview', () => {
@@ -157,7 +157,7 @@ describe('track presentation resolver', () => {
             trackKey: 'kettleRun',
             skin: 'default'
         });
-        expect(presentation.key).toBe('track:kettleRun:default');
+        expect(presentation.key).toBe('track:kettleRun:biome:city');
     });
 
     it('does not leak the daily event skin into generic share rendering', () => {
@@ -207,26 +207,38 @@ describe('track presentation biomes', () => {
         expect(biomeTrack.showCurbs).toBe(true);
     });
 
-    it('keeps every surface except the race on the schematic presentation', () => {
-        [
-            TRACK_PRESENTATION_SURFACES.TRACK_PICKER,
-            TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
-            TRACK_PRESENTATION_SURFACES.SHARE
-        ].forEach((surface) => {
-            const presentation = resolveTrackPresentation('circuit', { surface });
+    it('paints every known biome during a race', () => {
+        BIOME_NAMES.forEach((biome) => {
+            const presentation = resolveTrackPresentation('sunlitTemple', {
+                surface: TRACK_PRESENTATION_SURFACES.RACE,
+                biome
+            });
 
-            expect(presentation.key).toBe('track:circuit:default');
-            expect(presentation.backgroundStyle).toBe('flat');
+            expect(isBiomePainted(biome)).toBe(true);
+            expect(presentation.key).toBe(`track:sunlitTemple:biome:${biome}`);
+            expect(presentation.backgroundStyle).toBe('biome');
+            expect(presentation.biomeGround).toBe('#080e1b');
         });
     });
 
-    it('leaves the presentation key untouched for a biome that paints nothing', () => {
-        const presentation = resolveTrackPresentation('kettleRun', {
-            surface: TRACK_PRESENTATION_SURFACES.RACE
-        });
+    it('keeps every non-race surface schematic for every biome', () => {
+        const surfaces = [
+            TRACK_PRESENTATION_SURFACES.TRACK_PICKER,
+            TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+            TRACK_PRESENTATION_SURFACES.SHARE
+        ];
 
-        expect(presentation.key).toBe('track:kettleRun:default');
-        expect(presentation.backgroundStyle).toBe('flat');
+        BIOME_NAMES.forEach((biome) => {
+            surfaces.forEach((surface) => {
+                const presentation = resolveTrackPresentation('sunlitTemple', {
+                    surface,
+                    biome
+                });
+
+                expect(presentation.key).toBe('track:sunlitTemple:default');
+                expect(presentation.backgroundStyle).toBe('flat');
+            });
+        });
     });
 
     it('lets a caller preview a biome the track has not been saved with', () => {
