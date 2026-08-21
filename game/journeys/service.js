@@ -1,5 +1,5 @@
 import { telemetry } from "@devvit/analytics/client/reddit";
-import { reportRaceStart } from "./race-start-report.js";
+import { reportRaceStart } from "./race-report.js";
 
 const JOURNEY_INTERACTIONS = new Set(["pause", "resume"]);
 
