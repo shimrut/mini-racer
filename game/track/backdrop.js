@@ -1,59 +1,19 @@
-/**
- * The ground a biome track is set on.
- *
- * The ground is terrain, not scattered shapes. A smooth directional field runs
- * across the whole track, and each biome tone fills everything above one height.
- * Filling those tones from low to high forms broad, gently wandering ribbons.
- * Rocks and marker grids are then scattered on top of that.
- *
- * The field and the scatter are both anchored to absolute world coordinates and
- * seeded from the track key, so a track is always the same place, two tracks in
- * one biome are two different places, and a track whose measured bounds shift by
- * a fraction of a pixel does not move.
- *
- * Everything is built once and kept as Path2D beside the track bitmap. A frame
- * fills the ground once, then fills only the tiles and props the viewport can see.
- *
- * The ground does not scroll at its own rate. The infield is transparent on a
- * biome track, so the same ground shows inside the track as outside it, and any
- * rate other than the world's would slide one against the other. Depth comes from
- * the shadow baked under the track instead.
- */
-
 import { createSeededRandom, hashSeed } from './seeded-random.js';
+import {
+    buildTrackDistanceIndex,
+    createEnvironmentNoise,
+    sampleEnvironmentProps,
+} from './environment-field.js';
 
-/** Field bounds are rounded out to this grid so the field edge does not chase the
- * last decimal of a measured track bound. What the ground looks like does not
- * depend on it: the height field is read at absolute world coordinates. */
 const FIELD_SNAP = 200;
-
-/**
- * How far the ground reaches past the track. The camera can lead the car by about
- * 1560px on a wide desktop screen; past the field the plain ground colour still
- * covers the viewport, so reaching the edge shows bare ground, never a hole.
- */
 const FIELD_MARGIN = 2000;
-
-/** How finely the height field is read. This has to be well under the shortest
- * contour wavelength below, or the contours come out faceted. */
-const SAMPLE_STEP = 70;
-
-/** Contours are grouped into tiles this many samples wide, so off-screen ground
- * can be skipped without splitting a fill into thousands of small ones. */
+const SAMPLE_STEP = 72;
 const TILE_SAMPLES = 12;
+const TRACK_INFLUENCE_DISTANCE = 760;
 
-/** Fixed world-space levels keep the ribbons stable when measured bounds change. */
-const TERRAIN_LEVELS = [-0.48, -0.12, 0.20, 0.48];
-
-const TIER_TERRAIN = 0;
-const TIER_ROCKS = 1;
-const TIER_DECALS = 2;
-
-// Small, sparse details let the directional terrain remain the dominant read.
-const ROCK_CELL = 440;
-const ROCK_CHANCE = 0.65;
-const DECAL_CELL = 520;
-const DECAL_CHANCE = 0.6;
+const TIER_ESSENTIAL_PROPS = 0;
+const TIER_MAJOR_PROPS = 1;
+const TIER_ALL_PROPS = 2;
 
 function snapDown(value) {
     return Math.floor(value / FIELD_SNAP) * FIELD_SNAP;
@@ -63,54 +23,51 @@ function snapUp(value) {
     return Math.ceil(value / FIELD_SNAP) * FIELD_SNAP;
 }
 
+function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep(value) {
+    const clamped = clamp01(value);
+    return clamped * clamped * (3 - 2 * clamped);
+}
+
 function range(random, low, high) {
     return low + random() * (high - low);
 }
 
-/**
- * A broad ribbon field whose phase and direction come from the track seed.
- * Coordinates are absolute, while slow along-ribbon bends keep the terrain from
- * reading as repeated straight stripes.
- */
-function createTerrainField(seedKey) {
-    const grainAngle = (hashSeed(`${seedKey}:grain`) % 1000) / 1000 * Math.PI;
-    const grainCos = Math.cos(grainAngle);
-    const grainSin = Math.sin(grainAngle);
-    const seededUnit = (suffix) => (hashSeed(`${seedKey}:${suffix}`) % 10000) / 10000;
-    const phase = seededUnit('phase') * Math.PI * 2;
-    const bendPhase = seededUnit('bend') * Math.PI * 2;
-    const depthPhase = seededUnit('depth') * Math.PI * 2;
-    const wavelength = 900 + seededUnit('width') * 300;
-    const crossAngle = grainAngle
-        + (0.28 + seededUnit('cross-angle') * 0.18) * Math.PI;
-    const crossCos = Math.cos(crossAngle);
-    const crossSin = Math.sin(crossAngle);
-    const crossWavelength = 1700 + seededUnit('cross-width') * 700;
-
-    return (worldX, worldY) => {
-        const along = worldX * grainCos + worldY * grainSin;
-        const across = -worldX * grainSin + worldY * grainCos;
-        const bend = Math.sin(along / 1900 * Math.PI * 2 + bendPhase) * 135
-            + Math.sin(along / 4100 * Math.PI * 2 + depthPhase) * 80;
-        const ribbon = Math.sin((across + bend) / wavelength * Math.PI * 2 + phase);
-        const crossAlong = worldX * crossCos + worldY * crossSin;
-        const crossAcross = -worldX * crossSin + worldY * crossCos;
-        const crossBend = Math.sin(crossAlong / 4600 * Math.PI * 2 + phase) * 170;
-        const depth = Math.sin(
-            (crossAcross + crossBend) / crossWavelength * Math.PI * 2 + depthPhase,
-        ) * 0.44;
-        return (ribbon + depth) / 1.44;
+function createRunoffWidthResolver(config, seedKey) {
+    const phase = (hashSeed(`${seedKey}:runoff-phase`) / 4294967295) * Math.PI * 2;
+    const baseWidth = config.runoffWidth ?? 64;
+    const variation = config.runoffVariation ?? 18;
+    return (nearest) => {
+        if (!nearest) return baseWidth;
+        const first = Math.sin(nearest.along * Math.PI * 6 + phase);
+        const second = Math.sin(nearest.along * Math.PI * 14 + phase * 0.63);
+        return baseWidth + variation * (first * 0.68 + second * 0.32);
     };
 }
 
-/**
- * Adds the part of one grid square that lies above `level` to `path`.
- *
- * This is the marching-squares cell case: the four corner heights say which
- * corners are above the level, and the crossings are read along each edge. Two
- * neighbouring squares work out exactly the same crossing on the edge they share,
- * so the squares meet with no seam and one fill covers all of them.
- */
+function shapeTerrainValue(value, style, x, y, noise, scale) {
+    if (style === 'angular-elevation') {
+        const ridged = Math.sign(value) * Math.pow(Math.abs(value), 0.72);
+        return ridged * 0.82 + noise(x + 340, y - 190, scale * 1.9) * 0.18;
+    }
+    if (style === 'snow-drift') {
+        return value * 0.78 + noise(x * 0.72, y * 0.72, scale * 1.8) * 0.22;
+    }
+    if (style === 'dunes') {
+        const broadDune = Math.sin((x * 0.42 + y * 0.74) / (scale * 0.36)) * 0.13;
+        return value * 0.87 + broadDune;
+    }
+    return value;
+}
+
+function createContourLevels(count) {
+    if (count <= 1) return [0];
+    return Array.from({ length: count }, (_, index) => -0.48 + (index / (count - 1)) * 0.9);
+}
+
 function addCellAboveLevel(path, level, x0, y0, x1, y1, topLeft, topRight, bottomRight, bottomLeft) {
     const code = (topLeft >= level ? 1 : 0)
         | (topRight >= level ? 2 : 0)
@@ -127,325 +84,608 @@ function addCellAboveLevel(path, level, x0, y0, x1, y1, topLeft, topRight, botto
         return;
     }
 
-    const cross = (a, b) => (level - a) / (b - a);
+    const cross = (a, b) => {
+        const denominator = b - a;
+        return Math.abs(denominator) < 1e-9 ? 0.5 : (level - a) / denominator;
+    };
     const top = { x: x0 + (x1 - x0) * cross(topLeft, topRight), y: y0 };
     const right = { x: x1, y: y0 + (y1 - y0) * cross(topRight, bottomRight) };
     const bottom = { x: x0 + (x1 - x0) * cross(bottomLeft, bottomRight), y: y1 };
-    const left = { x: x0, y: y0 + (y1 - y0) * cross(topLeft, bottomLeft) };
-    const topLeftCorner = { x: x0, y: y0 };
-    const topRightCorner = { x: x1, y: y0 };
-    const bottomRightCorner = { x: x1, y: y1 };
-    const bottomLeftCorner = { x: x0, y: y1 };
-
+    const left = { x: x0, y: y0 + (y1 - y0) * cross(topLeft, bottomLeft), };
+    const corners = [
+        { x: x0, y: y0 },
+        { x: x1, y: y0 },
+        { x: x1, y: y1 },
+        { x: x0, y: y1 },
+    ];
     const emit = (points) => {
         path.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i += 1) {
-            path.lineTo(points[i].x, points[i].y);
+        for (let index = 1; index < points.length; index += 1) {
+            path.lineTo(points[index].x, points[index].y);
         }
         path.closePath();
     };
 
     switch (code) {
-        case 1: emit([topLeftCorner, top, left]); break;
-        case 2: emit([top, topRightCorner, right]); break;
-        case 3: emit([topLeftCorner, topRightCorner, right, left]); break;
-        case 4: emit([right, bottomRightCorner, bottom]); break;
-        // Opposite corners: two separate slopes rather than a guessed saddle.
-        case 5: emit([topLeftCorner, top, left]); emit([right, bottomRightCorner, bottom]); break;
-        case 6: emit([top, topRightCorner, bottomRightCorner, bottom]); break;
-        case 7: emit([topLeftCorner, topRightCorner, bottomRightCorner, bottom, left]); break;
-        case 8: emit([left, bottom, bottomLeftCorner]); break;
-        case 9: emit([topLeftCorner, top, bottom, bottomLeftCorner]); break;
-        case 10: emit([top, topRightCorner, right]); emit([left, bottom, bottomLeftCorner]); break;
-        case 11: emit([topLeftCorner, topRightCorner, right, bottom, bottomLeftCorner]); break;
-        case 12: emit([left, right, bottomRightCorner, bottomLeftCorner]); break;
-        case 13: emit([topLeftCorner, top, right, bottomRightCorner, bottomLeftCorner]); break;
-        case 14: emit([top, topRightCorner, bottomRightCorner, bottomLeftCorner, left]); break;
+        case 1: emit([corners[0], top, left]); break;
+        case 2: emit([top, corners[1], right]); break;
+        case 3: emit([corners[0], corners[1], right, left]); break;
+        case 4: emit([right, corners[2], bottom]); break;
+        case 5: emit([corners[0], top, left]); emit([right, corners[2], bottom]); break;
+        case 6: emit([top, corners[1], corners[2], bottom]); break;
+        case 7: emit([corners[0], corners[1], corners[2], bottom, left]); break;
+        case 8: emit([left, bottom, corners[3]]); break;
+        case 9: emit([corners[0], top, bottom, corners[3]]); break;
+        case 10: emit([top, corners[1], right]); emit([left, bottom, corners[3]]); break;
+        case 11: emit([corners[0], corners[1], right, bottom, corners[3]]); break;
+        case 12: emit([left, right, corners[2], corners[3]]); break;
+        case 13: emit([corners[0], top, right, corners[2], corners[3]]); break;
+        case 14: emit([top, corners[1], corners[2], corners[3], left]); break;
         default: break;
     }
 }
 
-/** Reads the height field over the whole area, on absolute world coordinates. */
-function sampleTerrain(field, area) {
-    const columns = Math.round((area.maxX - area.minX) / SAMPLE_STEP) + 1;
-    const rows = Math.round((area.maxY - area.minY) / SAMPLE_STEP) + 1;
-    const heights = new Float32Array(columns * rows);
-
-    for (let row = 0; row < rows; row += 1) {
-        const y = area.minY + row * SAMPLE_STEP;
-        for (let column = 0; column < columns; column += 1) {
-            heights[row * columns + column] = field(area.minX + column * SAMPLE_STEP, y);
-        }
-    }
-
-    return { heights, columns, rows };
-}
-
-/** Builds one tone's ground as tiles, so off-screen ground can be skipped. */
-function buildTerrainLayer(samples, area, level, styleIndex) {
-    const { heights, columns, rows } = samples;
+function buildScalarLayer(values, dimensions, area, level, style) {
+    const { columns, rows } = dimensions;
     const tiles = [];
-
     for (let tileRow = 0; tileRow < rows - 1; tileRow += TILE_SAMPLES) {
         for (let tileColumn = 0; tileColumn < columns - 1; tileColumn += TILE_SAMPLES) {
             const lastRow = Math.min(tileRow + TILE_SAMPLES, rows - 1);
             const lastColumn = Math.min(tileColumn + TILE_SAMPLES, columns - 1);
             const path = new Path2D();
             let painted = false;
-
             for (let row = tileRow; row < lastRow; row += 1) {
                 const y0 = area.minY + row * SAMPLE_STEP;
                 for (let column = tileColumn; column < lastColumn; column += 1) {
-                    const x0 = area.minX + column * SAMPLE_STEP;
                     const index = row * columns + column;
-                    const topLeft = heights[index];
-                    const topRight = heights[index + 1];
-                    const bottomLeft = heights[index + columns];
-                    const bottomRight = heights[index + columns + 1];
-                    if (
-                        topLeft < level && topRight < level
-                        && bottomLeft < level && bottomRight < level
-                    ) {
-                        continue;
-                    }
+                    const corners = [
+                        values[index],
+                        values[index + 1],
+                        values[index + columns + 1],
+                        values[index + columns],
+                    ];
+                    if (corners.every((value) => value < level)) continue;
+                    const x0 = area.minX + column * SAMPLE_STEP;
                     addCellAboveLevel(
-                        path, level,
-                        x0, y0, x0 + SAMPLE_STEP, y0 + SAMPLE_STEP,
-                        topLeft, topRight, bottomRight, bottomLeft,
+                        path,
+                        level,
+                        x0,
+                        y0,
+                        x0 + SAMPLE_STEP,
+                        y0 + SAMPLE_STEP,
+                        corners[0],
+                        corners[1],
+                        corners[2],
+                        corners[3],
                     );
                     painted = true;
                 }
             }
-
             if (!painted) continue;
             tiles.push({
                 path,
-                styleIndex,
+                style,
                 minX: area.minX + tileColumn * SAMPLE_STEP,
                 minY: area.minY + tileRow * SAMPLE_STEP,
                 maxX: area.minX + lastColumn * SAMPLE_STEP,
-                maxY: area.minY + lastRow * SAMPLE_STEP
+                maxY: area.minY + lastRow * SAMPLE_STEP,
             });
         }
     }
-
     return tiles;
 }
 
-/**
- * A rock: a dark slab with one lit facet, the way the reference art draws them.
- */
-function buildRock(random, centerX, centerY) {
-    const radius = range(random, 18, 38);
-    const sides = Math.floor(range(random, 5, 8));
-    const spin = random() * Math.PI * 2;
-    const squash = range(random, 0.55, 0.85);
+function sampleEnvironment(config, area, seedKey, distanceIndex) {
+    const columns = Math.round((area.maxX - area.minX) / SAMPLE_STEP) + 1;
+    const rows = Math.round((area.maxY - area.minY) / SAMPLE_STEP) + 1;
+    const terrain = new Float32Array(columns * rows);
+    const transition = new Float32Array(columns * rows);
+    const runoff = new Float32Array(columns * rows);
+    const noise = createEnvironmentNoise(`${seedKey}:terrain`);
+    const contourScale = 820 * (config.contourScale || 1);
+    const resolveRunoffWidth = createRunoffWidthResolver(config, seedKey);
+    const transitionWidth = config.transitionWidth ?? 150;
 
-    const points = [];
-    for (let side = 0; side < sides; side += 1) {
-        const angle = spin + (side / sides) * Math.PI * 2;
-        const wobble = range(random, 0.78, 1.12);
-        points.push({
-            x: centerX + Math.cos(angle) * radius * wobble,
-            y: centerY + Math.sin(angle) * radius * wobble * squash
-        });
-    }
-
-    const body = new Path2D();
-    body.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i += 1) body.lineTo(points[i].x, points[i].y);
-    body.closePath();
-
-    // The lit facet is one side of the slab, closed back through the middle.
-    const facet = new Path2D();
-    const litCount = Math.max(2, Math.round(points.length / 2));
-    facet.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i <= litCount; i += 1) facet.lineTo(points[i % points.length].x, points[i % points.length].y);
-    facet.lineTo(centerX, centerY);
-    facet.closePath();
-
-    let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
-    for (const point of points) {
-        if (point.x < minX) minX = point.x;
-        if (point.y < minY) minY = point.y;
-        if (point.x > maxX) maxX = point.x;
-        if (point.y > maxY) maxY = point.y;
-    }
-
-    return { path: body, facet, minX, minY, maxX, maxY };
-}
-
-/** A faint marker grid, as one path so the whole grid costs one fill. */
-function buildDecalGrid(random, centerX, centerY) {
-    const columns = Math.floor(range(random, 4, 8));
-    const rows = Math.floor(range(random, 3, 7));
-    const spacing = range(random, 22, 34);
-    const size = 4;
-    const originX = centerX - ((columns - 1) * spacing) / 2;
-    const originY = centerY - ((rows - 1) * spacing) / 2;
-
-    const path = new Path2D();
-    for (let column = 0; column < columns; column += 1) {
-        for (let row = 0; row < rows; row += 1) {
-            path.rect(originX + column * spacing, originY + row * spacing, size, size);
+    for (let row = 0; row < rows; row += 1) {
+        const y = area.minY + row * SAMPLE_STEP;
+        for (let column = 0; column < columns; column += 1) {
+            const x = area.minX + column * SAMPLE_STEP;
+            const index = row * columns + column;
+            const nearest = distanceIndex?.query(x, y, TRACK_INFLUENCE_DISTANCE) || null;
+            const distance = nearest?.distance ?? TRACK_INFLUENCE_DISTANCE * 2;
+            const runoffWidth = resolveRunoffWidth(nearest);
+            const organic = noise(x, y, contourScale);
+            const trackParallel = nearest
+                ? noise(nearest.along * contourScale * 5.4, distance * 1.35, contourScale * 0.72)
+                : organic;
+            const influence = smoothstep(1 - distance / TRACK_INFLUENCE_DISTANCE);
+            const blended = organic * (1 - influence * 0.58) + trackParallel * influence * 0.58;
+            terrain[index] = shapeTerrainValue(
+                blended,
+                config.terrainStyle,
+                x,
+                y,
+                noise,
+                contourScale,
+            );
+            transition[index] = runoffWidth + transitionWidth - distance;
+            runoff[index] = runoffWidth - distance;
         }
     }
 
+    return { terrain, transition, runoff, columns, rows, resolveRunoffWidth };
+}
+
+function transformPoint(centerX, centerY, rotation, scale, x, y) {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
     return {
-        path,
-        minX: originX - size,
-        minY: originY - size,
-        maxX: originX + columns * spacing + size,
-        maxY: originY + rows * spacing + size
+        x: centerX + (x * cos - y * sin) * scale,
+        y: centerY + (x * sin + y * cos) * scale,
     };
 }
 
-/**
- * Places one thing per grid cell, seeded from that cell's own coordinates, so a
- * prop depends only on where it is and never shifts when the field edge moves.
- */
-function scatter(seedKey, name, area, cellSize, chance, build) {
-    const props = [];
-    const firstColumn = Math.floor(area.minX / cellSize);
-    const lastColumn = Math.ceil(area.maxX / cellSize);
-    const firstRow = Math.floor(area.minY / cellSize);
-    const lastRow = Math.ceil(area.maxY / cellSize);
-
-    for (let column = firstColumn; column < lastColumn; column += 1) {
-        for (let row = firstRow; row < lastRow; row += 1) {
-            const random = createSeededRandom(`${seedKey}:${name}:${column}:${row}`);
-            if (random() > chance) continue;
-            const x = (column + range(random, 0.15, 0.85)) * cellSize;
-            const y = (row + range(random, 0.15, 0.85)) * cellSize;
-            props.push(build(random, x, y));
-        }
+function addPolygon(path, points) {
+    path.moveTo(points[0].x, points[0].y);
+    for (let index = 1; index < points.length; index += 1) {
+        path.lineTo(points[index].x, points[index].y);
     }
-
-    return props;
+    path.closePath();
 }
 
-/**
- * Builds the ground for one track. Returns null unless the presentation asks for a
- * biome background, so callers can pass any presentation.
- *
- * `bounds` are the track's world-pixel extents. `seedKey` must identify the track
- * and its biome, so re-picking a biome in the map maker rebuilds the ground.
- */
-export function buildBiomeBackdrop(presentation, bounds, seedKey) {
+function buildFacetedProp(random, x, y, definition, scale, rotation, count = 1) {
+    const body = new Path2D();
+    const accent = new Path2D();
+    let radius = 0;
+    for (let cluster = 0; cluster < count; cluster += 1) {
+        const localScale = scale * range(random, 0.72, 1.08);
+        const offsetX = count > 1 ? range(random, -22, 22) * scale : 0;
+        const offsetY = count > 1 ? range(random, -15, 15) * scale : 0;
+        const sides = Math.floor(range(random, 5, 8));
+        const localRadius = range(random, 15, 27) * localScale;
+        const points = [];
+        for (let side = 0; side < sides; side += 1) {
+            const angle = rotation + (side / sides) * Math.PI * 2;
+            const wobble = range(random, 0.82, 1.14);
+            points.push({
+                x: x + offsetX + Math.cos(angle) * localRadius * wobble,
+                y: y + offsetY + Math.sin(angle) * localRadius * wobble * 0.72,
+            });
+        }
+        addPolygon(body, points);
+        addPolygon(accent, [points[0], points[1], { x: x + offsetX, y: y + offsetY }]);
+        radius = Math.max(radius, Math.hypot(offsetX, offsetY) + localRadius * 1.2);
+    }
+    return {
+        layers: [
+            { path: body, style: definition.color },
+            { path: accent, style: definition.accentColor },
+        ],
+        radius,
+    };
+}
+
+function buildPineProp(x, y, definition, scale, rotation) {
+    const body = new Path2D();
+    const accent = new Path2D();
+    const tiers = [
+        { top: -31, half: 17, bottom: 3 },
+        { top: -19, half: 22, bottom: 16 },
+        { top: -5, half: 27, bottom: 31 },
+    ];
+    for (const [index, tier] of tiers.entries()) {
+        const points = [
+            transformPoint(x, y, rotation, scale, 0, tier.top),
+            transformPoint(x, y, rotation, scale, tier.half, tier.bottom),
+            transformPoint(x, y, rotation, scale, -tier.half, tier.bottom),
+        ];
+        addPolygon(index === 0 ? accent : body, points);
+    }
+    return {
+        layers: [
+            { path: body, style: definition.color },
+            { path: accent, style: definition.accentColor },
+        ],
+        radius: 38 * scale,
+    };
+}
+
+function buildShrubProp(random, x, y, definition, scale, rotation) {
+    const body = new Path2D();
+    const accent = new Path2D();
+    for (let clump = 0; clump < 4; clump += 1) {
+        const angle = rotation + (clump / 4) * Math.PI * 2;
+        const centerX = x + Math.cos(angle) * 8 * scale;
+        const centerY = y + Math.sin(angle) * 5 * scale;
+        const points = [];
+        for (let side = 0; side < 6; side += 1) {
+            const sideAngle = (side / 6) * Math.PI * 2;
+            const radius = range(random, 7, 11) * scale;
+            points.push({
+                x: centerX + Math.cos(sideAngle) * radius,
+                y: centerY + Math.sin(sideAngle) * radius * 0.72,
+            });
+        }
+        addPolygon(clump === 0 ? accent : body, points);
+    }
+    return {
+        layers: [
+            { path: body, style: definition.color },
+            { path: accent, style: definition.accentColor },
+        ],
+        radius: 24 * scale,
+    };
+}
+
+function buildPebbleProp(random, x, y, definition, scale, rotation) {
+    return buildFacetedProp(random, x, y, definition, scale * 0.42, rotation, 3);
+}
+
+function choosePropDefinition(random, definitions) {
+    const totalWeight = definitions.reduce((sum, definition) => sum + (definition.weight || 1), 0);
+    let target = random() * totalWeight;
+    for (const definition of definitions) {
+        target -= definition.weight || 1;
+        if (target <= 0) return definition;
+    }
+    return definitions[definitions.length - 1];
+}
+
+function buildProp(point, config) {
+    const random = createSeededRandom(point.seed);
+    const definition = choosePropDefinition(random, config.props);
+    const scale = range(random, definition.minScale ?? 0.9, definition.maxScale ?? 1.1);
+    const maxRotation = definition.maxRotation ?? 0.18;
+    const rotation = range(random, -maxRotation, maxRotation);
+    let built;
+    if (definition.type === 'pine') {
+        built = buildPineProp(point.x, point.y, definition, scale, rotation);
+    } else if (definition.type === 'shrub') {
+        built = buildShrubProp(random, point.x, point.y, definition, scale, rotation);
+    } else if (definition.type === 'pebble' || definition.type === 'ice-chip') {
+        built = buildPebbleProp(random, point.x, point.y, definition, scale, rotation);
+    } else {
+        built = buildFacetedProp(
+            random,
+            point.x,
+            point.y,
+            definition,
+            scale,
+            rotation,
+            definition.type === 'rock-formation' ? 3 : 1,
+        );
+    }
+    return {
+        ...built,
+        x: point.x,
+        y: point.y,
+        type: definition.type,
+        priority: random(),
+        minX: point.x - built.radius,
+        minY: point.y - built.radius,
+        maxX: point.x + built.radius,
+        maxY: point.y + built.radius,
+    };
+}
+
+function buildBlob(random, x, y, radiusX, radiusY, sides = 14) {
+    const path = new Path2D();
+    const points = [];
+    const spin = random() * Math.PI * 2;
+    for (let side = 0; side < sides; side += 1) {
+        const angle = spin + (side / sides) * Math.PI * 2;
+        const wobble = range(random, 0.78, 1.18);
+        points.push({
+            x: x + Math.cos(angle) * radiusX * wobble,
+            y: y + Math.sin(angle) * radiusY * wobble,
+        });
+    }
+    addPolygon(path, points);
+    return path;
+}
+
+function buildSecondaryFeatures(config, area, seedKey, distanceIndex, resolveRunoffWidth) {
+    const features = [];
+    const transitionWidth = config.transitionWidth ?? 150;
+    const acceptsFeature = (x, y, clearance) => {
+        if (distanceIndex?.containsTrack(x, y)) return false;
+        const nearest = distanceIndex?.query(x, y, 1600) || null;
+        if (distanceIndex && !nearest) return false;
+        return !nearest || nearest.distance > resolveRunoffWidth(nearest) + transitionWidth + clearance;
+    };
+    const addFeaturePoints = (suffix, targetCount, spacing, clearance, build) => {
+        const points = sampleEnvironmentProps({
+            seedKey: `${seedKey}:feature:${suffix}`,
+            area,
+            minDistance: spacing,
+            targetCount,
+            clustering: 0.18,
+            clusterRadius: spacing * 0.8,
+            accept: (x, y) => acceptsFeature(x, y, clearance),
+            createCandidate: distanceIndex
+                ? (random) => distanceIndex.sampleNearBoundary(
+                    random,
+                    transitionWidth + clearance + 120,
+                    Math.min(1450, transitionWidth + clearance + 760),
+                )
+                : null,
+        });
+        for (const point of points) build(point);
+    };
+
+    if (config.id === 'arctic') {
+        addFeaturePoints('pond', 7, 760, 330, (point) => {
+            const random = createSeededRandom(point.seed);
+            const radiusX = range(random, 130, 260);
+            const radiusY = range(random, 70, 150);
+            features.push({
+                path: buildBlob(random, point.x, point.y, radiusX, radiusY, 16),
+                fillStyle: '#a9cfdb',
+                minX: point.x - radiusX * 1.2,
+                minY: point.y - radiusY * 1.2,
+                maxX: point.x + radiusX * 1.2,
+                maxY: point.y + radiusY * 1.2,
+            });
+            const cracks = new Path2D();
+            for (let crack = 0; crack < 3; crack += 1) {
+                const startX = point.x + range(random, -radiusX * 0.5, radiusX * 0.5);
+                const startY = point.y + range(random, -radiusY * 0.45, radiusY * 0.45);
+                cracks.moveTo(startX, startY);
+                cracks.lineTo(startX + range(random, -55, 55), startY + range(random, -26, 26));
+                cracks.lineTo(startX + range(random, -92, 92), startY + range(random, -46, 46));
+            }
+            features.push({
+                path: cracks,
+                strokeStyle: '#87b4c3',
+                lineWidth: 2,
+                minX: point.x - radiusX,
+                minY: point.y - radiusY,
+                maxX: point.x + radiusX,
+                maxY: point.y + radiusY,
+            });
+        });
+    } else if (config.id === 'beach') {
+        addFeaturePoints('shoreline', 4, 1200, 620, (point) => {
+            const random = createSeededRandom(point.seed);
+            const radiusX = range(random, 260, 520);
+            const radiusY = range(random, 150, 300);
+            features.push({
+                path: buildBlob(random, point.x, point.y, radiusX, radiusY, 18),
+                fillStyle: '#416f7b',
+                minX: point.x - radiusX * 1.2,
+                minY: point.y - radiusY * 1.2,
+                maxX: point.x + radiusX * 1.2,
+                maxY: point.y + radiusY * 1.2,
+            });
+            features.push({
+                path: buildBlob(random, point.x, point.y, radiusX * 0.8, radiusY * 0.78, 18),
+                fillStyle: '#5b8790',
+                minX: point.x - radiusX,
+                minY: point.y - radiusY,
+                maxX: point.x + radiusX,
+                maxY: point.y + radiusY,
+            });
+        });
+    } else if (config.id === 'mountains') {
+        addFeaturePoints('elevation', 6, 900, 350, (point) => {
+            const random = createSeededRandom(point.seed);
+            const radiusX = range(random, 150, 280);
+            const radiusY = range(random, 90, 180);
+            features.push({
+                path: buildBlob(random, point.x, point.y, radiusX, radiusY, 8),
+                fillStyle: config.groundColors[1],
+                minX: point.x - radiusX * 1.2,
+                minY: point.y - radiusY * 1.2,
+                maxX: point.x + radiusX * 1.2,
+                maxY: point.y + radiusY * 1.2,
+            });
+        });
+    }
+    return features;
+}
+
+function buildProps(config, area, seedKey, distanceIndex, resolveRunoffWidth) {
+    if (!config.props?.length) return [];
+    const width = area.maxX - area.minX;
+    const height = area.maxY - area.minY;
+    const targetCount = Math.min(
+        config.maxProps ?? 320,
+        Math.max(18, Math.round((width * height / 1000000) * config.propDensity * 10)),
+    );
+    const transitionWidth = config.transitionWidth ?? 150;
+    const conservativeRadius = config.maxPropRadius ?? 64;
+    const clearance = config.propClearance ?? 42;
+    const points = sampleEnvironmentProps({
+        seedKey: `${seedKey}:props`,
+        area,
+        minDistance: config.propSpacing ?? (config.id === 'forest' ? 155 : 205),
+        targetCount,
+        clustering: config.clustering,
+        clusterRadius: config.clusterRadius ?? 420,
+        createCandidate: distanceIndex
+            ? (random) => distanceIndex.sampleNearBoundary(
+                random,
+                transitionWidth + conservativeRadius + clearance + 28,
+                920,
+            )
+            : null,
+        accept(x, y) {
+            if (distanceIndex?.containsTrack(x, y)) return false;
+            const nearest = distanceIndex?.query(x, y, 980) || null;
+            if (distanceIndex && !nearest) return false;
+            return !nearest || nearest.distance > (
+                resolveRunoffWidth(nearest)
+                + transitionWidth
+                + conservativeRadius
+                + clearance
+            );
+        },
+    });
+    return points.map((point) => buildProp(point, config));
+}
+
+/** Builds one deterministic environment around the smoothed circuit geometry. */
+export function buildBiomeBackdrop(presentation, bounds, seedKey, {
+    geometry = null,
+    worldScale = 1,
+} = {}) {
     if (!presentation || presentation.backgroundStyle !== 'biome') return null;
     if (!bounds || typeof Path2D === 'undefined') return null;
+    const config = presentation.biomeConfig;
+    if (!config) return null;
 
     const area = {
         minX: snapDown(bounds.minX) - FIELD_MARGIN,
         minY: snapDown(bounds.minY) - FIELD_MARGIN,
         maxX: snapUp(bounds.maxX) + FIELD_MARGIN,
-        maxY: snapUp(bounds.maxY) + FIELD_MARGIN
+        maxY: snapUp(bounds.maxY) + FIELD_MARGIN,
     };
-
-    const field = createTerrainField(`${seedKey}:terrain`);
-    const samples = sampleTerrain(field, area);
-
-    const terrainTones = presentation.biomeTerrainColors || [];
-    const styles = [
-        ...terrainTones,
-        presentation.biomeRockColor || terrainTones[terrainTones.length - 1],
-        presentation.biomeRockLitColor || presentation.biomeRockColor,
-        presentation.biomeDecalColor || terrainTones[0]
-    ];
-    const rockStyle = terrainTones.length;
-    const rockLitStyle = rockStyle + 1;
-    const decalStyle = rockStyle + 2;
-
-    // Low levels first: each higher tone sits inside the one below, so filling in
-    // order steps the ground up one terrace at a time.
+    const distanceIndex = buildTrackDistanceIndex(geometry, worldScale);
+    const samples = sampleEnvironment(config, area, seedKey, distanceIndex);
+    const dimensions = { columns: samples.columns, rows: samples.rows };
+    const terrainColors = config.groundColors.slice(1, config.contourCount);
+    const levels = createContourLevels(terrainColors.length);
     const terrain = [];
-    TERRAIN_LEVELS.slice(0, terrainTones.length).forEach((level, index) => {
-        terrain.push(...buildTerrainLayer(samples, area, level, index));
+    terrainColors.forEach((style, index) => {
+        terrain.push(...buildScalarLayer(samples.terrain, dimensions, area, levels[index], style));
     });
+    const transition = buildScalarLayer(samples.transition, dimensions, area, 0, config.transitionColor);
+    const runoff = buildScalarLayer(samples.runoff, dimensions, area, 0, config.runoffColor);
+    const features = buildSecondaryFeatures(
+        config,
+        area,
+        seedKey,
+        distanceIndex,
+        samples.resolveRunoffWidth,
+    );
+    const props = buildProps(
+        config,
+        area,
+        seedKey,
+        distanceIndex,
+        samples.resolveRunoffWidth,
+    );
 
-    const rocks = scatter(seedKey, 'rock', area, ROCK_CELL, ROCK_CHANCE, buildRock);
-    const decals = scatter(seedKey, 'decal', area, DECAL_CELL, DECAL_CHANCE, buildDecalGrid);
-
-    return { field: area, terrain, rocks, decals, styles, rockStyle, rockLitStyle, decalStyle };
+    return {
+        field: area,
+        terrain,
+        transition,
+        runoff,
+        features,
+        props,
+        groundColor: config.groundColors[0],
+        configId: config.id,
+        distanceIndex,
+        resolveRunoffWidth: samples.resolveRunoffWidth,
+    };
 }
 
 function isVisible(item, minX, minY, maxX, maxY) {
     return !(item.maxX < minX || item.minX > maxX || item.maxY < minY || item.minY > maxY);
 }
 
-/**
- * Paints the ground into the viewport.
- *
- * `offsetX`/`offsetY`/`scale` map world coordinates to the target canvas, so the
- * race and the map maker share one painter despite working in different units.
- * `detailTier` drops the smallest things first when the device is struggling.
- */
-export function drawBiomeBackdrop(ctx, width, height, {
+function prepareTransform(ctx, width, height, offsetX, offsetY, scale) {
+    const visible = {
+        minX: -offsetX / scale,
+        minY: -offsetY / scale,
+        maxX: (width - offsetX) / scale,
+        maxY: (height - offsetY) / scale,
+    };
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+    return visible;
+}
+
+function drawTiles(ctx, tiles, visible) {
+    let painted = 0;
+    let style = null;
+    for (const tile of tiles) {
+        if (!isVisible(tile, visible.minX, visible.minY, visible.maxX, visible.maxY)) continue;
+        if (tile.style !== style) {
+            ctx.fillStyle = tile.style;
+            style = tile.style;
+        }
+        ctx.fill(tile.path);
+        painted += 1;
+    }
+    return painted;
+}
+
+function drawFeatures(ctx, features, visible) {
+    let painted = 0;
+    for (const feature of features) {
+        if (!isVisible(feature, visible.minX, visible.minY, visible.maxX, visible.maxY)) continue;
+        if (feature.fillStyle) {
+            ctx.fillStyle = feature.fillStyle;
+            ctx.fill(feature.path);
+        }
+        if (feature.strokeStyle) {
+            ctx.strokeStyle = feature.strokeStyle;
+            ctx.lineWidth = feature.lineWidth || 1;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke(feature.path);
+        }
+        painted += 1;
+    }
+    return painted;
+}
+
+export function drawBiomeBackdropBase(ctx, width, height, {
     offsetX = 0,
     offsetY = 0,
     scale = 1,
     presentation = {},
     backdrop = null,
-    detailTier = TIER_DECALS
 } = {}) {
-    ctx.fillStyle = presentation.biomeGround || presentation.offTrackColor || '#0b1220';
+    ctx.fillStyle = backdrop?.groundColor
+        || presentation.biomeConfig?.groundColors?.[0]
+        || presentation.biomeGround
+        || presentation.offTrackColor
+        || '#0b1220';
     ctx.fillRect(0, 0, width, height);
-
     if (!backdrop || scale <= 0) return 0;
-
-    const minX = -offsetX / scale;
-    const minY = -offsetY / scale;
-    const maxX = (width - offsetX) / scale;
-    const maxY = (height - offsetY) / scale;
-
-    ctx.save();
-    ctx.translate(offsetX, offsetY);
-    ctx.scale(scale, scale);
-
-    let painted = 0;
-    let appliedStyle = -1;
-    const setStyle = (styleIndex) => {
-        if (styleIndex === appliedStyle) return;
-        ctx.fillStyle = backdrop.styles[styleIndex];
-        appliedStyle = styleIndex;
-    };
-
-    for (const tile of backdrop.terrain) {
-        if (!isVisible(tile, minX, minY, maxX, maxY)) continue;
-        setStyle(tile.styleIndex);
-        ctx.fill(tile.path);
-        painted += 1;
-    }
-
-    if (detailTier >= TIER_ROCKS) {
-        // Slabs first, then every lit facet, so the style flips twice for all the
-        // rocks on screen rather than twice per rock. Rocks are a cell apart, so
-        // none of them can cover another one's facet.
-        const visibleRocks = backdrop.rocks
-            .filter((rock) => isVisible(rock, minX, minY, maxX, maxY));
-        setStyle(backdrop.rockStyle);
-        for (const rock of visibleRocks) ctx.fill(rock.path);
-        setStyle(backdrop.rockLitStyle);
-        for (const rock of visibleRocks) ctx.fill(rock.facet);
-        painted += visibleRocks.length;
-    }
-
-    if (detailTier >= TIER_DECALS) {
-        setStyle(backdrop.decalStyle);
-        for (const decal of backdrop.decals) {
-            if (!isVisible(decal, minX, minY, maxX, maxY)) continue;
-            ctx.fill(decal.path);
-            painted += 1;
-        }
-    }
-
+    const visible = prepareTransform(ctx, width, height, offsetX, offsetY, scale);
+    let painted = drawTiles(ctx, backdrop.terrain, visible);
+    painted += drawFeatures(ctx, backdrop.features, visible);
+    painted += drawTiles(ctx, backdrop.transition, visible);
+    painted += drawTiles(ctx, backdrop.runoff, visible);
     ctx.restore();
     return painted;
 }
 
-/** How much of the ground to draw, given how the device is currently coping. */
+export function drawBiomeBackdropProps(ctx, width, height, {
+    offsetX = 0,
+    offsetY = 0,
+    scale = 1,
+    backdrop = null,
+    detailTier = TIER_ALL_PROPS,
+} = {}) {
+    if (!backdrop || scale <= 0) return 0;
+    const visible = prepareTransform(ctx, width, height, offsetX, offsetY, scale);
+    let painted = 0;
+    for (const prop of backdrop.props) {
+        if (detailTier <= TIER_ESSENTIAL_PROPS && prop.priority < 0.82) continue;
+        if (detailTier < TIER_ALL_PROPS && prop.priority < 0.52) continue;
+        if (!isVisible(prop, visible.minX, visible.minY, visible.maxX, visible.maxY)) continue;
+        for (const layer of prop.layers) {
+            ctx.fillStyle = layer.style;
+            ctx.fill(layer.path);
+        }
+        painted += 1;
+    }
+    ctx.restore();
+    return painted;
+}
+
+export function drawBiomeBackdrop(ctx, width, height, options = {}) {
+    return drawBiomeBackdropBase(ctx, width, height, options)
+        + drawBiomeBackdropProps(ctx, width, height, options);
+}
+
 export function resolveBackdropDetailTier(qualityLevel = 0, frameSkip = 0) {
-    if (frameSkip > 0) return TIER_TERRAIN;
-    if (qualityLevel > 0) return TIER_ROCKS;
-    return TIER_DECALS;
+    if (frameSkip > 0) return TIER_ESSENTIAL_PROPS;
+    if (qualityLevel > 0) return TIER_MAJOR_PROPS;
+    return TIER_ALL_PROPS;
 }

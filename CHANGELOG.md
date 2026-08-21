@@ -1,12 +1,15 @@
 # Changelog
 
-- Tracks are now set in a **biome**, and the ground shows it. A biome track
-  draws dark, broad ribbon-like landforms, small faceted rocks and faint marker
-  grids behind and through the circuit, and the track casts a shadow onto that
-  ground. The layout is built from the track's own key, so a track is always
-  the same place, and two tracks in one biome are two different places. Every
-  biome currently shares this dark reference treatment so it appears in normal
-  races; saved biome identities remain intact for distinct art later.
+- Tracks now generate a complete environment from their smoothed circuit
+  geometry and track key. Forest, Mountains, Arctic, and Beach each configure
+  their own 3–5-shade terrain, variable shoulder/runoff, sparse clustered
+  vector props, and biome features such as rock formations, frozen ponds, or
+  shoreline where space allows. Contours react to distance and direction from
+  the circuit instead of acting as background wallpaper; props are kept off the
+  track, kerbs, and immediate runoff. Asphalt keeps its existing shape and adds
+  only a broad tonal shift and thin dark kerb-side edge. Everything is cached,
+  culled, deterministic, and asset-free; track geometry, kerbs, cars, controls,
+  HUD, physics, and gameplay are unchanged.
 
 - Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
   Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested

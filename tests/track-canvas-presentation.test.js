@@ -30,6 +30,8 @@ function createContext() {
         moveTo: vi.fn(),
         lineTo: vi.fn(),
         closePath: vi.fn(),
+        clip: vi.fn(),
+        lineDashOffset: 0,
         createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
         createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() }))
     };
@@ -93,6 +95,30 @@ describe('track canvas presentation', () => {
 
         expect(ctx.fill).toHaveBeenCalledWith(surfacePath, 'evenodd');
         expect(ctx.fill).toHaveBeenCalledWith(innerPath);
+    });
+
+    it('adds subtle clipped asphalt variation and a darker inner edge', () => {
+        const ctx = createContext();
+        const surfacePath = { id: 'surface' };
+        const innerPath = { id: 'inner' };
+        const outerPath = { id: 'outer' };
+
+        fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, 320, 200, {
+            key: 'track:asphalt-test',
+            trackColor: '#334155',
+            infieldColor: 'transparent',
+            asphaltEdgeColor: 'rgba(2, 6, 23, 0.5)',
+            asphaltEdgeWidth: 3,
+        });
+
+        expect(ctx.createLinearGradient).toHaveBeenCalledOnce();
+        const gradient = ctx.createLinearGradient.mock.results[0].value;
+        expect(gradient.addColorStop).toHaveBeenCalledTimes(3);
+        expect(ctx.clip).toHaveBeenCalledWith(surfacePath, 'evenodd');
+        expect(ctx.stroke).toHaveBeenCalledWith(outerPath);
+        expect(ctx.stroke).toHaveBeenCalledWith(innerPath);
+        expect(ctx.strokeStyle).toBe('rgba(2, 6, 23, 0.5)');
+        expect(ctx.lineWidth).toBe(3);
     });
 
     it('draws layered canyon walls for canyon-style desert track edges', () => {

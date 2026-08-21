@@ -1,6 +1,7 @@
 import { buildTrackCanvas } from './canvas.js';
 import { buildBiomeBackdrop } from './backdrop.js';
 import { buildCollisionRuntime, buildTrackGeometry } from './runtime.js';
+import { CONFIG } from '../config.js';
 
 const geometryCache = new Map();
 const runtimeCache = new Map();
@@ -83,6 +84,10 @@ export function getTrackCanvasAsset(trackKey, track, options = {}) {
                 options.presentation || null,
                 built.bounds,
                 options.presentation?.key || trackKey,
+                {
+                    geometry,
+                    worldScale: CONFIG.gridSize,
+                },
             ),
         };
         // Evict the entry, but do not touch the canvas it holds. The engine keeps the

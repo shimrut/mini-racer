@@ -1,6 +1,9 @@
 import { CONFIG } from '../config.js';
 import { createSeededRandom } from './seeded-random.js';
-import { drawBiomeBackdrop } from './backdrop.js';
+import {
+    drawBiomeBackdropBase,
+    drawBiomeBackdropProps,
+} from './backdrop.js';
 
 function drawDesertBackdrop(ctx, width, height, presentation = {}) {
     ctx.fillStyle = presentation.offTrackColor || '#8d6a3b';
@@ -147,7 +150,7 @@ export function drawViewportPresentationBackground(
     detailTier = 2
 ) {
     if (presentation.backgroundStyle === 'biome') {
-        drawBiomeBackdrop(ctx, width, height, {
+        drawBiomeBackdropBase(ctx, width, height, {
             offsetX: -camera.x * zoom,
             offsetY: -camera.y * zoom,
             scale: zoom,
@@ -165,6 +168,27 @@ export function drawViewportPresentationBackground(
 
     ctx.fillStyle = presentation.offTrackColor || CONFIG.offTrackColor;
     ctx.fillRect(0, 0, width, height);
+}
+
+export function drawViewportPresentationProps(
+    ctx,
+    width,
+    height,
+    camera = { x: 0, y: 0 },
+    zoom = 1,
+    presentation = {},
+    backdrop = null,
+    detailTier = 2
+) {
+    if (presentation.backgroundStyle !== 'biome') return 0;
+    return drawBiomeBackdropProps(ctx, width, height, {
+        offsetX: -camera.x * zoom,
+        offsetY: -camera.y * zoom,
+        scale: zoom,
+        presentation,
+        backdrop,
+        detailTier
+    });
 }
 
 function drawBoundaryDebris(ctx, points, mapTrackPoint, presentation, {
@@ -268,14 +292,54 @@ export function drawInnerDebris(ctx, inner, mapTrackPoint, presentation) {
     });
 }
 
+export function drawAsphaltVariation(ctx, surfacePath, width, height, presentation = {}) {
+    if (
+        !ctx.createLinearGradient
+        || presentation.asphaltVariation === false
+        || presentation.backgroundStyle === 'transparent'
+    ) return;
+    const random = createSeededRandom(`${presentation.key || 'track'}:asphalt`);
+    const angle = random() * Math.PI * 2;
+    const span = Math.hypot(width, height);
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const dx = Math.cos(angle) * span / 2;
+    const dy = Math.sin(angle) * span / 2;
+    const gradient = ctx.createLinearGradient(
+        centerX - dx,
+        centerY - dy,
+        centerX + dx,
+        centerY + dy,
+    );
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.018)');
+    gradient.addColorStop(0.46, 'rgba(255, 255, 255, 0.045)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.055)');
+    ctx.save();
+    ctx.clip(surfacePath, 'evenodd');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+}
+
+export function drawAsphaltInnerEdge(ctx, surfacePath, outerPath, innerPath, presentation = {}) {
+    ctx.save();
+    ctx.clip(surfacePath, 'evenodd');
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = presentation.asphaltEdgeWidth ?? 4;
+    ctx.strokeStyle = presentation.asphaltEdgeColor || 'rgba(4, 10, 20, 0.42)';
+    ctx.stroke(outerPath);
+    ctx.stroke(innerPath);
+    ctx.restore();
+}
+
 export function fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, width, height, presentation = {}) {
-    void outerPath;
-    void width;
-    void height;
     ctx.fillStyle = presentation.trackColor || CONFIG.trackColor;
     ctx.fill(surfacePath, 'evenodd');
     ctx.fillStyle = presentation.infieldColor || CONFIG.offTrackColor;
     ctx.fill(innerPath);
+    drawAsphaltVariation(ctx, surfacePath, width, height, presentation);
+    drawAsphaltInnerEdge(ctx, surfacePath, outerPath, innerPath, presentation);
 }
 
 export function drawTrackBoundaries(ctx, outerPath, innerPath, presentation = {}) {

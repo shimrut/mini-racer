@@ -2,53 +2,69 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
     buildBiomeBackdrop,
     drawBiomeBackdrop,
-    resolveBackdropDetailTier
+    drawBiomeBackdropBase,
+    drawBiomeBackdropProps,
+    resolveBackdropDetailTier,
 } from '../game/track/backdrop.js';
-import { getBiomePresentation } from '../game/track/biomes.js';
+import { getBiomeConfig, getBiomePresentation } from '../game/track/biomes.js';
 
 const BIOME_PRESENTATION = {
     backgroundStyle: 'biome',
-    ...getBiomePresentation('basalt')
+    ...getBiomePresentation('forest'),
 };
-
 const FLAT_PRESENTATION = { backgroundStyle: 'flat', offTrackColor: '#0f172a' };
 
-const BOUNDS = { minX: 0, minY: 0, maxX: 1120, maxY: 721 };
+const GEOMETRY = {
+    outer: [
+        { x: 0, y: 0 }, { x: 1120, y: 0 }, { x: 1120, y: 720 }, { x: 0, y: 720 },
+    ],
+    inner: [
+        { x: 280, y: 220 }, { x: 840, y: 220 }, { x: 840, y: 500 }, { x: 280, y: 500 },
+    ],
+};
+const BOUNDS = { minX: 0, minY: 0, maxX: 1120, maxY: 720 };
 
 function createRecordingContext() {
     const calls = {
         fill: 0, fillRect: 0, save: 0, restore: 0,
-        translate: [], scale: [], fillStyles: []
+        translate: [], scale: [], fillStyles: [], stroke: 0,
     };
     const ctx = {
         set fillStyle(value) { calls.fillStyles.push(value); },
         get fillStyle() { return calls.fillStyles[calls.fillStyles.length - 1]; },
         fill: () => { calls.fill += 1; },
         fillRect: () => { calls.fillRect += 1; },
+        stroke: () => { calls.stroke += 1; },
         save: () => { calls.save += 1; },
         restore: () => { calls.restore += 1; },
         translate: (x, y) => { calls.translate.push([x, y]); },
-        scale: (x, y) => { calls.scale.push([x, y]); }
+        scale: (x, y) => { calls.scale.push([x, y]); },
     };
     return { ctx, calls };
+}
+
+function build(seed = 'track:forest', geometry = GEOMETRY) {
+    return buildBiomeBackdrop(
+        BIOME_PRESENTATION,
+        BOUNDS,
+        seed,
+        { geometry, worldScale: 1 },
+    );
 }
 
 function boxSignature(items) {
     return items.map((item) => [
         Math.round(item.minX), Math.round(item.minY),
         Math.round(item.maxX), Math.round(item.maxY),
-        item.styleIndex ?? ''
+        item.style || item.type || '',
     ].join(':')).join('|');
 }
 
-function nearTrack(items) {
-    return items.filter((item) => (
-        item.minX > BOUNDS.minX - 900 && item.maxX < BOUNDS.maxX + 900
-        && item.minY > BOUNDS.minY - 900 && item.maxY < BOUNDS.maxY + 900
-    ));
+function propSignature(items) {
+    return items.map((item) => `${item.type}:${item.x.toFixed(3)}:${item.y.toFixed(3)}`).join('|');
 }
 
-describe('biome backdrop', () => {
+describe('track-derived biome environment', () => {
     beforeAll(() => {
         vi.stubGlobal('Path2D', class {
             moveTo() {}
@@ -62,147 +78,156 @@ describe('biome backdrop', () => {
         vi.unstubAllGlobals();
     });
 
-    it('builds nothing for a presentation that paints no biome', () => {
-        expect(buildBiomeBackdrop(FLAT_PRESENTATION, BOUNDS, 'circuit')).toBeNull();
-        expect(buildBiomeBackdrop(null, BOUNDS, 'circuit')).toBeNull();
-        expect(buildBiomeBackdrop(BIOME_PRESENTATION, null, 'circuit')).toBeNull();
+    it('does not build an environment for flat or incomplete presentations', () => {
+        expect(buildBiomeBackdrop(FLAT_PRESENTATION, BOUNDS, 'flat')).toBeNull();
+        expect(buildBiomeBackdrop(null, BOUNDS, 'null')).toBeNull();
+        expect(buildBiomeBackdrop(BIOME_PRESENTATION, null, 'missing')).toBeNull();
     });
 
-    it('builds broad directional terrain in four nested low-contrast tones', () => {
-        const backdrop = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
-        const tonesUsed = [...new Set(backdrop.terrain.map((tile) => tile.styleIndex))].sort();
+    it('is deterministic for identical geometry, seed, and biome', () => {
+        const first = build();
+        const second = build();
 
-        expect(tonesUsed).toEqual([0, 1, 2, 3]);
-
-        // Higher thresholds remain nested, while the field turns them into ribbons.
-        const areaOf = (styleIndex) => backdrop.terrain
-            .filter((tile) => tile.styleIndex === styleIndex).length;
-        expect(areaOf(1)).toBeLessThanOrEqual(areaOf(0));
-        expect(areaOf(2)).toBeLessThanOrEqual(areaOf(1));
-        expect(areaOf(3)).toBeLessThanOrEqual(areaOf(2));
-        expect(areaOf(3)).toBeGreaterThan(0);
-    });
-
-    it('lays out the same ground every time for one track', () => {
-        const first = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'track:circuit:biome:basalt');
-        const second = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'track:circuit:biome:basalt');
-
-        expect(first.terrain.length).toBeGreaterThan(0);
         expect(boxSignature(second.terrain)).toBe(boxSignature(first.terrain));
-        expect(boxSignature(second.rocks)).toBe(boxSignature(first.rocks));
+        expect(boxSignature(second.transition)).toBe(boxSignature(first.transition));
+        expect(boxSignature(second.runoff)).toBe(boxSignature(first.runoff));
+        expect(propSignature(second.props)).toBe(propSignature(first.props));
     });
 
-    it('lays out different ground for a different track in the same biome', () => {
-        const circuit = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'track:circuit:biome:basalt');
-        const ridge = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'track:obsidianRidge:biome:basalt');
+    it('changes terrain and props when the seed changes', () => {
+        const first = build('track:forest:a');
+        const second = build('track:forest:b');
 
-        expect(boxSignature(ridge.terrain)).not.toBe(boxSignature(circuit.terrain));
-        expect(boxSignature(ridge.rocks)).not.toBe(boxSignature(circuit.rocks));
+        expect(boxSignature(second.terrain)).not.toBe(boxSignature(first.terrain));
+        expect(propSignature(second.props)).not.toBe(propSignature(first.props));
     });
 
-    it('ignores sub-pixel drift in the track bounds', () => {
-        // Smoothed bounds can move a fraction of a pixel between rebuilds and can
-        // cross a field boundary doing it. The ground near the track must not move.
-        const exact = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
-        const jittered = buildBiomeBackdrop(BIOME_PRESENTATION, {
-            minX: BOUNDS.minX + 0.4,
-            minY: BOUNDS.minY - 0.3,
-            maxX: BOUNDS.maxX + 0.2,
-            maxY: BOUNDS.maxY - 0.45
-        }, 'circuit');
+    it('reacts to changed track geometry with a stable seed', () => {
+        const shiftedInner = {
+            ...GEOMETRY,
+            inner: GEOMETRY.inner.map((point) => ({ x: point.x + 150, y: point.y + 80 })),
+        };
+        const first = build('track:forest:geometry', GEOMETRY);
+        const second = build('track:forest:geometry', shiftedInner);
 
-        expect(nearTrack(exact.rocks).length).toBeGreaterThan(0);
-        expect(boxSignature(nearTrack(jittered.rocks))).toBe(boxSignature(nearTrack(exact.rocks)));
+        expect(second.distanceIndex.query(500, 300, 4000).distance)
+            .not.toBe(first.distanceIndex.query(500, 300, 4000).distance);
+        expect(second.distanceIndex).not.toBeNull();
     });
 
-    it('measures every piece with a real bounding box, so culling can trust it', () => {
-        const backdrop = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
+    it('uses three to five configured contour shades plus the biome base', () => {
+        const backdrop = build();
+        const config = getBiomeConfig('forest');
+        const terrainStyles = new Set(backdrop.terrain.map((tile) => tile.style));
 
-        for (const item of [...backdrop.terrain, ...backdrop.rocks, ...backdrop.decals]) {
-            expect(Number.isFinite(item.minX) && Number.isFinite(item.maxX)).toBe(true);
-            expect(Number.isFinite(item.minY) && Number.isFinite(item.maxY)).toBe(true);
+        expect(terrainStyles.size).toBe(config.contourCount - 1);
+        expect(terrainStyles.size).toBeGreaterThanOrEqual(3);
+        expect(terrainStyles.size).toBeLessThanOrEqual(5);
+        expect(backdrop.groundColor).toBe(config.groundColors[0]);
+    });
+
+    it('builds transition terrain and runoff, with seeded width variation', () => {
+        const backdrop = build();
+        expect(backdrop.transition.length).toBeGreaterThan(0);
+        expect(backdrop.runoff.length).toBeGreaterThan(0);
+
+        const widths = [0.08, 0.31, 0.57, 0.83]
+            .map((along) => backdrop.resolveRunoffWidth({ along }));
+        expect(new Set(widths.map((width) => width.toFixed(4))).size).toBeGreaterThan(1);
+    });
+
+    it('keeps props Poisson-spaced and outside track, runoff, and transition clearance', () => {
+        const backdrop = build();
+        const config = getBiomeConfig('forest');
+        expect(backdrop.props.length).toBeGreaterThan(0);
+
+        for (let i = 0; i < backdrop.props.length; i += 1) {
+            const prop = backdrop.props[i];
+            expect(backdrop.distanceIndex.containsTrack(prop.x, prop.y)).toBe(false);
+            const nearest = backdrop.distanceIndex.query(prop.x, prop.y, 4000);
+            expect(nearest).not.toBeNull();
+            expect(nearest.distance).toBeGreaterThan(
+                backdrop.resolveRunoffWidth(nearest)
+                + config.transitionWidth
+                + config.maxPropRadius
+                + config.propClearance,
+            );
+            for (let j = i + 1; j < backdrop.props.length; j += 1) {
+                const other = backdrop.props[j];
+                expect(Math.hypot(prop.x - other.x, prop.y - other.y))
+                    .toBeGreaterThanOrEqual(config.propSpacing - 0.0001);
+            }
+        }
+    });
+
+    it('keeps finite bounds for terrain, features, runoff, and props', () => {
+        const backdrop = build();
+        for (const item of [
+            ...backdrop.terrain,
+            ...backdrop.transition,
+            ...backdrop.runoff,
+            ...backdrop.features,
+            ...backdrop.props,
+        ]) {
+            expect(Number.isFinite(item.minX)).toBe(true);
+            expect(Number.isFinite(item.minY)).toBe(true);
+            expect(Number.isFinite(item.maxX)).toBe(true);
+            expect(Number.isFinite(item.maxY)).toBe(true);
             expect(item.maxX).toBeGreaterThan(item.minX);
             expect(item.maxY).toBeGreaterThan(item.minY);
         }
     });
 
-    it('reaches well past the track so the camera cannot run off the ground', () => {
-        const backdrop = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
+    it('draws base and props separately, and drops props by detail tier', () => {
+        const backdrop = build();
+        const full = createRecordingContext();
+        const reduced = createRecordingContext();
+        const terrainOnly = createRecordingContext();
+        const options = {
+            offsetX: -backdrop.field.minX,
+            offsetY: -backdrop.field.minY,
+            scale: 1,
+            presentation: BIOME_PRESENTATION,
+            backdrop,
+        };
+        const width = backdrop.field.maxX - backdrop.field.minX;
+        const height = backdrop.field.maxY - backdrop.field.minY;
 
-        expect(BOUNDS.minX - backdrop.field.minX).toBeGreaterThanOrEqual(1600);
-        expect(backdrop.field.maxY - BOUNDS.maxY).toBeGreaterThanOrEqual(1600);
+        const basePainted = drawBiomeBackdropBase(full.ctx, width, height, options);
+        const fullProps = drawBiomeBackdropProps(full.ctx, width, height, { ...options, detailTier: 2 });
+        const reducedProps = drawBiomeBackdropProps(reduced.ctx, width, height, { ...options, detailTier: 1 });
+        const terrainProps = drawBiomeBackdropProps(terrainOnly.ctx, width, height, { ...options, detailTier: 0 });
+
+        expect(basePainted).toBeGreaterThan(0);
+        expect(fullProps).toBeGreaterThan(0);
+        expect(reducedProps).toBeGreaterThan(0);
+        expect(reducedProps).toBeLessThanOrEqual(fullProps);
+        expect(terrainProps).toBeGreaterThan(0);
+        expect(terrainProps).toBeLessThanOrEqual(reducedProps);
+        expect(full.calls.fillRect).toBe(1);
+        expect(full.calls.save).toBe(2);
+        expect(full.calls.restore).toBe(2);
     });
 
-    it('draws only what the viewport can see', () => {
-        const backdrop = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
-        const total = backdrop.terrain.length + backdrop.rocks.length + backdrop.decals.length;
+    it('keeps the combined painter compatible and covers an empty backdrop', () => {
+        const backdrop = build();
         const { ctx, calls } = createRecordingContext();
-
         const painted = drawBiomeBackdrop(ctx, 1920, 1080, {
             presentation: BIOME_PRESENTATION,
-            backdrop
+            backdrop,
         });
-
         expect(painted).toBeGreaterThan(0);
-        expect(painted).toBeLessThan(total);
-        expect(calls.fillRect).toBe(1);
-        expect(calls.save).toBe(1);
-        expect(calls.restore).toBe(1);
-    });
 
-    it('uses no gradient and no ellipse, so it stays a flat fill', () => {
-        const backdrop = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
-        const { ctx } = createRecordingContext();
-
-        // A gradient or an ellipse would show up as a missing method on the stub.
-        expect(() => drawBiomeBackdrop(ctx, 1920, 1080, {
+        const empty = createRecordingContext();
+        expect(drawBiomeBackdrop(empty.ctx, 800, 600, {
             presentation: BIOME_PRESENTATION,
-            backdrop
-        })).not.toThrow();
-    });
-
-    it('drops the smallest things first when the device is struggling', () => {
-        const backdrop = buildBiomeBackdrop(BIOME_PRESENTATION, BOUNDS, 'circuit');
-        const { field } = backdrop;
-        // Paint the whole field, so the comparison is about the tier and not about
-        // which corner of the ground a viewport happens to sit on.
-        const paint = (detailTier) => drawBiomeBackdrop(
-            createRecordingContext().ctx,
-            field.maxX - field.minX,
-            field.maxY - field.minY,
-            {
-                offsetX: -field.minX,
-                offsetY: -field.minY,
-                scale: 1,
-                presentation: BIOME_PRESENTATION,
-                backdrop,
-                detailTier
-            },
-        );
-
-        const full = paint(2);
-        const noDecals = paint(1);
-        const terrainOnly = paint(0);
-
-        expect(noDecals).toBeLessThan(full);
-        expect(terrainOnly).toBeLessThan(noDecals);
-        expect(terrainOnly).toBeGreaterThan(0);
-    });
-
-    it('still covers the viewport when there is no ground to draw', () => {
-        const { ctx, calls } = createRecordingContext();
-
-        const painted = drawBiomeBackdrop(ctx, 800, 600, {
-            presentation: BIOME_PRESENTATION,
-            backdrop: null
-        });
-
-        expect(painted).toBe(0);
+            backdrop: null,
+        })).toBe(0);
+        expect(empty.calls.fillRect).toBe(1);
         expect(calls.fillRect).toBe(1);
-        expect(calls.fillStyles[0]).toBe(BIOME_PRESENTATION.biomeGround);
     });
 
-    it('reduces detail from the signals the engine already tracks', () => {
+    it('uses the existing quality and frame-skip tiers', () => {
         expect(resolveBackdropDetailTier(0, 0)).toBe(2);
         expect(resolveBackdropDetailTier(1, 0)).toBe(1);
         expect(resolveBackdropDetailTier(0, 1)).toBe(0);

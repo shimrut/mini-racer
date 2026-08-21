@@ -451,7 +451,15 @@ export function renderTrackPreviewCanvas(canvas, payload) {
     surfacePath.addPath(outerPath);
     surfacePath.addPath(innerPath);
 
-    fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, width, height, presentation);
+    fillTrackPresentation(
+        ctx,
+        surfacePath,
+        innerPath,
+        outerPath,
+        width,
+        height,
+        transparentBackground ? { ...presentation, asphaltVariation: false } : presentation,
+    );
 
     if (startLine) {
         const p1 = mapPoint(startLine.p1);

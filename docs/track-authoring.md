@@ -13,14 +13,19 @@ every consumer load the large geometry registry.
   `TRACK_SCHEDULE_KEYS`, `DEFAULT_TRACK_KEY`, `hasTrack()`, `getTrackName()`,
   and `getTrackBiome()`.
 - `game/track/biomes.js`
-  Owns the list of biomes and the presentation each one paints. Imports nothing
-  but the seeded random stream, so the map maker's Node save plumbing and the
-  backfill tool read the same list the game renders from. Until distinct biome
-  art is added, every known biome shares the dark reference ground treatment;
-  its saved identity and per-track cache key still remain distinct.
+  Owns the immutable, configuration-driven biome definitions. Forest,
+  Mountains, Arctic, and Beach declare palettes, runoff, contour scale, prop
+  density/clustering, and simple procedural prop types. Legacy catalog names
+  resolve to one of those canonical configurations without rewriting saved
+  track metadata.
 - `game/track/backdrop.js`
-  Builds a biome's ground once per track and draws the part the viewport can
-  see.
+  Builds the base terrain, track-reactive contours, secondary features,
+  variable runoff, and Poisson-spaced props once per track. It draws the base
+  below the cached track and the excluded props above it.
+- `game/track/environment-field.js`
+  Owns seeded low-frequency value noise, the spatial distance index over the
+  smoothed inner/outer walls, and non-grid prop sampling. This is rendering
+  data only and does not participate in collision or simulation.
 - `game/track/definitions/<track-slug>.js`
   Owns one track's boundaries, start position, start line, checkpoints, and
   geometry-specific options.
@@ -83,8 +88,10 @@ start/finish line and snaps onto that line's center axis when moved.
    the biome shown, so `random` is never stored. The biome lives in
    `TRACK_CATALOG`, not in the definition module.
 
-   The ground layout is built from the track key, so renaming a track changes
-   how its ground looks.
+   The environment is built from the smoothed track walls plus the track key,
+   so the same saved track is stable while geometry edits or a rename produce a
+   new deterministic layout. Mapmaker uses the same environment inputs as a
+   race and rebuilds the preview after wall edits.
 3. New Daily Challenge tracks are appended as the final
    `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
    When extending an existing branch, keep the existing catalog and schedule

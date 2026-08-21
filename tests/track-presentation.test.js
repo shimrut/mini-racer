@@ -5,7 +5,12 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES
 } from '../game/track/presentation.js';
-import { BIOME_NAMES, isBiomePainted } from '../game/track/biomes.js';
+import {
+    BIOME_CONFIGS,
+    BIOME_NAMES,
+    getBiomeConfig,
+    isBiomePainted
+} from '../game/track/biomes.js';
 
 describe('track presentation resolver', () => {
     it('supports a local query override so event skins can be tested without changing server rotation', () => {
@@ -184,12 +189,13 @@ describe('track presentation biomes', () => {
         expect(presentation.backgroundStyle).toBe('biome');
         // The ground runs under the track, so the infield must not cover it.
         expect(presentation.infieldColor).toBe('transparent');
+        expect(presentation.biomeConfig).toBe(BIOME_CONFIGS.mountains);
         expect(presentation.biomeGround).toBe('#080e1b');
         expect(presentation.biomeTerrainColors).toEqual([
-            'rgba(16, 25, 43, 0.45)',
-            'rgba(21, 31, 50, 0.33)',
-            'rgba(27, 39, 61, 0.24)',
-            'rgba(34, 47, 70, 0.15)'
+            '#10192b',
+            '#151f32',
+            '#1b273d',
+            '#222f46'
         ]);
     });
 
@@ -217,8 +223,74 @@ describe('track presentation biomes', () => {
             expect(isBiomePainted(biome)).toBe(true);
             expect(presentation.key).toBe(`track:sunlitTemple:biome:${biome}`);
             expect(presentation.backgroundStyle).toBe('biome');
-            expect(presentation.biomeGround).toBe('#080e1b');
+            expect(presentation.biomeConfig).toBe(getBiomeConfig(biome));
+            expect(presentation.biomeGround).toBe(getBiomeConfig(biome).groundColors[0]);
         });
+    });
+
+    it('keeps the stored biome order append-only while adding Mountains and Arctic', () => {
+        expect(BIOME_NAMES).toEqual([
+            'beach',
+            'forest',
+            'canyon',
+            'basalt',
+            'marsh',
+            'city',
+            'mountains',
+            'arctic'
+        ]);
+    });
+
+    it('defines the requested renderer inputs for every canonical biome', () => {
+        Object.values(BIOME_CONFIGS).forEach((config) => {
+            expect(config.groundColors.length).toBeGreaterThanOrEqual(3);
+            expect(config.groundColors.length).toBeLessThanOrEqual(5);
+            expect(config.runoffColor).toMatch(/^#/);
+            expect(config.transitionColor).toMatch(/^#/);
+            expect(config.contourCount).toBeGreaterThan(0);
+            expect(config.contourScale).toBeGreaterThan(0);
+            expect(config.propDensity).toBeGreaterThanOrEqual(0);
+            expect(config.clustering).toBeGreaterThanOrEqual(0);
+            expect(config.terrainStyle).toBeTruthy();
+            expect(config.features.length).toBeGreaterThan(0);
+            expect(config.props.length).toBeGreaterThan(0);
+        });
+    });
+
+    it('declares the requested terrain features and props per biome', () => {
+        expect(BIOME_CONFIGS.forest.props.map(({ type }) => type)).toEqual([
+            'pine',
+            'rock',
+            'shrub'
+        ]);
+        expect(BIOME_CONFIGS.mountains.props.map(({ type }) => type)).toEqual([
+            'rock-formation',
+            'boulder',
+            'pine'
+        ]);
+        expect(BIOME_CONFIGS.arctic.features.map(({ type }) => type)).toEqual([
+            'snow-drifts',
+            'frozen-ponds',
+            'ice-cracks'
+        ]);
+        expect(BIOME_CONFIGS.arctic.props.map(({ type }) => type)).toContain('snowy-rock');
+        expect(BIOME_CONFIGS.beach.features.map(({ type }) => type)).toEqual([
+            'dunes',
+            'shoreline',
+            'water'
+        ]);
+        expect(BIOME_CONFIGS.beach.props.map(({ type }) => type)).toEqual([
+            'rock',
+            'pebble'
+        ]);
+    });
+
+    it('maps legacy stored biome names to suitable canonical configs', () => {
+        expect(getBiomeConfig('canyon')).toBe(BIOME_CONFIGS.mountains);
+        expect(getBiomeConfig('basalt')).toBe(BIOME_CONFIGS.mountains);
+        expect(getBiomeConfig('marsh')).toBe(BIOME_CONFIGS.forest);
+        expect(getBiomeConfig('city')).toBe(BIOME_CONFIGS.mountains);
+        expect(getBiomeConfig('unknown')).toBeNull();
     });
 
     it('keeps every non-race surface schematic for every biome', () => {
@@ -279,5 +351,6 @@ describe('track presentation biomes', () => {
 
         expect(skinned.key).toBe('event:daily-challenge:kettleRun:desert');
         expect(skinned.backgroundStyle).toBe('desert');
+        expect(skinned.biomeConfig).toBe(getBiomeConfig('city'));
     });
 });

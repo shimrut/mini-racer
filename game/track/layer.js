@@ -1,4 +1,7 @@
-import { drawViewportPresentationBackground } from "./canvas.js";
+import {
+  drawViewportPresentationBackground,
+  drawViewportPresentationProps,
+} from "./canvas.js";
 
 /**
  * Blits the visible slice of the pre-rendered track bitmap into the race canvas.
@@ -84,7 +87,20 @@ export class TrackLayerRenderer {
       backdrop,
       detailTier,
     );
-    if (sourceWidth <= 0 || sourceHeight <= 0) return;
+    const drawProps = () => drawViewportPresentationProps(
+      ctx,
+      canvasWidth,
+      canvasHeight,
+      { x: worldLeft, y: worldTop },
+      zoom,
+      presentation || {},
+      backdrop,
+      detailTier,
+    );
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      drawProps();
+      return;
+    }
 
     const destX = (trackCanvasOrigin.x + sourceLeft - worldLeft) * zoom;
     const destY = (trackCanvasOrigin.y + sourceTop - worldTop) * zoom;
@@ -100,5 +116,6 @@ export class TrackLayerRenderer {
       sourceWidth * zoom,
       sourceHeight * zoom,
     );
+    drawProps();
   }
 }

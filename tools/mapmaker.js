@@ -7,7 +7,11 @@ import {
     isBiomePainted,
     pickRandomBiome,
 } from '../game/track/biomes.js';
-import { buildBiomeBackdrop, drawBiomeBackdrop } from '../game/track/backdrop.js';
+import {
+    buildBiomeBackdrop,
+    drawBiomeBackdropBase,
+    drawBiomeBackdropProps,
+} from '../game/track/backdrop.js';
 import {
     drawTrackBoundaries,
     drawTrackFinishLine,
@@ -1882,6 +1886,7 @@ class MapmakerApp {
     }
 
     onPointerUp() {
+        const movedTrackWall = this.state.drag?.type === 'handle';
         if (this.state.drag?.type !== 'pan') {
             this.state.skipDrawClick = false;
         }
@@ -1889,6 +1894,7 @@ class MapmakerApp {
             this.releaseViewBounds({ keepCameraSteady: true });
         }
         this.state.drag = null;
+        if (movedTrackWall) this.previewBackdrop = null;
         this.canvas.dataset.pan = 'false';
         this.draw();
     }
@@ -2171,6 +2177,7 @@ class MapmakerApp {
     }
 
     markDirty(message, updateStatus = true) {
+        if (this.state.drag?.type !== 'handle') this.previewBackdrop = null;
         this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
         this.syncTrackSelectText();
         this.syncDirtyBadge();
@@ -2274,7 +2281,12 @@ class MapmakerApp {
         }
 
         const gridSize = CONFIG.gridSize;
-        const points = [...this.track.outer, ...this.track.inner];
+        const geometry = buildTrackGeometry({
+            outer: this.track.outer,
+            inner: this.track.inner,
+            cornerRadius: this.getCornerRadius(),
+        });
+        const points = [...geometry.outer, ...geometry.inner];
         const bounds = points.reduce((box, point) => ({
             minX: Math.min(box.minX, point.x * gridSize),
             minY: Math.min(box.minY, point.y * gridSize),
@@ -2286,18 +2298,22 @@ class MapmakerApp {
         if (this.previewBackdrop?.key !== cacheKey) {
             this.previewBackdrop = {
                 key: cacheKey,
-                backdrop: buildBiomeBackdrop(presentation, bounds, cacheKey),
+                backdrop: buildBiomeBackdrop(presentation, bounds, cacheKey, {
+                    geometry,
+                    worldScale: gridSize,
+                }),
             };
         }
         return this.previewBackdrop.backdrop;
     }
 
-    drawBiomeGround(viewport) {
+    drawBiomeGround(viewport, phase = 'base') {
         const presentation = this.getPreviewPresentation();
         if (presentation.backgroundStyle !== 'biome') return;
 
         // The maker works in grid units; the ground is measured in world pixels.
-        drawBiomeBackdrop(this.ctx, viewport.width, viewport.height, {
+        const draw = phase === 'props' ? drawBiomeBackdropProps : drawBiomeBackdropBase;
+        draw(this.ctx, viewport.width, viewport.height, {
             offsetX: viewport.offsetX,
             offsetY: viewport.offsetY,
             scale: viewport.scale / CONFIG.gridSize,
@@ -2629,11 +2645,15 @@ class MapmakerApp {
         this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         this.ctx.clearRect(0, 0, viewport.width, viewport.height);
 
-        this.drawBiomeGround(viewport);
-        this.drawGrid(viewport);
+        this.drawBiomeGround(viewport, 'base');
 
         if (this.hasTrackGeometry()) {
             this.drawRaceTrackPreview(viewport);
+        }
+        this.drawBiomeGround(viewport, 'props');
+        this.drawGrid(viewport);
+
+        if (this.hasTrackGeometry()) {
             this.drawPolygon(
                 this.track.outer,
                 viewport,
