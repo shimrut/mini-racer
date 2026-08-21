@@ -1,5 +1,13 @@
 # Changelog
 
+- Tracks are now set in a **biome**, and the ground shows it. A biome track
+  draws layered landforms, rock clusters and faint marker grids behind and
+  through the circuit, and the track casts a shadow onto that ground. The
+  layout is built from the track's own key, so a track is always the same
+  place, and two tracks in one biome are two different places. Classic Circuit
+  and fourteen others are set in **Basalt**, the first biome with art; the rest
+  keep the plain background until their biome is painted.
+
 - Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
   Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested
   Run**, **Mountain Peak**, and **Shark Fin**. Question Mark's third checkpoint

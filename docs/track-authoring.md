@@ -9,8 +9,16 @@ every consumer load the large geometry registry.
 ## Track Files
 
 - `game/track/catalog.js`
-  Owns every playable track's player-facing name plus `TRACK_SCHEDULE_KEYS`,
-  `DEFAULT_TRACK_KEY`, `hasTrack()`, and `getTrackName()`.
+  Owns every playable track's player-facing name and biome, plus
+  `TRACK_SCHEDULE_KEYS`, `DEFAULT_TRACK_KEY`, `hasTrack()`, `getTrackName()`,
+  and `getTrackBiome()`.
+- `game/track/biomes.js`
+  Owns the list of biomes and the presentation each one paints. Imports nothing
+  but the seeded random stream, so the map maker's Node save plumbing and the
+  backfill tool read the same list the game renders from.
+- `game/track/backdrop.js`
+  Builds a biome's ground once per track and draws the part the viewport can
+  see.
 - `game/track/definitions/<track-slug>.js`
   Owns one track's boundaries, start position, start line, checkpoints, and
   geometry-specific options.
@@ -66,6 +74,15 @@ start/finish line and snaps onto that line's center axis when moved.
    - **Daily Challenge** also appends or keeps the track in
      `TRACK_SCHEDULE_KEYS`.
    - **Campaign only** keeps the track out of the Daily schedule.
+
+   Also choose **Biome**, which sets the ground the track is raced on. It
+   defaults to **Random**, which settles on a real biome immediately and names
+   it under the field; **Reroll Biome** gives a different one. Saving writes
+   the biome shown, so `random` is never stored. The biome lives in
+   `TRACK_CATALOG`, not in the definition module.
+
+   The ground layout is built from the track key, so renaming a track changes
+   how its ground looks.
 3. New Daily Challenge tracks are appended as the final
    `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
    When extending an existing branch, keep the existing catalog and schedule
