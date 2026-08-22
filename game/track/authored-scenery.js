@@ -133,7 +133,8 @@ export function isAuthoredPlacementClear(
   distanceIndex,
   trackAnalysis,
   clearance,
-  cornerClearance = clearance
+  cornerClearance = clearance,
+  allowTrackOverlap = false
 ) {
   if (
     candidate.x - footprintRadius < area.minX ||
@@ -142,6 +143,7 @@ export function isAuthoredPlacementClear(
     candidate.y + footprintRadius > area.maxY
   )
     return false;
+  if (allowTrackOverlap) return true;
   if (distanceIndex?.containsTrack(candidate.x, candidate.y)) return false;
   const nearest =
     distanceIndex?.query(
@@ -234,7 +236,8 @@ export function buildAuthoredComposition({
               distanceIndex,
               trackAnalysis,
               group.clearance,
-              group.cornerClearance
+              group.cornerClearance,
+              group.allowTrackOverlap
             )
           )
             continue;

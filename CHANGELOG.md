@@ -2,16 +2,18 @@
 
 - Forest, Mountains, Arctic, and Beach races now share the illustrated authored
   scenery system. Forest composes ground masses and complete tree groups;
-  Mountains uses layered ridges, rock fields, boulder groups, and sparse trees;
+  Mountains uses broad smooth low-contrast patches, sparse small faceted rocks,
+  and tiny four-dot markers;
   Arctic uses snow fields, frozen ponds, snowdrifts, ice details, and snowy
   rocks; Beach uses dune masses, coastal shelves with wet/shallow/deep bands,
   and pebble groups. Each biome has three deterministic composition recipes and
   reusable hand-designed primitives with controlled rotation, scale, mirroring,
   and palette variation. The old noise, contour, blob, and Poisson prop paths
-  are removed. Every complete primitive clears the road, kerbs, and one
-  irregular 30-60px shoulder; no second track-shaped terrain band or post-track
-  prop pass remains. Track geometry, kerbs, cars, controls, HUD, camera, physics,
-  gameplay, and replay validation are unchanged.
+  are removed. Mountains background patches may continue beneath the cached
+  track, while every rock, marker, and other biome primitive clears the road,
+  kerbs, and one irregular 30-60px shoulder. No second track-shaped terrain band
+  or post-track prop pass remains. Track geometry, kerbs, cars, controls, HUD,
+  camera, physics, gameplay, and replay validation are unchanged.
 
 - Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
   Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested

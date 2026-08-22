@@ -4,429 +4,239 @@ import {
   transformedPoint,
 } from "./authored-scenery.js";
 
-const polygon = (points) =>
+const freezePoints = (points) =>
   Object.freeze(points.map((point) => Object.freeze(point)));
 const template = (value) => Object.freeze(value);
 
-export const MOUNTAIN_RIDGE_TEMPLATES = Object.freeze([
+/** Broad, smooth silhouettes that sit behind the road and may continue beneath it. */
+export const MOUNTAIN_PATCH_TEMPLATES = Object.freeze([
   template({
-    id: "mountain-ridge-01",
-    radius: 330,
-    body: polygon([
-      [-310, 90],
-      [-245, -92],
-      [-104, -238],
-      [38, -116],
-      [142, -254],
-      [302, -76],
-      [286, 130],
-      [80, 230],
-      [-142, 210],
-    ]),
-    face: polygon([
-      [-245, -92],
-      [-104, -238],
-      [38, -116],
-      [80, 230],
-      [-142, 210],
-    ]),
-    crest: polygon([
-      [-245, -92],
-      [-104, -238],
-      [38, -116],
-      [142, -254],
-      [302, -76],
+    id: "mountain-patch-01",
+    radius: 570,
+    start: Object.freeze([-480, -80]),
+    curves: freezePoints([
+      [-410, -350, -120, -390],
+      [190, -410, 460, -150],
+      [560, 70, 360, 280],
+      [90, 430, -250, 300],
+      [-530, 190, -480, -80],
     ]),
   }),
   template({
-    id: "mountain-ridge-02",
-    radius: 315,
-    body: polygon([
-      [-292, 122],
-      [-260, -48],
-      [-122, -218],
-      [18, -178],
-      [118, -74],
-      [226, -194],
-      [296, 24],
-      [210, 202],
-      [-30, 236],
-      [-238, 198],
-    ]),
-    face: polygon([
-      [-122, -218],
-      [18, -178],
-      [118, -74],
-      [-30, 236],
-      [-238, 198],
-    ]),
-    crest: polygon([
-      [-260, -48],
-      [-122, -218],
-      [18, -178],
-      [118, -74],
-      [226, -194],
+    id: "mountain-patch-02",
+    radius: 540,
+    start: Object.freeze([-440, 80]),
+    curves: freezePoints([
+      [-500, -190, -210, -330],
+      [70, -440, 350, -270],
+      [520, -100, 420, 170],
+      [250, 370, -80, 350],
+      [-390, 330, -440, 80],
     ]),
   }),
   template({
-    id: "mountain-ridge-03",
-    radius: 340,
-    body: polygon([
-      [-326, 18],
-      [-214, -172],
-      [-48, -230],
-      [74, -106],
-      [214, -226],
-      [326, -24],
-      [272, 170],
-      [94, 244],
-      [-132, 220],
-      [-286, 136],
-    ]),
-    face: polygon([
-      [-214, -172],
-      [-48, -230],
-      [74, -106],
-      [94, 244],
-      [-132, 220],
-    ]),
-    crest: polygon([
-      [-214, -172],
-      [-48, -230],
-      [74, -106],
-      [214, -226],
-      [326, -24],
+    id: "mountain-patch-03",
+    radius: 585,
+    start: Object.freeze([-510, 20]),
+    curves: freezePoints([
+      [-420, -300, -100, -360],
+      [220, -350, 490, -80],
+      [530, 210, 230, 350],
+      [-90, 420, -390, 240],
+      [-560, 150, -510, 20],
     ]),
   }),
 ]);
 
-export const MOUNTAIN_ROCK_FIELD_TEMPLATES = Object.freeze([
+/** Small faceted stones; their complete group footprint still clears the circuit. */
+export const MOUNTAIN_ROCK_TEMPLATES = Object.freeze([
   template({
-    id: "mountain-rock-field-01",
-    radius: 150,
+    id: "mountain-rock-01",
+    radius: 58,
     rocks: Object.freeze([
-      [-112, 18, 46],
-      [-54, -48, 38],
-      [10, 26, 52],
-      [70, -34, 34],
-      [118, 42, 26],
+      Object.freeze([-30, 12, 13]),
+      Object.freeze([5, -13, 10]),
+      Object.freeze([32, 14, 8]),
     ]),
   }),
   template({
-    id: "mountain-rock-field-02",
-    radius: 156,
+    id: "mountain-rock-02",
+    radius: 55,
     rocks: Object.freeze([
-      [-118, -30, 34],
-      [-74, 48, 48],
-      [-12, -14, 42],
-      [52, 42, 34],
-      [112, -28, 46],
+      Object.freeze([-28, -10, 9]),
+      Object.freeze([1, 14, 14]),
+      Object.freeze([31, -8, 10]),
     ]),
   }),
   template({
-    id: "mountain-rock-field-03",
-    radius: 148,
+    id: "mountain-rock-03",
+    radius: 52,
     rocks: Object.freeze([
-      [-106, 42, 38],
-      [-48, -36, 48],
-      [18, -52, 30],
-      [58, 30, 50],
-      [112, 2, 28],
+      Object.freeze([-27, 13, 8]),
+      Object.freeze([-2, -12, 12]),
+      Object.freeze([29, 9, 9]),
     ]),
   }),
 ]);
 
-export const MOUNTAIN_BOULDER_TEMPLATES = Object.freeze([
+/** Each marker is exactly one quiet 2x2 group of four round dots. */
+export const MOUNTAIN_MARKER_TEMPLATES = Object.freeze([
   template({
-    id: "mountain-boulders-01",
-    radius: 96,
-    rocks: Object.freeze([
-      [-46, 8, 42],
-      [18, -20, 34],
-      [50, 28, 24],
+    id: "mountain-marker-01",
+    radius: 20,
+    dotSize: 4,
+    dots: freezePoints([
+      [-7, -7], [7, -7], [-7, 7], [7, 7],
     ]),
   }),
   template({
-    id: "mountain-boulders-02",
-    radius: 92,
-    rocks: Object.freeze([
-      [-42, -20, 30],
-      [4, 16, 44],
-      [50, -6, 28],
-    ]),
-  }),
-]);
-
-export const MOUNTAIN_TREE_GROUP_TEMPLATES = Object.freeze([
-  template({
-    id: "mountain-trees-01",
-    radius: 105,
-    trees: Object.freeze([
-      [-70, 22, 0.8],
-      [-18, -34, 1],
-      [40, 18, 0.72],
-      [78, -18, 0.86],
+    id: "mountain-marker-02",
+    radius: 18,
+    dotSize: 3.5,
+    dots: freezePoints([
+      [-6, -6], [6, -6], [-6, 6], [6, 6],
     ]),
   }),
   template({
-    id: "mountain-trees-02",
-    radius: 110,
-    trees: Object.freeze([
-      [-76, -18, 0.72],
-      [-26, 28, 0.92],
-      [30, -30, 0.82],
-      [76, 24, 1],
-    ]),
-  }),
-  template({
-    id: "mountain-trees-03",
-    radius: 102,
-    trees: Object.freeze([
-      [-66, 30, 0.86],
-      [-22, -24, 0.74],
-      [28, 18, 1],
-      [70, -30, 0.78],
+    id: "mountain-marker-03",
+    radius: 22,
+    dotSize: 4.5,
+    dots: freezePoints([
+      [-8, -8], [8, -8], [-8, 8], [8, 8],
     ]),
   }),
 ]);
 
-const edge = [
-  [0.08, 0.12],
-  [0.27, 0.08],
-  [0.5, 0.07],
-  [0.73, 0.09],
-  [0.92, 0.16],
-  [0.93, 0.5],
-  [0.87, 0.86],
-  [0.52, 0.93],
-  [0.18, 0.9],
-  [0.07, 0.55],
-];
 export const MOUNTAIN_COMPOSITION_RECIPES = Object.freeze([
   Object.freeze({
     id: "MOUNTAINS_A",
-    ridges: Object.freeze(edge.slice(0, 8)),
-    rocks: Object.freeze([
-      [0.1, 0.3],
-      [0.3, 0.11],
-      [0.65, 0.1],
-      [0.9, 0.34],
-      [0.86, 0.77],
-      [0.24, 0.88],
+    patches: freezePoints([
+      [0.12, 0.14], [0.55, 0.1], [0.88, 0.26], [0.2, 0.82], [0.72, 0.88],
     ]),
-    boulders: Object.freeze([
-      [0.08, 0.72],
-      [0.5, 0.92],
-      [0.92, 0.62],
-      [0.72, 0.9],
+    rocks: freezePoints([
+      [0.1, 0.34], [0.3, 0.11], [0.82, 0.12], [0.91, 0.64], [0.34, 0.9],
     ]),
-    trees: Object.freeze([
-      [0.16, 0.14],
-      [0.38, 0.08],
-      [0.82, 0.16],
-      [0.14, 0.86],
+    markers: freezePoints([
+      [0.13, 0.68], [0.53, 0.91], [0.9, 0.42],
     ]),
   }),
   Object.freeze({
     id: "MOUNTAINS_B",
-    ridges: Object.freeze([
-      [0.08, 0.18],
-      [0.08, 0.46],
-      [0.1, 0.78],
-      [0.35, 0.92],
-      [0.66, 0.9],
-      [0.91, 0.74],
-      [0.92, 0.38],
+    patches: freezePoints([
+      [0.1, 0.24], [0.4, 0.1], [0.84, 0.14], [0.9, 0.72], [0.46, 0.88],
     ]),
-    rocks: Object.freeze([
-      [0.2, 0.1],
-      [0.46, 0.08],
-      [0.77, 0.12],
-      [0.9, 0.55],
-      [0.68, 0.9],
-      [0.18, 0.86],
-      [0.07, 0.62],
+    rocks: freezePoints([
+      [0.08, 0.55], [0.22, 0.1], [0.67, 0.09], [0.91, 0.4], [0.73, 0.9], [0.18, 0.86],
     ]),
-    boulders: Object.freeze([
-      [0.08, 0.08],
-      [0.92, 0.12],
-      [0.9, 0.9],
-    ]),
-    trees: Object.freeze([
-      [0.3, 0.1],
-      [0.72, 0.1],
-      [0.88, 0.58],
-      [0.28, 0.9],
-      [0.08, 0.52],
+    markers: freezePoints([
+      [0.11, 0.15], [0.54, 0.09], [0.9, 0.84], [0.31, 0.91],
     ]),
   }),
   Object.freeze({
     id: "MOUNTAINS_C",
-    ridges: Object.freeze([
-      [0.08, 0.1],
-      [0.36, 0.08],
-      [0.68, 0.08],
-      [0.92, 0.2],
-      [0.92, 0.54],
-      [0.86, 0.88],
+    patches: freezePoints([
+      [0.16, 0.1], [0.66, 0.11], [0.9, 0.45], [0.75, 0.87], [0.22, 0.86],
     ]),
-    rocks: Object.freeze([
-      [0.14, 0.2],
-      [0.52, 0.08],
-      [0.84, 0.18],
-      [0.91, 0.7],
-      [0.58, 0.91],
+    rocks: freezePoints([
+      [0.1, 0.42], [0.36, 0.08], [0.8, 0.12], [0.91, 0.72], [0.52, 0.91],
     ]),
-    boulders: Object.freeze([
-      [0.08, 0.5],
-      [0.18, 0.88],
-      [0.82, 0.9],
-      [0.94, 0.46],
-      [0.48, 0.94],
-    ]),
-    trees: Object.freeze([
-      [0.12, 0.12],
-      [0.76, 0.1],
-      [0.92, 0.38],
+    markers: freezePoints([
+      [0.12, 0.16], [0.88, 0.28], [0.84, 0.88],
     ]),
   }),
 ]);
 
 const PALETTES = Object.freeze([
-  Object.freeze({
-    base: "#172238",
-    face: "#202f49",
-    crest: "#3a4962",
-    rock: "#27354d",
-    accent: "#52617a",
-    tree: "#142837",
-    treeAccent: "#2a4350",
-  }),
-  Object.freeze({
-    base: "#1b2840",
-    face: "#263650",
-    crest: "#43526a",
-    rock: "#2c3a52",
-    accent: "#5a6981",
-    tree: "#172d3d",
-    treeAccent: "#304a57",
-  }),
-  Object.freeze({
-    base: "#202d45",
-    face: "#2b3b55",
-    crest: "#4a5971",
-    rock: "#314058",
-    accent: "#627188",
-    tree: "#1a3242",
-    treeAccent: "#36505d",
-  }),
+  Object.freeze({ patch: "#0d1728", rock: "#1b2940", rockFace: "#2a3850", marker: "#243249" }),
+  Object.freeze({ patch: "#101b2d", rock: "#1e2d45", rockFace: "#2d3c54", marker: "#29374d" }),
+  Object.freeze({ patch: "#121e30", rock: "#223149", rockFace: "#314058", marker: "#2c3b51" }),
 ]);
 
-function local(x, y, r, sx, sy, px, py) {
-  return transformedPoint(x, y, r, sx, sy, px, py);
+function local(x, y, rotation, scaleX, scaleY, pointX, pointY) {
+  return transformedPoint(x, y, rotation, scaleX, scaleY, pointX, pointY);
 }
-function ridgeLayers(t, x, y, r, sx, sy, p) {
-  const build = (points) => {
-    const path = new Path2D();
-    addPolygon(
-      path,
-      points.map(([px, py]) => local(x, y, r, sx, sy, px, py))
-    );
-    return path;
-  };
-  return [
-    { path: build(t.body), style: p.base },
-    { path: build(t.face), style: p.face },
-    { path: build(t.crest), style: p.crest },
-  ];
+
+function patchLayers(t, x, y, rotation, scaleX, scaleY, palette) {
+  const path = new Path2D();
+  const start = local(x, y, rotation, scaleX, scaleY, ...t.start);
+  path.moveTo(start.x, start.y);
+  for (const [cx, cy, pointX, pointY] of t.curves) {
+    const control = local(x, y, rotation, scaleX, scaleY, cx, cy);
+    const point = local(x, y, rotation, scaleX, scaleY, pointX, pointY);
+    path.quadraticCurveTo(control.x, control.y, point.x, point.y);
+  }
+  path.closePath();
+  return [{ path, style: palette.patch }];
 }
-function rockLayers(t, x, y, r, sx, sy, p) {
+
+function rockLayers(t, x, y, rotation, scaleX, scaleY, palette) {
   const body = new Path2D();
-  const accent = new Path2D();
-  t.rocks.forEach(([rx, ry, size]) => {
-    const pts = [
-      [-0.9, -0.35],
-      [-0.22, -0.8],
-      [0.82, -0.42],
-      [0.72, 0.54],
-      [-0.48, 0.76],
-    ].map(([px, py]) => local(x, y, r, sx, sy, rx + px * size, ry + py * size));
-    addPolygon(body, pts);
-    addPolygon(accent, [pts[0], pts[1], local(x, y, r, sx, sy, rx, ry)]);
-  });
+  const face = new Path2D();
+  for (const [rockX, rockY, size] of t.rocks) {
+    const points = [
+      [-0.9, -0.2], [-0.25, -0.8], [0.75, -0.45], [0.85, 0.38], [-0.35, 0.72],
+    ].map(([pointX, pointY]) => local(
+      x, y, rotation, scaleX, scaleY,
+      rockX + pointX * size, rockY + pointY * size
+    ));
+    addPolygon(body, points);
+    addPolygon(face, [points[0], points[1], local(x, y, rotation, scaleX, scaleY, rockX, rockY)]);
+  }
   return [
-    { path: body, style: p.rock },
-    { path: accent, style: p.accent },
+    { path: body, style: palette.rock },
+    { path: face, style: palette.rockFace },
   ];
 }
-function treeLayers(t, x, y, r, sx, sy, p) {
-  const body = new Path2D();
-  const accent = new Path2D();
-  t.trees.forEach(([tx, ty, s], i) => {
-    const pts = [
-      [0, -30],
-      [20, 28],
-      [-20, 28],
-    ].map(([px, py]) => local(x, y, r, sx, sy, tx + px * s, ty + py * s));
-    addPolygon(i % 3 === 0 ? accent : body, pts);
-  });
-  return [
-    { path: body, style: p.tree },
-    { path: accent, style: p.treeAccent },
-  ];
+
+function markerLayers(t, x, y, rotation, scaleX, scaleY, palette) {
+  const path = new Path2D();
+  for (const [dotX, dotY] of t.dots) {
+    const center = local(x, y, rotation, scaleX, scaleY, dotX, dotY);
+    const size = t.dotSize * Math.min(Math.abs(scaleX), Math.abs(scaleY));
+    path.moveTo(center.x + size / 2, center.y);
+    path.arc(center.x, center.y, size / 2, 0, Math.PI * 2);
+  }
+  return [{ path, style: palette.marker }];
 }
 
 export function buildAuthoredMountainScenery(options) {
-  const built = buildAuthoredComposition({
+  return buildAuthoredComposition({
     ...options,
     seedSuffix: "authored-mountains",
     recipes: MOUNTAIN_COMPOSITION_RECIPES,
     palettes: PALETTES,
     groups: [
       {
-        recipeKey: "ridges",
+        recipeKey: "patches",
         outputKey: "largeFeatures",
-        templates: MOUNTAIN_RIDGE_TEMPLATES,
-        kind: "mountain-ridge",
-        clearance: 100,
-        cornerClearance: 130,
-        scaleRange: [0.72, 0.94],
-        buildLayers: ridgeLayers,
+        templates: MOUNTAIN_PATCH_TEMPLATES,
+        kind: "mountain-background-patch",
+        clearance: 0,
+        cornerClearance: 0,
+        allowTrackOverlap: true,
+        scaleRange: [0.72, 0.9],
+        buildLayers: patchLayers,
       },
       {
         recipeKey: "rocks",
         outputKey: "mediumFeatures",
-        templates: MOUNTAIN_ROCK_FIELD_TEMPLATES,
-        kind: "mountain-rock-field",
-        clearance: 64,
-        cornerClearance: 100,
-        scaleRange: [0.8, 1.08],
-        buildLayers: rockLayers,
-      },
-      {
-        recipeKey: "boulders",
-        outputKey: "boulderFeatures",
-        templates: MOUNTAIN_BOULDER_TEMPLATES,
-        kind: "mountain-boulder-cluster",
+        templates: MOUNTAIN_ROCK_TEMPLATES,
+        kind: "mountain-faceted-rock-group",
         clearance: 60,
-        cornerClearance: 92,
-        scaleRange: [0.82, 1.12],
-        buildLayers: rockLayers,
-      },
-      {
-        recipeKey: "trees",
-        outputKey: "treeFeatures",
-        templates: MOUNTAIN_TREE_GROUP_TEMPLATES,
-        kind: "mountain-sparse-tree-group",
-        clearance: 58,
         cornerClearance: 88,
         scaleRange: [0.82, 1.08],
-        buildLayers: treeLayers,
+        buildLayers: rockLayers,
+      },
+      {
+        recipeKey: "markers",
+        outputKey: "smallFeatures",
+        templates: MOUNTAIN_MARKER_TEMPLATES,
+        kind: "mountain-four-dot-marker",
+        clearance: 58,
+        cornerClearance: 82,
+        scaleRange: [0.88, 1.08],
+        buildLayers: markerLayers,
       },
     ],
   });
-  return {
-    ...built,
-    smallFeatures: [...built.boulderFeatures, ...built.treeFeatures],
-  };
 }

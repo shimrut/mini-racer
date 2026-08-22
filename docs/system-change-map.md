@@ -73,13 +73,17 @@ flowchart LR
   both walls. `game/track/authored-scenery.js` owns the shared broad-zone
   placement, track-bounds/major-corner analysis, deterministic transforms,
   complete-footprint clearance, palette variation, and distance-only 30-60px
-  shoulder used by every canonical biome. The old seeded-noise and Poisson prop
-  samplers are removed.
+  shoulder used by every canonical biome. A narrowly scoped background-layer
+  option lets Mountains' broad patches continue beneath the cached track;
+  decorative rocks and markers retain complete-footprint clearance. The old
+  seeded-noise and Poisson prop samplers are removed.
 - `game/track/forest-scenery.js`, `mountains-scenery.js`,
   `arctic-scenery.js`, and `beach-scenery.js` own their hand-authored primitive
   libraries, palettes, and three composition recipes each. Forest-backed Marsh
   and Mountains-backed Canyon, Basalt, and City continue through their existing
-  canonical aliases without rewriting catalog data.
+  canonical aliases without rewriting catalog data. Mountains owns three smooth
+  patch templates, three small faceted-rock templates, and three exact 2x2
+  four-dot marker templates rather than ridges, boulders, or trees.
 - `game/track/backdrop.js` selects the canonical authored builder, then
   `game/track/layer.js` renders large features, medium features, small features,
   and the single shoulder before the cached track slice. There is no terrain

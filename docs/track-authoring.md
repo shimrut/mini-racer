@@ -19,7 +19,9 @@ every consumer load the large geometry registry.
 - `game/track/authored-scenery.js`
   Owns the shared broad-zone placement engine, deterministic transforms,
   track-bounds/major-corner analysis, complete-footprint exclusion, palette
-  selection, and one distance-only 30-60px shoulder.
+  selection, and one distance-only 30-60px shoulder. Its background-layer
+  exception is reserved for broad scenery that intentionally continues beneath
+  the cached track; decorative primitives still use full clearance.
 - `game/track/forest-scenery.js`
   Owns three ground-mass primitives, three complete
   forest-cluster primitives, two rock formations, small vegetation groups, and
@@ -29,16 +31,17 @@ every consumer load the large geometry registry.
 - `game/track/mountains-scenery.js`, `arctic-scenery.js`, and
   `beach-scenery.js`
   Own the remaining authored libraries and three recipes per biome: layered
-  mountain ridges/rock fields/boulders/sparse trees; snow fields/frozen ponds/
-  snowdrifts/ice details/snowy rocks; and dune masses/coastal shelves/pebble
-  groups. Lines such as ridge crests, ice cracks, dune crests, and foam edges are
-  fixed inside the primitive instead of being generated from noise.
+  Mountains-style smooth patches/small faceted rocks/exact 2x2 four-dot markers;
+  snow fields/frozen ponds/snowdrifts/ice details/snowy rocks; and dune masses/
+  coastal shelves/pebble groups. Curves, ice cracks, dune crests, and foam edges
+  are fixed inside the primitive instead of being generated from noise.
 - `game/track/backdrop.js`
   Selects the canonical authored builder and draws it in world space. Every
-  biome applies a recipe in broad composition zones, rejects a complete
-  primitive if it conflicts with the road/kerb/shoulder exclusion, and draws
-  large, medium, and small scenery plus one irregular 30-60px shoulder below the
-  cached track. No terrain or prop pass draws after the track.
+  biome applies a recipe in broad composition zones and draws large, medium, and
+  small scenery plus one irregular 30-60px shoulder below the cached track.
+  Complete decorative primitives are rejected when they conflict with the
+  road/kerb/shoulder exclusion. Mountains background patches alone may cross
+  underneath that track layer. No terrain or prop pass draws after the track.
 - `game/track/environment-field.js`
   Owns only the spatial distance index over the smoothed inner/outer walls. This
   is scenery-clearance data and does not participate in collision or simulation.
