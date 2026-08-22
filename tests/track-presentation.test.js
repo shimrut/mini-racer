@@ -192,12 +192,6 @@ describe('track presentation biomes', () => {
         expect(presentation.infieldColor).toBe('transparent');
         expect(presentation.biomeConfig).toBe(BIOME_CONFIGS.mountains);
         expect(presentation.biomeGround).toBe('#080e1b');
-        expect(presentation.biomeTerrainColors).toEqual([
-            '#10192b',
-            '#151f32',
-            '#1b273d',
-            '#222f46'
-        ]);
     });
 
     it('leaves the track surface, curbs and finish line alone', () => {
@@ -242,55 +236,16 @@ describe('track presentation biomes', () => {
         ]);
     });
 
-    it('defines the requested renderer inputs for every canonical biome', () => {
+    it('exposes only the inputs used by the authored renderer', () => {
         Object.values(BIOME_CONFIGS).forEach((config) => {
             expect(config.groundColors.length).toBeGreaterThanOrEqual(3);
             expect(config.groundColors.length).toBeLessThanOrEqual(5);
             expect(config.runoffColor).toMatch(/^#/);
-            expect(config.transitionColor).toMatch(/^#/);
-            expect(config.contourCount).toBeGreaterThan(0);
-            expect(config.contourScale).toBeGreaterThan(0);
-            expect(config.propDensity).toBeGreaterThanOrEqual(0);
-            expect(config.clustering).toBeGreaterThanOrEqual(0);
-            expect(config.terrainStyle).toBeTruthy();
-            expect(config.features.length).toBeGreaterThan(0);
-            expect(config.props.length).toBeGreaterThan(0);
-            expect(config.runoffWidth - config.runoffVariation + config.transitionWidth)
-                .toBeGreaterThanOrEqual(60);
-            expect(config.runoffWidth + config.runoffVariation + config.transitionWidth)
-                .toBeLessThanOrEqual(100);
+            expect(Object.keys(config)).toEqual(['id', 'groundColors', 'runoffColor']);
             const presentation = getBiomePresentation(config.id);
             expect(presentation.trackShadowBlur).toBeLessThanOrEqual(8);
             expect(presentation.trackShadowOffsetY).toBeLessThanOrEqual(2);
         });
-    });
-
-    it('declares the requested terrain features and props per biome', () => {
-        expect(BIOME_CONFIGS.forest.props.map(({ type }) => type)).toEqual([
-            'pine',
-            'rock',
-            'shrub'
-        ]);
-        expect(BIOME_CONFIGS.mountains.props.map(({ type }) => type)).toEqual([
-            'rock-formation',
-            'boulder',
-            'pine'
-        ]);
-        expect(BIOME_CONFIGS.arctic.features.map(({ type }) => type)).toEqual([
-            'snow-drifts',
-            'frozen-ponds',
-            'ice-cracks'
-        ]);
-        expect(BIOME_CONFIGS.arctic.props.map(({ type }) => type)).toContain('snowy-rock');
-        expect(BIOME_CONFIGS.beach.features.map(({ type }) => type)).toEqual([
-            'dunes',
-            'shoreline',
-            'water'
-        ]);
-        expect(BIOME_CONFIGS.beach.props.map(({ type }) => type)).toEqual([
-            'rock',
-            'pebble'
-        ]);
     });
 
     it('maps legacy stored biome names to suitable canonical configs', () => {

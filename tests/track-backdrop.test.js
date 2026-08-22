@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+    buildAuthoredMountainScenery,
     buildBiomeBackdrop,
     drawBiomeBackdrop,
     drawBiomeBackdropBase,
@@ -14,6 +15,30 @@ import {
     FOREST_GROUND_MASS_TEMPLATES,
     FOREST_ROCK_FORMATION_TEMPLATES,
 } from '../game/track/forest-scenery.js';
+import {
+    buildAuthoredMountainScenery,
+    MOUNTAIN_BOULDER_TEMPLATES,
+    MOUNTAIN_COMPOSITION_RECIPES,
+    MOUNTAIN_RIDGE_TEMPLATES,
+    MOUNTAIN_ROCK_FIELD_TEMPLATES,
+    MOUNTAIN_TREE_GROUP_TEMPLATES,
+} from '../game/track/mountains-scenery.js';
+import {
+    buildAuthoredArcticScenery,
+    ARCTIC_COMPOSITION_RECIPES,
+    ARCTIC_FROZEN_POND_TEMPLATES,
+    ARCTIC_ICE_PATCH_TEMPLATES,
+    ARCTIC_SNOW_FIELD_TEMPLATES,
+    ARCTIC_SNOWDRIFT_TEMPLATES,
+    ARCTIC_SNOWY_ROCK_TEMPLATES,
+} from '../game/track/arctic-scenery.js';
+import {
+    buildAuthoredBeachScenery,
+    BEACH_COMPOSITION_RECIPES,
+    BEACH_DUNE_TEMPLATES,
+    BEACH_PEBBLE_TEMPLATES,
+    BEACH_SHORELINE_TEMPLATES,
+} from '../game/track/beach-scenery.js';
 
 const BIOME_PRESENTATION = {
     backgroundStyle: 'biome',
@@ -106,6 +131,43 @@ describe('world-first biome environment', () => {
         expect(FOREST_COMPOSITION_RECIPES.map((recipe) => recipe.id)).toEqual([
             'FOREST_A', 'FOREST_B', 'FOREST_C',
         ]);
+    });
+
+    it('has the exact authored libraries and recipes for Mountains, Arctic, and Beach', () => {
+        expect([
+            MOUNTAIN_RIDGE_TEMPLATES.length,
+            MOUNTAIN_ROCK_FIELD_TEMPLATES.length,
+            MOUNTAIN_BOULDER_TEMPLATES.length,
+            MOUNTAIN_TREE_GROUP_TEMPLATES.length,
+        ]).toEqual([3, 3, 2, 3]);
+        expect(MOUNTAIN_COMPOSITION_RECIPES.map(({ id }) => id)).toEqual(['MOUNTAINS_A', 'MOUNTAINS_B', 'MOUNTAINS_C']);
+        expect([
+            ARCTIC_SNOW_FIELD_TEMPLATES.length,
+            ARCTIC_FROZEN_POND_TEMPLATES.length,
+            ARCTIC_SNOWDRIFT_TEMPLATES.length,
+            ARCTIC_ICE_PATCH_TEMPLATES.length,
+            ARCTIC_SNOWY_ROCK_TEMPLATES.length,
+        ]).toEqual([3, 3, 3, 2, 2]);
+        expect(ARCTIC_COMPOSITION_RECIPES.map(({ id }) => id)).toEqual(['ARCTIC_A', 'ARCTIC_B', 'ARCTIC_C']);
+        expect([
+            BEACH_DUNE_TEMPLATES.length,
+            BEACH_SHORELINE_TEMPLATES.length,
+            BEACH_PEBBLE_TEMPLATES.length,
+        ]).toEqual([3, 3, 2]);
+        expect(BEACH_COMPOSITION_RECIPES.map(({ id }) => id)).toEqual(['BEACH_A', 'BEACH_B', 'BEACH_C']);
+    });
+
+    it('preserves the approved Forest transform golden after shared-helper extraction', () => {
+        const backdrop = build();
+        const signature = [
+            backdrop.compositionRecipe,
+            ...[...backdrop.largeFeatures, ...backdrop.mediumFeatures, ...backdrop.smallFeatures]
+                .map((feature) => `${feature.templateId}:${feature.x.toFixed(3)}:${feature.y.toFixed(3)}:${feature.scale.toFixed(4)}:${feature.rotation.toFixed(4)}:${feature.mirror}:${feature.paletteIndex}`),
+        ].join('|');
+        expect(signature).toBe('FOREST_B|forest-ground-mass-01:-280.846:-427.844:1.0192:-2.9866:1:0|forest-ground-mass-02:-457.461:-61.151:0.8335:0.4261:-1:1|forest-ground-mass-03:-546.578:633.897:1.0516:0.8043:1:2|forest-ground-mass-01:-432.059:1144.943:0.9546:2.0418:-1:2|forest-ground-mass-02:1328.030:-441.855:1.0858:0.5508:1:2|forest-ground-mass-03:1633.513:322.345:0.9411:2.1146:-1:1|forest-ground-mass-01:1418.825:1186.640:1.0936:1.7908:1:0|forest-cluster-01:-171.139:-415.083:1.0985:0.7547:1:1|forest-cluster-02:-387.351:-39.328:0.9160:2.1671:1:1|forest-cluster-03:-434.717:607.575:0.9214:-0.3313:1:0|forest-cluster-01:-314.338:1143.024:0.9994:1.0076:-1:0|forest-cluster-02:1247.744:-348.790:1.0258:2.8900:-1:0|forest-cluster-03:1552.080:376.164:1.0308:-2.1645:1:2|forest-cluster-01:1298.741:1174.132:1.1148:0.6775:-1:0|forest-rock-formation-01:-59.742:-408.705:0.8635:-2.1681:1:2|forest-rock-formation-02:-213.176:1145.981:1.1074:-0.6762:1:1|forest-rock-formation-01:1271.548:1063.318:1.1210:1.3384:1:1|forest-vegetation-01:-57.099:-388.710:1.1236:2.6387:1:0|forest-vegetation-02:-346.176:543.537:1.0042:2.3326:-1:0|forest-vegetation-03:1162.363:-287.720:1.0341:1.9349:-1:2|forest-vegetation-01:1232.951:1097.171:1.0829:-0.3175:-1:0');
+        expect([0.08, 0.31, 0.57, 0.83]
+            .map((along) => backdrop.shoulder.resolveWidth({ along }).toFixed(6)))
+            .toEqual(['52.512993', '47.790451', '35.285924', '38.800027']);
     });
 
     it('is deterministic for identical geometry, seed, and biome', () => {
@@ -234,35 +296,83 @@ describe('world-first biome environment', () => {
         expect(backdrop.trackLocalExtent).toEqual({ min: 30, max: 60 });
     });
 
-    it('preserves the legacy authored coverage for non-Forest biomes', () => {
-        const expectedRegions = {
-            mountains: ['mountain-ridge', 'boulder-field', 'mountain-tree-line'],
-            arctic: ['snowdrift', 'frozen-lake', 'arctic-rock-cluster'],
-            beach: ['water-body', 'dune-field', 'beach-rock-cluster'],
-        };
-        const expectedFeatures = {
-            mountains: ['mountain-ridge-lines', 'mountain-rock-field'],
-            arctic: ['snowdrift-lines', 'ice-cracks'],
-            beach: ['wet-sand', 'dune-crests'],
-        };
-
-        Object.entries(expectedRegions).forEach(([biome, expected]) => {
+    it.each([
+        ['mountains', /^MOUNTAINS_/, { 'mountain-ridge': [6, 8], 'mountain-rock-field': [5, 7], 'mountain-boulder-cluster': [3, 5], 'mountain-sparse-tree-group': [3, 5] }],
+        ['arctic', /^ARCTIC_/, { 'arctic-snow-field': [6, 8], 'arctic-frozen-pond': [2, 4], 'arctic-snowdrift': [5, 7], 'arctic-ice-patch': [3, 5], 'arctic-snowy-rock-cluster': [3, 5] }],
+        ['beach', /^BEACH_/, { 'beach-dune-mass': [5, 8], 'beach-shoreline-system': [1, 3], 'beach-pebble-group': [3, 5] }],
+    ])('builds authored %s scenery with contracted counts and no legacy scatter', (biome, recipePattern, ranges) => {
             const backdrop = buildBiomeBackdrop(
                 getBiomePresentation(biome),
                 BOUNDS,
                 `world:${biome}`,
                 { geometry: GEOMETRY, worldScale: 1 },
             );
-            const types = new Set(backdrop.regions.map((region) => region.type));
-            expected.forEach((type) => expect(types.has(type)).toBe(true));
-            const featureTypes = new Set(backdrop.features.map((feature) => feature.semanticType));
-            expectedFeatures[biome].forEach((type) => expect(featureTypes.has(type)).toBe(true));
-            const clustered = backdrop.propCandidates.filter((point) => point.regionType);
-            expect(clustered.length).toBeGreaterThan(backdrop.propCandidates.length * 0.7);
-            expect(backdrop.terrain.length).toBeGreaterThan(0);
-            expect(backdrop.transition.length).toBeGreaterThan(0);
-            expect(backdrop.props.length).toBeGreaterThan(0);
+            const all = [...backdrop.largeFeatures, ...backdrop.mediumFeatures, ...backdrop.smallFeatures];
+            const repeated = buildBiomeBackdrop(getBiomePresentation(biome), BOUNDS, `world:${biome}`, { geometry: GEOMETRY });
+            const varied = buildBiomeBackdrop(getBiomePresentation(biome), BOUNDS, `world:${biome}:varied`, { geometry: GEOMETRY });
+            expect(backdrop.compositionRecipe).toMatch(recipePattern);
+            expect(featureSignature(all)).toBe(featureSignature([
+                ...repeated.largeFeatures, ...repeated.mediumFeatures, ...repeated.smallFeatures,
+            ]));
+            expect(featureSignature(all)).not.toBe(featureSignature([
+                ...varied.largeFeatures, ...varied.mediumFeatures, ...varied.smallFeatures,
+            ]));
+            Object.entries(ranges).forEach(([kind, [min, max]]) => {
+                const count = all.filter((feature) => feature.kind === kind).length;
+                expect(count).toBeGreaterThanOrEqual(min);
+                expect(count).toBeLessThanOrEqual(max);
+            });
+            all.forEach((feature) => {
+                const nearest = backdrop.distanceIndex.query(feature.x, feature.y, 4000);
+                expect(nearest.distance).toBeGreaterThan(feature.footprintRadius + 57);
+                expect(Number.isFinite(feature.minX + feature.minY + feature.maxX + feature.maxY)).toBe(true);
+            });
+            expect(new Set(all.map((feature) => feature.paletteIndex)).size).toBeGreaterThan(1);
+            all.flatMap((feature) => feature.layers)
+                .filter((layer) => layer.strokeStyle)
+                .forEach((layer) => expect(layer.style).toBeUndefined());
+            expect(backdrop.transition).toEqual([]);
+            expect(backdrop.regions).toEqual([]);
+            expect(backdrop.propCandidates).toEqual([]);
+            expect(backdrop.props).toEqual([]);
+            expect(backdrop.shoulder).toEqual(expect.objectContaining({ source: 'distance-only', minWidth: 30, maxWidth: 60 }));
+            expect(backdrop.trackLocalExtent).toEqual({ min: 30, max: 60 });
+    });
+
+    it.each([
+        ['mountains', buildAuthoredMountainScenery],
+        ['arctic', buildAuthoredArcticScenery],
+        ['beach', buildAuthoredBeachScenery],
+    ])('handles null/tiny geometry safely for %s', (biome, builder) => {
+        const result = builder({
+            seedKey: `tiny:${biome}`,
+            area: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+            distanceIndex: null,
         });
+        expect(result.trackAnalysis).toEqual({ bounds: null, majorCorners: [] });
+        expect(result.largeFeatures).toEqual([]);
+        expect(result.mediumFeatures).toEqual([]);
+        expect(result.smallFeatures).toEqual([]);
+    });
+
+    it.each(['mountains', 'arctic', 'beach'])('keeps %s independent of wall point order', (biome) => {
+        const rotate = (points, amount) => [...points.slice(amount), ...points.slice(0, amount)];
+        const reordered = { outer: rotate(GEOMETRY.outer, 2), inner: rotate(GEOMETRY.inner, 1) };
+        const first = buildBiomeBackdrop(getBiomePresentation(biome), BOUNDS, `sequence:${biome}`, { geometry: GEOMETRY });
+        const second = buildBiomeBackdrop(getBiomePresentation(biome), BOUNDS, `sequence:${biome}`, { geometry: reordered });
+        expect(featureSignature([...second.largeFeatures, ...second.mediumFeatures, ...second.smallFeatures]))
+            .toBe(featureSignature([...first.largeFeatures, ...first.mediumFeatures, ...first.smallFeatures]));
+    });
+
+    it.each([
+        ['canyon', 'mountains', /^MOUNTAINS_/],
+        ['basalt', 'mountains', /^MOUNTAINS_/],
+        ['city', 'mountains', /^MOUNTAINS_/],
+        ['marsh', 'forest', /^FOREST_/],
+    ])('routes %s through the canonical %s authored builder', (alias, canonical, recipePattern) => {
+        const backdrop = buildBiomeBackdrop(getBiomePresentation(alias), BOUNDS, `alias:${alias}`, { geometry: GEOMETRY });
+        expect(backdrop.configId).toBe(canonical);
+        expect(backdrop.compositionRecipe).toMatch(recipePattern);
     });
 
     it('keeps every authored footprint outside the track and shoulder', () => {

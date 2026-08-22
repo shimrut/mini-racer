@@ -1,4 +1,11 @@
-import { createSeededRandom, hashSeed } from './seeded-random.js';
+import { createSeededRandom } from './seeded-random.js';
+import {
+    addPolygon,
+    analyzeAuthoredTrack,
+    range,
+    sampleAuthoredShoulder,
+    transformedPoint,
+} from './authored-scenery.js';
 
 const TAU = Math.PI * 2;
 
@@ -102,25 +109,6 @@ export const FOREST_COMPOSITION_RECIPES = Object.freeze([
     }),
 ]);
 
-function range(random, min, max) {
-    return min + random() * (max - min);
-}
-
-function transformedPoint(x, y, rotation, scaleX, scaleY, pointX, pointY) {
-    const cos = Math.cos(rotation);
-    const sin = Math.sin(rotation);
-    return {
-        x: x + pointX * scaleX * cos - pointY * scaleY * sin,
-        y: y + pointX * scaleX * sin + pointY * scaleY * cos,
-    };
-}
-
-function addPolygon(path, points) {
-    path.moveTo(points[0].x, points[0].y);
-    for (let index = 1; index < points.length; index += 1) path.lineTo(points[index].x, points[index].y);
-    path.closePath();
-}
-
 function makeLayersFeature({ template, x, y, rotation, scale, mirror, palette, paletteIndex, kind, buildLayers }) {
     const scaleX = scale * mirror;
     const scaleY = scale;
@@ -210,58 +198,11 @@ const PALETTES = Object.freeze([
 
 /** Distance-only shoulder field. Forest never samples terrain noise. */
 export function sampleForestShoulder({ seedKey, area, distanceIndex, sampleStep = 24 }) {
-    const columns = Math.round((area.maxX - area.minX) / sampleStep) + 1;
-    const rows = Math.round((area.maxY - area.minY) / sampleStep) + 1;
-    const values = new Float32Array(columns * rows);
-    const phase = (hashSeed(`${seedKey}:phase`) / 4294967295) * TAU;
-    const resolveWidth = (nearest) => {
-        const along = nearest?.along ?? 0;
-        const broad = Math.sin(along * TAU * 3 + phase) * 10.2;
-        const detail = Math.sin(along * TAU * 7 + phase * 0.61) * 4.8;
-        return 45 + broad + detail;
-    };
-    for (let row = 0; row < rows; row += 1) {
-        const y = area.minY + row * sampleStep;
-        for (let column = 0; column < columns; column += 1) {
-            const x = area.minX + column * sampleStep;
-            const nearest = distanceIndex?.query(x, y, 62) || null;
-            values[row * columns + column] = resolveWidth(nearest) - (nearest?.distance ?? 120);
-        }
-    }
-    return { values, columns, rows, sampleStep, resolveWidth };
+    return sampleAuthoredShoulder({ seedKey, area, distanceIndex, sampleStep });
 }
 
 export function analyzeForestTrack(distanceIndex) {
-    const outer = distanceIndex?.outer || [];
-    if (outer.length < 3) return { bounds: null, majorCorners: [] };
-    const bounds = outer.reduce((result, point) => ({
-        minX: Math.min(result.minX, point.x),
-        minY: Math.min(result.minY, point.y),
-        maxX: Math.max(result.maxX, point.x),
-        maxY: Math.max(result.maxY, point.y),
-    }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
-    const candidates = outer.map((point, index) => {
-        const previous = outer[(index - 1 + outer.length) % outer.length];
-        const next = outer[(index + 1) % outer.length];
-        const incoming = { x: point.x - previous.x, y: point.y - previous.y };
-        const outgoing = { x: next.x - point.x, y: next.y - point.y };
-        const inLength = Math.hypot(incoming.x, incoming.y) || 1;
-        const outLength = Math.hypot(outgoing.x, outgoing.y) || 1;
-        const dot = Math.max(-1, Math.min(1, (
-            incoming.x * outgoing.x + incoming.y * outgoing.y
-        ) / (inLength * outLength)));
-        return { x: point.x, y: point.y, curvature: Math.acos(dot), index };
-    }).sort((a, b) => b.curvature - a.curvature);
-    const diagonal = Math.hypot(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
-    const separation = Math.max(180, diagonal * 0.11);
-    const majorCorners = [];
-    for (const candidate of candidates) {
-        if (candidate.curvature < 0.08 && majorCorners.length >= 3) break;
-        if (majorCorners.some((corner) => Math.hypot(candidate.x - corner.x, candidate.y - corner.y) < separation)) continue;
-        majorCorners.push(candidate);
-        if (majorCorners.length === 6) break;
-    }
-    return { bounds, majorCorners };
+    return analyzeAuthoredTrack(distanceIndex);
 }
 
 function candidateFromSlot(slot, area, random, attempt) {

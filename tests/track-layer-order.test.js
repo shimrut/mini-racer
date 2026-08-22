@@ -25,7 +25,12 @@ function createContext() {
 }
 
 describe('track layer environment order', () => {
-  it('renders authored Forest features, then shoulder, then track with nothing after it', () => {
+  it.each([
+    ['forest', 'FOREST_A'],
+    ['mountains', 'MOUNTAINS_A'],
+    ['arctic', 'ARCTIC_A'],
+    ['beach', 'BEACH_A'],
+  ])('renders authored %s features, then shoulder, then track with nothing after it', (configId, compositionRecipe) => {
         const ctx = createContext();
         const renderer = new TrackLayerRenderer(ctx);
         const propPath = { id: 'prop' };
@@ -43,8 +48,8 @@ describe('track layer environment order', () => {
                 biomeGround: '#base',
             },
             backdrop: {
-                configId: 'forest',
-                compositionRecipe: 'FOREST_A',
+                configId,
+                compositionRecipe,
                 groundColor: '#base',
                 largeFeatures: [{
                     minX: 40,
@@ -68,7 +73,7 @@ describe('track layer environment order', () => {
         expect(ctx.drawImage).toHaveBeenCalledOnce();
     });
 
-    it('still paints props when the camera is outside the raster track bounds', () => {
+    it('does not paint legacy props after the track', () => {
         const ctx = createContext();
         const renderer = new TrackLayerRenderer(ctx);
         renderer.draw({
@@ -100,6 +105,6 @@ describe('track layer environment order', () => {
         });
 
         expect(ctx.operations).toContain('base');
-        expect(ctx.operations).toContain('fill:#prop');
+        expect(ctx.operations).not.toContain('fill:#prop');
     });
 });

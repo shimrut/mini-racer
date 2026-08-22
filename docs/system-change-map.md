@@ -69,17 +69,22 @@ flowchart LR
   canvases, and each track's deterministic environment. The environment uses
   the already-smoothed walls only for local clearance and remains separate from
   collision data.
-- `game/track/environment-field.js` builds the spatial distance index over both
-  walls. The deferred Mountains, Arctic, and Beach renderer also keeps its
-  existing seeded noise and prop sampling there.
-  `game/track/forest-scenery.js` owns Forest's authored primitive library, three
-  composition recipes, track-bounds/major-corner analysis, deterministic
-  transforms, footprint clearance, palette variation, and distance-only
-  30-60px shoulder. `game/track/backdrop.js` selects that path for Forest and
-  Forest-backed legacy names without running the old noise/contour/Poisson path.
-  `game/track/layer.js` renders Forest ground masses, complete tree groups, rocks,
-  vegetation, and shoulder before the cached track slice; there is no Forest prop
-  scatter pass after the track. Cars and HUD keep their existing later phases.
+- `game/track/environment-field.js` builds only the spatial distance index over
+  both walls. `game/track/authored-scenery.js` owns the shared broad-zone
+  placement, track-bounds/major-corner analysis, deterministic transforms,
+  complete-footprint clearance, palette variation, and distance-only 30-60px
+  shoulder used by every canonical biome. The old seeded-noise and Poisson prop
+  samplers are removed.
+- `game/track/forest-scenery.js`, `mountains-scenery.js`,
+  `arctic-scenery.js`, and `beach-scenery.js` own their hand-authored primitive
+  libraries, palettes, and three composition recipes each. Forest-backed Marsh
+  and Mountains-backed Canyon, Basalt, and City continue through their existing
+  canonical aliases without rewriting catalog data.
+- `game/track/backdrop.js` selects the canonical authored builder, then
+  `game/track/layer.js` renders large features, medium features, small features,
+  and the single shoulder before the cached track slice. There is no terrain
+  contour/blob pass and nothing scatters props after the track. Cars and HUD keep
+  their existing later phases.
   The cached track bitmap itself adds only one
   subtle large-scale asphalt gradient and a clipped dark edge inside the kerbs;
   the biome track shadow is deliberately faint so it cannot read as another halo.

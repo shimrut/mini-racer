@@ -13,28 +13,35 @@ every consumer load the large geometry registry.
   `TRACK_SCHEDULE_KEYS`, `DEFAULT_TRACK_KEY`, `hasTrack()`, `getTrackName()`,
   and `getTrackBiome()`.
 - `game/track/biomes.js`
-  Owns the immutable, configuration-driven biome definitions. Forest,
-  Mountains, Arctic, and Beach declare their palettes and renderer inputs.
-  Legacy catalog names resolve to one of those canonical configurations without
-  rewriting saved track metadata.
+  Owns the immutable canonical ground and shoulder palettes. Legacy catalog
+  names resolve to Forest, Mountains, Arctic, or Beach without rewriting saved
+  track metadata.
+- `game/track/authored-scenery.js`
+  Owns the shared broad-zone placement engine, deterministic transforms,
+  track-bounds/major-corner analysis, complete-footprint exclusion, palette
+  selection, and one distance-only 30-60px shoulder.
 - `game/track/forest-scenery.js`
-  Owns the first authored biome: three ground-mass primitives, three complete
+  Owns three ground-mass primitives, three complete
   forest-cluster primitives, two rock formations, small vegetation groups, and
   three reusable composition recipes. The seed chooses only the recipe,
   primitive, position, rotation, scale, mirroring, palette variation, and layer.
   Tree and rock arrangements inside a primitive are authored, not regenerated.
+- `game/track/mountains-scenery.js`, `arctic-scenery.js`, and
+  `beach-scenery.js`
+  Own the remaining authored libraries and three recipes per biome: layered
+  mountain ridges/rock fields/boulders/sparse trees; snow fields/frozen ponds/
+  snowdrifts/ice details/snowy rocks; and dune masses/coastal shelves/pebble
+  groups. Lines such as ridge crests, ice cracks, dune crests, and foam edges are
+  fixed inside the primitive instead of being generated from noise.
 - `game/track/backdrop.js`
-  Selects the environment renderer and draws it in world space. Forest analyzes
-  the track bounds and major corners, applies an authored recipe in broad
-  composition zones, rejects any complete primitive that conflicts with the
-  road/kerb/shoulder exclusion, and draws one irregular 30-60px shoulder. Its
-  masses, tree groups, rocks, and vegetation all stay below the cached track.
-  Mountains, Arctic, and Beach temporarily retain the earlier noise/contour and
-  prop-distribution path while Forest is visually validated.
+  Selects the canonical authored builder and draws it in world space. Every
+  biome applies a recipe in broad composition zones, rejects a complete
+  primitive if it conflicts with the road/kerb/shoulder exclusion, and draws
+  large, medium, and small scenery plus one irregular 30-60px shoulder below the
+  cached track. No terrain or prop pass draws after the track.
 - `game/track/environment-field.js`
-  Owns the spatial distance index over the smoothed inner/outer walls. It also
-  retains seeded value noise and prop sampling only for the deferred biome path.
-  This is rendering data and does not participate in collision or simulation.
+  Owns only the spatial distance index over the smoothed inner/outer walls. This
+  is scenery-clearance data and does not participate in collision or simulation.
 - `game/track/definitions/<track-slug>.js`
   Owns one track's boundaries, start position, start line, checkpoints, and
   geometry-specific options.
@@ -97,12 +104,12 @@ start/finish line and snaps onto that line's center axis when moved.
    the biome shown, so `random` is never stored. The biome lives in
    `TRACK_CATALOG`, not in the definition module.
 
-   The environment seed comes from the track presentation key. For Forest, the
-   same seed and geometry always select the same authored recipe and transforms;
-   a wall edit recomposes only where a complete primitive would violate road,
-   kerb, shoulder, or major-corner clearance. Renaming changes the key and
-   therefore settles a new deterministic composition. Mapmaker uses the same
-   environment inputs as a race.
+   The environment seed comes from the track presentation key. For every
+   canonical biome, the same seed and geometry always select the same authored
+   recipe and transforms; a wall edit recomposes only where a complete primitive
+   would violate road, kerb, shoulder, or major-corner clearance. Renaming
+   changes the key and therefore settles a new deterministic composition.
+   Mapmaker uses the same environment inputs as a race.
 3. New Daily Challenge tracks are appended as the final
    `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
    When extending an existing branch, keep the existing catalog and schedule
