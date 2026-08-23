@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@devvit/analytics": "0.14.1",
+    "@devvit/public-api": "0.14.1",
     "@devvit/redis": "0.14.1",
     "@devvit/web": "0.14.1",
     "express": "^5.1.0",

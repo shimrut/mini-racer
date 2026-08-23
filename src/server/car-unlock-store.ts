@@ -18,7 +18,7 @@ const WON_CHALLENGE_PREFIX = 'win:challenge:';
 const CAR_UNLOCK_PROMOTION_LOCK_TTL_MS = 30_000;
 const CAR_UNLOCK_PROMOTION_LOCK_ATTEMPTS = 5;
 
-function playerKey(playerId: string): string {
+export function carUnlockHashKey(playerId: string): string {
     const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
     return `miniracer:car-unlocks:v1:${playerHash}`;
 }
@@ -67,7 +67,7 @@ async function writeCarUnlockEvent(
 ): Promise<void> {
     const lock = await acquirePromotionLock(playerId, client);
     try {
-        await write(playerKey(await resolvePromotedPlayerId(playerId, client)));
+        await write(carUnlockHashKey(await resolvePromotedPlayerId(playerId, client)));
     } finally {
         await releaseRedisLock(lock, client);
     }
@@ -104,7 +104,7 @@ async function readEventFields(
     playerId: string,
     client: RedisClient = redis,
 ): Promise<Record<string, string>> {
-    return client.hGetAll(playerKey(playerId));
+    return client.hGetAll(carUnlockHashKey(playerId));
 }
 
 export async function hasCarUnlockProgress(
@@ -202,16 +202,16 @@ export async function mergeGuestCarUnlockProgress({
     try {
         const alreadyPromotedTo = await client.get(promotionKey(guestPlayerId));
         if (alreadyPromotedTo) return false;
-        const guestKey = playerKey(guestPlayerId);
+        const guestKey = carUnlockHashKey(guestPlayerId);
         const fields = await client.hGetAll(guestKey);
         const hadGuestProgress = Object.keys(fields).length > 0;
         const transaction = await beginOwnedRedisLockTransaction(lock, client);
         if (!transaction) throw new Error('Car unlock promotion lock was lost.');
         if (replace) {
-            await transaction.del(playerKey(redditPlayerId));
-            if (hadGuestProgress) await transaction.hSet(playerKey(redditPlayerId), fields);
+            await transaction.del(carUnlockHashKey(redditPlayerId));
+            if (hadGuestProgress) await transaction.hSet(carUnlockHashKey(redditPlayerId), fields);
         } else if (hadGuestProgress) {
-            await transaction.hSet(playerKey(redditPlayerId), fields);
+            await transaction.hSet(carUnlockHashKey(redditPlayerId), fields);
         }
         await transaction.set(promotionKey(guestPlayerId), redditPlayerId);
         await transaction.del(guestKey);
@@ -237,11 +237,11 @@ export async function discardGuestCarUnlockProgress({
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) return false;
     const lock = await acquirePromotionLock(guestPlayerId, client);
     try {
-        const hadGuestProgress = Object.keys(await client.hGetAll(playerKey(guestPlayerId))).length > 0;
+        const hadGuestProgress = Object.keys(await client.hGetAll(carUnlockHashKey(guestPlayerId))).length > 0;
         const transaction = await beginOwnedRedisLockTransaction(lock, client);
         if (!transaction) throw new Error('Car unlock discard lock was lost.');
         await transaction.set(promotionKey(guestPlayerId), redditPlayerId);
-        await transaction.del(playerKey(guestPlayerId));
+        await transaction.del(carUnlockHashKey(guestPlayerId));
         const results = await transaction.exec();
         if (!Array.isArray(results) || results.length === 0) {
             throw new Error('Car unlock discard was interrupted.');
