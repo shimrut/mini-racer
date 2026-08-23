@@ -210,6 +210,16 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
     return row;
 }
 
+function createOutcomeLockup(text, phase) {
+    const lockup = document.createElement('p');
+    lockup.className = 'challenge-result-lockup';
+    const result = document.createElement('span');
+    result.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
+    result.textContent = text;
+    lockup.appendChild(result);
+    return lockup;
+}
+
 export function renderChallengeFinishHero(
     overlayEl,
     {
@@ -241,15 +251,7 @@ export function renderChallengeFinishHero(
     root.setAttribute('aria-label', accessibleLabel);
     if (phase === 'pending') root.setAttribute('aria-live', 'polite');
 
-    const lockup = document.createElement('p');
-    lockup.className = 'challenge-result-lockup';
-
-    const result = document.createElement('span');
-    result.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
-    result.textContent = outcome;
-
-    lockup.appendChild(result);
-    root.appendChild(lockup);
+    root.appendChild(createOutcomeLockup(outcome, phase));
 
     if (phase === 'pending' || phase === 'error' || !outcomeByPhase[phase]) {
         const detail = document.createElement('span');
@@ -313,7 +315,8 @@ export function renderWinCombinedMedalOverlay(
         root.classList.add('win-combined-medal-overlay--complete');
     }
     root.setAttribute('role', 'group');
-    root.setAttribute('aria-label', 'Medals for this track');
+    root.setAttribute('aria-label', 'Finish. Medals for this track');
+    root.appendChild(createOutcomeLockup('FINISH', 'finish'));
 
     const centerWrap = document.createElement('div');
     centerWrap.className = 'win-combined-medal-overlay__center';

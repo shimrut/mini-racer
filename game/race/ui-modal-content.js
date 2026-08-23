@@ -693,8 +693,10 @@ export class ModalContentUi {
         const isChallengeHero = Boolean(
             challengeFinish || challengeConfirmPhase || lapMedal === 'challenge',
         );
-        // A challenge finish reads as three rows under the verdict, so the sheet lays itself out for them.
-        container.classList?.toggle?.('is-challenge-finish', isChallengeHero);
+        // Daily, Campaign, and Head to Head share the lockup sheet. Head to Head
+        // still owns YOU WON / YOU LOST; ordinary finishes paint FINISH and keep medals.
+        container.classList?.toggle?.('is-challenge-finish', true);
+        container.classList?.toggle?.('is-standard-finish', !isChallengeHero);
         this.applyChallengeOpponentStat(container, isChallengeHero ? challengeVerdict : null);
         if (label2El) {
             label2El.hidden = false;

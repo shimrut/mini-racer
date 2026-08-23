@@ -125,6 +125,18 @@ describe('game stylesheet architecture', () => {
         expect(resultDetailStyles).toContain('@media (max-height: 640px)');
     });
 
+    it('puts Daily and Campaign medals under the shared finish lockup', () => {
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-standard-finish #combined-hero-medal,[\s\S]*display:\s*contents;/,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-standard-finish \.win-combined-medal-overlay__row\s*\{[^}]*order:\s*3;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-standard-finish \.combined-stats-grid\s*\{[^}]*order:\s*4;/s,
+        );
+    });
+
     it('enters the challenge finish heading like Mini Racer and staggers the rows below', () => {
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) both;/,
@@ -136,7 +148,7 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\),[\s\S]*animation:\s*leaderboardRowIn var\(--dur-snap\) var\(--ease-settle\) backwards;/,
         );
         expect(resultDetailStyles).toMatch(
-            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.2s;/,
+            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.1s;/,
         );
         expect(resultDetailStyles).toMatch(
             /combined-actions > :nth-child\(1 of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)\s*\{[^}]*animation-delay:\s*0\.35s;/,

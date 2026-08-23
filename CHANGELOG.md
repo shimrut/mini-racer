@@ -1,5 +1,10 @@
 # Changelog
 
+- Daily and Campaign finishes now use the same lockup as Head to Head: a
+  left-aligned italic **FINISH** over a right-aligned time, then the medal
+  row, then the comparison rows. Head to Head still says **YOU WON** /
+  **YOU LOST**.
+
 - Daily and Campaign ranked submits now share one `submitCompetitionRun`
   path for replay checks, rate limits, the per-player submit lock, board
   write, and challenge PB. Daily still attaches rank / field size, car

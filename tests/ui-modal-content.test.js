@@ -441,6 +441,8 @@ describe('ui modal content helpers', () => {
         expect(rightGroup.hidden).toBe(false);
         expect(container.querySelector('.rank-num').textContent).toBe('1');
         expect(container.querySelector('#combined-rank-total').textContent).toBe('');
+        expect(container.classList.contains('is-challenge-finish')).toBe(true);
+        expect(container.classList.contains('is-standard-finish')).toBe(false);
 
         // With no best of their own, the opponent's target is no stand-in for one.
         component.renderCombinedResults(container, {
@@ -604,6 +606,10 @@ describe('ui modal content helpers', () => {
         expect(container.querySelector('#combined-stat-label-2').textContent).toBe('VS PB');
         expect(container.querySelector('#combined-best-lap').textContent).toBe('No lap times yet');
         expect(container.textContent).not.toContain('+9.062s');
+        expect(container.classList.contains('is-challenge-finish')).toBe(true);
+        expect(container.classList.contains('is-standard-finish')).toBe(true);
+        expect(container.querySelector('.challenge-result-lockup__outcome').textContent).toBe('FINISH');
+        expect(container.querySelector('.win-combined-medal-overlay__row, .combined-medal-row')).toBeTruthy();
 
         global.document = originalDocument;
     });

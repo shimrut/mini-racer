@@ -273,7 +273,7 @@
     transform-origin: top center;
 }
 
-/* Head to Head owns this result composition; Daily and Campaign keep the shared finish grid. */
+/* Daily, Campaign, and Head to Head share this lockup. Head to Head uses YOU WON/LOST; Daily and Campaign use FINISH with medals under the time. */
 #modal-combined-view.is-challenge-finish .pause-header {
     display: flex;
     flex-direction: column;
@@ -302,7 +302,31 @@
     width: 100%;
 }
 
+#modal-combined-view.is-standard-finish #combined-hero-medal,
+#modal-combined-view.is-standard-finish .win-combined-medal-overlay,
+#modal-combined-view.is-standard-finish .win-combined-medal-overlay__center {
+    display: contents;
+}
+
+#modal-combined-view.is-standard-finish .win-combined-medal-overlay__row {
+    order: 3;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 0.65rem;
+}
+
+#modal-combined-view.is-standard-finish .win-combined-medal-overlay__row .combined-medal-row-slot .medal-svg--hero {
+    width: min(16vw, 2.65rem);
+}
+
+#modal-combined-view.is-standard-finish .combined-stats-grid {
+    order: 4;
+    margin-top: 1.35rem;
+}
+
 #modal-combined-view.is-challenge-finish .challenge-result-lockup {
+    order: 1;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -490,6 +514,10 @@
     #modal-combined-view.is-challenge-finish .combined-stats-grid {
         gap: 0.35rem;
         margin-top: 2.25rem;
+    }
+
+    #modal-combined-view.is-standard-finish .combined-stats-grid {
+        margin-top: 1rem;
     }
 
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__status {
