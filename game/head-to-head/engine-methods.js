@@ -361,14 +361,17 @@ export const headToHeadEngineMethods = {
             return;
         }
 
-        openPendingFinish();
+        const localWin = localDifferenceMs !== null && localDifferenceMs < 0;
+        openPendingFinish({ phase: localWin ? 'won' : 'pending' });
 
         void (async () => {
             if (!stillOnThisFinish()) return;
-            this.modal.updateChallengeFinishHero?.({
-                phase: 'pending',
-                statusText: verifyingStatus,
-            });
+            if (!localWin) {
+                this.modal.updateChallengeFinishHero?.({
+                    phase: 'pending',
+                    statusText: verifyingStatus,
+                });
+            }
 
             let confirmationFailed = false;
             let response = { ok: false, body: { error: 'This run could not be verified.' } };

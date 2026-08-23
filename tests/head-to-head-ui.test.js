@@ -249,9 +249,9 @@ describe('Head to Head lobby and finish', () => {
             null,
             expect.objectContaining({
                 lapTime: 7.75,
-                lapMedal: null,
+                lapMedal: 'challenge',
                 challengeFinish: true,
-                challengeConfirmPhase: 'pending',
+                challengeConfirmPhase: 'won',
             }),
             expect.objectContaining({
                 modalKind: 'win',
@@ -335,15 +335,15 @@ describe('Head to Head lobby and finish', () => {
             'Challenge complete',
             null,
             expect.objectContaining({
-                lapMedal: null,
+                lapMedal: 'challenge',
                 challengeFinish: true,
-                challengeConfirmPhase: 'pending',
+                challengeConfirmPhase: 'won',
                 challengeVerdict: { opponentName: 'shimroot', deltaSec: -0.5 },
                 showGlobalLeaderboard: false,
             }),
             pendingOptions,
         );
-        expect(winUpdateHero).toHaveBeenCalledWith(
+        expect(winUpdateHero).not.toHaveBeenCalledWith(
             expect.objectContaining({ phase: 'pending' }),
         );
         await vi.waitFor(() => {
@@ -354,6 +354,48 @@ describe('Head to Head lobby and finish', () => {
             });
         });
         expect(winShowModal).toHaveBeenCalledTimes(1);
+
+        let answerWin;
+        const deferredShowModal = vi.fn();
+        const deferredUpdateHero = vi.fn();
+        headToHeadServiceMocks.submitHeadToHeadRun.mockReset();
+        headToHeadServiceMocks.submitHeadToHeadRun.mockReturnValue(
+            new Promise((resolve) => { answerWin = resolve; }),
+        );
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(
+            {
+                ...baseContext,
+                modal: {
+                    modalMsg,
+                    showModal: deferredShowModal,
+                    updateChallengeFinishHero: deferredUpdateHero,
+                },
+            },
+            { lapTime: 7.5 },
+        );
+        expect(deferredShowModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            expect.objectContaining({ challengeConfirmPhase: 'won', lapMedal: 'challenge' }),
+            pendingOptions,
+        );
+        expect(deferredUpdateHero).not.toHaveBeenCalled();
+        answerWin({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'won',
+                resultLabel: 'Challenge Won',
+                differenceMs: -500,
+            },
+        });
+        await vi.waitFor(() => {
+            expect(deferredUpdateHero).toHaveBeenCalledWith({
+                phase: 'won',
+                verdict: { opponentName: 'shimroot', deltaSec: -0.5 },
+                bestUpdate: null,
+            });
+        });
 
         headToHeadServiceMocks.submitHeadToHeadRun.mockReset();
 

@@ -1027,32 +1027,48 @@ export function createHeadToHeadService(
         ) {
             return { status: 422, body: { status: 'invalid_replay', error: 'This challenge run could not be verified.' } };
         }
-        const bestUpdate = await recordVerifiedBest(challenge, input.replay, viewer, context, verified);
         const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
+        const bestUpdatePromise = recordVerifiedBest(
+            challenge,
+            input.replay,
+            viewer,
+            context,
+            verified,
+        );
         if (differenceMs >= 0) {
-            return targetNotBeaten(differenceMs, bestUpdate);
+            return targetNotBeaten(differenceMs, await bestUpdatePromise);
         }
-        await recordCompletedRace(viewer.playerId);
-        await recordHeadToHeadWin(viewer.playerId, challengeId);
 
-        // Nothing about a Head to Head outlives its post, so a short-lived receipt carries the verified time to the brag comment it earns.
-        let acceptToken: string | null = null;
-        if (challenge.postId) {
-            acceptToken = createId();
-            await writeHeadToHeadAccept(acceptToken, {
-                challengeId,
-                postId: challenge.postId,
-                playerId: viewer.playerId,
-                username: viewer.username || 'Guest racer',
-                bestTimeMs: verified.bestTimeMs,
-                targetTimeMs: challenge.targetTimeMs,
-                medal: verified.medal,
-                commentText: formatChallengeBragComment(
-                    verified.bestTimeMs,
-                    challenge.trackKey,
-                ),
-            });
-        }
+        // Origin save, brag receipt, and unlock writes do not depend on each other.
+        // Completed-race and win events share one car-unlock hash, so those two stay in order.
+        const acceptPromise = challenge.postId
+            ? (async () => {
+                const acceptToken = createId();
+                await writeHeadToHeadAccept(acceptToken, {
+                    challengeId,
+                    postId: challenge.postId,
+                    playerId: viewer.playerId,
+                    username: viewer.username || 'Guest racer',
+                    bestTimeMs: verified.bestTimeMs,
+                    targetTimeMs: challenge.targetTimeMs,
+                    medal: verified.medal,
+                    commentText: formatChallengeBragComment(
+                        verified.bestTimeMs,
+                        challenge.trackKey,
+                    ),
+                });
+                return acceptToken;
+            })()
+            : Promise.resolve(null);
+        const unlockWrites = (async () => {
+            await recordCompletedRace(viewer.playerId);
+            await recordHeadToHeadWin(viewer.playerId, challengeId);
+        })();
+        const [bestUpdate, acceptToken] = await Promise.all([
+            bestUpdatePromise,
+            acceptPromise,
+            unlockWrites,
+        ]);
         return {
             status: 200,
             body: {
