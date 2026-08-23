@@ -231,11 +231,6 @@ export async function writeEntry(
             score: Date.now() + competition.guestRetentionSeconds * 1000,
         });
     }
-    if (competition.ttlSeconds != null) {
-        await transaction.expire(competition.leaderboardKey, competition.ttlSeconds);
-        await transaction.expire(competition.entryHashKey, competition.ttlSeconds);
-        await transaction.expire(competition.standingsRevisionKey, competition.ttlSeconds);
-    }
 }
 
 export type SnapshotPayload = {

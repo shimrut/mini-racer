@@ -1,6 +1,7 @@
 import {
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
+    createRedisChallengeStandingsRevisionKey,
     getDailyGpCompetitionTtlSeconds,
     type DailyGpChallenge,
     type DailyGpLapCount,
@@ -68,7 +69,7 @@ export function toDailyCompetition(
         objectiveType: challenge.objectiveType,
         leaderboardKey: createRedisChallengeLeaderboardKey(challenge.id),
         entryHashKey: createRedisChallengeEntryHashKey(challenge.id),
-        standingsRevisionKey: `${createRedisChallengeLeaderboardKey(challenge.id)}:standings-revision`,
+        standingsRevisionKey: createRedisChallengeStandingsRevisionKey(challenge.id),
         pbHashKey: challengeCollectionKey(challenge.id),
         ttlSeconds: getDailyGpCompetitionTtlSeconds(challenge, now),
         guestExpiryKey: null,

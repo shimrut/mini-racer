@@ -154,9 +154,9 @@ describe('server daily gp store submissions', () => {
         mockRedis.expire.mockResolvedValue(true);
         mockRedis.expireTime.mockResolvedValue(Math.floor(Date.now() / 1000) + 60);
         mockRedis.zAdd.mockResolvedValue(1);
-        mockRedis.zCard.mockResolvedValue(0);
+        mockRedis.zCard.mockResolvedValue(1);
         mockRedis.zRange.mockResolvedValue([]);
-        mockRedis.zRank.mockResolvedValue(undefined);
+        mockRedis.zRank.mockResolvedValue(0);
         mockRedis.watch.mockImplementation(() => createMockTransaction());
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: true,
@@ -217,6 +217,9 @@ describe('server daily gp store submissions', () => {
                 completedLaps: 1,
                 checkpointTimesSec: [4.2, 9.8],
                 validationMethod: 'strict-replay',
+                playerRank: 1,
+                playerRankLabel: '#1',
+                leaderboardEntryCount: 1,
             },
         });
         expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalledWith({
@@ -648,7 +651,19 @@ describe('server daily gp store submissions', () => {
                 0,
             );
             expect(mockRedis.expire).toHaveBeenCalledWith(
+                `dailygp:leaderboard:${oldChallenge.id}:entries`,
+                0,
+            );
+            expect(mockRedis.expire).toHaveBeenCalledWith(
+                `dailygp:leaderboard:${oldChallenge.id}:standings-revision`,
+                0,
+            );
+            expect(mockRedis.expire).toHaveBeenCalledWith(
                 `dailygp:leaderboard:${currentChallenge.id}`,
+                getDailyGpCompetitionTtlSeconds(currentChallenge),
+            );
+            expect(mockRedis.expire).toHaveBeenCalledWith(
+                `dailygp:leaderboard:${currentChallenge.id}:standings-revision`,
                 getDailyGpCompetitionTtlSeconds(currentChallenge),
             );
             expect(mockRedis.set).toHaveBeenCalledWith(
@@ -2822,6 +2837,10 @@ describe('server daily gp store submissions', () => {
             expect(mockRedis.hDel).not.toHaveBeenCalled();
             expect(mockRedis.expire).toHaveBeenCalledWith(
                 `dailygp:leaderboard:${challenge.id}`,
+                getDailyGpCompetitionTtlSeconds(challenge),
+            );
+            expect(mockRedis.expire).toHaveBeenCalledWith(
+                `dailygp:leaderboard:${challenge.id}:standings-revision`,
                 getDailyGpCompetitionTtlSeconds(challenge),
             );
         });

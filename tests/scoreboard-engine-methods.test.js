@@ -129,10 +129,20 @@ describe("scoreboard engine verification retries", () => {
           improved: true,
           bestTimeMs: 43000,
           completedLaps: 1,
+          playerRank: 4,
+          leaderboardEntryCount: 12,
         },
       },
     );
 
+    expect(engine.modal.updateModalScoreboardSnapshot).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        playerRank: 4,
+        playerRankLabel: "#4",
+        leaderboardEntryCount: 12,
+      }),
+    );
     expect(engine.leaderboards.refreshDailyChallengeAfterAcceptedSubmission)
       .toHaveBeenCalledWith(challengeId);
     expect(engine.modal.updateModalScoreboardSnapshot)

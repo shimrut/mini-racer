@@ -268,3 +268,10 @@ export function createRedisChallengeLeaderboardKey(challengeId: string): string 
 export function createRedisChallengeEntryHashKey(challengeId: string): string {
     return `dailygp:leaderboard:${challengeId}:entries`;
 }
+
+export function createRedisChallengeStandingsRevisionKey(challengeId: string): string {
+    return `${createRedisChallengeLeaderboardKey(challengeId)}:standings-revision`;
+}
+
+/** The one hash that names every live challenge, so a walk of Daily storage can start from it. */
+export const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';

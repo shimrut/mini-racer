@@ -19,9 +19,12 @@ import {
     createDailyChallengeId,
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
+    createRedisChallengeStandingsRevisionKey,
+    DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
     DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS,
     DAILY_GP_DEFAULT_LIMIT,
     DAILY_GP_PLAYLIST_DAYS,
+    formatRankLabel,
     formatUtcChallengeDate,
     getUtcDayIndex,
     getDailyGpCompetitionTtlSeconds,
@@ -41,6 +44,7 @@ import {
     createEmptySnapshot,
     parseStoredEntry,
     readEntryByPlayerId,
+    readPlayerRank,
     readSnapshot,
     writeEntry,
     type SnapshotPayload,
@@ -151,7 +155,6 @@ function guestProgressSelectionPendingKey(guestPlayerId: string): string {
 }
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
-const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY = 'dailygp:maintenance:challenge-history:v1:cursor';
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_BATCH_SIZE = 50;
 const DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
@@ -169,6 +172,47 @@ async function readPlayerCarUnlocks(
         redis,
         completedRaceEvidence,
     );
+}
+
+async function readPlayerStandingSummary(
+    competition: ReturnType<typeof toDailyCompetition>,
+    playerId: string,
+): Promise<{
+    playerRank: number | null;
+    playerRankLabel: string | null;
+    leaderboardEntryCount: number;
+}> {
+    const [playerRank, leaderboardEntryCount] = await Promise.all([
+        readPlayerRank(competition, playerId),
+        redis.zCard(competition.leaderboardKey),
+    ]);
+    return {
+        playerRank,
+        playerRankLabel: formatRankLabel(playerRank),
+        leaderboardEntryCount: Number.isFinite(leaderboardEntryCount)
+            ? Number(leaderboardEntryCount)
+            : 0,
+    };
+}
+
+/** Creates the standings-revision key if needed, then stamps TTL on all three Daily board keys. */
+async function stampDailyCompetitionExpiry(
+    challenge: DailyGpChallenge,
+    now = new Date(),
+): Promise<void> {
+    const ttlSeconds = getDailyGpCompetitionTtlSeconds(challenge, now);
+    const standingsRevisionKey = createRedisChallengeStandingsRevisionKey(challenge.id);
+    const keys = [
+        createRedisChallengeLeaderboardKey(challenge.id),
+        createRedisChallengeEntryHashKey(challenge.id),
+        standingsRevisionKey,
+    ];
+    if (ttlSeconds <= 0) {
+        await Promise.all(keys.map((key) => redis.expire(key, 0)));
+        return;
+    }
+    await redis.incrBy(standingsRevisionKey, 0);
+    await Promise.all(keys.map((key) => redis.expire(key, ttlSeconds)));
 }
 
 function preferencesAllowedByCarUnlocks(
@@ -274,14 +318,9 @@ async function maintainChallengeHistory(now = new Date()): Promise<void> {
             const startsAtMs = challenge ? Date.parse(challenge.startsAt) : Number.NaN;
             return Number.isFinite(startsAtMs) && startsAtMs <= cutoffMs ? [field] : [];
         });
-        await Promise.all(parsedEntries.flatMap(({ challenge }) => {
-            if (!challenge) return [];
-            const ttlSeconds = getDailyGpCompetitionTtlSeconds(challenge, now);
-            return [
-                redis.expire(createRedisChallengeLeaderboardKey(challenge.id), ttlSeconds),
-                redis.expire(createRedisChallengeEntryHashKey(challenge.id), ttlSeconds),
-            ];
-        }));
+        await Promise.all(parsedEntries.flatMap(({ challenge }) => (
+            challenge ? [stampDailyCompetitionExpiry(challenge, now)] : []
+        )));
         if (expiredFields.length) {
             await redis.hDel(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, expiredFields);
         }
@@ -300,6 +339,7 @@ async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise
         { [challenge.id]: JSON.stringify(challenge) },
     );
     await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+    await stampDailyCompetitionExpiry(challenge);
     await maintainChallengeHistory();
     return challenge;
 }
@@ -398,6 +438,7 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     );
     if (didSet) {
         await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+        await stampDailyCompetitionExpiry(challenge);
         await maintainChallengeHistory();
         return challenge;
     }
@@ -421,6 +462,7 @@ export async function persistServerDailyGpChallenge(
     );
     if (didSet) {
         await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+        await stampDailyCompetitionExpiry(challenge);
         await maintainChallengeHistory();
         return challenge;
     }
@@ -1802,7 +1844,7 @@ export async function submitServerDailyGpRun({
             },
         };
     }
-    await upsertPlayerProfile({
+    const profileWrite = upsertPlayerProfile({
         playerId: normalizedPlayerId,
         leaderboardIdentity,
         redditUsername,
@@ -1816,6 +1858,7 @@ export async function submitServerDailyGpRun({
     ) ?? strictReplayOutcome.run.checkpointTimesSec ?? null;
     const track = TRACKS[challenge.trackKey];
     if (!track) {
+        await profileWrite;
         return {
             status: 500,
             body: {
@@ -1826,6 +1869,7 @@ export async function submitServerDailyGpRun({
     }
     const submissionLock = await acquireSubmissionLock(challenge.id, normalizedPlayerId);
     if (!submissionLock) {
+        await profileWrite;
         return {
             status: 429,
             body: {
@@ -1857,6 +1901,7 @@ export async function submitServerDailyGpRun({
     }>;
     let trackPbPersistence: PromiseSettledResult<Awaited<ReturnType<typeof upsertPlayerTrackPersonalBest>>>;
     const competition = toDailyCompetition(challenge);
+    let releaseLock: Promise<unknown> = Promise.resolve();
     try {
         previousEntry = await readEntryByPlayerId(competition, normalizedPlayerId);
         const dailyWrite = async () => {
@@ -1898,18 +1943,18 @@ export async function submitServerDailyGpRun({
             }),
         ]);
     } finally {
-        try {
-            await releaseSubmissionLock(submissionLock);
-        } catch (error) {
+        releaseLock = releaseSubmissionLock(submissionLock).catch((error) => {
             // Lock cleanup is best-effort; it must not replace a committed outcome.
             console.error('Daily GP submission lock cleanup failed:', error);
-        }
+        });
     }
 
     if (dailyPersistence!.status === 'rejected') {
+        await Promise.all([releaseLock, profileWrite.catch(() => undefined)]);
         throw dailyPersistence!.reason;
     }
     if (dailyPersistence!.value.interrupted) {
+        await Promise.all([releaseLock, profileWrite.catch(() => undefined)]);
         return {
             status: 503,
             body: {
@@ -1925,7 +1970,13 @@ export async function submitServerDailyGpRun({
         console.error('Challenge PB persistence failed after a valid Daily GP run:', trackPbPersistence!.reason);
     }
     const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
-    await recordCompletedRace(normalizedPlayerId);
+    const [standing, carUnlocks] = await Promise.all([
+        readPlayerStandingSummary(competition, normalizedPlayerId),
+        readPlayerCarUnlocks(normalizedPlayerId, true),
+        recordCompletedRace(normalizedPlayerId),
+        releaseLock,
+        profileWrite,
+    ]);
     recordAnalyticsRaceBestEffort('daily', 'finish', normalizedPlayerId);
     return {
         status: 200,
@@ -1944,23 +1995,39 @@ export async function submitServerDailyGpRun({
             checkpointTimesSec: storedDailyEntry.checkpointTimesSec ?? null,
             validationMethod: storedDailyEntry.validationMethod ?? 'strict-replay',
             strictReplayFailureReason: storedDailyEntry.strictReplayFailureReason ?? null,
-            carUnlocks: await readPlayerCarUnlocks(normalizedPlayerId),
+            playerRank: standing.playerRank,
+            playerRankLabel: standing.playerRankLabel,
+            leaderboardEntryCount: standing.leaderboardEntryCount,
+            carUnlocks,
         },
     };
 }
 
-export async function recordServerRaceStart({
+export async function recordServerRaceEvent({
     mode,
+    action,
     playerId,
     redditUsername,
     guestToken,
 }: {
     mode?: unknown;
+    action?: unknown;
     playerId?: unknown;
     redditUsername?: unknown;
     guestToken?: unknown;
 } = {}): Promise<void> {
     const identity = await resolveAuthorizedPlayerIdentity({ playerId, redditUsername, guestToken });
     if (!identity.canonicalPlayerId) return;
-    await recordAnalyticsRace({ mode, action: 'start', playerId: identity.canonicalPlayerId });
+    await recordAnalyticsRace({ mode, action, playerId: identity.canonicalPlayerId });
+}
+
+export async function recordServerRaceStart(
+    input: {
+        mode?: unknown;
+        playerId?: unknown;
+        redditUsername?: unknown;
+        guestToken?: unknown;
+    } = {},
+): Promise<void> {
+    await recordServerRaceEvent({ ...input, action: 'start' });
 }

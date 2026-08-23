@@ -1,5 +1,11 @@
 # Changelog
 
+- Daily submit now overlaps independent Redis work after a valid run (profile
+  write, lock release, completed-race flag, garage snapshot) and returns the
+  player's rank and field size on the same reply so the finish line can paint
+  `#N of M` before the standings snapshot comes back. Challenge setup now
+  creates and expires the standings-revision key with the rest of that day's
+  board, and ranked writes no longer restamp those TTLs on every submit.
 - Installed Reddit's experimental `devvit-docs` skill so coding agents can
   look up official Devvit documentation for this app's version.
 

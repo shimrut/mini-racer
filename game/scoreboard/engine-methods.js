@@ -24,6 +24,29 @@ import {
 } from "../daily-challenge/service.js";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
 
+function scoreboardSnapshotFromSubmitRank(body, cachedSnapshot) {
+  const playerRank = Number.isInteger(body?.playerRank) && body.playerRank > 0
+    ? body.playerRank
+    : null;
+  const leaderboardEntryCount = Number.isInteger(body?.leaderboardEntryCount)
+    && body.leaderboardEntryCount >= 0
+    ? body.leaderboardEntryCount
+    : null;
+  if (playerRank == null && leaderboardEntryCount == null) {
+    return null;
+  }
+  return {
+    ...(cachedSnapshot && typeof cachedSnapshot === "object" ? cachedSnapshot : {}),
+    isLoading: false,
+    ...(playerRank != null
+      ? { playerRank, playerRankLabel: `#${playerRank}` }
+      : {}),
+    ...(leaderboardEntryCount != null
+      ? { leaderboardEntryCount, totalCount: leaderboardEntryCount }
+      : {}),
+  };
+}
+
 function challengeFromDailyVerificationEntry(engine, entry) {
   const active = engine?.activeDailyChallenge;
   if (active?.id === entry?.challengeId) return active;
@@ -365,7 +388,18 @@ export const scoreboardEngineMethods = {
         this.resolveTrackPersonalBestGhostPending?.(entry.challengeId);
       }
 
-      let scoreboardSnapshot = getCachedDailyChallengeSnapshot(entry.challengeId);
+      let scoreboardSnapshot = scoreboardSnapshotFromSubmitRank(
+        body,
+        getCachedDailyChallengeSnapshot(entry.challengeId),
+      );
+      if (
+        scoreboardSnapshot
+        && this.modal.matchesModalScoreboardContext({
+          challengeId: entry.challengeId,
+        })
+      ) {
+        this.modal.updateModalScoreboardSnapshot(scoreboardSnapshot);
+      }
       if (body.improved === true) {
         scoreboardSnapshot = this.leaderboards?.refreshDailyChallengeAfterAcceptedSubmission
           ? await this.leaderboards.refreshDailyChallengeAfterAcceptedSubmission(entry.challengeId)

@@ -740,17 +740,22 @@ export async function submitServerCampaignRun({
         };
     }
 
-    await recordCompletedRace(canonicalPlayerId);
+    const [carUnlocks] = await Promise.all([
+        getCarUnlockSnapshot(
+            canonicalPlayerId,
+            savedProgress.resultsByRaceId,
+            redis,
+            true,
+        ),
+        recordCompletedRace(canonicalPlayerId),
+    ]);
 
     return {
         status: 200,
         body: {
             ...outcome.body as Record<string, unknown>,
             progress: publicProgress(savedProgress),
-            carUnlocks: await getCarUnlockSnapshot(
-                canonicalPlayerId,
-                savedProgress.resultsByRaceId,
-            ),
+            carUnlocks,
         },
     };
 }
