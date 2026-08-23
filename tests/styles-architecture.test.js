@@ -86,7 +86,6 @@ describe('game stylesheet architecture', () => {
         const styles = readCssBundle(manifestUrl);
 
         for (const token of [
-            '--dur-pop: 50ms;',
             '--dur-snap: 75ms;',
             '--dur-fast: 120ms;',
             '--dur-base: 160ms;',
@@ -152,7 +151,7 @@ describe('game stylesheet architecture', () => {
             /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.1s;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-actions > :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-pop\) var\(--ease-settle\) backwards;[^}]*animation-delay:\s*0\.35s;/s,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-actions > :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-slow\) var\(--ease-glide\) 0\.4s both;/s,
         );
         expect(resultDetailStyles).not.toMatch(
             /combined-actions > :nth-child\(\d+ of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)/,

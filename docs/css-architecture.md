@@ -80,8 +80,9 @@ lobby/won portrait.
 The verdict lockup enters with the same `slideInLeft` 0.5s glide as Mini, and
 the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
 comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart from
-200ms; every visible finish button then rises together at 350ms in `--dur-pop`
-(50ms). Hidden rows and
+200ms; every visible finish button then fades and rises together at 400ms in
+`--dur-slow` (200ms) with `--ease-glide`, matching the title rather than the row snap.
+Hidden rows and
 `display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
 turns the sequence off. Daily and Campaign use that same entrance, with
 `FINISH` and medals under the clock.
@@ -289,7 +290,6 @@ against it rather than against a hand-typed number.
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--dur-pop` | 50ms | Finish buttons rising together |
 | `--dur-snap` | 75ms | Finish comparison-row rise |
 | `--dur-fast` | 120ms | Immediate feedback: hover and press colour, opacity |
 | `--dur-base` | 160ms | The default — enters, exits, content swaps |
