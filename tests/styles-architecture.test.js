@@ -126,16 +126,23 @@ describe('game stylesheet architecture', () => {
 
     it('enters the challenge finish heading like Mini Racer and staggers the rows below', () => {
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.is-challenge-finish-enter \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.is-challenge-finish-enter #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) 0\.1s both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) 0\.1s both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /\.is-challenge-finish-stagger\s*\{[^}]*animation:\s*challengeFinishItemIn var\(--dur-base\) var\(--ease-settle\) both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\),[\s\S]*animation:\s*leaderboardRowIn var\(--dur-base\) var\(--ease-settle\) backwards;/,
         );
         expect(resultDetailStyles).toMatch(
-            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish-enter[\s\S]*animation:\s*none;/,
+            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.5s;/,
+        );
+        expect(resultDetailStyles).toMatch(
+            /combined-actions > :nth-child\(1 of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)\s*\{[^}]*animation-delay:\s*0\.65s;/,
+        );
+        expect(resultDetailStyles).not.toContain('challengeFinishItemIn');
+        expect(resultDetailStyles).toMatch(
+            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish\.active-view[\s\S]*animation:\s*none;/,
         );
     });
 

@@ -781,47 +781,4 @@ describe('leaderboard row patching', () => {
         expect(secondPass).toEqual(firstPass);
         expect(secondPass[1].querySelector('.combined-row-name').textContent).toBe('Also One');
     });
-
-    it('staggers visible challenge finish rows and buttons 50ms apart after the heading', () => {
-        const originalDocument = global.document;
-        const dom = new JSDOM(`
-            <div id="combined" class="is-challenge-finish">
-                <div class="combined-stats-grid">
-                    <div id="combined-opponent-stat" class="stat-floating-item" hidden>
-                        <span id="combined-opponent-delta"></span>
-                    </div>
-                    <div id="pb-row" class="stat-floating-item"></div>
-                    <div id="combined-stats-right-group" class="stat-floating-item" hidden></div>
-                    <div id="combined-next-medal-stat" class="stat-floating-item" hidden></div>
-                </div>
-                <div class="combined-actions">
-                    <button id="combined-restart-btn" class="combined-action-btn" type="button"></button>
-                    <button id="combined-playlist-btn" class="combined-action-btn" type="button"></button>
-                    <p id="combined-mode-shortcuts-label" class="combined-mode-shortcuts-label" hidden></p>
-                    <button id="combined-more-btn" class="combined-action-btn" type="button" hidden></button>
-                    <button id="combined-garage-btn" class="combined-action-btn" type="button" style="display: none;"></button>
-                    <button id="combined-menu-btn" class="combined-action-btn" type="button"></button>
-                </div>
-            </div>
-        `);
-        global.document = dom.window.document;
-        const container = dom.window.document.getElementById('combined');
-        const component = new ModalContentUi();
-
-        component.syncChallengeFinishEntrance(container, { restart: true });
-
-        expect(container.classList.contains('is-challenge-finish-enter')).toBe(true);
-        expect(container.querySelector('#pb-row').style.getPropertyValue('--challenge-finish-delay')).toBe('500ms');
-        expect(container.querySelector('#combined-restart-btn').style.getPropertyValue('--challenge-finish-delay')).toBe('550ms');
-        expect(container.querySelector('#combined-playlist-btn').style.getPropertyValue('--challenge-finish-delay')).toBe('600ms');
-        expect(container.querySelector('#combined-menu-btn').style.getPropertyValue('--challenge-finish-delay')).toBe('650ms');
-        expect(container.querySelector('#combined-opponent-stat').classList.contains('is-challenge-finish-stagger')).toBe(false);
-        expect(container.querySelector('#combined-garage-btn').classList.contains('is-challenge-finish-stagger')).toBe(false);
-
-        component.applyChallengeOpponentStat(container, { deltaSec: 0.2 });
-        expect(container.querySelector('#combined-opponent-stat').style.getPropertyValue('--challenge-finish-delay')).toBe('0ms');
-        expect(container.querySelector('#pb-row').style.getPropertyValue('--challenge-finish-delay')).toBe('500ms');
-
-        global.document = originalDocument;
-    });
 });

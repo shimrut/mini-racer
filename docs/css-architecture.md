@@ -70,9 +70,10 @@ The finish hero contains no avatar, medal, opponent name, or duplicate margin.
 Those elements remain valid on the separate Challenge lobby/won portrait.
 The verdict lockup enters with the same `slideInLeft` 0.5s glide as Mini, and
 the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
-comparison rows and finish buttons then appear one after another at 50ms,
-starting at 500ms, under `is-challenge-finish-enter`. Reduced motion turns
-that sequence off.
+comparison rows then use the existing `leaderboardRowIn` fade, 50ms apart from
+500ms; finish buttons continue that cascade from 650ms. Hidden rows and
+`display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
+turns the sequence off. Daily and Campaign finishes stay still.
 
 ## Daily And Campaign Poster Contract
 
