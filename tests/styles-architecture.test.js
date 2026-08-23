@@ -86,6 +86,7 @@ describe('game stylesheet architecture', () => {
         const styles = readCssBundle(manifestUrl);
 
         for (const token of [
+            '--dur-snap: 75ms;',
             '--dur-fast: 120ms;',
             '--dur-base: 160ms;',
             '--dur-slow: 200ms;',
@@ -132,7 +133,7 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) 0\.1s both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\),[\s\S]*animation:\s*leaderboardRowIn var\(--dur-base\) var\(--ease-settle\) backwards;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\),[\s\S]*animation:\s*leaderboardRowIn var\(--dur-snap\) var\(--ease-settle\) backwards;/,
         );
         expect(resultDetailStyles).toMatch(
             /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.5s;/,
