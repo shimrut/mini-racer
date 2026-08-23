@@ -104,13 +104,13 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish \.pause-header\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup\s*\{[^}]*font-family:\s*var\(--header-font\);[^}]*font-style:\s*normal;[^}]*font-weight:\s*900;/s,
+            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup\s*\{[^}]*font-family:\s*var\(--header-font\);[^}]*font-style:\s*italic;[^}]*font-weight:\s*900;/s,
         );
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish #combined-time\s*\{[^}]*font-style:\s*normal;/s,
+            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup__lead\s*\{[^}]*font-size:\s*clamp\(1\.85rem, 8vw, 2\.6rem\);/s,
         );
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.combined-stat-label\s*\{[^}]*font-style:\s*normal;/s,

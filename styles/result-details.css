@@ -305,15 +305,22 @@
     min-width: 0;
     margin: 0;
     font-family: var(--header-font);
-    font-style: normal;
+    font-style: italic;
     font-weight: 900;
+    line-height: 0.82;
     text-transform: uppercase;
+    text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__lead {
+    font-size: clamp(1.85rem, 8vw, 2.6rem);
+    letter-spacing: -0.02em;
+    color: var(--text-color);
 }
 
 #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome {
-    font-size: clamp(2.35rem, 11vw, 3.25rem);
+    font-size: clamp(3rem, 14vw, 4.25rem);
     letter-spacing: -0.04em;
-    line-height: 0.9;
     white-space: nowrap;
     color: var(--text-color);
 }
@@ -350,10 +357,6 @@
 }
 
 #modal-combined-view.is-challenge-finish #combined-time {
-    font-family: var(--header-font);
-    font-size: clamp(2.75rem, 13vw, 3.75rem);
-    font-style: normal;
-    letter-spacing: -0.055em;
     white-space: nowrap;
 }
 
@@ -408,12 +411,16 @@
         gap: 0.2rem;
     }
 
+    #modal-combined-view.is-challenge-finish .challenge-result-lockup__lead {
+        font-size: clamp(1.35rem, 6vw, 1.85rem);
+    }
+
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome {
-        font-size: clamp(1.85rem, 8vw, 2.6rem);
+        font-size: clamp(2.2rem, 10vw, 3.1rem);
     }
 
     #modal-combined-view.is-challenge-finish #combined-time {
-        font-size: clamp(2.1rem, 9vw, 3rem);
+        font-size: clamp(2.4rem, 11vw, 3.25rem);
     }
 
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--pending,
