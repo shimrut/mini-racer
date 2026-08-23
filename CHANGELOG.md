@@ -1,5 +1,8 @@
 # Changelog
 
+- Installed Reddit's experimental `devvit-docs` skill so coding agents can
+  look up official Devvit documentation for this app's version.
+
 - Upgraded the Devvit toolchain to 0.14.1. Reddit now runs apps on Node 24,
   which is why this is a 0.14 release; our game APIs stay the same. Wiki
   helpers were only deprecated, and this app does not use them. Hosted

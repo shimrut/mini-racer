@@ -27,7 +27,9 @@ public/assets/medals/
 local-assets/
 
 # IDE / agent / internal notes (not part of the game repo)
-.cursor/
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
 .agents/
 .vscode/
 progress.md
