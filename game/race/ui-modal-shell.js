@@ -6,6 +6,7 @@ import {
     applyCombinedRankValue,
     buildScoreboardRankDisplay
 } from './result-flow.js';
+import { bindCombinedStatButton } from './ui-modal-content.js';
 import {
     scheduleCombinedMedalEntranceAfterModal,
     shouldCelebrateMedalTier,
@@ -1202,19 +1203,20 @@ export class ModalShell {
             );
             const trackLocked = Boolean(lapData.challengeViewerBest?.trackLocked);
             if (canOpenLeaderboard) {
-                rightGroupEl.classList.add('combined-stats-right-group--interactive');
-                rightGroupEl.onclick = () => {
-                    this.showModalLeaderboardPayload();
-                };
+                bindCombinedStatButton(rightGroupEl, {
+                    interactiveClass: 'combined-stats-right-group--interactive',
+                    onActivate: () => this.showModalLeaderboardPayload(),
+                });
             } else if (trackLocked) {
-                // Rank row already opens the locked-track explanation from renderCombinedResults.
+                bindCombinedStatButton(rightGroupEl, {
+                    interactiveClass: 'combined-stats-right-group--interactive',
+                    ariaLabel: 'Track locked. Open explanation.',
+                    onActivate: () => this.content.openChallengeTrackLockedPopover(this.modalCombinedView),
+                });
             } else {
-                rightGroupEl.classList.remove('combined-stats-right-group--interactive');
-                rightGroupEl.onclick = null;
-                rightGroupEl.onkeydown = null;
-                rightGroupEl.removeAttribute('role');
-                rightGroupEl.removeAttribute('tabindex');
-                rightGroupEl.removeAttribute('aria-label');
+                bindCombinedStatButton(rightGroupEl, {
+                    interactiveClass: 'combined-stats-right-group--interactive',
+                });
             }
         }
 

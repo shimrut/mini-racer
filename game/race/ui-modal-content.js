@@ -255,6 +255,34 @@ function getFinitePositiveRank(value) {
         : null;
 }
 
+export function bindCombinedStatButton(element, {
+    interactiveClass = '',
+    ariaLabel = '',
+    onActivate = null,
+} = {}) {
+    if (!element) return;
+    if (typeof onActivate !== 'function') {
+        if (interactiveClass) element.classList.remove(interactiveClass);
+        element.removeAttribute('role');
+        element.removeAttribute('tabindex');
+        element.removeAttribute('aria-label');
+        element.onclick = null;
+        element.onkeydown = null;
+        return;
+    }
+    if (interactiveClass) element.classList.add(interactiveClass);
+    element.setAttribute('role', 'button');
+    element.setAttribute('tabindex', '0');
+    if (ariaLabel) element.setAttribute('aria-label', ariaLabel);
+    else element.removeAttribute('aria-label');
+    element.onclick = onActivate;
+    element.onkeydown = (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        onActivate();
+    };
+}
+
 export function bindPopoverOverlayEscapeDismiss(onDismiss) {
     if (typeof document === 'undefined') return () => {};
 
@@ -774,19 +802,15 @@ export class ModalContentUi {
                     });
                 };
 
-                timeEl.onclick = openSplitsPopover;
-                timeEl.onkeydown = (event) => {
-                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                    event.preventDefault();
-                    openSplitsPopover();
-                };
+                bindCombinedStatButton(timeEl, {
+                    interactiveClass: 'combined-stat-value--interactive',
+                    ariaLabel: 'View checkpoint split times',
+                    onActivate: openSplitsPopover,
+                });
             } else {
-                timeEl.classList.remove('combined-stat-value--interactive');
-                timeEl.removeAttribute('role');
-                timeEl.removeAttribute('tabindex');
-                timeEl.removeAttribute('aria-label');
-                timeEl.onclick = null;
-                timeEl.onkeydown = null;
+                bindCombinedStatButton(timeEl, {
+                    interactiveClass: 'combined-stat-value--interactive',
+                });
             }
         }
         if (bestLapEl) {
@@ -875,32 +899,16 @@ export class ModalContentUi {
     }
 
     bindChallengeTrackLockedRank(container, trackLocked) {
-        const rightGroupEl = container?.querySelector('#combined-stats-right-group');
-        const rankValueEl = container?.querySelector('#combined-rank-value');
-        if (!rightGroupEl) return;
-
-        rankValueEl?.classList.toggle('combined-rank-value--locked', Boolean(trackLocked));
-        if (!trackLocked) {
-            rightGroupEl.classList.remove('combined-stats-right-group--interactive');
-            rightGroupEl.removeAttribute('role');
-            rightGroupEl.removeAttribute('tabindex');
-            rightGroupEl.removeAttribute('aria-label');
-            rightGroupEl.onclick = null;
-            rightGroupEl.onkeydown = null;
-            return;
-        }
-
-        rightGroupEl.classList.add('combined-stats-right-group--interactive');
-        rightGroupEl.setAttribute('role', 'button');
-        rightGroupEl.setAttribute('tabindex', '0');
-        rightGroupEl.setAttribute('aria-label', 'Track locked. Open explanation.');
-        const openLocked = () => this.openChallengeTrackLockedPopover(container);
-        rightGroupEl.onclick = openLocked;
-        rightGroupEl.onkeydown = (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            openLocked();
-        };
+        bindCombinedStatButton(
+            container?.querySelector('#combined-stats-right-group'),
+            trackLocked
+                ? {
+                    interactiveClass: 'combined-stats-right-group--interactive',
+                    ariaLabel: 'Track locked. Open explanation.',
+                    onActivate: () => this.openChallengeTrackLockedPopover(container),
+                }
+                : { interactiveClass: 'combined-stats-right-group--interactive' },
+        );
     }
 
     openChallengeTrackLockedPopover(container) {
@@ -908,10 +916,13 @@ export class ModalContentUi {
             title: 'TRACK LOCKED',
             overlayClass: 'combined-track-locked-overlay',
             buildRows: (listEl) => {
-                const copy = document.createElement('p');
-                copy.className = 'combined-track-locked-copy';
-                copy.textContent = "You haven't unlocked this track in Campaign, so you can't rank for it.";
-                listEl.appendChild(copy);
+                const row = document.createElement('div');
+                row.className = 'combined-medal-times-row';
+                const label = document.createElement('span');
+                label.className = 'combined-medal-times-label';
+                label.textContent = "You haven't unlocked this track in Campaign, so you can't rank for it.";
+                row.appendChild(label);
+                listEl.appendChild(row);
             },
         });
     }

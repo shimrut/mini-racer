@@ -138,6 +138,7 @@ export function buildChallengeRankSnapshot(bestUpdate, viewerBest) {
     if (viewerBest?.trackLocked) {
         return {
             playerRankLabel: CHALLENGE_RANK_LOCKED,
+            statusText: CHALLENGE_RANK_LOCKED,
             trackLocked: true,
         };
     }
@@ -188,6 +189,7 @@ export function applyCombinedRankValue({
             || rankDisplay.text === 'N/A'
             || scoreboardSnapshot?.verificationState === 'error'
             || scoreboardSnapshot?.verificationState === 'rejected'
+            || scoreboardSnapshot?.trackLocked
         );
     rankValueEl.classList.toggle('combined-rank-value--status', shouldShowStatusText);
 

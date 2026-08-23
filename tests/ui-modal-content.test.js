@@ -508,13 +508,14 @@ describe('ui modal content helpers', () => {
 
         expect(rightGroup.hidden).toBe(false);
         expect(container.querySelector('#combined-rank-value').textContent).toBe('TRACK LOCKED');
+        expect(container.querySelector('#combined-rank-value').classList.contains('combined-rank-value--status')).toBe(true);
         expect(rightGroup.classList.contains('combined-stats-right-group--interactive')).toBe(true);
 
         rightGroup.click();
         const overlay = container.querySelector('.combined-medal-times-overlay');
         expect(overlay).toBeTruthy();
         expect(container.querySelector('.combined-medal-times-title').textContent).toBe('TRACK LOCKED');
-        expect(container.querySelector('.combined-track-locked-copy').textContent)
+        expect(container.querySelector('.combined-medal-times-label').textContent)
             .toBe("You haven't unlocked this track in Campaign, so you can't rank for it.");
 
         global.requestAnimationFrame = originalRaf;

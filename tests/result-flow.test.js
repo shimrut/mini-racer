@@ -123,6 +123,7 @@ describe('result-flow helpers', () => {
         });
         expect(buildChallengeRankSnapshot({ rank: 1 }, { trackLocked: true })).toEqual({
             playerRankLabel: 'TRACK LOCKED',
+            statusText: 'TRACK LOCKED',
             trackLocked: true,
         });
     });
