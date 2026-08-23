@@ -15,30 +15,8 @@ import {
 import {
     createVerificationSnapshot,
 } from '../scoreboard/verification-queue.js';
-import { getExistingCampaignScoreboardSnapshot } from '../campaign/engine-methods.js';
-import { getCampaignStage } from '../campaign/manifest.js';
-import { getCachedDailyChallengeSnapshot } from '../daily-challenge/service.js';
-import { createModalActions, getCombinedRankNumber } from '../race/result-flow.js';
+import { createModalActions } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
-
-function withHeldChallengeViewerBest(engine, challenge) {
-    const viewerBest = challenge?.viewerBest ?? null;
-    if (!viewerBest || viewerBest.trackLocked) return viewerBest;
-    if (getCombinedRankNumber({ playerRank: viewerBest.rank })) return viewerBest;
-
-    const origin = challenge.origin;
-    let snapshot = null;
-    if (origin?.mode === 'daily' && origin.challengeId) {
-        snapshot = getCachedDailyChallengeSnapshot(origin.challengeId);
-    } else {
-        const raceId = origin?.mode === 'campaign' ? origin.raceId : challenge.raceId;
-        const stage = getCampaignStage(raceId);
-        snapshot = stage ? getExistingCampaignScoreboardSnapshot(engine, stage) : null;
-    }
-    const rank = getCombinedRankNumber(snapshot);
-    if (!rank) return viewerBest;
-    return { ...viewerBest, rank };
-}
 
 function toRaceChallenge(stage) {
     return {
@@ -311,7 +289,7 @@ export const headToHeadEngineMethods = {
                     challengeViewerAvatarUrl: challenge.viewerAvatarUrl ?? null,
                     challengeVerdict: buildVerdict(localDifferenceMs),
                     previousPersonalBestSec,
-                    challengeViewerBest: withHeldChallengeViewerBest(this, challenge),
+                    challengeViewerBest: challenge.viewerBest ?? null,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
                     // Rank is already on this row; a personal best may replace the number, but the

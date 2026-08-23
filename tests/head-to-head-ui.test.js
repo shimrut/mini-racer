@@ -537,49 +537,6 @@ describe('Head to Head lobby and finish', () => {
         );
     });
 
-    it('fills a missing challenge rank from Campaign standings already on the engine', async () => {
-        const context = {
-            activeHeadToHead: {
-                challengeId: 'challenge-1',
-                origin: { mode: 'campaign', campaignId: 'numbered-v1', raceId: 'numbered-v1-03' },
-                raceId: 'numbered-v1-03',
-                trackKey: 'numberZero',
-                lapCount: 1,
-                targetTimeMs: 8_000,
-                viewerBest: { bestTimeMs: 8_200, medal: 'silver', rank: null, trackLocked: false },
-            },
-            campaignBootstrap: {
-                standingsByRaceId: {
-                    'numbered-v1-03': { rank: 12, totalCount: 40 },
-                },
-            },
-            journeys: { endAttempt: vi.fn() },
-            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
-            modal: {
-                modalMsg: { style: {}, textContent: '' },
-                showModal: vi.fn(),
-                updateChallengeFinishHero: vi.fn(),
-            },
-            restartActiveRace: vi.fn(),
-            loadChallengeLobby: vi.fn(),
-            settings: { openSettings: vi.fn() },
-        };
-
-        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
-
-        expect(context.modal.showModal).toHaveBeenCalledWith(
-            expect.any(String),
-            null,
-            expect.objectContaining({
-                challengeViewerBest: expect.objectContaining({
-                    bestTimeMs: 8_200,
-                    rank: 12,
-                }),
-            }),
-            expect.anything(),
-        );
-    });
-
     it('sends a settled loss that beats the best already held', async () => {
         const context = {
             activeHeadToHead: {
