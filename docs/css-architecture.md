@@ -53,6 +53,23 @@ Some files intentionally span more than one product surface. Those boundaries
 reflect contiguous sections of the original stylesheet and avoid changing which
 equally specific rule wins.
 
+## Head To Head Finish Contract
+
+`styles/result-details.css` owns the Head to Head-only finish composition under
+`#modal-combined-view.is-challenge-finish`; the shared Daily and Campaign finish
+rules remain unchanged. The top row places a stacked, italic Outfit `CHALLENGE`
+and truthful verdict beside the dominant upright race time. The result lockup uses green
+for `WON`, red for `LOST`, and neutral text for `TIE`; pending and failed
+verification use `VERIFYING` and `UNVERIFIED` and retain their status detail.
+
+Below that top row, the existing result slots flow as three left-label/right-value
+upright rows: opponent delta, prior-PB delta, and originating rank. The PB slot keeps its
+honest empty state and the rank row stays hidden when no rank exists. The layout
+uses grid/flex flow, inherited modal width and safe-area behavior, plus a
+`max-height: 640px` compaction; it must not introduce absolute result positioning.
+The finish hero contains no avatar, medal, opponent name, or duplicate margin.
+Those elements remain valid on the separate Challenge lobby/won portrait.
+
 ## Daily And Campaign Poster Contract
 
 Daily and Campaign share one responsive poster composition rather than

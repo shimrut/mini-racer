@@ -77,6 +77,8 @@ import {
     previewHeadToHeadBrag,
 } from './head-to-head-brag.js';
 import {
+    readHeadToHeadViewerBest,
+    recordHeadToHeadBest,
     resolveHeadToHeadSource,
     validateHeadToHeadReplay,
 } from './head-to-head-runtime.js';
@@ -86,6 +88,8 @@ import { prepareServerLeaderboardRace } from './leaderboard-race-service.js';
 const headToHeadService = createHeadToHeadService({
     resolveSource: resolveHeadToHeadSource,
     validateReplay: validateHeadToHeadReplay,
+    recordBest: recordHeadToHeadBest,
+    readViewerBest: readHeadToHeadViewerBest,
 });
 
 function registerProductionRoutes(app: express.Application): void {

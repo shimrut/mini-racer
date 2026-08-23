@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { TRACK_CATALOG } from '../game/track/catalog.js';
-import { GENERIC_SNOO_URL } from '../game/ui/avatar.js';
 import {
     TRACK_MEDAL_THRESHOLDS,
     getAuthorMedalSeconds,
@@ -414,80 +413,50 @@ describe('medals', () => {
                 statusText: 'Submitting...',
             });
             expect(children[0].dataset.challengePhase).toBe('pending');
-            expect(children[0].children.some(
-                (c) => c.textContent === 'Submitting...',
-            )).toBe(true);
+            expect(children[0].children[0].children[0].textContent).toBe('CHALLENGE');
+            expect(children[0].children[0].children[1].textContent).toBe('VERIFYING');
+            expect(children[0].children[1].textContent).toBe('Submitting...');
 
             renderChallengeFinishHero(overlay, { phase: 'won' });
             expect(children[0].dataset.challengePhase).toBe('won');
-            expect(children[0].children.some(
-                (c) => c.textContent === 'Challenge beaten',
-            )).toBe(true);
+            expect(children[0].children[0].children[1].textContent).toBe('WON');
 
             renderChallengeFinishHero(overlay, {
                 phase: 'won',
                 verdict: { opponentName: 'shimroot', deltaSec: -0.305 },
             });
-            expect(children[0].children.some(
-                (c) => c.textContent === 'Beat shimroot',
-            )).toBe(true);
-            const wonMargin = children[0].children.at(-1);
-            expect(wonMargin.textContent).toBe('-0.305s');
-            expect(wonMargin.classList.classes.has('is-gain')).toBe(true);
+            expect(children[0].children[0].children[1].textContent).toBe('WON');
+            expect(children[0].children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, {
                 phase: 'lost',
                 verdict: { opponentName: 'shimroot', deltaSec: 0.546 },
             });
-            expect(children[0].children.some(
-                (c) => c.textContent === 'Lost to shimroot',
-            )).toBe(true);
-            const lostMargin = children[0].children.at(-1);
-            expect(lostMargin.textContent).toBe('+0.546s');
-            expect(lostMargin.classList.classes.has('is-loss')).toBe(true);
+            expect(children[0].children[0].children[1].textContent).toBe('LOST');
+            expect(children[0].children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, {
                 phase: 'won',
                 avatarUrl: 'https://i.redd.it/snoo.png',
             });
             const wonRoot = children[0];
-            const portrait = wonRoot.children[0].children[0].children[0]
-                .children.find((c) => c.className?.includes?.('challenge-won-hero__portrait'));
-            expect(portrait).toBeTruthy();
-            expect(portrait.children[0].src).toBe('https://i.redd.it/snoo.png');
-            expect(portrait.children[1].className)
-                .toContain('challenge-won-hero__medal');
-            expect(wonRoot.children.some(
-                (c) => c.textContent === 'Challenge beaten',
-            )).toBe(true);
-
-            renderChallengeFinishHero(overlay, { phase: 'won' });
-            const facelessPortrait = children[0].children[0].children[0].children[0]
-                .children.find((c) => c.className?.includes?.('challenge-won-hero__portrait'));
-            expect(facelessPortrait).toBeTruthy();
-            expect(facelessPortrait.children[0].src).toBe(GENERIC_SNOO_URL);
-            expect(facelessPortrait.children[0].classList.classes.has('challenge-avatar--generic'))
-                .toBe(true);
-            expect(facelessPortrait.children[1].className)
-                .toContain('challenge-won-hero__medal');
+            expect(wonRoot.children[0].children[1].textContent).toBe('WON');
+            expect(wonRoot.children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, {
                 phase: 'error',
                 error: 'Could not confirm.',
             });
             expect(children[0].dataset.challengePhase).toBe('error');
-            expect(children[0].children.some(
-                (c) => c.textContent === 'Could not confirm.',
-            )).toBe(true);
+            expect(children[0].children[0].children[1].textContent).toBe('UNVERIFIED');
+            expect(children[0].children[1].textContent).toBe('Could not confirm.');
 
             renderChallengeFinishHero(overlay, { phase: 'lost' });
             expect(children[0].dataset.challengePhase).toBe('lost');
-            expect(children[0].children.some(
-                (c) => c.textContent === 'Challenge Lost',
-            )).toBe(true);
-            expect(children[0].children[0].children.some(
-                (c) => c.className?.includes?.('combined-medal-row'),
-            )).toBe(true);
+            expect(children[0].children[0].children[1].textContent).toBe('LOST');
+
+            renderChallengeFinishHero(overlay, { phase: 'tie' });
+            expect(children[0].children[0].children[1].textContent).toBe('TIE');
         } finally {
             global.document = originalDocument;
         }

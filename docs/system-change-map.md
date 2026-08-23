@@ -375,19 +375,25 @@ flowchart LR
   not store the new frozen replay. Signed-in Reddit users create posts; guests
   can load, race, and submit against them using the existing guest
   identity/token. Head to Head outcomes are not durable player history and do
-  not merge at sign-in. A Daily-origin post keeps its embedded race contract
+  not merge at sign-in. A challenge run can still improve the originating
+  Daily or Campaign best: the finish compares against the prior comparable PB
+  and shows the rank returned for that source, while leaving a missing PB as an
+  honest empty state and a missing rank hidden. A Daily-origin post keeps its embedded race contract
   after the normal Daily window, while regular Daily mode remains expiry-scoped. The
   standalone post and expanded game both forward the current Reddit `postId`
   with challenge reads and submissions; the server accepts that explicit
   context only as a validated `t3_` post ID before re-reading the Reddit post.
   The challenger cannot accept or submit against their own post (`own_challenge`);
   the in-feed Accept card shows an expired-style message and opens the source
-  mode via a stored launch target that overrides challenge post data. Challenge
-  finishes do not award medals, campaign progress, Daily/Campaign standings,
-  or PBs. One finish sheet always offers Improve / Brag / Home; Brag unlocks
-  only after a verified beat. Confirmation status is patched into the medal
-  hero (Submitting/Verifying → medal or error). Duel submissions never call
-  the Campaign store.
+  mode via a stored launch target that overrides challenge post data. The duel
+  verdict remains session-only even when its source run improves the ordinary
+  PB and rank. One finish sheet always offers Improve / Brag / Home; Brag unlocks
+  only after a verified beat. The Head to Head finish replaces the legacy
+  medal/avatar hero with a stacked Outfit `CHALLENGE` + truthful verdict
+  lockup beside the race time. The three comparison rows own opponent margin,
+  prior-PB delta, and originating rank; a server-corrected verdict repaints the
+  opponent row as well as the lockup. Daily and Campaign keep their existing
+  finish composition.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,
   and frozen challenger Reddit avatar URL (no ghost or player ID in public post

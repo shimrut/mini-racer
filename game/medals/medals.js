@@ -1,6 +1,4 @@
 import { createMedalIconSvg } from './medal-icon.js';
-import { createAvatarImage } from '../ui/avatar.js';
-import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 import {
     STANDARD_MEDAL_TIER_RANK,
     allStandardMedalsUnlocked,
@@ -218,8 +216,6 @@ export function renderChallengeFinishHero(
         phase = 'pending',
         statusText = null,
         error = null,
-        avatarUrl = null,
-        verdict = null,
     } = {},
 ) {
     if (!overlayEl) return;
@@ -229,103 +225,42 @@ export function renderChallengeFinishHero(
     root.className = 'win-combined-medal-overlay win-combined-medal-overlay--challenge';
     root.dataset.challengePhase = phase;
 
-    const centerWrap = document.createElement('div');
-    centerWrap.className = 'win-combined-medal-overlay__center';
-
-    const appendPlaceholderMedal = () => {
-        const row = document.createElement('div');
-        row.className = 'combined-medal-row win-combined-medal-overlay__row';
-        const slot = document.createElement('div');
-        slot.className = 'combined-medal-row-slot';
-        slot.appendChild(createMedalIconSvg('white', {
-            className: 'medal-svg--hero',
-        }));
-        row.appendChild(slot);
-        centerWrap.appendChild(row);
+    const outcomeByPhase = {
+        won: 'WON',
+        lost: 'LOST',
+        tie: 'TIE',
+        pending: 'VERIFYING',
+        error: 'UNVERIFIED',
     };
+    const outcome = outcomeByPhase[phase] || 'UNVERIFIED';
+    const accessibleLabel = phase === 'error'
+        ? (error || 'This run could not be verified.')
+        : (phase === 'pending' ? (statusText || 'Verifying challenge result') : `Challenge ${outcome}`);
 
-    const label = document.createElement('p');
-    label.className = 'combined-medal-challenge-label';
+    root.setAttribute('role', phase === 'error' ? 'alert' : 'status');
+    root.setAttribute('aria-label', accessibleLabel);
+    if (phase === 'pending') root.setAttribute('aria-live', 'polite');
 
-    const opponentName = typeof verdict?.opponentName === 'string' && verdict.opponentName.trim()
-        ? verdict.opponentName.trim()
-        : null;
-    const margin = formatSplitTimeDeltaSec(verdict?.deltaSec ?? null);
+    const lockup = document.createElement('p');
+    lockup.className = 'challenge-result-lockup';
 
-    if (phase === 'won') {
-        root.setAttribute('role', 'group');
-        root.setAttribute('aria-label', 'Challenge beaten');
+    const lead = document.createElement('span');
+    lead.className = 'challenge-result-lockup__lead';
+    lead.textContent = 'CHALLENGE';
 
-        const row = document.createElement('div');
-        row.className = 'combined-medal-row win-combined-medal-overlay__row';
-        row.setAttribute('role', 'group');
-        row.setAttribute('aria-label', 'Challenge beaten');
+    const result = document.createElement('span');
+    result.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
+    result.textContent = outcome;
 
-        const slot = document.createElement('div');
-        slot.className = 'combined-medal-row-slot';
-        slot.dataset.tier = 'challenge';
-        const medal = createMedalIconSvg('challenge', {
-            className: 'medal-svg--hero medal-pile-icon--deferred',
-        });
-        const portrait = document.createElement('div');
-        portrait.className = 'challenge-won-hero__portrait';
-        const avatar = createAvatarImage(document, avatarUrl, {
-            className: 'challenge-avatar challenge-avatar--hero',
-            genericClass: 'challenge-avatar--generic',
-            hidden: true,
-        });
-        const medalMount = document.createElement('span');
-        medalMount.className = 'challenge-won-hero__medal';
-        medalMount.appendChild(medal);
-        portrait.appendChild(avatar);
-        portrait.appendChild(medalMount);
-        slot.appendChild(portrait);
-        row.appendChild(slot);
-        centerWrap.appendChild(row);
+    lockup.appendChild(lead);
+    lockup.appendChild(result);
+    root.appendChild(lockup);
 
-        label.textContent = opponentName ? `Beat ${opponentName}` : 'Challenge beaten';
-        label.classList.add('combined-medal-challenge-label--won');
-    } else if (phase === 'pending') {
-        const pendingLabel = statusText || 'Submitting...';
-        root.setAttribute('role', 'status');
-        root.setAttribute('aria-label', pendingLabel);
-        root.setAttribute('aria-live', 'polite');
-        appendPlaceholderMedal();
-        label.textContent = pendingLabel;
-        label.classList.add('combined-medal-challenge-label--pending');
-    } else if (phase === 'lost' || phase === 'tie') {
-        const outcomeLabel = opponentName
-            ? (phase === 'tie' ? `Tied with ${opponentName}` : `Lost to ${opponentName}`)
-            : (phase === 'tie' ? 'Tie' : 'Challenge Lost');
-        root.setAttribute('role', 'status');
-        root.setAttribute('aria-label', outcomeLabel);
-        appendPlaceholderMedal();
-        label.textContent = outcomeLabel;
-        label.classList.add('combined-medal-challenge-label--outcome');
-    } else {
-        const errorLabel = error || 'This run could not be verified.';
-        root.setAttribute('role', 'alert');
-        root.setAttribute('aria-label', errorLabel);
-        appendPlaceholderMedal();
-        label.textContent = errorLabel;
-        label.classList.add('combined-medal-challenge-label--error');
-    }
-
-    root.appendChild(centerWrap);
-    root.appendChild(label);
-
-    const settled = phase === 'won' || phase === 'lost' || phase === 'tie';
-    if (settled && (margin?.isGain || margin?.isLoss)) {
-        const marginEl = document.createElement('p');
-        marginEl.className = 'combined-medal-challenge-margin';
-        marginEl.textContent = `${margin.text}s`;
-        if (margin.isGain) marginEl.classList.add('is-gain');
-        if (margin.isLoss) marginEl.classList.add('is-loss');
-        root.appendChild(marginEl);
-        root.setAttribute(
-            'aria-label',
-            `${label.textContent} by ${Math.abs(Number(verdict.deltaSec)).toFixed(3)} seconds`,
-        );
+    if (phase === 'pending' || phase === 'error' || !outcomeByPhase[phase]) {
+        const detail = document.createElement('span');
+        detail.className = 'challenge-result-lockup__status';
+        detail.textContent = accessibleLabel;
+        root.appendChild(detail);
     }
 
     overlayEl.appendChild(root);

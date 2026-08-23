@@ -4,16 +4,30 @@ import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import {
     getServerHeadToHeadSource,
+    submitServerCampaignRun,
 } from './campaign-store.js';
 import {
     getServerDailyGpPlayableChallenge,
+    submitServerDailyGpRun,
 } from './daily-gp-store.js';
+import { readEntryByPlayerId, readPlayerRank } from './competition-leaderboard.js';
 import {
+    toCampaignCompetition,
+    toDailyCompetition,
+    type Competition,
+} from './competition.js';
+import {
+    CAMPAIGN_ID,
     getHeadToHeadOrigin,
     type HeadToHeadRecord,
     type HeadToHeadSource,
 } from './head-to-head-model.js';
 import type { HeadToHeadPostContext } from './head-to-head-post.js';
+import type {
+    HeadToHeadBestContext,
+    HeadToHeadBestUpdate,
+    HeadToHeadViewerBest,
+} from './head-to-head-service.js';
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 
@@ -121,5 +135,141 @@ export function validateHeadToHeadReplay(
             challenge.lapCount,
         ),
         ghost: validation.run.ghost,
+    };
+}
+
+async function readBestEffortRank(
+    competition: Competition,
+    playerId: string | null | undefined,
+): Promise<number | null> {
+    if (!playerId) return null;
+    try {
+        return await readPlayerRank(competition, playerId);
+    } catch (error) {
+        // The rank is decoration on a result that is already stored.
+        console.error('Head to Head rank read failed:', error);
+        return null;
+    }
+}
+
+/** Only an accepted run with a real stored time is worth reporting back to the challenge screen. */
+function acceptedBest(
+    outcome: { status: number; body: unknown },
+): { improved: boolean; bestTimeMs: number } | null {
+    const body = outcome.body as { accepted?: boolean; improved?: boolean; bestTimeMs?: unknown };
+    if (outcome.status !== 200 || body.accepted !== true) return null;
+    const bestTimeMs = Number(body.bestTimeMs);
+    if (!Number.isFinite(bestTimeMs) || bestTimeMs <= 0) return null;
+    return { improved: body.improved === true, bestTimeMs };
+}
+
+/**
+ * A verified challenge run is a verified run on the stage or Daily it was minted from: same track,
+ * same laps, same rules, same validator. So it earns the board entry, the personal best and the
+ * progress a normal run earns. Whatever the mode refuses — a locked stage, a Daily that has closed —
+ * stays unwritten, because the refusal is the rule.
+ */
+export async function recordHeadToHeadBest(
+    challenge: HeadToHeadRecord,
+    replay: unknown,
+    context: HeadToHeadBestContext = {},
+): Promise<HeadToHeadBestUpdate | null> {
+    const origin = getHeadToHeadOrigin(challenge);
+    if (!origin || replay == null) return null;
+    const identity = {
+        playerId: context.playerId ?? undefined,
+        redditUsername: context.username ?? undefined,
+        guestToken: context.guestToken ?? undefined,
+        requestRateLimitIdentity: context.requestRateLimitIdentity ?? undefined,
+    };
+
+    if (origin.mode === 'campaign') {
+        const stage = getCampaignStage(origin.raceId);
+        if (!stage) return null;
+        const best = acceptedBest(await submitServerCampaignRun({
+            ...identity,
+            raceId: stage.raceId,
+            trackKey: challenge.trackKey,
+            replay,
+        }));
+        if (!best) return null;
+        return {
+            ...best,
+            mode: 'campaign',
+            medal: getMedalForRaceTime(stage.trackKey, best.bestTimeMs / 1000, stage.lapCount),
+            rank: await readBestEffortRank(
+                toCampaignCompetition(CAMPAIGN_ID, stage),
+                context.canonicalPlayerId,
+            ),
+        };
+    }
+
+    const dailyChallenge = await getServerDailyGpPlayableChallenge(origin.challengeId);
+    if (!dailyChallenge) return null;
+    const best = acceptedBest(await submitServerDailyGpRun({
+        ...identity,
+        challengeId: dailyChallenge.id,
+        trackKey: challenge.trackKey,
+        replay,
+    }));
+    if (!best) return null;
+    return {
+        ...best,
+        mode: 'daily',
+        medal: getMedalForRaceTime(
+            dailyChallenge.trackKey,
+            best.bestTimeMs / 1000,
+            challenge.lapCount,
+        ),
+        rank: await readBestEffortRank(
+            toDailyCompetition(dailyChallenge),
+            context.canonicalPlayerId,
+        ),
+    };
+}
+
+/** The board entry is the number the submit compares against, so it is the number worth showing. */
+async function challengeCompetition(
+    challenge: HeadToHeadRecord,
+): Promise<{ competition: Competition; trackKey: string; lapCount: number } | null> {
+    const origin = getHeadToHeadOrigin(challenge);
+    if (!origin) return null;
+    if (origin.mode === 'campaign') {
+        const stage = getCampaignStage(origin.raceId);
+        return stage
+            ? {
+                competition: toCampaignCompetition(CAMPAIGN_ID, stage),
+                trackKey: stage.trackKey,
+                lapCount: stage.lapCount,
+            }
+            : null;
+    }
+    const dailyChallenge = await getServerDailyGpPlayableChallenge(origin.challengeId);
+    return dailyChallenge
+        ? {
+            competition: toDailyCompetition(dailyChallenge),
+            trackKey: dailyChallenge.trackKey,
+            lapCount: challenge.lapCount,
+        }
+        : null;
+}
+
+/**
+ * What this player already holds on the stage or Daily behind the challenge. Null when they hold
+ * nothing there, or when the Daily has closed and no run could be written to it anyway.
+ */
+export async function readHeadToHeadViewerBest(
+    challenge: HeadToHeadRecord,
+    playerId: string | null,
+): Promise<HeadToHeadViewerBest | null> {
+    if (!playerId) return null;
+    const target = await challengeCompetition(challenge);
+    if (!target) return null;
+    const entry = await readEntryByPlayerId(target.competition, playerId);
+    const bestTimeMs = Number(entry?.bestTimeMs);
+    if (!Number.isFinite(bestTimeMs) || bestTimeMs <= 0) return null;
+    return {
+        bestTimeMs,
+        medal: getMedalForRaceTime(target.trackKey, bestTimeMs / 1000, target.lapCount),
     };
 }

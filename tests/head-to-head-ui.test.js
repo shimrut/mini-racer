@@ -350,6 +350,7 @@ describe('Head to Head lobby and finish', () => {
             expect(winUpdateHero).toHaveBeenCalledWith({
                 phase: 'won',
                 verdict: { opponentName: 'shimroot', deltaSec: -0.5 },
+                bestUpdate: null,
             });
         });
         expect(winShowModal).toHaveBeenCalledTimes(1);
@@ -376,6 +377,8 @@ describe('Head to Head lobby and finish', () => {
             settledLap('lost', 0.4),
             pendingOptions,
         );
+        // The verdict is settled on screen without waiting, and the hero is left alone
+        // because this run earned no personal best to report.
         expect(lossUpdateHero).not.toHaveBeenCalled();
 
         const tieShowModal = vi.fn();
@@ -400,7 +403,9 @@ describe('Head to Head lobby and finish', () => {
         );
         expect(tieUpdateHero).not.toHaveBeenCalled();
 
-        expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
+        // A settled loss or tie is still sent: the run may be the player's best on the stage
+        // or Daily the challenge came from, and that best is theirs whatever the challenge said.
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(2);
     });
 
     it('swaps the placeholder share request for the accept token a verified win returns', async () => {
@@ -449,6 +454,158 @@ describe('Head to Head lobby and finish', () => {
                 shareRequest: { kind: 'challenge-brag', acceptToken: 'accept-token-1' },
             });
         });
+    });
+
+    it('reports the personal best a lost challenge still earned', async () => {
+        const updateChallengeFinishHero = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero,
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        const bestUpdate = {
+            mode: 'campaign',
+            improved: true,
+            bestTimeMs: 8_400,
+            medal: 'silver',
+            rank: 6,
+        };
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: false,
+                status: 'target_not_beaten',
+                targetTimeMs: 8_000,
+                differenceMs: 400,
+                bestUpdate,
+            },
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+
+        // The verdict was already settled on screen, so only the personal best arrives from the server.
+        await vi.waitFor(() => {
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith({ bestUpdate });
+        });
+    });
+
+    it('keeps a settled loss home when it does not beat the best already held', async () => {
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+                viewerBest: { bestTimeMs: 8_200, medal: 'silver' },
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+
+        // 8.4s loses the challenge and is slower than the 8.2s already stored, so nothing is sent.
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
+    });
+
+    it('sends a settled loss that beats the best already held', async () => {
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+                viewerBest: { bestTimeMs: 8_900, medal: 'bronze' },
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+
+        // 8.4s still loses the challenge, but it beats the 8.9s already stored.
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+
+        await vi.waitFor(() => {
+            expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('measures the finish against the best already held', async () => {
+        const updateChallengeFinishHero = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                challengerUsername: 'shimroot',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+                viewerBest: { bestTimeMs: 8_900, medal: 'bronze' },
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero,
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            showDailyLobby: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            applyCarUnlockSnapshot: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'won',
+                bestTimeMs: 7_500,
+                differenceMs: -500,
+                bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 7_500, rank: 1 },
+            },
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.5 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            expect.objectContaining({
+                previousPersonalBestSec: 8.9,
+                allowLeaderboardOpen: false,
+            }),
+            expect.anything(),
+        );
+
     });
 
     it('leaves the finish unbraggable when a win comes back without an accept token', async () => {
@@ -660,7 +817,9 @@ describe('Head to Head lobby and finish', () => {
             });
             expect(setChallengeWinActions).not.toHaveBeenCalled();
         } else {
-            expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
+            // The verdict settled on screen without waiting, but the run still went out so a
+            // personal best could be claimed. With none reported, the hero is left as it was.
+            expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
             expect(updateChallengeFinishHero).not.toHaveBeenCalled();
             expect(setChallengeWinActions).not.toHaveBeenCalled();
         }

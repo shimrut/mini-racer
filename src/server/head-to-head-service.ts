@@ -80,6 +80,29 @@ export type HeadToHeadReplayResult = {
     reason?: string;
 };
 
+export type HeadToHeadBestContext = {
+    /** Forwarded to the mode's own submit exactly as the request carried it, so identity resolves the same way twice. */
+    playerId?: string | null;
+    username?: string | null;
+    guestToken?: string | null;
+    requestRateLimitIdentity?: string | null;
+    /** Already resolved by the challenge submit; used only to read back the rank. */
+    canonicalPlayerId?: string | null;
+};
+
+export type HeadToHeadViewerBest = {
+    bestTimeMs: number;
+    medal: HeadToHeadMedal;
+};
+
+export type HeadToHeadBestUpdate = {
+    mode: 'campaign' | 'daily';
+    improved: boolean;
+    bestTimeMs: number;
+    medal: HeadToHeadMedal;
+    rank: number | null;
+};
+
 export type HeadToHeadServiceDependencies = {
     resolveSource(
         input: Record<string, unknown>,
@@ -90,6 +113,23 @@ export type HeadToHeadServiceDependencies = {
         challenge: HeadToHeadRecord,
         replay: unknown,
     ): Promise<HeadToHeadReplayResult> | HeadToHeadReplayResult;
+    /**
+     * Sends a verified run to the mode it was minted from, so it earns the board entry, the
+     * personal best and the progress a normal run earns. Returns null when the mode refuses it.
+     */
+    recordBest?(
+        challenge: HeadToHeadRecord,
+        replay: unknown,
+        context: HeadToHeadBestContext,
+    ): Promise<HeadToHeadBestUpdate | null> | HeadToHeadBestUpdate | null;
+    /**
+     * What the viewer already holds on the stage or Daily behind the challenge, so the finish can
+     * tell an improvement from a run not worth sending.
+     */
+    readViewerBest?(
+        challenge: HeadToHeadRecord,
+        playerId: string | null,
+    ): Promise<HeadToHeadViewerBest | null> | HeadToHeadViewerBest | null;
     now?: () => Date;
     createId?: () => string;
 };
@@ -847,6 +887,7 @@ export function createHeadToHeadService(
                 status: 'ready',
                 challenge,
                 opponentGhost: record.frozenGhost,
+                viewerBest: await readViewerBest(record, viewer.playerId),
                 viewerUsername: viewer.displayName,
                 viewerAvatarUrl: avatars.viewerAvatarUrl,
                 viewerType: viewer.signedIn
@@ -856,6 +897,45 @@ export function createHeadToHeadService(
                         : 'anonymous',
             },
         };
+    }
+
+    /** Decoration on the challenge screen: a failed read must not keep the challenge from loading. */
+    async function readViewerBest(
+        challenge: HeadToHeadRecord,
+        playerId: string | null,
+    ): Promise<HeadToHeadViewerBest | null> {
+        if (!dependencies.readViewerBest || !playerId) return null;
+        try {
+            return await dependencies.readViewerBest(challenge, playerId) ?? null;
+        } catch (error) {
+            console.error('Head to Head viewer best could not be read:', error);
+            return null;
+        }
+    }
+
+    /**
+     * The challenge result never depends on this. A refusal from the mode is the rule working —
+     * a locked stage, a Daily that has closed — and a failure is a lost personal best, not a lost race.
+     */
+    async function recordVerifiedBest(
+        challenge: HeadToHeadRecord,
+        replay: unknown,
+        viewer: ChallengeViewer,
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadBestUpdate | null> {
+        if (!dependencies.recordBest) return null;
+        try {
+            return await dependencies.recordBest(challenge, replay, {
+                playerId: context.playerId ?? null,
+                username: viewer.username,
+                guestToken: context.guestToken ?? null,
+                requestRateLimitIdentity: context.requestRateLimitIdentity ?? null,
+                canonicalPlayerId: viewer.playerId,
+            }) ?? null;
+        } catch (error) {
+            console.error('Head to Head result could not be ranked in its own mode:', error);
+            return null;
+        }
     }
 
     async function submit(
@@ -911,8 +991,7 @@ export function createHeadToHeadService(
                 },
             };
         }
-        const claimedTimeMs = Number(input.bestTimeMs);
-        const targetNotBeaten = (differenceMs: number) => ({
+        const targetNotBeaten = (differenceMs: number, bestUpdate: HeadToHeadBestUpdate | null) => ({
             status: 422,
             body: {
                 accepted: false,
@@ -920,17 +999,13 @@ export function createHeadToHeadService(
                 error: 'This run did not beat the challenge time.',
                 targetTimeMs: challenge.targetTimeMs,
                 differenceMs,
+                bestUpdate,
             },
         });
         recordAnalyticsRaceBestEffort('challenge', 'finish', viewer.playerId);
-        if (
-            Number.isInteger(claimedTimeMs)
-            && claimedTimeMs > 0
-            && claimedTimeMs >= challenge.targetTimeMs
-        ) {
-            return targetNotBeaten(claimedTimeMs - challenge.targetTimeMs);
-        }
 
+        // Every finish is verified now, win or lose: a run that misses the target can still be the
+        // player's best on the stage or Daily this challenge was minted from, and that best is theirs to keep.
         const verified = await dependencies.validateReplay(challenge, input.replay);
         if (
             !verified.ok
@@ -941,9 +1016,10 @@ export function createHeadToHeadService(
         ) {
             return { status: 422, body: { status: 'invalid_replay', error: 'This challenge run could not be verified.' } };
         }
+        const bestUpdate = await recordVerifiedBest(challenge, input.replay, viewer, context);
         const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
         if (differenceMs >= 0) {
-            return targetNotBeaten(differenceMs);
+            return targetNotBeaten(differenceMs, bestUpdate);
         }
         await recordCompletedRace(viewer.playerId);
         await recordHeadToHeadWin(viewer.playerId, challengeId);
@@ -977,6 +1053,7 @@ export function createHeadToHeadService(
                 targetTimeMs: challenge.targetTimeMs,
                 differenceMs,
                 acceptToken,
+                bestUpdate,
                 carUnlocks: await readChallengeCarUnlocks(viewer.playerId),
             },
         };

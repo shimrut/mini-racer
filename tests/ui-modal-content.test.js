@@ -389,6 +389,73 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
+    it('reads a challenge finish against the personal best it had and the rank it earned', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-opponent-stat" hidden aria-hidden="true">
+                    <span id="combined-opponent-delta"></span>
+                </div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div class="stat-floating-item">
+                    <span id="combined-stat-label-2" hidden aria-hidden="true"></span>
+                    <span id="combined-best-lap"></span>
+                </div>
+                <div id="combined-next-medal-stat"></div>
+                <div id="combined-next-medal-icon-slot"></div>
+                <div id="combined-next-medal-time"></div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+        const rightGroup = container.querySelector('#combined-stats-right-group');
+        const label = container.querySelector('#combined-stat-label-2');
+        const delta = container.querySelector('#combined-best-lap');
+
+        component.renderCombinedResults(container, {
+            time: 16.174,
+            // The challenge target, which is the opponent's time and never the player's own best.
+            bestLap: 16.839,
+            challengeFinish: true,
+            challengeConfirmPhase: 'pending',
+            previousPersonalBestSec: 17.2,
+        });
+        expect(label.hidden).toBe(false);
+        expect(label.textContent).toBe('VS. YOUR PB');
+        expect(delta.textContent).toBe('-1.026s');
+        expect(delta.classList.contains('is-gain')).toBe(true);
+        expect(rightGroup.hidden).toBe(true);
+
+        component.applyChallengeOpponentStat(container, { deltaSec: 0.253 });
+        const opponentDelta = container.querySelector('#combined-opponent-delta');
+        expect(opponentDelta.textContent).toBe('+0.253s');
+        expect(opponentDelta.classList.contains('is-loss')).toBe(true);
+
+        component.applyChallengeRankStat(container, { improved: true, bestTimeMs: 16174, rank: 1 });
+        expect(rightGroup.hidden).toBe(false);
+        expect(container.querySelector('.rank-num').textContent).toBe('1');
+        expect(container.querySelector('#combined-rank-total').textContent).toBe('');
+
+        // With no best of their own, the opponent's target is no stand-in for one.
+        component.renderCombinedResults(container, {
+            time: 16.174,
+            bestLap: 16.839,
+            challengeFinish: true,
+            challengeConfirmPhase: 'won',
+            previousPersonalBestSec: null,
+            challengeBestUpdate: { improved: true, bestTimeMs: 16174, rank: 4 },
+        });
+        expect(delta.textContent).toBe('No lap times yet');
+        expect(container.querySelector('.rank-num').textContent).toBe('4');
+
+        global.document = originalDocument;
+    });
+
     it('counts the racers who posted a time, not the community behind them', () => {
         const originalDocument = global.document;
         const dom = new JSDOM(`

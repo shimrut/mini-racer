@@ -82,6 +82,7 @@ export const headToHeadEngineMethods = {
             ...challenge,
             frozenGhost: response.body?.opponentGhost ?? null,
             viewerAvatarUrl: response.body?.viewerAvatarUrl ?? null,
+            viewerBest: response.body?.viewerBest ?? null,
         } : null;
         let challengeReady = response.ok
             && response.body?.status === 'ready'
@@ -138,6 +139,7 @@ export const headToHeadEngineMethods = {
             trackName: getTrackName(challenge?.trackKey, challenge?.trackKey || ''),
             laps: challenge?.lapCount,
             targetTimeMs: challenge?.targetTimeMs,
+            viewerBestTimeMs: response.body?.viewerBest?.bestTimeMs ?? null,
             medal: challenge?.medal,
             outcome: outcome || remembered?.outcome || null,
             bestTimeMs: outcome ? bestTimeMs : (remembered?.bestTimeMs ?? null),
@@ -260,6 +262,12 @@ export const headToHeadEngineMethods = {
             : null;
         const settlesLocally = localDifferenceMs !== null && localDifferenceMs >= 0;
 
+        // The best the player already holds on the stage or Daily behind this challenge. The finish
+        // sheet measures the run against it the way an ordinary finish does.
+        const viewerBestMs = Number(challenge.viewerBest?.bestTimeMs);
+        const hasViewerBest = Number.isFinite(viewerBestMs) && viewerBestMs > 0;
+        const previousPersonalBestSec = hasViewerBest ? viewerBestMs / 1000 : null;
+
         const openPendingFinish = ({
             phase = 'pending',
             error = null,
@@ -280,8 +288,11 @@ export const headToHeadEngineMethods = {
                     challengeConfirmError: error,
                     challengeViewerAvatarUrl: challenge.viewerAvatarUrl ?? null,
                     challengeVerdict: buildVerdict(localDifferenceMs),
+                    previousPersonalBestSec,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
+                    // The rank shown here comes from the submit, so there is no board sheet behind it.
+                    allowLeaderboardOpen: false,
                 },
                 {
                     ...createModalActions({
@@ -310,8 +321,33 @@ export const headToHeadEngineMethods = {
             && this.activeHeadToHead?.challengeId === challenge.challengeId
         );
 
+        // A settled loss keeps its instant verdict, but the run is still a real run on the stage or
+        // Daily behind the challenge. Send it when it beats what the player already holds there, so the
+        // personal best it earned is not thrown away. A slower run would be refused anyway, so it stays home.
+        const beatsViewerBest = finalTimeMs !== null
+            && (!hasViewerBest || finalTimeMs < viewerBestMs);
+        const claimSettledBest = async () => {
+            let settledResponse = null;
+            try {
+                settledResponse = await submitHeadToHeadRun({
+                    challengeId: challenge.challengeId,
+                    replay,
+                    bestTimeMs: finalTimeMs,
+                });
+            } catch (submitError) {
+                console.error('Could not rank a settled Head to Head run:', submitError);
+                return;
+            }
+            if (!stillOnThisFinish()) return;
+            const settledBestUpdate = settledResponse?.body?.bestUpdate ?? null;
+            if (settledBestUpdate) {
+                this.modal.updateChallengeFinishHero?.({ bestUpdate: settledBestUpdate });
+            }
+        };
+
         if (settlesLocally) {
             openPendingFinish({ phase: localDifferenceMs === 0 ? 'tie' : 'lost' });
+            if (!submissionBlockedReason && beatsViewerBest) void claimSettledBest();
             return;
         }
 
@@ -355,6 +391,9 @@ export const headToHeadEngineMethods = {
 
             const accepted = response.ok && response.body?.accepted === true;
             const outcome = accepted ? response.body?.outcome : null;
+            // A challenge run is a real run on the stage or Daily behind it, so a lost challenge
+            // can still carry a personal best home. Report it on both endings.
+            const bestUpdate = response.body?.bestUpdate ?? null;
 
             if (!accepted) {
                 const serverDifferenceMs = Number(response.body?.differenceMs);
@@ -365,6 +404,7 @@ export const headToHeadEngineMethods = {
                     this.modal.updateChallengeFinishHero?.({
                         phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
                         verdict: buildVerdict(serverDifferenceMs),
+                        bestUpdate,
                     });
                     return;
                 }
@@ -390,6 +430,7 @@ export const headToHeadEngineMethods = {
                 this.modal.updateChallengeFinishHero?.({
                     phase: 'won',
                     verdict,
+                    bestUpdate,
                 });
                 rememberHeadToHeadWin(
                     challenge.challengeId,
@@ -401,6 +442,7 @@ export const headToHeadEngineMethods = {
             this.modal.updateChallengeFinishHero?.({
                 phase: outcome === 'tie' ? 'tie' : 'lost',
                 verdict,
+                bestUpdate,
             });
         })();
     },

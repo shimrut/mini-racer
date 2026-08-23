@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { ModalShell } from '../game/race/ui-modal-shell.js';
+import { ModalContentUi } from '../game/race/ui-modal-content.js';
 import { TRACK_MODE_DAILY_GP } from '../game/config.js';
 
 const {
@@ -48,6 +49,45 @@ describe('standings return flow', () => {
             expect(context.closeModal).toHaveBeenCalledOnce();
         } finally {
             global.requestAnimationFrame = originalRequestAnimationFrame;
+        }
+    });
+});
+
+describe('challenge finish correction', () => {
+    it('repaints the opponent row when the asynchronous verdict changes', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="finish" class="active-view">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-opponent-stat" hidden aria-hidden="true">
+                    <span id="combined-opponent-delta"></span>
+                </div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const view = dom.window.document.getElementById('finish');
+        const context = {
+            modalCombinedView: view,
+            content: new ModalContentUi(),
+            _challengeFinishPhase: 'pending',
+            _combinedResultsLapData: {
+                challengeConfirmPhase: 'pending',
+                challengeVerdict: { deltaSec: -0.1 },
+            },
+            combinedPlaylistBtn: null,
+        };
+
+        try {
+            ModalShell.prototype.updateChallengeFinishHero.call(context, {
+                phase: 'lost',
+                verdict: { deltaSec: 0.253 },
+            });
+
+            expect(view.querySelector('#combined-opponent-stat').hidden).toBe(false);
+            expect(view.querySelector('#combined-opponent-delta').textContent).toBe('+0.253s');
+            expect(view.querySelector('#combined-opponent-delta').classList.contains('is-loss')).toBe(true);
+        } finally {
+            global.document = originalDocument;
         }
     });
 });

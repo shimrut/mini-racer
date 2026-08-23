@@ -1,5 +1,9 @@
 import { getTrackName } from '../track/catalog.js';
-import { applyCombinedRankValue, buildModalDeltaDisplay } from '../race/result-flow.js';
+import {
+    applyCombinedRankValue,
+    buildChallengeRankSnapshot,
+    buildModalDeltaDisplay,
+} from '../race/result-flow.js';
 import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
@@ -613,6 +617,7 @@ export class ModalContentUi {
         challengeConfirmError = null,
         challengeViewerAvatarUrl = null,
         challengeVerdict = null,
+        challengeBestUpdate = null,
         previousPersonalBestSec = undefined,
         deltaToPersonalBest = undefined,
         previousTrackMedal = null,
@@ -653,34 +658,31 @@ export class ModalContentUi {
             lapCount,
         });
         
+        // A challenge run is a real run on the stage or Daily it was minted from, so its sheet reports
+        // the same two numbers an ordinary finish reports: the gap to the best held before it, and the
+        // rank it now holds. The rank arrives with the submit that ranked the run, not from a board read.
         const isChallengeHero = Boolean(
             challengeFinish || challengeConfirmPhase || lapMedal === 'challenge',
         );
-        const bestLapStatEl = bestLapEl?.closest?.('.stat-floating-item') || null;
-        if (bestLapStatEl) {
-            bestLapStatEl.hidden = isChallengeHero;
-            if (isChallengeHero) {
-                bestLapStatEl.setAttribute('hidden', '');
-                bestLapStatEl.setAttribute('aria-hidden', 'true');
-            } else {
-                bestLapStatEl.removeAttribute('hidden');
-                bestLapStatEl.removeAttribute('aria-hidden');
-            }
-        }
-        if (label2El && !isChallengeHero) {
+        // A challenge finish reads as three rows under the verdict, so the sheet lays itself out for them.
+        container.classList?.toggle?.('is-challenge-finish', isChallengeHero);
+        this.applyChallengeOpponentStat(container, isChallengeHero ? challengeVerdict : null);
+        if (label2El) {
             label2El.hidden = false;
             label2El.removeAttribute('hidden');
             label2El.removeAttribute('aria-hidden');
             // The slot below this label is always a signed gap to the personal
             // best, never a lap time, so the label reads as a comparison in the
             // same shape as the ghost's "VS #1".
-            label2El.textContent = 'VS PB';
+            label2El.textContent = isChallengeHero ? 'VS. YOUR PB' : 'VS PB';
         }
         applyCombinedRankValue({
             rankValueEl,
             rankTotalEl,
             rightGroupEl,
-            scoreboardSnapshot,
+            scoreboardSnapshot: isChallengeHero
+                ? buildChallengeRankSnapshot(challengeBestUpdate)
+                : scoreboardSnapshot,
         });
         if (timeEl) {
             timeEl.innerHTML = Number.isFinite(time)
@@ -805,7 +807,9 @@ export class ModalContentUi {
                     bestLapEl,
                     time,
                     previousPersonalBestSec,
-                    bestLap,
+                    // On a challenge `bestLap` is the opponent's target, never the player's own best,
+                    // so it is no fallback for a personal best that is not there.
+                    isChallengeHero ? null : bestLap,
                     deltaToPersonalBest,
                 );
             }
@@ -820,6 +824,47 @@ export class ModalContentUi {
             if (nextMedalIconSlot) nextMedalIconSlot.replaceChildren();
             if (nextMedalTimeEl) nextMedalTimeEl.textContent = '';
         }
+    }
+
+    /** The gap to the opponent only exists on a challenge, so its row is hidden everywhere else. */
+    applyChallengeOpponentStat(container, verdict) {
+        const statEl = container.querySelector('#combined-opponent-stat');
+        const valueEl = container.querySelector('#combined-opponent-delta');
+        if (!statEl || !valueEl) return;
+
+        const deltaSec = Number(verdict?.deltaSec);
+        if (!verdict || !Number.isFinite(deltaSec)) {
+            statEl.hidden = true;
+            statEl.setAttribute('hidden', '');
+            statEl.setAttribute('aria-hidden', 'true');
+            return;
+        }
+
+        statEl.hidden = false;
+        statEl.removeAttribute('hidden');
+        statEl.removeAttribute('aria-hidden');
+        const deltaDisplay = buildModalDeltaDisplay({ deltaToBest: deltaSec });
+        valueEl.textContent = deltaDisplay.text;
+        valueEl.classList.remove('is-gain', 'is-loss');
+        if (deltaDisplay.valueClass === 'modal-stat-value--delta-negative') {
+            valueEl.classList.add('is-gain');
+        } else if (deltaDisplay.valueClass === 'modal-stat-value--delta-positive') {
+            valueEl.classList.add('is-loss');
+        }
+    }
+
+    /**
+     * The rank of a challenge run lands after the sheet is already open, because the server ranks the
+     * run while the player reads the verdict. Only the rank slot is repainted, so the hero stays put.
+     */
+    applyChallengeRankStat(container, bestUpdate) {
+        if (!container) return;
+        applyCombinedRankValue({
+            rankValueEl: container.querySelector('#combined-rank-value'),
+            rankTotalEl: container.querySelector('#combined-rank-total'),
+            rightGroupEl: container.querySelector('#combined-stats-right-group'),
+            scoreboardSnapshot: buildChallengeRankSnapshot(bestUpdate),
+        });
     }
 
     formatTime(seconds) {

@@ -1099,6 +1099,7 @@ export class ModalShell {
             challengeConfirmError: lapData.challengeConfirmError ?? null,
             challengeViewerAvatarUrl: lapData.challengeViewerAvatarUrl ?? null,
             challengeVerdict: lapData.challengeVerdict ?? null,
+            challengeBestUpdate: lapData.challengeBestUpdate ?? null,
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
@@ -1274,15 +1275,20 @@ export class ModalShell {
         error = null,
         shareRequest = undefined,
         verdict = undefined,
+        bestUpdate = undefined,
     } = {}) {
         if (!this.modalCombinedView?.classList.contains('active-view')) return;
 
         const heroMedalEl = this.modalCombinedView.querySelector('#combined-hero-medal');
         const lapData = this._combinedResultsLapData;
-        // Only a new phase or a server-corrected margin earns a repaint; otherwise the hero replays its entrance for nothing.
+        // Only a new phase or a server-corrected margin earns a repaint; otherwise the hero replays
+        // its entrance for nothing.
         const phaseUnchanged = phase === undefined || phase === this._challengeFinishPhase;
         const marginUnchanged = verdict === undefined
             || verdict?.deltaSec === lapData?.challengeVerdict?.deltaSec;
+        const bestUnchanged = bestUpdate === undefined
+            || (bestUpdate?.bestTimeMs === lapData?.challengeBestUpdate?.bestTimeMs
+                && bestUpdate?.rank === lapData?.challengeBestUpdate?.rank);
         if (!phaseUnchanged || !marginUnchanged) {
             const nextPhase = phase ?? this._challengeFinishPhase;
             const nextVerdict = verdict === undefined
@@ -1300,6 +1306,13 @@ export class ModalShell {
                 lapData.challengeConfirmPhase = nextPhase;
                 lapData.challengeVerdict = nextVerdict;
             }
+            this.content.applyChallengeOpponentStat(this.modalCombinedView, nextVerdict);
+        }
+        // The rank the run earned belongs to the stat row under the hero, so it lands there on its own.
+        if (!bestUnchanged) {
+            const nextBestUpdate = bestUpdate ?? null;
+            this.content.applyChallengeRankStat(this.modalCombinedView, nextBestUpdate);
+            if (lapData) lapData.challengeBestUpdate = nextBestUpdate;
         }
 
         if (shareRequest !== undefined) {

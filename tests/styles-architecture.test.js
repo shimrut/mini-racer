@@ -24,6 +24,10 @@ const standingsStyles = readFileSync(
     new URL('../styles/modal-components-and-standings.css', import.meta.url),
     'utf8',
 );
+const resultDetailStyles = readFileSync(
+    new URL('../styles/result-details.css', import.meta.url),
+    'utf8',
+);
 
 const expectedImports = [
     './fonts.css',
@@ -93,6 +97,28 @@ describe('game stylesheet architecture', () => {
         ]) {
             expect(styles).toContain(token);
         }
+    });
+
+    it('keeps the challenge finish as a scoped responsive result lockup', () => {
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish \.pause-header\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup\s*\{[^}]*font-family:\s*var\(--header-font\);[^}]*font-style:\s*italic;[^}]*font-weight:\s*900;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish #combined-time\s*\{[^}]*font-style:\s*normal;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish \.combined-stat-label\s*\{[^}]*font-style:\s*normal;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /\.challenge-result-lockup__outcome--pending,[\s\S]*\.challenge-result-lockup__outcome--error\s*\{[^}]*font-size:\s*clamp\(1\.45rem, 6\.5vw, 2\.2rem\);/s,
+        );
+        expect(resultDetailStyles).toContain('@media (max-height: 640px)');
     });
 
     it('routes every sub-200ms duration through a token', () => {

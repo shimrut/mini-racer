@@ -273,6 +273,171 @@
     transform-origin: top center;
 }
 
+/* Head to Head owns this result composition; Daily and Campaign keep the shared finish grid. */
+#modal-combined-view.is-challenge-finish .pause-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    text-align: left;
+    gap: clamp(0.65rem, 2vh, 1.1rem) clamp(0.8rem, 4vw, 1.75rem);
+    width: 100%;
+}
+
+#modal-combined-view.is-challenge-finish #combined-hero-medal {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    width: auto;
+    margin-bottom: 0;
+    transform: none;
+    justify-content: flex-start;
+}
+
+#modal-combined-view.is-challenge-finish .win-combined-medal-overlay--challenge {
+    align-items: flex-start;
+    min-width: 0;
+    width: 100%;
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    margin: 0;
+    font-family: var(--header-font);
+    font-style: italic;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__lead {
+    font-size: clamp(0.72rem, 3.3vw, 1.15rem);
+    letter-spacing: 0.015em;
+    line-height: 0.9;
+    color: var(--text-color);
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome {
+    font-size: clamp(2.75rem, 13vw, 3.75rem);
+    letter-spacing: -0.055em;
+    line-height: 0.82;
+    white-space: nowrap;
+    color: var(--text-color);
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--won {
+    color: var(--success-bright);
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--lost,
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--error {
+    color: var(--accent-color);
+}
+
+/* Longer truth states must keep their half of the 320px top row beside the clock. */
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--pending,
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--error {
+    font-size: clamp(1.45rem, 6.5vw, 2.2rem);
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__status {
+    display: block;
+    max-width: 18rem;
+    margin-top: 0.45rem;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+#modal-combined-view.is-challenge-finish .combined-hero-time-group {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    min-width: 0;
+    text-align: right;
+}
+
+#modal-combined-view.is-challenge-finish #combined-time {
+    font-family: var(--header-font);
+    font-size: clamp(2.75rem, 13vw, 3.75rem);
+    font-style: normal;
+    letter-spacing: -0.055em;
+    white-space: nowrap;
+}
+
+#modal-combined-view.is-challenge-finish .combined-stats-grid {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.55rem, 1.8vh, 0.9rem);
+    max-width: none;
+    margin-top: clamp(0.25rem, 1vh, 0.65rem);
+}
+
+#modal-combined-view.is-challenge-finish .stat-floating-item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 1.35rem;
+}
+
+#modal-combined-view.is-challenge-finish .combined-stat-label {
+    font-family: var(--header-font);
+    font-size: clamp(0.78rem, 3.2vw, 1rem);
+    font-weight: 900;
+    font-style: normal;
+    letter-spacing: -0.015em;
+    opacity: 1;
+    color: var(--text-color);
+}
+
+#modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta,
+#modal-combined-view.is-challenge-finish .combined-rank-container {
+    font-family: var(--header-font);
+    font-size: clamp(0.9rem, 3.7vw, 1.15rem);
+    font-style: normal;
+    font-weight: 900;
+    letter-spacing: -0.025em;
+    text-align: right;
+}
+
+#modal.modal--win #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta {
+    font-size: clamp(0.9rem, 3.7vw, 1.15rem);
+}
+
+#modal.modal--win #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta.is-loss {
+    color: var(--accent-color);
+}
+
+@media (max-height: 640px) {
+    #modal-combined-view.is-challenge-finish .pause-header {
+        gap: 0.45rem 0.8rem;
+    }
+
+    #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome,
+    #modal-combined-view.is-challenge-finish #combined-time {
+        font-size: clamp(2.75rem, 9vw, 3.25rem);
+    }
+
+    #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--pending,
+    #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--error {
+        font-size: clamp(1.25rem, 4.5vw, 1.85rem);
+    }
+
+    #modal-combined-view.is-challenge-finish .combined-stats-grid {
+        gap: 0.35rem;
+        margin-top: 0.1rem;
+    }
+
+    #modal-combined-view.is-challenge-finish .challenge-result-lockup__status {
+        margin-top: 0.25rem;
+    }
+}
+
 .combined-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));

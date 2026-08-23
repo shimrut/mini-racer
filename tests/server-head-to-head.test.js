@@ -146,6 +146,8 @@ function makeService({
     sourceKind = 'campaign',
     trackKey = 'numberThree',
     validateReplay = null,
+    recordBest = null,
+    readViewerBest = null,
 } = {}) {
     let nextId = 0;
     return createHeadToHeadService({
@@ -156,6 +158,8 @@ function makeService({
             medal: 'gold',
             ghost: { schemaVersion: 2, samples: ['viewer'] },
         })),
+        ...(recordBest ? { recordBest } : {}),
+        ...(readViewerBest ? { readViewerBest } : {}),
         now: () => new Date('2026-07-23T12:00:00.000Z'),
         createId: () => `generated-${++nextId}`,
     });
@@ -635,7 +639,7 @@ describe('head-to-head service', () => {
         });
     });
 
-    it('refuses a slower claimed time without validating the replay', async () => {
+    it('validates every finish and lets the replay overrule a slower claimed time', async () => {
         const validateReplay = vi.fn(async () => ({
             ok: true,
             bestTimeMs: 25_000,
@@ -645,16 +649,18 @@ describe('head-to-head service', () => {
         const service = makeService({ bestTimeMs: 25_640, validateReplay });
         const created = await createChallenge(service);
 
-        const refused = await service.submit(
+        const accepted = await service.submit(
             { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 25_641 },
             { ...context, username: 'ChallengerAce' },
         );
 
-        expect(refused).toMatchObject({
-            status: 422,
-            body: { accepted: false, status: 'target_not_beaten', differenceMs: 1 },
+        // The claimed time no longer short-circuits: a losing run still has a time worth ranking,
+        // so the replay is always read and the replay decides.
+        expect(validateReplay).toHaveBeenCalledTimes(1);
+        expect(accepted).toMatchObject({
+            status: 200,
+            body: { accepted: true, outcome: 'won', differenceMs: -640 },
         });
-        expect(validateReplay).not.toHaveBeenCalled();
     });
 
     it('falls back to the replay when a submission carries no usable claimed time', async () => {
@@ -717,6 +723,153 @@ describe('head-to-head service', () => {
             .toEqual([]);
         expect([...strings.keys()].filter((key) => key.startsWith('miniracer:head-to-head:accept:')))
             .toEqual([]);
+    });
+
+    it('tells the accepter what they already hold on the stage behind the challenge', async () => {
+        const readViewerBest = vi.fn(async () => ({ bestTimeMs: 26_500, medal: 'silver' }));
+        const service = makeService({ bestTimeMs: 25_640, readViewerBest });
+        const created = await createChallenge(service);
+
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            username: 'ChallengerAce',
+        });
+
+        expect(readViewerBest).toHaveBeenCalledWith(
+            expect.objectContaining({ raceId: 'numbered-v1-03' }),
+            'reddit:challengerace',
+        );
+        expect(loaded.body).toMatchObject({
+            status: 'ready',
+            viewerBest: { bestTimeMs: 26_500, medal: 'silver' },
+        });
+    });
+
+    it('loads the challenge even when the accepter best cannot be read', async () => {
+        const readViewerBest = vi.fn(async () => {
+            throw new Error('redis unavailable');
+        });
+        const service = makeService({ bestTimeMs: 25_640, readViewerBest });
+        const created = await createChallenge(service);
+
+        const loaded = await service.get(created.body.challengeId, {
+            ...context,
+            username: 'ChallengerAce',
+        });
+
+        expect(loaded).toMatchObject({ status: 200, body: { status: 'ready', viewerBest: null } });
+    });
+
+    it('sends a winning run to the mode it was minted from', async () => {
+        const recordBest = vi.fn(async () => ({
+            mode: 'campaign',
+            improved: true,
+            bestTimeMs: 25_000,
+            medal: 'gold',
+            rank: 4,
+        }));
+        const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000, recordBest });
+        const created = await createChallenge(service);
+
+        const won = await service.submit(
+            { challengeId: created.body.challengeId, replay: { frames: ['viewer'] }, bestTimeMs: 25_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(recordBest).toHaveBeenCalledTimes(1);
+        const [recordedChallenge, recordedReplay, recordedContext] = recordBest.mock.calls[0];
+        expect(recordedChallenge.raceId).toBe('numbered-v1-03');
+        expect(recordedReplay).toEqual({ frames: ['viewer'] });
+        expect(recordedContext).toMatchObject({
+            username: 'ChallengerAce',
+            canonicalPlayerId: 'reddit:challengerace',
+        });
+        expect(won.body).toMatchObject({
+            accepted: true,
+            outcome: 'won',
+            bestUpdate: { mode: 'campaign', improved: true, bestTimeMs: 25_000, medal: 'gold', rank: 4 },
+        });
+    });
+
+    it('ranks a run that lost the challenge but beat the player own best', async () => {
+        const recordBest = vi.fn(async () => ({
+            mode: 'daily',
+            improved: true,
+            bestTimeMs: 26_000,
+            medal: 'silver',
+            rank: 12,
+        }));
+        const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 26_000, recordBest });
+        const created = await createChallenge(service);
+
+        const lost = await service.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 26_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(recordBest).toHaveBeenCalledTimes(1);
+        expect(lost).toMatchObject({
+            status: 422,
+            body: {
+                accepted: false,
+                status: 'target_not_beaten',
+                differenceMs: 360,
+                bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 26_000, rank: 12 },
+            },
+        });
+    });
+
+    it('reports no update when the mode refuses the run', async () => {
+        const recordBest = vi.fn(async () => null);
+        const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000, recordBest });
+        const created = await createChallenge(service);
+
+        const won = await service.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 25_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(won).toMatchObject({
+            status: 200,
+            body: { accepted: true, outcome: 'won', bestUpdate: null },
+        });
+    });
+
+    it('keeps the challenge result when the mode write fails', async () => {
+        const recordBest = vi.fn(async () => {
+            throw new Error('redis unavailable');
+        });
+        const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000, recordBest });
+        const created = await createChallenge(service);
+
+        const won = await service.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 25_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(won).toMatchObject({
+            status: 200,
+            body: { accepted: true, outcome: 'won', bestUpdate: null },
+        });
+        expect(typeof won.body.acceptToken).toBe('string');
+    });
+
+    it('never sends an unverified run to the mode', async () => {
+        const recordBest = vi.fn(async () => null);
+        const service = makeService({
+            bestTimeMs: 25_640,
+            recordBest,
+            validateReplay: vi.fn(async () => ({ ok: false, reason: 'replay_invalid' })),
+        });
+        const created = await createChallenge(service);
+
+        const refused = await service.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 25_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(refused).toMatchObject({ status: 422, body: { status: 'invalid_replay' } });
+        expect(recordBest).not.toHaveBeenCalled();
     });
 
     it('lets a guest load and submit a challenge result', async () => {

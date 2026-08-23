@@ -4,12 +4,22 @@ import { createTrackFingerprint } from '../src/server/pb-ghost-trace.ts';
 
 const mockDailyChallenge = vi.hoisted(() => vi.fn());
 const mockValidateReplay = vi.hoisted(() => vi.fn());
+const mockSubmitCampaignRun = vi.hoisted(() => vi.fn());
+const mockSubmitDailyRun = vi.hoisted(() => vi.fn());
+const mockReadPlayerRank = vi.hoisted(() => vi.fn());
+const mockReadEntry = vi.hoisted(() => vi.fn());
 
 vi.mock('../src/server/campaign-store.js', () => ({
     getServerHeadToHeadSource: vi.fn(),
+    submitServerCampaignRun: mockSubmitCampaignRun,
 }));
 vi.mock('../src/server/daily-gp-store.js', () => ({
     getServerDailyGpPlayableChallenge: mockDailyChallenge,
+    submitServerDailyGpRun: mockSubmitDailyRun,
+}));
+vi.mock('../src/server/competition-leaderboard.js', () => ({
+    readPlayerRank: mockReadPlayerRank,
+    readEntryByPlayerId: mockReadEntry,
 }));
 vi.mock('../src/server/head-to-head-post.js', () => ({
     resolveHeadToHeadRecord: vi.fn(),
@@ -19,6 +29,8 @@ vi.mock('../src/server/replay-validator.js', () => ({
 }));
 
 const {
+    readHeadToHeadViewerBest,
+    recordHeadToHeadBest,
     resolveHeadToHeadSource,
     validateHeadToHeadReplay,
 } = await import('../src/server/head-to-head-runtime.ts');
@@ -118,5 +130,159 @@ describe('head-to-head runtime', () => {
             id: challenge.challengeId,
             availableUntil: '9999-12-31T23:59:59.999Z',
         });
+    });
+});
+
+describe('head-to-head result written back to its own mode', () => {
+    const campaignChallenge = {
+        challengeId: 'challenge-post',
+        origin: { mode: 'campaign', campaignId: 'numbered-v1', raceId: 'numbered-v1-03' },
+        trackKey: 'numberThree',
+        lapCount: 1,
+        targetTimeMs: 25_640,
+    };
+    const dailyOriginChallenge = {
+        challengeId: 'challenge-post',
+        origin: { mode: 'daily', challengeId: dailyChallenge.id },
+        trackKey,
+        lapCount: 1,
+        targetTimeMs: 20_000,
+    };
+    const viewer = {
+        playerId: 'raw-player',
+        username: 'ChallengerAce',
+        guestToken: 'guest-token',
+        canonicalPlayerId: 'reddit:challengerace',
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDailyChallenge.mockResolvedValue(dailyChallenge);
+        mockReadPlayerRank.mockResolvedValue(4);
+    });
+
+    it('sends a campaign challenge run to its own stage', async () => {
+        mockSubmitCampaignRun.mockResolvedValue({
+            status: 200,
+            body: { accepted: true, improved: true, bestTimeMs: 24_000 },
+        });
+
+        const update = await recordHeadToHeadBest(campaignChallenge, { frames: [] }, viewer);
+
+        expect(mockSubmitCampaignRun).toHaveBeenCalledWith(expect.objectContaining({
+            raceId: 'numbered-v1-03',
+            trackKey: 'numberThree',
+            replay: { frames: [] },
+            playerId: 'raw-player',
+            redditUsername: 'ChallengerAce',
+            guestToken: 'guest-token',
+        }));
+        expect(update).toMatchObject({ mode: 'campaign', improved: true, bestTimeMs: 24_000, rank: 4 });
+    });
+
+    it('writes nothing when the campaign stage is locked', async () => {
+        mockSubmitCampaignRun.mockResolvedValue({
+            status: 403,
+            body: { accepted: false, error: 'Campaign race is locked.' },
+        });
+
+        expect(await recordHeadToHeadBest(campaignChallenge, { frames: [] }, viewer)).toBeNull();
+    });
+
+    it('sends a Daily challenge run to its own Daily', async () => {
+        mockSubmitDailyRun.mockResolvedValue({
+            status: 200,
+            body: { accepted: true, improved: false, bestTimeMs: 19_000 },
+        });
+
+        const update = await recordHeadToHeadBest(dailyOriginChallenge, { frames: [] }, viewer);
+
+        expect(mockSubmitDailyRun).toHaveBeenCalledWith(expect.objectContaining({
+            challengeId: dailyChallenge.id,
+            trackKey,
+            replay: { frames: [] },
+        }));
+        expect(update).toMatchObject({ mode: 'daily', improved: false, bestTimeMs: 19_000 });
+    });
+
+    it('writes nothing once the Daily behind the challenge has closed', async () => {
+        mockDailyChallenge.mockResolvedValue(null);
+
+        expect(await recordHeadToHeadBest(dailyOriginChallenge, { frames: [] }, viewer)).toBeNull();
+        expect(mockSubmitDailyRun).not.toHaveBeenCalled();
+    });
+
+    it('keeps the result when the rank cannot be read', async () => {
+        mockSubmitCampaignRun.mockResolvedValue({
+            status: 200,
+            body: { accepted: true, improved: true, bestTimeMs: 24_000 },
+        });
+        mockReadPlayerRank.mockRejectedValue(new Error('redis unavailable'));
+
+        const update = await recordHeadToHeadBest(campaignChallenge, { frames: [] }, viewer);
+
+        expect(update).toMatchObject({ mode: 'campaign', bestTimeMs: 24_000, rank: null });
+    });
+});
+
+describe('the best a challenge viewer already holds', () => {
+    const campaignChallenge = {
+        challengeId: 'challenge-post',
+        origin: { mode: 'campaign', campaignId: 'numbered-v1', raceId: 'numbered-v1-03' },
+        trackKey: 'numberThree',
+        lapCount: 1,
+        targetTimeMs: 25_640,
+    };
+    const dailyOriginChallenge = {
+        challengeId: 'challenge-post',
+        origin: { mode: 'daily', challengeId: dailyChallenge.id },
+        trackKey,
+        lapCount: 1,
+        targetTimeMs: 20_000,
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDailyChallenge.mockResolvedValue(dailyChallenge);
+    });
+
+    it('reads the stage entry the submit would compare against', async () => {
+        mockReadEntry.mockResolvedValue({ bestTimeMs: 26_500 });
+
+        expect(await readHeadToHeadViewerBest(campaignChallenge, 'reddit:racer'))
+            .toMatchObject({ bestTimeMs: 26_500 });
+        expect(mockReadEntry).toHaveBeenCalledWith(
+            expect.objectContaining({ mode: 'campaign', id: 'numbered-v1-03' }),
+            'reddit:racer',
+        );
+    });
+
+    it('reads the Daily entry for a Daily challenge', async () => {
+        mockReadEntry.mockResolvedValue({ bestTimeMs: 19_500 });
+
+        expect(await readHeadToHeadViewerBest(dailyOriginChallenge, 'guest:racer'))
+            .toMatchObject({ bestTimeMs: 19_500 });
+        expect(mockReadEntry).toHaveBeenCalledWith(
+            expect.objectContaining({ mode: 'daily', id: dailyChallenge.id }),
+            'guest:racer',
+        );
+    });
+
+    it('holds nothing for a racer with no time there', async () => {
+        mockReadEntry.mockResolvedValue(null);
+
+        expect(await readHeadToHeadViewerBest(campaignChallenge, 'reddit:racer')).toBeNull();
+    });
+
+    it('holds nothing without a player', async () => {
+        expect(await readHeadToHeadViewerBest(campaignChallenge, null)).toBeNull();
+        expect(mockReadEntry).not.toHaveBeenCalled();
+    });
+
+    it('holds nothing once the Daily has closed', async () => {
+        mockDailyChallenge.mockResolvedValue(null);
+
+        expect(await readHeadToHeadViewerBest(dailyOriginChallenge, 'reddit:racer')).toBeNull();
+        expect(mockReadEntry).not.toHaveBeenCalled();
     });
 });

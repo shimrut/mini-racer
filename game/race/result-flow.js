@@ -121,6 +121,16 @@ export function buildScoreboardRankDisplay(scoreboardSnapshot, { fallbackText = 
     };
 }
 
+/**
+ * A challenge finish learns its rank from the submit that ranked the run, so the rank slot reads that
+ * number instead of a board snapshot it never loads. No rank yet means the slot stays away.
+ */
+export function buildChallengeRankSnapshot(bestUpdate) {
+    const rank = Number(bestUpdate?.rank);
+    if (!Number.isInteger(rank) || rank <= 0) return null;
+    return { playerRankLabel: `#${rank}` };
+}
+
 function setCombinedRankGroupVisible(rightGroupEl, visible) {
     if (!rightGroupEl) return;
     if (visible) {
