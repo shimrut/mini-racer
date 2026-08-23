@@ -139,19 +139,19 @@ describe('game stylesheet architecture', () => {
 
     it('enters the challenge finish heading like Mini Racer and staggers the rows below', () => {
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.375s var\(--ease-glide\) both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) 0\.1s both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.45s var\(--ease-glide\) 0\.075s both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-snap\) var\(--ease-settle\) backwards;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-finish-row\) var\(--ease-settle\) backwards;/,
         );
         expect(resultDetailStyles).toMatch(
-            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.1s;/,
+            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.075s;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-actions > :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-slow\) var\(--ease-glide\) 0\.4s both;/s,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-actions > :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-finish-btn\) var\(--ease-glide\) 0\.3s both;/s,
         );
         expect(resultDetailStyles).not.toMatch(
             /combined-actions > :nth-child\(\d+ of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)/,

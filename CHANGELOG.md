@@ -1,7 +1,7 @@
 # Changelog
 
-- Finish-screen buttons still appear together, but they fade and rise over
-  200ms after the comparison rows, with the same glide as the title.
+- Finish-screen motion is 25% quicker: the title, time, comparison rows, and
+  buttons keep the same order, just less waiting.
 
 - Daily and Campaign finishes now use the same lockup as Head to Head: a
   left-aligned italic **FINISH** over a right-aligned time, then the medal
