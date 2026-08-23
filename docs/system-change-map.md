@@ -386,8 +386,9 @@ flowchart LR
   the in-feed Accept card shows an expired-style message and opens the source
   mode via a stored launch target that overrides challenge post data.   The duel
   verdict remains session-only even when its source run improves the ordinary
-  PB and rank. The challenge lobby still shows that originating Daily or Campaign
-  personal best in the second seat when the player already holds one; otherwise
+  PB and rank.   The challenge lobby still shows that originating Daily or Campaign
+  personal best in the second seat when the player already holds one, labeled
+  Your PB the same way the challenger seat is labeled with their name; otherwise
   that seat stays empty beside their avatar. One finish sheet always offers Improve / Brag / Home; Brag unlocks
   only after a verified beat. A local win stamps YOU WON before the server
   answers; share, car unlocks, and remembered wins wait for confirmation. The Head to Head finish replaces the legacy

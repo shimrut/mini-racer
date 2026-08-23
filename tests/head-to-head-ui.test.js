@@ -1292,6 +1292,8 @@ describe('Head to Head poster after the duel is beaten', () => {
         expect(document.getElementById('challenge-target-time').textContent).toBe('0:25.640');
         expect(document.getElementById('challenge-viewer-best-time').textContent).toBe('0:26.500');
         expect(document.getElementById('challenge-viewer-figures').hidden).toBe(false);
+        expect(document.getElementById('challenge-viewer-figures')
+            .querySelector('.challenge-racer__label').textContent).toBe('Your PB');
     });
 
     it('leaves the accepter side empty when they hold no time there', () => {
