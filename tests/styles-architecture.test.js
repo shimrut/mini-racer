@@ -137,25 +137,24 @@ describe('game stylesheet architecture', () => {
         );
     });
 
-    it('enters the challenge finish heading like Mini Racer and staggers the rows below', () => {
+    it('fades the challenge finish sheet as one piece', () => {
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.375s var\(--ease-glide\) both;/,
-        );
-        expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.45s var\(--ease-glide\) 0\.075s both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view\s*\{[^}]*animation:\s*none;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-finish-row\) var\(--ease-settle\) backwards;/,
+            /@keyframes finishReveal\s*\{[^}]*opacity:\s*0;/,
         );
         expect(resultDetailStyles).toMatch(
-            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.075s;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.pause-header,[\s\S]*#modal-combined-view\.is-challenge-finish\.active-view \.combined-actions\s*\{[^}]*animation:\s*finishReveal var\(--dur-slow\) var\(--ease-glide\) both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-actions > :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-finish-btn\) var\(--ease-glide\) 0\.3s both;/s,
+            /#modal-combined-view\.is-challenge-finish \.medal-svg--medal-entrance\s*\{[^}]*animation:\s*none;/,
         );
-        expect(resultDetailStyles).not.toMatch(
-            /combined-actions > :nth-child\(\d+ of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)/,
-        );
+        expect(resultDetailStyles).not.toContain('slideInLeft');
+        expect(resultDetailStyles).not.toContain('slideInRight');
+        expect(resultDetailStyles).not.toContain('leaderboardRowIn');
+        expect(resultDetailStyles).not.toContain('--dur-finish-row');
+        expect(resultDetailStyles).not.toContain('--dur-finish-btn');
         expect(resultDetailStyles).not.toContain('challengeFinishItemIn');
         expect(resultDetailStyles).toMatch(
             /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish\.active-view[\s\S]*animation:\s*none;/,

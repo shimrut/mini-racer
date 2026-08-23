@@ -1,7 +1,7 @@
 # Changelog
 
-- Finish-screen motion is 25% quicker: the title, time, comparison rows, and
-  buttons keep the same order, just less waiting.
+- The finish sheet now fades in once, as one piece. It no longer mixes the
+  lobby title slide, list-row hops, and a second fade of the whole card.
 
 - Daily and Campaign finishes now use the same lockup as Head to Head: a
   left-aligned italic **FINISH** over a right-aligned time, then the medal
