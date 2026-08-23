@@ -323,7 +323,7 @@
     font-size: 3.5rem;
     font-weight: 900;
     font-style: italic;
-    letter-spacing: 0.05em;
+    letter-spacing: -0.05em;
     line-height: 0.85;
     white-space: nowrap;
 }
@@ -367,7 +367,7 @@
     gap: clamp(0.55rem, 1.8vh, 0.9rem);
     max-width: none;
     width: 100%;
-    margin-top: 1.75rem;
+    margin-top: 2.75rem;
 }
 
 #modal-combined-view.is-challenge-finish .stat-floating-item {
@@ -378,11 +378,17 @@
     min-height: 1.35rem;
 }
 
-#modal-combined-view.is-challenge-finish .combined-stat-label {
+#modal-combined-view.is-challenge-finish .combined-stat-label,
+#modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta,
+#modal-combined-view.is-challenge-finish .combined-rank-container,
+#modal.modal--win #modal-combined-view.is-challenge-finish .combined-rank-value {
     font-family: var(--header-font);
-    font-size: clamp(0.78rem, 3.2vw, 1rem);
+    font-size: 1rem;
     font-weight: 900;
     font-style: normal;
+}
+
+#modal-combined-view.is-challenge-finish .combined-stat-label {
     letter-spacing: -0.015em;
     opacity: 1;
     color: var(--text-color);
@@ -390,16 +396,12 @@
 
 #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta,
 #modal-combined-view.is-challenge-finish .combined-rank-container {
-    font-family: var(--header-font);
-    font-size: clamp(0.9rem, 3.7vw, 1.15rem);
-    font-style: normal;
-    font-weight: 900;
     letter-spacing: -0.025em;
     text-align: right;
 }
 
 #modal.modal--win #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta {
-    font-size: clamp(0.9rem, 3.7vw, 1.15rem);
+    font-size: 1rem;
 }
 
 #modal.modal--win #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta.is-loss {
@@ -423,7 +425,7 @@
 
     #modal-combined-view.is-challenge-finish .combined-stats-grid {
         gap: 0.35rem;
-        margin-top: 1.25rem;
+        margin-top: 2.25rem;
     }
 
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__status {

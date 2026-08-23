@@ -2,7 +2,8 @@
 
 - Head to Head finish now left-aligns **YOU WON** / **YOU LOST** and
   right-aligns the time at **3.5rem**, tight together, with more space before
-  the comparison rows. Daily and Campaign finishes are unchanged.
+  the comparison rows. Those row labels and values share one size. Daily and
+  Campaign finishes are unchanged.
 
 - Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
   Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested

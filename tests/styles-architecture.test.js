@@ -116,7 +116,7 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish \.combined-hero-time-group\s*\{[^}]*text-align:\s*right;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.combined-stat-label\s*\{[^}]*font-style:\s*normal;/s,
+            /#modal-combined-view\.is-challenge-finish \.combined-stat-label,\s*#modal-combined-view\.is-challenge-finish \.combined-stat-value--pb-delta[\s\S]*font-size:\s*1rem;[\s\S]*font-style:\s*normal;/s,
         );
         expect(resultDetailStyles).toMatch(
             /\.challenge-result-lockup__outcome--pending,[\s\S]*\.challenge-result-lockup__outcome--error\s*\{[^}]*font-size:\s*clamp\(1\.45rem, 6\.5vw, 2\.2rem\);/s,
