@@ -136,10 +136,10 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\),[\s\S]*animation:\s*leaderboardRowIn var\(--dur-snap\) var\(--ease-settle\) backwards;/,
         );
         expect(resultDetailStyles).toMatch(
-            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.5s;/,
+            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.2s;/,
         );
         expect(resultDetailStyles).toMatch(
-            /combined-actions > :nth-child\(1 of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)\s*\{[^}]*animation-delay:\s*0\.65s;/,
+            /combined-actions > :nth-child\(1 of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)\s*\{[^}]*animation-delay:\s*0\.35s;/,
         );
         expect(resultDetailStyles).not.toContain('challengeFinishItemIn');
         expect(resultDetailStyles).toMatch(
