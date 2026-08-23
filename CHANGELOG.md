@@ -1,5 +1,10 @@
 # Changelog
 
+- Upgraded the Devvit toolchain to 0.14.1. Reddit now runs apps on Node 24,
+  which is why this is a 0.14 release; our game APIs stay the same. Wiki
+  helpers were only deprecated, and this app does not use them. Hosted
+  playtest validation remains required before publishing.
+
 - Head to Head finish now left-aligns **YOU WON** / **YOU LOST** and
   right-aligns the time at **3.5rem**, tight together, with more space before
   the comparison rows. Those row labels and values share one size. Daily and
