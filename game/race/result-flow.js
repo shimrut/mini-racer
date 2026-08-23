@@ -144,7 +144,8 @@ export function buildChallengeRankSnapshot(bestUpdate, viewerBest) {
     }
     const pbRank = toPositiveRank(bestUpdate?.rank);
     if (pbRank) return { playerRankLabel: `#${pbRank}` };
-    const heldRank = toPositiveRank(viewerBest?.rank);
+    const heldRank = toPositiveRank(viewerBest?.rank)
+        ?? toPositiveRank(viewerBest?.playerRank);
     if (heldRank) return { playerRankLabel: `#${heldRank}` };
     return { playerRankLabel: CHALLENGE_RANK_UNRANKED };
 }

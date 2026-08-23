@@ -377,8 +377,9 @@ flowchart LR
   identity/token. Head to Head outcomes are not durable player history and do
   not merge at sign-in. A challenge run can still improve the originating
   Daily or Campaign best: the finish compares against the prior comparable PB
-  and always shows rank for that source. The number updates only when the run is a
-  personal best; otherwise the finish keeps the rank already held. A missing PB stays
+  and always shows rank for that source. That rank is the same Campaign or Daily
+  board place the lobby already shows, including after Campaign standings repair.
+  The number updates only when the run is a personal best; otherwise the finish keeps the rank already held. A missing PB stays
   an honest empty state, and a Campaign stage the player has not unlocked reads
   `TRACK LOCKED` with a tap explanation that they cannot rank for it. A Daily-origin post keeps its embedded race contract
   after the normal Daily window, while regular Daily mode remains expiry-scoped. The

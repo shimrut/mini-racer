@@ -5,6 +5,7 @@ import { TRACKS } from '../../game/track/tracks.js';
 import {
     getCampaignProgressForSelection,
     getServerHeadToHeadSource,
+    repairCampaignStandingsFromEntries,
     submitServerCampaignRun,
 } from './campaign-store.js';
 import {
@@ -288,13 +289,21 @@ export async function readHeadToHeadViewerBest(
     }
     const target = await challengeCompetition(challenge);
     if (!target) return null;
+    if (origin?.mode === 'campaign') {
+        try {
+            await repairCampaignStandingsFromEntries(playerId);
+        } catch (error) {
+            // Rank is decoration on a time that is already stored.
+            console.error('Head to Head campaign standings repair failed:', error);
+        }
+    }
     const entry = await readEntryByPlayerId(target.competition, playerId);
     const bestTimeMs = Number(entry?.bestTimeMs);
     if (!Number.isFinite(bestTimeMs) || bestTimeMs <= 0) return null;
     return {
         bestTimeMs,
         medal: getMedalForRaceTime(target.trackKey, bestTimeMs / 1000, target.lapCount),
-        rank: toViewerRank(await readPlayerRank(target.competition, playerId)),
+        rank: toViewerRank(await readBestEffortRank(target.competition, playerId)),
         trackLocked: false,
     };
 }

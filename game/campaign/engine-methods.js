@@ -80,7 +80,7 @@ function getCampaignVerificationBestTimeSec(engine, stage) {
     return candidates.length ? Math.min(...candidates) : null;
 }
 
-function getExistingCampaignScoreboardSnapshot(engine, stage) {
+export function getExistingCampaignScoreboardSnapshot(engine, stage) {
     const raceId = stage?.raceId;
     if (!raceId) return null;
 

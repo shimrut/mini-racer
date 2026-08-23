@@ -422,7 +422,7 @@ async function repairCampaignProgressFromLeaderboard(
     });
 }
 
-async function repairCampaignStandingsFromEntries(playerId: string): Promise<void> {
+export async function repairCampaignStandingsFromEntries(playerId: string): Promise<void> {
     for (const stage of CAMPAIGN_STAGES) {
         const competition = competitionFor(stage, playerId);
         const [entry, rankedScore] = await Promise.all([

@@ -115,6 +115,9 @@ describe('result-flow helpers', () => {
         expect(buildChallengeRankSnapshot(null, { rank: 12 })).toEqual({
             playerRankLabel: '#12',
         });
+        expect(buildChallengeRankSnapshot(null, { playerRank: 8 })).toEqual({
+            playerRankLabel: '#8',
+        });
         expect(buildChallengeRankSnapshot({ rank: 3 }, { rank: 12 })).toEqual({
             playerRankLabel: '#3',
         });

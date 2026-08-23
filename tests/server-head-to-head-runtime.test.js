@@ -11,11 +11,13 @@ const mockReadPlayerRank = vi.hoisted(() => vi.fn());
 const mockReadEntry = vi.hoisted(() => vi.fn());
 
 const mockGetCampaignProgress = vi.hoisted(() => vi.fn());
+const mockRepairStandings = vi.hoisted(() => vi.fn());
 
 vi.mock('../src/server/campaign-store.js', () => ({
     getServerHeadToHeadSource: vi.fn(),
     submitServerCampaignRun: mockSubmitCampaignRun,
     getCampaignProgressForSelection: mockGetCampaignProgress,
+    repairCampaignStandingsFromEntries: mockRepairStandings,
 }));
 vi.mock('../src/server/daily-gp-store.js', () => ({
     getServerDailyGpPlayableChallenge: mockDailyChallenge,
@@ -247,7 +249,10 @@ describe('the best a challenge viewer already holds', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        mockReadPlayerRank.mockReset();
+        mockReadEntry.mockReset();
         mockDailyChallenge.mockResolvedValue(dailyChallenge);
+        mockRepairStandings.mockResolvedValue(undefined);
         mockGetCampaignProgress.mockResolvedValue({
             resultsByRaceId: Object.fromEntries(
                 CAMPAIGN_STAGES.map((stage) => [stage.raceId, { medal: 'gold' }]),
@@ -269,6 +274,23 @@ describe('the best a challenge viewer already holds', () => {
             expect.objectContaining({ mode: 'campaign', id: 'numbered-v1-03' }),
             'reddit:racer',
         );
+        expect(mockRepairStandings).toHaveBeenCalledWith('reddit:racer');
+        expect(mockReadPlayerRank).toHaveBeenCalledWith(
+            expect.objectContaining({ mode: 'campaign', id: 'numbered-v1-03' }),
+            'reddit:racer',
+        );
+    });
+
+    it('keeps the stored time when the rank read fails', async () => {
+        mockReadEntry.mockResolvedValue({ bestTimeMs: 26_500 });
+        mockReadPlayerRank.mockRejectedValue(new Error('redis rank missing'));
+
+        expect(await readHeadToHeadViewerBest(campaignChallenge, 'reddit:racer'))
+            .toMatchObject({
+                bestTimeMs: 26_500,
+                rank: null,
+                trackLocked: false,
+            });
     });
 
     it('reads the Daily entry for a Daily challenge', async () => {
@@ -280,6 +302,7 @@ describe('the best a challenge viewer already holds', () => {
             expect.objectContaining({ mode: 'daily', id: dailyChallenge.id }),
             'guest:racer',
         );
+        expect(mockRepairStandings).not.toHaveBeenCalled();
     });
 
     it('holds nothing for a racer with no time there', async () => {
