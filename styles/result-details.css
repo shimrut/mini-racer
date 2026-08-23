@@ -312,14 +312,8 @@
     text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-#modal-combined-view.is-challenge-finish .challenge-result-lockup__lead {
-    font-size: clamp(1.85rem, 8vw, 2.6rem);
-    letter-spacing: -0.02em;
-    color: var(--text-color);
-}
-
 #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome {
-    font-size: clamp(3rem, 14vw, 4.25rem);
+    font-size: clamp(2.5rem, 11vw, 3.75rem);
     letter-spacing: -0.04em;
     white-space: nowrap;
     color: var(--text-color);
@@ -411,12 +405,8 @@
         gap: 0.2rem;
     }
 
-    #modal-combined-view.is-challenge-finish .challenge-result-lockup__lead {
-        font-size: clamp(1.35rem, 6vw, 1.85rem);
-    }
-
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome {
-        font-size: clamp(2.2rem, 10vw, 3.1rem);
+        font-size: clamp(2rem, 9vw, 2.85rem);
     }
 
     #modal-combined-view.is-challenge-finish #combined-time {

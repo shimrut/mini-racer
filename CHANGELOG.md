@@ -1,8 +1,7 @@
 # Changelog
 
-- Head to Head finish now stacks italic **YOU** / **WON** (or **LOST**) above
-  the shared finish clock, matching the Mini Racer heading. Daily and Campaign
-  finishes are unchanged.
+- Head to Head finish now puts italic **YOU WON** / **YOU LOST** on one line
+  above the shared finish clock. Daily and Campaign finishes are unchanged.
 
 - Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
   Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested

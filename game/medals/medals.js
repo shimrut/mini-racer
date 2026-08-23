@@ -225,19 +225,17 @@ export function renderChallengeFinishHero(
     root.className = 'win-combined-medal-overlay win-combined-medal-overlay--challenge';
     root.dataset.challengePhase = phase;
 
-    const verdictByPhase = {
-        won: { lead: 'YOU', outcome: 'WON' },
-        lost: { lead: 'YOU', outcome: 'LOST' },
-        tie: { lead: 'YOU', outcome: 'TIED' },
-        pending: { lead: null, outcome: 'VERIFYING' },
-        error: { lead: null, outcome: 'UNVERIFIED' },
+    const outcomeByPhase = {
+        won: 'YOU WON',
+        lost: 'YOU LOST',
+        tie: 'YOU TIED',
+        pending: 'VERIFYING',
+        error: 'UNVERIFIED',
     };
-    const verdict = verdictByPhase[phase] || verdictByPhase.error;
+    const outcome = outcomeByPhase[phase] || 'UNVERIFIED';
     const accessibleLabel = phase === 'error'
         ? (error || 'This run could not be verified.')
-        : (phase === 'pending'
-            ? (statusText || 'Verifying challenge result')
-            : (verdict.lead ? `${verdict.lead} ${verdict.outcome}` : verdict.outcome));
+        : (phase === 'pending' ? (statusText || 'Verifying challenge result') : outcome);
 
     root.setAttribute('role', phase === 'error' ? 'alert' : 'status');
     root.setAttribute('aria-label', accessibleLabel);
@@ -246,21 +244,14 @@ export function renderChallengeFinishHero(
     const lockup = document.createElement('p');
     lockup.className = 'challenge-result-lockup';
 
-    if (verdict.lead) {
-        const lead = document.createElement('span');
-        lead.className = 'challenge-result-lockup__lead';
-        lead.textContent = verdict.lead;
-        lockup.appendChild(lead);
-    }
-
     const result = document.createElement('span');
     result.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
-    result.textContent = verdict.outcome;
+    result.textContent = outcome;
 
     lockup.appendChild(result);
     root.appendChild(lockup);
 
-    if (phase === 'pending' || phase === 'error' || !verdictByPhase[phase]) {
+    if (phase === 'pending' || phase === 'error' || !outcomeByPhase[phase]) {
         const detail = document.createElement('span');
         detail.className = 'challenge-result-lockup__status';
         detail.textContent = accessibleLabel;

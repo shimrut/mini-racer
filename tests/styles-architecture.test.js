@@ -110,7 +110,7 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup__lead\s*\{[^}]*font-size:\s*clamp\(1\.85rem, 8vw, 2\.6rem\);/s,
+            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup__outcome\s*\{[^}]*white-space:\s*nowrap;/s,
         );
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.combined-stat-label\s*\{[^}]*font-style:\s*normal;/s,
