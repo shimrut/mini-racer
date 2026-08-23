@@ -57,15 +57,15 @@ equally specific rule wins.
 
 `styles/result-details.css` owns the Head to Head-only finish composition under
 `#modal-combined-view.is-challenge-finish`; the shared Daily and Campaign finish
-rules remain unchanged. The top row places a stacked, italic Outfit `CHALLENGE`
-and truthful verdict beside the dominant upright race time. The result lockup uses green
-for `WON`, red for `LOST`, and neutral text for `TIE`; pending and failed
-verification use `VERIFYING` and `UNVERIFIED` and retain their status detail.
+rules remain unchanged. The result stacks a centered upright Outfit verdict
+above the dominant race time. The lockup uses green for `YOU WON`, red for
+`YOU LOST`, and neutral text for `YOU TIED`; pending and failed verification
+use `VERIFYING` and `UNVERIFIED` and retain their status detail.
 
-Below that top row, the existing result slots flow as three left-label/right-value
+Below that stack, the existing result slots flow as three left-label/right-value
 upright rows: opponent delta, prior-PB delta, and originating rank. The PB slot keeps its
 honest empty state and the rank row stays hidden when no rank exists. The layout
-uses grid/flex flow, inherited modal width and safe-area behavior, plus a
+uses flex flow, inherited modal width and safe-area behavior, plus a
 `max-height: 640px` compaction; it must not introduce absolute result positioning.
 The finish hero contains no avatar, medal, opponent name, or duplicate margin.
 Those elements remain valid on the separate Challenge lobby/won portrait.

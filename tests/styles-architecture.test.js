@@ -101,10 +101,10 @@ describe('game stylesheet architecture', () => {
 
     it('keeps the challenge finish as a scoped responsive result lockup', () => {
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.pause-header\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s,
+            /#modal-combined-view\.is-challenge-finish \.pause-header\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup\s*\{[^}]*font-family:\s*var\(--header-font\);[^}]*font-style:\s*italic;[^}]*font-weight:\s*900;/s,
+            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup\s*\{[^}]*font-family:\s*var\(--header-font\);[^}]*font-style:\s*normal;[^}]*font-weight:\s*900;/s,
         );
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;/s,

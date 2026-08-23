@@ -413,26 +413,26 @@ describe('medals', () => {
                 statusText: 'Submitting...',
             });
             expect(children[0].dataset.challengePhase).toBe('pending');
-            expect(children[0].children[0].children[0].textContent).toBe('CHALLENGE');
-            expect(children[0].children[0].children[1].textContent).toBe('VERIFYING');
+            expect(children[0].children[0].children[0].textContent).toBe('VERIFYING');
+            expect(children[0].textContent).not.toContain('CHALLENGE');
             expect(children[0].children[1].textContent).toBe('Submitting...');
 
             renderChallengeFinishHero(overlay, { phase: 'won' });
             expect(children[0].dataset.challengePhase).toBe('won');
-            expect(children[0].children[0].children[1].textContent).toBe('WON');
+            expect(children[0].children[0].children[0].textContent).toBe('YOU WON');
 
             renderChallengeFinishHero(overlay, {
                 phase: 'won',
                 verdict: { opponentName: 'shimroot', deltaSec: -0.305 },
             });
-            expect(children[0].children[0].children[1].textContent).toBe('WON');
+            expect(children[0].children[0].children[0].textContent).toBe('YOU WON');
             expect(children[0].children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, {
                 phase: 'lost',
                 verdict: { opponentName: 'shimroot', deltaSec: 0.546 },
             });
-            expect(children[0].children[0].children[1].textContent).toBe('LOST');
+            expect(children[0].children[0].children[0].textContent).toBe('YOU LOST');
             expect(children[0].children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, {
@@ -440,7 +440,7 @@ describe('medals', () => {
                 avatarUrl: 'https://i.redd.it/snoo.png',
             });
             const wonRoot = children[0];
-            expect(wonRoot.children[0].children[1].textContent).toBe('WON');
+            expect(wonRoot.children[0].children[0].textContent).toBe('YOU WON');
             expect(wonRoot.children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, {
@@ -448,15 +448,15 @@ describe('medals', () => {
                 error: 'Could not confirm.',
             });
             expect(children[0].dataset.challengePhase).toBe('error');
-            expect(children[0].children[0].children[1].textContent).toBe('UNVERIFIED');
+            expect(children[0].children[0].children[0].textContent).toBe('UNVERIFIED');
             expect(children[0].children[1].textContent).toBe('Could not confirm.');
 
             renderChallengeFinishHero(overlay, { phase: 'lost' });
             expect(children[0].dataset.challengePhase).toBe('lost');
-            expect(children[0].children[0].children[1].textContent).toBe('LOST');
+            expect(children[0].children[0].children[0].textContent).toBe('YOU LOST');
 
             renderChallengeFinishHero(overlay, { phase: 'tie' });
-            expect(children[0].children[0].children[1].textContent).toBe('TIE');
+            expect(children[0].children[0].children[0].textContent).toBe('YOU TIED');
         } finally {
             global.document = originalDocument;
         }

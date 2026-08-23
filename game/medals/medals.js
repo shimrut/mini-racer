@@ -226,16 +226,16 @@ export function renderChallengeFinishHero(
     root.dataset.challengePhase = phase;
 
     const outcomeByPhase = {
-        won: 'WON',
-        lost: 'LOST',
-        tie: 'TIE',
+        won: 'YOU WON',
+        lost: 'YOU LOST',
+        tie: 'YOU TIED',
         pending: 'VERIFYING',
         error: 'UNVERIFIED',
     };
     const outcome = outcomeByPhase[phase] || 'UNVERIFIED';
     const accessibleLabel = phase === 'error'
         ? (error || 'This run could not be verified.')
-        : (phase === 'pending' ? (statusText || 'Verifying challenge result') : `Challenge ${outcome}`);
+        : (phase === 'pending' ? (statusText || 'Verifying challenge result') : outcome);
 
     root.setAttribute('role', phase === 'error' ? 'alert' : 'status');
     root.setAttribute('aria-label', accessibleLabel);
@@ -244,15 +244,10 @@ export function renderChallengeFinishHero(
     const lockup = document.createElement('p');
     lockup.className = 'challenge-result-lockup';
 
-    const lead = document.createElement('span');
-    lead.className = 'challenge-result-lockup__lead';
-    lead.textContent = 'CHALLENGE';
-
     const result = document.createElement('span');
     result.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
     result.textContent = outcome;
 
-    lockup.appendChild(lead);
     lockup.appendChild(result);
     root.appendChild(lockup);
 
