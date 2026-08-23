@@ -8,13 +8,10 @@ an ordered manifest whose imports are bundled into the production `game.css`.
 Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
 `head-to-head.css`, `mod-analytics.css`)
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
-(`#ef4444`) tokens as the game. The moderator analytics page is a dense
-dashboard: a stat-tile row with day-over-day deltas and sparklines, a stacked
-new/returning column chart with a hover readout, reach and play-mix panels,
-ranked track bars, and a sticky-header daily table. Its two series are the red
-accent (returning) and `#0e9bd6` (new) — a pair checked for colour-vision
-separation against the `#0f172a` panel; marks carry the series colour and text
-never does. The Head to Head surface uses a responsive
+(`#ef4444`) tokens as the game. The moderator analytics page is one
+sticky-header table: a row per UTC day, with the day's players split into new
+and returning and each mode's starts and finishes beside them. The newest row
+carries the red accent. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the
 verified track trace remains an open hero on the right, and the CTA anchors below
 that trace. Its brand uses the shared stacked Mini/Racer lockup, the duel row
@@ -71,6 +68,11 @@ uses flex flow, inherited modal width and safe-area behavior, plus a
 `max-height: 640px` compaction; it must not introduce absolute result positioning.
 The finish hero contains no avatar, medal, opponent name, or duplicate margin.
 Those elements remain valid on the separate Challenge lobby/won portrait.
+The verdict lockup enters with the same `slideInLeft` 0.5s glide as Mini, and
+the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
+comparison rows and finish buttons then appear one after another at 50ms,
+starting at 500ms, under `is-challenge-finish-enter`. Reduced motion turns
+that sequence off.
 
 ## Daily And Campaign Poster Contract
 
@@ -97,6 +99,16 @@ maintaining mode-specific card layouts:
   measured WebView, so the app must not guess their height with an internal
   spacer. The existing overlay padding and reported safe-area inset are the only
   bottom clearance.
+- A frame is the one place where that measurement fails. The reddit.com page
+  keeps the game in a frame, and a frame reports its own box as
+  `visualViewport.height` and reports a zero safe-area inset. The app therefore
+  cannot see Reddit's bar or the mobile browser's toolbar over the bottom strip,
+  which cut the speedometer and the pause button. `markFramedDocument()` puts
+  `is-framed` on the root, and the phone rule in `responsive-layout.css` holds
+  `.mobile-hud-bar` 4rem above the frame's bottom edge. The Reddit apps load the
+  game as the top document, so they stay on the measured clearance. Desktop
+  keeps the base rule. This 4rem is the only guessed clearance in the
+  stylesheets. Do not extend it to the lobby, which measures correctly.
 - Each Daily/Campaign pane is a two-row grid: the carousel gets
   `minmax(0, 1fr)` and Start Race gets its own intrinsic row. Neither is
   positioned, sticky, or layered. The pane, carousel, and mode-specific shell

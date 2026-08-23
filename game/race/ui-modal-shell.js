@@ -1210,6 +1210,8 @@ export class ModalShell {
             }
         }
 
+        this.content.syncChallengeFinishEntrance?.(this.modalCombinedView, { restart: true });
+
         this._setActiveView(this.modalCombinedView);
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));

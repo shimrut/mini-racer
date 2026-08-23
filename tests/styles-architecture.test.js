@@ -124,6 +124,21 @@ describe('game stylesheet architecture', () => {
         expect(resultDetailStyles).toContain('@media (max-height: 640px)');
     });
 
+    it('enters the challenge finish heading like Mini Racer and staggers the rows below', () => {
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish\.is-challenge-finish-enter \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) both;/,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish\.is-challenge-finish-enter #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) 0\.1s both;/,
+        );
+        expect(resultDetailStyles).toMatch(
+            /\.is-challenge-finish-stagger\s*\{[^}]*animation:\s*challengeFinishItemIn var\(--dur-base\) var\(--ease-settle\) both;/,
+        );
+        expect(resultDetailStyles).toMatch(
+            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish-enter[\s\S]*animation:\s*none;/,
+        );
+    });
+
     it('routes every sub-200ms duration through a token', () => {
         const styles = readCssBundle(manifestUrl);
         const strays = [];

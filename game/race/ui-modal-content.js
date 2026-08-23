@@ -329,6 +329,25 @@ export function mountCombinedPopoverOverlay(container, { title, overlayClass = '
     });
 }
 
+const CHALLENGE_FINISH_ENTER_CLASS = 'is-challenge-finish-enter';
+const CHALLENGE_FINISH_STAGGER_CLASS = 'is-challenge-finish-stagger';
+const CHALLENGE_FINISH_ITEM_START_MS = 500;
+const CHALLENGE_FINISH_ITEM_GAP_MS = 50;
+
+function isChallengeFinishStaggerVisible(el) {
+    if (!el || el.hidden || el.hasAttribute('hidden')) return false;
+    if (el.style.display === 'none') return false;
+    return true;
+}
+
+function clearChallengeFinishEntrance(container) {
+    container.classList.remove(CHALLENGE_FINISH_ENTER_CLASS);
+    for (const el of container.querySelectorAll(`.${CHALLENGE_FINISH_STAGGER_CLASS}`)) {
+        el.classList.remove(CHALLENGE_FINISH_STAGGER_CLASS);
+        el.style.removeProperty('--challenge-finish-delay');
+    }
+}
+
 export class ModalContentUi {
     constructor() {}
 
@@ -666,6 +685,11 @@ export class ModalContentUi {
         );
         // A challenge finish reads as three rows under the verdict, so the sheet lays itself out for them.
         container.classList?.toggle?.('is-challenge-finish', isChallengeHero);
+        if (isChallengeHero) {
+            container.classList.remove(CHALLENGE_FINISH_ENTER_CLASS);
+        } else {
+            this.syncChallengeFinishEntrance(container);
+        }
         this.applyChallengeOpponentStat(container, isChallengeHero ? challengeVerdict : null);
         if (label2El) {
             label2El.hidden = false;
@@ -851,6 +875,7 @@ export class ModalContentUi {
         } else if (deltaDisplay.valueClass === 'modal-stat-value--delta-positive') {
             valueEl.classList.add('is-loss');
         }
+        this.syncChallengeFinishEntrance(container);
     }
 
     /**
@@ -865,6 +890,55 @@ export class ModalContentUi {
             rightGroupEl: container.querySelector('#combined-stats-right-group'),
             scoreboardSnapshot: buildChallengeRankSnapshot(bestUpdate),
         });
+        this.syncChallengeFinishEntrance(container);
+    }
+
+    /**
+     * Challenge finish motion is CSS. This only numbers the rows and buttons that are actually
+     * on screen so hidden slots do not leave holes in the 50ms cascade.
+     */
+    syncChallengeFinishEntrance(container, { restart = false } = {}) {
+        if (!container) return;
+        if (!container.classList.contains('is-challenge-finish')) {
+            clearChallengeFinishEntrance(container);
+            return;
+        }
+
+        if (!restart && !container.classList.contains(CHALLENGE_FINISH_ENTER_CLASS)) {
+            return;
+        }
+
+        const items = [
+            ...container.querySelectorAll('.combined-stats-grid > .stat-floating-item'),
+            ...container.querySelectorAll('.combined-actions > .combined-action-btn, .combined-actions > .combined-mode-shortcuts-label'),
+        ];
+
+        if (restart) {
+            container.classList.remove(CHALLENGE_FINISH_ENTER_CLASS);
+            for (const el of items) {
+                el.classList.remove(CHALLENGE_FINISH_STAGGER_CLASS);
+                el.style.removeProperty('--challenge-finish-delay');
+            }
+            void container.offsetWidth;
+        }
+
+        const enterAlready = container.classList.contains(CHALLENGE_FINISH_ENTER_CLASS);
+        let index = 0;
+        for (const el of items) {
+            if (!isChallengeFinishStaggerVisible(el)) continue;
+            if (!restart && el.classList.contains(CHALLENGE_FINISH_STAGGER_CLASS)) {
+                index += 1;
+                continue;
+            }
+            const delayMs = restart || !enterAlready
+                ? CHALLENGE_FINISH_ITEM_START_MS + index * CHALLENGE_FINISH_ITEM_GAP_MS
+                : 0;
+            el.style.setProperty('--challenge-finish-delay', `${delayMs}ms`);
+            el.classList.add(CHALLENGE_FINISH_STAGGER_CLASS);
+            index += 1;
+        }
+
+        container.classList.add(CHALLENGE_FINISH_ENTER_CLASS);
     }
 
     formatTime(seconds) {

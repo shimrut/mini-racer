@@ -408,6 +408,47 @@
     color: var(--accent-color);
 }
 
+#modal-combined-view.is-challenge-finish.is-challenge-finish-enter .challenge-result-lockup,
+#modal-combined-view.is-challenge-finish.is-challenge-finish-enter .challenge-result-lockup__status {
+    opacity: 0;
+    backface-visibility: hidden;
+    animation: slideInLeft 0.5s var(--ease-glide) both;
+}
+
+#modal-combined-view.is-challenge-finish.is-challenge-finish-enter #combined-time {
+    opacity: 0;
+    backface-visibility: hidden;
+    animation: slideInRight 0.6s var(--ease-glide) 0.1s both;
+}
+
+#modal-combined-view.is-challenge-finish.is-challenge-finish-enter .is-challenge-finish-stagger {
+    animation: challengeFinishItemIn var(--dur-base) var(--ease-settle) both;
+    animation-delay: var(--challenge-finish-delay, 0ms);
+}
+
+@keyframes challengeFinishItemIn {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 0.35rem, 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #modal-combined-view.is-challenge-finish.is-challenge-finish-enter .challenge-result-lockup,
+    #modal-combined-view.is-challenge-finish.is-challenge-finish-enter .challenge-result-lockup__status,
+    #modal-combined-view.is-challenge-finish.is-challenge-finish-enter #combined-time,
+    #modal-combined-view.is-challenge-finish.is-challenge-finish-enter .is-challenge-finish-stagger {
+        opacity: 1;
+        transform: none;
+        animation: none;
+    }
+}
+
 @media (max-height: 640px) {
     #modal-combined-view.is-challenge-finish .pause-header {
         gap: 0;
