@@ -223,7 +223,11 @@ describe('server daily gp store submissions', () => {
             },
         });
         expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalledWith({
-            challenge: expect.objectContaining({ id: challenge.id }),
+            challenge: expect.objectContaining({
+                trackKey: challenge.trackKey,
+                rulesRevision: challenge.rulesRevision,
+                objectiveType: challenge.objectiveType,
+            }),
             replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
         });
         expect(mockRedis.zAdd).toHaveBeenCalledWith(
@@ -288,7 +292,7 @@ describe('server daily gp store submissions', () => {
             expect.objectContaining({ member: 'reddit:pm-user', score: 12345 }),
         );
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-            'Challenge PB persistence failed after a valid Daily GP run:',
+            'Challenge PB persistence failed after a valid run:',
             expect.any(Error),
         );
         consoleErrorSpy.mockRestore();
@@ -320,11 +324,63 @@ describe('server daily gp store submissions', () => {
             body: { accepted: true, trackPbPersistenceStatus: 'stored' },
         });
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-            'Daily GP submission lock cleanup failed:',
+            'Competition submission lock cleanup failed:',
             expect.any(Error),
         );
         consoleErrorSpy.mockRestore();
     });
+
+    it('does not mark hasAnyData on a post-replay lock rejection', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.set.mockImplementation(async (key, value, options = {}) => {
+            if (String(key).startsWith('dailygp:submit-lock:')) return '';
+            if (options.nx && (ownedLocks.has(key) || storedStrings.has(key))) return '';
+            if (String(key).includes('lock:') || String(key).includes('-lock:')) {
+                ownedLocks.set(key, value);
+            } else {
+                storedStrings.set(key, value);
+            }
+            return 'OK';
+        });
+
+        const result = await submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(result.status).toBe(429);
+        const profileWrite = findWrittenPlayerProfile('reddit:pm-user');
+        expect(profileWrite == null || profileWrite.profile.hasAnyData !== true).toBe(true);
+    });
+
+    it('strips releaseLock from Daily non-200 replies', async () => {
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockValidateDailyGpReplayDetailed.mockReturnValueOnce({
+            ok: false,
+            failure: { reason: 'truncated_mismatch' },
+        });
+
+        const result = await submitServerDailyGpRun({
+            playerId: 'browser-player-id',
+            challengeId: challenge.id,
+            trackKey: challenge.trackKey,
+            redditUsername: 'Pm-User',
+            replay: { inputs: [] },
+        });
+
+        expect(result.status).toBe(422);
+        expect(result).toEqual({
+            status: 422,
+            body: expect.objectContaining({ accepted: false }),
+        });
+        expect(result).not.toHaveProperty('releaseLock');
+    });
+
 
     it('propagates an unexpected daily persistence failure instead of silently succeeding', async () => {
         const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');

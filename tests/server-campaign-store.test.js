@@ -1475,4 +1475,55 @@ describe('Campaign server store', () => {
             body: { personalBest: { bestTimeMs: 1000 } },
         });
     });
+
+    it('strips releaseLock from Campaign non-200 replies', async () => {
+        const competitionSubmit = await import('../src/server/competition-submit.ts');
+        vi.spyOn(competitionSubmit, 'submitCompetitionRun').mockResolvedValueOnce({
+            status: 422,
+            body: { accepted: false, error: 'bad replay', reason: 'truncated_mismatch' },
+            releaseLock: Promise.resolve(),
+        });
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const result = await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            playerId: 'browser-player-id',
+            redditUsername: 'Pm-User',
+            replay: { inputs: [] },
+        });
+        expect(result).toEqual({
+            status: 422,
+            body: { accepted: false, error: 'bad replay', reason: 'truncated_mismatch' },
+        });
+        expect(result).not.toHaveProperty('releaseLock');
+    });
+
+    it('awaits releaseLock when post-accept unlock work rejects', async () => {
+        const competitionSubmit = await import('../src/server/competition-submit.ts');
+        let releaseResolved = false;
+        const releaseLock = Promise.resolve().then(() => {
+            releaseResolved = true;
+        });
+        vi.spyOn(competitionSubmit, 'submitCompetitionRun').mockResolvedValueOnce({
+            status: 200,
+            body: {
+                accepted: true,
+                improved: true,
+                bestTimeMs: 12_345,
+                checkpointTimesSec: [4.2, 9.8],
+            },
+            releaseLock,
+        });
+        const carUnlockStore = await import('../src/server/car-unlock-store.ts');
+        vi.spyOn(carUnlockStore, 'getCarUnlockSnapshot').mockRejectedValueOnce(new Error('unlock snapshot failed'));
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        await expect(submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            playerId: 'browser-player-id',
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        })).rejects.toThrow('unlock snapshot failed');
+        expect(releaseResolved).toBe(true);
+    });
 });

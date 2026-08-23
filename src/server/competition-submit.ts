@@ -104,8 +104,10 @@ export async function submitCompetitionRun({
     requestRateLimitIdentity?: unknown;
     submissionOwnerId?: unknown;
 }) {
+    let releaseLock: Promise<unknown> = Promise.resolve();
+
     if (isMismatchedSubmissionOwner(playerId, submissionOwnerId)) {
-        return SUBMISSION_IDENTITY_CHANGED_RESULT;
+        return { ...SUBMISSION_IDENTITY_CHANGED_RESULT, releaseLock };
     }
 
     if (trackKey !== competition.trackKey) {
@@ -116,6 +118,7 @@ export async function submitCompetitionRun({
                 error: 'Submission track does not match challenge.',
                 reason: 'track_mismatch',
             },
+            releaseLock,
         };
     }
 
@@ -131,6 +134,7 @@ export async function submitCompetitionRun({
                 error: 'Too many submission attempts. Try again soon.',
                 retryAfterSeconds: rateLimitResult.retryAfterSeconds,
             },
+            releaseLock,
         };
     }
 
@@ -152,6 +156,7 @@ export async function submitCompetitionRun({
                 reason: strictReplayOutcome.failure.reason,
                 strictReplayFailureReason: strictReplayOutcome.failure.reason,
             },
+            releaseLock,
         };
     }
 
@@ -160,6 +165,7 @@ export async function submitCompetitionRun({
         return {
             status: 500,
             body: { accepted: false, error: 'Daily challenge track is unavailable.' },
+            releaseLock,
         };
     }
 
@@ -182,6 +188,7 @@ export async function submitCompetitionRun({
                 error: 'Submission already in progress. Try again in a moment.',
                 retryAfterSeconds: 1,
             },
+            releaseLock,
         };
     }
 
@@ -247,24 +254,25 @@ export async function submitCompetitionRun({
             }),
         ]);
     } finally {
-        try {
-            await releaseRedisLock(submissionLock, redis);
-        } catch (error) {
+        releaseLock = releaseRedisLock(submissionLock, redis).catch((error) => {
             // Lock cleanup is best-effort; it must not replace a committed outcome.
             console.error('Competition submission lock cleanup failed:', error);
-        }
+        });
     }
 
     if (boardPersistence!.status === 'rejected') {
+        await releaseLock;
         throw boardPersistence!.reason;
     }
     if (boardPersistence!.value.interrupted) {
+        await releaseLock;
         return {
             status: 503,
             body: {
                 accepted: false,
                 error: 'Submission save was interrupted. Retrying automatically.',
             },
+            releaseLock,
         };
     }
 
@@ -292,5 +300,6 @@ export async function submitCompetitionRun({
             validationMethod: storedEntry.validationMethod ?? 'strict-replay',
             strictReplayFailureReason: storedEntry.strictReplayFailureReason ?? null,
         },
+        releaseLock,
     };
 }

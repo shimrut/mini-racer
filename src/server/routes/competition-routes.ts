@@ -115,11 +115,6 @@ export function registerCompetitionRoutes(
                 redditUsername: dependencies.getRequestUsername(),
                 requestRateLimitIdentity: dependencies.getRequestRateLimitIdentity(),
             });
-            if (result.status === 200) {
-                const body = result.body && typeof result.body === 'object'
-                    ? result.body as { accepted?: unknown }
-                    : null;
-            }
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to submit Reddit Mini Racer run:', error);

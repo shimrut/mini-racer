@@ -13,7 +13,6 @@ import {
     resolveLeaderboardDisplayName,
     sanitizeRedditUsername,
 } from '../../game/shared/leaderboard-identity.js';
-import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
 import {
     buildDailyGpChallengeForDayIndexWithTrack,
     createDailyChallengeId,
@@ -31,13 +30,11 @@ import {
     isDailyGpChallengePlayable,
     normalizeDailyGpRaceContract,
     type DailyGpChallenge,
-    type DailyGpLeaderboardEntry,
     type DailyGpPlayerPreferences,
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
 import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import type { FinalDailyGpPodium } from './daily-podium-model.js';
-import { validateDailyGpReplayDetailed } from './replay-validator.js';
 import { toDailyCompetition } from './competition.js';
 import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import {
@@ -61,7 +58,6 @@ import {
 import {
     getPlayerTrackPbRecord,
     seedPlayerTrackPersonalBest,
-    upsertPlayerTrackPersonalBest,
 } from './pb-ghost-store.js';
 import {
     acquireRedisLock,
@@ -92,8 +88,11 @@ import {
 import { verifyGuestPlayerToken } from './player-token.js';
 import { isRetiredGuestPlayerId } from './guest-retirement.js';
 import {
+    competitionSubmissionLockKey,
     isMismatchedSubmissionOwner,
+    submitCompetitionRun,
     SUBMISSION_IDENTITY_CHANGED_RESULT,
+    SUBMISSION_LOCK_TTL_MS,
 } from './competition-submit.js';
 
 // Re-exported here so the paths callers and tests already import from keep resolving.
@@ -157,9 +156,6 @@ function guestProgressSelectionPendingKey(guestPlayerId: string): string {
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY = 'dailygp:maintenance:challenge-history:v1:cursor';
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_BATCH_SIZE = 50;
-const DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
-const DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
-const DAILY_GP_SUBMISSION_LOCK_TTL_MS = 30_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function readPlayerCarUnlocks(
@@ -228,13 +224,7 @@ function preferencesAllowedByCarUnlocks(
     };
 }
 
-function createSubmissionRateLimitKey(challengeId: string, rateLimitIdentity: string): string {
-    return `dailygp:submit-rate-limit:${challengeId}:${rateLimitIdentity}`;
-}
 
-function createSubmissionLockKey(challengeId: string, playerId: string): string {
-    return `dailygp:submit-lock:${challengeId}:${playerId}`;
-}
 
 function createEmptyDailySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
     return createEmptySnapshot(toDailyCompetition(challenge), DAILY_GP_DEFAULT_LIMIT);
@@ -535,59 +525,23 @@ async function readFinalPodiumPositions(
 }
 
 
-async function checkSubmissionRateLimit(
-    challengeId: string,
-    playerId: string,
-): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number }> {
-    const rateLimitKey = createSubmissionRateLimitKey(challengeId, playerId);
-    const attemptCount = await redis.incrBy(rateLimitKey, 1);
-    if (attemptCount === 1) {
-        await redis.expire(rateLimitKey, DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
-    }
-    if (attemptCount <= DAILY_GP_SUBMISSION_RATE_LIMIT_MAX_REQUESTS) {
-        return { allowed: true };
-    }
-
-    const expiresAt = await redis.expireTime(rateLimitKey);
-    if (Number.isFinite(expiresAt) && expiresAt > 0) {
-        return {
-            allowed: false,
-            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
-        };
-    }
-    // A counter left without a TTL only ever climbs, so repair the window rather than report a retry time that never arrives.
-    await redis.expire(rateLimitKey, DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
-    return {
-        allowed: false,
-        retryAfterSeconds: DAILY_GP_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
-    };
-}
-
-async function acquireSubmissionLock(
-    challengeId: string,
-    playerId: string,
-): Promise<RedisLock | null> {
-    const key = createSubmissionLockKey(challengeId, playerId);
-    return acquireRedisLock(key, DAILY_GP_SUBMISSION_LOCK_TTL_MS, redis);
-}
-
 async function releaseSubmissionLock(lock: RedisLock | null): Promise<void> {
     await releaseRedisLock(lock, redis);
 }
 
 async function acquireDailyMergeLocks(
-    challengeId: string,
+    competition: ReturnType<typeof toDailyCompetition>,
     guestPlayerId: string,
     redditPlayerId: string,
 ): Promise<RedisLock[]> {
     const keys = [
-        createSubmissionLockKey(challengeId, guestPlayerId),
-        createSubmissionLockKey(challengeId, redditPlayerId),
+        competitionSubmissionLockKey(competition, guestPlayerId),
+        competitionSubmissionLockKey(competition, redditPlayerId),
     ].sort();
     const locks: RedisLock[] = [];
     try {
         for (const key of keys) {
-            const lock = await acquireRedisLock(key, DAILY_GP_SUBMISSION_LOCK_TTL_MS, redis);
+            const lock = await acquireRedisLock(key, SUBMISSION_LOCK_TTL_MS, redis);
             if (!lock) {
                 throw new Error('Daily guest merge blocked by an in-flight submission.');
             }
@@ -602,10 +556,10 @@ async function acquireDailyMergeLocks(
 
 function dailyMergeLockForPlayer(
     locks: RedisLock[],
-    challengeId: string,
+    competition: ReturnType<typeof toDailyCompetition>,
     playerId: string,
 ): RedisLock | null {
-    const key = createSubmissionLockKey(challengeId, playerId);
+    const key = competitionSubmissionLockKey(competition, playerId);
     return locks.find((lock) => lock.key === key) ?? null;
 }
 
@@ -793,7 +747,7 @@ export async function mergeGuestDailyProgress({
         hasGuestEvidence ||= Boolean(peeked.guestEntry || peeked.guestPb);
 
         const locks = await acquireDailyMergeLocks(
-            challenge.id,
+            competition,
             guestPlayerId,
             redditPlayerId,
         );
@@ -840,7 +794,7 @@ export async function mergeGuestDailyProgress({
             if (entryToWrite || replace) {
                 const accountLock = dailyMergeLockForPlayer(
                     locks,
-                    challenge.id,
+                    competition,
                     redditPlayerId,
                 );
                 if (!accountLock) {
@@ -885,7 +839,7 @@ export async function mergeGuestDailyProgress({
             if (guestEntry || guestPb) {
                 const guestLock = dailyMergeLockForPlayer(
                     locks,
-                    challenge.id,
+                    competition,
                     guestPlayerId,
                 );
                 if (!guestLock) {
@@ -934,8 +888,8 @@ export async function discardGuestDailyProgress({
         if (!state.guestEntry && !state.guestPb) continue;
         discarded = true;
         const lock = await acquireRedisLock(
-            createSubmissionLockKey(challenge.id, guestPlayerId),
-            DAILY_GP_SUBMISSION_LOCK_TTL_MS,
+            competitionSubmissionLockKey(competition, guestPlayerId),
+            SUBMISSION_LOCK_TTL_MS,
             redis,
         );
         if (!lock) throw new Error('Daily guest discard is already in progress.');
@@ -1726,9 +1680,7 @@ export async function submitServerDailyGpRun({
     leaderboardIdentity,
     redditUsername,
     guestToken,
-    bestTime,
     replay,
-    checkpointTimesSec,
     trackKey,
     requestRateLimitIdentity,
     submissionOwnerId,
@@ -1738,9 +1690,7 @@ export async function submitServerDailyGpRun({
     leaderboardIdentity?: unknown;
     redditUsername?: unknown;
     guestToken?: unknown;
-    bestTime?: unknown;
     replay?: unknown;
-    checkpointTimesSec?: unknown;
     trackKey?: unknown;
     requestRateLimitIdentity?: unknown;
     submissionOwnerId?: unknown;
@@ -1801,200 +1751,38 @@ export async function submitServerDailyGpRun({
         return SUBMISSION_IDENTITY_CHANGED_RESULT;
     }
 
-    const safeRequestRateLimitIdentity = typeof requestRateLimitIdentity === 'string'
-        && requestRateLimitIdentity.trim()
-        ? requestRateLimitIdentity.trim()
-        : null;
-    const rateLimitIdentity = !sanitizeRedditUsername(redditUsername)
-        && safeRequestRateLimitIdentity
-        ? `request:${safeRequestRateLimitIdentity}`
-        : identity.canonicalPlayerId;
-    const rateLimitResult = await checkSubmissionRateLimit(challenge.id, rateLimitIdentity);
-    if (!rateLimitResult.allowed) {
-        return {
-            status: 429,
-            body: {
-                accepted: false,
-                error: 'Too many submission attempts. Try again soon.',
-                retryAfterSeconds: rateLimitResult.retryAfterSeconds,
-            },
-        };
-    }
-
-    const strictReplayOutcome = validateDailyGpReplayDetailed({ challenge, replay });
-    if (!strictReplayOutcome.ok) {
-        return {
-            status: 422,
-            body: {
-                accepted: false,
-                error: 'Submission replay validation failed.',
-                reason: strictReplayOutcome.failure.reason,
-                strictReplayFailureReason: strictReplayOutcome.failure.reason,
-            },
-        };
+    const competition = toDailyCompetition(challenge);
+    const outcome = await submitCompetitionRun({
+        competition,
+        playerId: identity.canonicalPlayerId,
+        redditUsername,
+        trackKey,
+        replay,
+        requestRateLimitIdentity,
+        submissionOwnerId,
+    });
+    if (outcome.status !== 200 || !(outcome.body as { accepted?: boolean }).accepted) {
+        return { status: outcome.status, body: outcome.body };
     }
 
     const normalizedPlayerId = identity.canonicalPlayerId;
-    if (!normalizedPlayerId) {
-        return {
-            status: 400,
-            body: {
-                accepted: false,
-                error: 'Player identity is unavailable.',
-            },
-        };
-    }
-    const profileWrite = upsertPlayerProfile({
-        playerId: normalizedPlayerId,
-        leaderboardIdentity,
-        redditUsername,
-        hasAnyData: true,
-    });
-    const nextBestTimeSec = strictReplayOutcome.run.bestTimeSec;
-    const nextBestTimeMs = strictReplayOutcome.run.bestTimeMs;
-    const normalizedCheckpointTimesSec = normalizeCheckpointTimesSec(
-        nextBestTimeSec,
-        strictReplayOutcome.run.checkpointTimesSec,
-    ) ?? strictReplayOutcome.run.checkpointTimesSec ?? null;
-    const track = TRACKS[challenge.trackKey];
-    if (!track) {
-        await profileWrite;
-        return {
-            status: 500,
-            body: {
-                accepted: false,
-                error: 'Daily challenge track is unavailable.',
-            },
-        };
-    }
-    const submissionLock = await acquireSubmissionLock(challenge.id, normalizedPlayerId);
-    if (!submissionLock) {
-        await profileWrite;
-        return {
-            status: 429,
-            body: {
-                accepted: false,
-                error: 'Submission already in progress. Try again in a moment.',
-                retryAfterSeconds: 1,
-            },
-        };
-    }
-    const nextEntry: DailyGpLeaderboardEntry = {
-        playerId: normalizedPlayerId,
-        trackKey: challenge.trackKey,
-        bestTimeMs: nextBestTimeMs,
-        updatedAt: new Date().toISOString(),
-        completedLaps: strictReplayOutcome.run.completedLaps === 2
-            || strictReplayOutcome.run.completedLaps === 3
-            ? strictReplayOutcome.run.completedLaps
-            : 1,
-        checkpointTimesSec: normalizedCheckpointTimesSec,
-        validationMethod: 'strict-replay',
-        strictReplayFailureReason: null,
-    };
-
-    let previousEntry: DailyGpLeaderboardEntry | null = null;
-    let dailyPersistence: PromiseSettledResult<{
-        interrupted: boolean;
-        improved: boolean;
-        entry: DailyGpLeaderboardEntry;
-    }>;
-    let trackPbPersistence: PromiseSettledResult<Awaited<ReturnType<typeof upsertPlayerTrackPersonalBest>>>;
-    const competition = toDailyCompetition(challenge);
-    let releaseLock: Promise<unknown> = Promise.resolve();
-    try {
-        previousEntry = await readEntryByPlayerId(competition, normalizedPlayerId);
-        const dailyWrite = async () => {
-            if (previousEntry && previousEntry.bestTimeMs <= nextBestTimeMs) {
-                return { interrupted: false, improved: false, entry: previousEntry };
-            }
-
-            const tx = await beginOwnedRedisLockTransaction(submissionLock, redis);
-            if (!tx) {
-                return { interrupted: true, improved: false, entry: previousEntry ?? nextEntry };
-            }
-            await writeEntry(competition, normalizedPlayerId, nextEntry, tx);
-            const transactionResults = await tx.exec();
-            return {
-                interrupted: !Array.isArray(transactionResults) || transactionResults.length === 0,
-                improved: true,
-                entry: nextEntry,
-            };
-        };
-        const retainedPersonalBest = previousEntry?.validationMethod === 'strict-replay'
-            ? {
-                bestTimeMs: previousEntry.bestTimeMs,
-                checkpointTimesSec: previousEntry.checkpointTimesSec,
-                updatedAt: previousEntry.updatedAt,
-            }
-            : null;
-        [dailyPersistence, trackPbPersistence] = await Promise.allSettled([
-            dailyWrite(),
-            upsertPlayerTrackPersonalBest({
-                playerId: normalizedPlayerId,
-                competition,
-                track,
-                bestTimeMs: nextBestTimeMs,
-                checkpointTimesSec: normalizedCheckpointTimesSec,
-                lapCompletionTimesSec: strictReplayOutcome.run.lapCompletionTimesSec,
-                ghost: strictReplayOutcome.run.ghost ?? null,
-                updatedAt: nextEntry.updatedAt,
-                retainedPersonalBest,
-            }),
-        ]);
-    } finally {
-        releaseLock = releaseSubmissionLock(submissionLock).catch((error) => {
-            // Lock cleanup is best-effort; it must not replace a committed outcome.
-            console.error('Daily GP submission lock cleanup failed:', error);
-        });
-    }
-
-    if (dailyPersistence!.status === 'rejected') {
-        await Promise.all([releaseLock, profileWrite.catch(() => undefined)]);
-        throw dailyPersistence!.reason;
-    }
-    if (dailyPersistence!.value.interrupted) {
-        await Promise.all([releaseLock, profileWrite.catch(() => undefined)]);
-        return {
-            status: 503,
-            body: {
-                accepted: false,
-                error: 'Submission save was interrupted. Retrying automatically.',
-            },
-        };
-    }
-
-    const storedDailyEntry = dailyPersistence!.value.entry;
-    const trackPbAvailable = trackPbPersistence!.status === 'fulfilled';
-    if (!trackPbAvailable) {
-        console.error('Challenge PB persistence failed after a valid Daily GP run:', trackPbPersistence!.reason);
-    }
-    const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
     const [standing, carUnlocks] = await Promise.all([
         readPlayerStandingSummary(competition, normalizedPlayerId),
         readPlayerCarUnlocks(normalizedPlayerId, true),
         recordCompletedRace(normalizedPlayerId),
-        releaseLock,
-        profileWrite,
+        outcome.releaseLock,
+        upsertPlayerProfile({
+            playerId: normalizedPlayerId,
+            leaderboardIdentity,
+            redditUsername,
+            hasAnyData: true,
+        }),
     ]);
     recordAnalyticsRaceBestEffort('daily', 'finish', normalizedPlayerId);
     return {
         status: 200,
         body: {
-            accepted: true,
-            improved: dailyPersistence!.value.improved,
-            bestTimeMs: storedDailyEntry.bestTimeMs,
-            trackPbPersistenceStatus: trackPbAvailable
-                ? (trackPbResult!.improved ? 'stored' : 'unchanged')
-                : 'unavailable',
-            trackPersonalBest: trackPbResult?.record ?? null,
-            trackBestTimeMs: trackPbResult?.record.bestTimeMs ?? null,
-            trackPbImproved: trackPbResult?.improved ?? false,
-            trackGhostAvailable: Boolean(trackPbResult?.record.ghost),
-            completedLaps: storedDailyEntry.completedLaps,
-            checkpointTimesSec: storedDailyEntry.checkpointTimesSec ?? null,
-            validationMethod: storedDailyEntry.validationMethod ?? 'strict-replay',
-            strictReplayFailureReason: storedDailyEntry.strictReplayFailureReason ?? null,
+            ...(outcome.body as Record<string, unknown>),
             playerRank: standing.playerRank,
             playerRankLabel: standing.playerRankLabel,
             leaderboardEntryCount: standing.leaderboardEntryCount,

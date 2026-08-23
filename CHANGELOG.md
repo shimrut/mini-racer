@@ -1,5 +1,13 @@
 # Changelog
 
+- Daily and Campaign ranked submits now share one `submitCompetitionRun`
+  path for replay checks, rate limits, the per-player submit lock, board
+  write, and challenge PB. Daily still attaches rank / field size, car
+  unlocks, and `hasAnyData` only after an accepted run; Campaign still
+  updates stage progress afterward. Lock cleanup always finishes before a
+  hard failure or retryable `503`, and wrappers never leak `releaseLock` on
+  the HTTP reply.
+
 - Daily submit now overlaps independent Redis work after a valid run (profile
   write, lock release, completed-race flag, garage snapshot) and returns the
   player's rank and field size on the same reply so the finish line can paint

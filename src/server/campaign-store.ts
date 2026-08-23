@@ -689,75 +689,81 @@ export async function submitServerCampaignRun({
         requestRateLimitIdentity,
     });
     if (outcome.status !== 200 || !(outcome.body as { accepted?: boolean }).accepted) {
-        return outcome;
+        return { status: outcome.status, body: outcome.body };
     }
-    recordAnalyticsRaceBestEffort('campaign', 'finish', identity.canonicalPlayerId);
 
-    const body = outcome.body as {
-        accepted: true;
-        improved: boolean;
-        bestTimeMs: number;
-        checkpointTimesSec: number[] | null;
-    };
-    const nowIso = new Date().toISOString();
-    const result: CampaignBestResult = {
-        raceId: stage.raceId,
-        trackKey: stage.trackKey,
-        lapCount: stage.lapCount,
-        rulesRevision: stage.rulesRevision,
-        bestTimeMs: body.bestTimeMs,
-        medal: getMedalForRaceTime(stage.trackKey, body.bestTimeMs / 1000, stage.lapCount),
-        checkpointTimesSec: body.checkpointTimesSec,
-        updatedAt: nowIso,
-    };
-    let savedProgress: CampaignProgress;
     try {
-        savedProgress = await mutateProgress(canonicalPlayerId, (freshProgress) => {
-            const previous = freshProgress.resultsByRaceId[stage.raceId] ?? null;
-            if (previous && previous.bestTimeMs <= body.bestTimeMs) return freshProgress;
-            return {
-                campaignId: CAMPAIGN_ID,
-                startedAt: freshProgress.startedAt || nowIso,
-                resultsByRaceId: { ...freshProgress.resultsByRaceId, [stage.raceId]: result },
-                updatedAt: nowIso,
-            } satisfies CampaignProgress;
-        });
-    } catch (error) {
-        if (error instanceof CampaignProgressBusyError) {
+        recordAnalyticsRaceBestEffort('campaign', 'finish', identity.canonicalPlayerId);
+
+        const body = outcome.body as {
+            accepted: true;
+            improved: boolean;
+            bestTimeMs: number;
+            checkpointTimesSec: number[] | null;
+        };
+        const nowIso = new Date().toISOString();
+        const result: CampaignBestResult = {
+            raceId: stage.raceId,
+            trackKey: stage.trackKey,
+            lapCount: stage.lapCount,
+            rulesRevision: stage.rulesRevision,
+            bestTimeMs: body.bestTimeMs,
+            medal: getMedalForRaceTime(stage.trackKey, body.bestTimeMs / 1000, stage.lapCount),
+            checkpointTimesSec: body.checkpointTimesSec,
+            updatedAt: nowIso,
+        };
+        let savedProgress: CampaignProgress;
+        try {
+            savedProgress = await mutateProgress(canonicalPlayerId, (freshProgress) => {
+                const previous = freshProgress.resultsByRaceId[stage.raceId] ?? null;
+                if (previous && previous.bestTimeMs <= body.bestTimeMs) return freshProgress;
+                return {
+                    campaignId: CAMPAIGN_ID,
+                    startedAt: freshProgress.startedAt || nowIso,
+                    resultsByRaceId: { ...freshProgress.resultsByRaceId, [stage.raceId]: result },
+                    updatedAt: nowIso,
+                } satisfies CampaignProgress;
+            });
+        } catch (error) {
+            if (error instanceof CampaignProgressBusyError) {
+                return {
+                    status: 503,
+                    body: { accepted: false, error: 'Campaign progress save was interrupted. Retry.' },
+                };
+            }
+            throw error;
+        }
+
+        const confirmedResult = savedProgress.resultsByRaceId[stage.raceId];
+        if (!confirmedResult || confirmedResult.bestTimeMs > body.bestTimeMs) {
             return {
                 status: 503,
                 body: { accepted: false, error: 'Campaign progress save was interrupted. Retry.' },
             };
         }
-        throw error;
-    }
 
-    const confirmedResult = savedProgress.resultsByRaceId[stage.raceId];
-    if (!confirmedResult || confirmedResult.bestTimeMs > body.bestTimeMs) {
+        const [carUnlocks] = await Promise.all([
+            getCarUnlockSnapshot(
+                canonicalPlayerId,
+                savedProgress.resultsByRaceId,
+                redis,
+                true,
+            ),
+            recordCompletedRace(canonicalPlayerId),
+            outcome.releaseLock,
+        ]);
+
         return {
-            status: 503,
-            body: { accepted: false, error: 'Campaign progress save was interrupted. Retry.' },
+            status: 200,
+            body: {
+                ...outcome.body as Record<string, unknown>,
+                progress: publicProgress(savedProgress),
+                carUnlocks,
+            },
         };
+    } finally {
+        await outcome.releaseLock;
     }
-
-    const [carUnlocks] = await Promise.all([
-        getCarUnlockSnapshot(
-            canonicalPlayerId,
-            savedProgress.resultsByRaceId,
-            redis,
-            true,
-        ),
-        recordCompletedRace(canonicalPlayerId),
-    ]);
-
-    return {
-        status: 200,
-        body: {
-            ...outcome.body as Record<string, unknown>,
-            progress: publicProgress(savedProgress),
-            carUnlocks,
-        },
-    };
 }
 
 export async function getServerCampaignPbGhost({
