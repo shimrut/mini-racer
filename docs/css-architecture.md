@@ -57,11 +57,12 @@ equally specific rule wins.
 
 `styles/result-details.css` owns the Head to Head-only finish composition under
 `#modal-combined-view.is-challenge-finish`; the shared Daily and Campaign finish
-rules remain unchanged. The result stacks a centered italic Outfit
-`YOU WON` / `YOU LOST` / `YOU TIED` on one line above the race time. Green is
-a win, red is a loss, and a tie stays neutral. Pending and failed verification
-use `VERIFYING` and `UNVERIFIED` and retain their status detail. The time keeps
-the shared italic finish clock.
+rules remain unchanged. The result stacks italic Outfit `YOU WON` /
+`YOU LOST` / `YOU TIED` on the left above a right-aligned race time of the same
+size. That block, including the comparison rows, uses the same 320px column as
+the finish buttons. Green is a win, red is a loss, and a tie stays neutral.
+Pending and failed verification use `VERIFYING` and `UNVERIFIED` and retain
+their status detail.
 
 Below that stack, the existing result slots flow as three left-label/right-value
 upright rows: opponent delta, prior-PB delta, and originating rank. The PB slot keeps its

@@ -389,8 +389,9 @@ flowchart LR
   verdict remains session-only even when its source run improves the ordinary
   PB and rank. One finish sheet always offers Improve / Brag / Home; Brag unlocks
   only after a verified beat. The Head to Head finish replaces the legacy
-  medal/avatar hero with a centered italic Outfit `YOU WON` / `YOU LOST` line
-  stacked above the shared finish clock. The three comparison rows own opponent margin,
+  medal/avatar hero with a left-aligned italic Outfit `YOU WON` / `YOU LOST`
+  line and a right-aligned finish clock of the same size, both in the 320px
+  button column. The three comparison rows own opponent margin,
   prior-PB delta, and originating rank; a server-corrected verdict repaints the
   opponent row as well as the lockup. Daily and Campaign keep their existing
   finish composition.

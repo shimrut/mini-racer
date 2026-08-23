@@ -1,7 +1,8 @@
 # Changelog
 
-- Head to Head finish now puts italic **YOU WON** / **YOU LOST** on one line
-  above the shared finish clock. Daily and Campaign finishes are unchanged.
+- Head to Head finish now left-aligns **YOU WON** / **YOU LOST** and
+  right-aligns the time at the same size, in the same 320px column as the
+  buttons. Daily and Campaign finishes are unchanged.
 
 - Eight new tracks join the Daily rotation: **Twisted Ladder**, **Hairpin
   Hook**, **Dragon Loop**, **Thor's Hammer**, **Question Mark**, **Nested
