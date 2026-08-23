@@ -110,7 +110,7 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup__outcome,\s*#modal-combined-view\.is-challenge-finish #combined-time\s*\{[^}]*font-size:\s*2\.75rem;/s,
+            /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup__outcome,\s*#modal-combined-view\.is-challenge-finish #combined-time\s*\{[^}]*font-size:\s*3\.5rem;/s,
         );
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.combined-hero-time-group\s*\{[^}]*text-align:\s*right;/s,
