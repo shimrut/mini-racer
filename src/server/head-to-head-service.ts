@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
+import {
+    recordAnalyticsChallengeCreateBestEffort,
+    recordAnalyticsRaceBestEffort,
+} from './analytics-store.js';
 import { getTrackName } from '../../game/track/catalog.js';
 import {
     CAMPAIGN_ID,
@@ -815,6 +819,7 @@ export function createHeadToHeadService(
                 saved.trackKey,
             );
             await redis.del(previewKey(token));
+            recordAnalyticsChallengeCreateBestEffort(playerIdForUsername(request.username));
             return {
                 status: 200,
                 body: {
@@ -999,6 +1004,8 @@ export function createHeadToHeadService(
                 bestUpdate,
             },
         });
+        recordAnalyticsRaceBestEffort('challenge', 'finish', viewer.playerId);
+
         // Every finish is verified now, win or lose: a run that misses the target can still be the
         // player's best on the stage or Daily this challenge was minted from, and that best is theirs to keep.
         const verified = await dependencies.validateReplay(challenge, input.replay);
