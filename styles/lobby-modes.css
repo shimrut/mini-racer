@@ -426,6 +426,14 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     min-width: 0;
 }
 
+.challenge-racer--viewer {
+    flex-direction: row-reverse;
+}
+
+.challenge-racer--viewer .challenge-racer__figures {
+    align-items: flex-end;
+}
+
 .challenge-racer__figures {
     display: flex;
     flex-direction: column;

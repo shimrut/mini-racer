@@ -773,6 +773,11 @@ export class LobbyUi {
             this.challengeState.viewerAvatarUrl,
             'Your avatar',
         );
+        const viewerFigures = document.getElementById('challenge-viewer-figures');
+        const viewerBestTime = document.getElementById('challenge-viewer-best-time');
+        const hasViewerBest = this.challengeState.viewerBestTimeMs != null;
+        if (viewerFigures) viewerFigures.hidden = !hasViewerBest;
+        setText(viewerBestTime, this.challengeState.viewerBestTimeLabel || '');
         const beaten = Boolean(this.challengeState.beaten);
         const poster = document.getElementById('challenge-poster');
         if (poster) poster.hidden = beaten;

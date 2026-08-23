@@ -223,6 +223,8 @@ export function normalizeChallengeLobbyState(state = {}) {
     const gapMs = beaten && bestTimeMs !== null && available
         ? Math.round(bestTimeMs) - Math.round(targetTimeMs)
         : null;
+    const viewerBestTimeMs = toFiniteNumber(state.viewerBestTimeMs);
+    const hasViewerBest = viewerBestTimeMs !== null && viewerBestTimeMs > 0;
     return {
         ...state,
         signedIn,
@@ -248,6 +250,8 @@ export function normalizeChallengeLobbyState(state = {}) {
         laps,
         targetTimeMs: available ? Math.round(targetTimeMs) : null,
         targetTimeLabel: available ? formatLobbyTime(targetTimeMs) : '--:--.---',
+        viewerBestTimeMs: hasViewerBest ? Math.round(viewerBestTimeMs) : null,
+        viewerBestTimeLabel: hasViewerBest ? formatLobbyTime(viewerBestTimeMs) : null,
         medal: typeof state.medal === 'string' && state.medal.trim()
             ? state.medal.trim()
             : null,

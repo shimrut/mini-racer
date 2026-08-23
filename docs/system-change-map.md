@@ -384,9 +384,11 @@ flowchart LR
   context only as a validated `t3_` post ID before re-reading the Reddit post.
   The challenger cannot accept or submit against their own post (`own_challenge`);
   the in-feed Accept card shows an expired-style message and opens the source
-  mode via a stored launch target that overrides challenge post data. The duel
+  mode via a stored launch target that overrides challenge post data.   The duel
   verdict remains session-only even when its source run improves the ordinary
-  PB and rank. One finish sheet always offers Improve / Brag / Home; Brag unlocks
+  PB and rank. The challenge lobby still shows that originating Daily or Campaign
+  personal best in the second seat when the player already holds one; otherwise
+  that seat stays empty beside their avatar. One finish sheet always offers Improve / Brag / Home; Brag unlocks
   only after a verified beat. A local win stamps YOU WON before the server
   answers; share, car unlocks, and remembered wins wait for confirmation. The Head to Head finish replaces the legacy
   medal/avatar hero with a left-aligned italic Outfit `YOU WON` / `YOU LOST`

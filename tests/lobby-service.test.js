@@ -234,6 +234,22 @@ describe('lobby service', () => {
         });
         expect(guest.signedIn).toBe(false);
         expect(player.canAccept).toBe(true);
+        expect(normalizeChallengeLobbyState({
+            ...player,
+            viewerBestTimeMs: 26_500,
+        })).toMatchObject({
+            viewerBestTimeMs: 26_500,
+            viewerBestTimeLabel: '0:26.500',
+        });
+        for (const viewerBestTimeMs of [undefined, null, 0, -1, Number.NaN]) {
+            expect(normalizeChallengeLobbyState({
+                ...player,
+                viewerBestTimeMs,
+            })).toMatchObject({
+                viewerBestTimeMs: null,
+                viewerBestTimeLabel: null,
+            });
+        }
         expect(player.statusMessage).toBe('');
         expect(guest.beaten).toBe(false);
         expect(player.beaten).toBe(false);
