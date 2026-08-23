@@ -137,6 +137,13 @@ export function validateHeadToHeadReplay(
             challenge.lapCount,
         ),
         ghost: validation.run.ghost,
+        run: validation.run,
+        judgedContract: {
+            trackKey: challenge.trackKey,
+            lapCount: challenge.lapCount,
+            rulesRevision: challenge.rulesRevision,
+            objectiveType: objectiveTypeForLapCount(challenge.lapCount),
+        },
     };
 }
 
@@ -184,6 +191,15 @@ export async function recordHeadToHeadBest(
         guestToken: context.guestToken ?? undefined,
         requestRateLimitIdentity: context.requestRateLimitIdentity ?? undefined,
     };
+    const reuse = {
+        countTowardRateLimit: false as const,
+        ...(context.verifiedRun != null && context.judgedContract
+            ? {
+                verifiedRun: context.verifiedRun,
+                judgedContract: context.judgedContract,
+            }
+            : {}),
+    };
 
     if (origin.mode === 'campaign') {
         const stage = getCampaignStage(origin.raceId);
@@ -193,7 +209,7 @@ export async function recordHeadToHeadBest(
             raceId: stage.raceId,
             trackKey: challenge.trackKey,
             replay,
-        }));
+        }, reuse));
         if (!best) return null;
         return {
             ...best,
@@ -213,7 +229,7 @@ export async function recordHeadToHeadBest(
         challengeId: dailyChallenge.id,
         trackKey: challenge.trackKey,
         replay,
-    }));
+    }, reuse));
     if (!best) return null;
     return {
         ...best,

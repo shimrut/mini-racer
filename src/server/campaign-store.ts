@@ -31,6 +31,7 @@ import {
     submitCompetitionRun,
     SUBMISSION_IDENTITY_CHANGED_RESULT,
     SUBMISSION_LOCK_TTL_MS,
+    type RankedSubmitReuseOptions,
 } from './competition-submit.js';
 import { getPlayerTrackPbRecord } from './pb-ghost-store.js';
 import { redisCompressed } from '@devvit/redis';
@@ -648,7 +649,7 @@ export async function submitServerCampaignRun({
     guestToken?: unknown;
     requestRateLimitIdentity?: unknown;
     submissionOwnerId?: unknown;
-} = {}) {
+} = {}, reuse?: RankedSubmitReuseOptions) {
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     if (!identity.canonicalPlayerId) {
         return {
@@ -687,7 +688,7 @@ export async function submitServerCampaignRun({
         trackKey,
         replay,
         requestRateLimitIdentity,
-    });
+    }, reuse);
     if (outcome.status !== 200 || !(outcome.body as { accepted?: boolean }).accepted) {
         return { status: outcome.status, body: outcome.body };
     }

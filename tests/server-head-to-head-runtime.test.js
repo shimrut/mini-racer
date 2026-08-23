@@ -182,7 +182,7 @@ describe('head-to-head result written back to its own mode', () => {
             playerId: 'raw-player',
             redditUsername: 'ChallengerAce',
             guestToken: 'guest-token',
-        }));
+        }), { countTowardRateLimit: false });
         expect(update).toMatchObject({ mode: 'campaign', improved: true, bestTimeMs: 24_000, rank: 4 });
     });
 
@@ -207,7 +207,7 @@ describe('head-to-head result written back to its own mode', () => {
             challengeId: dailyChallenge.id,
             trackKey,
             replay: { frames: [] },
-        }));
+        }), { countTowardRateLimit: false });
         expect(update).toMatchObject({ mode: 'daily', improved: false, bestTimeMs: 19_000 });
     });
 
@@ -228,6 +228,71 @@ describe('head-to-head result written back to its own mode', () => {
         const update = await recordHeadToHeadBest(campaignChallenge, { frames: [] }, viewer);
 
         expect(update).toMatchObject({ mode: 'campaign', bestTimeMs: 24_000, rank: null });
+    });
+
+    const judgedRun = {
+        bestTimeSec: 12.345,
+        bestTimeMs: 12_345,
+        completedLaps: 1,
+        checkpointTimesSec: [4.2],
+        lapCompletionTimesSec: [12.345],
+        ghost: { schemaVersion: 2, finishTimeMs: 12_345 },
+    };
+
+    it('passes a judged campaign run through and skip-counts', async () => {
+        mockSubmitCampaignRun.mockResolvedValue({
+            status: 200,
+            body: { accepted: true, improved: true, bestTimeMs: 12_345 },
+        });
+        const judgedContract = {
+            trackKey: 'numberThree',
+            lapCount: 1,
+            rulesRevision: 1,
+            objectiveType: 'single_lap_fastest',
+        };
+
+        await recordHeadToHeadBest(campaignChallenge, { frames: [] }, {
+            ...viewer,
+            verifiedRun: judgedRun,
+            judgedContract,
+        });
+
+        expect(mockSubmitCampaignRun).toHaveBeenCalledWith(
+            expect.objectContaining({ raceId: 'numbered-v1-03', replay: { frames: [] } }),
+            {
+                countTowardRateLimit: false,
+                verifiedRun: judgedRun,
+                judgedContract,
+            },
+        );
+    });
+
+    it('passes a judged Daily run through and skip-counts', async () => {
+        mockSubmitDailyRun.mockResolvedValue({
+            status: 200,
+            body: { accepted: true, improved: true, bestTimeMs: 12_345 },
+        });
+        const judgedContract = {
+            trackKey,
+            lapCount: 1,
+            rulesRevision: 1,
+            objectiveType: 'single_lap_fastest',
+        };
+
+        await recordHeadToHeadBest(dailyOriginChallenge, { frames: [] }, {
+            ...viewer,
+            verifiedRun: judgedRun,
+            judgedContract,
+        });
+
+        expect(mockSubmitDailyRun).toHaveBeenCalledWith(
+            expect.objectContaining({ challengeId: dailyChallenge.id, replay: { frames: [] } }),
+            {
+                countTowardRateLimit: false,
+                verifiedRun: judgedRun,
+                judgedContract,
+            },
+        );
     });
 });
 

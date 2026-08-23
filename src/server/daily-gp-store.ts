@@ -93,6 +93,7 @@ import {
     submitCompetitionRun,
     SUBMISSION_IDENTITY_CHANGED_RESULT,
     SUBMISSION_LOCK_TTL_MS,
+    type RankedSubmitReuseOptions,
 } from './competition-submit.js';
 
 // Re-exported here so the paths callers and tests already import from keep resolving.
@@ -1694,7 +1695,7 @@ export async function submitServerDailyGpRun({
     trackKey?: unknown;
     requestRateLimitIdentity?: unknown;
     submissionOwnerId?: unknown;
-}) {
+}, reuse?: RankedSubmitReuseOptions) {
     const challenge = await getServerDailyGpPlayableChallenge(
         typeof challengeId === 'string' ? challengeId : null,
     );
@@ -1760,7 +1761,7 @@ export async function submitServerDailyGpRun({
         replay,
         requestRateLimitIdentity,
         submissionOwnerId,
-    });
+    }, reuse);
     if (outcome.status !== 200 || !(outcome.body as { accepted?: boolean }).accepted) {
         return { status: outcome.status, body: outcome.body };
     }

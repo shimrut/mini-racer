@@ -26,7 +26,7 @@ type ReplayPayload = {
     inputs?: unknown;
 };
 
-type ReplayValidationResult = {
+export type ReplayValidationResult = {
     bestTimeSec: number;
     bestTimeMs: number;
     completedLaps: number | null;

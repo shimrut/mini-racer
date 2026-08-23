@@ -157,6 +157,20 @@ function makeService({
             bestTimeMs: validatedTimeMs,
             medal: 'gold',
             ghost: { schemaVersion: 2, samples: ['viewer'] },
+            run: {
+                bestTimeSec: validatedTimeMs / 1000,
+                bestTimeMs: validatedTimeMs,
+                completedLaps: 2,
+                checkpointTimesSec: null,
+                lapCompletionTimesSec: null,
+                ghost: { schemaVersion: 2, samples: ['viewer'] },
+            },
+            judgedContract: {
+                trackKey,
+                lapCount: 2,
+                rulesRevision: 1,
+                objectiveType: 'multi_lap_total',
+            },
         })),
         ...(recordBest ? { recordBest } : {}),
         ...(readViewerBest ? { readViewerBest } : {}),
@@ -783,6 +797,12 @@ describe('head-to-head service', () => {
         expect(recordedContext).toMatchObject({
             username: 'ChallengerAce',
             canonicalPlayerId: 'reddit:challengerace',
+            verifiedRun: expect.objectContaining({ bestTimeMs: 25_000, completedLaps: 2 }),
+            judgedContract: expect.objectContaining({
+                trackKey: 'numberThree',
+                lapCount: 2,
+                objectiveType: 'multi_lap_total',
+            }),
         });
         expect(won.body).toMatchObject({
             accepted: true,
@@ -808,6 +828,13 @@ describe('head-to-head service', () => {
         );
 
         expect(recordBest).toHaveBeenCalledTimes(1);
+        expect(recordBest.mock.calls[0][2]).toMatchObject({
+            verifiedRun: expect.objectContaining({ bestTimeMs: 26_000, completedLaps: 2 }),
+            judgedContract: expect.objectContaining({
+                lapCount: 2,
+                objectiveType: 'multi_lap_total',
+            }),
+        });
         expect(lost).toMatchObject({
             status: 422,
             body: {

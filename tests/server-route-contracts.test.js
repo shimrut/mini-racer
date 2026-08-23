@@ -312,6 +312,7 @@ describe('server route contracts', () => {
             redditUsername: 'pm-user',
             requestRateLimitIdentity: 'request-id',
         });
+        expect(submitServerDailyGpRun.mock.calls[0]).toHaveLength(1);
     });
 
     it('preserves active, playlist, and paginated snapshot contracts', async () => {

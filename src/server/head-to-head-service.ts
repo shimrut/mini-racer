@@ -49,6 +49,8 @@ import {
     resolveRedditAvatarUrl,
 } from './daily-podium-service.js';
 import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
+import type { JudgedCompetitionContract } from './competition-submit.js';
+import type { ReplayValidationResult } from './replay-validator.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
@@ -75,6 +77,8 @@ export type HeadToHeadReplayResult = {
     bestTimeMs: number;
     medal: HeadToHeadMedal;
     ghost: unknown;
+    run: ReplayValidationResult;
+    judgedContract: JudgedCompetitionContract;
 } | {
     ok: false;
     reason?: string;
@@ -88,6 +92,8 @@ export type HeadToHeadBestContext = {
     requestRateLimitIdentity?: string | null;
     /** Already resolved by the challenge submit; used only to read back the rank. */
     canonicalPlayerId?: string | null;
+    verifiedRun?: ReplayValidationResult;
+    judgedContract?: JudgedCompetitionContract;
 };
 
 export type HeadToHeadViewerBest = {
@@ -924,6 +930,7 @@ export function createHeadToHeadService(
         replay: unknown,
         viewer: ChallengeViewer,
         context: HeadToHeadRequestContext,
+        verified: Extract<HeadToHeadReplayResult, { ok: true }>,
     ): Promise<HeadToHeadBestUpdate | null> {
         if (!dependencies.recordBest) return null;
         try {
@@ -933,6 +940,8 @@ export function createHeadToHeadService(
                 guestToken: context.guestToken ?? null,
                 requestRateLimitIdentity: context.requestRateLimitIdentity ?? null,
                 canonicalPlayerId: viewer.playerId,
+                verifiedRun: verified.run,
+                judgedContract: verified.judgedContract,
             }) ?? null;
         } catch (error) {
             console.error('Head to Head result could not be ranked in its own mode:', error);
@@ -1018,7 +1027,7 @@ export function createHeadToHeadService(
         ) {
             return { status: 422, body: { status: 'invalid_replay', error: 'This challenge run could not be verified.' } };
         }
-        const bestUpdate = await recordVerifiedBest(challenge, input.replay, viewer, context);
+        const bestUpdate = await recordVerifiedBest(challenge, input.replay, viewer, context, verified);
         const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
         if (differenceMs >= 0) {
             return targetNotBeaten(differenceMs, bestUpdate);

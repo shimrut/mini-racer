@@ -59,6 +59,7 @@ describe('Campaign route contracts', () => {
             requestRateLimitIdentity: 'trusted-request',
             replay: { inputs: [] },
         });
+        expect(deps.submitServerCampaignRun.mock.calls[0]).toHaveLength(1);
     });
 
     it('registers bootstrap, start, snapshot, and PB ghost endpoints', async () => {

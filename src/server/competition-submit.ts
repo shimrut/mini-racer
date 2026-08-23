@@ -2,7 +2,7 @@ import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';
 import { writeEntry, readEntryByPlayerId } from './competition-leaderboard.js';
 import { upsertPlayerTrackPersonalBest } from './pb-ghost-store.js';
-import { validateDailyGpReplayDetailed } from './replay-validator.js';
+import { validateDailyGpReplayDetailed, type ReplayValidationResult } from './replay-validator.js';
 import {
     acquireRedisLock,
     beginOwnedRedisLockTransaction,
@@ -78,6 +78,53 @@ export function isMismatchedSubmissionOwner(
     return Boolean(claimedOwnerId) && claimedOwnerId !== playerId;
 }
 
+export type JudgedCompetitionContract = {
+    trackKey: string;
+    lapCount: number;
+    rulesRevision: number;
+    objectiveType: Competition['objectiveType'];
+};
+
+export type RankedSubmitReuseOptions = {
+    verifiedRun?: ReplayValidationResult;
+    judgedContract?: JudgedCompetitionContract;
+    countTowardRateLimit?: boolean;
+};
+
+function isWellFormedVerifiedRun(run: unknown): run is ReplayValidationResult {
+    if (!run || typeof run !== 'object') return false;
+    const candidate = run as ReplayValidationResult;
+    if (!Number.isFinite(candidate.bestTimeMs) || candidate.bestTimeMs <= 0) return false;
+    if (candidate.ghost == null) return false;
+    return candidate.completedLaps === 1
+        || candidate.completedLaps === 2
+        || candidate.completedLaps === 3;
+}
+
+function judgedContractMatches(
+    contract: unknown,
+    competition: Competition,
+): contract is JudgedCompetitionContract {
+    if (!contract || typeof contract !== 'object') return false;
+    const judged = contract as JudgedCompetitionContract;
+    return judged.trackKey === competition.trackKey
+        && judged.lapCount === competition.lapCount
+        && judged.rulesRevision === competition.rulesRevision
+        && judged.objectiveType === competition.objectiveType;
+}
+
+function validateCompetitionReplay(competition: Competition, replay: unknown) {
+    return validateDailyGpReplayDetailed({
+        challenge: {
+            trackKey: competition.trackKey,
+            rulesRevision: competition.rulesRevision,
+            objectiveType: competition.objectiveType,
+            objectiveParams: { lapCount: competition.lapCount },
+        } as never,
+        replay,
+    });
+}
+
 export const SUBMISSION_IDENTITY_CHANGED_RESULT = {
     status: 409,
     body: {
@@ -87,23 +134,26 @@ export const SUBMISSION_IDENTITY_CHANGED_RESULT = {
     },
 } as const;
 
-export async function submitCompetitionRun({
-    competition,
-    playerId,
-    redditUsername,
-    trackKey,
-    replay,
-    requestRateLimitIdentity,
-    submissionOwnerId,
-}: {
-    competition: Competition;
-    playerId: string;
-    redditUsername?: unknown;
-    trackKey?: unknown;
-    replay?: unknown;
-    requestRateLimitIdentity?: unknown;
-    submissionOwnerId?: unknown;
-}) {
+export async function submitCompetitionRun(
+    {
+        competition,
+        playerId,
+        redditUsername,
+        trackKey,
+        replay,
+        requestRateLimitIdentity,
+        submissionOwnerId,
+    }: {
+        competition: Competition;
+        playerId: string;
+        redditUsername?: unknown;
+        trackKey?: unknown;
+        replay?: unknown;
+        requestRateLimitIdentity?: unknown;
+        submissionOwnerId?: unknown;
+    },
+    reuse: RankedSubmitReuseOptions = {},
+) {
     let releaseLock: Promise<unknown> = Promise.resolve();
 
     if (isMismatchedSubmissionOwner(playerId, submissionOwnerId)) {
@@ -122,31 +172,45 @@ export async function submitCompetitionRun({
         };
     }
 
-    const rateLimitResult = await checkSubmissionRateLimit(
-        competition,
-        resolveRateLimitIdentity(playerId, redditUsername, requestRateLimitIdentity),
-    );
-    if (!rateLimitResult.allowed) {
-        return {
-            status: 429,
-            body: {
-                accepted: false,
-                error: 'Too many submission attempts. Try again soon.',
-                retryAfterSeconds: rateLimitResult.retryAfterSeconds,
-            },
-            releaseLock,
-        };
+    if (reuse.countTowardRateLimit !== false) {
+        const rateLimitResult = await checkSubmissionRateLimit(
+            competition,
+            resolveRateLimitIdentity(playerId, redditUsername, requestRateLimitIdentity),
+        );
+        if (!rateLimitResult.allowed) {
+            return {
+                status: 429,
+                body: {
+                    accepted: false,
+                    error: 'Too many submission attempts. Try again soon.',
+                    retryAfterSeconds: rateLimitResult.retryAfterSeconds,
+                },
+                releaseLock,
+            };
+        }
     }
 
-    const strictReplayOutcome = validateDailyGpReplayDetailed({
-        challenge: {
-            trackKey: competition.trackKey,
-            rulesRevision: competition.rulesRevision,
-            objectiveType: competition.objectiveType,
-            objectiveParams: { lapCount: competition.lapCount },
-        } as never,
-        replay,
-    });
+    const verifiedRun = reuse.verifiedRun;
+    let strictReplayOutcome;
+    if (verifiedRun != null) {
+        if (
+            isWellFormedVerifiedRun(verifiedRun)
+            && judgedContractMatches(reuse.judgedContract, competition)
+        ) {
+            strictReplayOutcome = { ok: true as const, run: verifiedRun };
+        } else {
+            console.error('Competition submit could not reuse a judged run:', {
+                reason: isWellFormedVerifiedRun(verifiedRun)
+                    ? 'judged_contract_mismatch'
+                    : 'malformed_verified_run',
+                competitionId: competition.id,
+                competitionMode: competition.mode,
+            });
+            strictReplayOutcome = validateCompetitionReplay(competition, replay);
+        }
+    } else {
+        strictReplayOutcome = validateCompetitionReplay(competition, replay);
+    }
     if (!strictReplayOutcome.ok) {
         return {
             status: 422,

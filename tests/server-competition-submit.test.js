@@ -7,12 +7,15 @@ const mockBeginOwnedRedisLockTransaction = vi.fn();
 const mockWriteEntry = vi.fn();
 const mockReadEntryByPlayerId = vi.fn();
 const mockUpsertPlayerTrackPersonalBest = vi.fn();
+const mockRedisIncrBy = vi.fn(async () => 1);
+const mockRedisExpire = vi.fn(async () => true);
+const mockRedisExpireTime = vi.fn(async () => Math.floor(Date.now() / 1000) + 60);
 
 vi.mock('@devvit/redis', () => ({
     redis: {
-        incrBy: vi.fn(async () => 1),
-        expire: vi.fn(async () => true),
-        expireTime: vi.fn(async () => Math.floor(Date.now() / 1000) + 60),
+        incrBy: (...args) => mockRedisIncrBy(...args),
+        expire: (...args) => mockRedisExpire(...args),
+        expireTime: (...args) => mockRedisExpireTime(...args),
     },
 }));
 
@@ -113,6 +116,7 @@ describe('submitCompetitionRun', () => {
             bestTimeMs: 12_345,
         });
         expect(mockWriteEntry).toHaveBeenCalled();
+        expect(mockRedisIncrBy).toHaveBeenCalled();
         expect(mockAcquireRedisLock).toHaveBeenCalledWith(
             competitionSubmissionLockKey(competition, 'reddit:pm-user'),
             expect.any(Number),
@@ -177,5 +181,102 @@ describe('submitCompetitionRun', () => {
         expect(locked.status).toBe(429);
         expect(locked.body.accepted).toBe(false);
         expect(locked.releaseLock).toEqual(expect.any(Promise));
+    });
+
+    const matchingContract = {
+        trackKey: 'circuit',
+        lapCount: 1,
+        rulesRevision: 1,
+        objectiveType: 'single_lap_fastest',
+    };
+
+    it('reuses a judged run and skips the origin rate limit', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const outcome = await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            redditUsername: 'Pm-User',
+            trackKey: 'circuit',
+            replay: { inputs: [] },
+        }, {
+            verifiedRun: validReplayOutcome().run,
+            judgedContract: matchingContract,
+            countTowardRateLimit: false,
+        });
+
+        expect(outcome.status).toBe(200);
+        expect(outcome.body).toMatchObject({ accepted: true, bestTimeMs: 12_345 });
+        expect(mockValidateDailyGpReplayDetailed).not.toHaveBeenCalled();
+        expect(mockRedisIncrBy).not.toHaveBeenCalled();
+        expect(mockWriteEntry).toHaveBeenCalled();
+        expect(consoleErrorSpy).not.toHaveBeenCalled();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('falls back to a full re-drive when the judged contract does not match', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const outcome = await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        }, {
+            verifiedRun: validReplayOutcome().run,
+            judgedContract: { ...matchingContract, lapCount: 2 },
+            countTowardRateLimit: false,
+        });
+
+        expect(outcome.status).toBe(200);
+        expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalled();
+        expect(mockRedisIncrBy).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Competition submit could not reuse a judged run:',
+            expect.objectContaining({ reason: 'judged_contract_mismatch' }),
+        );
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('falls back to a full re-drive when the judged run is malformed', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const outcome = await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        }, {
+            verifiedRun: { ...validReplayOutcome().run, ghost: null },
+            judgedContract: matchingContract,
+            countTowardRateLimit: false,
+        });
+
+        expect(outcome.status).toBe(200);
+        expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Competition submit could not reuse a judged run:',
+            expect.objectContaining({ reason: 'malformed_verified_run' }),
+        );
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('does not log when an ordinary submit has no judged run', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalled();
+        expect(consoleErrorSpy).not.toHaveBeenCalled();
+        consoleErrorSpy.mockRestore();
     });
 });
