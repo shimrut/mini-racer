@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACKS } from '../game/track/tracks.js';
+import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { createTrackFingerprint } from '../src/server/pb-ghost-trace.ts';
 
 const mockDailyChallenge = vi.hoisted(() => vi.fn());
@@ -9,9 +10,12 @@ const mockSubmitDailyRun = vi.hoisted(() => vi.fn());
 const mockReadPlayerRank = vi.hoisted(() => vi.fn());
 const mockReadEntry = vi.hoisted(() => vi.fn());
 
+const mockGetCampaignProgress = vi.hoisted(() => vi.fn());
+
 vi.mock('../src/server/campaign-store.js', () => ({
     getServerHeadToHeadSource: vi.fn(),
     submitServerCampaignRun: mockSubmitCampaignRun,
+    getCampaignProgressForSelection: mockGetCampaignProgress,
 }));
 vi.mock('../src/server/daily-gp-store.js', () => ({
     getServerDailyGpPlayableChallenge: mockDailyChallenge,
@@ -244,13 +248,23 @@ describe('the best a challenge viewer already holds', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockDailyChallenge.mockResolvedValue(dailyChallenge);
+        mockGetCampaignProgress.mockResolvedValue({
+            resultsByRaceId: Object.fromEntries(
+                CAMPAIGN_STAGES.map((stage) => [stage.raceId, { medal: 'gold' }]),
+            ),
+        });
     });
 
     it('reads the stage entry the submit would compare against', async () => {
         mockReadEntry.mockResolvedValue({ bestTimeMs: 26_500 });
+        mockReadPlayerRank.mockResolvedValue(4);
 
         expect(await readHeadToHeadViewerBest(campaignChallenge, 'reddit:racer'))
-            .toMatchObject({ bestTimeMs: 26_500 });
+            .toMatchObject({
+                bestTimeMs: 26_500,
+                rank: 4,
+                trackLocked: false,
+            });
         expect(mockReadEntry).toHaveBeenCalledWith(
             expect.objectContaining({ mode: 'campaign', id: 'numbered-v1-03' }),
             'reddit:racer',
@@ -283,6 +297,18 @@ describe('the best a challenge viewer already holds', () => {
         mockDailyChallenge.mockResolvedValue(null);
 
         expect(await readHeadToHeadViewerBest(dailyOriginChallenge, 'reddit:racer')).toBeNull();
+        expect(mockReadEntry).not.toHaveBeenCalled();
+    });
+
+    it('marks a Campaign stage the player has not unlocked as locked', async () => {
+        mockGetCampaignProgress.mockResolvedValue({ resultsByRaceId: {} });
+
+        expect(await readHeadToHeadViewerBest(campaignChallenge, 'reddit:racer')).toEqual({
+            bestTimeMs: null,
+            medal: null,
+            rank: null,
+            trackLocked: true,
+        });
         expect(mockReadEntry).not.toHaveBeenCalled();
     });
 });

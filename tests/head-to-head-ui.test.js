@@ -509,7 +509,7 @@ describe('Head to Head lobby and finish', () => {
                 trackKey: 'numberZero',
                 lapCount: 1,
                 targetTimeMs: 8_000,
-                viewerBest: { bestTimeMs: 8_200, medal: 'silver' },
+                viewerBest: { bestTimeMs: 8_200, medal: 'silver', rank: 7 },
             },
             journeys: { endAttempt: vi.fn() },
             scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
@@ -527,6 +527,14 @@ describe('Head to Head lobby and finish', () => {
         await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
 
         expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            expect.any(String),
+            null,
+            expect.objectContaining({
+                challengeViewerBest: { bestTimeMs: 8_200, medal: 'silver', rank: 7 },
+            }),
+            expect.anything(),
+        );
     });
 
     it('sends a settled loss that beats the best already held', async () => {
@@ -1235,6 +1243,21 @@ describe('Head to Head poster after the duel is beaten', () => {
         }
         return dom.window.document;
     }
+
+    it('puts the best the accepter already holds opposite the time to beat', () => {
+        const document = renderPane({ ...readyState, viewerBestTimeMs: 26_500 });
+
+        expect(document.getElementById('challenge-target-time').textContent).toBe('0:25.640');
+        expect(document.getElementById('challenge-viewer-best-time').textContent).toBe('0:26.500');
+        expect(document.getElementById('challenge-viewer-figures').hidden).toBe(false);
+    });
+
+    it('leaves the accepter side empty when they hold no time there', () => {
+        for (const viewerBestTimeMs of [undefined, null, 0, -1, Number.NaN]) {
+            const document = renderPane({ ...readyState, viewerBestTimeMs });
+            expect(document.getElementById('challenge-viewer-figures').hidden).toBe(true);
+        }
+    });
 
     it('makes a transient failure actionable with the existing Retry button', () => {
         const originalDocument = global.document;

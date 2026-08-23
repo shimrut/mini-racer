@@ -108,6 +108,15 @@
     color: var(--text-color);
 }
 
+.combined-track-locked-copy {
+    margin: 0;
+    font-family: var(--header-font);
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--text-color);
+}
+
 .combined-medal-times-row--split .combined-medal-times-label {
     color: var(--text-dim);
     flex: 1 1 auto;
@@ -408,6 +417,12 @@
     color: var(--accent-color);
 }
 
+#modal.modal--win #modal-combined-view.is-challenge-finish .combined-rank-value.combined-rank-value--locked {
+    font-size: 0.8rem;
+    letter-spacing: -0.03em;
+    font-weight: 800;
+}
+
 #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup,
 #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__status {
     opacity: 0;
@@ -427,7 +442,7 @@
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(1 of :not([hidden])) {
-    animation-delay: 0.2s;
+    animation-delay: 0.1s;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(2 of :not([hidden])) {

@@ -63,7 +63,11 @@ their status detail.
 
 Below that stack, the existing result slots flow as three left-label/right-value
 upright rows: opponent delta, prior-PB delta, and originating rank. The PB slot keeps its
-honest empty state and the rank row stays hidden when no rank exists. The layout
+honest empty state. The rank row stays visible: it shows the rank already held on
+that board, updates the number only when this run is a personal best, and reads
+`TRACK LOCKED` for a Campaign stage the player has not unlocked. Tapping that
+locked row opens the existing split-times mini overlay with a short explanation.
+The layout
 uses flex flow, inherited modal width and safe-area behavior, plus a
 `max-height: 640px` compaction; it must not introduce absolute result positioning.
 The finish hero contains no avatar, medal, opponent name, or duplicate margin.

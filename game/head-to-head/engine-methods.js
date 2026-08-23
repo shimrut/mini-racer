@@ -289,9 +289,11 @@ export const headToHeadEngineMethods = {
                     challengeViewerAvatarUrl: challenge.viewerAvatarUrl ?? null,
                     challengeVerdict: buildVerdict(localDifferenceMs),
                     previousPersonalBestSec,
+                    challengeViewerBest: challenge.viewerBest ?? null,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
-                    // The rank shown here comes from the submit, so there is no board sheet behind it.
+                    // Rank is already on this row; a personal best may replace the number, but the
+                    // Head to Head finish still has no board sheet behind it.
                     allowLeaderboardOpen: false,
                 },
                 {

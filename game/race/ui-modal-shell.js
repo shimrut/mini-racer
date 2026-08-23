@@ -1100,6 +1100,7 @@ export class ModalShell {
             challengeViewerAvatarUrl: lapData.challengeViewerAvatarUrl ?? null,
             challengeVerdict: lapData.challengeVerdict ?? null,
             challengeBestUpdate: lapData.challengeBestUpdate ?? null,
+            challengeViewerBest: lapData.challengeViewerBest ?? null,
             previousPersonalBestSec: lapData.previousPersonalBestSec,
             deltaToPersonalBest: lapData.deltaToPersonalBest,
             previousTrackMedal: lapData.previousTrackMedal ?? null,
@@ -1199,14 +1200,21 @@ export class ModalShell {
                 this._modalRunsPayload?.scoreboardTrackKey
                 && this._modalRunsPayload?.allowLeaderboardOpen !== false
             );
+            const trackLocked = Boolean(lapData.challengeViewerBest?.trackLocked);
             if (canOpenLeaderboard) {
                 rightGroupEl.classList.add('combined-stats-right-group--interactive');
                 rightGroupEl.onclick = () => {
                     this.showModalLeaderboardPayload();
                 };
+            } else if (trackLocked) {
+                // Rank row already opens the locked-track explanation from renderCombinedResults.
             } else {
                 rightGroupEl.classList.remove('combined-stats-right-group--interactive');
                 rightGroupEl.onclick = null;
+                rightGroupEl.onkeydown = null;
+                rightGroupEl.removeAttribute('role');
+                rightGroupEl.removeAttribute('tabindex');
+                rightGroupEl.removeAttribute('aria-label');
             }
         }
 
@@ -1311,7 +1319,11 @@ export class ModalShell {
         // The rank the run earned belongs to the stat row under the hero, so it lands there on its own.
         if (!bestUnchanged) {
             const nextBestUpdate = bestUpdate ?? null;
-            this.content.applyChallengeRankStat(this.modalCombinedView, nextBestUpdate);
+            this.content.applyChallengeRankStat(
+                this.modalCombinedView,
+                nextBestUpdate,
+                lapData?.challengeViewerBest,
+            );
             if (lapData) lapData.challengeBestUpdate = nextBestUpdate;
         }
 

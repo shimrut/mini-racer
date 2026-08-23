@@ -91,8 +91,10 @@ export type HeadToHeadBestContext = {
 };
 
 export type HeadToHeadViewerBest = {
-    bestTimeMs: number;
-    medal: HeadToHeadMedal;
+    bestTimeMs: number | null;
+    medal: HeadToHeadMedal | null;
+    rank: number | null;
+    trackLocked: boolean;
 };
 
 export type HeadToHeadBestUpdate = {

@@ -618,6 +618,7 @@ export class ModalContentUi {
         challengeViewerAvatarUrl = null,
         challengeVerdict = null,
         challengeBestUpdate = null,
+        challengeViewerBest = null,
         previousPersonalBestSec = undefined,
         deltaToPersonalBest = undefined,
         previousTrackMedal = null,
@@ -660,7 +661,7 @@ export class ModalContentUi {
         
         // A challenge run is a real run on the stage or Daily it was minted from, so its sheet reports
         // the same two numbers an ordinary finish reports: the gap to the best held before it, and the
-        // rank it now holds. The rank arrives with the submit that ranked the run, not from a board read.
+        // rank already held there. That rank number only changes when this run is a personal best.
         const isChallengeHero = Boolean(
             challengeFinish || challengeConfirmPhase || lapMedal === 'challenge',
         );
@@ -676,14 +677,18 @@ export class ModalContentUi {
             // same shape as the ghost's "VS #1".
             label2El.textContent = isChallengeHero ? 'VS. YOUR PB' : 'VS PB';
         }
+        const challengeRankSnapshot = isChallengeHero
+            ? buildChallengeRankSnapshot(challengeBestUpdate, challengeViewerBest)
+            : null;
         applyCombinedRankValue({
             rankValueEl,
             rankTotalEl,
             rightGroupEl,
             scoreboardSnapshot: isChallengeHero
-                ? buildChallengeRankSnapshot(challengeBestUpdate)
+                ? challengeRankSnapshot
                 : scoreboardSnapshot,
         });
+        this.bindChallengeTrackLockedRank(container, Boolean(challengeRankSnapshot?.trackLocked));
         if (timeEl) {
             timeEl.innerHTML = Number.isFinite(time)
                 ? `<span class="time-num">${time.toFixed(3)}</span><span class="time-unit">s</span>`
@@ -854,16 +859,60 @@ export class ModalContentUi {
     }
 
     /**
-     * The rank of a challenge run lands after the sheet is already open, because the server ranks the
-     * run while the player reads the verdict. Only the rank slot is repainted, so the hero stays put.
+     * A personal-best submit can replace the rank already on the row. Locked Campaign tracks stay
+     * locked. Only the rank slot is repainted, so the hero stays put.
      */
-    applyChallengeRankStat(container, bestUpdate) {
+    applyChallengeRankStat(container, bestUpdate, viewerBest = null) {
         if (!container) return;
+        const snapshot = buildChallengeRankSnapshot(bestUpdate, viewerBest);
         applyCombinedRankValue({
             rankValueEl: container.querySelector('#combined-rank-value'),
             rankTotalEl: container.querySelector('#combined-rank-total'),
             rightGroupEl: container.querySelector('#combined-stats-right-group'),
-            scoreboardSnapshot: buildChallengeRankSnapshot(bestUpdate),
+            scoreboardSnapshot: snapshot,
+        });
+        this.bindChallengeTrackLockedRank(container, Boolean(snapshot?.trackLocked));
+    }
+
+    bindChallengeTrackLockedRank(container, trackLocked) {
+        const rightGroupEl = container?.querySelector('#combined-stats-right-group');
+        const rankValueEl = container?.querySelector('#combined-rank-value');
+        if (!rightGroupEl) return;
+
+        rankValueEl?.classList.toggle('combined-rank-value--locked', Boolean(trackLocked));
+        if (!trackLocked) {
+            rightGroupEl.classList.remove('combined-stats-right-group--interactive');
+            rightGroupEl.removeAttribute('role');
+            rightGroupEl.removeAttribute('tabindex');
+            rightGroupEl.removeAttribute('aria-label');
+            rightGroupEl.onclick = null;
+            rightGroupEl.onkeydown = null;
+            return;
+        }
+
+        rightGroupEl.classList.add('combined-stats-right-group--interactive');
+        rightGroupEl.setAttribute('role', 'button');
+        rightGroupEl.setAttribute('tabindex', '0');
+        rightGroupEl.setAttribute('aria-label', 'Track locked. Open explanation.');
+        const openLocked = () => this.openChallengeTrackLockedPopover(container);
+        rightGroupEl.onclick = openLocked;
+        rightGroupEl.onkeydown = (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            openLocked();
+        };
+    }
+
+    openChallengeTrackLockedPopover(container) {
+        mountCombinedPopoverOverlay(container, {
+            title: 'TRACK LOCKED',
+            overlayClass: 'combined-track-locked-overlay',
+            buildRows: (listEl) => {
+                const copy = document.createElement('p');
+                copy.className = 'combined-track-locked-copy';
+                copy.textContent = "You haven't unlocked this track in Campaign, so you can't rank for it.";
+                listEl.appendChild(copy);
+            },
         });
     }
 

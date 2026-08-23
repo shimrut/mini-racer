@@ -121,14 +121,31 @@ export function buildScoreboardRankDisplay(scoreboardSnapshot, { fallbackText = 
     };
 }
 
+const CHALLENGE_RANK_UNRANKED = '—';
+const CHALLENGE_RANK_LOCKED = 'TRACK LOCKED';
+
+function toPositiveRank(value) {
+    const rank = Number(value);
+    return Number.isInteger(rank) && rank > 0 ? rank : null;
+}
+
 /**
- * A challenge finish learns its rank from the submit that ranked the run, so the rank slot reads that
- * number instead of a board snapshot it never loads. No rank yet means the slot stays away.
+ * Challenge finishes always show a rank row. The number updates only when this run is a personal
+ * best and the submit returns a rank. Until then the row keeps the rank already held on that
+ * board, or an empty mark. A Campaign stage the player has not unlocked reads as TRACK LOCKED.
  */
-export function buildChallengeRankSnapshot(bestUpdate) {
-    const rank = Number(bestUpdate?.rank);
-    if (!Number.isInteger(rank) || rank <= 0) return null;
-    return { playerRankLabel: `#${rank}` };
+export function buildChallengeRankSnapshot(bestUpdate, viewerBest) {
+    if (viewerBest?.trackLocked) {
+        return {
+            playerRankLabel: CHALLENGE_RANK_LOCKED,
+            trackLocked: true,
+        };
+    }
+    const pbRank = toPositiveRank(bestUpdate?.rank);
+    if (pbRank) return { playerRankLabel: `#${pbRank}` };
+    const heldRank = toPositiveRank(viewerBest?.rank);
+    if (heldRank) return { playerRankLabel: `#${heldRank}` };
+    return { playerRankLabel: CHALLENGE_RANK_UNRANKED };
 }
 
 function setCombinedRankGroupVisible(rightGroupEl, visible) {

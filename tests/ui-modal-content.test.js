@@ -429,7 +429,8 @@ describe('ui modal content helpers', () => {
         expect(label.textContent).toBe('VS. YOUR PB');
         expect(delta.textContent).toBe('-1.026s');
         expect(delta.classList.contains('is-gain')).toBe(true);
-        expect(rightGroup.hidden).toBe(true);
+        expect(rightGroup.hidden).toBe(false);
+        expect(container.querySelector('#combined-rank-value').textContent).toBe('—');
 
         component.applyChallengeOpponentStat(container, { deltaSec: 0.253 });
         const opponentDelta = container.querySelector('#combined-opponent-delta');
@@ -453,6 +454,70 @@ describe('ui modal content helpers', () => {
         expect(delta.textContent).toBe('No lap times yet');
         expect(container.querySelector('.rank-num').textContent).toBe('4');
 
+        component.renderCombinedResults(container, {
+            time: 16.174,
+            bestLap: 16.839,
+            challengeFinish: true,
+            challengeConfirmPhase: 'lost',
+            previousPersonalBestSec: 16.0,
+            challengeViewerBest: { bestTimeMs: 16_000, medal: 'gold', rank: 9, trackLocked: false },
+        });
+        expect(container.querySelector('.rank-num').textContent).toBe('9');
+
+        component.applyChallengeRankStat(
+            container,
+            { improved: true, bestTimeMs: 15_500, rank: 3 },
+            { bestTimeMs: 16_000, medal: 'gold', rank: 9, trackLocked: false },
+        );
+        expect(container.querySelector('.rank-num').textContent).toBe('3');
+
+        global.document = originalDocument;
+    });
+
+    it('shows TRACK LOCKED on a campaign stage the player has not unlocked and explains it on tap', () => {
+        const originalDocument = global.document;
+        const originalRaf = global.requestAnimationFrame;
+        global.requestAnimationFrame = (cb) => cb();
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true">
+                    <span class="combined-stat-label">RANK</span>
+                    <div class="combined-rank-container">
+                        <div id="combined-rank-value"></div>
+                        <div id="combined-rank-total"></div>
+                    </div>
+                </div>
+                <div id="combined-time"></div>
+                <div id="combined-best-lap"></div>
+                <div id="combined-stat-label-2"></div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+        const rightGroup = container.querySelector('#combined-stats-right-group');
+
+        component.renderCombinedResults(container, {
+            time: 16.174,
+            bestLap: 15.2,
+            challengeFinish: true,
+            challengeConfirmPhase: 'lost',
+            challengeViewerBest: { trackLocked: true },
+        });
+
+        expect(rightGroup.hidden).toBe(false);
+        expect(container.querySelector('#combined-rank-value').textContent).toBe('TRACK LOCKED');
+        expect(rightGroup.classList.contains('combined-stats-right-group--interactive')).toBe(true);
+
+        rightGroup.click();
+        const overlay = container.querySelector('.combined-medal-times-overlay');
+        expect(overlay).toBeTruthy();
+        expect(container.querySelector('.combined-medal-times-title').textContent).toBe('TRACK LOCKED');
+        expect(container.querySelector('.combined-track-locked-copy').textContent)
+            .toBe("You haven't unlocked this track in Campaign, so you can't rank for it.");
+
+        global.requestAnimationFrame = originalRaf;
         global.document = originalDocument;
     });
 

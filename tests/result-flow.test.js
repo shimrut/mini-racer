@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     applyCombinedRankValue,
+    buildChallengeRankSnapshot,
     buildModalRunsPayload,
     buildModalRunsViewOptions,
     buildModalDeltaDisplay,
@@ -108,6 +109,22 @@ describe('result-flow helpers', () => {
         });
         expect(rightGroupEl.hidden).toBe(true);
         expect(rankValueEl.textContent).toBe('');
+    });
+
+    it('keeps a challenge rank row visible and only replaces the number on a personal best', () => {
+        expect(buildChallengeRankSnapshot(null, { rank: 12 })).toEqual({
+            playerRankLabel: '#12',
+        });
+        expect(buildChallengeRankSnapshot({ rank: 3 }, { rank: 12 })).toEqual({
+            playerRankLabel: '#3',
+        });
+        expect(buildChallengeRankSnapshot(null, null)).toEqual({
+            playerRankLabel: '—',
+        });
+        expect(buildChallengeRankSnapshot({ rank: 1 }, { trackLocked: true })).toEqual({
+            playerRankLabel: 'TRACK LOCKED',
+            trackLocked: true,
+        });
     });
 
     it('builds lap records and trims recent laps', () => {

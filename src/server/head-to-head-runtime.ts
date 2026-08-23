@@ -1,8 +1,9 @@
-import { getCampaignStage } from '../../game/campaign/manifest.js';
+import { getCampaignStage, isCampaignStageUnlocked } from '../../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../../game/medals/medal-timing.js';
 import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import {
+    getCampaignProgressForSelection,
     getServerHeadToHeadSource,
     submitServerCampaignRun,
 } from './campaign-store.js';
@@ -254,15 +255,37 @@ async function challengeCompetition(
         : null;
 }
 
+function toViewerRank(rank: number | null): number | null {
+    return Number.isInteger(rank) && Number(rank) > 0 ? Number(rank) : null;
+}
+
 /**
  * What this player already holds on the stage or Daily behind the challenge. Null when they hold
  * nothing there, or when the Daily has closed and no run could be written to it anyway.
+ * Campaign stages the player has not unlocked still return a payload so the finish can say the
+ * track is locked instead of pretending they have a rank.
  */
 export async function readHeadToHeadViewerBest(
     challenge: HeadToHeadRecord,
     playerId: string | null,
 ): Promise<HeadToHeadViewerBest | null> {
     if (!playerId) return null;
+    const origin = getHeadToHeadOrigin(challenge);
+    if (origin?.mode === 'campaign') {
+        try {
+            const progress = await getCampaignProgressForSelection(playerId);
+            if (!isCampaignStageUnlocked(origin.raceId, progress.resultsByRaceId)) {
+                return {
+                    bestTimeMs: null,
+                    medal: null,
+                    rank: null,
+                    trackLocked: true,
+                };
+            }
+        } catch {
+            // A progress miss must not hide a real board rank; fall through and read the entry.
+        }
+    }
     const target = await challengeCompetition(challenge);
     if (!target) return null;
     const entry = await readEntryByPlayerId(target.competition, playerId);
@@ -271,5 +294,7 @@ export async function readHeadToHeadViewerBest(
     return {
         bestTimeMs,
         medal: getMedalForRaceTime(target.trackKey, bestTimeMs / 1000, target.lapCount),
+        rank: toViewerRank(await readPlayerRank(target.competition, playerId)),
+        trackLocked: false,
     };
 }
