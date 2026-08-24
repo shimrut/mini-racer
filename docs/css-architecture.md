@@ -84,7 +84,8 @@ comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart f
 turns the sequence off. Daily and Campaign put a status heading above the
 time in that same column — medal name, NEW BEST, or FINISHED — with that same
 Mini `slideInLeft` and Racer `slideInRight` pair and `--dur-finish-headline`
-delay. VS PB, RANK, and MEDALS stay the comparison rows. Tapping MEDALS opens
+delay. MEDALS, VS PB, and RANK stay the comparison rows. Racing a standings
+ghost also shows VS #rank (or VS) above VS PB. Tapping MEDALS opens
 the same mini overlay as checkpoint splits, with each medal stacked above its
 target time. They do not run the Head to Head row and button stagger.
 

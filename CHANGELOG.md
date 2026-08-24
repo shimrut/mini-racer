@@ -1,5 +1,8 @@
 # Changelog
 
+- Daily and Campaign finish screens now put MEDALS first. Racing someone from
+  standings also shows a VS opponent row, and VS PB stays underneath.
+
 - Head to Head finish heading and time now wait the same 10ms after the modal
   fade as Daily and Campaign. The comparison-row stagger is unchanged.
 

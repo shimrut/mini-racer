@@ -805,11 +805,15 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
-    it('shows a ghost comparison as VS rank and a signed gap, not a won/lost sentence', () => {
+    it('shows a standings ghost on VS opponent and keeps VS PB', () => {
         const originalDocument = global.document;
         const dom = new JSDOM(`
             <div id="combined">
                 <div id="combined-hero-medal"></div>
+                <div id="combined-opponent-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">VS. OPPONENT</span>
+                    <span id="combined-opponent-delta"></span>
+                </div>
                 <div id="combined-stats-right-group"></div>
                 <div id="combined-rank-value"></div>
                 <div id="combined-rank-total"></div>
@@ -827,32 +831,43 @@ describe('ui modal content helpers', () => {
         global.document = dom.window.document;
         const container = dom.window.document.getElementById('combined');
         const component = new ModalContentUi();
-        const labelEl = container.querySelector('#combined-stat-label-2');
-        const deltaEl = container.querySelector('#combined-best-lap');
+        const pbLabelEl = container.querySelector('#combined-stat-label-2');
+        const pbDeltaEl = container.querySelector('#combined-best-lap');
+        const opponentStat = container.querySelector('#combined-opponent-stat');
+        const opponentLabel = opponentStat.querySelector('.combined-stat-label');
+        const opponentDelta = container.querySelector('#combined-opponent-delta');
 
         component.renderCombinedResults(container, {
             time: 9.604,
+            previousPersonalBestSec: 9.5,
+            deltaToPersonalBest: 0.104,
             raceComparisonTarget: { displayName: 'ALFREAD_IO', rank: 1 },
             comparisonOutcome: 'lost',
             deltaToComparison: 0.243,
         });
-        expect(labelEl.textContent).toBe('VS #1');
-        expect(deltaEl.textContent).toBe('+0.243s');
-        expect(deltaEl.classList.contains('is-loss')).toBe(true);
-        expect(deltaEl.classList.contains('is-gain')).toBe(false);
+        expect(opponentStat.hidden).toBe(false);
+        expect(opponentLabel.textContent).toBe('VS #1');
+        expect(opponentDelta.textContent).toBe('+0.243s');
+        expect(opponentDelta.classList.contains('is-loss')).toBe(true);
+        expect(pbLabelEl.textContent).toBe('VS PB');
+        expect(pbDeltaEl.textContent).toBe('+0.104s');
+        expect(pbDeltaEl.classList.contains('is-loss')).toBe(true);
         expect(container.textContent).not.toContain('LOST');
         expect(container.textContent).not.toContain('ALFREAD_IO');
 
         component.renderCombinedResults(container, {
             time: 9.361,
+            previousPersonalBestSec: 9.5,
+            deltaToPersonalBest: -0.139,
             raceComparisonTarget: { displayName: 'ALFREAD_IO', rank: 2 },
             comparisonOutcome: 'won',
             deltaToComparison: -0.243,
         });
-        expect(labelEl.textContent).toBe('VS #2');
-        expect(deltaEl.textContent).toBe('-0.243s');
-        expect(deltaEl.classList.contains('is-gain')).toBe(true);
-        expect(deltaEl.classList.contains('is-loss')).toBe(false);
+        expect(opponentLabel.textContent).toBe('VS #2');
+        expect(opponentDelta.textContent).toBe('-0.243s');
+        expect(opponentDelta.classList.contains('is-gain')).toBe(true);
+        expect(pbLabelEl.textContent).toBe('VS PB');
+        expect(pbDeltaEl.textContent).toBe('-0.139s');
         expect(container.textContent).not.toContain('WON');
 
         component.renderCombinedResults(container, {
@@ -861,10 +876,11 @@ describe('ui modal content helpers', () => {
             comparisonOutcome: 'tie',
             deltaToComparison: 0,
         });
-        expect(labelEl.textContent).toBe('VS #1');
-        expect(deltaEl.textContent).toBe('0.000s');
-        expect(deltaEl.classList.contains('is-gain')).toBe(false);
-        expect(deltaEl.classList.contains('is-loss')).toBe(false);
+        expect(opponentLabel.textContent).toBe('VS #1');
+        expect(opponentDelta.textContent).toBe('0.000s');
+        expect(opponentDelta.classList.contains('is-gain')).toBe(false);
+        expect(opponentDelta.classList.contains('is-loss')).toBe(false);
+        expect(pbLabelEl.textContent).toBe('VS PB');
 
         component.renderCombinedResults(container, {
             time: 9.361,
@@ -872,8 +888,17 @@ describe('ui modal content helpers', () => {
             comparisonOutcome: 'won',
             deltaToComparison: -0.25,
         });
-        expect(labelEl.textContent).toBe('VS');
-        expect(deltaEl.textContent).toBe('-0.250s');
+        expect(opponentLabel.textContent).toBe('VS');
+        expect(opponentDelta.textContent).toBe('-0.250s');
+
+        component.renderCombinedResults(container, {
+            time: 9.5,
+            previousPersonalBestSec: 9.4,
+            deltaToPersonalBest: 0.1,
+        });
+        expect(opponentStat.hidden).toBe(true);
+        expect(pbLabelEl.textContent).toBe('VS PB');
+        expect(pbDeltaEl.textContent).toBe('+0.100s');
 
         global.document = originalDocument;
     });

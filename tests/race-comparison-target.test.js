@@ -421,6 +421,9 @@ describe('leaderboard race comparison target', () => {
         outcome: 'won',
         deltaSec: -0.25,
       }),
+      trackPersonalBestByTrackKey: {
+        'numbered-v1-00': { bestTime: 12.5 },
+      },
       openCampaignStandings: vi.fn(),
       startCampaignStage: vi.fn(),
       restartActiveRace: vi.fn(),
@@ -441,6 +444,8 @@ describe('leaderboard race comparison target', () => {
     const lapData = showModal.mock.calls[0][2];
     expect(lapData).toMatchObject({
       lapTime: 11.75,
+      previousPersonalBestSec: 12.5,
+      deltaToPersonalBest: -0.75,
       raceComparisonTarget: comparisonTarget,
       comparisonOutcome: 'won',
       deltaToComparison: -0.25,

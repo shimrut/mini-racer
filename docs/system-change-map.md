@@ -107,11 +107,11 @@ flowchart LR
 - `game/scoreboard/engine-methods.js` starts verification from the finish event, handles retry behavior until the competition deadline, and consumes the canonical challenge-PB record returned by an accepted submission.
 - Finish-screen RANK first paint and live updates share `applyCombinedRankValue` in `game/race/result-flow.js`, so loading shows Submitting/Verifying status text and failures keep RANK visible with the error. After the win modal opens, a synchronous queue sync paints Verifying when an entry still exists; if accept finishes with no standings snapshot, loading clears and RANK hides.
 - Standings opened from the finish sheet always dismiss back to that finish sheet, even if an asynchronous standings refresh replaces the temporary close-mode flag.
-- Finish-screen opponent comparisons reuse the personal-best delta slot:
-  **VS #rank** and a signed gap (`+0.243s` slower, `-0.243s` faster, `0.000s`
-  tied). The opponent name and won/lost copy stay off that row so it matches
-  RANK. Personal-best comparisons stay on the same slot when no opponent was
-  raced. After a win, Improve starts the same Daily or Campaign race without
+- Finish-screen opponent comparisons from Daily or Campaign standings use the
+  same opponent row as Head to Head: **VS #rank** (or **VS**) and a signed gap
+  (`+0.243s` slower, `-0.243s` faster, `0.000s` tied). VS PB stays on its own
+  row. The opponent name and won/lost copy stay off that row so it matches
+  RANK. After a win, Improve starts the same Daily or Campaign race without
   that frozen ghost, so the sheet does not keep showing VS #1 after you have
   taken first.
 - Finish-screen personal-best comparisons use like-for-like race results. A
@@ -407,7 +407,8 @@ flowchart LR
   the same heading-to-row gap,
   button-edge alignment, and Mini/Racer entrance delayed by `--dur-finish-headline`,
   and reuse those left-label / right-value comparison rows
-  for VS PB, RANK, and MEDALS. Tapping MEDALS opens the shared finish mini
+  for MEDALS, VS PB, and RANK. Racing a standings ghost also shows VS opponent
+  on that shared row. Tapping MEDALS opens the shared finish mini
   overlay with each medal and its time stacked, matching checkpoint splits.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,

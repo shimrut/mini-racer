@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readCssBundle } from './helpers/read-css-bundle.js';
 
 const styles = readCssBundle(new URL('../styles.css', import.meta.url));
+const gameHtml = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
 
 describe('finish screen styles', () => {
     it('lines stats up with finish buttons in the same padded column', () => {
@@ -53,6 +55,26 @@ describe('finish screen styles', () => {
         expect(styles).not.toMatch(
             /\.leaderboard-row__action\s*\{[^}]*width:\s*3rem;/s,
         );
+    });
+
+    it('puts Daily and Campaign medals first, then opponent, VS PB, and RANK', () => {
+        const start = gameHtml.indexOf('class="combined-stats-grid">');
+        const actions = gameHtml.indexOf('class="combined-actions"', start);
+        expect(start).toBeGreaterThan(-1);
+        expect(actions).toBeGreaterThan(start);
+        const ids = [...gameHtml.slice(start, actions).matchAll(/id="(combined-[^"]+)"/g)]
+            .map((match) => match[1]);
+        expect(ids).toEqual([
+            'combined-medals-stat',
+            'combined-medals-row',
+            'combined-opponent-stat',
+            'combined-opponent-delta',
+            'combined-stat-label-2',
+            'combined-best-lap',
+            'combined-stats-right-group',
+            'combined-rank-value',
+            'combined-rank-total',
+        ]);
     });
 
     it('puts Daily and Campaign medals in a compact right-side MEDALS row', () => {

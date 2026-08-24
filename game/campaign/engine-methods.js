@@ -857,11 +857,21 @@ export const campaignEngineMethods = {
         const paceBaseline = this.getActiveRacePaceBaseline?.()
             ?? this.activePersonalBestPaceBaseline
             ?? null;
-        const previousPersonalBestSec = comparison
-            ? null
-            : (Number.isFinite(paceBaseline?.finishTimeSec)
-                ? paceBaseline.finishTimeSec
-                : null);
+        let previousPersonalBestSec = null;
+        if (comparison) {
+            const cached = Number(this.trackPersonalBestByTrackKey?.[stage.raceId]?.bestTime);
+            const storedMs = Number(
+                this.campaignBootstrap?.progress?.resultsByRaceId?.[stage.raceId]?.bestTimeMs,
+            );
+            const prepared = Number(
+                this.personalBestPaceBaselineByRaceId?.[stage.raceId]?.finishTimeSec,
+            );
+            if (cached > 0) previousPersonalBestSec = cached;
+            else if (storedMs > 0) previousPersonalBestSec = storedMs / 1000;
+            else if (prepared > 0) previousPersonalBestSec = prepared;
+        } else if (Number.isFinite(paceBaseline?.finishTimeSec)) {
+            previousPersonalBestSec = paceBaseline.finishTimeSec;
+        }
         const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
         const nextTarget = getCampaignNextStageTarget(this, stage);
         this.modal.showModal(

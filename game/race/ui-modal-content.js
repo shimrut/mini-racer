@@ -756,14 +756,30 @@ export class ModalContentUi {
         );
         // A challenge finish reads as three rows under the verdict, so the sheet lays itself out for them.
         container.classList?.toggle?.('is-challenge-finish', isChallengeHero);
-        this.applyChallengeOpponentStat(container, isChallengeHero ? challengeVerdict : null);
+        const standingsOpponent = !isChallengeHero
+            && raceComparisonTarget
+            && comparisonOutcome
+            && Number.isFinite(deltaToComparison)
+            ? { deltaSec: deltaToComparison }
+            : null;
+        this.applyChallengeOpponentStat(
+            container,
+            isChallengeHero ? challengeVerdict : standingsOpponent,
+            {
+                label: isChallengeHero
+                    ? 'VS. OPPONENT'
+                    : (Number.isFinite(raceComparisonTarget?.rank)
+                        ? `VS #${raceComparisonTarget.rank}`
+                        : 'VS'),
+            },
+        );
         if (label2El) {
             label2El.hidden = false;
             label2El.removeAttribute('hidden');
             label2El.removeAttribute('aria-hidden');
             // The slot below this label is always a signed gap to the personal
-            // best, never a lap time, so the label reads as a comparison in the
-            // same shape as the ghost's "VS #1".
+            // best, never a lap time. Standings ghost races keep this row and
+            // put the opponent gap on VS. OPPONENT / VS #rank instead.
             label2El.textContent = isChallengeHero ? 'VS. YOUR PB' : 'VS PB';
         }
         const challengeRankSnapshot = isChallengeHero
@@ -882,41 +898,22 @@ export class ModalContentUi {
             }
         }
         if (bestLapEl) {
-            if (raceComparisonTarget && comparisonOutcome) {
-                if (label2El) {
-                    label2El.textContent = Number.isFinite(raceComparisonTarget.rank)
-                        ? `VS #${raceComparisonTarget.rank}`
-                        : 'VS';
-                }
-                const deltaDisplay = buildModalDeltaDisplay({
-                    deltaToBest: Number.isFinite(deltaToComparison) ? deltaToComparison : null,
-                });
-                bestLapEl.textContent = deltaDisplay.text;
-                bestLapEl.classList.remove('is-gain', 'is-loss', 'combined-stat-value--placeholder');
-                bestLapEl.classList.add('combined-stat-value--pb-delta');
-                if (deltaDisplay.valueClass === 'modal-stat-value--delta-negative') {
-                    bestLapEl.classList.add('is-gain');
-                } else if (deltaDisplay.valueClass === 'modal-stat-value--delta-positive') {
-                    bestLapEl.classList.add('is-loss');
-                }
-            } else {
-                this._applyCombinedWinPbDelta(
-                    bestLapEl,
-                    time,
-                    previousPersonalBestSec,
-                    // On a challenge `bestLap` is the opponent's target, never the player's own best,
-                    // so it is no fallback for a personal best that is not there.
-                    isChallengeHero ? null : bestLap,
-                    deltaToPersonalBest,
-                );
-            }
+            this._applyCombinedWinPbDelta(
+                bestLapEl,
+                time,
+                previousPersonalBestSec,
+                // On a challenge `bestLap` is the opponent's target, never the player's own best,
+                // so it is no fallback for a personal best that is not there.
+                isChallengeHero ? null : bestLap,
+                deltaToPersonalBest,
+            );
             bestLapEl.classList.remove('combined-stat-value--impact');
         }
 
     }
 
-    /** The gap to the opponent only exists on a challenge, so its row is hidden everywhere else. */
-    applyChallengeOpponentStat(container, verdict) {
+    /** Opponent gap: Head to Head verdict, or a Daily/Campaign standings ghost race. */
+    applyChallengeOpponentStat(container, verdict, { label = 'VS. OPPONENT' } = {}) {
         const statEl = container.querySelector('#combined-opponent-stat');
         const valueEl = container.querySelector('#combined-opponent-delta');
         if (!statEl || !valueEl) return;
@@ -929,6 +926,8 @@ export class ModalContentUi {
             return;
         }
 
+        const labelEl = statEl.querySelector('.combined-stat-label');
+        if (labelEl) labelEl.textContent = label;
         statEl.hidden = false;
         statEl.removeAttribute('hidden');
         statEl.removeAttribute('aria-hidden');
