@@ -52,17 +52,14 @@ equally specific rule wins.
 
 ## Head To Head Finish Contract
 
-`styles/result-details.css` owns the shared finish lockup under
-`#modal-combined-view.is-challenge-finish`. Daily and Campaign add
-`is-standard-finish` so they show italic Outfit `FINISH` in that same
-slot instead of `YOU WON` / `YOU LOST` / `YOU TIED`, with the medal row
-directly under the time. Head to Head keeps the verdict colors: green is a
-win, red is a loss, and a tie stays neutral. Pending and failed verification
-use `VERIFYING` and `UNVERIFIED` and retain their status detail.
-
-The result stacks that italic lockup on the left above a right-aligned race
-time of the same size. That block, including the comparison rows, uses the
-same 320px column as the finish buttons.
+`styles/result-details.css` owns the Head to Head-only finish composition under
+`#modal-combined-view.is-challenge-finish`; the shared Daily and Campaign finish
+rules remain unchanged. The result stacks italic Outfit `YOU WON` /
+`YOU LOST` / `YOU TIED` on the left above a right-aligned race time of the same
+size. That block, including the comparison rows, uses the same 320px column as
+the finish buttons. Green is a win, red is a loss, and a tie stays neutral.
+Pending and failed verification use `VERIFYING` and `UNVERIFIED` and retain
+their status detail.
 
 Below that stack, the existing result slots flow as three left-label/right-value
 upright rows: opponent delta, prior-PB delta, and originating rank. The PB slot keeps its
@@ -73,17 +70,14 @@ locked row opens the existing split-times mini overlay with a short explanation.
 The layout
 uses flex flow, inherited modal width and safe-area behavior, plus a
 `max-height: 640px` compaction; it must not introduce absolute result positioning.
-The finish hero contains no avatar, opponent name, or duplicate margin.
-Head to Head also omits medals there; Daily and Campaign keep the medal row
-under the time. Those omitted elements remain valid on the separate Challenge
-lobby/won portrait.
+The finish hero contains no avatar, medal, opponent name, or duplicate margin.
+Those elements remain valid on the separate Challenge lobby/won portrait.
 The verdict lockup enters with the same `slideInLeft` 0.5s glide as Mini, and
 the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
 comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart from
 200ms; finish buttons continue that cascade from 350ms. Hidden rows and
 `display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
-turns the sequence off. Daily and Campaign use that same entrance, with
-`FINISH` and medals under the clock.
+turns the sequence off. Daily and Campaign finishes stay still.
 
 ## Daily And Campaign Poster Contract
 

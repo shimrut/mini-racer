@@ -462,27 +462,6 @@ describe('medals', () => {
         }
     });
 
-    it('renderWinCombinedMedalOverlay paints FINISH above the medal row', async () => {
-        const { JSDOM } = await import('jsdom');
-        const { renderWinCombinedMedalOverlay } = await import('../game/medals/medals.js');
-        const originalDocument = global.document;
-        const dom = new JSDOM('<!DOCTYPE html><div id="overlay"></div>');
-        global.document = dom.window.document;
-        try {
-            const overlay = dom.window.document.getElementById('overlay');
-            renderWinCombinedMedalOverlay(overlay, {
-                trackKey: 'circuit',
-                lapMedal: 'gold',
-                previousTrackMedal: 'bronze',
-            });
-            expect(overlay.querySelector('.challenge-result-lockup__outcome').textContent).toBe('FINISH');
-            expect(overlay.querySelector('.win-combined-medal-overlay__row')).toBeTruthy();
-            expect(overlay.querySelector('.win-combined-medal-overlay--challenge')).toBeNull();
-        } finally {
-            global.document = originalDocument;
-        }
-    });
-
     it('isPersonalBestTimeImprovement is strict on the clock', () => {
         expect(isPersonalBestTimeImprovement(3, null)).toBe(true);
         expect(isPersonalBestTimeImprovement(3, { bestTime: 4 })).toBe(true);
