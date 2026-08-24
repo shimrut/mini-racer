@@ -551,6 +551,9 @@ export class RealTimeRacer {
     this.interactions.bindPrimaryActions();
     this.dailyChallengeUi.bindPlaylistModal();
     this.dailyCarousel.bind();
+    const openDailyTracks = () => void this.openDailyChallengePlaylist();
+    this.dailyCarousel.expiryLine?.addEventListener("click", openDailyTracks);
+    this.dailyCarousel.navigation?.addEventListener("click", openDailyTracks);
     this.campaignCarousel.bind();
     this.lobbyUi.bind();
     this.garage.bind();

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
     buildDailyCarouselCards,
@@ -282,6 +283,24 @@ function stubRailRebuild(carousel, rail) {
         _parts: {},
     }));
 }
+
+describe('Daily tracks opener', () => {
+    it('wires the Daily expiry line and counter to the Tracks list', () => {
+        const engineSource = readFileSync(new URL('../game/engine.js', import.meta.url), 'utf8');
+        expect(engineSource).toContain(
+            'const openDailyTracks = () => void this.openDailyChallengePlaylist();',
+        );
+        expect(engineSource).toContain(
+            'this.dailyCarousel.expiryLine?.addEventListener("click", openDailyTracks);',
+        );
+        expect(engineSource).toContain(
+            'this.dailyCarousel.navigation?.addEventListener("click", openDailyTracks);',
+        );
+        expect(engineSource).not.toContain(
+            'this.campaignCarousel.navigation?.addEventListener("click", openDailyTracks);',
+        );
+    });
+});
 
 describe('TrackCarousel expiry line', () => {
     function stubExpiryLine(carousel, resolveExpiry) {

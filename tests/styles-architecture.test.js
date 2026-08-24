@@ -540,6 +540,12 @@ describe('game stylesheet architecture', () => {
             /\.track-carousel--lobby \.track-carousel__expiry\s*\{[^}]*grid-area:\s*2 \/ 1;[^}]*font-family:\s*var\(--mono-font\);[^}]*text-align:\s*center;[^}]*text-transform:\s*uppercase;/s,
         );
         expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby \.track-carousel__expiry\s*\{[^}]*cursor:\s*pointer;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /#daily-carousel-navigation\s*\{[^}]*cursor:\s*pointer;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby:has\(\.track-carousel__expiry\) \.track-carousel__navigation\s*\{[^}]*grid-area:\s*3 \/ 1;/s,
         );
         expect(trackCarouselStyles).toMatch(

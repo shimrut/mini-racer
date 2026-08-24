@@ -52,7 +52,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
   both compact and tall tracks; changing the Garage skin repaints this marker
   in both modes. A centered Start Race pill is the only bottom action. Back
   returns to Home, and Standings opens on the track currently centred in the
-  carousel.
+  carousel. Tapping the Daily expiry line or track counter opens the Tracks
+  list for the Daily playlist.
 - [ ] At the first and last Daily/Campaign entries, the selected track still
   centers in the Reddit WebView. Swiping or tapping an edge track updates only
   the right-side Daily date or Campaign track name plus the selected Standings

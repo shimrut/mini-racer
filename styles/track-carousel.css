@@ -131,6 +131,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     grid-area: 2 / 1;
     align-self: center;
     margin: 0;
+    cursor: pointer;
     color: var(--text-dim);
     font-family: var(--mono-font);
     font-size: 0.7rem;
@@ -160,6 +161,10 @@ body[data-lobby-mode="campaign"] #start-overlay {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     min-width: 0;
+}
+
+#daily-carousel-navigation {
+    cursor: pointer;
 }
 
 /* The padding is there for the keyboard cue in `lobby-modes.css`: the ring

@@ -1,5 +1,7 @@
 # Changelog
 
+- Tapping the Daily expiry line or track counter opens the Tracks list.
+
 - Head to Head finish now shows Daily and Campaign as soon as the local clock
   is already faster than the target. Brag stays gray until the server confirms.
   Improve and Home come back if that confirm is a miss or fails.

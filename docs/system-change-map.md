@@ -214,6 +214,8 @@ flowchart LR
   overlay becomes `display: none`; this prevents the lap HUD from jumping after
   the race chrome has appeared.
   Standings resolves the carousel's currently centred track at click time.
+  Tapping Daily's expiry line or `current / total` counter opens the shared
+  Tracks modal on the Daily playlist.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. A timeout, network failure, or server 5xx during
   challenge loading is contained in the challenge pane: the global loader is
