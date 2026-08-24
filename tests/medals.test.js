@@ -21,6 +21,7 @@ import {
     FIRST_UNLOCK_MEDAL_HOLD_MS,
     isPersonalBestTimeImprovement,
     isStandardMedalTier,
+    resolveCombinedFinishHeadline,
 } from '../game/medals/medals.js';
 
 describe('medals', () => {
@@ -351,6 +352,49 @@ describe('medals', () => {
         expect(shouldCelebrateMedalTier('white', null)).toBe(false);
         expect(shouldCelebrateMedalTier('challenge', null)).toBe(true);
         expect(shouldCelebrateMedalTier('challenge', 'author')).toBe(true);
+    });
+
+    it('resolveCombinedFinishHeadline prefers a new medal, then a new best, else finished', () => {
+        expect(resolveCombinedFinishHeadline({
+            lapMedal: 'bronze',
+            previousTrackMedal: null,
+            lapTimeSec: 20,
+            previousPersonalBestSec: null,
+        })).toEqual({ kind: 'bronze', text: 'bronze' });
+        expect(resolveCombinedFinishHeadline({
+            lapMedal: 'gold',
+            previousTrackMedal: 'gold',
+            lapTimeSec: 10,
+            previousPersonalBestSec: 11,
+            deltaToPersonalBest: -1,
+        })).toEqual({ kind: 'new-best', text: 'new best' });
+        expect(resolveCombinedFinishHeadline({
+            lapMedal: 'gold',
+            previousTrackMedal: 'gold',
+            lapTimeSec: 12,
+            previousPersonalBestSec: 11,
+            deltaToPersonalBest: 1,
+        })).toEqual({ kind: 'finished', text: 'finished' });
+        expect(resolveCombinedFinishHeadline({
+            lapMedal: null,
+            previousTrackMedal: null,
+            lapTimeSec: 18.5,
+            previousPersonalBestSec: null,
+        })).toEqual({ kind: 'new-best', text: 'new best' });
+        expect(resolveCombinedFinishHeadline({
+            lapMedal: 'author',
+            previousTrackMedal: 'gold',
+            lapTimeSec: 8,
+            previousPersonalBestSec: 9,
+            deltaToPersonalBest: -1,
+        })).toEqual({ kind: 'author', text: 'author' });
+        expect(resolveCombinedFinishHeadline({
+            lapMedal: 'gold',
+            previousTrackMedal: 'gold',
+            lapTimeSec: 11,
+            previousPersonalBestSec: 11,
+            deltaToPersonalBest: 0,
+        })).toEqual({ kind: 'finished', text: 'finished' });
     });
 
     it('labels the challenge display medal without treating it as a Campaign tier', async () => {

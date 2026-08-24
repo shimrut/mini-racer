@@ -402,8 +402,9 @@ flowchart LR
   line and a right-aligned finish clock of the same size, both in the shared
   320px finish column used by Daily and Campaign as well. The three comparison rows own opponent margin,
   prior-PB delta, and originating rank; a server-corrected verdict repaints the
-  opponent row as well as the lockup. Daily and Campaign keep their time
-  hero in that same column, with the same heading-to-row gap and
+  opponent row as well as the lockup. Daily and Campaign keep a status heading
+  above the time in that same column (medal name, NEW BEST, or FINISHED), with
+  the same heading-to-row gap and
   button-edge alignment, and reuse those left-label / right-value comparison rows
   for VS PB, RANK, and MEDALS.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post

@@ -80,9 +80,11 @@ the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
 comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart from
 200ms; finish buttons continue that cascade from 350ms. Hidden rows and
 `display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
-turns the sequence off. Daily and Campaign keep their time
-hero in that same column, with VS PB, RANK, and MEDALS as the comparison rows.
-They do not run the Head to Head entrance sequence.
+turns the sequence off. Daily and Campaign put a status heading above the
+time in that same column — medal name, NEW BEST, or FINISHED — with the Mini
+`slideInLeft` and Racer `slideInRight` pair delayed by `--dur-finish-headline`
+(10ms) after the finish modal fade starts. VS PB, RANK, and MEDALS stay the
+comparison rows. They do not run the Head to Head row and button stagger.
 
 ## Daily And Campaign Poster Contract
 
@@ -292,6 +294,7 @@ against it rather than against a hand-typed number.
 | `--dur-base` | 160ms | The default — enters, exits, content swaps |
 | `--dur-slow` | 200ms | The ceiling for anything the player waits through |
 | `--dur-race-start-exit` | 100ms | Exact Daily/Campaign Start Race screen fade |
+| `--dur-finish-headline` | 10ms | Daily/Campaign finish heading delay after the modal fade |
 | `--ease-standard` | `cubic-bezier(0.4, 0, 0.2, 1)` | Neutral in-and-out |
 | `--ease-settle` | `cubic-bezier(0.22, 1, 0.36, 1)` | Panels and cards arriving |
 | `--ease-glide` | `cubic-bezier(0.16, 1, 0.3, 1)` | Long decelerating entrances |

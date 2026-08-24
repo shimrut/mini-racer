@@ -176,6 +176,19 @@ describe('game stylesheet architecture', () => {
         );
     });
 
+    it('enters the Daily and Campaign finish heading like Mini Racer, 10ms after the modal', () => {
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view:not\(\.is-challenge-finish\)\.active-view \.combined-finish-heading:not\(\[hidden\]\)\s*\{[^}]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) var\(--dur-finish-headline\) both;/,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view:not\(\.is-challenge-finish\)\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) calc\(0\.1s \+ var\(--dur-finish-headline\)\) both;/,
+        );
+        expect(foundationStyles).toContain('--dur-finish-headline: 10ms;');
+        expect(resultDetailStyles).toMatch(
+            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*:not\(\.is-challenge-finish\)\.active-view \.combined-finish-heading[\s\S]*animation:\s*none;/,
+        );
+    });
+
     it('routes every sub-200ms duration through a token', () => {
         const styles = readCssBundle(manifestUrl);
         const strays = [];

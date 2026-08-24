@@ -60,6 +60,31 @@ export function shouldCelebrateMedalTier(tier, previousBestMedalOnTrack, context
     return STANDARD_MEDAL_TIER_RANK[tier] > prevRank;
 }
 
+function isCombinedFinishNewPersonalBest(lapTimeSec, previousPersonalBestSec, deltaToPersonalBest) {
+    if (!Number.isFinite(Number(lapTimeSec))) return false;
+    if (Number.isFinite(deltaToPersonalBest)) return deltaToPersonalBest < 0;
+    if (previousPersonalBestSec === undefined || previousPersonalBestSec === null) {
+        return true;
+    }
+    return isPersonalBestTimeImprovement(lapTimeSec, { bestTime: previousPersonalBestSec });
+}
+
+export function resolveCombinedFinishHeadline({
+    lapMedal = null,
+    previousTrackMedal = null,
+    lapTimeSec,
+    previousPersonalBestSec = undefined,
+    deltaToPersonalBest = undefined,
+} = {}) {
+    if (isStandardMedalTier(lapMedal) && shouldCelebrateMedalTier(lapMedal, previousTrackMedal)) {
+        return { kind: lapMedal, text: lapMedal };
+    }
+    if (isCombinedFinishNewPersonalBest(lapTimeSec, previousPersonalBestSec, deltaToPersonalBest)) {
+        return { kind: 'new-best', text: 'new best' };
+    }
+    return { kind: 'finished', text: 'finished' };
+}
+
 function revealDeferredMedalIcon(
     icon,
     { delay = 0, reduced = false, celebrate = true, playUnlockSound = null } = {},

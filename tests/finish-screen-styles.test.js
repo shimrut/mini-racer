@@ -63,4 +63,19 @@ describe('finish screen styles', () => {
             /#modal-combined-view:not\(\.is-challenge-finish\) #combined-hero-medal\s*\{\s*display:\s*none;/,
         );
     });
+
+    it('paints Daily and Campaign finish headings in medal, new-best, and finished colors', () => {
+        expect(styles).toMatch(
+            /#modal-combined-view:not\(\.is-challenge-finish\) \.combined-finish-heading\[data-kind="finished"\]\s*\{\s*color:\s*var\(--accent-color\);/,
+        );
+        expect(styles).toMatch(
+            /#modal-combined-view:not\(\.is-challenge-finish\) \.combined-finish-heading\[data-kind="new-best"\]\s*\{\s*color:\s*var\(--success-bright\);/,
+        );
+        expect(styles).toMatch(
+            /#modal-combined-view:not\(\.is-challenge-finish\) \.combined-finish-heading\[data-kind="gold"\]\s*\{\s*color:\s*#e8b84a;/,
+        );
+        expect(styles).toMatch(
+            /#modal-combined-view\.is-challenge-finish \.combined-finish-heading\s*\{\s*display:\s*none;/,
+        );
+    });
 });

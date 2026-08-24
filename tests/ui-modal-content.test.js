@@ -394,6 +394,7 @@ describe('ui modal content helpers', () => {
         const originalDocument = global.document;
         const dom = new JSDOM(`
             <div id="combined">
+                <span id="combined-finish-heading" class="combined-finish-heading" hidden></span>
                 <div id="combined-hero-medal"></div>
                 <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
                 <div id="combined-rank-value"></div>
@@ -425,6 +426,67 @@ describe('ui modal content helpers', () => {
         expect(medalsRow.querySelectorAll('.combined-medal-row-slot').length).toBe(4);
         expect(hero.querySelector('.combined-medal-row')).toBeNull();
         expect(container.querySelector('#combined-stat-label-2').textContent).toBe('VS PB');
+        const heading = container.querySelector('#combined-finish-heading');
+        expect(heading.hidden).toBe(false);
+        expect(heading.textContent).toBe('gold');
+        expect(heading.dataset.kind).toBe('gold');
+
+        global.document = originalDocument;
+    });
+
+    it('labels Daily finish as new best or finished when no medal unlocks', () => {
+        const originalDocument = global.document;
+        const markup = `
+            <div id="combined">
+                <span id="combined-finish-heading" class="combined-finish-heading" hidden></span>
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div id="combined-best-lap"></div>
+                <div id="combined-stat-label-2"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
+            </div>
+        `;
+        let dom = new JSDOM(markup);
+        global.document = dom.window.document;
+        let container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+
+        component.renderCombinedResults(container, {
+            time: 11.2,
+            bestLap: 11.2,
+            trackKey: 'circuit',
+            lapMedal: 'gold',
+            previousTrackMedal: 'gold',
+            previousPersonalBestSec: 12,
+            deltaToPersonalBest: -0.8,
+        });
+        let heading = container.querySelector('#combined-finish-heading');
+        expect(heading.hidden).toBe(false);
+        expect(heading.textContent).toBe('new best');
+        expect(heading.dataset.kind).toBe('new-best');
+
+        dom = new JSDOM(markup);
+        global.document = dom.window.document;
+        container = dom.window.document.getElementById('combined');
+        component.renderCombinedResults(container, {
+            time: 12.4,
+            bestLap: 12.4,
+            trackKey: 'circuit',
+            lapMedal: 'gold',
+            previousTrackMedal: 'gold',
+            previousPersonalBestSec: 12,
+            deltaToPersonalBest: 0.4,
+        });
+        heading = container.querySelector('#combined-finish-heading');
+        expect(heading.hidden).toBe(false);
+        expect(heading.textContent).toBe('finished');
+        expect(heading.dataset.kind).toBe('finished');
 
         global.document = originalDocument;
     });
@@ -433,6 +495,7 @@ describe('ui modal content helpers', () => {
         const originalDocument = global.document;
         const dom = new JSDOM(`
             <div id="combined">
+                <span id="combined-finish-heading" class="combined-finish-heading" hidden></span>
                 <div id="combined-hero-medal"></div>
                 <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
                 <div id="combined-rank-value"></div>
@@ -462,6 +525,9 @@ describe('ui modal content helpers', () => {
         expect(container.querySelector('#combined-medals-row').children.length).toBe(0);
         expect(container.querySelector('#combined-hero-medal').children.length).toBeGreaterThan(0);
         expect(container.classList.contains('is-challenge-finish')).toBe(true);
+        const heading = container.querySelector('#combined-finish-heading');
+        expect(heading.hidden).toBe(true);
+        expect(heading.textContent).toBe('');
 
         global.document = originalDocument;
     });

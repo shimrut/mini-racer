@@ -267,6 +267,65 @@
     text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+#modal-combined-view:not(.is-challenge-finish) .combined-hero-time-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading {
+    display: block;
+    align-self: flex-start;
+    margin: 0;
+    font-family: var(--header-font);
+    font-style: italic;
+    font-weight: 900;
+    font-size: 3.5rem;
+    letter-spacing: -0.05em;
+    line-height: 0.85;
+    text-transform: uppercase;
+    text-align: left;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading[hidden] {
+    display: none;
+}
+
+#modal-combined-view.is-challenge-finish .combined-finish-heading {
+    display: none;
+}
+
+#modal-combined-view:not(.is-challenge-finish) #combined-time {
+    align-self: flex-end;
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading[data-kind="finished"] {
+    color: var(--accent-color);
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading[data-kind="new-best"] {
+    color: var(--success-bright);
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading[data-kind="bronze"] {
+    color: #c17f59;
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading[data-kind="silver"] {
+    color: #b8c4d4;
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading[data-kind="gold"] {
+    color: #e8b84a;
+}
+
+#modal-combined-view:not(.is-challenge-finish) .combined-finish-heading[data-kind="author"] {
+    color: #c4b5fd;
+}
+
 #combined-hero-medal {
     display: flex;
     justify-content: center;
@@ -368,6 +427,18 @@
     animation: slideInRight 0.6s var(--ease-glide) 0.1s both;
 }
 
+#modal-combined-view:not(.is-challenge-finish).active-view .combined-finish-heading:not([hidden]) {
+    opacity: 0;
+    backface-visibility: hidden;
+    animation: slideInLeft 0.5s var(--ease-glide) var(--dur-finish-headline) both;
+}
+
+#modal-combined-view:not(.is-challenge-finish).active-view #combined-time {
+    opacity: 0;
+    backface-visibility: hidden;
+    animation: slideInRight 0.6s var(--ease-glide) calc(0.1s + var(--dur-finish-headline)) both;
+}
+
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:not([hidden]),
 #modal-combined-view.is-challenge-finish.active-view .combined-actions > :not([hidden]):not([style*="display: none"]) {
     animation: leaderboardRowIn var(--dur-snap) var(--ease-settle) backwards;
@@ -406,7 +477,9 @@
     #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__status,
     #modal-combined-view.is-challenge-finish.active-view #combined-time,
     #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:not([hidden]),
-    #modal-combined-view.is-challenge-finish.active-view .combined-actions > :not([hidden]):not([style*="display: none"]) {
+    #modal-combined-view.is-challenge-finish.active-view .combined-actions > :not([hidden]):not([style*="display: none"]),
+    #modal-combined-view:not(.is-challenge-finish).active-view .combined-finish-heading,
+    #modal-combined-view:not(.is-challenge-finish).active-view #combined-time {
         opacity: 1;
         transform: none;
         animation: none;
@@ -419,7 +492,9 @@
     }
 
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome,
-    #modal-combined-view.is-challenge-finish #combined-time {
+    #modal-combined-view.is-challenge-finish #combined-time,
+    #modal-combined-view:not(.is-challenge-finish) .combined-finish-heading,
+    #modal-combined-view:not(.is-challenge-finish) #combined-time {
         font-size: 3.5rem;
     }
 

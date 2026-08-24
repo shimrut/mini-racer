@@ -4,7 +4,7 @@ import {
     buildChallengeRankSnapshot,
     buildModalDeltaDisplay,
 } from '../race/result-flow.js';
-import { renderWinCombinedMedalOverlay } from '../medals/medals.js';
+import { renderWinCombinedMedalOverlay, resolveCombinedFinishHeadline } from '../medals/medals.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
 const LEADERBOARD_SHARE_ICON_PATH = 'M307.8 18.4c-12 5-19.8 16.6-19.8 29.6l0 80-112 0c-97.2 0-176 78.8-176 176 0 113.3 81.5 163.9 100.2 174.1 2.5 1.4 5.3 1.9 8.1 1.9 10.9 0 19.7-8.9 19.7-19.7 0-7.5-4.3-14.4-9.8-19.5-9.4-8.8-22.2-26.4-22.2-56.7 0-53 43-96 96-96l96 0 0 80c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l160-160c12.5-12.5 12.5-32.8 0-45.3l-160-160c-9.2-9.2-22.9-11.9-34.9-6.9z';
@@ -392,7 +392,36 @@ export class ModalContentUi {
         }
 
         this.renderCombinedMedalOverlay(hostEl, options);
+        this.applyCombinedFinishHeadline(container, { ...options, isChallengeHero });
         return hostEl;
+    }
+
+    applyCombinedFinishHeadline(container, options = {}) {
+        const headingEl = container?.querySelector('#combined-finish-heading');
+        if (!headingEl) return;
+        const isChallengeHero = options.isChallengeHero === true || Boolean(
+            options.challengeFinish || options.challengeConfirmPhase || options.lapMedal === 'challenge',
+        );
+        if (isChallengeHero) {
+            headingEl.textContent = '';
+            delete headingEl.dataset.kind;
+            headingEl.hidden = true;
+            headingEl.setAttribute('hidden', '');
+            headingEl.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        const headline = resolveCombinedFinishHeadline({
+            lapMedal: options.lapMedal,
+            previousTrackMedal: options.previousTrackMedal,
+            lapTimeSec: options.lapTimeSec,
+            previousPersonalBestSec: options.previousPersonalBestSec,
+            deltaToPersonalBest: options.deltaToPersonalBest,
+        });
+        headingEl.textContent = headline.text;
+        headingEl.dataset.kind = headline.kind;
+        headingEl.hidden = false;
+        headingEl.removeAttribute('hidden');
+        headingEl.removeAttribute('aria-hidden');
     }
 
     createModalStat(labelText, valueText, valueClass = '', onClick = null) {
@@ -708,6 +737,7 @@ export class ModalContentUi {
             challengeVerdict,
             previousPersonalBestSec,
             previousTrackMedal,
+            deltaToPersonalBest,
             lapCount,
         });
         

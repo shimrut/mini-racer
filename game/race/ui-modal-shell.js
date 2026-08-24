@@ -1277,6 +1277,7 @@ export class ModalShell {
                 challengeConfirmError: lapData.challengeConfirmError ?? null,
                 previousPersonalBestSec: lapData.previousPersonalBestSec,
                 previousTrackMedal: lapData.previousTrackMedal ?? null,
+                deltaToPersonalBest: lapData.deltaToPersonalBest,
                 lapCount: lapData.requiredLaps ?? lapData.completedLaps ?? 1,
             },
         );

@@ -1,5 +1,9 @@
 # Changelog
 
+- Daily and Campaign finish screens now put a status line above the time, in
+  the same Mini / Racer entrance as Head to Head: the medal just unlocked,
+  NEW BEST, or FINISHED. Head to Head still uses YOU WON / YOU LOST.
+
 - Daily and Campaign finish screens now show medals on a compact MEDALS row
   beside RANK and VS PB, instead of as a large block under the time. Head to
   Head still uses YOU WON / YOU LOST in that top slot.
