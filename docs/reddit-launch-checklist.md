@@ -32,7 +32,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The launch card works without inline scroll traps.
 - [ ] The expanded game works across phone and desktop layouts.
 - [ ] The retry flow is fast and predictable after a finish or an enabled collision auto-restart.
-- [ ] A verified PB ghost appears on the next attempt for that daily challenge and disappears six hours after the challenge leaves the seven-day playable window.
+- [ ] A verified PB ghost appears on the next attempt for that daily challenge and remains until 45 days after the race started, even after the challenge leaves the seven-day playlist.
 - [ ] The PB ghost uses the player's currently selected car and is visibly more transparent than the live player car.
 - [ ] `Race Now` keeps the custom-post loading screen visible until the resolved track ghost is prepared: valid historical posts load their own ghost, while expired posts load today's featured-track ghost.
 - [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.

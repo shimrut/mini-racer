@@ -1,5 +1,8 @@
 # Changelog
 
+- Daily times, ghost replays, and challenge records now stay for 45 days
+  after the race started, matching posts and analytics. The playlist is still
+  seven days; you cannot set a new time once a race has dropped off.
 - Head to Head now paints the challenger's ghost with a random Garage skin
   that is not the acceptor's current car, so the two cars are easy to tell
   apart. The acceptor still races in the skin they have equipped.

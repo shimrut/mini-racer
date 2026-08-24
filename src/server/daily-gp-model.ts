@@ -25,9 +25,8 @@ export const DAILY_GP_REDIS_TTL_SECONDS = 45 * 24 * 60 * 60;
 /** Matches `CAMPAIGN_GUEST_TTL_SECONDS`: a profile must outlive the progress it names. `tests/reddit-daily-gp-model.test.js` holds the two together. */
 export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 90 * 24 * 60 * 60;
 export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = null;
-export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = DAILY_GP_REDIS_TTL_SECONDS;
 export const DAILY_GP_PLAYLIST_DAYS = 7;
-export const DAILY_GP_COMPETITION_GRACE_MS = 6 * 60 * 60 * 1000;
 
 export type DailyGpChallenge = {
     id: string;
@@ -231,7 +230,7 @@ export function isDailyGpChallengePlayable(challenge: DailyGpChallenge, now = ne
 }
 
 export function getDailyGpCompetitionDeadlineMs(challenge: DailyGpChallenge): number {
-    return Date.parse(challenge.availableUntil) + DAILY_GP_COMPETITION_GRACE_MS;
+    return Date.parse(challenge.startsAt) + (DAILY_GP_REDIS_TTL_SECONDS * 1000);
 }
 
 export function getDailyGpCompetitionTtlSeconds(

@@ -56,6 +56,7 @@ import {
     upsertPlayerProfile,
 } from './competition-identity.js';
 import {
+    challengeCollectionKey,
     getPlayerTrackPbRecord,
     seedPlayerTrackPersonalBest,
 } from './pb-ghost-store.js';
@@ -192,10 +193,11 @@ async function readPlayerStandingSummary(
     };
 }
 
-/** Creates the standings-revision key if needed, then stamps TTL on all three Daily board keys. */
+/** Stamps TTL on the Daily board keys and ghost hash. Challenge setup creates the standings-revision key; restamp does not. */
 async function stampDailyCompetitionExpiry(
     challenge: DailyGpChallenge,
     now = new Date(),
+    { createStandingsRevision = true } = {},
 ): Promise<void> {
     const ttlSeconds = getDailyGpCompetitionTtlSeconds(challenge, now);
     const standingsRevisionKey = createRedisChallengeStandingsRevisionKey(challenge.id);
@@ -203,12 +205,15 @@ async function stampDailyCompetitionExpiry(
         createRedisChallengeLeaderboardKey(challenge.id),
         createRedisChallengeEntryHashKey(challenge.id),
         standingsRevisionKey,
+        challengeCollectionKey(challenge.id),
     ];
     if (ttlSeconds <= 0) {
         await Promise.all(keys.map((key) => redis.expire(key, 0)));
         return;
     }
-    await redis.incrBy(standingsRevisionKey, 0);
+    if (createStandingsRevision) {
+        await redis.incrBy(standingsRevisionKey, 0);
+    }
     await Promise.all(keys.map((key) => redis.expire(key, ttlSeconds)));
 }
 
@@ -310,7 +315,7 @@ async function maintainChallengeHistory(now = new Date()): Promise<void> {
             return Number.isFinite(startsAtMs) && startsAtMs <= cutoffMs ? [field] : [];
         });
         await Promise.all(parsedEntries.flatMap(({ challenge }) => (
-            challenge ? [stampDailyCompetitionExpiry(challenge, now)] : []
+            challenge ? [stampDailyCompetitionExpiry(challenge, now, { createStandingsRevision: false })] : []
         )));
         if (expiredFields.length) {
             await redis.hDel(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, expiredFields);

@@ -15,7 +15,6 @@ import {
     createRedisChallengeLeaderboardKey,
     DAY_MS,
     DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS,
-    DAILY_GP_COMPETITION_GRACE_MS,
     DAILY_GP_DEFAULT_LIMIT,
     DAILY_GP_GUEST_PROFILE_TTL_SECONDS,
     DAILY_GP_LEGACY_RULES_REVISION,
@@ -48,9 +47,8 @@ describe('reddit daily gp model', () => {
         expect(DAILY_GP_REDIS_TTL_SECONDS).toBe(3_888_000);
         expect(DAILY_GP_GUEST_PROFILE_TTL_SECONDS).toBe(7_776_000);
         expect(DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS).toBe(null);
-        expect(DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS).toBe(2_592_000);
+        expect(DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS).toBe(3_888_000);
         expect(DAILY_GP_PLAYLIST_DAYS).toBe(7);
-        expect(DAILY_GP_COMPETITION_GRACE_MS).toBe(21_600_000);
     });
 
     it('keeps a profile alive at least as long as the data it names', () => {
@@ -226,23 +224,23 @@ describe('reddit daily gp model', () => {
             'circuit',
         );
         expect(getDailyGpCompetitionDeadlineMs(challenge)).toBe(
-            Date.parse('2026-05-13T06:00:00.000Z'),
+            Date.parse('2026-06-20T00:00:00.000Z'),
         );
         expect(getDailyGpCompetitionTtlSeconds(
             challenge,
-            new Date('2026-05-13T05:59:01.000Z'),
+            new Date('2026-06-19T23:59:01.000Z'),
         )).toBe(59);
         expect(getDailyGpCompetitionTtlSeconds(
             challenge,
-            new Date('2026-05-13T06:00:00.000Z'),
+            new Date('2026-06-20T00:00:00.000Z'),
         )).toBe(0);
         expect(getDailyGpCompetitionTtlSeconds(
             challenge,
-            new Date('2026-05-14T00:00:00.000Z'),
+            new Date('2026-06-21T00:00:00.000Z'),
         )).toBe(0);
         expect(getDailyGpCompetitionTtlSeconds({
             ...challenge,
-            availableUntil: 'bad',
+            startsAt: 'bad',
         })).toBe(0);
         expect(getDailyGpCompetitionTtlSeconds(
             challenge,
@@ -271,7 +269,7 @@ describe('reddit daily gp model', () => {
             .toBe(false);
         expect(getDailyGpCompetitionDeadlineMs({
             ...challenge,
-            availableUntil: 'not-a-date',
+            startsAt: 'not-a-date',
         })).toBeNaN();
     });
 });
