@@ -1,5 +1,9 @@
 # Changelog
 
+- Head to Head finish now shows Daily and Campaign as soon as the local clock
+  is already faster than the target. Brag stays gray until the server confirms.
+  Improve and Home come back if that confirm is a miss or fails.
+
 - Head to Head finish words in the hero — VERIFYING, YOU WON, YOU LOST, YOU
   TIED, UNVERIFIED — now all use the same size.
 

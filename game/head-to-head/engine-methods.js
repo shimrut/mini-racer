@@ -316,6 +316,15 @@ export const headToHeadEngineMethods = {
                 campaignAction: () => this.showCampaignLobby(),
             });
         };
+        // Clock already faster than the target: show Daily/Campaign now. Brag stays locked
+        // until the server signs the beat. A miss or failed confirm puts Improve/Home back.
+        const optimisticWin = localDifferenceMs !== null && localDifferenceMs < 0;
+        const revertOptimisticWin = () => {
+            if (!optimisticWin) return;
+            this.modal.clearChallengeWinActions?.({
+                restartAction: () => this.restartActiveRace(),
+            });
+        };
         const stillOnThisFinish = () => (
             this._headToHeadFinishAttempt === finishAttempt
             && this.status === 'won'
@@ -356,6 +365,7 @@ export const headToHeadEngineMethods = {
         }
 
         openPendingFinish({ phase: 'pending' });
+        if (optimisticWin) applyWinActions();
 
         void (async () => {
             if (!stillOnThisFinish()) return;
@@ -394,6 +404,7 @@ export const headToHeadEngineMethods = {
                         phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
                         verdict: buildVerdict(serverDifferenceMs),
                     });
+                    revertOptimisticWin();
                     return;
                 }
                 this.modal.updateChallengeFinishHero?.({
@@ -402,6 +413,7 @@ export const headToHeadEngineMethods = {
                         ? (response.body?.error || 'Race finished, but the challenge result could not be confirmed.')
                         : (response.body?.error || 'This run could not be verified.'),
                 });
+                revertOptimisticWin();
                 return;
             }
             const verdict = buildVerdict(Number(response.body?.differenceMs));
@@ -430,6 +442,7 @@ export const headToHeadEngineMethods = {
                 phase: outcome === 'tie' ? 'tie' : 'lost',
                 verdict,
             });
+            revertOptimisticWin();
         })();
     },
 

@@ -82,7 +82,9 @@ The verdict lockup and Daily/Campaign status heading enter with the same
 `slideInLeft` 0.5s glide as Mini, and the time with the same `slideInRight`
 0.6s / 0.1s delay as Racer, both delayed by `--dur-finish-headline` (10ms)
 after the finish modal fade starts. Comparison rows and buttons do not
-stagger. Reduced motion turns the sequence off. Daily and Campaign put a
+stagger. A local Head to Head beat can swap Improve/Home for Daily/Campaign
+while VERIFYING is still showing; Brag stays disabled until the judged win.
+Reduced motion turns the sequence off. Daily and Campaign put a
 status heading above the time in that same column — medal name, NEW BEST, or
 FINISHED. MEDALS, VS PB, and RANK stay the comparison rows. Racing a standings
 ghost also shows VS #rank (or VS) above VS PB. Tapping MEDALS opens

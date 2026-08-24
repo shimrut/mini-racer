@@ -228,6 +228,8 @@ describe('Head to Head lobby and finish', () => {
                 modalMsg,
                 showModal: vi.fn(),
                 updateChallengeFinishHero,
+                setChallengeWinActions: vi.fn(),
+                clearChallengeWinActions: vi.fn(),
             },
             restartActiveRace: vi.fn(),
             loadChallengeLobby: vi.fn(),
@@ -272,6 +274,10 @@ describe('Head to Head lobby and finish', () => {
             );
         });
         expect(context.modal.showModal).toHaveBeenCalledTimes(1);
+        expect(context.modal.setChallengeWinActions).toHaveBeenCalledTimes(1);
+        expect(context.modal.clearChallengeWinActions).toHaveBeenCalledWith({
+            restartAction: expect.any(Function),
+        });
     });
 
     it('patches the hero in place for a claimed win and settles lost/tie without submitting', async () => {
@@ -743,12 +749,76 @@ describe('Head to Head lobby and finish', () => {
                 campaignAction: expect.any(Function),
             });
         });
-        expect(setChallengeWinActions).toHaveBeenCalledTimes(1);
+        expect(setChallengeWinActions).toHaveBeenCalled();
         const { dailyAction, campaignAction } = setChallengeWinActions.mock.calls.at(-1)[0];
         dailyAction();
         campaignAction();
         expect(context.showDailyLobby).toHaveBeenCalledTimes(1);
         expect(context.showCampaignLobby).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers Daily and Campaign on a local beat before the server answers, then restores Improve if it was not a beat', async () => {
+        const setChallengeWinActions = vi.fn();
+        const clearChallengeWinActions = vi.fn();
+        const updateChallengeFinishHero = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                challengerUsername: 'shimroot',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero,
+                setChallengeWinActions,
+                clearChallengeWinActions,
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            showDailyLobby: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+
+        let answerWin;
+        headToHeadServiceMocks.submitHeadToHeadRun.mockReturnValue(
+            new Promise((resolve) => { answerWin = resolve; }),
+        );
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.5 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            expect.objectContaining({ challengeConfirmPhase: 'pending' }),
+            expect.objectContaining({ shareEnabled: false }),
+        );
+        expect(setChallengeWinActions).toHaveBeenCalledTimes(1);
+        expect(clearChallengeWinActions).not.toHaveBeenCalled();
+        expect(updateChallengeFinishHero).not.toHaveBeenCalled();
+
+        answerWin({
+            ok: false,
+            body: {
+                accepted: false,
+                status: 'target_not_beaten',
+                differenceMs: 400,
+            },
+        });
+        await vi.waitFor(() => {
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith({
+                phase: 'lost',
+                verdict: { opponentName: 'shimroot', deltaSec: 0.4 },
+            });
+        });
+        expect(clearChallengeWinActions).toHaveBeenCalledWith({
+            restartAction: expect.any(Function),
+        });
     });
 
     it('ignores a stale attempt answering after the racer has retried', async () => {
@@ -769,6 +839,7 @@ describe('Head to Head lobby and finish', () => {
                 showModal: vi.fn(),
                 updateChallengeFinishHero,
                 setChallengeWinActions,
+                clearChallengeWinActions: vi.fn(),
             },
             restartActiveRace: vi.fn(),
             loadChallengeLobby: vi.fn(),
@@ -822,6 +893,7 @@ describe('Head to Head lobby and finish', () => {
         expect(updateChallengeFinishHero).not.toHaveBeenCalledWith({
             shareRequest: { kind: 'challenge-brag', acceptToken: 'accept-token-first' },
         });
+        expect(context.modal.clearChallengeWinActions).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -865,13 +937,19 @@ describe('Head to Head lobby and finish', () => {
                     expect.objectContaining({ phase: expectedPhase }),
                 );
             });
-            expect(setChallengeWinActions).not.toHaveBeenCalled();
+            // 7.5 already beat 8.0 on the clock, so Daily/Campaign appear first, then
+            // Improve/Home return when the tape is refused.
+            expect(setChallengeWinActions).toHaveBeenCalledTimes(1);
+            expect(clearChallengeWinActions).toHaveBeenCalledWith({
+                restartAction: expect.any(Function),
+            });
         } else {
             // The verdict settled on screen without waiting, but the run still went out so a
             // personal best could be claimed. With none reported, the hero is left as it was.
             expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
             expect(updateChallengeFinishHero).not.toHaveBeenCalled();
             expect(setChallengeWinActions).not.toHaveBeenCalled();
+            expect(clearChallengeWinActions).not.toHaveBeenCalled();
         }
         expect(context.modal.showModal).toHaveBeenCalledWith(
             'Challenge complete',
