@@ -404,8 +404,9 @@ flowchart LR
   prior-PB delta, and originating rank; a server-corrected verdict repaints the
   opponent row as well as the lockup. Daily and Campaign keep a status heading
   above the time in that same column (medal name, NEW BEST, or FINISHED), with
-  the same heading-to-row gap and
-  button-edge alignment, and reuse those left-label / right-value comparison rows
+  the same heading-to-row gap,
+  button-edge alignment, and Mini/Racer entrance delayed by `--dur-finish-headline`,
+  and reuse those left-label / right-value comparison rows
   for VS PB, RANK, and MEDALS. Tapping MEDALS opens the shared finish mini
   overlay with each medal and its time stacked, matching checkpoint splits.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post

@@ -1,5 +1,8 @@
 # Changelog
 
+- Head to Head finish heading and time now wait the same 10ms after the modal
+  fade as Daily and Campaign. The comparison-row stagger is unchanged.
+
 - Daily and Campaign finish screens now open a small MEDALS sheet from that
   row, listing each medal on the left and its time on the right, the same way
   checkpoint splits open from the clock. The author medal is labeled author.
