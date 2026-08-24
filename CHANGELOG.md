@@ -1,5 +1,9 @@
 # Changelog
 
+- Tapping the Campaign track counter opens the Tracks list with Campaign
+  stages. Unlocked rows start that stage; locked rows jump the carousel to
+  that poster.
+
 - Tapping the Daily expiry line or track counter opens the Tracks list.
 
 - Head to Head finish now shows Daily and Campaign as soon as the local clock

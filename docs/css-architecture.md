@@ -137,7 +137,8 @@ maintaining mode-specific card layouts:
 - The Daily/Campaign carousel stacks the schematic, the `current / total`
   counter, then the track's own footer (time, rank, medals) — everything below
   the artwork describes the track above it. Daily's expiry line and counter
-  open the Tracks list; Campaign's counter does not. Previous and Next leave that stack:
+  open the Tracks list; Campaign's counter opens the same list with Campaign
+  stages. Previous and Next leave that stack:
   they are circular icon buttons grid-placed into row 1 with `align-self:
   center` and `justify-self: start`/`end`, so they flank the schematic and stay
   centred on artwork whose height is only resolved at layout time. Absolute

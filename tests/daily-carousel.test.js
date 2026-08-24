@@ -300,6 +300,16 @@ describe('Daily tracks opener', () => {
             'this.campaignCarousel.navigation?.addEventListener("click", openDailyTracks);',
         );
     });
+
+    it('wires the Campaign counter to the Tracks list', () => {
+        const engineSource = readFileSync(new URL('../game/engine.js', import.meta.url), 'utf8');
+        expect(engineSource).toMatch(
+            /invokeModeMethod\(\s*"campaign",\s*"openCampaignTracks"/,
+        );
+        expect(engineSource).toContain(
+            'this.campaignCarousel.navigation?.addEventListener("click", openCampaignTracks);',
+        );
+    });
 });
 
 describe('TrackCarousel expiry line', () => {

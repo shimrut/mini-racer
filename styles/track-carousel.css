@@ -163,7 +163,8 @@ body[data-lobby-mode="campaign"] #start-overlay {
     min-width: 0;
 }
 
-#daily-carousel-navigation {
+#daily-carousel-navigation,
+#campaign-carousel-navigation {
     cursor: pointer;
 }
 

@@ -543,7 +543,7 @@ describe('game stylesheet architecture', () => {
             /\.track-carousel--lobby \.track-carousel__expiry\s*\{[^}]*cursor:\s*pointer;/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /#daily-carousel-navigation\s*\{[^}]*cursor:\s*pointer;/s,
+            /#daily-carousel-navigation,\s*#campaign-carousel-navigation\s*\{[^}]*cursor:\s*pointer;/s,
         );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby:has\(\.track-carousel__expiry\) \.track-carousel__navigation\s*\{[^}]*grid-area:\s*3 \/ 1;/s,

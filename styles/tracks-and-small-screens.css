@@ -92,6 +92,24 @@
     height: 100%;
 }
 
+#daily-playlist-modal .daily-playlist-entry--hero.is-locked .daily-playlist-hero-preview canvas {
+    filter: saturate(0.55) brightness(0.78);
+}
+
+.daily-playlist-hero-lock {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    color: var(--text-dim);
+}
+
+.daily-playlist-hero-lock-icon {
+    width: 1.65rem;
+    height: 2.2rem;
+}
+
 @media (max-width: 560px) {
     #modal:has(#modal-runs-view.active-view) .modal-card,
     #settings-modal .modal-card,

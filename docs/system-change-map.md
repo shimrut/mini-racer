@@ -215,7 +215,9 @@ flowchart LR
   the race chrome has appeared.
   Standings resolves the carousel's currently centred track at click time.
   Tapping Daily's expiry line or `current / total` counter opens the shared
-  Tracks modal on the Daily playlist.
+  Tracks modal on the Daily playlist. Tapping Campaign's `current / total`
+  counter opens that same modal on Campaign stages: unlocked rows start the
+  stage, locked rows close and centre that poster on the carousel.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. A timeout, network failure, or server 5xx during
   challenge loading is contained in the challenge pane: the global loader is

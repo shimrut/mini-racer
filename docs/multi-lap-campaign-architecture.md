@@ -412,9 +412,10 @@ the same compact action layout:
   player has no rank. Each page reads the independent leaderboard for its
   selected day or stage. Unlock gates still apply to starting and submitting
   races.
-- Tracks opens the shared Tracks modal. Daily shows the published playlist;
-  Campaign shows Gold progress, locked/unlocked state, fixed laps, best
-  medal/time, and lets the player select any unlocked stage.
+- The Daily and Campaign counters open the shared Tracks modal. Daily shows
+  the published playlist; Campaign shows stage number, laps, medal/time, and
+  a simple locked look. Unlocked Campaign rows start that stage; locked rows
+  jump the carousel to that poster.
 - Home, Daily, and Campaign retain the original compact start-group width.
   Daily and Campaign place the icon-backed Standings and Tracks utilities on
   the right, matching the pre-Campaign Daily lobby.

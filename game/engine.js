@@ -555,6 +555,11 @@ export class RealTimeRacer {
     this.dailyCarousel.expiryLine?.addEventListener("click", openDailyTracks);
     this.dailyCarousel.navigation?.addEventListener("click", openDailyTracks);
     this.campaignCarousel.bind();
+    const openCampaignTracks = () => void this.invokeModeMethod(
+      "campaign",
+      "openCampaignTracks",
+    );
+    this.campaignCarousel.navigation?.addEventListener("click", openCampaignTracks);
     this.lobbyUi.bind();
     this.garage.bind();
     this.hud.setPauseVisible(false);

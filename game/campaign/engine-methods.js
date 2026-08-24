@@ -38,6 +38,13 @@ import {
 const CAMPAIGN_UNLOCK_CONFIRMATION_TIMEOUT_MS = 5_000;
 const CAMPAIGN_UNLOCK_CONFIRMATION_POLL_MS = 50;
 
+function campaignTracksListPayload(engine) {
+    const stages = engine.campaignLobbyState?.stages;
+    const hasStages = Array.isArray(stages) && stages.length > 0;
+    if (hasStages) return stages;
+    return engine._campaignBootstrapReady ? [] : null;
+}
+
 function toRaceChallenge(stage) {
     return {
         id: stage.raceId,
@@ -391,6 +398,7 @@ export const campaignEngineMethods = {
             if (!this.startButtonPending) {
                 this.lobbyUi.setCampaignPrimaryLoading?.(!bootstrapReady);
             }
+            this.syncOpenCampaignTracks?.();
         }
         return this.campaignLobbyState;
     },
@@ -419,6 +427,7 @@ export const campaignEngineMethods = {
         this.lobbyUi.showCampaign(this.campaignLobbyState);
         if (paintCarousel) this.paintCampaignCarousel();
         this.lobbyUi.setCampaignPrimaryLoading?.(!bootstrapReady);
+        this.syncOpenCampaignTracks?.();
     },
 
     async ensureCampaignBootstrap({ forceRefresh = false } = {}) {
@@ -568,6 +577,36 @@ export const campaignEngineMethods = {
         if (!stage?.id) return;
         this.selectedCampaignStageId = stage.id;
         this.lobbyUi?.setCampaignSelectedStage?.(stage);
+    },
+
+    syncOpenCampaignTracks() {
+        if (!this.dailyChallengeUi?.isCampaignTracksModalOpen?.()) return;
+        this.dailyChallengeUi.renderCampaignPlaylist(
+            campaignTracksListPayload(this),
+            null,
+            { selectedStageId: this.selectedCampaignStageId },
+        );
+    },
+
+    openCampaignTracks() {
+        this.dailyChallengeUi?.openCampaignTracksModal?.(
+            campaignTracksListPayload(this),
+            {
+                onChoose: (stage) => this.handleCampaignTracksChoose(stage),
+            },
+            { selectedStageId: this.selectedCampaignStageId },
+        );
+    },
+
+    handleCampaignTracksChoose(stage) {
+        if (!stage?.id) return;
+        if (!stage.unlocked) {
+            this.selectedCampaignStageId = stage.id;
+            this.campaignCarousel?.selectChallenge?.(stage.id);
+            this.lobbyUi?.setCampaignSelectedStage?.(stage);
+            return;
+        }
+        void this.startCampaignStage(stage);
     },
 
     handleCampaignCarouselSettled(card) {
