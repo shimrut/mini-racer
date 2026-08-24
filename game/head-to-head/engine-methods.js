@@ -341,21 +341,16 @@ export const headToHeadEngineMethods = {
         const beatsViewerBest = finalTimeMs !== null
             && (!hasViewerBest || finalTimeMs < viewerBestMs);
         const claimSettledBest = async () => {
-            let settledResponse = null;
             try {
-                settledResponse = await submitHeadToHeadRun({
+                // Same submit as a claimed win: origin personal best and ghost save after the
+                // first body, so this call does not wait on Daily/Campaign or paint origin place.
+                await submitHeadToHeadRun({
                     challengeId: challenge.challengeId,
                     replay,
                     bestTimeMs: finalTimeMs,
                 });
             } catch (submitError) {
                 console.error('Could not rank a settled Head to Head run:', submitError);
-                return;
-            }
-            if (!stillOnThisFinish()) return;
-            const settledBestUpdate = settledResponse?.body?.bestUpdate ?? null;
-            if (settledBestUpdate) {
-                this.modal.updateChallengeFinishHero?.({ bestUpdate: settledBestUpdate });
             }
         };
 
@@ -373,17 +368,14 @@ export const headToHeadEngineMethods = {
             return;
         }
 
-        const localWin = localDifferenceMs !== null && localDifferenceMs < 0;
-        openPendingFinish({ phase: localWin ? 'won' : 'pending' });
+        openPendingFinish({ phase: 'pending' });
 
         void (async () => {
             if (!stillOnThisFinish()) return;
-            if (!localWin) {
-                this.modal.updateChallengeFinishHero?.({
-                    phase: 'pending',
-                    statusText: verifyingStatus,
-                });
-            }
+            this.modal.updateChallengeFinishHero?.({
+                phase: 'pending',
+                statusText: verifyingStatus,
+            });
 
             let confirmationFailed = false;
             let response = { ok: false, body: { error: 'This run could not be verified.' } };
@@ -408,9 +400,6 @@ export const headToHeadEngineMethods = {
 
             const accepted = response.ok && response.body?.accepted === true;
             const outcome = accepted ? response.body?.outcome : null;
-            // A challenge run is a real run on the stage or Daily behind it, so a lost challenge
-            // can still carry a personal best home. Report it on both endings.
-            const bestUpdate = response.body?.bestUpdate ?? null;
 
             if (!accepted) {
                 const serverDifferenceMs = Number(response.body?.differenceMs);
@@ -421,7 +410,6 @@ export const headToHeadEngineMethods = {
                     this.modal.updateChallengeFinishHero?.({
                         phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
                         verdict: buildVerdict(serverDifferenceMs),
-                        bestUpdate,
                     });
                     return;
                 }
@@ -447,7 +435,6 @@ export const headToHeadEngineMethods = {
                 this.modal.updateChallengeFinishHero?.({
                     phase: 'won',
                     verdict,
-                    bestUpdate,
                 });
                 rememberHeadToHeadWin(
                     challenge.challengeId,
@@ -459,7 +446,6 @@ export const headToHeadEngineMethods = {
             this.modal.updateChallengeFinishHero?.({
                 phase: outcome === 'tie' ? 'tie' : 'lost',
                 verdict,
-                bestUpdate,
             });
         })();
     },

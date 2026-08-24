@@ -790,6 +790,13 @@ describe('head-to-head service', () => {
             { ...context, username: 'ChallengerAce' },
         );
 
+        expect(won.body).toMatchObject({
+            accepted: true,
+            outcome: 'won',
+        });
+        expect(won.body).not.toHaveProperty('bestUpdate');
+        expect(recordBest).not.toHaveBeenCalled();
+        await won.afterSend();
         expect(recordBest).toHaveBeenCalledTimes(1);
         const [recordedChallenge, recordedReplay, recordedContext] = recordBest.mock.calls[0];
         expect(recordedChallenge.raceId).toBe('numbered-v1-03');
@@ -804,11 +811,37 @@ describe('head-to-head service', () => {
                 objectiveType: 'multi_lap_total',
             }),
         });
-        expect(won.body).toMatchObject({
-            accepted: true,
-            outcome: 'won',
-            bestUpdate: { mode: 'campaign', improved: true, bestTimeMs: 25_000, medal: 'gold', rank: 4 },
+    });
+
+    it('returns win and loss before origin personal best and ghost finish', async () => {
+        let finishOrigin;
+        const recordBest = vi.fn(() => new Promise((resolve) => {
+            finishOrigin = resolve;
+        }));
+        const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000, recordBest });
+        const created = await createChallenge(service);
+
+        const won = await service.submit(
+            { challengeId: created.body.challengeId, replay: {}, bestTimeMs: 25_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(won.status).toBe(200);
+        expect(won.body).toMatchObject({ accepted: true, outcome: 'won' });
+        expect(won.body).not.toHaveProperty('bestUpdate');
+        expect(typeof won.body.acceptToken).toBe('string');
+        expect(recordBest).not.toHaveBeenCalled();
+
+        const originSave = won.afterSend();
+        expect(recordBest).toHaveBeenCalledTimes(1);
+        finishOrigin({
+            mode: 'campaign',
+            improved: true,
+            bestTimeMs: 25_000,
+            medal: 'gold',
+            rank: 4,
         });
+        await originSave;
     });
 
     it('ranks a run that lost the challenge but beat the player own best', async () => {
@@ -827,6 +860,9 @@ describe('head-to-head service', () => {
             { ...context, username: 'ChallengerAce' },
         );
 
+        expect(lost.body).not.toHaveProperty('bestUpdate');
+        expect(recordBest).not.toHaveBeenCalled();
+        await lost.afterSend();
         expect(recordBest).toHaveBeenCalledTimes(1);
         expect(recordBest.mock.calls[0][2]).toMatchObject({
             verifiedRun: expect.objectContaining({ bestTimeMs: 26_000, completedLaps: 2 }),
@@ -841,9 +877,9 @@ describe('head-to-head service', () => {
                 accepted: false,
                 status: 'target_not_beaten',
                 differenceMs: 360,
-                bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 26_000, rank: 12 },
             },
         });
+        expect(lost.body).not.toHaveProperty('bestUpdate');
     });
 
     it('reports no update when the mode refuses the run', async () => {
@@ -856,10 +892,10 @@ describe('head-to-head service', () => {
             { ...context, username: 'ChallengerAce' },
         );
 
-        expect(won).toMatchObject({
-            status: 200,
-            body: { accepted: true, outcome: 'won', bestUpdate: null },
-        });
+        expect(won.body).toMatchObject({ accepted: true, outcome: 'won' });
+        expect(won.body).not.toHaveProperty('bestUpdate');
+        await won.afterSend();
+        expect(recordBest).toHaveBeenCalledTimes(1);
     });
 
     it('keeps the challenge result when the mode write fails', async () => {
@@ -874,11 +910,10 @@ describe('head-to-head service', () => {
             { ...context, username: 'ChallengerAce' },
         );
 
-        expect(won).toMatchObject({
-            status: 200,
-            body: { accepted: true, outcome: 'won', bestUpdate: null },
-        });
+        expect(won.body).toMatchObject({ accepted: true, outcome: 'won' });
+        expect(won.body).not.toHaveProperty('bestUpdate');
         expect(typeof won.body.acceptToken).toBe('string');
+        await expect(won.afterSend()).resolves.toBeNull();
     });
 
     it('never sends an unverified run to the mode', async () => {
@@ -896,6 +931,7 @@ describe('head-to-head service', () => {
         );
 
         expect(refused).toMatchObject({ status: 422, body: { status: 'invalid_replay' } });
+        expect(refused.afterSend).toBeUndefined();
         expect(recordBest).not.toHaveBeenCalled();
     });
 

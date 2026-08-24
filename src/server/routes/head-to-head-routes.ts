@@ -120,7 +120,16 @@ export function registerHeadToHeadRoutes(
                     body,
                 ),
             );
+            // Win/loss and the brag token belong in this body. Origin personal best and ghost do
+            // not: they run after the send so Redis still finishes without holding the phone.
             res.status(result.status).json(result.body);
+            if (result.afterSend) {
+                try {
+                    await result.afterSend();
+                } catch (error) {
+                    console.error('Head to Head origin save failed after submit response:', error);
+                }
+            }
         } catch (error) {
             console.error('Failed to submit Mini Racer head-to-head:', error);
             res.status(500).json({ accepted: false, status: 'challenge_failed', error: 'Could not verify this challenge run.' });

@@ -70,6 +70,11 @@ export type HeadToHeadRequestContext = {
 export type HeadToHeadServiceResult = {
     status: number;
     body: Record<string, unknown>;
+    /**
+     * Origin personal-best / ghost work that must not hold the HTTP body. The submit route sends
+     * `body` first, then awaits this so Redis still finishes on the same request.
+     */
+    afterSend?: () => Promise<unknown>;
 };
 
 export type HeadToHeadReplayResult = {
@@ -1002,7 +1007,7 @@ export function createHeadToHeadService(
                 },
             };
         }
-        const targetNotBeaten = (differenceMs: number, bestUpdate: HeadToHeadBestUpdate | null) => ({
+        const targetNotBeaten = (differenceMs: number): HeadToHeadServiceResult => ({
             status: 422,
             body: {
                 accepted: false,
@@ -1010,7 +1015,6 @@ export function createHeadToHeadService(
                 error: 'This run did not beat the challenge time.',
                 targetTimeMs: challenge.targetTimeMs,
                 differenceMs,
-                bestUpdate,
             },
         });
         recordAnalyticsRaceBestEffort('challenge', 'finish', viewer.playerId);
@@ -1028,7 +1032,7 @@ export function createHeadToHeadService(
             return { status: 422, body: { status: 'invalid_replay', error: 'This challenge run could not be verified.' } };
         }
         const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
-        const bestUpdatePromise = recordVerifiedBest(
+        const originSave = () => recordVerifiedBest(
             challenge,
             input.replay,
             viewer,
@@ -1036,11 +1040,17 @@ export function createHeadToHeadService(
             verified,
         );
         if (differenceMs >= 0) {
-            return targetNotBeaten(differenceMs, await bestUpdatePromise);
+            // Win/loss can leave as soon as the tape is judged. Origin personal best and ghost stay
+            // off this body and run after the route has already sent it.
+            return {
+                ...targetNotBeaten(differenceMs),
+                afterSend: originSave,
+            };
         }
 
-        // Origin save, brag receipt, and unlock writes do not depend on each other.
-        // Completed-race and win events share one car-unlock hash, so those two stay in order.
+        // Brag receipt and Head to Head unlocks belong on the first body. Origin save does not:
+        // those Daily/Campaign writes would hold the duel, and public Daily/Campaign HTTP cannot
+        // take this already-judged run.
         const acceptPromise = challenge.postId
             ? (async () => {
                 const acceptToken = createId();
@@ -1064,8 +1074,7 @@ export function createHeadToHeadService(
             await recordCompletedRace(viewer.playerId);
             await recordHeadToHeadWin(viewer.playerId, challengeId);
         })();
-        const [bestUpdate, acceptToken] = await Promise.all([
-            bestUpdatePromise,
+        const [acceptToken] = await Promise.all([
             acceptPromise,
             unlockWrites,
         ]);
@@ -1080,9 +1089,9 @@ export function createHeadToHeadService(
                 targetTimeMs: challenge.targetTimeMs,
                 differenceMs,
                 acceptToken,
-                bestUpdate,
                 carUnlocks: await readChallengeCarUnlocks(viewer.playerId),
             },
+            afterSend: originSave,
         };
     }
 

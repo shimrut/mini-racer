@@ -95,4 +95,59 @@ describe('Head to Head route identity forwarding', () => {
             guestToken: 'signed-token',
         });
     });
+
+    it('sends the duel body before origin save and keeps the handler alive for Redis', async () => {
+        const order = [];
+        let finishOrigin;
+        const originSave = new Promise((resolve) => {
+            finishOrigin = resolve;
+        });
+        const submitHeadToHead = vi.fn(async () => ({
+            status: 200,
+            body: { accepted: true, outcome: 'won', acceptToken: 'token-1' },
+            afterSend: async () => {
+                await originSave;
+                order.push('origin-save');
+            },
+        }));
+        const handlers = routeHandlers({
+            getHeadToHeadRequestContext: () => ({
+                username: null,
+                subredditName: 'MiniRacer',
+                postData: { postType: 'head-to-head', challengeId: 'challenge-1' },
+            }),
+            readContextPostData: () => ({ postType: 'head-to-head', challengeId: 'challenge-1' }),
+            previewHeadToHead: vi.fn(),
+            createHeadToHead: vi.fn(),
+            getHeadToHead: vi.fn(),
+            submitHeadToHead,
+            previewHeadToHeadBrag: vi.fn(),
+            confirmHeadToHeadBrag: vi.fn(),
+        });
+        const submitResponse = responseRecorder();
+        const json = submitResponse.json.bind(submitResponse);
+        submitResponse.json = (body) => {
+            order.push('json');
+            return json(body);
+        };
+
+        const submitDone = handlers.post['/api/head-to-head/submit']({
+            body: { replay: { inputs: [] } },
+        }, submitResponse);
+
+        await vi.waitFor(() => {
+            expect(order).toEqual(['json']);
+        });
+        expect(submitResponse.statusCode).toBe(200);
+        expect(submitResponse.body).toEqual({
+            accepted: true,
+            outcome: 'won',
+            acceptToken: 'token-1',
+        });
+        expect(submitResponse.body).not.toHaveProperty('bestUpdate');
+
+        finishOrigin();
+        await submitDone;
+        expect(order).toEqual(['json', 'origin-save']);
+    });
 });
