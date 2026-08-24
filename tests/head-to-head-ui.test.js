@@ -1194,6 +1194,82 @@ describe('Head to Head lobby and finish', () => {
         expect(context.startButtonPending).toBe(false);
     });
 
+    it('gives the challenger ghost a random garage skin different from the acceptor', async () => {
+        const frozenGhost = { schemaVersion: 2, samples: [] };
+        const installedTarget = { displayName: 'RaceFan', carAssetName: 'assets/cars/mr_mr_blue.webp' };
+        const installRaceComparisonTarget = vi.fn(() => installedTarget);
+        const prepareOpponent = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                lapCount: 2,
+                rulesRevision: 1,
+                targetTimeMs: 8_000,
+                challengerUsername: '  RaceFan  ',
+                frozenGhost,
+            },
+            startButtonPending: false,
+            currentTrackKey: 'numberZero',
+            trackCanvas: {},
+            trackPersonalBestByTrackKey: {},
+            pbGhost: { clearTrack: vi.fn(), prepareOpponent },
+            journeys: { startAttempt: vi.fn() },
+            clearRaceComparisonTarget: vi.fn(),
+            installRaceComparisonTarget,
+            applyDailyChallenge: vi.fn(),
+            startSequence: vi.fn(),
+        };
+
+        await headToHeadEngineMethods.startHeadToHead.call(context);
+
+        expect(context.clearRaceComparisonTarget).toHaveBeenCalledTimes(1);
+        expect(installRaceComparisonTarget).toHaveBeenCalledWith(
+            {
+                displayName: 'RaceFan',
+                bestTimeMs: 8_000,
+                ghost: frozenGhost,
+            },
+            { lapCount: 2 },
+        );
+        expect(prepareOpponent).not.toHaveBeenCalled();
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+    });
+
+    it('still prepares the challenger ghost when the comparison target cannot be installed', async () => {
+        const frozenGhost = { schemaVersion: 2, samples: [] };
+        const prepareOpponent = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                raceId: 'numbered-v1-00',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                rulesRevision: 1,
+                targetTimeMs: 8_000,
+                frozenGhost,
+            },
+            startButtonPending: false,
+            currentTrackKey: 'numberZero',
+            trackCanvas: {},
+            trackPersonalBestByTrackKey: {},
+            pbGhost: { clearTrack: vi.fn(), prepareOpponent },
+            journeys: { startAttempt: vi.fn() },
+            installRaceComparisonTarget: vi.fn(() => null),
+            applyDailyChallenge: vi.fn(),
+            startSequence: vi.fn(),
+        };
+
+        await headToHeadEngineMethods.startHeadToHead.call(context);
+
+        expect(prepareOpponent).toHaveBeenCalledWith({
+            bestTimeMs: 8_000,
+            ghost: frozenGhost,
+        });
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps a permanent challenge error unavailable instead of offering Retry', async () => {
         const showChallenge = vi.fn();
         const context = {

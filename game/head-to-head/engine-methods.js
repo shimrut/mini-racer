@@ -195,11 +195,23 @@ export const headToHeadEngineMethods = {
                 });
             }
             if (challenge.frozenGhost) {
-                const prepareGhost = this.pbGhost.prepareOpponent || this.pbGhost.prepare;
-                prepareGhost?.call(this.pbGhost, {
+                const challengerName = typeof challenge.challengerUsername === 'string'
+                    ? challenge.challengerUsername.trim()
+                    : '';
+                const installed = this.installRaceComparisonTarget?.({
+                    displayName: challengerName || 'Challenger',
                     bestTimeMs: challenge.targetTimeMs,
                     ghost: challenge.frozenGhost,
+                }, {
+                    lapCount: challenge.lapCount,
                 });
+                if (!installed) {
+                    const prepareGhost = this.pbGhost.prepareOpponent || this.pbGhost.prepare;
+                    prepareGhost?.call(this.pbGhost, {
+                        bestTimeMs: challenge.targetTimeMs,
+                        ghost: challenge.frozenGhost,
+                    });
+                }
             }
             delete this.trackPersonalBestByTrackKey[stage.raceId];
             this.bestLapTime = null;

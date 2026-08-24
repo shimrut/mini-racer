@@ -14,6 +14,8 @@ Share verified times or challenge other players Head to Head.
   ghosts, and a separate leaderboard for every stage.
 - Added **Head to Head** challenges from verified Daily and Campaign results.
   Race another player’s frozen ghost, beat their time, and Brag when signed in.
+  You keep your current car skin; the challenger’s ghost uses a different
+  random Garage car.
 - Guests can race Daily, Campaign, and Head to Head. Signing in keeps the faster
   Campaign result when guest progress is merged.
 - Daily races now use **1 or 2 laps**, with the last **7 days** available to replay.

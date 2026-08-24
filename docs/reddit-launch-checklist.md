@@ -116,6 +116,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
   `SUBMIT_POST`, the request runs as `USER` with user-generated content, and an
   app-authored fallback is deleted and reported as unavailable without awarding
   the post unlock.
+- [ ] Accept a Head to Head: the live car stays on the equipped Garage skin
+  and the challenger ghost uses a different random Garage skin. Retry keeps
+  that pairing; Race again from the lobby may pick a new challenger skin.
 - [ ] The Head to Head post makes the challenger, viewer, track name, target
   time, lap count, and Race Head to Head action legible without
   inline scrolling on desktop or compact Reddit WebView widths.

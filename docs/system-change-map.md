@@ -444,6 +444,10 @@ flowchart LR
   submissions may refresh the player's cached PB but cannot replace that
   opponent mid-session. Opponent ghosts are explicit and therefore render
   independently of the PB-ghost preference.
+- Head to Head reuses that same opponent-skin path. The acceptor keeps the
+  car they have equipped; the challenger's frozen ghost is painted with one
+  random Garage skin that is not the acceptor's current car. In-race Retry
+  keeps that pairing; a fresh Race from the lobby picks again.
 - The finish sheet's primary action never promises a rematch it has not
   confirmed. A loss offers Retry against the same ghost; a win holds the
   ordinary Improve — which restarts the competition without the beaten
