@@ -100,15 +100,27 @@ describe('game stylesheet architecture', () => {
         }
     });
 
-    it('keeps the challenge finish as a scoped responsive result lockup', () => {
+    it('uses one padded 320px finish column for Daily, Campaign, and Head to Head', () => {
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.pause-header\s*\{[^}]*align-items:\s*stretch;[^}]*max-width:\s*320px;/s,
+            /#modal-combined-view \.pause-header\s*\{[^}]*align-items:\s*stretch;[^}]*max-width:\s*320px;[^}]*padding:\s*0\.35rem;/s,
         );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view \.combined-actions\s*\{[^}]*max-width:\s*320px;[^}]*padding:\s*0\.35rem;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /\.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;[^}]*margin-top:\s*2\.75rem;/s,
+        );
+        expect(resultDetailStyles).not.toMatch(
+            /#modal-combined-view\.is-challenge-finish \.pause-header\s*\{[^}]*max-width:\s*320px;/s,
+        );
+    });
+
+    it('keeps the challenge finish as a scoped responsive result lockup', () => {
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup\s*\{[^}]*font-family:\s*var\(--header-font\);[^}]*font-style:\s*italic;[^}]*font-weight:\s*900;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*order:\s*3;[^}]*margin-top:\s*2\.75rem;/s,
+            /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*order:\s*3;/s,
         );
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup__outcome,\s*#modal-combined-view\.is-challenge-finish #combined-time\s*\{[^}]*font-size:\s*3\.5rem;/s,
@@ -124,7 +136,7 @@ describe('game stylesheet architecture', () => {
 
     it('lays out Daily, Campaign, and Head to Head comparison stats as the same left-label rows', () => {
         expect(resultDetailStyles).toMatch(
-            /\.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;[^}]*max-width:\s*320px;/s,
+            /\.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;[^}]*margin-top:\s*2\.75rem;/s,
         );
         expect(resultDetailStyles).toMatch(
             /\.stat-floating-item\s*\{[^}]*flex-direction:\s*row;[^}]*justify-content:\s*space-between;/s,

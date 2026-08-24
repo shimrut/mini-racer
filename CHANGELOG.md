@@ -1,5 +1,10 @@
 # Changelog
 
+- Daily, Campaign, and Head to Head finishes now share one layout: the same
+  320px column and padding as the buttons, and the same gap from the heading
+  down to the comparison rows. Head to Head still swaps in YOU WON / YOU LOST
+  and its entrance motion; Daily and Campaign still show time and medals.
+
 - Nine new tracks join the Daily rotation: **Twisted Clover**, **Hook Loop**,
   **Crooked Arrow**, **Winding Road**, **Gun Slinger**, **Lightning Hook**,
   **Double Trouble**, **Broken Wing**, and **Twin Wings**. They are appended

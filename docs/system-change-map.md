@@ -393,11 +393,12 @@ flowchart LR
   only after a verified beat. A local win stamps YOU WON before the server
   answers; share, car unlocks, and remembered wins wait for confirmation. The Head to Head finish replaces the legacy
   medal/avatar hero with a left-aligned italic Outfit `YOU WON` / `YOU LOST`
-  line and a right-aligned finish clock of the same size, both in the 320px
-  button column. The three comparison rows own opponent margin,
+  line and a right-aligned finish clock of the same size, both in the shared
+  320px finish column used by Daily and Campaign as well. The three comparison rows own opponent margin,
   prior-PB delta, and originating rank; a server-corrected verdict repaints the
   opponent row as well as the lockup. Daily and Campaign keep their time and
-  medal hero, and reuse those same left-label / right-value comparison rows
+  medal hero in that same column, with the same heading-to-row gap and
+  button-edge alignment, and reuse those left-label / right-value comparison rows
   for VS PB, RANK, and Next.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,

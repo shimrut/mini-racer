@@ -50,16 +50,18 @@ Some files intentionally span more than one product surface. Those boundaries
 reflect contiguous sections of the original stylesheet and avoid changing which
 equally specific rule wins.
 
-## Head To Head Finish Contract
+## Finish Sheet Contract
 
-`styles/result-details.css` owns the Head to Head-only finish composition under
-`#modal-combined-view.is-challenge-finish`; the shared Daily and Campaign finish
-rules remain unchanged. The result stacks italic Outfit `YOU WON` /
-`YOU LOST` / `YOU TIED` on the left above a right-aligned race time of the same
-size. That block, including the comparison rows, uses the same 320px column as
-the finish buttons. Green is a win, red is a loss, and a tie stays neutral.
-Pending and failed verification use `VERIFYING` and `UNVERIFIED` and retain
-their status detail.
+Daily, Campaign, and Head to Head share one finish column in
+`styles/result-details.css` under `#modal-combined-view`: the hero, comparison
+rows, and buttons use the same 320px width and 0.35rem padding, and the rows
+sit 2.75rem below the hero. Mode only changes the content in those slots.
+
+Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
+`YOU TIED` on the left above a right-aligned race time of the same
+size, scoped under `#modal-combined-view.is-challenge-finish`. Green is a win,
+red is a loss, and a tie stays neutral. Pending and failed verification use
+`VERIFYING` and `UNVERIFIED` and retain their status detail.
 
 Below that stack, the existing result slots flow as three left-label/right-value
 upright rows: opponent delta, prior-PB delta, and originating rank. The PB slot keeps its
@@ -70,17 +72,16 @@ locked row opens the existing split-times mini overlay with a short explanation.
 The layout
 uses flex flow, inherited modal width and safe-area behavior, plus a
 `max-height: 640px` compaction; it must not introduce absolute result positioning.
-The finish hero contains no avatar, medal, opponent name, or duplicate margin.
+The Head to Head hero contains no avatar, medal, opponent name, or duplicate margin.
 Those elements remain valid on the separate Challenge lobby/won portrait.
 The verdict lockup enters with the same `slideInLeft` 0.5s glide as Mini, and
 the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
 comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart from
 200ms; finish buttons continue that cascade from 350ms. Hidden rows and
 `display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
-turns the sequence off. Daily and Campaign keep their own time and medal
-hero, but their VS PB, RANK, and Next rows use this same left-label /
-right-value row in the 320px button column. They do not run the Head to Head
-entrance sequence.
+turns the sequence off. Daily and Campaign keep their time and medal
+hero in that same column, with VS PB, RANK, and Next as the comparison rows.
+They do not run the Head to Head entrance sequence.
 
 ## Daily And Campaign Poster Contract
 

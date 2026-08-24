@@ -4,6 +4,18 @@ import { readCssBundle } from './helpers/read-css-bundle.js';
 const styles = readCssBundle(new URL('../styles.css', import.meta.url));
 
 describe('finish screen styles', () => {
+    it('lines stats up with finish buttons in the same padded column', () => {
+        expect(styles).toMatch(
+            /#modal-combined-view \.pause-header\s*\{[^}]*max-width:\s*320px;[^}]*padding:\s*0\.35rem;/s,
+        );
+        expect(styles).toMatch(
+            /#modal-combined-view \.combined-actions\s*\{[^}]*max-width:\s*320px;[^}]*padding:\s*0\.35rem;/s,
+        );
+        expect(styles).toMatch(
+            /\.combined-stats-grid\s*\{[^}]*margin-top:\s*2\.75rem;/s,
+        );
+    });
+
     it('keeps the Improve button width rule separate from generic button declarations', () => {
         expect(styles).toMatch(
             /#modal\.modal--win #combined-restart-btn\s*\{\s*width:\s*100%;\s*\}/,

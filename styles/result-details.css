@@ -249,32 +249,8 @@
     align-items: center;
 }
 
-.combined-hero-time-group {
-    margin-top: 1rem;
-    margin-bottom: 1rem;
-}
-
-#combined-time {
-    font-size: 4rem;
-    font-weight: 900;
-    font-style: italic;
-    letter-spacing: 0.05em;
-    line-height: 1;
-    text-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-
-#combined-hero-medal {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: var(--space-xl);
-    width: 100%;
-    transform: scale(0.75);
-    transform-origin: top center;
-}
-
-/* Head to Head owns this result composition; Daily and Campaign keep the shared finish grid. */
-#modal-combined-view.is-challenge-finish .pause-header {
+/* One finish column for every mode. Head to Head only swaps the hero copy. */
+#modal-combined-view .pause-header {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -287,12 +263,35 @@
     box-sizing: border-box;
 }
 
-#modal-combined-view.is-challenge-finish #combined-hero-medal {
-    order: 1;
+.combined-hero-time-group {
+    margin: 0;
     min-width: 0;
     width: 100%;
+    text-align: center;
+}
+
+#combined-time {
+    font-size: 3.5rem;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: -0.05em;
+    line-height: 0.85;
+    white-space: nowrap;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+#combined-hero-medal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     margin-bottom: 0;
+    min-width: 0;
+    width: 100%;
     transform: none;
+}
+
+#modal-combined-view.is-challenge-finish #combined-hero-medal {
+    order: 1;
     justify-content: flex-start;
 }
 
@@ -354,16 +353,11 @@
 
 #modal-combined-view.is-challenge-finish .combined-hero-time-group {
     order: 2;
-    margin: 0;
-    min-width: 0;
-    width: 100%;
     text-align: right;
 }
 
 #modal-combined-view.is-challenge-finish .combined-stats-grid {
     order: 3;
-    max-width: none;
-    margin-top: 2.75rem;
 }
 
 #modal.modal--win #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta.is-loss {
@@ -429,7 +423,7 @@
 }
 
 @media (max-height: 640px) {
-    #modal-combined-view.is-challenge-finish .pause-header {
+    #modal-combined-view .pause-header {
         gap: 0;
     }
 
@@ -443,11 +437,6 @@
         font-size: clamp(1.25rem, 4.5vw, 1.85rem);
     }
 
-    #modal-combined-view.is-challenge-finish .combined-stats-grid {
-        gap: 0.35rem;
-        margin-top: 2.25rem;
-    }
-
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__status {
         margin-top: 0.25rem;
     }
@@ -458,7 +447,8 @@
     flex-direction: column;
     gap: clamp(0.55rem, 1.8vh, 0.9rem);
     width: 100%;
-    max-width: 320px;
+    max-width: none;
+    margin-top: 2.75rem;
     margin-left: auto;
     margin-right: auto;
     font-size: 1rem;
@@ -552,5 +542,9 @@
     }
     .combined-actions {
         gap: 0.4rem;
+    }
+    .combined-stats-grid {
+        gap: 0.35rem;
+        margin-top: 2.25rem;
     }
 }
