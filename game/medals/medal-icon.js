@@ -15,7 +15,7 @@ const MEDAL_TIER_CAPTION = {
     bronze: 'bronze',
     silver: 'silver',
     gold: 'gold',
-    author: 'creator',
+    author: 'author',
     'personal-best': 'pb',
     challenge: 'beat'
 };

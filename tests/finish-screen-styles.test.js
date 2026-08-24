@@ -81,10 +81,13 @@ describe('finish screen styles', () => {
 
     it('stacks medal times in the finish mini-modal', () => {
         expect(styles).toMatch(
-            /\.combined-medal-times-row--medal\s*\{[^}]*justify-content:\s*space-between;/,
+            /\.combined-medal-times-row--medal\s*\{[^}]*width:\s*100%;[^}]*justify-content:\s*space-between;/,
         );
         expect(styles).toMatch(
-            /\.combined-medal-times-row--medal \.medal-svg--hero\s*\{[^}]*width:\s*1\.5rem;/,
+            /\.combined-medal-times-row--medal \.medal-svg--popover\s*\{[^}]*width:\s*1\.75rem;/,
+        );
+        expect(styles).toMatch(
+            /\.combined-medal-times-row--medal \.combined-medal-times-time\s*\{[^}]*margin-left:\s*auto;[^}]*text-align:\s*right;/,
         );
     });
 });

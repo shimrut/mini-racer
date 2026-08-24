@@ -111,6 +111,11 @@ describe('medal-icon', () => {
                 (c) => c.className === 'medal-svg__tier-caption',
             );
             expect(challengeCaption?.textContent).toBe('beat');
+            const author = createMedalIconSvg('author');
+            const authorCaption = author.children[0].children.find(
+                (c) => c.className === 'medal-svg__tier-caption',
+            );
+            expect(authorCaption?.textContent).toBe('author');
         } finally {
             global.document = originalDocument;
         }

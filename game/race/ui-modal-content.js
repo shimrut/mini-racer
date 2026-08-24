@@ -1023,8 +1023,8 @@ export class ModalContentUi {
 
                     const icon = createMedalIconSvg(tier, {
                         className: filled
-                            ? 'medal-svg--hero'
-                            : 'medal-svg--hero medal-svg--row-placeholder',
+                            ? 'medal-svg--popover'
+                            : 'medal-svg--popover medal-svg--row-placeholder',
                         outline: !filled,
                         showEmblem: filled,
                         centerText: null,

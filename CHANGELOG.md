@@ -1,8 +1,9 @@
 # Changelog
 
 - Daily and Campaign finish screens now open a small MEDALS sheet from that
-  row, listing each medal with its time, the same way checkpoint splits open
-  from the clock. Head to Head is unchanged.
+  row, listing each medal on the left and its time on the right, the same way
+  checkpoint splits open from the clock. The author medal is labeled author.
+  Head to Head is unchanged.
 
 - Daily and Campaign finish screens now put a status line above the time, in
   the same Mini / Racer entrance as Head to Head: the medal just unlocked,
