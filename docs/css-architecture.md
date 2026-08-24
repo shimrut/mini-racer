@@ -60,8 +60,10 @@ sit 2.75rem below the hero. Mode only changes the content in those slots.
 Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
 `YOU TIED` on the left above a right-aligned race time of the same
 size, scoped under `#modal-combined-view.is-challenge-finish`. Green is a win,
-red is a loss, and a tie stays neutral. Pending and failed verification use
-`VERIFYING` and `UNVERIFIED` and retain their status detail.
+red is a loss, and a tie stays neutral. Pending verification shows only
+`VERIFYING`; a judged result pushes that word out as `YOU WON` / `YOU LOST` /
+`YOU TIED` slides in. Failed verification uses `UNVERIFIED` and keeps its
+status detail.
 
 Below that stack, the existing result slots flow as three left-label/right-value
 upright rows: opponent delta, prior-PB delta, and originating rank. The PB slot keeps its

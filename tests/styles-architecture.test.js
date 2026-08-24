@@ -175,7 +175,9 @@ describe('game stylesheet architecture', () => {
         expect(resultDetailStyles).not.toMatch(
             /is-challenge-finish\.active-view \.combined-actions/,
         );
-        expect(resultDetailStyles).not.toContain('leaderboardRowIn var(--dur-snap)');
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup__outcome\.is-incoming\s*\{[^}]*animation:\s*challengeOutcomePushIn 0\.5s var\(--ease-glide\) both;/,
+        );
         expect(resultDetailStyles).toMatch(
             /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish\.active-view[\s\S]*animation:\s*none;/,
         );

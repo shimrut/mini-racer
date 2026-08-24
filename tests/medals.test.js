@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { JSDOM } from 'jsdom';
 import { TRACK_CATALOG } from '../game/track/catalog.js';
 import {
     TRACK_MEDAL_THRESHOLDS,
@@ -22,6 +23,7 @@ import {
     isPersonalBestTimeImprovement,
     isStandardMedalTier,
     resolveCombinedFinishHeadline,
+    renderChallengeFinishHero,
 } from '../game/medals/medals.js';
 
 describe('medals', () => {
@@ -440,6 +442,7 @@ describe('medals', () => {
                     dataset: {},
                     textContent: '',
                     setAttribute() {},
+                    removeAttribute() {},
                     appendChild(child) {
                         this.children.push(child);
                         return child;
@@ -459,7 +462,8 @@ describe('medals', () => {
             expect(children[0].dataset.challengePhase).toBe('pending');
             expect(children[0].children[0].children[0].textContent).toBe('VERIFYING');
             expect(children[0].textContent).not.toContain('CHALLENGE');
-            expect(children[0].children[1].textContent).toBe('Submitting...');
+            expect(children[0].textContent).not.toContain('Submitting');
+            expect(children[0].children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, { phase: 'won' });
             expect(children[0].dataset.challengePhase).toBe('won');
@@ -504,6 +508,35 @@ describe('medals', () => {
         } finally {
             global.document = originalDocument;
         }
+    });
+
+    it('pushes VERIFYING out when YOU WON arrives', () => {
+        const originalDocument = global.document;
+        const originalMatchMedia = global.matchMedia;
+        const dom = new JSDOM('<div id="hero"></div>');
+        global.document = dom.window.document;
+        global.matchMedia = undefined;
+        const overlay = dom.window.document.getElementById('hero');
+
+        renderChallengeFinishHero(overlay, { phase: 'pending' });
+        expect(overlay.querySelector('.challenge-result-lockup__outcome').textContent).toBe('VERIFYING');
+        expect(overlay.querySelector('.challenge-result-lockup__status')).toBeNull();
+        expect(overlay.textContent).not.toContain('Submitting');
+
+        renderChallengeFinishHero(overlay, { phase: 'won' });
+        const outcomes = [...overlay.querySelectorAll('.challenge-result-lockup__outcome')];
+        expect(outcomes.map((el) => el.textContent)).toEqual(['VERIFYING', 'YOU WON']);
+        expect(outcomes[0].classList.contains('is-outgoing')).toBe(true);
+        expect(outcomes[1].classList.contains('is-incoming')).toBe(true);
+        expect(overlay.querySelector('[data-challenge-phase="won"]')).toBeTruthy();
+
+        outcomes[1].dispatchEvent(new dom.window.Event('animationend'));
+        expect(overlay.querySelectorAll('.challenge-result-lockup__outcome')).toHaveLength(1);
+        expect(overlay.querySelector('.challenge-result-lockup__outcome').textContent).toBe('YOU WON');
+        expect(overlay.querySelector('.is-incoming')).toBeNull();
+
+        global.document = originalDocument;
+        global.matchMedia = originalMatchMedia;
     });
 
     it('isPersonalBestTimeImprovement is strict on the clock', () => {

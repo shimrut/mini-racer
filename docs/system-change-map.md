@@ -397,9 +397,10 @@ flowchart LR
   only after a verified beat. The phone does not stamp YOU WON; the first
   submit body is the official beat / not beat and can turn Brag on. Origin
   place on the sheet can stay empty. Share, car unlocks, and remembered wins
-  wait for that confirmation. The Head to Head finish replaces the legacy
-  medal/avatar hero with a left-aligned italic Outfit `YOU WON` / `YOU LOST`
-  line and a right-aligned finish clock of the same size, both in the shared
+  wait for that confirmation. The Head to Head finish shows VERIFYING until the
+  judged result arrives, then pushes that word out as `YOU WON` / `YOU LOST` /
+  `YOU TIED` slides in. The lockup stays a left-aligned italic Outfit line with a
+  right-aligned finish clock of the same size, both in the shared
   320px finish column used by Daily and Campaign as well. The three comparison rows own opponent margin,
   prior-PB delta, and originating rank; a server-corrected verdict repaints the
   opponent row as well as the lockup. Daily and Campaign keep a status heading

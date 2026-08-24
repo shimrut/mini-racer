@@ -384,12 +384,12 @@
 }
 
 #modal-combined-view.is-challenge-finish .challenge-result-lockup {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    display: grid;
+    justify-items: start;
     min-width: 0;
     width: 100%;
     margin: 0;
+    overflow: hidden;
     font-family: var(--header-font);
     font-style: italic;
     font-weight: 900;
@@ -407,6 +407,10 @@
     letter-spacing: -0.05em;
     line-height: 0.85;
     white-space: nowrap;
+}
+
+#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome {
+    grid-area: 1 / 1;
 }
 
 #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--won {
@@ -461,9 +465,42 @@
     animation: slideInRight 0.6s var(--ease-glide) calc(0.1s + var(--dur-finish-headline)) both;
 }
 
+#modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__outcome.is-outgoing {
+    animation: challengeOutcomePushOut 0.5s var(--ease-glide) both;
+}
+
+#modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__outcome.is-incoming {
+    animation: challengeOutcomePushIn 0.5s var(--ease-glide) both;
+}
+
+@keyframes challengeOutcomePushOut {
+    from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) skewX(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translate3d(-120px, 0, 0) skewX(-20deg);
+    }
+}
+
+@keyframes challengeOutcomePushIn {
+    from {
+        opacity: 0;
+        transform: translate3d(120px, 0, 0) skewX(20deg);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) skewX(0);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup,
     #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__status,
+    #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__outcome,
     #modal-combined-view.is-challenge-finish.active-view #combined-time,
     #modal-combined-view:not(.is-challenge-finish).active-view .combined-finish-heading,
     #modal-combined-view:not(.is-challenge-finish).active-view #combined-time {

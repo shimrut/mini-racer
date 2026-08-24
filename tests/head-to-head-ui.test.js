@@ -343,7 +343,7 @@ describe('Head to Head lobby and finish', () => {
             }),
             pendingOptions,
         );
-        expect(winUpdateHero).toHaveBeenCalledWith(
+        expect(winUpdateHero).not.toHaveBeenCalledWith(
             expect.objectContaining({ phase: 'pending' }),
         );
         await vi.waitFor(() => {
@@ -378,7 +378,7 @@ describe('Head to Head lobby and finish', () => {
             expect.objectContaining({ challengeConfirmPhase: 'pending', lapMedal: null }),
             pendingOptions,
         );
-        expect(deferredUpdateHero).toHaveBeenCalledWith(
+        expect(deferredUpdateHero).not.toHaveBeenCalledWith(
             expect.objectContaining({ phase: 'pending' }),
         );
         answerWin({

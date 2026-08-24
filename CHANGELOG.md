@@ -1,5 +1,8 @@
 # Changelog
 
+- Head to Head finish now shows only VERIFYING while the result is checked, then
+  slides YOU WON in so it pushes that word out.
+
 - Head to Head finish rows and buttons no longer appear one by one. All three
   modes now use the same heading and time entrance.
 

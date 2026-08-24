@@ -235,53 +235,124 @@ function appendMedalRowTo(parent, trackKey, bestStoredMedal, {
     return row;
 }
 
+const CHALLENGE_OUTCOME_BY_PHASE = {
+    won: 'YOU WON',
+    lost: 'YOU LOST',
+    tie: 'YOU TIED',
+    pending: 'VERIFYING',
+    error: 'UNVERIFIED',
+};
+
+function challengeFinishOutcomeText(phase) {
+    return CHALLENGE_OUTCOME_BY_PHASE[phase] || 'UNVERIFIED';
+}
+
+function challengeFinishAccessibleLabel(phase, { error = null } = {}) {
+    if (phase === 'error') return error || 'This run could not be verified.';
+    if (phase === 'pending') return 'VERIFYING';
+    return challengeFinishOutcomeText(phase);
+}
+
+function prefersReducedMotion() {
+    return typeof matchMedia === 'function'
+        && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function createChallengeOutcomeEl(phase, text) {
+    const result = document.createElement('span');
+    result.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
+    result.textContent = text;
+    return result;
+}
+
+function finishChallengeOutcomePush(lockup) {
+    if (!lockup) return;
+    for (const outgoing of lockup.querySelectorAll('.is-outgoing')) outgoing.remove();
+    for (const incoming of lockup.querySelectorAll('.is-incoming')) {
+        incoming.classList.remove('is-incoming');
+    }
+}
+
+function syncChallengeFinishHeroChrome(root, phase, accessibleLabel) {
+    if (!root) return;
+    root.dataset.challengePhase = phase;
+    root.setAttribute('role', phase === 'error' ? 'alert' : 'status');
+    root.setAttribute('aria-label', accessibleLabel);
+    if (phase === 'pending') root.setAttribute('aria-live', 'polite');
+    else root.removeAttribute('aria-live');
+    const detail = typeof root.querySelector === 'function'
+        ? root.querySelector('.challenge-result-lockup__status')
+        : null;
+    if (phase === 'error' || !CHALLENGE_OUTCOME_BY_PHASE[phase]) {
+        if (detail) {
+            detail.textContent = accessibleLabel;
+        } else {
+            const nextDetail = document.createElement('span');
+            nextDetail.className = 'challenge-result-lockup__status';
+            nextDetail.textContent = accessibleLabel;
+            root.appendChild(nextDetail);
+        }
+        return;
+    }
+    detail?.remove();
+}
+
+function pushChallengeFinishOutcome(overlayEl, phase, outcome, accessibleLabel) {
+    const root = overlayEl.querySelector('.win-combined-medal-overlay--challenge');
+    const lockup = overlayEl.querySelector('.challenge-result-lockup');
+    const outgoing = lockup?.querySelector('.challenge-result-lockup__outcome:not(.is-outgoing)');
+    if (!root || !lockup || !outgoing) return false;
+
+    finishChallengeOutcomePush(lockup);
+    syncChallengeFinishHeroChrome(root, phase, accessibleLabel);
+
+    if (prefersReducedMotion()) {
+        outgoing.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
+        outgoing.textContent = outcome;
+        return true;
+    }
+
+    const incoming = createChallengeOutcomeEl(phase, outcome);
+    outgoing.classList.add('is-outgoing');
+    incoming.classList.add('is-incoming');
+    lockup.appendChild(incoming);
+    incoming.addEventListener('animationend', () => finishChallengeOutcomePush(lockup), { once: true });
+    return true;
+}
+
 export function renderChallengeFinishHero(
     overlayEl,
     {
         phase = 'pending',
-        statusText = null,
         error = null,
     } = {},
 ) {
     if (!overlayEl) return;
+
+    const outcome = challengeFinishOutcomeText(phase);
+    const accessibleLabel = challengeFinishAccessibleLabel(phase, { error });
+    const existingOutcome = typeof overlayEl.querySelector === 'function'
+        ? overlayEl.querySelector('.challenge-result-lockup__outcome:not(.is-outgoing)')
+        : null;
+    if (
+        existingOutcome
+        && existingOutcome.textContent
+        && existingOutcome.textContent !== outcome
+        && pushChallengeFinishOutcome(overlayEl, phase, outcome, accessibleLabel)
+    ) {
+        return;
+    }
+
     overlayEl.replaceChildren();
 
     const root = document.createElement('div');
     root.className = 'win-combined-medal-overlay win-combined-medal-overlay--challenge';
-    root.dataset.challengePhase = phase;
-
-    const outcomeByPhase = {
-        won: 'YOU WON',
-        lost: 'YOU LOST',
-        tie: 'YOU TIED',
-        pending: 'VERIFYING',
-        error: 'UNVERIFIED',
-    };
-    const outcome = outcomeByPhase[phase] || 'UNVERIFIED';
-    const accessibleLabel = phase === 'error'
-        ? (error || 'This run could not be verified.')
-        : (phase === 'pending' ? (statusText || 'Verifying challenge result') : outcome);
-
-    root.setAttribute('role', phase === 'error' ? 'alert' : 'status');
-    root.setAttribute('aria-label', accessibleLabel);
-    if (phase === 'pending') root.setAttribute('aria-live', 'polite');
 
     const lockup = document.createElement('p');
     lockup.className = 'challenge-result-lockup';
-
-    const result = document.createElement('span');
-    result.className = `challenge-result-lockup__outcome challenge-result-lockup__outcome--${phase}`;
-    result.textContent = outcome;
-
-    lockup.appendChild(result);
+    lockup.appendChild(createChallengeOutcomeEl(phase, outcome));
     root.appendChild(lockup);
-
-    if (phase === 'pending' || phase === 'error' || !outcomeByPhase[phase]) {
-        const detail = document.createElement('span');
-        detail.className = 'challenge-result-lockup__status';
-        detail.textContent = accessibleLabel;
-        root.appendChild(detail);
-    }
+    syncChallengeFinishHeroChrome(root, phase, accessibleLabel);
 
     overlayEl.appendChild(root);
 }

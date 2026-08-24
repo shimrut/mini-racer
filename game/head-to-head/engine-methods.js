@@ -12,9 +12,6 @@ import {
 import {
     cancelDeferredLobbyWork,
 } from '../lobby/deferred-work.js';
-import {
-    createVerificationSnapshot,
-} from '../scoreboard/verification-queue.js';
 import { createModalActions } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
 
@@ -246,16 +243,6 @@ export const headToHeadEngineMethods = {
         const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
         const submissionBlockedReason = this.rankedSubmissionBlockedReason
             || (replay ? null : 'This run could not be verified.');
-        const submittingStatus = createVerificationSnapshot({
-            verificationState: 'pending',
-            isLoading: true,
-            submissionStage: 'submitting',
-        }).statusText || 'Submitting...';
-        const verifyingStatus = createVerificationSnapshot({
-            verificationState: 'pending',
-            isLoading: true,
-            submissionStage: 'verifying',
-        }).statusText || 'Verifying...';
 
         const finalTimeMs = Number.isFinite(finalTime) ? Math.round(finalTime * 1000) : null;
         const targetTimeMs = Number.isFinite(challenge.targetTimeMs)
@@ -296,7 +283,7 @@ export const headToHeadEngineMethods = {
                     lapMedal: phase === 'won' ? 'challenge' : null,
                     challengeFinish: true,
                     challengeConfirmPhase: phase,
-                    challengeConfirmStatus: phase === 'pending' ? submittingStatus : null,
+                    challengeConfirmStatus: null,
                     challengeConfirmError: error,
                     challengeViewerAvatarUrl: challenge.viewerAvatarUrl ?? null,
                     challengeVerdict: buildVerdict(localDifferenceMs),
@@ -372,10 +359,6 @@ export const headToHeadEngineMethods = {
 
         void (async () => {
             if (!stillOnThisFinish()) return;
-            this.modal.updateChallengeFinishHero?.({
-                phase: 'pending',
-                statusText: verifyingStatus,
-            });
 
             let confirmationFailed = false;
             let response = { ok: false, body: { error: 'This run could not be verified.' } };
