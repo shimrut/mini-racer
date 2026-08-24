@@ -362,56 +362,12 @@
 
 #modal-combined-view.is-challenge-finish .combined-stats-grid {
     order: 3;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(0.55rem, 1.8vh, 0.9rem);
     max-width: none;
-    width: 100%;
     margin-top: 2.75rem;
-}
-
-#modal-combined-view.is-challenge-finish .stat-floating-item {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    min-height: 1.35rem;
-}
-
-#modal-combined-view.is-challenge-finish .combined-stat-label,
-#modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta,
-#modal-combined-view.is-challenge-finish .combined-rank-container,
-#modal.modal--win #modal-combined-view.is-challenge-finish .combined-rank-value {
-    font-family: var(--header-font);
-    font-size: 1rem;
-    font-weight: 900;
-    font-style: normal;
-}
-
-#modal-combined-view.is-challenge-finish .combined-stat-label {
-    letter-spacing: -0.015em;
-    opacity: 1;
-    color: var(--text-color);
-}
-
-#modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta,
-#modal-combined-view.is-challenge-finish .combined-rank-container {
-    letter-spacing: -0.025em;
-    text-align: right;
-}
-
-#modal.modal--win #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta {
-    font-size: 1rem;
 }
 
 #modal.modal--win #modal-combined-view.is-challenge-finish .combined-stat-value--pb-delta.is-loss {
     color: var(--accent-color);
-}
-
-#modal.modal--win #modal-combined-view.is-challenge-finish .combined-rank-value.combined-rank-value--status {
-    font-size: 0.8rem;
-    letter-spacing: -0.03em;
-    font-weight: 800;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup,
@@ -498,22 +454,58 @@
 }
 
 .combined-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.55rem, 1.8vh, 0.9rem);
     width: 100%;
-    max-width: 400px;
-    font-size: 1.25rem;
-    font-style: italic;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 1rem;
+    font-style: normal;
     font-weight: 900;
-    letter-spacing: 0.05em;
+    letter-spacing: -0.02em;
 }
 
 .stat-floating-item {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
+    flex-direction: row;
     align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 1.35rem;
+}
+
+#modal-combined-view .combined-stat-label,
+#modal-combined-view .combined-stat-value--pb-delta,
+#modal-combined-view .combined-rank-container,
+#modal.modal--win #modal-combined-view .combined-rank-value {
+    font-family: var(--header-font);
+    font-size: 1rem;
+    font-weight: 900;
+    font-style: normal;
+}
+
+#modal-combined-view .combined-stat-label {
+    letter-spacing: -0.015em;
+    opacity: 1;
+    color: var(--text-color);
+}
+
+#modal-combined-view .combined-stat-value--pb-delta,
+#modal-combined-view .combined-rank-container {
+    letter-spacing: -0.025em;
+    text-align: right;
+}
+
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta {
+    font-size: 1rem;
+}
+
+#modal.modal--win #modal-combined-view .combined-rank-value.combined-rank-value--status {
+    font-size: 0.8rem;
+    letter-spacing: -0.03em;
+    font-weight: 800;
 }
 
 #combined-rank-total {
@@ -549,7 +541,7 @@
     }
 
     #modal.modal--win #modal-combined-view .combined-rank-value {
-        font-size: clamp(2rem, 8vw, 2.5rem);
+        font-size: 1rem;
     }
     .modal .modal-card {
         padding: 0.8rem;

@@ -77,7 +77,10 @@ the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
 comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart from
 200ms; finish buttons continue that cascade from 350ms. Hidden rows and
 `display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
-turns the sequence off. Daily and Campaign finishes stay still.
+turns the sequence off. Daily and Campaign keep their own time and medal
+hero, but their VS PB, RANK, and Next rows use this same left-label /
+right-value row in the 320px button column. They do not run the Head to Head
+entrance sequence.
 
 ## Daily And Campaign Poster Contract
 

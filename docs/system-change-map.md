@@ -396,8 +396,9 @@ flowchart LR
   line and a right-aligned finish clock of the same size, both in the 320px
   button column. The three comparison rows own opponent margin,
   prior-PB delta, and originating rank; a server-corrected verdict repaints the
-  opponent row as well as the lockup. Daily and Campaign keep their existing
-  finish composition.
+  opponent row as well as the lockup. Daily and Campaign keep their time and
+  medal hero, and reuse those same left-label / right-value comparison rows
+  for VS PB, RANK, and Next.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,
   and frozen challenger Reddit avatar URL (no ghost or player ID in public post

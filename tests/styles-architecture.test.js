@@ -108,7 +108,7 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup\s*\{[^}]*font-family:\s*var\(--header-font\);[^}]*font-style:\s*italic;[^}]*font-weight:\s*900;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;/s,
+            /#modal-combined-view\.is-challenge-finish \.combined-stats-grid\s*\{[^}]*order:\s*3;[^}]*margin-top:\s*2\.75rem;/s,
         );
         expect(resultDetailStyles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.challenge-result-lockup__outcome,\s*#modal-combined-view\.is-challenge-finish #combined-time\s*\{[^}]*font-size:\s*3\.5rem;/s,
@@ -117,12 +117,21 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish \.combined-hero-time-group\s*\{[^}]*text-align:\s*right;/s,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish \.combined-stat-label,\s*#modal-combined-view\.is-challenge-finish \.combined-stat-value--pb-delta[\s\S]*font-size:\s*1rem;[\s\S]*font-style:\s*normal;/s,
-        );
-        expect(resultDetailStyles).toMatch(
             /\.challenge-result-lockup__outcome--pending,[\s\S]*\.challenge-result-lockup__outcome--error\s*\{[^}]*font-size:\s*clamp\(1\.45rem, 6\.5vw, 2\.2rem\);/s,
         );
         expect(resultDetailStyles).toContain('@media (max-height: 640px)');
+    });
+
+    it('lays out Daily, Campaign, and Head to Head comparison stats as the same left-label rows', () => {
+        expect(resultDetailStyles).toMatch(
+            /\.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;[^}]*max-width:\s*320px;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /\.stat-floating-item\s*\{[^}]*flex-direction:\s*row;[^}]*justify-content:\s*space-between;/s,
+        );
+        expect(resultDetailStyles).toMatch(
+            /#modal-combined-view \.combined-stat-label,[\s\S]*#modal-combined-view \.combined-stat-value--pb-delta[\s\S]*font-size:\s*1rem;[\s\S]*font-style:\s*normal;/s,
+        );
     });
 
     it('enters the challenge finish heading like Mini Racer and staggers the rows below', () => {

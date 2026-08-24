@@ -1,5 +1,9 @@
 # Changelog
 
+- Daily and Campaign finish stats now use the same left-label / right-value
+  rows as Head to Head: VS PB and RANK sit in the button column, with Next
+  following that same row. Time and medals stay as they were.
+
 - Daily and Campaign ranked submits now share one `submitCompetitionRun`
   path for replay checks, rate limits, the per-player submit lock, board
   write, and challenge PB. Daily still attaches rank / field size, car
