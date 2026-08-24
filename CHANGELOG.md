@@ -1,5 +1,8 @@
 # Changelog
 
+- Head to Head finish rows and buttons no longer appear one by one. All three
+  modes now use the same heading and time entrance.
+
 - Daily and Campaign finish screens now put MEDALS first. Racing someone from
   standings also shows a VS opponent row, and VS PB stays underneath.
 

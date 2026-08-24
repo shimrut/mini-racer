@@ -75,19 +75,16 @@ uses flex flow, inherited modal width and safe-area behavior, plus a
 `max-height: 640px` compaction; it must not introduce absolute result positioning.
 The Head to Head hero contains no avatar, medal, opponent name, or duplicate margin.
 Those elements remain valid on the separate Challenge lobby/won portrait.
-The verdict lockup enters with the same `slideInLeft` 0.5s glide as Mini, and
-the time with the same `slideInRight` 0.6s / 0.1s delay as Racer, both delayed
-by `--dur-finish-headline` (10ms) after the finish modal fade starts. Visible
-comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart from
-200ms; finish buttons continue that cascade from 350ms. Hidden rows and
-`display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
-turns the sequence off. Daily and Campaign put a status heading above the
-time in that same column — medal name, NEW BEST, or FINISHED — with that same
-Mini `slideInLeft` and Racer `slideInRight` pair and `--dur-finish-headline`
-delay. MEDALS, VS PB, and RANK stay the comparison rows. Racing a standings
+The verdict lockup and Daily/Campaign status heading enter with the same
+`slideInLeft` 0.5s glide as Mini, and the time with the same `slideInRight`
+0.6s / 0.1s delay as Racer, both delayed by `--dur-finish-headline` (10ms)
+after the finish modal fade starts. Comparison rows and buttons do not
+stagger. Reduced motion turns the sequence off. Daily and Campaign put a
+status heading above the time in that same column — medal name, NEW BEST, or
+FINISHED. MEDALS, VS PB, and RANK stay the comparison rows. Racing a standings
 ghost also shows VS #rank (or VS) above VS PB. Tapping MEDALS opens
 the same mini overlay as checkpoint splits, with each medal stacked above its
-target time. They do not run the Head to Head row and button stagger.
+target time.
 
 ## Daily And Campaign Poster Contract
 
@@ -292,7 +289,6 @@ against it rather than against a hand-typed number.
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--dur-snap` | 75ms | Head to Head finish row and button rise |
 | `--dur-fast` | 120ms | Immediate feedback: hover and press colour, opacity |
 | `--dur-base` | 160ms | The default — enters, exits, content swaps |
 | `--dur-slow` | 200ms | The ceiling for anything the player waits through |

@@ -86,7 +86,6 @@ describe('game stylesheet architecture', () => {
         const styles = readCssBundle(manifestUrl);
 
         for (const token of [
-            '--dur-snap: 75ms;',
             '--dur-fast: 120ms;',
             '--dur-base: 160ms;',
             '--dur-slow: 200ms;',
@@ -162,38 +161,23 @@ describe('game stylesheet architecture', () => {
         );
     });
 
-    it('enters the challenge finish heading like Mini Racer and staggers the rows below', () => {
+    it('enters every finish heading like Mini Racer, 10ms after the modal, with no row stagger', () => {
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup,[\s\S]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) var\(--dur-finish-headline\) both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup,[\s\S]*#modal-combined-view:not\(\.is-challenge-finish\)\.active-view \.combined-finish-heading:not\(\[hidden\]\)\s*\{[^}]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) var\(--dur-finish-headline\) both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) calc\(0\.1s \+ var\(--dur-finish-headline\)\) both;/,
-        );
-        expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\),[\s\S]*animation:\s*leaderboardRowIn var\(--dur-snap\) var\(--ease-settle\) backwards;/,
-        );
-        expect(resultDetailStyles).toMatch(
-            /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.1s;/,
-        );
-        expect(resultDetailStyles).toMatch(
-            /combined-actions > :nth-child\(1 of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)\s*\{[^}]*animation-delay:\s*0\.35s;/,
-        );
-        expect(resultDetailStyles).not.toContain('challengeFinishItemIn');
-        expect(resultDetailStyles).toMatch(
-            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish\.active-view[\s\S]*animation:\s*none;/,
-        );
-    });
-
-    it('enters the Daily and Campaign finish heading like Mini Racer, 10ms after the modal', () => {
-        expect(resultDetailStyles).toMatch(
-            /#modal-combined-view:not\(\.is-challenge-finish\)\.active-view \.combined-finish-heading:not\(\[hidden\]\)\s*\{[^}]*animation:\s*slideInLeft 0\.5s var\(--ease-glide\) var\(--dur-finish-headline\) both;/,
-        );
-        expect(resultDetailStyles).toMatch(
-            /#modal-combined-view:not\(\.is-challenge-finish\)\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) calc\(0\.1s \+ var\(--dur-finish-headline\)\) both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view #combined-time,[\s\S]*#modal-combined-view:not\(\.is-challenge-finish\)\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) calc\(0\.1s \+ var\(--dur-finish-headline\)\) both;/,
         );
         expect(foundationStyles).toContain('--dur-finish-headline: 10ms;');
+        expect(resultDetailStyles).not.toMatch(
+            /is-challenge-finish\.active-view \.combined-stats-grid/,
+        );
+        expect(resultDetailStyles).not.toMatch(
+            /is-challenge-finish\.active-view \.combined-actions/,
+        );
+        expect(resultDetailStyles).not.toContain('leaderboardRowIn var(--dur-snap)');
         expect(resultDetailStyles).toMatch(
-            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*:not\(\.is-challenge-finish\)\.active-view \.combined-finish-heading[\s\S]*animation:\s*none;/,
+            /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish\.active-view[\s\S]*animation:\s*none;/,
         );
     });
 

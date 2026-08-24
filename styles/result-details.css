@@ -447,69 +447,24 @@
 }
 
 #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup,
-#modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__status {
-    opacity: 0;
-    backface-visibility: hidden;
-    animation: slideInLeft 0.5s var(--ease-glide) var(--dur-finish-headline) both;
-}
-
-#modal-combined-view.is-challenge-finish.active-view #combined-time {
-    opacity: 0;
-    backface-visibility: hidden;
-    animation: slideInRight 0.6s var(--ease-glide) calc(0.1s + var(--dur-finish-headline)) both;
-}
-
+#modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__status,
 #modal-combined-view:not(.is-challenge-finish).active-view .combined-finish-heading:not([hidden]) {
     opacity: 0;
     backface-visibility: hidden;
     animation: slideInLeft 0.5s var(--ease-glide) var(--dur-finish-headline) both;
 }
 
+#modal-combined-view.is-challenge-finish.active-view #combined-time,
 #modal-combined-view:not(.is-challenge-finish).active-view #combined-time {
     opacity: 0;
     backface-visibility: hidden;
     animation: slideInRight 0.6s var(--ease-glide) calc(0.1s + var(--dur-finish-headline)) both;
 }
 
-#modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:not([hidden]),
-#modal-combined-view.is-challenge-finish.active-view .combined-actions > :not([hidden]):not([style*="display: none"]) {
-    animation: leaderboardRowIn var(--dur-snap) var(--ease-settle) backwards;
-}
-
-#modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(1 of :not([hidden])) {
-    animation-delay: 0.1s;
-}
-
-#modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(2 of :not([hidden])) {
-    animation-delay: 0.25s;
-}
-
-#modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(3 of :not([hidden])) {
-    animation-delay: 0.3s;
-}
-
-#modal-combined-view.is-challenge-finish.active-view .combined-actions > :nth-child(1 of :not([hidden]):not([style*="display: none"])) {
-    animation-delay: 0.35s;
-}
-
-#modal-combined-view.is-challenge-finish.active-view .combined-actions > :nth-child(2 of :not([hidden]):not([style*="display: none"])) {
-    animation-delay: 0.4s;
-}
-
-#modal-combined-view.is-challenge-finish.active-view .combined-actions > :nth-child(3 of :not([hidden]):not([style*="display: none"])) {
-    animation-delay: 0.45s;
-}
-
-#modal-combined-view.is-challenge-finish.active-view .combined-actions > :nth-child(4 of :not([hidden]):not([style*="display: none"])) {
-    animation-delay: 0.5s;
-}
-
 @media (prefers-reduced-motion: reduce) {
     #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup,
     #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__status,
     #modal-combined-view.is-challenge-finish.active-view #combined-time,
-    #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:not([hidden]),
-    #modal-combined-view.is-challenge-finish.active-view .combined-actions > :not([hidden]):not([style*="display: none"]),
     #modal-combined-view:not(.is-challenge-finish).active-view .combined-finish-heading,
     #modal-combined-view:not(.is-challenge-finish).active-view #combined-time {
         opacity: 1;
