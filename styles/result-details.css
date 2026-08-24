@@ -149,19 +149,6 @@
 .combined-stats-right-group--interactive {
     cursor: pointer;
     user-select: none;
-    transition: transform var(--dur-base) ease;
-}
-
-.combined-stats-right-group--interactive:hover {
-    transform: scale(1.03);
-}
-
-.combined-stats-right-group--interactive:active {
-    transform: none;
-}
-
-.combined-stats-right-group--interactive:hover .combined-rank-value {
-    color: var(--text-color) !important;
 }
 
 #modal-combined-view .modal-card-section {

@@ -1,5 +1,8 @@
 # Changelog
 
+- The finish-sheet RANK row no longer grows or recolors on hover. It still
+  opens standings when that is available.
+
 - Added **Square Root** (2 laps) and **Half Life** (1 lap) as Campaign stages
   14 and 15 after Golden Ratio. They stay out of Daily rotation. Square Root
   unlocks at 35 Campaign medals plus a medal on Golden Ratio; Half Life

@@ -69,7 +69,8 @@ honest empty state. The rank row stays visible: it shows the rank already held o
 that board, updates the number only when this run is a personal best, and reads
 `TRACK LOCKED` for a Campaign stage the player has not unlocked. Tapping that
 locked row opens the existing split-times mini overlay with a short explanation.
-The layout
+The rank row stays clickable for standings or that locked note, with no hover
+scale or recolor. The layout
 uses flex flow, inherited modal width and safe-area behavior, plus a
 `max-height: 640px` compaction; it must not introduce absolute result positioning.
 The Head to Head hero contains no avatar, medal, opponent name, or duplicate margin.

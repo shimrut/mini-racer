@@ -134,6 +134,14 @@ describe('game stylesheet architecture', () => {
         expect(resultDetailStyles).toContain('@media (max-height: 640px)');
     });
 
+    it('does not scale or recolor the finish RANK row on hover', () => {
+        expect(resultDetailStyles).toMatch(
+            /\.combined-stats-right-group--interactive\s*\{[^}]*cursor:\s*pointer;/,
+        );
+        expect(resultDetailStyles).not.toContain('.combined-stats-right-group--interactive:hover');
+        expect(resultDetailStyles).not.toContain('.combined-stats-right-group--interactive:active');
+    });
+
     it('lays out Daily, Campaign, and Head to Head comparison stats as the same left-label rows', () => {
         expect(resultDetailStyles).toMatch(
             /\.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;[^}]*margin-top:\s*2\.75rem;/s,
