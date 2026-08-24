@@ -97,6 +97,15 @@ export const TRACK_CATALOG = {
     nestedRun: { name: "Nested Run" },
     mountainPeak: { name: "Mountain Peak" },
     sharkFin: { name: "Shark Fin" },
+    twistedClover: { name: "Twisted Clover" },
+    hookLoop: { name: "Hook Loop" },
+    crookedArrow: { name: "Crooked Arrow" },
+    windingRoad: { name: "Winding Road" },
+    gunSlinger: { name: "Gun Slinger" },
+    lightningHook: { name: "Lightning Hook" },
+    doubleTrouble: { name: "Double Trouble" },
+    brokenWing: { name: "Broken Wing" },
+    twinWings: { name: "Twin Wings" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -184,6 +193,15 @@ export const TRACK_SCHEDULE_KEYS = [
     'nestedRun',
     'mountainPeak',
     'sharkFin',
+    'twistedClover',
+    'hookLoop',
+    'crookedArrow',
+    'windingRoad',
+    'gunSlinger',
+    'lightningHook',
+    'doubleTrouble',
+    'brokenWing',
+    'twinWings',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

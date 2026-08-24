@@ -96,6 +96,15 @@ import questionMark from './definitions/question-mark.js';
 import nestedRun from './definitions/nested-run.js';
 import mountainPeak from './definitions/mountain-peak.js';
 import sharkFin from './definitions/shark-fin.js';
+import twistedClover from './definitions/twisted-clover.js';
+import hookLoop from './definitions/hook-loop.js';
+import crookedArrow from './definitions/crooked-arrow.js';
+import windingRoad from './definitions/winding-road.js';
+import gunSlinger from './definitions/gun-slinger.js';
+import lightningHook from './definitions/lightning-hook.js';
+import doubleTrouble from './definitions/double-trouble.js';
+import brokenWing from './definitions/broken-wing.js';
+import twinWings from './definitions/twin-wings.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -197,6 +206,15 @@ const TRACK_GEOMETRY = {
     nestedRun,
     mountainPeak,
     sharkFin,
+    twistedClover,
+    hookLoop,
+    crookedArrow,
+    windingRoad,
+    gunSlinger,
+    lightningHook,
+    doubleTrouble,
+    brokenWing,
+    twinWings,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

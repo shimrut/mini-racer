@@ -586,5 +586,60 @@
     "gold": 16.09,
     "silver": 16.48,
     "bronze": 16.82
+  },
+  "twistedClover": {
+    "author": 7.75,
+    "gold": 7.99,
+    "silver": 8.23,
+    "bronze": 8.51
+  },
+  "hookLoop": {
+    "author": 6.85,
+    "gold": 7.06,
+    "silver": 7.25,
+    "bronze": 7.51
+  },
+  "crookedArrow": {
+    "author": 10.87,
+    "gold": 11.08,
+    "silver": 11.37,
+    "bronze": 11.72
+  },
+  "windingRoad": {
+    "author": 8.89,
+    "gold": 9.18,
+    "silver": 9.31,
+    "bronze": 9.62
+  },
+  "gunSlinger": {
+    "author": 9.15,
+    "gold": 9.39,
+    "silver": 9.72,
+    "bronze": 10.03
+  },
+  "lightningHook": {
+    "author": 12.70,
+    "gold": 12.95,
+    "silver": 13.21,
+    "bronze": 13.55
+  },
+  "doubleTrouble": {
+    "author": 11.33,
+    "gold": 11.61,
+    "silver": 11.87,
+    "bronze": 12.05
+  },
+  "brokenWing": {
+    "author": 11.33,
+    "gold": 11.66,
+    "silver": 11.99,
+    "bronze": 12.41
+  },
+  "twinWings": {
+    "author": 10.61,
+    "gold": 10.86,
+    "silver": 11.12,
+    "bronze": 11.43
   }
 }
+ 

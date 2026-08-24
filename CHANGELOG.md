@@ -1,5 +1,10 @@
 # Changelog
 
+- Nine new tracks join the Daily rotation: **Twisted Clover**, **Hook Loop**,
+  **Crooked Arrow**, **Winding Road**, **Gun Slinger**, **Lightning Hook**,
+  **Double Trouble**, **Broken Wing**, and **Twin Wings**. They are appended
+  after Shark Fin, so already-published days keep their track.
+
 - Daily and Campaign finish stats now use the same left-label / right-value
   rows as Head to Head: VS PB and RANK sit in the button column, with Next
   following that same row. Time and medals stay as they were.
