@@ -309,6 +309,8 @@ describe('Daily tracks opener', () => {
         expect(engineSource).toContain(
             'this.campaignCarousel.navigation?.addEventListener("click", openCampaignTracks);',
         );
+        expect(engineSource).toContain('onOpenTracks:');
+        expect(engineSource).toContain('void this.openDailyChallengePlaylist();');
     });
 });
 
@@ -971,15 +973,20 @@ describe('daily and campaign keyboard rows', () => {
             ['lobby-mode-toolbar__action', 'lobby-header-action'],
             { left: 220, top: 8, width: 40, height: 40 },
         );
+        const tracks = navButton(
+            'lobby-mode-tracks-btn',
+            ['lobby-mode-toolbar__action', 'lobby-header-action'],
+            { left: 265, top: 8, width: 40, height: 40 },
+        );
         const garage = navButton(
             'lobby-mode-garage-btn',
             ['lobby-mode-toolbar__action', 'lobby-header-action'],
-            { left: 270, top: 8, width: 40, height: 40 },
+            { left: 310, top: 8, width: 40, height: 40 },
         );
         const settings = navButton(
             'lobby-mode-settings-btn',
             ['lobby-mode-toolbar__action', 'lobby-header-action'],
-            { left: 320, top: 8, width: 40, height: 40 },
+            { left: 355, top: 8, width: 40, height: 40 },
         );
         const dailySwitch = navButton(
             'lobby-switch-daily-btn',
@@ -1007,7 +1014,7 @@ describe('daily and campaign keyboard rows', () => {
             classList: classList(),
         };
         const toolbar = {
-            querySelectorAll: () => [standings, garage, settings],
+            querySelectorAll: () => [standings, tracks, garage, settings],
         };
         const modeSwitch = {
             querySelectorAll: () => [dailySwitch, campaignSwitch],
@@ -1033,6 +1040,7 @@ describe('daily and campaign keyboard rows', () => {
                 '.lobby-header': {
                     querySelectorAll: () => [
                         standings,
+                        tracks,
                         garage,
                         settings,
                         dailySwitch,
@@ -1049,6 +1057,7 @@ describe('daily and campaign keyboard rows', () => {
             lobby,
             onCarouselNavigate,
             standings,
+            tracks,
             garage,
             settings,
             dailySwitch,
@@ -1097,6 +1106,7 @@ describe('daily and campaign keyboard rows', () => {
             world.lobby.handleKeydown(keyEvent('ArrowUp'));
             world.lobby.handleKeydown(keyEvent('ArrowUp'));
             expect(world.standings.classList.contains(MENU_SELECTED_CLASS)
+                || world.tracks.classList.contains(MENU_SELECTED_CLASS)
                 || world.garage.classList.contains(MENU_SELECTED_CLASS)
                 || world.settings.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
 

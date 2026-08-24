@@ -192,8 +192,8 @@ flowchart LR
   multiplier. This keeps the marker consistently twice the gameplay
   car-to-track proportion across different tracks and DPRs while leaving the
   deliberately larger standalone post-preview car unchanged. The
-  existing Back, Standings, Garage, and Settings toolbar stays in the top header
-  as one right-aligned icon-only rail, while the billing starts at the
+  existing Back, Standings, Tracks, Garage, and Settings toolbar stays in the top header
+  as one right-aligned icon-only rail, with Tracks between Standings and Garage, while the billing starts at the
   upper-left beside it and one centered Start Race action anchors the bottom.
   The buttons retain accessible aria-labels and their original compact minimum
   tap area. The track name now travels with that action as its smaller race
@@ -214,9 +214,9 @@ flowchart LR
   overlay becomes `display: none`; this prevents the lap HUD from jumping after
   the race chrome has appeared.
   Standings resolves the carousel's currently centred track at click time.
-  Tapping Daily's expiry line or `current / total` counter opens the shared
-  Tracks modal on the Daily playlist. Tapping Campaign's `current / total`
-  counter opens that same modal on Campaign stages: unlocked tiles start the
+  The top-right Tracks icon, Daily's expiry line, and `current / total` counter
+  open the shared Tracks modal on the Daily playlist. The same icon and
+  Campaign's `current / total` counter open that modal on Campaign stages: unlocked tiles start the
   stage, locked tiles close and centre that poster on the carousel. The list
   layout matches Garage: title `Daily Tracks` or `Campaign Tracks`, then a
   three-across grid of track tiles.

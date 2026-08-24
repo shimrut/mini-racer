@@ -1119,11 +1119,13 @@ describe('Campaign lobby and shared modal adapters', () => {
         )?.[0];
         expect(toolbarMarkup).toContain('class="lobby-mode-toolbar__actions"');
         expect(toolbarMarkup).toMatch(
-            /<button id="lobby-mode-standings-btn"[\s\S]*id="lobby-mode-garage-btn"[\s\S]*id="lobby-mode-settings-btn"/,
+            /<button id="lobby-mode-standings-btn"[\s\S]*id="lobby-mode-tracks-btn"[\s\S]*id="lobby-mode-garage-btn"[\s\S]*id="lobby-mode-settings-btn"/,
         );
         expect(toolbarMarkup).not.toContain('id="lobby-mode-back-btn"');
         expect(toolbarMarkup).toContain('id="lobby-mode-standings-btn"');
         expect(toolbarMarkup).toContain('aria-label="Standings"');
+        expect(toolbarMarkup).toContain('id="lobby-mode-tracks-btn"');
+        expect(toolbarMarkup).toContain('aria-label="Tracks"');
         expect(toolbarMarkup).toContain('id="lobby-mode-garage-btn"');
         expect(toolbarMarkup).toContain('aria-controls="garage-modal"');
         expect(toolbarMarkup).toContain('id="lobby-mode-settings-btn"');
@@ -1292,6 +1294,11 @@ describe('Campaign lobby and shared modal adapters', () => {
             /<button id="lobby-mode-standings-btn"[\s\S]*?<\/button>/,
         )?.[0];
         expect(standingsMarkup).toContain('viewBox="0 0 640 640"');
+        const tracksMarkup = html.match(
+            /<button id="lobby-mode-tracks-btn"[\s\S]*?<\/button>/,
+        )?.[0];
+        expect(tracksMarkup).toContain('viewBox="0 0 640 640"');
+        expect(tracksMarkup).toContain('aria-label="Tracks"');
         const garageMarkup = html.match(
             /<button id="lobby-mode-garage-btn"[\s\S]*?<\/button>/,
         )?.[0];
@@ -1430,6 +1437,27 @@ describe('Campaign lobby and shared modal adapters', () => {
             global.requestAnimationFrame = originalRequestAnimationFrame;
             global.document = originalDocument;
         }
+    });
+
+    it('routes Tracks through the currently active lobby mode', () => {
+        const originalDocument = global.document;
+        const tracks = createElement('button');
+        global.document = {
+            getElementById: vi.fn((id) => (
+                id === 'lobby-mode-tracks-btn' ? tracks : null
+            )),
+            querySelectorAll: vi.fn(() => []),
+            addEventListener: vi.fn(),
+        };
+        const onOpenTracks = vi.fn();
+        const lobby = new LobbyUi({ onOpenTracks });
+        lobby.mode = 'campaign';
+
+        lobby.bind();
+        tracks.listeners.get('click')();
+
+        expect(onOpenTracks).toHaveBeenCalledWith('campaign');
+        global.document = originalDocument;
     });
 
     it('routes Standings through the currently active lobby mode', () => {

@@ -115,7 +115,8 @@ body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     width: auto;
 }
 
-body[data-lobby-mode="challenge"] #lobby-mode-standings-btn {
+body[data-lobby-mode="challenge"] #lobby-mode-standings-btn,
+body[data-lobby-mode="challenge"] #lobby-mode-tracks-btn {
     display: none;
 }
 

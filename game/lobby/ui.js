@@ -107,6 +107,7 @@ export class LobbyUi {
         onSelectCampaign = null,
         onBack = null,
         onOpenStandings = null,
+        onOpenTracks = null,
         onStartDaily = null,
         onStartCampaign = null,
         onAcceptChallenge = null,
@@ -118,6 +119,7 @@ export class LobbyUi {
         this.onSelectCampaign = onSelectCampaign;
         this.onBack = onBack;
         this.onOpenStandings = onOpenStandings;
+        this.onOpenTracks = onOpenTracks;
         this.onStartDaily = onStartDaily;
         this.onStartCampaign = onStartCampaign;
         this.onAcceptChallenge = onAcceptChallenge;
@@ -166,6 +168,8 @@ export class LobbyUi {
         });
         document.getElementById('lobby-mode-standings-btn')
             ?.addEventListener('click', () => this.onOpenStandings?.(this.mode));
+        document.getElementById('lobby-mode-tracks-btn')
+            ?.addEventListener('click', () => this.onOpenTracks?.(this.mode));
         document.getElementById('lobby-back-btn')
             ?.addEventListener('click', () => this.onBack?.(this.mode));
         document.getElementById('daily-challenge-start-btn')

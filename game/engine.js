@@ -380,6 +380,15 @@ export class RealTimeRacer {
       onSelectCampaign: () => void this.activateMode("campaign"),
       onBack: () => this.showHomeLobby(),
       onOpenStandings: (mode) => this.openVisibleLobbyStandings(mode),
+      onOpenTracks: (mode) => {
+        if (mode === "campaign") {
+          this.invokeModeMethod("campaign", "openCampaignTracks");
+          return;
+        }
+        if (mode === "daily") {
+          void this.openDailyChallengePlaylist();
+        }
+      },
       onStartCampaign: () => void this.invokeModeMethod(
         "campaign",
         "startCampaignStage",

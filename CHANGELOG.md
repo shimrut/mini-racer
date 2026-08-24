@@ -1,5 +1,8 @@
 # Changelog
 
+- Daily and Campaign have a Tracks icon in the top-right again, between
+  Standings and Garage, opening the same list as the expiry line and counter.
+
 - The Tracks list now matches Garage: Daily Tracks or Campaign Tracks at the
   top, then a three-across grid of track tiles.
 

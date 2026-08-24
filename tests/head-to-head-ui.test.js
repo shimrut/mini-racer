@@ -1516,7 +1516,7 @@ describe('Head to Head poster after the duel is beaten', () => {
         expect(doc.getElementById('challenge-won-cta').hidden).toBe(false);
     });
 
-    it('carries Garage and Settings into the duel, but not Standings', () => {
+    it('carries Garage and Settings into the duel, but not Standings or Tracks', () => {
         const lobbyCss = readFileSync(
             new URL('../styles/lobby-modes.css', import.meta.url),
             'utf8',
@@ -1525,7 +1525,7 @@ describe('Head to Head poster after the duel is beaten', () => {
             /body\[data-lobby-mode="challenge"\] \.lobby-mode-toolbar,[\s\S]*?body\[data-lobby-mode="campaign"\] \.lobby-mode-toolbar\s*\{[^}]*position:\s*absolute;[^}]*top:\s*0;[^}]*right:\s*0;[^}]*display:\s*flex;/s,
         );
         expect(lobbyCss).toMatch(
-            /body\[data-lobby-mode="challenge"\] #lobby-mode-standings-btn\s*\{[^}]*display:\s*none;/s,
+            /body\[data-lobby-mode="challenge"\] #lobby-mode-standings-btn,[\s\S]*body\[data-lobby-mode="challenge"\] #lobby-mode-tracks-btn\s*\{[^}]*display:\s*none;/s,
         );
     });
 

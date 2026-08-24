@@ -224,8 +224,9 @@ maintaining mode-specific card layouts:
   dot, and lap count are rendered as the secondary race-brief line under the
   red Start Race action. A locked stage keeps that brief while the primary label
   changes to `Locked`.
-- Daily and Campaign put Back, Standings, Garage, and Settings in one compact
-  right-aligned icon-only rail. The buttons retain their accessible `aria-label`
+- Daily and Campaign put Back, Standings, Tracks, Garage, and Settings in one compact
+  right-aligned icon-only rail. Tracks sits between Standings and Garage, matching
+  the old main-menu order. The buttons retain their accessible `aria-label`
   values and original compact minimum `2.75rem` tap area; Home and Challenge
   keep their existing navigation treatments.
 - The lobby header keeps billing and the fixed Mini Racer wordmark in its own
