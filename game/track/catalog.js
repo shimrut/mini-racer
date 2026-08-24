@@ -106,6 +106,8 @@ export const TRACK_CATALOG = {
     doubleTrouble: { name: "Double Trouble" },
     brokenWing: { name: "Broken Wing" },
     twinWings: { name: "Twin Wings" },
+    squareRoot: { name: "Square Root" },
+    halfLife: { name: "Half Life" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [

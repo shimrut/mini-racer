@@ -60,9 +60,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Campaign matches the Daily lobby layout: no stage rows appear directly;
   Standings opens the shared modal for the current stage, and Tracks opens the
   shared modal with Campaign progress and selectable unlocked stages.
-- [ ] Campaign stages use the fixed `2,2,1,1,2,1,1,3,2,1,3,1,2,2` lap sequence,
-  closing on Golden Ratio as a two-lap stage — Imaginary Number is the last
-  three-lap one — and require
+- [ ] Campaign stages use the fixed `2,2,1,1,2,1,1,3,2,1,3,1,2,2,2,1` lap
+  sequence, closing on Half Life as a one-lap stage — Imaginary Number is the
+  last three-lap one — and require
   the configured medal total plus any medal on the immediately previous stage,
   and keep independent permanent standings and PB ghosts.
 - [ ] A locked Campaign card shows both unlock gates with medal placeholders:

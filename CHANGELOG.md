@@ -1,5 +1,10 @@
 # Changelog
 
+- Added **Square Root** (2 laps) and **Half Life** (1 lap) as Campaign stages
+  14 and 15 after Golden Ratio. They stay out of Daily rotation. Square Root
+  unlocks at 35 Campaign medals plus a medal on Golden Ratio; Half Life
+  unlocks at 37 medals plus a medal on Square Root.
+
 - Daily, Campaign, and Head to Head finishes now share one layout: the same
   320px column and padding as the buttons, and the same gap from the heading
   down to the comparison rows. Head to Head still swaps in YOU WON / YOU LOST

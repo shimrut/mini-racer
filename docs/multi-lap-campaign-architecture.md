@@ -14,8 +14,8 @@ leaderboard, and retention rules.
 
 - Campaign ID: `numbered-v1`.
 - Stages: Number Zero through Number Nine, Imaginary Number, Infinite Pie,
-  Euler's Number, and Golden Ratio.
-- Fixed lap counts: `2, 2, 1, 1, 2, 1, 1, 3, 2, 1, 3, 1, 2, 2`.
+  Euler's Number, Golden Ratio, Square Root, and Half Life.
+- Fixed lap counts: `2, 2, 1, 1, 2, 1, 1, 3, 2, 1, 3, 1, 2, 2, 2, 1`.
 - Unlock rule: Gold or Author on the immediately preceding stage.
 - Campaign starts, progress, per-stage bests, PB ghosts, and leaderboards are
   server records for guests and signed-in players. Shared stage leaderboards
@@ -93,8 +93,10 @@ leaderboard, and retention rules.
 
 - Campaign tracks are a curated, permanent set and do not rotate.
 - Every campaign race declares a fixed lap count of 1, 2, or 3.
-- Golden Ratio is the final stage (`numbered-v1-13`), a three-lap race gated at
-  32 total Campaign medals plus a medal on Euler's Number.
+- Half Life is the final stage (`numbered-v1-15`), a one-lap race gated at
+  37 total Campaign medals plus a medal on Square Root. Square Root
+  (`numbered-v1-14`) is a two-lap race gated at 35 medals plus a medal on
+  Golden Ratio.
 - Campaign progress and leaderboards are separate from Daily GP.
 - Tracks unlock from medals earned in the campaign.
 - When a cumulative medal gate is the remaining blocker, the lobby reports

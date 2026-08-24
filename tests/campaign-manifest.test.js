@@ -32,6 +32,8 @@ describe('Campaign manifest', () => {
             { raceId: 'numbered-v1-11', trackKey: 'infinitePie', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 27, previousRaceId: 'numbered-v1-10' } },
             { raceId: 'numbered-v1-12', trackKey: 'eulersNumber', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 30, previousRaceId: 'numbered-v1-11' } },
             { raceId: 'numbered-v1-13', trackKey: 'goldenRatio', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 32, previousRaceId: 'numbered-v1-12' } },
+            { raceId: 'numbered-v1-14', trackKey: 'squareRoot', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 35, previousRaceId: 'numbered-v1-13' } },
+            { raceId: 'numbered-v1-15', trackKey: 'halfLife', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 37, previousRaceId: 'numbered-v1-14' } },
         ]);
         expect(Object.isFrozen(CAMPAIGN_STAGES)).toBe(true);
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);
@@ -39,7 +41,7 @@ describe('Campaign manifest', () => {
 
     it('keeps every gate reachable on Gold alone and strictly rising', () => {
         const requirements = CAMPAIGN_STAGES.map((stage) => stage.unlock.requiredMedals ?? 0);
-        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30, 32]);
+        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30, 32, 35, 37]);
         requirements.forEach((required, index) => {
             expect(required).toBeLessThanOrEqual(index * 3);
             if (index > 0) expect(required).toBeGreaterThan(requirements[index - 1]);

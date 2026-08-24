@@ -2,7 +2,7 @@
 
 Mini Racer is a quick racing game on Reddit.
 
-Race the daily track, replay the last seven days, or take on the 14-stage Campaign.
+Race the daily track, replay the last seven days, or take on the 16-stage Campaign.
 Chase personal bests, earn medals, unlock cars and trails, climb leaderboards, and race ghosts.
 Share verified times or challenge other players Head to Head.
 
@@ -10,7 +10,7 @@ Share verified times or challenge other players Head to Head.
 
 ### 2.0
 
-- Added the permanent **14-stage Campaign** with medals, unlocks, personal bests,
+- Added the permanent **16-stage Campaign** with medals, unlocks, personal bests,
   ghosts, and a separate leaderboard for every stage.
 - Added **Head to Head** challenges from verified Daily and Campaign results.
   Race another player’s frozen ghost, beat their time, and Brag when signed in.
@@ -26,7 +26,8 @@ Share verified times or challenge other players Head to Head.
   faster navigation and clearer race information.
 - Improved millisecond timing, PB ghosts, challenge loading, Campaign startup,
   guest recovery, and protection against lost progress.
-- Added more tracks, including **Golden Ratio** as the Campaign finale.
+- Added more tracks, including **Square Root** and **Half Life** as the last
+  two Campaign stages.
 
 ### 1.4.1
 

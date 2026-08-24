@@ -24,6 +24,8 @@ const STAGE_DEFINITIONS = [
     ['11', 'infinitePie', 1, 27],
     ['12', 'eulersNumber', 2, 30],
     ['13', 'goldenRatio', 2, 32],
+    ['14', 'squareRoot', 2, 35],
+    ['15', 'halfLife', 1, 37],
 ];
 
 export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(

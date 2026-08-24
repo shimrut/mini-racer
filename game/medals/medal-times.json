@@ -636,10 +636,22 @@
     "bronze": 12.41
   },
   "twinWings": {
-    "author": 10.61,
-    "gold": 10.86,
-    "silver": 11.12,
-    "bronze": 11.43
+    "author": 10.71,
+    "gold": 10.96,
+    "silver": 11.22,
+    "bronze": 11.53
+  },
+  "halfLife": {
+    "author": 11.27,
+    "gold": 11.51,
+    "silver": 11.79,
+    "bronze": 12.02
+  },
+  "squareRoot": {
+    "author": 9.32,
+    "gold": 9.59,
+    "silver": 9.81,
+    "bronze": 9.99
   }
 }
  

@@ -158,6 +158,8 @@ describe('track runtime integrity', () => {
             'doubleTrouble',
             'brokenWing',
             'twinWings',
+            'squareRoot',
+            'halfLife',
         ]);
         const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -195,7 +197,7 @@ describe('track runtime integrity', () => {
             '2835aa8e12848f18df32725370f93af486477be964617a0fb1f4ecb5fe63db16',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'da7aa7c9e96985325084fd4489089a84d9c9466edada48b39dea12875f27ba1a',
+            '40ec2fbd114ee9fba9c1dc17009821b9421f45489037923e69595eb0804d849e',
         );
     });
 
