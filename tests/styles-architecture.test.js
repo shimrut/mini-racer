@@ -86,7 +86,6 @@ describe('game stylesheet architecture', () => {
         const styles = readCssBundle(manifestUrl);
 
         for (const token of [
-            '--dur-pop: 50ms;',
             '--dur-snap: 75ms;',
             '--dur-fast: 120ms;',
             '--dur-base: 160ms;',
@@ -146,16 +145,13 @@ describe('game stylesheet architecture', () => {
             /#modal-combined-view\.is-challenge-finish\.active-view #combined-time\s*\{[^}]*animation:\s*slideInRight 0\.6s var\(--ease-glide\) 0\.1s both;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-snap\) var\(--ease-settle\) backwards;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-stats-grid > \.stat-floating-item:not\(\[hidden\]\),[\s\S]*animation:\s*leaderboardRowIn var\(--dur-snap\) var\(--ease-settle\) backwards;/,
         );
         expect(resultDetailStyles).toMatch(
             /stat-floating-item:nth-child\(1 of :not\(\[hidden\]\)\)\s*\{[^}]*animation-delay:\s*0\.1s;/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.combined-actions > :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\s*\{[^}]*animation:\s*leaderboardRowIn var\(--dur-pop\) var\(--ease-settle\) backwards;[^}]*animation-delay:\s*0\.35s;/s,
-        );
-        expect(resultDetailStyles).not.toMatch(
-            /combined-actions > :nth-child\(\d+ of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)/,
+            /combined-actions > :nth-child\(1 of :not\(\[hidden\]\):not\(\[style\*="display: none"\]\)\)\s*\{[^}]*animation-delay:\s*0\.35s;/,
         );
         expect(resultDetailStyles).not.toContain('challengeFinishItemIn');
         expect(resultDetailStyles).toMatch(
