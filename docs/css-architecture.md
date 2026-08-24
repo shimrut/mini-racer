@@ -77,12 +77,12 @@ The finish hero contains no avatar, opponent name, or duplicate margin.
 Head to Head also omits medals there; Daily and Campaign keep the medal row
 under the time. Those omitted elements remain valid on the separate Challenge
 lobby/won portrait.
-The verdict lockup uses Mini's `slideInLeft` in 0.375s, and
-the time uses Racer's `slideInRight` in 0.45s / 0.075s delay. Visible
-comparison rows then use `leaderboardRowIn` at `--dur-finish-row` (56ms);
-every visible finish button then fades and rises together at 300ms in
-`--dur-finish-btn` (150ms) with `--ease-glide`. Those finish durations are 25%
-quicker than Mini / Racer / the previous sheet. Hidden rows and
+The verdict lockup enters with the same `slideInLeft` 0.5s glide as Mini, and
+the time with the same `slideInRight` 0.6s / 0.1s delay as Racer. Visible
+comparison rows then use `leaderboardRowIn` at `--dur-snap` (75ms), 50ms apart from
+200ms; every visible finish button then fades and rises together at 400ms in
+`--dur-slow` (200ms) with `--ease-glide`, matching the title rather than the row snap.
+Hidden rows and
 `display: none` actions are skipped with `:nth-child(n of …)`. Reduced motion
 turns the sequence off. Daily and Campaign use that same entrance, with
 `FINISH` and medals under the clock.

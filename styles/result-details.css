@@ -274,11 +274,6 @@
 }
 
 /* Daily, Campaign, and Head to Head share this lockup. Head to Head uses YOU WON/LOST; Daily and Campaign use FINISH with medals under the time. */
-#modal-combined-view.is-challenge-finish {
-    --dur-finish-row: 56ms;
-    --dur-finish-btn: 150ms;
-}
-
 #modal-combined-view.is-challenge-finish .pause-header {
     display: flex;
     flex-direction: column;
@@ -447,35 +442,35 @@
 #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__status {
     opacity: 0;
     backface-visibility: hidden;
-    animation: slideInLeft 0.375s var(--ease-glide) both;
+    animation: slideInLeft 0.5s var(--ease-glide) both;
 }
 
 #modal-combined-view.is-challenge-finish.active-view #combined-time {
     opacity: 0;
     backface-visibility: hidden;
-    animation: slideInRight 0.45s var(--ease-glide) 0.075s both;
+    animation: slideInRight 0.6s var(--ease-glide) 0.1s both;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:not([hidden]) {
-    animation: leaderboardRowIn var(--dur-finish-row) var(--ease-settle) backwards;
+    animation: leaderboardRowIn var(--dur-snap) var(--ease-settle) backwards;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-actions > :not([hidden]):not([style*="display: none"]) {
     opacity: 0;
     backface-visibility: hidden;
-    animation: leaderboardRowIn var(--dur-finish-btn) var(--ease-glide) 0.3s both;
+    animation: leaderboardRowIn var(--dur-slow) var(--ease-glide) 0.4s both;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(1 of :not([hidden])) {
-    animation-delay: 0.075s;
+    animation-delay: 0.1s;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(2 of :not([hidden])) {
-    animation-delay: 0.188s;
+    animation-delay: 0.25s;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(3 of :not([hidden])) {
-    animation-delay: 0.225s;
+    animation-delay: 0.3s;
 }
 
 @media (prefers-reduced-motion: reduce) {
