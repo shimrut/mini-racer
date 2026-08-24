@@ -422,11 +422,6 @@
     color: var(--accent-color);
 }
 
-#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--pending,
-#modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--error {
-    font-size: clamp(1.45rem, 6.5vw, 2.2rem);
-}
-
 #modal-combined-view.is-challenge-finish .challenge-result-lockup__status {
     display: block;
     max-width: 18rem;
@@ -520,11 +515,6 @@
     #modal-combined-view:not(.is-challenge-finish) .combined-finish-heading,
     #modal-combined-view:not(.is-challenge-finish) #combined-time {
         font-size: 3.5rem;
-    }
-
-    #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--pending,
-    #modal-combined-view.is-challenge-finish .challenge-result-lockup__outcome--error {
-        font-size: clamp(1.25rem, 4.5vw, 1.85rem);
     }
 
     #modal-combined-view.is-challenge-finish .challenge-result-lockup__status {

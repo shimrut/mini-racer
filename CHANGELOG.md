@@ -1,5 +1,8 @@
 # Changelog
 
+- Head to Head finish words in the hero — VERIFYING, YOU WON, YOU LOST, YOU
+  TIED, UNVERIFIED — now all use the same size.
+
 - Head to Head finish now shows only VERIFYING while the result is checked, then
   slides YOU WON in so it pushes that word out.
 
