@@ -142,6 +142,14 @@ describe('game stylesheet architecture', () => {
         expect(resultDetailStyles).not.toContain('.combined-stats-right-group--interactive:active');
     });
 
+    it('does not scale or recolor the finish MEDALS row on hover', () => {
+        expect(resultDetailStyles).toMatch(
+            /#combined-medals-stat\.combined-medals-stat--interactive\s*\{[^}]*cursor:\s*pointer;/,
+        );
+        expect(resultDetailStyles).not.toContain('.combined-medals-stat--interactive:hover');
+        expect(resultDetailStyles).not.toContain('.combined-medals-stat--interactive:active');
+    });
+
     it('lays out Daily, Campaign, and Head to Head comparison stats as the same left-label rows', () => {
         expect(resultDetailStyles).toMatch(
             /\.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;[^}]*margin-top:\s*2\.75rem;/s,

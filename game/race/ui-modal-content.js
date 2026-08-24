@@ -4,7 +4,14 @@ import {
     buildChallengeRankSnapshot,
     buildModalDeltaDisplay,
 } from '../race/result-flow.js';
-import { renderWinCombinedMedalOverlay, resolveCombinedFinishHeadline } from '../medals/medals.js';
+import {
+    getMedalRowSlots,
+    isStandardMedalTier,
+    maxMedalTier,
+    renderWinCombinedMedalOverlay,
+    resolveCombinedFinishHeadline,
+} from '../medals/medals.js';
+import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { formatSplitTimeDeltaSec } from '../race/lap-speed.js';
 
 const LEADERBOARD_SHARE_ICON_PATH = 'M307.8 18.4c-12 5-19.8 16.6-19.8 29.6l0 80-112 0c-97.2 0-176 78.8-176 176 0 113.3 81.5 163.9 100.2 174.1 2.5 1.4 5.3 1.9 8.1 1.9 10.9 0 19.7-8.9 19.7-19.7 0-7.5-4.3-14.4-9.8-19.5-9.4-8.8-22.2-26.4-22.2-56.7 0-53 43-96 96-96l96 0 0 80c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l160-160c12.5-12.5 12.5-32.8 0-45.3l-160-160c-9.2-9.2-22.9-11.9-34.9-6.9z';
@@ -771,6 +778,13 @@ export class ModalContentUi {
                 : scoreboardSnapshot,
         });
         this.bindChallengeTrackLockedRank(container, Boolean(challengeRankSnapshot?.trackLocked));
+        this.bindCombinedMedalsRow(container, {
+            isChallengeHero,
+            trackKey,
+            lapMedal,
+            previousTrackMedal,
+            lapCount,
+        });
         if (timeEl) {
             timeEl.innerHTML = Number.isFinite(time)
                 ? `<span class="time-num">${time.toFixed(3)}</span><span class="time-unit">s</span>`
@@ -969,6 +983,65 @@ export class ModalContentUi {
                 label.textContent = "You haven't unlocked this track in Campaign, so you can't rank for it.";
                 row.appendChild(label);
                 listEl.appendChild(row);
+            },
+        });
+    }
+
+    bindCombinedMedalsRow(container, {
+        isChallengeHero = false,
+        trackKey = null,
+        lapMedal = null,
+        previousTrackMedal = null,
+        lapCount = 1,
+    } = {}) {
+        const medalsStatEl = container?.querySelector('#combined-medals-stat');
+        const bestStoredMedal = maxMedalTier(
+            isStandardMedalTier(previousTrackMedal) ? previousTrackMedal : null,
+            isStandardMedalTier(lapMedal) ? lapMedal : null,
+        );
+        const slots = getMedalRowSlots(trackKey, bestStoredMedal, lapCount);
+        bindCombinedStatButton(
+            medalsStatEl,
+            isChallengeHero || slots.length === 0
+                ? { interactiveClass: 'combined-medals-stat--interactive' }
+                : {
+                    interactiveClass: 'combined-medals-stat--interactive',
+                    ariaLabel: 'View medal times',
+                    onActivate: () => this.openCombinedMedalsPopover(container, slots),
+                },
+        );
+    }
+
+    openCombinedMedalsPopover(container, slots) {
+        mountCombinedPopoverOverlay(container, {
+            title: 'MEDALS',
+            overlayClass: 'combined-medals-times-overlay',
+            buildRows: (listEl) => {
+                for (const { tier, filled, thresholdSec } of slots) {
+                    const row = document.createElement('div');
+                    row.className = 'combined-medal-times-row combined-medal-times-row--medal';
+
+                    const icon = createMedalIconSvg(tier, {
+                        className: filled
+                            ? 'medal-svg--hero'
+                            : 'medal-svg--hero medal-svg--row-placeholder',
+                        outline: !filled,
+                        showEmblem: filled,
+                        centerText: null,
+                        rowPlaceholder: !filled,
+                    });
+                    icon.setAttribute('aria-hidden', 'true');
+
+                    const timeEl = document.createElement('span');
+                    timeEl.className = 'combined-medal-times-time';
+                    timeEl.textContent = Number.isFinite(thresholdSec)
+                        ? `${thresholdSec.toFixed(3)}s`
+                        : '--';
+
+                    row.appendChild(icon);
+                    row.appendChild(timeEl);
+                    listEl.appendChild(row);
+                }
             },
         });
     }

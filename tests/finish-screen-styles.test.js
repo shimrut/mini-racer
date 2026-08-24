@@ -78,4 +78,13 @@ describe('finish screen styles', () => {
             /#modal-combined-view\.is-challenge-finish \.combined-finish-heading\s*\{\s*display:\s*none;/,
         );
     });
+
+    it('stacks medal times in the finish mini-modal', () => {
+        expect(styles).toMatch(
+            /\.combined-medal-times-row--medal\s*\{[^}]*justify-content:\s*space-between;/,
+        );
+        expect(styles).toMatch(
+            /\.combined-medal-times-row--medal \.medal-svg--hero\s*\{[^}]*width:\s*1\.5rem;/,
+        );
+    });
 });

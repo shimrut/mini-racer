@@ -84,7 +84,9 @@ turns the sequence off. Daily and Campaign put a status heading above the
 time in that same column — medal name, NEW BEST, or FINISHED — with the Mini
 `slideInLeft` and Racer `slideInRight` pair delayed by `--dur-finish-headline`
 (10ms) after the finish modal fade starts. VS PB, RANK, and MEDALS stay the
-comparison rows. They do not run the Head to Head row and button stagger.
+comparison rows. Tapping MEDALS opens the same mini overlay as checkpoint
+splits, with each medal stacked above its target time. They do not run the Head
+to Head row and button stagger.
 
 ## Daily And Campaign Poster Contract
 

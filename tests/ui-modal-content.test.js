@@ -434,6 +434,56 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
+    it('opens a medals mini-modal with stacked medal times from the MEDALS row', () => {
+        const originalDocument = global.document;
+        const originalRaf = global.requestAnimationFrame;
+        global.requestAnimationFrame = (cb) => cb();
+        const dom = new JSDOM(`
+            <div id="combined">
+                <span id="combined-finish-heading" class="combined-finish-heading" hidden></span>
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div id="combined-best-lap"></div>
+                <div id="combined-stat-label-2"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+
+        component.renderCombinedResults(container, {
+            time: 12.34,
+            bestLap: 12.34,
+            trackKey: 'circuit',
+            lapMedal: 'gold',
+        });
+
+        const medalsStat = container.querySelector('#combined-medals-stat');
+        expect(medalsStat.classList.contains('combined-medals-stat--interactive')).toBe(true);
+        medalsStat.click();
+
+        const overlay = container.querySelector('.combined-medal-times-overlay');
+        expect(overlay).toBeTruthy();
+        expect(container.querySelector('.combined-medal-times-title').textContent).toBe('MEDALS');
+        const rows = container.querySelectorAll('.combined-medal-times-row--medal');
+        expect(rows.length).toBe(4);
+        expect(rows[0].querySelector('.medal-svg--bronze')).toBeTruthy();
+        expect(rows[1].querySelector('.medal-svg--silver')).toBeTruthy();
+        expect(rows[2].querySelector('.medal-svg--gold')).toBeTruthy();
+        expect(rows[3].querySelector('.medal-svg--author')).toBeTruthy();
+        expect(rows[2].querySelector('.combined-medal-times-time').textContent).toMatch(/^\d+\.\d{3}s$/);
+
+        global.requestAnimationFrame = originalRaf;
+        global.document = originalDocument;
+    });
+
     it('labels Daily finish as new best or finished when no medal unlocks', () => {
         const originalDocument = global.document;
         const markup = `
@@ -528,6 +578,7 @@ describe('ui modal content helpers', () => {
         const heading = container.querySelector('#combined-finish-heading');
         expect(heading.hidden).toBe(true);
         expect(heading.textContent).toBe('');
+        expect(container.querySelector('#combined-medals-stat').classList.contains('combined-medals-stat--interactive')).toBe(false);
 
         global.document = originalDocument;
     });

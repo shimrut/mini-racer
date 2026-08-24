@@ -406,7 +406,8 @@ flowchart LR
   above the time in that same column (medal name, NEW BEST, or FINISHED), with
   the same heading-to-row gap and
   button-edge alignment, and reuse those left-label / right-value comparison rows
-  for VS PB, RANK, and MEDALS.
+  for VS PB, RANK, and MEDALS. Tapping MEDALS opens the shared finish mini
+  overlay with each medal and its time stacked, matching checkpoint splits.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,
   and frozen challenger Reddit avatar URL (no ghost or player ID in public post

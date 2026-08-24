@@ -1,5 +1,9 @@
 # Changelog
 
+- Daily and Campaign finish screens now open a small MEDALS sheet from that
+  row, listing each medal with its time, the same way checkpoint splits open
+  from the clock. Head to Head is unchanged.
+
 - Daily and Campaign finish screens now put a status line above the time, in
   the same Mini / Racer entrance as Head to Head: the medal just unlocked,
   NEW BEST, or FINISHED. Head to Head still uses YOU WON / YOU LOST.

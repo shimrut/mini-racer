@@ -151,6 +151,29 @@
     user-select: none;
 }
 
+#combined-medals-stat.combined-medals-stat--interactive {
+    cursor: pointer;
+    user-select: none;
+}
+
+.combined-medal-times-row--medal {
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.combined-medal-times-row--medal .medal-svg--hero {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+
+.combined-medal-times-row--medal .combined-medal-times-time {
+    flex: 0 0 auto;
+    min-width: 5.5rem;
+    text-align: right;
+}
+
 #modal-combined-view .modal-card-section {
     background: transparent;
     border: none;
