@@ -456,9 +456,8 @@
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-actions > :not([hidden]):not([style*="display: none"]) {
-    opacity: 0;
-    backface-visibility: hidden;
-    animation: leaderboardRowIn var(--dur-slow) var(--ease-glide) 0.4s both;
+    animation: leaderboardRowIn var(--dur-pop) var(--ease-settle) backwards;
+    animation-delay: 0.35s;
 }
 
 #modal-combined-view.is-challenge-finish.active-view .combined-stats-grid > .stat-floating-item:nth-child(1 of :not([hidden])) {
