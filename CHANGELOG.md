@@ -1,5 +1,9 @@
 # Changelog
 
+- Daily and Campaign finish screens now show medals on a compact MEDALS row
+  beside RANK and VS PB, instead of as a large block under the time. Head to
+  Head still uses YOU WON / YOU LOST in that top slot.
+
 - Head to Head now waits for the server's judged beat / not-beat before showing
   YOU WON and the win buttons. Daily/Campaign personal-best save still runs on
   that same request, after the reply has already gone out.

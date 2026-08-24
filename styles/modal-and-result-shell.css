@@ -351,20 +351,8 @@
     height: 0.95rem;
 }
 
-#modal.modal--win #modal-combined-view #combined-next-medal-stat[hidden] {
+#modal.modal--win #modal-combined-view #combined-medals-stat[hidden] {
     display: none !important;
-}
-
-#modal.modal--win #modal-combined-view .combined-next-medal-icon-slot {
-    display: inline-flex;
-    align-items: center;
-    line-height: 0;
-}
-
-#modal.modal--win #modal-combined-view .combined-next-medal-icon-slot .medal-svg {
-    width: 1.15rem;
-    height: 1.15rem;
-    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
 }
 
 #modal.modal--win .modal-view#modal-combined-view.active-view {

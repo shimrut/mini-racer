@@ -54,4 +54,13 @@ describe('finish screen styles', () => {
             /\.leaderboard-row__action\s*\{[^}]*width:\s*3rem;/s,
         );
     });
+
+    it('puts Daily and Campaign medals in a compact right-side MEDALS row', () => {
+        expect(styles).toMatch(
+            /#combined-medals-row \.combined-medal-row-slot \.medal-svg--hero\s*\{[^}]*width:\s*1\.28rem;/s,
+        );
+        expect(styles).toMatch(
+            /#modal-combined-view:not\(\.is-challenge-finish\) #combined-hero-medal\s*\{\s*display:\s*none;/,
+        );
+    });
 });

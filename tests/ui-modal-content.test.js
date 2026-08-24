@@ -334,9 +334,10 @@ describe('ui modal content helpers', () => {
                 <div id="combined-best-lap"></div>
                 <div id="combined-stat-label-1"></div>
                 <div id="combined-stat-label-2"></div>
-                <div id="combined-next-medal-stat"></div>
-                <div id="combined-next-medal-icon-slot"></div>
-                <div id="combined-next-medal-time"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
             </div>
         `);
         global.document = dom.window.document;
@@ -389,6 +390,82 @@ describe('ui modal content helpers', () => {
         global.document = originalDocument;
     });
 
+    it('places Daily medals on a compact MEDALS row and leaves the hero empty', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div id="combined-best-lap"></div>
+                <div id="combined-stat-label-2"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+
+        component.renderCombinedResults(container, {
+            time: 12.34,
+            bestLap: 12.34,
+            trackKey: 'circuit',
+            lapMedal: 'gold',
+        });
+
+        const medalsStat = container.querySelector('#combined-medals-stat');
+        const medalsRow = container.querySelector('#combined-medals-row');
+        const hero = container.querySelector('#combined-hero-medal');
+        expect(medalsStat.hidden).toBe(false);
+        expect(medalsRow.querySelectorAll('.combined-medal-row-slot').length).toBe(4);
+        expect(hero.querySelector('.combined-medal-row')).toBeNull();
+        expect(container.querySelector('#combined-stat-label-2').textContent).toBe('VS PB');
+
+        global.document = originalDocument;
+    });
+
+    it('keeps Head to Head result copy in the hero and hides the MEDALS row', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="combined">
+                <div id="combined-hero-medal"></div>
+                <div id="combined-stats-right-group" hidden aria-hidden="true"></div>
+                <div id="combined-rank-value"></div>
+                <div id="combined-rank-total"></div>
+                <div id="combined-time"></div>
+                <div id="combined-best-lap"></div>
+                <div id="combined-stat-label-2"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const container = dom.window.document.getElementById('combined');
+        const component = new ModalContentUi();
+
+        component.renderCombinedResults(container, {
+            time: 16.174,
+            bestLap: 16.839,
+            trackKey: 'circuit',
+            challengeFinish: true,
+            lapMedal: 'challenge',
+        });
+
+        expect(container.querySelector('#combined-medals-stat').hidden).toBe(true);
+        expect(container.querySelector('#combined-medals-row').children.length).toBe(0);
+        expect(container.querySelector('#combined-hero-medal').children.length).toBeGreaterThan(0);
+        expect(container.classList.contains('is-challenge-finish')).toBe(true);
+
+        global.document = originalDocument;
+    });
+
     it('reads a challenge finish against the personal best it had and the rank it earned', () => {
         const originalDocument = global.document;
         const dom = new JSDOM(`
@@ -405,9 +482,10 @@ describe('ui modal content helpers', () => {
                     <span id="combined-stat-label-2" hidden aria-hidden="true"></span>
                     <span id="combined-best-lap"></span>
                 </div>
-                <div id="combined-next-medal-stat"></div>
-                <div id="combined-next-medal-icon-slot"></div>
-                <div id="combined-next-medal-time"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
             </div>
         `);
         global.document = dom.window.document;
@@ -534,9 +612,10 @@ describe('ui modal content helpers', () => {
                 <div id="combined-best-lap"></div>
                 <div id="combined-stat-label-1"></div>
                 <div id="combined-stat-label-2"></div>
-                <div id="combined-next-medal-stat"></div>
-                <div id="combined-next-medal-icon-slot"></div>
-                <div id="combined-next-medal-time"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
             </div>
         `);
         global.document = dom.window.document;
@@ -585,9 +664,10 @@ describe('ui modal content helpers', () => {
                     <div id="combined-best-lap"></div>
                     <div id="combined-stat-label-2"></div>
                 </div>
-                <div id="combined-next-medal-stat"></div>
-                <div id="combined-next-medal-icon-slot"></div>
-                <div id="combined-next-medal-time"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
             </div>
         `);
         global.document = dom.window.document;
@@ -621,9 +701,10 @@ describe('ui modal content helpers', () => {
                     <div id="combined-best-lap"></div>
                     <div id="combined-stat-label-2"></div>
                 </div>
-                <div id="combined-next-medal-stat"></div>
-                <div id="combined-next-medal-icon-slot"></div>
-                <div id="combined-next-medal-time"></div>
+                <div id="combined-medals-stat" hidden aria-hidden="true">
+                    <span class="combined-stat-label">MEDALS</span>
+                    <div id="combined-medals-row"></div>
+                </div>
             </div>
         `);
         global.document = dom.window.document;

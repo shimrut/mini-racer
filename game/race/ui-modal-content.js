@@ -367,6 +367,34 @@ export class ModalContentUi {
         renderWinCombinedMedalOverlay(heroMedalEl, options);
     }
 
+    renderCombinedFinishMedals(container, options = {}) {
+        if (!container) return null;
+        const isChallengeHero = Boolean(
+            options.challengeFinish || options.challengeConfirmPhase || options.lapMedal === 'challenge',
+        );
+        const heroMedalEl = container.querySelector('#combined-hero-medal');
+        const medalsStatEl = container.querySelector('#combined-medals-stat');
+        const medalsRowEl = container.querySelector('#combined-medals-row');
+        const hostEl = isChallengeHero ? heroMedalEl : medalsRowEl;
+
+        if (heroMedalEl && hostEl !== heroMedalEl) heroMedalEl.replaceChildren();
+        if (medalsRowEl && hostEl !== medalsRowEl) medalsRowEl.replaceChildren();
+
+        if (medalsStatEl) {
+            medalsStatEl.hidden = isChallengeHero;
+            if (isChallengeHero) {
+                medalsStatEl.setAttribute('hidden', '');
+                medalsStatEl.setAttribute('aria-hidden', 'true');
+            } else {
+                medalsStatEl.removeAttribute('hidden');
+                medalsStatEl.removeAttribute('aria-hidden');
+            }
+        }
+
+        this.renderCombinedMedalOverlay(hostEl, options);
+        return hostEl;
+    }
+
     createModalStat(labelText, valueText, valueClass = '', onClick = null) {
     const stat = onClick ? document.createElement('button') : document.createElement('span');
     stat.className = `modal-stat-stack${onClick ? ' modal-stat-button' : ''}`;
@@ -661,18 +689,14 @@ export class ModalContentUi {
     } = {}) {
         if (!container) return;
 
-        const heroMedalEl = container.querySelector('#combined-hero-medal');
         const rightGroupEl = container.querySelector('#combined-stats-right-group');
         const rankValueEl = container.querySelector('#combined-rank-value');
         const rankTotalEl = container.querySelector('#combined-rank-total');
         const timeEl = container.querySelector('#combined-time');
         const bestLapEl = container.querySelector('#combined-best-lap');
         const label2El = container.querySelector('#combined-stat-label-2');
-        const nextMedalStatEl = container.querySelector('#combined-next-medal-stat');
-        const nextMedalIconSlot = container.querySelector('#combined-next-medal-icon-slot');
-        const nextMedalTimeEl = container.querySelector('#combined-next-medal-time');
 
-        this.renderCombinedMedalOverlay(heroMedalEl, {
+        this.renderCombinedFinishMedals(container, {
             trackKey,
             lapTimeSec: time,
             lapMedal,
@@ -845,14 +869,6 @@ export class ModalContentUi {
             bestLapEl.classList.remove('combined-stat-value--impact');
         }
 
-        if (nextMedalStatEl) {
-            nextMedalStatEl.hidden = true;
-            nextMedalStatEl.setAttribute('hidden', '');
-            nextMedalStatEl.setAttribute('aria-hidden', 'true');
-            nextMedalStatEl.removeAttribute('aria-label');
-            if (nextMedalIconSlot) nextMedalIconSlot.replaceChildren();
-            if (nextMedalTimeEl) nextMedalTimeEl.textContent = '';
-        }
     }
 
     /** The gap to the opponent only exists on a challenge, so its row is hidden everywhere else. */

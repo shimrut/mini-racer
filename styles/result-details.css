@@ -277,6 +277,10 @@
     transform: none;
 }
 
+#modal-combined-view:not(.is-challenge-finish) #combined-hero-medal {
+    display: none;
+}
+
 #modal-combined-view.is-challenge-finish #combined-hero-medal {
     order: 1;
     justify-content: flex-start;
@@ -496,10 +500,40 @@
     gap: 0.25rem;
 }
 
-.combined-next-medal-container {
+.combined-medals-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: flex-end;
+    min-width: 0;
+    line-height: 0;
+}
+
+#combined-medals-row .win-combined-medal-overlay,
+#combined-medals-row .win-combined-medal-overlay__center {
+    width: auto;
+    max-width: none;
+    gap: 0;
+}
+
+#combined-medals-row .combined-medal-row {
+    justify-content: flex-end;
+    gap: 0.18rem;
+    padding-bottom: 0;
+    width: auto;
+}
+
+#combined-medals-row .combined-medal-row-slot .medal-svg--hero {
+    width: 1.28rem;
+    height: 1.28rem;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+
+#combined-medals-row .combined-medal-row-slot__time {
+    display: none;
+}
+
+#combined-medals-row .medal-svg--row-placeholder {
+    filter: saturate(0.4) brightness(0.8);
 }
 
 @media (max-height: 640px) {

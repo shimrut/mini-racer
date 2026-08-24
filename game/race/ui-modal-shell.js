@@ -1224,7 +1224,6 @@ export class ModalShell {
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
 
-        const heroMedalEl = this.modalCombinedView?.querySelector('#combined-hero-medal');
         const previousTrackMedal = lapData.previousTrackMedal ?? null;
         const trackKey = lapData.trackKey || this.getCurrentTrackKey();
         const shouldCelebrateTier = (tier) => shouldCelebrateMedalTier(tier, previousTrackMedal, {
@@ -1240,8 +1239,12 @@ export class ModalShell {
             || (lapData.challengeFinish && lapData.challengeConfirmPhase !== 'won'
                 && lapData.lapMedal !== 'challenge');
         if (!challengePending) {
-            scheduleCombinedMedalEntranceAfterModal(this.modal, this.modalCombinedView, {
-                heroMedalEl,
+            const combinedView = this.modalCombinedView;
+            const medalHostEl = combinedView?.classList.contains('is-challenge-finish')
+                ? combinedView.querySelector('#combined-hero-medal')
+                : combinedView?.querySelector('#combined-medals-row');
+            scheduleCombinedMedalEntranceAfterModal(this.modal, combinedView, {
+                heroMedalEl: medalHostEl,
                 stackEl: null
             }, {
                 staggerMs: 85,
@@ -1262,8 +1265,8 @@ export class ModalShell {
         const lapData = this._combinedResultsLapData;
         if (!lapData || (lapData.lapMedal ?? null) === (lapMedal ?? null)) return;
         lapData.lapMedal = lapMedal ?? null;
-        this.content.renderCombinedMedalOverlay(
-            this.modalCombinedView.querySelector('#combined-hero-medal'),
+        this.content.renderCombinedFinishMedals(
+            this.modalCombinedView,
             {
                 trackKey: lapData.trackKey || this.getCurrentTrackKey(),
                 lapTimeSec: lapData.lapTime,
