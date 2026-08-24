@@ -165,6 +165,32 @@ describe('Campaign Tracks list rows', () => {
         expect(findByClass(list.children[1], 'daily-playlist-hero-lock')).toBeTruthy();
         expect(list.children[1].attributes['aria-label']).toContain('Locked');
         expect(JSON.stringify(list.children[1])).not.toContain('Expires');
+        expect(findByClass(list.children[0], 'daily-playlist-hero-content')).toBeNull();
+        expect(list.children[0].children[0].className).toContain('daily-playlist-hero-preview');
+        expect(list.children[0].children[1].className).toContain('daily-playlist-hero-title');
+        expect(list.children[0].children[2].className).toContain('daily-playlist-hero-day');
+    });
+
+    it('titles the overlay Daily Tracks or Campaign Tracks', () => {
+        const title = createElement('span');
+        const modal = createElement('div');
+        modal.classList = createClassList();
+        modal.offsetHeight = 0;
+        modal.querySelector = (selector) => (selector === '[data-modal-title]' ? title : null);
+
+        global.document.getElementById = (id) => {
+            if (id === 'daily-playlist-list') return list;
+            if (id === 'daily-playlist-modal') return modal;
+            return null;
+        };
+
+        const ui = new DailyChallengeUi();
+        ui.openTracksModal = vi.fn();
+        ui.openPlaylistModal([]);
+        expect(title.textContent).toBe('Daily Tracks');
+
+        ui.openCampaignTracksModal([]);
+        expect(title.textContent).toBe('Campaign Tracks');
     });
 
     it('starts an unlocked stage and scrolls the carousel for a locked one', () => {

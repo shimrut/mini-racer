@@ -1,5 +1,8 @@
 # Changelog
 
+- The Tracks list now matches Garage: Daily Tracks or Campaign Tracks at the
+  top, then a three-across grid of track tiles.
+
 - Tapping the Campaign track counter opens the Tracks list with Campaign
   stages. Unlocked rows start that stage; locked rows jump the carousel to
   that poster.

@@ -39,23 +39,6 @@
     object-fit: contain;
 }
 
-.daily-playlist-hero-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex: 1 1 auto;
-    min-width: 0;
-    gap: 1rem;
-    padding: 1rem 1.05rem;
-}
-
-.daily-playlist-hero-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 0;
-}
-
 .daily-playlist-hero-title {
     font-size: 1.25rem;
     font-weight: 900;
@@ -94,20 +77,6 @@
 
 #daily-playlist-modal .daily-playlist-entry--hero.is-locked .daily-playlist-hero-preview canvas {
     filter: saturate(0.55) brightness(0.78);
-}
-
-.daily-playlist-hero-lock {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    pointer-events: none;
-    color: var(--text-dim);
-}
-
-.daily-playlist-hero-lock-icon {
-    width: 1.65rem;
-    height: 2.2rem;
 }
 
 @media (max-width: 560px) {
@@ -188,23 +157,21 @@
         min-height: 5.85rem;
     }
 
-    .daily-playlist-entry--hero {
-        flex-direction: column;
-        min-height: 0;
+    #daily-playlist-list.daily-playlist-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.65rem;
     }
 
-    .daily-playlist-hero-preview {
-        width: 100%;
-        min-width: 0;
-        height: 7rem;
+    #daily-playlist-modal .daily-playlist-entry--hero {
+        min-height: 6.7rem;
+        padding: 0.55rem 0.45rem 0.5rem;
     }
 
-    .daily-playlist-hero-content {
-        align-items: flex-end;
-        padding: 0.85rem;
+    #daily-playlist-modal .daily-playlist-hero-preview {
+        height: 3.6rem;
     }
 
-    .daily-playlist-hero-title {
-        font-size: 1.1rem;
+    #daily-playlist-modal .daily-playlist-hero-title {
+        font-size: 0.78rem;
     }
 }

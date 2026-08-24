@@ -36,6 +36,65 @@ function renderPlaylistMessage(list, text) {
     list.appendChild(empty);
 }
 
+function buildTracksTile({
+    isCurrent = false,
+    locked = false,
+    ariaLabel,
+    statusText,
+    titleText,
+    medalTier = null,
+    onClick,
+}) {
+    const row = document.createElement('button');
+    row.className = [
+        'daily-playlist-entry--hero',
+        isCurrent ? 'current' : '',
+        locked ? 'is-locked' : '',
+    ].filter(Boolean).join(' ');
+    row.type = 'button';
+    row.setAttribute('aria-label', ariaLabel);
+    row.addEventListener('click', onClick);
+
+    const preview = document.createElement('div');
+    preview.className = 'daily-playlist-hero-preview';
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 160;
+    preview.appendChild(canvas);
+
+    const medal = document.createElement('div');
+    medal.className = 'daily-playlist-hero-medal';
+    medal.setAttribute('aria-hidden', 'true');
+    medal.appendChild(createMedalIconSvg(
+        medalTier || 'white',
+        {
+            className: 'medal-svg--hero',
+            outline: !medalTier,
+            rowPlaceholder: !medalTier,
+        },
+    ));
+    preview.appendChild(medal);
+
+    if (locked) {
+        const lock = document.createElement('span');
+        lock.className = 'daily-playlist-hero-lock';
+        lock.setAttribute('aria-hidden', 'true');
+        lock.appendChild(createLockIconSvg('daily-playlist-hero-lock-icon'));
+        preview.appendChild(lock);
+    }
+
+    const title = document.createElement('span');
+    title.className = 'daily-playlist-hero-title';
+    title.textContent = titleText;
+
+    const status = document.createElement('span');
+    status.className = 'daily-playlist-hero-day';
+    status.textContent = statusText;
+
+    row.append(preview, title, status);
+    return { row, canvas };
+}
+
 export class DailyChallengeUi {
     constructor({
         previewQualityLevel = 0,
@@ -102,7 +161,7 @@ export class DailyChallengeUi {
         if (!modal) return;
         this._tracksModalKind = 'daily';
         configureReusableModal(modal, {
-            title: 'Tracks',
+            title: 'Daily Tracks',
             subtitle: '',
             closeLabel: 'Back',
         });
@@ -116,7 +175,7 @@ export class DailyChallengeUi {
         this._tracksModalKind = 'campaign';
         this._campaignTracksSelectedId = selectedStageId;
         configureReusableModal(modal, {
-            title: 'Tracks',
+            title: 'Campaign Tracks',
             subtitle: '',
             closeLabel: 'Back',
         });
@@ -161,7 +220,7 @@ export class DailyChallengeUi {
 
     bindPlaylistModal() {
         configureReusableModal(this.dailyChallengePlaylistModal, {
-            title: 'Tracks',
+            title: 'Daily Tracks',
             closeLabel: 'Back',
         });
         bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
@@ -201,59 +260,18 @@ export class DailyChallengeUi {
                 Number(bestResult?.bestTime),
                 requiredLaps,
             );
-
-            const row = document.createElement('button');
-            row.className = `daily-playlist-entry--hero${isCurrentTrack ? ' current' : ''}`;
-            row.type = 'button';
-            row.setAttribute(
-                'aria-label',
-                `Race ${trackName}. ${requiredLaps} ${requiredLaps === 1 ? 'lap' : 'laps'}. ${availabilityLabel}`
-            );
-            row.addEventListener('click', () => {
-                this.closePlaylistModal();
-                onPlay?.(challenge);
+            const { row, canvas } = buildTracksTile({
+                isCurrent: isCurrentTrack,
+                ariaLabel: `Race ${trackName}. ${requiredLaps} ${requiredLaps === 1 ? 'lap' : 'laps'}. ${availabilityLabel}`,
+                statusText: `${availabilityLabel} · ${requiredLaps} ${requiredLaps === 1 ? 'Lap' : 'Laps'}`,
+                titleText: trackName,
+                medalTier: bestMedal,
+                onClick: () => {
+                    this.closePlaylistModal();
+                    onPlay?.(challenge);
+                },
             });
-
-            const preview = document.createElement('div');
-            preview.className = 'daily-playlist-hero-preview';
-
-            const canvas = document.createElement('canvas');
-            canvas.width = 300;
-            canvas.height = 160;
-            preview.appendChild(canvas);
             this.renderPlaylistPreview(canvas, challenge);
-
-            const content = document.createElement('div');
-            content.className = 'daily-playlist-hero-content';
-
-            const info = document.createElement('div');
-            info.className = 'daily-playlist-hero-info';
-
-            const status = document.createElement('span');
-            status.className = 'daily-playlist-hero-day';
-            status.textContent = `${availabilityLabel} · ${requiredLaps} ${requiredLaps === 1 ? 'Lap' : 'Laps'}`;
-
-            const title = document.createElement('span');
-            title.className = 'daily-playlist-hero-title';
-            title.textContent = trackName;
-
-            info.append(status, title);
-
-            const medal = document.createElement('div');
-            medal.className = 'daily-playlist-hero-medal';
-            medal.setAttribute('aria-hidden', 'true');
-            medal.appendChild(createMedalIconSvg(
-                bestMedal || 'white',
-                {
-                    className: 'medal-svg--hero',
-                    outline: !bestMedal,
-                    rowPlaceholder: !bestMedal
-                }
-            ));
-
-            content.append(info, medal);
-            row.append(preview, content);
-
             list.appendChild(row);
         }
     }
@@ -296,64 +314,21 @@ export class DailyChallengeUi {
                 stage.laps,
             );
 
-            const row = document.createElement('button');
-            row.className = [
-                'daily-playlist-entry--hero',
-                isCurrentTrack ? 'current' : '',
-                locked ? 'is-locked' : '',
-            ].filter(Boolean).join(' ');
-            row.type = 'button';
-            row.setAttribute(
-                'aria-label',
-                locked
+            const { row, canvas } = buildTracksTile({
+                isCurrent: isCurrentTrack,
+                locked,
+                ariaLabel: locked
                     ? `Locked. ${trackName}. ${stageLabel}`
                     : `Race ${trackName}. ${lapsLabel}. ${stageLabel}`,
-            );
-            row.addEventListener('click', () => {
-                this.closePlaylistModal();
-                onChoose?.(stage);
-            });
-
-            const preview = document.createElement('div');
-            preview.className = 'daily-playlist-hero-preview';
-            const canvas = document.createElement('canvas');
-            canvas.width = 300;
-            canvas.height = 160;
-            preview.appendChild(canvas);
-            this.renderPlaylistPreview(canvas, stage);
-            if (locked) {
-                const lock = document.createElement('span');
-                lock.className = 'daily-playlist-hero-lock';
-                lock.setAttribute('aria-hidden', 'true');
-                lock.appendChild(createLockIconSvg('daily-playlist-hero-lock-icon'));
-                preview.appendChild(lock);
-            }
-
-            const content = document.createElement('div');
-            content.className = 'daily-playlist-hero-content';
-            const info = document.createElement('div');
-            info.className = 'daily-playlist-hero-info';
-            const status = document.createElement('span');
-            status.className = 'daily-playlist-hero-day';
-            status.textContent = `${stageLabel} · ${statusLabel}`;
-            const title = document.createElement('span');
-            title.className = 'daily-playlist-hero-title';
-            title.textContent = trackName;
-            info.append(status, title);
-
-            const medal = document.createElement('div');
-            medal.className = 'daily-playlist-hero-medal';
-            medal.setAttribute('aria-hidden', 'true');
-            medal.appendChild(createMedalIconSvg(
-                bestMedal || 'white',
-                {
-                    className: 'medal-svg--hero',
-                    outline: !bestMedal,
-                    rowPlaceholder: !bestMedal,
+                statusText: `${stageLabel} · ${statusLabel}`,
+                titleText: trackName,
+                medalTier: bestMedal,
+                onClick: () => {
+                    this.closePlaylistModal();
+                    onChoose?.(stage);
                 },
-            ));
-            content.append(info, medal);
-            row.append(preview, content);
+            });
+            this.renderPlaylistPreview(canvas, stage);
             list.appendChild(row);
         }
     }

@@ -216,8 +216,10 @@ flowchart LR
   Standings resolves the carousel's currently centred track at click time.
   Tapping Daily's expiry line or `current / total` counter opens the shared
   Tracks modal on the Daily playlist. Tapping Campaign's `current / total`
-  counter opens that same modal on Campaign stages: unlocked rows start the
-  stage, locked rows close and centre that poster on the carousel.
+  counter opens that same modal on Campaign stages: unlocked tiles start the
+  stage, locked tiles close and centre that poster on the carousel. The list
+  layout matches Garage: title `Daily Tracks` or `Campaign Tracks`, then a
+  three-across grid of track tiles.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. A timeout, network failure, or server 5xx during
   challenge loading is contained in the challenge pane: the global loader is
@@ -489,7 +491,7 @@ flowchart LR
   repaint the current selection. Race start and submission still enforce the
   unlock gate server-side. The shared Tracks modal
   swaps its Daily playlist renderer for Campaign progress when entered from the
-  Campaign lobby. Opening Campaign paints the lobby immediately from provisional
+  Campaign lobby, using the same three-across tile grid as Garage. Opening Campaign paints the lobby immediately from provisional
   or cached progress while `/api/campaign/bootstrap` refreshes in the background;
   Start/Continue, Tracks, and Standings wait for that bootstrap when it has not
   finished yet (Start shows a small button spinner).

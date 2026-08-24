@@ -622,4 +622,24 @@ describe('game stylesheet architecture', () => {
         expect(ui).toContain('status.append(createRequirementMedalIcon(requirement))');
     });
 
+    it('lays the Tracks list out like Garage: three tiles per row', () => {
+        const trackShellStyles = readFileSync(
+            new URL('../styles/settings-and-track-shells.css', import.meta.url),
+            'utf8',
+        );
+        const garageStyles = readFileSync(
+            new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
+        expect(garageStyles).toMatch(
+            /#garage-modal \.garage-skin-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/s,
+        );
+        expect(trackShellStyles).toMatch(
+            /#daily-playlist-list\.daily-playlist-list\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/s,
+        );
+        expect(trackShellStyles).toMatch(
+            /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*flex-direction:\s*column;/s,
+        );
+    });
+
 });
