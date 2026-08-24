@@ -54,6 +54,7 @@ import {
     readPlayerProfileMap,
     resolveAuthorizedPlayerIdentity,
     upsertPlayerProfile,
+    ensurePlayerProfileExists,
 } from './competition-identity.js';
 import {
     challengeCollectionKey,
@@ -1631,11 +1632,12 @@ export async function getServerDailyGpSnapshot({
     });
     const normalizedPlayerId = identity.canonicalPlayerId;
     if (normalizedPlayerId) {
-        await upsertPlayerProfile({
+        // Standings carry no name or settings to store. Stamping the profile here only made every
+        // parallel snapshot fetch collide on the one key.
+        await ensurePlayerProfileExists({
             playerId: normalizedPlayerId,
             leaderboardIdentity,
             redditUsername,
-            hasAnyData: false,
         });
     }
 

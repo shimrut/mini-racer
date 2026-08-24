@@ -108,6 +108,7 @@ export const TRACK_CATALOG = {
     twinWings: { name: "Twin Wings" },
     squareRoot: { name: "Square Root" },
     halfLife: { name: "Half Life" },
+    splitJaw: { name: "Split Jaw" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -204,6 +205,7 @@ export const TRACK_SCHEDULE_KEYS = [
     'doubleTrouble',
     'brokenWing',
     'twinWings',
+    'splitJaw',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

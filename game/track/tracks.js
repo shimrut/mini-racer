@@ -107,6 +107,7 @@ import brokenWing from './definitions/broken-wing.js';
 import twinWings from './definitions/twin-wings.js';
 import squareRoot from './definitions/square-root.js';
 import halfLife from './definitions/half-life.js';
+import splitJaw from './definitions/split-jaw.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -219,6 +220,7 @@ const TRACK_GEOMETRY = {
     twinWings,
     squareRoot,
     halfLife,
+    splitJaw,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

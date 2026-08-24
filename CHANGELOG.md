@@ -4,6 +4,12 @@
   YOU WON and the win buttons. Daily/Campaign personal-best save still runs on
   that same request, after the reply has already gone out.
 
+- Added **Split Jaw** to the track list and Daily rotation.
+- Opening standings no longer rewrites the player profile on every load, so
+  parallel reads stop colliding. A lost Redis race on a real profile save is
+  retried instead of treated as a hard failure.
+- Redis storage use can be measured from the keys the game already writes.
+
 - Daily times, ghost replays, and challenge records now stay for 45 days
   after the race started, matching posts and analytics. The playlist is still
   seven days; you cannot set a new time once a race has dropped off.

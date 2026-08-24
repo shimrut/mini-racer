@@ -409,6 +409,15 @@ export async function adoptExistingGuestPlayerProfile({
     };
 }
 
+/** Reddit reports a lost WATCH race as this gRPC error. There is no error type to match on, only the message. */
+function isRedisTransactionConflict(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const { message, details } = error as { message?: unknown; details?: unknown };
+    return [message, details].some(
+        (text) => typeof text === 'string' && text.includes('redis: transaction failed'),
+    );
+}
+
 export async function upsertPlayerProfile({
     playerId,
     leaderboardIdentity,
@@ -444,16 +453,47 @@ export async function upsertPlayerProfile({
             );
             const results = await transaction.exec();
             if (Array.isArray(results) && results.length > 0) return nextProfile;
+            // An empty EXEC is a lost race. Read the winner's profile and build on it.
         } catch (error) {
             try {
                 await transaction.discard();
             } catch (_discardError) {
                 // EXEC may already have closed the transaction.
             }
-            throw error;
+            if (!isRedisTransactionConflict(error)) throw error;
+            // Reddit throws the lost race instead of returning an empty EXEC. Same answer: retry.
         }
     }
     throw new Error('Player profile update was interrupted. Try again.');
+}
+
+/**
+ * A read path has no new identity to store; only lastSeenAt and updatedAt would move. Parallel reads
+ * that all stamp the one profile key lose the WATCH race against each other, so they create the
+ * profile if it is missing and otherwise leave it alone.
+ */
+export async function ensurePlayerProfileExists({
+    playerId,
+    leaderboardIdentity,
+    redditUsername,
+}: {
+    playerId: string;
+    leaderboardIdentity?: unknown;
+    redditUsername?: unknown;
+}): Promise<void> {
+    const profileKey = createRedisPlayerProfileKey(playerId);
+    if (await redis.get(profileKey)) return;
+    await redis.set(
+        profileKey,
+        JSON.stringify(buildPlayerProfile({
+            playerId,
+            leaderboardIdentity,
+            redditUsername,
+            hasAnyData: false,
+            previousProfile: null,
+        })),
+        { nx: true, ...createPlayerProfileExpiration(playerId) },
+    );
 }
 
 export async function readPlayerProfileMap(playerIds: string[]): Promise<Map<string, DailyGpPlayerProfile>> {

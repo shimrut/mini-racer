@@ -67,6 +67,10 @@ function findWrittenPlayerProfile(playerId) {
     return null;
 }
 
+function isPlayerProfileKey(key) {
+    return String(key).startsWith('dailygp:player-profile:');
+}
+
 function playerProfileRedisKey(playerId) {
     return `dailygp:player-profile:${createHash('sha256').update(playerId, 'utf8').digest('base64url')}`;
 }
@@ -1419,6 +1423,111 @@ describe('server daily gp store submissions', () => {
 
         expect(profile.preferences.carSkin).toBe(concurrentProfile.preferences.carSkin);
         expect(profile.hasAnyData).toBe(true);
+    });
+
+    it('retries a profile write when Reddit throws the lost WATCH race instead of an empty exec', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'reddit:profile-tx-conflict';
+        seedStoredPlayerProfile(playerId, {
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'Profile-Tx-Conflict',
+            preferences: null,
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+            lastSeenAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+        });
+        let watchCount = 0;
+        mockRedis.watch.mockImplementation(() => {
+            watchCount += 1;
+            if (watchCount > 1) return createMockTransaction();
+            return {
+                multi: vi.fn().mockResolvedValue(undefined),
+                set: vi.fn().mockResolvedValue(undefined),
+                exec: vi.fn(async () => {
+                    throw Object.assign(new Error('2 UNKNOWN: redis: transaction failed'), {
+                        code: 2,
+                        details: 'redis: transaction failed',
+                    });
+                }),
+                discard: vi.fn().mockResolvedValue(undefined),
+            };
+        });
+
+        const profile = await upsertPlayerProfile({
+            playerId,
+            redditUsername: 'Profile-Tx-Conflict',
+            hasAnyData: false,
+        });
+
+        expect(watchCount).toBe(2);
+        expect(profile.hasAnyData).toBe(true);
+    });
+
+    it('surfaces a profile write failure that is not a lost race', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        mockRedis.watch.mockImplementation(() => ({
+            multi: vi.fn().mockResolvedValue(undefined),
+            set: vi.fn().mockResolvedValue(undefined),
+            exec: vi.fn(async () => {
+                throw new Error('2 UNAVAILABLE: no connection established');
+            }),
+            discard: vi.fn().mockResolvedValue(undefined),
+        }));
+
+        await expect(upsertPlayerProfile({
+            playerId: 'reddit:profile-tx-broken',
+            hasAnyData: false,
+        })).rejects.toThrow('no connection established');
+    });
+
+    it('leaves an existing player profile alone when a snapshot is read', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        const playerId = 'reddit:snapshot-reader';
+        seedStoredPlayerProfile(playerId, {
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'Snapshot-Reader',
+            preferences: null,
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+            lastSeenAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+        });
+        mockRedis.set.mockClear();
+        mockRedis.watch.mockClear();
+
+        await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            redditUsername: 'Snapshot-Reader',
+            limit: 10,
+        });
+
+        expect(mockRedis.set.mock.calls.filter(([key]) => isPlayerProfileKey(key))).toEqual([]);
+        expect(mockRedis.watch.mock.calls.filter(([key]) => isPlayerProfileKey(key))).toEqual([]);
+        expect(JSON.parse(storedStrings.get(playerProfileRedisKey(playerId))).lastSeenAt)
+            .toBe('2026-01-01T00:00:00.000Z');
+    });
+
+    it('creates a missing player profile once when a snapshot is read', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        mockRedis.set.mockClear();
+
+        await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            redditUsername: 'Snapshot-Newcomer',
+            limit: 10,
+        });
+
+        const profileWrites = mockRedis.set.mock.calls.filter(([key]) => isPlayerProfileKey(key));
+        expect(profileWrites).toHaveLength(1);
+        expect(profileWrites[0][2]).toMatchObject({ nx: true });
+        expect(JSON.parse(profileWrites[0][1]).playerId).toBe('reddit:snapshot-newcomer');
     });
 
     it('ignores profiles left in the retired shared hash', async () => {

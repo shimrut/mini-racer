@@ -652,6 +652,12 @@
     "gold": 9.59,
     "silver": 9.81,
     "bronze": 9.99
+  },
+  "splitJaw": {
+    "author": 15.05,
+    "gold": 15.25,
+    "silver": 15.55,
+    "bronze": 15.95
   }
 }
  
