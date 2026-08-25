@@ -36,7 +36,7 @@ Mapmaker also draws a ghost car using the real race collision size
 - always at the start position
 - under the cursor while Line Build is active
 
-Brush size is fixed at `4u`, about **7 car-widths** across. That is the
+Brush size is fixed at **7 car-widths** (`3.85u`). That is the
 usual racing lane width for Line Build.
 
 Line Build fillets each sharp bend on the drawn centerline by half the lane

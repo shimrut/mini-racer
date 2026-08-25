@@ -16,6 +16,7 @@ import {
 import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
 import {
+    DEFAULT_DRAW_WIDTH,
     formatTrackNumber as formatNumber,
     generateTrackIntegrationSnippet,
     generateTrackModuleSource,
@@ -38,7 +39,7 @@ const TOOL_LABELS = {
 const EDITOR_TOOLS = ['outer', 'inner', 'startLine', 'startPos', 'checkpoints'];
 
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
-const FIXED_DRAW_WIDTH = 4;
+const FIXED_DRAW_WIDTH = DEFAULT_DRAW_WIDTH;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
 const DEFAULT_LINE_SMOOTHING = 0.35;
@@ -534,7 +535,7 @@ class MapmakerApp {
         const metrics = this.getDraftMetrics();
         const brushCars = formatCarWidths(metrics.width);
         const carSize = `Car ${formatNumber(CAR_WIDTH)}×${formatNumber(CAR_LENGTH)}u.`;
-        const brushText = `Brush ${formatNumber(metrics.width)}u (~${brushCars} cars wide).`;
+        const brushText = `Brush ${formatNumber(metrics.width)}u (${brushCars} cars wide).`;
         const smoothingText = `Smoothing ${formatNumber(metrics.lineSmoothing)}.`;
 
         if (!metrics.pointCount) {

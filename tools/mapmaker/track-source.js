@@ -1,6 +1,9 @@
+import { CONFIG } from '../../game/config.js';
+
 const MIN_DRAW_WIDTH = 1.5;
 const MAX_DRAW_WIDTH = 20;
-const DEFAULT_DRAW_WIDTH = 4;
+export const LINE_BUILD_CAR_UNITS = 7;
+export const DEFAULT_DRAW_WIDTH = LINE_BUILD_CAR_UNITS * CONFIG.carRadius * 2;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
 const TRACK_KEY_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;

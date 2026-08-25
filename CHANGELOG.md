@@ -1,5 +1,7 @@
 # Changelog
 
+- Mapmaker Line Build now paints a lane exactly 7 cars wide (3.85u), instead of 4u (~7.3 cars). Existing tracks stay as they are until you redraw them.
+
 - Daily and Campaign have a Tracks icon in the top-right again, between
   Standings and Garage, opening the same list as the expiry line and counter.
 

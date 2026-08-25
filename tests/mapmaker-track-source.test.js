@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { CONFIG } from '../game/config.js';
 import {
+    DEFAULT_DRAW_WIDTH,
+    LINE_BUILD_CAR_UNITS,
     formatTrackNumber,
     generateTrackIntegrationSnippet,
     generateTrackModuleSource,
@@ -37,6 +40,13 @@ const TRACK = {
 };
 
 describe('Mapmaker track source serializer', () => {
+    it('keeps Line Build width at exactly 7 car-widths', () => {
+        expect(LINE_BUILD_CAR_UNITS).toBe(7);
+        expect(DEFAULT_DRAW_WIDTH).toBe(LINE_BUILD_CAR_UNITS * CONFIG.carRadius * 2);
+        expect(formatTrackNumber(DEFAULT_DRAW_WIDTH)).toBe('3.85');
+        expect(DEFAULT_DRAW_WIDTH / (CONFIG.carRadius * 2)).toBe(7);
+    });
+
     it('formats stable compact coordinate values', () => {
         expect(formatTrackNumber(3)).toBe('3');
         expect(formatTrackNumber(3.1254)).toBe('3.125');
@@ -61,6 +71,15 @@ describe('Mapmaker track source serializer', () => {
         expect(source).toContain('startAngle: 0.125,');
         expect(source).not.toContain('Test Circuit');
         expect(source).not.toContain('TRACK_KEY');
+    });
+
+    it('falls back to the 7-car Line Build width when drawWidth is invalid', () => {
+        const source = generateTrackModuleSource({
+            ...TRACK,
+            drawWidth: 0
+        });
+
+        expect(source).toContain('drawWidth: 3.85,');
     });
 
     it('omits optional drawing properties when a new track does not define them', () => {
