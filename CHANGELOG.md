@@ -1,8 +1,6 @@
 # Changelog
 
-- Mapmaker Line Build now sizes straights to the car and keeps drawn 90s as 90s. It no longer opens fast corners into stadium sweepers. Existing tracks stay as they are until you redraw them.
-
-- Mapmaker Line Build now fits each closed-loop corner to the car from the last straight and the bend, instead of rounding every corner by the same half-lane amount. Existing tracks stay as they are until you redraw them.
+- Mapmaker Line Build no longer rewrites a closed sketch. A square stays a square; the 7-car-wide road follows what you drew. Existing tracks stay as they are until you redraw them.
 
 - Mapmaker Line Build now paints a lane exactly 7 cars wide (3.85u), instead of 4u (~7.3 cars). Existing tracks stay as they are until you redraw them.
 
