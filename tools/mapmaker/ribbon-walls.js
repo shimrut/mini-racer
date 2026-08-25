@@ -1,4 +1,4 @@
-// Constant-width walls from a centerline: tight bends inflate first so the inner offset cannot loop through itself, corners fillet at halfWidth, then every sample offsets by ±halfWidth.
+// Constant-width walls from a centerline: tight bends inflate first so the inner offset cannot loop through itself, corners fillet (halfWidth, or a per-corner radius), then every sample offsets by ±halfWidth.
 
 const STRAIGHT_DOT = 0.985;
 const MERGE_DISTANCE = 0.04;
@@ -155,11 +155,29 @@ export function inflateTightBends(points, minRadius) {
 }
 
 export function filletCenterline(points, filletRadius) {
-    if (!points || points.length < 3 || !(filletRadius > 0)) {
+    if (!points || points.length < 3) {
         return (points || []).map((point) => ({
             point: clonePoint(point),
             tangent: { x: 1, y: 0 },
         }));
+    }
+
+    const radiusAt = (index) => {
+        if (Array.isArray(filletRadius)) {
+            const value = Number(filletRadius[index]);
+            return Number.isFinite(value) && value > 0 ? value : 0;
+        }
+        return Number(filletRadius) || 0;
+    };
+    const hasAnyRadius = points.some((_, index) => radiusAt(index) > 0);
+    if (!hasAnyRadius) {
+        return points.map((point, index) => {
+            const next = points[(index + 1) % points.length];
+            return {
+                point: clonePoint(point),
+                tangent: normalizeVector(next.x - point.x, next.y - point.y),
+            };
+        });
     }
 
     const len = points.length;
@@ -183,7 +201,7 @@ export function filletCenterline(points, filletRadius) {
             const prevLen = distance(prev, curr);
             const nextLen = distance(curr, next);
             const maxTrim = Math.min(prevLen, nextLen) * 0.45;
-            const idealTrim = filletRadius * tanHalf;
+            const idealTrim = radiusAt(index) * tanHalf;
             trim = Math.min(idealTrim, maxTrim);
             radius = tanHalf > 1e-6 ? trim / tanHalf : 0;
 
@@ -268,14 +286,23 @@ export function filletCenterline(points, filletRadius) {
     return samples;
 }
 
-export function buildRibbonWallsFromCenterline(centerline, halfWidth) {
+export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadii = null) {
     if (!centerline || centerline.length < 3 || !(halfWidth > 0)) {
         return null;
     }
 
     const inflated = inflateTightBends(centerline, halfWidth);
     const loopCcw = signedArea(inflated) > 0;
-    const samples = filletCenterline(inflated, halfWidth);
+    const radii = Array.isArray(filletRadii) && filletRadii.length === inflated.length
+        ? filletRadii.map((value) => {
+            const radius = Number(value);
+            if (!(radius > 0)) {
+                return 0;
+            }
+            return Math.max(halfWidth, radius);
+        })
+        : halfWidth;
+    const samples = filletCenterline(inflated, radii);
     if (samples.length < 3) {
         return null;
     }

@@ -92,4 +92,13 @@ describe('buildRibbonWallsFromCenterline', () => {
         const samples = filletCenterline(SQUARE, 2);
         expect(samples.length).toBeGreaterThan(SQUARE.length);
     });
+
+    it('can fillet one corner wider than the others', () => {
+        const tight = filletCenterline(SQUARE, [2, 2, 2, 2]);
+        const open = filletCenterline(SQUARE, [2, 4, 2, 2]);
+        const origin = { x: 10, y: 0 };
+        const nearestTight = Math.min(...tight.map((sample) => distance(sample.point, origin)));
+        const nearestOpen = Math.min(...open.map((sample) => distance(sample.point, origin)));
+        expect(nearestOpen).toBeGreaterThan(nearestTight);
+    });
 });

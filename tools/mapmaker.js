@@ -15,6 +15,7 @@ import {
 } from './mapmaker/lane-gate.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
+import { reshapeLoopForHandling } from './mapmaker/handling-reshape.js';
 import {
     DEFAULT_DRAW_WIDTH,
     formatTrackNumber as formatNumber,
@@ -236,14 +237,15 @@ function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) 
         return null;
     }
 
-    const centerline = smoothLoopPoints(filtered, lineSmoothing);
+    const smoothed = smoothLoopPoints(filtered, lineSmoothing);
+    const { points: centerline, filletRadii } = reshapeLoopForHandling(smoothed, trackWidth);
     const loopLength = totalLoopLength(centerline);
     if (loopLength < trackWidth * 5) {
         return null;
     }
 
     const halfWidth = trackWidth / 2;
-    const walls = buildRibbonWallsFromCenterline(centerline, halfWidth);
+    const walls = buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadii);
     if (!walls) {
         return null;
     }

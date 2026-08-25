@@ -1,5 +1,7 @@
 # Changelog
 
+- Mapmaker Line Build now fits each closed-loop corner to the car from the last straight and the bend, instead of rounding every corner by the same half-lane amount. Existing tracks stay as they are until you redraw them.
+
 - Mapmaker Line Build now paints a lane exactly 7 cars wide (3.85u), instead of 4u (~7.3 cars). Existing tracks stay as they are until you redraw them.
 
 - Daily and Campaign have a Tracks icon in the top-right again, between
