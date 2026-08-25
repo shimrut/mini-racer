@@ -39,14 +39,12 @@ Mapmaker also draws a ghost car using the real race collision size
 Brush size is fixed at **7 car-widths** (`3.85u`). That is the
 usual racing lane width for Line Build.
 
-Line Build fillets each sharp bend to match the car: it walks the loop
-on the likely fast line, then rounds each corner from that arrival
-speed. A sketch that is too small is scaled up so those corners still
-have room. Fast corners get a larger fillet so a wide line still fits
-in the 7-car lane. Opposite kinks that would not fit as an S are
-eased. Bends tighter than half the lane are still widened first so
-the inside wall cannot cross itself. The road stays the same width
-through corners.
+Line Build keeps sharp corners sharp. Closing a loop sizes the
+straights so the car arrives fast enough that hugging the inside does
+not fit, and not so fast that the corner has to be opened into a
+sweeper. Opposite kinks that would not fit as an S are eased. Bends
+tighter than half the lane are still widened first so the inside wall
+cannot cross itself. The road stays the same width through corners.
 
 Existing saved tracks are unchanged until you redraw them with Line Build.
 

@@ -8,9 +8,10 @@ const SHARP_TURN = (75 * Math.PI) / 180;
 const OPPOSITE_TURN = (50 * Math.PI) / 180;
 const MIN_TURN = 0.05;
 const TARGET_SPEED_LOW = 200 / KPH_PER_WORLD_UNIT;
-const MAX_EDGE_GROWTH = 8;
+const TARGET_SPEED_HIGH = 230 / KPH_PER_WORLD_UNIT;
 const MIN_EDGE = 1.1;
-const MAX_FILLET = 4.2;
+const MIN_SCALE = 0.28;
+const MAX_SCALE = 2.2;
 const RESHAPE_ITERS = 3;
 const FLATTEN_STEP = 0.18;
 const MAX_FIT_RADIUS = 40;
@@ -90,6 +91,41 @@ export function speedAfterDistance(speedWorld, length, tuning = DEFAULT_PHYSICS_
         speed = next;
     }
     return speed;
+}
+
+export function lengthToReachSpeed(speedWorld, targetSpeed, tuning = DEFAULT_PHYSICS_TUNING) {
+    const vmax = vmaxWorld(tuning);
+    const goal = clamp(targetSpeed, 0, vmax);
+    let speed = clamp(speedWorld, 0, vmax);
+    if (speed >= goal - 1e-6) {
+        return 0;
+    }
+    let travelled = 0;
+    for (let guard = 0; guard < 12000; guard += 1) {
+        const speedRatio = speed / vmax;
+        const next = Math.min(
+            vmax,
+            speed + (tuning.accel / KPH_PER_WORLD_UNIT) * (1 - speedRatio * speedRatio) * PHYSICS_DT
+        );
+        travelled += Math.max(((speed + next) / 2) * PHYSICS_DT, 1e-9);
+        speed = next;
+        if (speed >= goal - 1e-6) {
+            return travelled;
+        }
+    }
+    return travelled;
+}
+
+function median(values) {
+    if (!values.length) {
+        return 1;
+    }
+    const ranked = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(ranked.length / 2);
+    if (ranked.length % 2 === 0) {
+        return (ranked[mid - 1] + ranked[mid]) / 2;
+    }
+    return ranked[mid];
 }
 
 export function maxFitRadius(absAngle, usableWidth) {
@@ -173,11 +209,11 @@ function trimForCorner(absAngle, filletRadius) {
     return filletRadius * tanHalf;
 }
 
-function targetFilletRadius(speed, halfWidth, isCorner) {
+function targetFilletRadius(halfWidth, isCorner) {
     if (!isCorner) {
         return 0;
     }
-    return clamp(lockRadiusAtSpeed(speed), halfWidth, MAX_FILLET);
+    return halfWidth;
 }
 
 function loopCentroid(points) {
@@ -200,39 +236,40 @@ function scaleLoopFromCentroid(points, factor) {
 }
 
 function scaleLoopToFitHandling(points, trackWidth, halfWidth, tuning) {
-    const { arrivals, exits, turns } = estimateArrivalSpeeds(points, trackWidth, tuning);
+    const { exits, turns } = estimateArrivalSpeeds(points, trackWidth, tuning);
     const count = points.length;
-    let factor = 1;
+    const ratios = [];
 
     for (let index = 0; index < count; index += 1) {
         const prevIndex = (index - 1 + count) % count;
         const turn = turns[index];
+        if (!turn.isCorner || turn.absAngle < SHARP_TURN || turn.inboundLength < 1e-6) {
+            continue;
+        }
         const prevTurn = turns[prevIndex];
-        const fillet = targetFilletRadius(arrivals[index], halfWidth, turn.isCorner);
-        const prevFillet = targetFilletRadius(arrivals[prevIndex], halfWidth, prevTurn.isCorner);
-        let need = MIN_EDGE
-            + (turn.isCorner ? trimForCorner(turn.absAngle, fillet) : 0)
-            + (prevTurn.isCorner ? trimForCorner(prevTurn.absAngle, prevFillet) : 0);
-
-        if (turn.isCorner && turn.absAngle >= SHARP_TURN && arrivals[index] < TARGET_SPEED_LOW) {
-            const startSpeed = index === 0 ? 0 : exits[prevIndex];
-            let extra = 0;
-            while (
-                speedAfterDistance(startSpeed, turn.inboundLength + extra, tuning) < TARGET_SPEED_LOW
-                && extra < MAX_EDGE_GROWTH
-            ) {
-                extra += 0.25;
-            }
-            need = Math.max(need, turn.inboundLength + extra);
+        const filletNeed = MIN_EDGE
+            + trimForCorner(turn.absAngle, halfWidth)
+            + (prevTurn.isCorner ? trimForCorner(prevTurn.absAngle, halfWidth) : 0);
+        const startSpeed = index === 0 ? 0 : exits[prevIndex];
+        const minLength = Math.max(filletNeed, lengthToReachSpeed(startSpeed, TARGET_SPEED_LOW, tuning));
+        const maxLength = Math.max(
+            minLength,
+            lengthToReachSpeed(startSpeed, TARGET_SPEED_HIGH, tuning)
+        );
+        let desired = turn.inboundLength;
+        if (desired < minLength) {
+            desired = minLength;
+        } else if (desired > maxLength) {
+            desired = maxLength;
         }
-
-        if (turn.inboundLength > 1e-6) {
-            factor = Math.max(factor, need / turn.inboundLength);
-        }
+        ratios.push(desired / turn.inboundLength);
     }
 
-    const scaleBy = clamp(factor, 1, 2.2);
-    if (scaleBy <= 1.001) {
+    if (!ratios.length) {
+        return points.map(clonePoint);
+    }
+    const scaleBy = clamp(median(ratios), MIN_SCALE, MAX_SCALE);
+    if (Math.abs(scaleBy - 1) <= 0.02) {
         return points.map(clonePoint);
     }
     return scaleLoopFromCentroid(points, scaleBy);
@@ -291,19 +328,16 @@ export function reshapeLoopForHandling(points, trackWidth, tuning = DEFAULT_PHYS
         working = scaleLoopToFitHandling(working, trackWidth, halfWidth, tuning);
     }
 
-    const { arrivals, turns } = estimateArrivalSpeeds(working, trackWidth, tuning);
-    const filletRadii = turns.map((turn, index) => (
-        turn.isCorner
-            ? targetFilletRadius(arrivals[index], halfWidth, true)
-            : 0
-    ));
+    const { turns } = estimateArrivalSpeeds(working, trackWidth, tuning);
+    const filletRadii = turns.map((turn) => targetFilletRadius(halfWidth, turn.isCorner));
 
     return { points: working, filletRadii };
 }
 
 export const HANDLING_RESHAPE = Object.freeze({
     TARGET_SPEED_LOW,
+    TARGET_SPEED_HIGH,
     SHARP_TURN,
-    MAX_FILLET,
-    MAX_EDGE_GROWTH
+    MIN_SCALE,
+    MAX_SCALE
 });

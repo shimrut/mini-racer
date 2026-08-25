@@ -49,12 +49,22 @@ describe('handling reshape', () => {
         expect(speed * KPH_PER_WORLD_UNIT).toBeLessThan(215);
     });
 
-    it('arrives faster after a long run-in than a short one', () => {
-        const shortArrival = estimateArrivalSpeeds(square(3), TRACK_WIDTH).arrivals[1];
-        const longArrival = estimateArrivalSpeeds(square(20), TRACK_WIDTH).arrivals[1];
-        expect(longArrival).toBeGreaterThan(shortArrival);
-        const long = reshapeLoopForHandling(square(20), TRACK_WIDTH);
-        expect(long.filletRadii[1]).toBeGreaterThan(TRACK_WIDTH / 2);
+    it('keeps a drawn square as 90s instead of opening them into a stadium', () => {
+        const source = square(20);
+        const reshaped = reshapeLoopForHandling(source, TRACK_WIDTH);
+        const halfWidth = TRACK_WIDTH / 2;
+        const inbound = distance(reshaped.points[0], reshaped.points[1]);
+        expect(inbound).toBeLessThan(12);
+        expect(inbound).toBeGreaterThan(3);
+        for (const radius of reshaped.filletRadii) {
+            expect(radius).toBeLessThanOrEqual(halfWidth + 0.01);
+        }
+        const { turns } = estimateArrivalSpeeds(reshaped.points, TRACK_WIDTH);
+        const sharp = turns.filter((turn) => turn.isCorner);
+        expect(sharp.length).toBe(4);
+        for (const turn of sharp) {
+            expect(turn.absAngle).toBeGreaterThan((80 * Math.PI) / 180);
+        }
     });
 
     it('lengthens a short sharp inbound so arrival is no longer a crawl', () => {
