@@ -19,7 +19,6 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { formatCampaignStageLabel } from '../campaign/carousel-model.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
-import { createLockIconSvg } from '../ui/lock-icon.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { getMedalForRaceTime } from '../medals/medal-timing.js';
 
@@ -36,8 +35,19 @@ function renderPlaylistMessage(list, text) {
     list.appendChild(empty);
 }
 
+function orderFeaturedFirst(items, isFeatured) {
+    const featuredIndex = items.findIndex(isFeatured);
+    if (featuredIndex <= 0) return items;
+    return [
+        items[featuredIndex],
+        ...items.slice(0, featuredIndex),
+        ...items.slice(featuredIndex + 1),
+    ];
+}
+
 function buildTracksTile({
     isCurrent = false,
+    isFeatured = false,
     locked = false,
     ariaLabel,
     statusText,
@@ -48,6 +58,7 @@ function buildTracksTile({
     const row = document.createElement('button');
     row.className = [
         'daily-playlist-entry--hero',
+        isFeatured ? 'is-featured' : '',
         isCurrent ? 'current' : '',
         locked ? 'is-locked' : '',
     ].filter(Boolean).join(' ');
@@ -62,36 +73,27 @@ function buildTracksTile({
     canvas.height = 160;
     preview.appendChild(canvas);
 
-    const medal = document.createElement('div');
-    medal.className = 'daily-playlist-hero-medal';
-    medal.setAttribute('aria-hidden', 'true');
-    medal.appendChild(createMedalIconSvg(
-        medalTier || 'white',
-        {
+    if (medalTier) {
+        const medal = document.createElement('div');
+        medal.className = 'daily-playlist-hero-medal';
+        medal.setAttribute('aria-hidden', 'true');
+        medal.appendChild(createMedalIconSvg(medalTier, {
             className: 'medal-svg--hero',
-            outline: !medalTier,
-            rowPlaceholder: !medalTier,
-        },
-    ));
-    preview.appendChild(medal);
-
-    if (locked) {
-        const lock = document.createElement('span');
-        lock.className = 'daily-playlist-hero-lock';
-        lock.setAttribute('aria-hidden', 'true');
-        lock.appendChild(createLockIconSvg('daily-playlist-hero-lock-icon'));
-        preview.appendChild(lock);
+        }));
+        preview.appendChild(medal);
     }
 
     const title = document.createElement('span');
     title.className = 'daily-playlist-hero-title';
     title.textContent = titleText;
 
-    const status = document.createElement('span');
-    status.className = 'daily-playlist-hero-day';
-    status.textContent = statusText;
-
-    row.append(preview, title, status);
+    row.append(preview, title);
+    if (statusText) {
+        const status = document.createElement('span');
+        status.className = 'daily-playlist-hero-day';
+        status.textContent = statusText;
+        row.append(status);
+    }
     return { row, canvas };
 }
 
@@ -246,7 +248,17 @@ export class DailyChallengeUi {
             return;
         }
 
-        for (const challenge of playableChallenges) {
+        const featuredId = playableChallenges.find((challenge) => (
+            getDailyChallengeCardStatus(challenge).key === 'featured'
+        ))?.id
+            ?? (playableChallenges.some((challenge) => (
+                challenge.id === this._dailyChallengeSummary?.challengeId
+            )) ? this._dailyChallengeSummary.challengeId : playableChallenges[0]?.id);
+
+        for (const challenge of orderFeaturedFirst(
+            playableChallenges,
+            (item) => item.id === featuredId,
+        )) {
             const availability = getDailyChallengeCardStatus(challenge);
             const availabilityLabel = availability.key === 'featured' ? 'Today' : availability.label;
             const isCurrentTrack = challenge.id === this._dailyChallengeSummary?.challengeId;
@@ -254,6 +266,7 @@ export class DailyChallengeUi {
             const bestResult = challenge.trackPersonalBest
                 || getDailyChallengeBestResult(challenge);
             const requiredLaps = getDailyChallengeRequiredLaps(challenge);
+            const lapsLabel = formatLapsLabel(requiredLaps);
             const bestMedal = getMedalForRaceTime(
                 challenge.trackKey,
                 Number(bestResult?.bestTime),
@@ -261,8 +274,9 @@ export class DailyChallengeUi {
             );
             const { row, canvas } = buildTracksTile({
                 isCurrent: isCurrentTrack,
-                ariaLabel: `Race ${trackName}. ${requiredLaps} ${requiredLaps === 1 ? 'lap' : 'laps'}. ${availabilityLabel}`,
-                statusText: `${availabilityLabel} · ${requiredLaps} ${requiredLaps === 1 ? 'Lap' : 'Laps'}`,
+                isFeatured: challenge.id === featuredId,
+                ariaLabel: `Race ${trackName}. ${lapsLabel}. ${availabilityLabel}`,
+                statusText: availability.key === 'featured' ? `Today · ${lapsLabel}` : lapsLabel,
                 titleText: trackName,
                 medalTier: bestMedal,
                 onClick: () => {
@@ -298,12 +312,18 @@ export class DailyChallengeUi {
             return;
         }
 
-        for (const stage of playableStages) {
+        const featuredId = playableStages.some((stage) => stage.id === this._campaignTracksSelectedId)
+            ? this._campaignTracksSelectedId
+            : playableStages.find((stage) => stage.unlocked)?.id ?? playableStages[0]?.id;
+
+        for (const stage of orderFeaturedFirst(
+            playableStages,
+            (item) => item.id === featuredId,
+        )) {
             const locked = !stage.unlocked;
             const isCurrentTrack = stage.id === this._campaignTracksSelectedId;
             const stageLabel = formatCampaignStageLabel(stage);
             const lapsLabel = formatLapsLabel(stage.laps);
-            const statusLabel = locked ? 'Locked' : lapsLabel;
             const trackName = typeof stage.trackName === 'string' && stage.trackName.trim()
                 ? stage.trackName.trim()
                 : stage.trackKey;
@@ -315,11 +335,12 @@ export class DailyChallengeUi {
 
             const { row, canvas } = buildTracksTile({
                 isCurrent: isCurrentTrack,
+                isFeatured: stage.id === featuredId,
                 locked,
                 ariaLabel: locked
                     ? `Locked. ${trackName}. ${stageLabel}`
                     : `Race ${trackName}. ${lapsLabel}. ${stageLabel}`,
-                statusText: `${stageLabel} · ${statusLabel}`,
+                statusText: locked ? '' : lapsLabel,
                 titleText: trackName,
                 medalTier: bestMedal,
                 onClick: () => {

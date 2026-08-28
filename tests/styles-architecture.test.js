@@ -633,7 +633,7 @@ describe('game stylesheet architecture', () => {
         expect(ui).toContain('status.append(createRequirementMedalIcon(requirement))');
     });
 
-    it('lays the Tracks list out like Garage: three tiles per row', () => {
+    it('lays the Tracks list as a featured tile over a three-across strip', () => {
         const trackShellStyles = readFileSync(
             new URL('../styles/settings-and-track-shells.css', import.meta.url),
             'utf8',
@@ -651,6 +651,13 @@ describe('game stylesheet architecture', () => {
         expect(trackShellStyles).toMatch(
             /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*flex-direction:\s*column;/s,
         );
+        expect(trackShellStyles).toMatch(
+            /#daily-playlist-modal \.daily-playlist-entry--hero\.is-featured\s*\{[^}]*grid-column:\s*1 \/ -1;/s,
+        );
+        expect(trackShellStyles).toMatch(
+            /#daily-playlist-modal \.daily-playlist-entry--hero\.current\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--accent-color\);/s,
+        );
+        expect(trackShellStyles).not.toContain('#daily-playlist-modal .daily-playlist-hero-lock');
     });
 
     it('paints settings on/off rows with the Daily/Campaign lobby pill', () => {

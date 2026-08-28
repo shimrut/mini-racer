@@ -1,5 +1,7 @@
 # Changelog
 
+- Daily and Campaign Tracks lists now lead with the current race as a large tile, then a quieter strip of the rest. Cards show the drawing, the name, and laps when the track is open. Locked tracks are only dimmed. Empty medals and lock icons are gone. The selected tile uses a thin ring, and Back sits in its own space at the bottom.
+
 - Daily preview now puts the lap count as a small label above the track name, the same way Time to Beat sits above the time.
 
 - New Daily races now use 1 or 2 laps only on tracks under 10 seconds (author time). Tracks of 10 seconds or more always run 1 lap. Days already published keep the lap count they had.

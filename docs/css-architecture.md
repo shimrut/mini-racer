@@ -140,9 +140,9 @@ maintaining mode-specific card layouts:
   counter, then the track's own footer (time, rank, medals) — everything below
   the artwork describes the track above it. Daily's expiry line and counter
   open the Tracks list; Campaign's counter opens the same list with Campaign
-  stages. That list uses the Garage car-grid contract: a header title
-  (`Daily Tracks` / `Campaign Tracks`) and `#daily-playlist-list` as
-  `repeat(3, minmax(0, 1fr))` tiles (preview, name, status), scoped under
+  stages. That list uses a header title (`Daily Tracks` / `Campaign Tracks`) and
+  `#daily-playlist-list` as a featured current tile over `repeat(3, minmax(0, 1fr))`
+  strip tiles (preview, name, laps when open), scoped under
   `#daily-playlist-modal` so lobby posters stay wide hero cards. Previous and Next leave that stack:
   they are circular icon buttons grid-placed into row 1 with `align-self:
   center` and `justify-self: start`/`end`, so they flank the schematic and stay

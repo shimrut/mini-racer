@@ -218,8 +218,11 @@ flowchart LR
   open the shared Tracks modal on the Daily playlist. The same icon and
   Campaign's `current / total` counter open that modal on Campaign stages: unlocked tiles start the
   stage, locked tiles close and centre that poster on the carousel. The list
-  layout matches Garage: title `Daily Tracks` or `Campaign Tracks`, then a
-  three-across grid of track tiles.
+  layout uses a featured tile for the current race, then a quieter three-across
+  strip of the rest. Unlocked tiles show the drawing, name, and laps; locked
+  tiles dim the drawing and drop lock icons, empty medals, and LOCKED copy.
+  Selection is a thin accent ring. Back keeps a reserved footer so it does not
+  sit on the last row.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. A timeout, network failure, or server 5xx during
   challenge loading is contained in the challenge pane: the global loader is
