@@ -696,3 +696,26 @@
     width: max-content;
     max-width: min(560px, calc(100vw - 2rem))
 }
+
+.daily-challenge-hud {
+    margin: 0;
+    pointer-events: none
+}
+
+.daily-challenge-hud--inline {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.daily-challenge-hud__progress {
+    margin: 0;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--text-color);
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    font-family: var(--header-font);
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}

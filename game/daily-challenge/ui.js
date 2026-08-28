@@ -116,6 +116,7 @@ export class DailyChallengeUi {
     get dailyChallengePlaylistModal() { return document.getElementById('daily-playlist-modal'); }
     get dailyChallengePlaylistList() { return document.getElementById('daily-playlist-list'); }
     get dailyChallengePlaylistCloseBtn() { return document.getElementById('daily-playlist-close-btn'); }
+    get dailyChallengeHudInline() { return document.getElementById('daily-challenge-hud-inline'); }
 
     focus() {
         const start = this.dailyChallengeStartBtn;
@@ -405,5 +406,16 @@ export class DailyChallengeUi {
         }
 
         this.setDailyChallengeSummary(nextSummary);
+    }
+
+    setDailyChallengeHud(state = null) {
+        const isVisible = Boolean(state?.visible);
+        const progressText = isVisible ? (state?.progressText || '') : '';
+
+        if (this.dailyChallengeHudInline) {
+            this.dailyChallengeHudInline.hidden = !isVisible;
+            const progressSpan = this.dailyChallengeHudInline.querySelector('.daily-challenge-hud__progress');
+            if (progressSpan) progressSpan.textContent = progressText;
+        }
     }
 }

@@ -586,9 +586,27 @@ export const dailyChallengeEngineMethods = {
     }
   },
 
+  getDailyChallengeProgressText() {
+    if (!this.currentChallengeRun) return "";
+
+    const requiredLaps = this.currentChallengeRun.requiredLaps || 1;
+    if (requiredLaps > 1) {
+      return `${Math.min(this.currentChallengeRun.completedLaps + 1, requiredLaps)} / ${requiredLaps}`;
+    }
+    return "1 / 1";
+  },
+
   updateDailyChallengeHud() {
-    if (!this.currentChallengeRun) return;
+    if (!this.currentChallengeRun) {
+      this.dailyChallengeUi.setDailyChallengeHud(null);
+      return;
+    }
+
     this.syncChallengeHudPrimaryStats();
+    this.dailyChallengeUi.setDailyChallengeHud({
+      visible: true,
+      progressText: this.getDailyChallengeProgressText(),
+    });
   },
 
   setDailyChallengeLobbySummary(challenge) {

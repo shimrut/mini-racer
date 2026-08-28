@@ -144,4 +144,27 @@ describe('ui daily challenge helpers', () => {
         global.document = originalDocument;
         global.window = originalWindow;
     });
+
+    it('shows lap progress without a laps label', () => {
+        const originalDocument = global.document;
+        const progressNode = { textContent: '' };
+        const dailyChallengeHudInline = {
+            hidden: true,
+            querySelector: vi.fn((selector) => (
+                selector === '.daily-challenge-hud__progress' ? progressNode : null
+            )),
+        };
+        global.document = {
+            getElementById: (id) => (
+                id === 'daily-challenge-hud-inline' ? dailyChallengeHudInline : null
+            ),
+        };
+        const component = new DailyChallengeUi();
+        component.setDailyChallengeHud({ visible: true, progressText: '1 / 2' });
+
+        expect(dailyChallengeHudInline.hidden).toBe(false);
+        expect(progressNode.textContent).toBe('1 / 2');
+
+        global.document = originalDocument;
+    });
 });
