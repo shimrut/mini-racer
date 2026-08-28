@@ -411,6 +411,18 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     gap: 0.3rem;
 }
 
+.lobby-primary-row--race .main-menu__item--primary.is-loading {
+    position: relative;
+}
+
+.lobby-primary-row--race .main-menu__item--primary.is-loading .main-menu__spinner {
+    position: absolute;
+    left: 1.25rem;
+    top: 0;
+    bottom: 0;
+    margin-block: auto;
+}
+
 #challenge-poster .track-carousel__card-foot {
     display: flex;
     align-items: center;

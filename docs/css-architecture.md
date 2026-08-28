@@ -98,7 +98,8 @@ maintaining mode-specific card layouts:
 
 - `lobby-modes.css` owns the shared Daily/Campaign header in flow, the top-right
   toolbar, mode pane, bottom primary row, and the two-line Daily/Campaign Start
-  Race action layout.
+  Race action layout. A pending Start spinner sits to the left of that stack so
+  the button does not grow a third row.
 - `styles/lobby-and-garage.css` owns the shared primary-button typography,
   including the smaller header-font race-brief line with the bold selected track
   name, separator dot, and singular/plural lap count under Start Race.

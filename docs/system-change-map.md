@@ -505,7 +505,7 @@ flowchart LR
   Campaign lobby, using the same three-across tile grid as Garage. Opening Campaign paints the lobby immediately from provisional
   or cached progress while `/api/campaign/bootstrap` refreshes in the background;
   Start/Continue, Tracks, and Standings wait for that bootstrap when it has not
-  finished yet (Start shows a small button spinner).
+  finished yet (Start shows a small spinner to the left of the label).
 - Player standing is independent of loaded pages: every snapshot resolves `playerRank` and `currentPlayerRow`, and the standings header keeps that rank and best time visible even when the player's row is outside the loaded rank range.
 - All player-visible race times use three decimal places, matching the verified
   millisecond precision across the HUD, results, splits, deltas, selectors,

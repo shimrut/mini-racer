@@ -1241,6 +1241,9 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(css).toMatch(
             /\.lobby-primary-row--race \.main-menu__item--primary\s*\{[^}]*flex-direction:\s*column;[^}]*gap:\s*0\.3rem;/s,
         );
+        expect(css).toMatch(
+            /\.lobby-primary-row--race \.main-menu__item--primary\.is-loading \.main-menu__spinner\s*\{[^}]*position:\s*absolute;[^}]*left:\s*1\.25rem;[^}]*top:\s*0;[^}]*bottom:\s*0;/s,
+        );
         expect(css).not.toContain('width: min(94vw, 60rem)');
         expect(css).toMatch(
             /\.lobby-pane\s*\{[^}]*animation:\s*lobbyPaneIn var\(--dur-base\) var\(--ease-settle\) both;/s,
