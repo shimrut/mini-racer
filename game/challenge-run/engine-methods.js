@@ -297,7 +297,6 @@ export const challengeRunEngineMethods = {
             }
         }
         this.hud.setPauseVisible(false);
-        this.hud.setHudPersonalBestsOpenAllowed(false);
         this.syncChallengeHudPrimaryStats();
         this.updateDailyChallengeHud();
     },

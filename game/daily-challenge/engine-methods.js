@@ -822,7 +822,6 @@ export const dailyChallengeEngineMethods = {
       }
     }
     this.hud.setPauseVisible(false);
-    this.hud.setHudPersonalBestsOpenAllowed(false);
     this.syncChallengeHudPrimaryStats();
     this.updateDailyChallengeHud();
   },
@@ -1256,7 +1255,6 @@ export const dailyChallengeEngineMethods = {
     this.status = "ready";
     void this.journeys?.endAttempt?.({ complete: false });
     this.hud.setPauseVisible(false);
-    this.hud.setHudPersonalBestsOpenAllowed(true);
 
     const existingScoreboardSnapshot = getCachedDailyChallengeSnapshot(
       this.activeDailyChallenge?.id,
@@ -1372,7 +1370,6 @@ export const dailyChallengeEngineMethods = {
     this.hud.setBestTime(this.bestLapTime, {
       persistToTrackCard: false,
     });
-    this.hud.setHudPersonalBestsOpenAllowed(false);
 
     const lapCheckpointTimes = this.getLapCheckpointTimesSec?.() ?? [];
     const storedPbCheckpointTimes = normalizeCheckpointTimesSec(

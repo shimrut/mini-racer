@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { InteractionsUi } from '../game/race/ui-interactions.js';
+import { PAUSE_ON_TIMER_STORAGE_KEY } from '../game/settings/pause-on-timer-preference.js';
 
 function createEventTarget() {
     const listeners = new Map();
@@ -66,6 +67,58 @@ describe('ui interaction helpers', () => {
         garageBtn.listeners.get('click')();
 
         expect(closeModal).toHaveBeenCalledTimes(1);
+    });
+
+    it('pauses from the timer and ignores the speedo when pause-on-timer is on', () => {
+        const originalWindow = globalThis.window;
+        const store = new Map([[PAUSE_ON_TIMER_STORAGE_KEY, '1']]);
+        globalThis.window = {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        };
+        const hudStatsBtn = createEventTarget();
+        const desktopSpeedometer = createEventTarget();
+        const onPauseRun = vi.fn();
+
+        InteractionsUi.prototype.bindPrimaryActions.call({
+            hudStatsBtn,
+            desktopSpeedometer,
+            onPauseRun,
+        });
+
+        hudStatsBtn.listeners.get('click')();
+        desktopSpeedometer.listeners.get('click')();
+
+        expect(onPauseRun).toHaveBeenCalledTimes(1);
+        globalThis.window = originalWindow;
+    });
+
+    it('pauses from the speedo and ignores the timer when pause-on-timer is off', () => {
+        const originalWindow = globalThis.window;
+        const store = new Map([[PAUSE_ON_TIMER_STORAGE_KEY, '0']]);
+        globalThis.window = {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        };
+        const hudStatsBtn = createEventTarget();
+        const desktopSpeedometer = createEventTarget();
+        const onPauseRun = vi.fn();
+
+        InteractionsUi.prototype.bindPrimaryActions.call({
+            hudStatsBtn,
+            desktopSpeedometer,
+            onPauseRun,
+        });
+
+        hudStatsBtn.listeners.get('click')();
+        desktopSpeedometer.listeners.get('click')();
+
+        expect(onPauseRun).toHaveBeenCalledTimes(1);
+        globalThis.window = originalWindow;
     });
 
 

@@ -331,7 +331,6 @@ export const raceEngineMethods = {
     this.carEffectsAudio?.prepareOnUserGesture?.();
     this.medalEffectsAudio?.prepareOnUserGesture?.();
     this.proceduralMusic?.prepareOnUserGesture?.();
-    this.hud.setHudPersonalBestsOpenAllowed(false);
     this.hud.setPauseVisible(false);
     const replayRulesRevision = Number.isInteger(this.activeDailyChallenge?.rulesRevision)
       ? this.activeDailyChallenge.rulesRevision
@@ -455,7 +454,6 @@ export const raceEngineMethods = {
     this.beginPbGhostSizeRun?.();
     this.modal.closeModal();
     this.hud.setPauseVisible(true);
-    this.hud.setHudPersonalBestsOpenAllowed(false);
     this.hud.syncHud({ time: 0, speed: 0, force: true });
     this.updateDailyChallengeHud();
     this.accumulator = 0;
@@ -818,7 +816,6 @@ export const raceEngineMethods = {
       this.clearDailyChallengeRun();
     }
     this.modal.closeModal();
-    this.hud.setHudPersonalBestsOpenAllowed(false);
     this.hud.setPauseVisible(false);
 
     this.hud.resetCountdown();

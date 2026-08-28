@@ -37,8 +37,11 @@
             <div class="hud-right-cluster">
                 <div class="hud-lap-cluster">
                     <button id="hud-stats-btn" class="hud-stats" type="button"
-                        aria-label="Show your 5 personal best lap times" disabled>
-                        <div class="hud-stat"><span id="time-val" class="hud-value">0.000</span></div>
+                        aria-label="Race time" disabled>
+                        <div class="hud-stat">
+                            <span id="hud-timer-pause-icon" class="hud-pause-icon" hidden></span>
+                            <span id="time-val" class="hud-value">0.000</span>
+                        </div>
                         <div class="hud-stat" id="best-time-display" style="display: none;">
                             <span id="best-time-val" class="hud-value">--</span>
                             <span id="best-time-medal" class="hud-medal" hidden></span>
@@ -533,6 +536,14 @@
 
                         <p class="leaderboard-subhead settings-subsection-label">Racing</p>
                         <div class="modal-sheet-panel modal-sheet-panel--racing-group">
+                            <div class="modal-sheet-settings-identity-head">
+                                <span id="settings-pause-on-timer-heading"
+                                    class="modal-sheet-settings-identity-heading">Pause on Timer: On</span>
+                                <input type="checkbox" id="settings-pause-on-timer-switch"
+                                    class="modal-sheet-settings-switch"
+                                    aria-labelledby="settings-pause-on-timer-heading" />
+                            </div>
+                            <div class="modal-sheet-settings-row-divider"></div>
                             <div class="modal-sheet-settings-identity-head">
                                 <span id="settings-pb-ghost-heading"
                                     class="modal-sheet-settings-identity-heading">Personal Best Ghost: On</span>

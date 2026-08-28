@@ -41,6 +41,10 @@ import {
     setMusicEnabled,
 } from './music-preference.js';
 import {
+    getPauseOnTimerEnabled,
+    setPauseOnTimerEnabled,
+} from './pause-on-timer-preference.js';
+import {
     getPbGhostEnabled,
     setPbGhostEnabled,
 } from './pb-ghost-preference.js';
@@ -48,12 +52,13 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
-    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onPbGhostChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
+    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onPauseOnTimerChanged, onPbGhostChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
         this.modal = modal;
         this.onCollisionAutoRestartChanged = onCollisionAutoRestartChanged;
         this.onCollisionRestartDelayChanged = onCollisionRestartDelayChanged;
         this.onCarAudioChanged = onCarAudioChanged;
         this.onMusicChanged = onMusicChanged;
+        this.onPauseOnTimerChanged = onPauseOnTimerChanged;
         this.onPbGhostChanged = onPbGhostChanged;
         this.onLeaderboardIdentityChanged = onLeaderboardIdentityChanged;
         this.onPlayerPreferencesChanged = onPlayerPreferencesChanged;
@@ -64,6 +69,7 @@ export class SettingsUi {
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
         this.refreshCollisionRestartDelayPanel();
+        this.refreshPauseOnTimerPanel();
         this.refreshPbGhostPanel();
     }
 
@@ -88,6 +94,8 @@ export class SettingsUi {
     get collisionRestartDelayHeading() { return document.getElementById('settings-collision-restart-delay-heading'); }
     get musicSwitch() { return document.getElementById('settings-music-switch'); }
     get musicHeading() { return document.getElementById('settings-music-heading'); }
+    get pauseOnTimerSwitch() { return document.getElementById('settings-pause-on-timer-switch'); }
+    get pauseOnTimerHeading() { return document.getElementById('settings-pause-on-timer-heading'); }
     get pbGhostSwitch() { return document.getElementById('settings-pb-ghost-switch'); }
     get pbGhostHeading() { return document.getElementById('settings-pb-ghost-heading'); }
 
@@ -209,6 +217,14 @@ export class SettingsUi {
                 this.refreshCollisionAutoRestartPanel();
             });
         }
+        if (this.pauseOnTimerSwitch) {
+            this.pauseOnTimerSwitch.addEventListener('change', () => {
+                const next = setPauseOnTimerEnabled(this.pauseOnTimerSwitch.checked);
+                this.onPauseOnTimerChanged?.(next);
+                this.onPlayerPreferencesChanged?.();
+                this.refreshPauseOnTimerPanel();
+            });
+        }
         if (this.pbGhostSwitch) {
             this.pbGhostSwitch.addEventListener('change', () => {
                 const next = setPbGhostEnabled(this.pbGhostSwitch.checked);
@@ -317,6 +333,15 @@ export class SettingsUi {
         });
     }
 
+    refreshPauseOnTimerPanel() {
+        this._syncBooleanSettingRow({
+            getValue: getPauseOnTimerEnabled,
+            switchEl: this.pauseOnTimerSwitch,
+            headingEl: this.pauseOnTimerHeading,
+            title: 'Pause on Timer',
+        });
+    }
+
     refreshPbGhostPanel() {
         this._syncBooleanSettingRow({
             getValue: getPbGhostEnabled,
@@ -399,6 +424,7 @@ export class SettingsUi {
         this.refreshCarAudioPanel();
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
+        this.refreshPauseOnTimerPanel();
         this.refreshPbGhostPanel();
         this.wireCollisionRestartDelayMeter();
         this.refreshCollisionRestartDelayPanel();

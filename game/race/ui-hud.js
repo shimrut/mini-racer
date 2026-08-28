@@ -1,6 +1,7 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { isStandardMedalTier } from '../medals/medal-timing.js';
+import { getPauseOnTimerEnabled } from '../settings/pause-on-timer-preference.js';
 
 const HUD_SPEED_MIN_MS = 1000 / 15;
 
@@ -17,8 +18,7 @@ export class RaceHud {
         this._lastTimeText = '0.000';
         this._lastSpeedText = '0';
         this._lastHudSpeedWrite = undefined;
-        this._hasPersonalBests = false;
-        this._hudPersonalBestsAllowed = false;
+        this._pauseAvailable = false;
         this._lapFlashTimer = null;
         this._hudAnchorResizeObserver = null;
         this._maxSpeed = 240;
@@ -40,6 +40,7 @@ export class RaceHud {
             mobileSpeedometer: document.getElementById('mobile-speedometer'),
             pauseBtn: document.getElementById('pause-btn'),
             hudStatsBtn: document.getElementById('hud-stats-btn'),
+            timerPauseIcon: document.getElementById('hud-timer-pause-icon'),
             startLights: document.getElementById('start-lights'),
             countdownLights: [
                 document.getElementById('light-1'),
@@ -64,6 +65,7 @@ export class RaceHud {
 
         this.anchorHudBar();
         this.initSpeedBars();
+        this.syncPauseControls();
     }
 
     get header() { return this.elements.header; }
@@ -82,6 +84,7 @@ export class RaceHud {
     get mobileSpeedometer() { return this.elements.mobileSpeedometer; }
     get pauseBtn() { return this.elements.pauseBtn; }
     get hudStatsBtn() { return this.elements.hudStatsBtn; }
+    get timerPauseIcon() { return this.elements.timerPauseIcon; }
     get startLights() { return this.elements.startLights; }
     get countdownLights() { return this.elements.countdownLights; }
     get goMessage() { return this.elements.goMessage; }
@@ -251,15 +254,11 @@ export class RaceHud {
             visible: true
         });
         this.syncBestTimeMedalBadge(trackKey, bestLapTime);
-        this._hasPersonalBests = true;
-        this.updateHudStatsButtonState();
         return;
     }
 
     this.syncBestTimeMedalBadge(null, null);
     this.setHudBestMetric({ visible: false });
-    this._hasPersonalBests = false;
-    this.updateHudStatsButtonState();
 }
 
     setComparisonTarget(target) {
@@ -277,24 +276,32 @@ export class RaceHud {
         visible: true,
     });
     this.syncBestTimeMedalBadge(null, null);
-    this._hasPersonalBests = false;
-    this.updateHudStatsButtonState();
-}
-
-    setHudPersonalBestsOpenAllowed(isAllowed) {
-    this._hudPersonalBestsAllowed = Boolean(isAllowed);
-    this.updateHudStatsButtonState();
 }
 
     setPauseVisible(isVisible) {
-    if (!this.pauseBtn) return;
-    this.pauseBtn.hidden = !isVisible;
-    this.pauseBtn.style.display = isVisible ? 'inline-flex' : 'none';
+    this._pauseAvailable = Boolean(isVisible);
+    this.syncPauseControls();
 }
 
-    updateHudStatsButtonState() {
+    syncPauseControls() {
+    const pauseOnTimer = getPauseOnTimerEnabled();
+    const showBottomPause = this._pauseAvailable && !pauseOnTimer;
+    const showTimerPause = this._pauseAvailable && pauseOnTimer;
+
+    if (this.pauseBtn) {
+        this.pauseBtn.hidden = !showBottomPause;
+        this.pauseBtn.style.display = showBottomPause ? 'inline-flex' : 'none';
+    }
     if (this.hudStatsBtn) {
-        this.hudStatsBtn.disabled = !(this._hasPersonalBests && this._hudPersonalBestsAllowed);
+        this.hudStatsBtn.disabled = !showTimerPause;
+        this.hudStatsBtn.classList.toggle('hud-stats--pause', showTimerPause);
+        this.hudStatsBtn.setAttribute(
+            'aria-label',
+            showTimerPause ? 'Pause run' : 'Race time',
+        );
+    }
+    if (this.timerPauseIcon) {
+        this.timerPauseIcon.hidden = !showTimerPause;
     }
 }
 

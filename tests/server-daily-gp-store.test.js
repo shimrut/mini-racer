@@ -1577,6 +1577,7 @@ describe('server daily gp store submissions', () => {
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
             pbGhostEnabled: true,
+            pauseOnTimerEnabled: true,
         };
 
         const saved = await updateServerPlayerPreferences({
@@ -1952,6 +1953,7 @@ describe('server daily gp store submissions', () => {
             ['a non-boolean carAudioEnabled', { carAudioEnabled: 1 }],
             ['a non-boolean crashAutoRestartEnabled', { crashAutoRestartEnabled: 'no' }],
             ['a non-boolean pbGhostEnabled', { pbGhostEnabled: 'sure' }],
+            ['a non-boolean pauseOnTimerEnabled', { pauseOnTimerEnabled: 'sure' }],
             ['a non-finite crashRestartDelaySec', { crashRestartDelaySec: 'slow' }],
             ['a negative crashRestartDelaySec', { crashRestartDelaySec: -0.1 }],
             ['a crashRestartDelaySec above 1', { crashRestartDelaySec: 1.1 }],
@@ -1975,6 +1977,8 @@ describe('server daily gp store submissions', () => {
             ['a crashRestartDelaySec of exactly 1', { crashRestartDelaySec: 1 }, { crashRestartDelaySec: 1 }],
             ['an omitted pbGhostEnabled', { pbGhostEnabled: undefined }, { pbGhostEnabled: true }],
             ['an explicit pbGhostEnabled of false', { pbGhostEnabled: false }, { pbGhostEnabled: false }],
+            ['an omitted pauseOnTimerEnabled', { pauseOnTimerEnabled: undefined }, { pauseOnTimerEnabled: true }],
+            ['an explicit pauseOnTimerEnabled of false', { pauseOnTimerEnabled: false }, { pauseOnTimerEnabled: false }],
         ])('accepts preferences with %s', async (_label, overrides, expected) => {
             const { updateServerPlayerPreferences } = await import('../src/server/daily-gp-store.ts');
 

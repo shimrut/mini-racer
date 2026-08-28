@@ -33,6 +33,7 @@ const DEFAULT_PLAYER_PREFERENCES: DailyGpPlayerPreferences = {
     crashAutoRestartEnabled: false,
     crashRestartDelaySec: 0.5,
     pbGhostEnabled: true,
+    pauseOnTimerEnabled: true,
 };
 
 function readCarSkinPreference(value: unknown): string | null {
@@ -61,8 +62,8 @@ function readCrashRestartDelaySecPreference(value: unknown): number | null {
     return Math.round(crashRestartDelaySec * 10) / 10;
 }
 
-function readPbGhostEnabledPreference(value: unknown): boolean | null {
-    if (value === undefined) return DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled;
+function readOptionalBooleanPreference(value: unknown, defaultValue: boolean): boolean | null {
+    if (value === undefined) return defaultValue;
     return readBooleanPreference(value);
 }
 
@@ -74,6 +75,7 @@ function readPlayerPreferenceFields(value: unknown): {
     crashAutoRestartEnabled: boolean | null;
     crashRestartDelaySec: number | null;
     pbGhostEnabled: boolean | null;
+    pauseOnTimerEnabled: boolean | null;
 } | null {
     if (!value || typeof value !== 'object') {
         return null;
@@ -87,7 +89,14 @@ function readPlayerPreferenceFields(value: unknown): {
         carAudioEnabled: readBooleanPreference(preferences.carAudioEnabled),
         crashAutoRestartEnabled: readBooleanPreference(preferences.crashAutoRestartEnabled),
         crashRestartDelaySec: readCrashRestartDelaySecPreference(preferences.crashRestartDelaySec),
-        pbGhostEnabled: readPbGhostEnabledPreference(preferences.pbGhostEnabled),
+        pbGhostEnabled: readOptionalBooleanPreference(
+            preferences.pbGhostEnabled,
+            DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled,
+        ),
+        pauseOnTimerEnabled: readOptionalBooleanPreference(
+            preferences.pauseOnTimerEnabled,
+            DEFAULT_PLAYER_PREFERENCES.pauseOnTimerEnabled,
+        ),
     };
 }
 
@@ -103,6 +112,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         crashAutoRestartEnabled,
         crashRestartDelaySec,
         pbGhostEnabled,
+        pauseOnTimerEnabled,
     } = fields;
     if (
         carSkin === null
@@ -112,6 +122,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         || crashAutoRestartEnabled === null
         || crashRestartDelaySec === null
         || pbGhostEnabled === null
+        || pauseOnTimerEnabled === null
     ) {
         return null;
     }
@@ -124,6 +135,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         crashAutoRestartEnabled,
         crashRestartDelaySec,
         pbGhostEnabled,
+        pauseOnTimerEnabled,
     };
 }
 
@@ -141,6 +153,8 @@ export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferenc
         crashRestartDelaySec: fields.crashRestartDelaySec
             ?? DEFAULT_PLAYER_PREFERENCES.crashRestartDelaySec,
         pbGhostEnabled: fields.pbGhostEnabled ?? DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled,
+        pauseOnTimerEnabled: fields.pauseOnTimerEnabled
+            ?? DEFAULT_PLAYER_PREFERENCES.pauseOnTimerEnabled,
     };
 }
 

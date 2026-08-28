@@ -1,3 +1,5 @@
+import { getPauseOnTimerEnabled } from '../settings/pause-on-timer-preference.js';
+
 export class InteractionsUi {
     constructor({
         modal,
@@ -5,7 +7,6 @@ export class InteractionsUi {
         leaderboards,
         onStart = null,
         onStartDailyChallenge = null,
-        onShowPersonalBests = null,
         onPauseRun = null,
     } = {}) {
         this.modal = modal;
@@ -13,7 +14,6 @@ export class InteractionsUi {
         this.leaderboards = leaderboards;
         this.onStart = onStart;
         this.onStartDailyChallenge = onStartDailyChallenge;
-        this.onShowPersonalBests = onShowPersonalBests;
         this.onPauseRun = onPauseRun;
     }
 
@@ -63,9 +63,6 @@ export class InteractionsUi {
                 );
             });
         }
-        if (this.hudStatsBtn && this.onShowPersonalBests) {
-            this.hudStatsBtn.addEventListener("click", this.onShowPersonalBests);
-        }
         if (this.menuGarageBtn) {
             this.menuGarageBtn.addEventListener("click", () => {
                 if (this.modal?.isModalActive?.()) {
@@ -74,11 +71,22 @@ export class InteractionsUi {
             });
         }
         if (this.desktopSpeedometer && this.onPauseRun)
-            this.desktopSpeedometer.addEventListener("click", this.onPauseRun);
+            this.desktopSpeedometer.addEventListener("click", () => {
+                if (getPauseOnTimerEnabled()) return;
+                this.onPauseRun();
+            });
         if (this.mobileSpeedometer && this.onPauseRun)
-            this.bindTapAction(this.mobileSpeedometer, this.onPauseRun);
+            this.bindTapAction(this.mobileSpeedometer, () => {
+                if (getPauseOnTimerEnabled()) return;
+                this.onPauseRun();
+            });
         if (this.pauseBtn && this.onPauseRun)
             this.pauseBtn.addEventListener("click", this.onPauseRun);
+        if (this.hudStatsBtn && this.onPauseRun)
+            this.hudStatsBtn.addEventListener("click", () => {
+                if (!getPauseOnTimerEnabled()) return;
+                this.onPauseRun();
+            });
     }
 
     bindSteeringControls({

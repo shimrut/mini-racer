@@ -67,6 +67,19 @@
     padding: 0
 }
 
+.hud-stat:has(.hud-pause-icon) {
+    align-items: center;
+}
+
+.hud-stats .hud-pause-icon {
+    width: 0.72rem;
+    height: 0.72rem;
+}
+
+.hud-stats--pause {
+    padding: 0.2rem 0 0.2rem 0.45rem;
+}
+
 .hud-label {
     font-size: .65rem;
     font-weight: 700;

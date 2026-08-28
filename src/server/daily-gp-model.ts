@@ -142,6 +142,7 @@ export type DailyGpPlayerPreferences = {
     crashAutoRestartEnabled: boolean;
     crashRestartDelaySec: number;
     pbGhostEnabled: boolean;
+    pauseOnTimerEnabled: boolean;
 };
 
 export function getUtcDayIndex(date = new Date()): number {

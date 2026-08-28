@@ -856,7 +856,6 @@ export const campaignEngineMethods = {
         this.status = 'ready';
         void this.journeys?.endAttempt?.({ complete: false });
         this.hud.setPauseVisible(false);
-        this.hud.setHudPersonalBestsOpenAllowed(true);
         this.modal.showModal(
             'RUN REJECTED',
             null,

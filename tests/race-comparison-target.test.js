@@ -173,8 +173,6 @@ describe('leaderboard race comparison target', () => {
     const hud = {
       setHudBestMetric,
       syncBestTimeMedalBadge: vi.fn(),
-      updateHudStatsButtonState: vi.fn(),
-      _hasPersonalBests: true,
     };
 
     RaceHud.prototype.setComparisonTarget.call(hud, {
@@ -187,7 +185,6 @@ describe('leaderboard race comparison target', () => {
       value: '12.345',
       visible: true,
     });
-    expect(hud._hasPersonalBests).toBe(false);
   });
 
   it('routes Daily and Campaign leaderboard starts through opponent-preserving entry points', async () => {

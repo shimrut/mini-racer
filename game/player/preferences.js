@@ -27,6 +27,10 @@ import {
     setCollisionRestartDelaySec,
 } from '../settings/collision-restart-delay-preference.js';
 import { getMusicEnabled, setMusicEnabled } from '../settings/music-preference.js';
+import {
+    getPauseOnTimerEnabled,
+    setPauseOnTimerEnabled,
+} from '../settings/pause-on-timer-preference.js';
 import { getPbGhostEnabled, setPbGhostEnabled } from '../settings/pb-ghost-preference.js';
 import { isLocalEnvironment } from '../track/environment.js';
 
@@ -39,6 +43,7 @@ export function readPlayerPreferences() {
         musicEnabled: getMusicEnabled(),
         carAudioEnabled: getCarProceduralAudioEnabled(),
         pbGhostEnabled: getPbGhostEnabled(),
+        pauseOnTimerEnabled: getPauseOnTimerEnabled(),
         // Legacy wire field retained so stored player profiles remain compatible.
         crashAutoRestartEnabled: getCollisionAutoRestartEnabled(),
         crashRestartDelaySec: getCollisionRestartDelaySec(),
@@ -55,6 +60,7 @@ export function applyPlayerPreferences(value) {
     setMusicEnabled(value.musicEnabled);
     setCarProceduralAudioEnabled(value.carAudioEnabled);
     setPbGhostEnabled(value.pbGhostEnabled !== false);
+    setPauseOnTimerEnabled(value.pauseOnTimerEnabled !== false);
     setCollisionAutoRestartEnabled(value.crashAutoRestartEnabled);
     setCollisionRestartDelaySec(value.crashRestartDelaySec);
     return true;

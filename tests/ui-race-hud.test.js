@@ -49,6 +49,39 @@ describe('ui race hud helpers', () => {
         vi.unstubAllGlobals();
     });
 
+    it('puts pause on the timer and hides the bottom pause when the setting is on', () => {
+        const store = new Map([['VectorGpPauseOnTimerEnabled', '1']]);
+        vi.stubGlobal('window', {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        });
+        const pauseBtn = { hidden: false, style: { display: 'inline-flex' } };
+        const hudStatsBtn = {
+            disabled: true,
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+        };
+        const timerPauseIcon = { hidden: true };
+
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'pause-btn': pauseBtn,
+            'hud-stats-btn': hudStatsBtn,
+            'hud-timer-pause-icon': timerPauseIcon,
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud.setPauseVisible(true);
+
+        expect(pauseBtn.hidden).toBe(true);
+        expect(pauseBtn.style.display).toBe('none');
+        expect(hudStatsBtn.disabled).toBe(false);
+        expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause', true);
+        expect(hudStatsBtn.setAttribute).toHaveBeenCalledWith('aria-label', 'Pause run');
+        expect(timerPauseIcon.hidden).toBe(false);
+    });
+
     it('forces the lap timer and speed values onto the HUD', () => {
         const timeVal = { textContent: '' };
         const speedVal = { textContent: '' };
@@ -97,7 +130,6 @@ describe('ui race hud helpers', () => {
             persistTrackPersonalBest
         });
         vi.spyOn(hud, "setHudBestMetric");
-        vi.spyOn(hud, "updateHudStatsButtonState");
         hud.setBestTime(48.35, {
             trackKey: 'circuit',
             mode: TRACK_MODE_DAILY_GP
@@ -114,8 +146,6 @@ describe('ui race hud helpers', () => {
             value: '48.350',
             visible: true
         });
-        expect(hud._hasPersonalBests).toBe(true);
-        expect(hud.updateHudStatsButtonState).toHaveBeenCalledTimes(1);
     });
 
     it('renders a new personal-best lap flash and clears it after the timeout', () => {
@@ -344,7 +374,14 @@ describe('ui race hud helpers', () => {
         expect(hud.hideLapFlash).toHaveBeenCalledTimes(1);
     });
 
-    it('toggles the pause affordance on both HUD speedometers', () => {
+    it('toggles the bottom pause button when pause-on-timer is off', () => {
+        const store = new Map([['VectorGpPauseOnTimerEnabled', '0']]);
+        vi.stubGlobal('window', {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        });
         const pauseBtn = {
             hidden: true,
             style: {}

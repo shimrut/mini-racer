@@ -66,6 +66,14 @@ No. Standings just shows a generated racer name instead of your Reddit name. Tim
 
 ---
 
+## Pause / HUD
+
+### I keep hitting Pause by accident on my phone
+
+Pause is on the **timer** at the top by default, not next to steering. If you still have a Pause button at the bottom, open Settings and turn **Pause on Timer** on. Turn it off if you want the old bottom Pause and tapping the speedo to pause.
+
+---
+
 ## Ghost
 
 ### What does **GHOST UNAVAILABLE** mean?

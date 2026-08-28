@@ -1,5 +1,7 @@
 # Changelog
 
+- Pause on phones now lives on the race timer by default (a pause icon next to the time). That keeps Pause away from steering thumbs. Settings → **Pause on Timer** turns the old bottom Pause button and speedo-tap pause back on.
+
 - Mapmaker Line Build no longer rewrites a closed sketch. A square stays a square; the 7-car-wide road follows what you drew. Existing tracks stay as they are until you redraw them.
 
 - Mapmaker Line Build now paints a lane exactly 7 cars wide (3.85u), instead of 4u (~7.3 cars). Existing tracks stay as they are until you redraw them.

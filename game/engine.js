@@ -511,6 +511,9 @@ export class RealTimeRacer {
           maxSpeedKph: this.runtimeConfig.maxSpeed,
         });
       },
+      onPauseOnTimerChanged: () => {
+        this.hud.syncPauseControls();
+      },
       onPbGhostChanged: (enabled) => {
         this.pbGhost.setEnabled(enabled);
         this.requestRender();
@@ -844,7 +847,9 @@ export class RealTimeRacer {
     this.settings.refreshMusicPanel();
     this.settings.refreshCollisionAutoRestartPanel();
     this.settings.refreshCollisionRestartDelayPanel();
+    this.settings.refreshPauseOnTimerPanel();
     this.settings.refreshPbGhostPanel();
+    this.hud.syncPauseControls();
     this.garage.syncSkinSelection();
     this.garage.syncTrailSelection();
     if (loadCar) await this.syncCarSpriteAsset();
