@@ -1,6 +1,6 @@
 # Changelog
 
-- Daily preview now puts the lap count under the track name. Time to beat stays on the right by itself.
+- Daily preview now puts the lap count as a small label above the track name, the same way Time to Beat sits above the time.
 
 - New Daily races now use 1 or 2 laps only on tracks under 10 seconds (author time). Tracks of 10 seconds or more always run 1 lap. Days already published keep the lap count they had.
 

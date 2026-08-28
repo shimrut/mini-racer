@@ -25,7 +25,7 @@ describe('current Daily launcher preview', () => {
         })).toEqual({ allowExpiredPost: true, ignorePostData: true });
     });
 
-    it('keeps laps under the track name and time to beat on its own', () => {
+    it('uses the lap count as an eyebrow and time to beat on its own', () => {
         expect(formatDailyPreviewLapsLabel(1)).toBe('1 LAP');
         expect(formatDailyPreviewLapsLabel(2)).toBe('2 LAPS');
         expect(formatDailyPreviewTimeLabel()).toBe('TIME TO BEAT');
