@@ -478,6 +478,10 @@ describe('ui modal content helpers', () => {
         expect(rows[1].querySelector('.medal-svg--silver')).toBeTruthy();
         expect(rows[2].querySelector('.medal-svg--gold')).toBeTruthy();
         expect(rows[3].querySelector('.medal-svg--author')).toBeTruthy();
+        expect(rows[0].querySelector('.combined-medal-times-label').textContent).toBe('Bronze');
+        expect(rows[1].querySelector('.combined-medal-times-label').textContent).toBe('Silver');
+        expect(rows[2].querySelector('.combined-medal-times-label').textContent).toBe('Gold');
+        expect(rows[3].querySelector('.combined-medal-times-label').textContent).toBe('Author');
         expect(rows[2].querySelector('.combined-medal-times-time').textContent).toMatch(/^\d+\.\d{3}s$/);
 
         global.requestAnimationFrame = originalRaf;

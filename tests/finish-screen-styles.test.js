@@ -109,6 +109,9 @@ describe('finish screen styles', () => {
             /\.combined-medal-times-row--medal \.medal-svg--popover\s*\{[^}]*width:\s*1\.75rem;/,
         );
         expect(styles).toMatch(
+            /\.combined-medal-times-row--medal \.combined-medal-times-label\s*\{[^}]*flex:\s*1 1 auto;/,
+        );
+        expect(styles).toMatch(
             /\.combined-medal-times-row--medal \.combined-medal-times-time\s*\{[^}]*margin-left:\s*auto;[^}]*text-align:\s*right;/,
         );
     });

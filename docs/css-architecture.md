@@ -88,8 +88,8 @@ Reduced motion turns the sequence off. Daily and Campaign put a
 status heading above the time in that same column — medal name, NEW BEST, or
 FINISHED. MEDALS, VS PB, and RANK stay the comparison rows. Racing a standings
 ghost also shows VS #rank (or VS) above VS PB. Tapping MEDALS opens
-the same mini overlay as checkpoint splits, with each medal stacked above its
-target time.
+the same mini overlay as checkpoint splits, with each medal, its name, and its
+target time in one row.
 
 ## Daily And Campaign Poster Contract
 

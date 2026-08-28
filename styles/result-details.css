@@ -181,6 +181,12 @@
     filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
 }
 
+.combined-medal-times-row--medal .combined-medal-times-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-color);
+}
+
 .combined-medal-times-row--medal .combined-medal-times-time {
     margin-left: auto;
     flex: 0 0 auto;

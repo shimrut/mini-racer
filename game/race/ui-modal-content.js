@@ -5,6 +5,7 @@ import {
     buildModalDeltaDisplay,
 } from '../race/result-flow.js';
 import {
+    formatMedalLabel,
     getMedalRowSlots,
     isStandardMedalTier,
     maxMedalTier,
@@ -380,6 +381,10 @@ export function appendMedalTimesRows(listEl, slots) {
         });
         icon.setAttribute('aria-hidden', 'true');
 
+        const nameEl = document.createElement('span');
+        nameEl.className = 'combined-medal-times-label';
+        nameEl.textContent = formatMedalLabel(tier);
+
         const timeEl = document.createElement('span');
         timeEl.className = 'combined-medal-times-time';
         timeEl.textContent = Number.isFinite(thresholdSec)
@@ -387,6 +392,7 @@ export function appendMedalTimesRows(listEl, slots) {
             : '--';
 
         row.appendChild(icon);
+        row.appendChild(nameEl);
         row.appendChild(timeEl);
         listEl.appendChild(row);
     }

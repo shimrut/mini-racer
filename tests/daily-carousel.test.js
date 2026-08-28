@@ -917,6 +917,8 @@ describe('TrackCarousel medal times', () => {
             const rows = overlay.querySelectorAll('.combined-medal-times-row--medal');
             expect(rows.length).toBe(4);
             expect(rows[0].querySelector('.medal-svg--bronze')).toBeTruthy();
+            expect(rows[0].querySelector('.combined-medal-times-label').textContent).toBe('Bronze');
+            expect(rows[3].querySelector('.combined-medal-times-label').textContent).toBe('Author');
             expect(rows[2].querySelector('.combined-medal-times-time').textContent)
                 .toMatch(/^\d+\.\d{3}s$/);
         } finally {
