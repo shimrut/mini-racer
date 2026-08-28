@@ -633,7 +633,7 @@ describe('game stylesheet architecture', () => {
         expect(ui).toContain('status.append(createRequirementMedalIcon(requirement))');
     });
 
-    it('lays the Tracks list as a featured tile over a three-across strip', () => {
+    it('lays the Tracks list as equal three-across tiles', () => {
         const trackShellStyles = readFileSync(
             new URL('../styles/settings-and-track-shells.css', import.meta.url),
             'utf8',
@@ -649,14 +649,18 @@ describe('game stylesheet architecture', () => {
             /#daily-playlist-list\.daily-playlist-list\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/s,
         );
         expect(trackShellStyles).toMatch(
-            /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*flex-direction:\s*column;/s,
+            /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*grid-template-rows:\s*4\.85rem 2\.3em 0\.85em;/s,
         );
         expect(trackShellStyles).toMatch(
-            /#daily-playlist-modal \.daily-playlist-entry--hero\.is-featured\s*\{[^}]*grid-column:\s*1 \/ -1;/s,
+            /#daily-playlist-modal \.daily-playlist-hero-title\s*\{[^}]*height:\s*2\.3em;[^}]*-webkit-line-clamp:\s*2;/s,
+        );
+        expect(trackShellStyles).toMatch(
+            /#daily-playlist-modal \.daily-playlist-entry--hero:hover\s*\{[^}]*transform:\s*none;[^}]*background:\s*#1e293b;[^}]*box-shadow:\s*none;/s,
         );
         expect(trackShellStyles).toMatch(
             /#daily-playlist-modal \.daily-playlist-entry--hero\.current\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--accent-color\);/s,
         );
+        expect(trackShellStyles).not.toContain('is-featured');
         expect(trackShellStyles).not.toContain('#daily-playlist-modal .daily-playlist-hero-lock');
     });
 

@@ -35,22 +35,11 @@ function renderPlaylistMessage(list, text) {
     list.appendChild(empty);
 }
 
-function orderFeaturedFirst(items, isFeatured) {
-    const featuredIndex = items.findIndex(isFeatured);
-    if (featuredIndex <= 0) return items;
-    return [
-        items[featuredIndex],
-        ...items.slice(0, featuredIndex),
-        ...items.slice(featuredIndex + 1),
-    ];
-}
-
 function buildTracksTile({
     isCurrent = false,
-    isFeatured = false,
     locked = false,
     ariaLabel,
-    statusText,
+    statusText = '',
     titleText,
     medalTier = null,
     onClick,
@@ -58,7 +47,6 @@ function buildTracksTile({
     const row = document.createElement('button');
     row.className = [
         'daily-playlist-entry--hero',
-        isFeatured ? 'is-featured' : '',
         isCurrent ? 'current' : '',
         locked ? 'is-locked' : '',
     ].filter(Boolean).join(' ');
@@ -87,13 +75,11 @@ function buildTracksTile({
     title.className = 'daily-playlist-hero-title';
     title.textContent = titleText;
 
-    row.append(preview, title);
-    if (statusText) {
-        const status = document.createElement('span');
-        status.className = 'daily-playlist-hero-day';
-        status.textContent = statusText;
-        row.append(status);
-    }
+    const status = document.createElement('span');
+    status.className = 'daily-playlist-hero-day';
+    status.textContent = statusText || '';
+
+    row.append(preview, title, status);
     return { row, canvas };
 }
 
@@ -248,17 +234,7 @@ export class DailyChallengeUi {
             return;
         }
 
-        const featuredId = playableChallenges.find((challenge) => (
-            getDailyChallengeCardStatus(challenge).key === 'featured'
-        ))?.id
-            ?? (playableChallenges.some((challenge) => (
-                challenge.id === this._dailyChallengeSummary?.challengeId
-            )) ? this._dailyChallengeSummary.challengeId : playableChallenges[0]?.id);
-
-        for (const challenge of orderFeaturedFirst(
-            playableChallenges,
-            (item) => item.id === featuredId,
-        )) {
+        for (const challenge of playableChallenges) {
             const availability = getDailyChallengeCardStatus(challenge);
             const availabilityLabel = availability.key === 'featured' ? 'Today' : availability.label;
             const isCurrentTrack = challenge.id === this._dailyChallengeSummary?.challengeId;
@@ -274,7 +250,6 @@ export class DailyChallengeUi {
             );
             const { row, canvas } = buildTracksTile({
                 isCurrent: isCurrentTrack,
-                isFeatured: challenge.id === featuredId,
                 ariaLabel: `Race ${trackName}. ${lapsLabel}. ${availabilityLabel}`,
                 statusText: availability.key === 'featured' ? `Today · ${lapsLabel}` : lapsLabel,
                 titleText: trackName,
@@ -312,14 +287,7 @@ export class DailyChallengeUi {
             return;
         }
 
-        const featuredId = playableStages.some((stage) => stage.id === this._campaignTracksSelectedId)
-            ? this._campaignTracksSelectedId
-            : playableStages.find((stage) => stage.unlocked)?.id ?? playableStages[0]?.id;
-
-        for (const stage of orderFeaturedFirst(
-            playableStages,
-            (item) => item.id === featuredId,
-        )) {
+        for (const stage of playableStages) {
             const locked = !stage.unlocked;
             const isCurrentTrack = stage.id === this._campaignTracksSelectedId;
             const stageLabel = formatCampaignStageLabel(stage);
@@ -335,7 +303,6 @@ export class DailyChallengeUi {
 
             const { row, canvas } = buildTracksTile({
                 isCurrent: isCurrentTrack,
-                isFeatured: stage.id === featuredId,
                 locked,
                 ariaLabel: locked
                     ? `Locked. ${trackName}. ${stageLabel}`

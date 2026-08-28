@@ -153,15 +153,15 @@ describe('Campaign Tracks list rows', () => {
         global.document = originalDocument;
     });
 
-    it('features the selected Campaign stage and keeps locked tiles quiet', () => {
+    it('keeps Campaign tiles quiet: laps when open, dimmed when locked', () => {
         const ui = new DailyChallengeUi();
         ui.renderCampaignPlaylist(campaignStages(), { onChoose: vi.fn() }, {
             selectedStageId: 'numbered-v1-00',
         });
 
         expect(list.children).toHaveLength(2);
-        expect(list.children[0].className).toContain('is-featured');
         expect(list.children[0].className).toContain('current');
+        expect(list.children[0].className).not.toContain('is-featured');
         expect(list.children[0].className).not.toContain('is-locked');
         expect(findByClass(list.children[0], 'daily-playlist-hero-day').textContent)
             .toBe('2 Laps');
@@ -173,8 +173,7 @@ describe('Campaign Tracks list rows', () => {
         expect(list.children[0].attributes['aria-label']).not.toContain('Expired');
 
         expect(list.children[1].className).toContain('is-locked');
-        expect(list.children[1].className).not.toContain('is-featured');
-        expect(findByClass(list.children[1], 'daily-playlist-hero-day')).toBeNull();
+        expect(findByClass(list.children[1], 'daily-playlist-hero-day').textContent).toBe('');
         expect(findByClass(list.children[1], 'daily-playlist-hero-lock')).toBeNull();
         expect(findByClass(list.children[1], 'daily-playlist-hero-medal')).toBeNull();
         expect(list.children[1].attributes['aria-label']).toContain('Locked');
@@ -185,18 +184,17 @@ describe('Campaign Tracks list rows', () => {
         expect(list.children[0].children[2].className).toContain('daily-playlist-hero-day');
     });
 
-    it('lifts a later selected Campaign stage into the featured slot', () => {
+    it('keeps Campaign stages in list order', () => {
         const ui = new DailyChallengeUi();
         ui.renderCampaignPlaylist(campaignStages(), { onChoose: vi.fn() }, {
             selectedStageId: 'numbered-v1-01',
         });
 
-        expect(list.children[0].className).toContain('is-featured');
-        expect(list.children[0].className).toContain('is-locked');
         expect(findByClass(list.children[0], 'daily-playlist-hero-title').textContent)
-            .toBe('Number One');
-        expect(findByClass(list.children[1], 'daily-playlist-hero-title').textContent)
             .toBe('Number Zero');
+        expect(list.children[1].className).toContain('current');
+        expect(findByClass(list.children[1], 'daily-playlist-hero-title').textContent)
+            .toBe('Number One');
     });
 
     it('titles the overlay Daily Tracks or Campaign Tracks', () => {
@@ -261,18 +259,17 @@ describe('Daily Tracks list rows', () => {
         global.document = originalDocument;
     });
 
-    it('features Today and keeps other Daily tiles to name and laps', () => {
+    it('keeps Daily tiles to name and laps, with Today on the live race', () => {
         const ui = new DailyChallengeUi();
         ui.setDailyChallengeSummary({ challengeId: 'daily-today' });
         ui.renderPlaylist(dailyChallenges(), { onPlay: vi.fn() });
 
         expect(list.children).toHaveLength(2);
-        expect(list.children[0].className).toContain('is-featured');
         expect(list.children[0].className).toContain('current');
+        expect(list.children[0].className).not.toContain('is-featured');
         expect(findByClass(list.children[0], 'daily-playlist-hero-day').textContent)
             .toBe('Today · 2 Laps');
         expect(list.children[0].attributes['aria-label']).toContain('Today');
-        expect(list.children[1].className).not.toContain('is-featured');
         expect(findByClass(list.children[1], 'daily-playlist-hero-day').textContent)
             .toBe('1 Lap');
         expect(list.children[1].attributes['aria-label']).toContain('Expired');

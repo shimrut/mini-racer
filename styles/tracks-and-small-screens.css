@@ -163,28 +163,16 @@
     }
 
     #daily-playlist-modal .daily-playlist-entry--hero {
-        min-height: 7.1rem;
-        padding: 0.45rem 0.35rem 0.4rem;
-    }
-
-    #daily-playlist-modal .daily-playlist-entry--hero.is-featured {
-        min-height: 9.4rem;
-        padding: 0.7rem 0.65rem 0.6rem;
+        grid-template-rows: 4.15rem 2.3em 0.85em;
+        padding: 0.45rem 0.3rem 0.4rem;
     }
 
     #daily-playlist-modal .daily-playlist-hero-preview {
         height: 4.15rem;
     }
 
-    #daily-playlist-modal .daily-playlist-entry--hero.is-featured .daily-playlist-hero-preview {
-        height: 5.5rem;
-    }
-
     #daily-playlist-modal .daily-playlist-hero-title {
         font-size: 0.76rem;
-    }
-
-    #daily-playlist-modal .daily-playlist-entry--hero.is-featured .daily-playlist-hero-title {
-        font-size: 0.98rem;
+        height: 2.3em;
     }
 }

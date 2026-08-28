@@ -1,6 +1,6 @@
 # Changelog
 
-- Daily and Campaign Tracks lists now lead with the current race as a large tile, then a quieter strip of the rest. Cards show the drawing, the name, and laps when the track is open. Locked tracks are only dimmed. Empty medals and lock icons are gone. The selected tile uses a thin ring, and Back sits in its own space at the bottom.
+- Daily and Campaign Tracks lists use equal tiles: drawing, a two-line name slot, and laps when the track is open. Locked tracks are only dimmed. Empty medals and lock icons are gone. Hover is a CSS background only. The selected tile uses a thin ring, and Back sits in its own space at the bottom.
 
 - Daily preview now puts the lap count as a small label above the track name, the same way Time to Beat sits above the time.
 
