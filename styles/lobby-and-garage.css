@@ -798,9 +798,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 #garage-modal .garage-tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    align-items: stretch;
     position: sticky;
     top: 0;
     z-index: 2;
+    height: 1.5rem;
     padding: 0.15rem;
     background: #1e293b;
     border-radius: var(--radius-full);
@@ -808,11 +810,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 #garage-modal .garage-tab {
-    min-height: 3.35rem;
-    padding: .8rem .5rem;
+    min-height: 0;
+    padding: 0 0.5rem;
     border-radius: var(--radius-full);
     background: transparent;
-    font-size: .95rem;
+    font-size: 0.78rem;
     letter-spacing: .05em;
 }
 
