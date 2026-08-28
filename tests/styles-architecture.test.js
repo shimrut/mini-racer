@@ -687,4 +687,20 @@ describe('game stylesheet architecture', () => {
         );
     });
 
+    it('paints garage Car/Trail with the Settings on/off pill', () => {
+        const garageStyles = readFileSync(
+            new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
+        expect(garageStyles).toMatch(
+            /\.garage-tabs\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*#1e293b;[^}]*border-radius:\s*var\(--radius-full\);/s,
+        );
+        expect(garageStyles).toMatch(
+            /\.garage-tabs::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
+        );
+        expect(garageStyles).toMatch(
+            /\.garage-tabs:has\(#garage-tab-trails\[aria-selected="true"\]\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
+        );
+    });
+
 });

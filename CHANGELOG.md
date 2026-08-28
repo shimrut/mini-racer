@@ -1,5 +1,7 @@
 # Changelog
 
+- Garage Car and Trail now use the same rounded pill switch as Settings on/off.
+
 - Wall sparks now fade after you finish or pause, instead of freezing and keeping the game drawing in the background.
 
 - The loading circle on Start Race now sits to the left of the text instead of underneath it.

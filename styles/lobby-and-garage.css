@@ -376,6 +376,10 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     .main-menu__item--primary .main-menu__label.is-swapping {
         animation: none;
     }
+
+    .garage-tabs::before {
+        transition: none;
+    }
 }
 
 .main-menu__item--primary .main-menu__label {
@@ -484,52 +488,73 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 .garage-tabs {
-    display: flex;
-    gap: .45rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    position: relative;
     margin-top: 0;
     flex-shrink: 0;
+    padding: 0.15rem;
+    background: #1e293b;
+    border-radius: var(--radius-full);
+}
+
+.garage-tabs::before {
+    content: "";
+    position: absolute;
+    top: 0.15rem;
+    bottom: 0.15rem;
+    left: 0.15rem;
+    width: calc(50% - 0.15rem);
+    background-color: var(--accent-color);
+    border-radius: var(--radius-full);
+    transition: transform var(--dur-slow) var(--ease-settle);
+    z-index: 0;
+}
+
+.garage-tabs:has(#garage-tab-trails[aria-selected="true"])::before {
+    transform: translateX(100%);
 }
 
 .garage-tab {
-    flex: 1 1 0;
+    appearance: none;
     min-width: 0;
+    width: 100%;
+    position: relative;
+    z-index: 1;
     padding: .62rem .55rem;
     border: none;
-    border-radius: var(--radius-sm);
-    background: #1e293b;
-    color: var(--text-dim);
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--text-muted);
     font-family: var(--header-font);
     font-size: .78rem;
     font-weight: 900;
     font-style: italic;
     text-transform: uppercase;
     letter-spacing: .08em;
+    line-height: 1;
+    text-align: center;
     cursor: pointer;
     box-shadow: none;
+    transition: color var(--dur-base) ease;
 }
 
 .garage-tab:hover {
-    background: #334155;
-    color: var(--text-color);
+    background: transparent;
+    color: var(--text-dim);
 }
 
-.garage-tab.is-selected {
-    background: #ffffff;
-    color: var(--bg-surface);
+.garage-tab.is-selected,
+.garage-tab.is-selected:hover {
+    background: transparent;
+    color: var(--text-color);
     box-shadow: none;
 }
 
-.garage-tab.is-selected:hover {
-    background: #ffffff;
-    color: var(--bg-surface);
-}
-
-.garage-tab.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-}
-
+.garage-tab.is-menu-selected,
 .garage-tab.is-selected.is-menu-selected {
-    box-shadow: 0 0 0 2px var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .garage-tab-panel {
@@ -771,26 +796,29 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 #garage-modal .garage-tabs {
-    gap: .5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     position: sticky;
     top: 0;
     z-index: 2;
-    padding-top: 0.1rem;
-    background: var(--bg-color);
+    padding: 0.15rem;
+    background: #1e293b;
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 0 0.5rem var(--bg-color);
 }
 
 #garage-modal .garage-tab {
     min-height: 3.35rem;
     padding: .8rem .5rem;
-    border-radius: var(--radius-md);
-    background: #111827;
+    border-radius: var(--radius-full);
+    background: transparent;
     font-size: .95rem;
     letter-spacing: .05em;
 }
 
 #garage-modal .garage-tab.is-selected,
 #garage-modal .garage-tab.is-selected:hover {
-    background: var(--accent-color);
+    background: transparent;
     color: #ffffff;
 }
 
@@ -886,12 +914,9 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     height: 3rem;
 }
 
-#garage-modal .garage-tab.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
-}
-
+#garage-modal .garage-tab.is-menu-selected,
 #garage-modal .garage-tab.is-selected.is-menu-selected {
-    box-shadow: 0 0 0 2px var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 #garage-modal .garage-skin-option.is-menu-selected,
