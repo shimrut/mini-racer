@@ -37,7 +37,7 @@ top-to-bottom order.
 | 6 | `styles/track-carousel.css` | Shared Daily/Campaign selector rail, cards and medal ladder |
 | 7 | `styles/race-controls-and-feedback.css` | Touch controls, countdown and lap feedback |
 | 8 | `styles/modal-and-result-shell.css` | Modal foundation, pause and initial result rules |
-| 9 | `styles/settings-and-track-shells.css` | Settings and track-list modal foundations. Settings on/off rows are pill switches (`appearance: none` on the native checkbox): dark track off, accent fill on, sliding thumb. Keyboard selection still uses the row's `is-menu-selected` ring. |
+| 9 | `styles/settings-and-track-shells.css` | Settings and track-list modal foundations. Settings on/off rows use the same Off/On pill as the Daily/Campaign lobby switch: dark track, sliding red thumb, Outfit labels. Keyboard selection still uses the row's `is-menu-selected` ring. |
 | 10 | `styles/modal-components-and-standings.css` | Reusable sheets, modal components and standings foundation |
 | 11 | `styles/responsive-layout.css` | Existing cross-product responsive overrides |
 | 12 | `styles/results.css` | Main finish-result presentation |

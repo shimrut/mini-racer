@@ -509,9 +509,14 @@
                         <div class="modal-sheet-panel modal-sheet-panel--reddit-identity">
                             <div class="modal-sheet-settings-identity-head">
                                 <span id="settings-reddit-heading" class="modal-sheet-settings-identity-heading">
-                                    Username: Off</span>
-                                <input type="checkbox" id="settings-reddit-identity-switch"
-                                    class="modal-sheet-settings-switch" aria-labelledby="settings-reddit-heading" />
+                                    Username</span>
+                                <label class="modal-sheet-settings-switch">
+                                    <input type="checkbox" id="settings-reddit-identity-switch"
+                                        class="modal-sheet-settings-switch__input"
+                                        aria-labelledby="settings-reddit-heading" />
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
+                                </label>
                             </div>
                             <p id="settings-identity-desc" class="modal-sheet-settings-identity-desc"></p>
                         </div>
@@ -520,16 +525,25 @@
                         <div class="modal-sheet-panel modal-sheet-panel--audio-group">
                             <div class="modal-sheet-settings-identity-head">
                                 <span id="settings-car-audio-heading"
-                                    class="modal-sheet-settings-identity-heading">Sound Effects: Off</span>
-                                <input type="checkbox" id="settings-car-audio-switch"
-                                    class="modal-sheet-settings-switch" aria-labelledby="settings-car-audio-heading" />
+                                    class="modal-sheet-settings-identity-heading">Sound Effects</span>
+                                <label class="modal-sheet-settings-switch">
+                                    <input type="checkbox" id="settings-car-audio-switch"
+                                        class="modal-sheet-settings-switch__input"
+                                        aria-labelledby="settings-car-audio-heading" />
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
+                                </label>
                             </div>
                             <div class="modal-sheet-settings-row-divider"></div>
                             <div class="modal-sheet-settings-identity-head">
-                                <span id="settings-music-heading" class="modal-sheet-settings-identity-heading">Music:
-                                    Off</span>
-                                <input type="checkbox" id="settings-music-switch" class="modal-sheet-settings-switch"
-                                    aria-labelledby="settings-music-heading" />
+                                <span id="settings-music-heading" class="modal-sheet-settings-identity-heading">Music</span>
+                                <label class="modal-sheet-settings-switch">
+                                    <input type="checkbox" id="settings-music-switch"
+                                        class="modal-sheet-settings-switch__input"
+                                        aria-labelledby="settings-music-heading" />
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
+                                </label>
                             </div>
                         </div>
 
@@ -537,34 +551,50 @@
                         <div class="modal-sheet-panel modal-sheet-panel--racing-group">
                             <div class="modal-sheet-settings-identity-head">
                                 <span id="settings-pause-on-timer-heading"
-                                    class="modal-sheet-settings-identity-heading">Pause on Timer: On</span>
-                                <input type="checkbox" id="settings-pause-on-timer-switch"
-                                    class="modal-sheet-settings-switch"
-                                    aria-labelledby="settings-pause-on-timer-heading" />
+                                    class="modal-sheet-settings-identity-heading">Pause on Timer</span>
+                                <label class="modal-sheet-settings-switch">
+                                    <input type="checkbox" id="settings-pause-on-timer-switch"
+                                        class="modal-sheet-settings-switch__input"
+                                        aria-labelledby="settings-pause-on-timer-heading" />
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
+                                </label>
                             </div>
                             <div class="modal-sheet-settings-row-divider"></div>
                             <div class="modal-sheet-settings-identity-head">
                                 <span id="settings-hide-hud-heading"
-                                    class="modal-sheet-settings-identity-heading">Hide HUD: Off</span>
-                                <input type="checkbox" id="settings-hide-hud-switch"
-                                    class="modal-sheet-settings-switch"
-                                    aria-labelledby="settings-hide-hud-heading" />
+                                    class="modal-sheet-settings-identity-heading">Hide HUD</span>
+                                <label class="modal-sheet-settings-switch">
+                                    <input type="checkbox" id="settings-hide-hud-switch"
+                                        class="modal-sheet-settings-switch__input"
+                                        aria-labelledby="settings-hide-hud-heading" />
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
+                                </label>
                             </div>
                             <div class="modal-sheet-settings-row-divider"></div>
                             <div class="modal-sheet-settings-identity-head">
                                 <span id="settings-pb-ghost-heading"
-                                    class="modal-sheet-settings-identity-heading">Personal Best Ghost: On</span>
-                                <input type="checkbox" id="settings-pb-ghost-switch"
-                                    class="modal-sheet-settings-switch"
-                                    aria-labelledby="settings-pb-ghost-heading" />
+                                    class="modal-sheet-settings-identity-heading">Personal Best Ghost</span>
+                                <label class="modal-sheet-settings-switch">
+                                    <input type="checkbox" id="settings-pb-ghost-switch"
+                                        class="modal-sheet-settings-switch__input"
+                                        aria-labelledby="settings-pb-ghost-heading" />
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
+                                </label>
                             </div>
                             <div class="modal-sheet-settings-row-divider"></div>
                             <div class="modal-sheet-settings-identity-head">
                                 <span id="settings-collision-auto-restart-heading"
-                                    class="modal-sheet-settings-identity-heading">Collision Auto-Restart: Off</span>
-                                <input type="checkbox" id="settings-collision-auto-restart-switch"
-                                    class="modal-sheet-settings-switch"
-                                    aria-labelledby="settings-collision-auto-restart-heading" />
+                                    class="modal-sheet-settings-identity-heading">Collision Auto-Restart</span>
+                                <label class="modal-sheet-settings-switch">
+                                    <input type="checkbox" id="settings-collision-auto-restart-switch"
+                                        class="modal-sheet-settings-switch__input"
+                                        aria-labelledby="settings-collision-auto-restart-heading" />
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
+                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
+                                </label>
                             </div>
                             <div class="modal-sheet-settings-row-divider"></div>
                             <div class="modal-sheet-settings-row modal-sheet-settings-row--collision-delay">

@@ -642,19 +642,19 @@ describe('game stylesheet architecture', () => {
         );
     });
 
-    it('paints settings on/off rows as pill switches, not native checkboxes', () => {
+    it('paints settings on/off rows with the Daily/Campaign lobby pill', () => {
         const trackShellStyles = readFileSync(
             new URL('../styles/settings-and-track-shells.css', import.meta.url),
             'utf8',
         );
         expect(trackShellStyles).toMatch(
-            /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*appearance:\s*none;[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*var\(--bg-surface\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(trackShellStyles).toMatch(
-            /#settings-modal \.modal-sheet-settings-switch:checked\s*\{[^}]*background-color:\s*var\(--accent-color\);/s,
+            /#settings-modal \.modal-sheet-settings-switch::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
-        expect(trackShellStyles).not.toMatch(
-            /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*accent-color:/s,
+        expect(trackShellStyles).toMatch(
+            /#settings-modal \.modal-sheet-settings-switch:has\(:checked\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
         );
     });
 

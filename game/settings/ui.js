@@ -167,11 +167,28 @@ export class SettingsUi {
             switchEl.checked = on;
         }
         if (headingEl) {
-            headingEl.textContent = `${title}: ${on ? 'On' : 'Off'}`;
+            headingEl.textContent = title;
         }
         if (descEl) {
             descEl.textContent = '';
         }
+    }
+
+    wireSettingsSwitchPills() {
+        this.settingsModal?.querySelectorAll('.modal-sheet-settings-switch').forEach((root) => {
+            if (root.dataset.wired === '1') return;
+            const input = root.querySelector('.modal-sheet-settings-switch__input');
+            if (!input) return;
+            root.dataset.wired = '1';
+            root.addEventListener('click', (event) => {
+                const opt = event.target.closest('[data-settings-switch]');
+                if (!opt || !root.contains(opt)) return;
+                const wantOn = opt.dataset.settingsSwitch === 'on';
+                if (input.checked === wantOn) {
+                    event.preventDefault();
+                }
+            });
+        });
     }
 
     bindEvents() {
@@ -180,6 +197,7 @@ export class SettingsUi {
             closeLabel: 'Back',
         });
         bindReusableModal(this.settingsModal, () => this.closeSettings());
+        this.wireSettingsSwitchPills();
 
         this.settingsToggleButtons.forEach((button) => {
             button.addEventListener('click', () => {
@@ -263,7 +281,7 @@ export class SettingsUi {
             this.redditIdentitySwitch.checked = isReddit;
         }
         if (this.redditHeading) {
-            this.redditHeading.textContent = `Username: ${isReddit ? 'On' : 'Off'}`;
+            this.redditHeading.textContent = 'Username';
         }
         if (this.identityDesc) {
             if (isReddit && safeReddit) {
