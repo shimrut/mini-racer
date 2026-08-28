@@ -1,6 +1,6 @@
 # Changelog
 
-- Pause on phones now lives on the race timer by default (a pause icon next to the time). That keeps Pause away from steering thumbs. Settings → **Pause on Timer** turns the old bottom Pause button and speedo-tap pause back on.
+- Pause on phones now lives on the race timer by default (a pause icon next to the time). That keeps Pause away from steering thumbs. Settings → **Pause on Timer** turns the old bottom Pause button and speedo-tap pause back on. The icon sits beside the digits without moving the timer.
 
 - Mapmaker Line Build no longer rewrites a closed sketch. A square stays a square; the 7-car-wide road follows what you drew. Existing tracks stay as they are until you redraw them.
 

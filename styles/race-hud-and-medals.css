@@ -67,17 +67,18 @@
     padding: 0
 }
 
-.hud-stat:has(.hud-pause-icon) {
-    align-items: center;
+.hud-stat:has(#hud-timer-pause-icon) {
+    position: relative;
 }
 
 .hud-stats .hud-pause-icon {
-    width: 0.72rem;
-    height: 0.72rem;
-}
-
-.hud-stats--pause {
-    padding: 0.2rem 0 0.2rem 0.45rem;
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    width: 1.4rem;
+    height: 1.4rem;
+    margin-right: 0.18rem;
+    transform: translateY(-50%);
 }
 
 .hud-label {
