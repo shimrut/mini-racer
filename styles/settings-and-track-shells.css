@@ -342,16 +342,6 @@
     box-shadow: none;
 }
 
-#daily-playlist-modal .daily-playlist-entry--hero.current {
-    background: transparent;
-    box-shadow: 0 0 0 2px var(--accent-color);
-}
-
-#daily-playlist-modal .daily-playlist-entry--hero.current:hover {
-    background: #1e293b;
-    box-shadow: 0 0 0 2px var(--accent-color);
-}
-
 #daily-playlist-modal .daily-playlist-hero-preview {
     position: relative;
     grid-column: 1 / -1;

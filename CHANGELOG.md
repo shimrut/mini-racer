@@ -1,6 +1,6 @@
 # Changelog
 
-- Daily and Campaign Tracks lists use two equal tiles per row: drawing on top, name on the left, laps on the right. Locked tracks are only dimmed. Empty medals and lock icons are gone. Hover is a CSS background only. The selected tile uses a thin ring, and Back sits in its own space at the bottom.
+- Daily and Campaign Tracks lists use two equal tiles per row: drawing on top, name on the left, laps on the right. Locked tracks are only dimmed. Empty medals and lock icons are gone. Hover is a CSS background only. Back sits in its own space at the bottom.
 
 - Daily preview now puts the lap count as a small label above the track name, the same way Time to Beat sits above the time.
 

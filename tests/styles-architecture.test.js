@@ -663,9 +663,7 @@ describe('game stylesheet architecture', () => {
         expect(trackShellStyles).toMatch(
             /#daily-playlist-modal \.daily-playlist-entry--hero:hover\s*\{[^}]*transform:\s*none;[^}]*background:\s*#1e293b;[^}]*box-shadow:\s*none;/s,
         );
-        expect(trackShellStyles).toMatch(
-            /#daily-playlist-modal \.daily-playlist-entry--hero\.current\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--accent-color\);/s,
-        );
+        expect(trackShellStyles).not.toContain('#daily-playlist-modal .daily-playlist-entry--hero.current {');
         expect(trackShellStyles).not.toContain('is-featured');
         expect(trackShellStyles).not.toContain('#daily-playlist-modal .daily-playlist-hero-lock');
     });
