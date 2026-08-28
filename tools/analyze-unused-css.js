@@ -154,7 +154,6 @@ function runAll() {
     ];
     reports['styles.css'] = analyzeCSS('styles.css', gameFiles, [
         'medal-svg--',
-        'daily-challenge-hud--',
         'combined-rank-value--',
         'modal--',
         'speedometer--',

@@ -144,35 +144,4 @@ describe('ui daily challenge helpers', () => {
         global.document = originalDocument;
         global.window = originalWindow;
     });
-
-    it('updates the daily challenge hud state', () => {
-        const originalDocument = global.document;
-
-        const progressNode = { textContent: '' };
-        const dailyChallengeHudInline = {
-            hidden: false,
-            querySelector: vi.fn(() => progressNode)
-        };
-        const hudLapCluster = {
-            classList: {
-                toggle: vi.fn()
-            }
-        };
-        global.document = {
-            getElementById: (id) => ({
-                'daily-challenge-hud-inline': dailyChallengeHudInline
-            }[id] || null),
-            querySelector: vi.fn((selector) =>
-                selector === '.hud-lap-cluster' ? hudLapCluster : null
-            )
-        };
-        const component = new DailyChallengeUi();
-        component.setDailyChallengeHud({ visible: true, progressText: '2 / 3 laps' });
-
-        expect(dailyChallengeHudInline.hidden).toBe(false);
-        expect(progressNode.textContent).toBe('2 / 3 laps');
-        expect(hudLapCluster.classList.toggle).toHaveBeenCalledWith('hud-lap-cluster--daily-active', true);
-
-        global.document = originalDocument;
-    });
 });

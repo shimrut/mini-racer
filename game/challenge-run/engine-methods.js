@@ -2,7 +2,6 @@ import { getDailyChallengeData } from '../daily-challenge/storage.js';
 import { isDailyChallengeStoredResultForChallenge } from '../daily-challenge/service.js';
 import {
     getDailyChallengeCopyLabels,
-    getDailyChallengeObjectiveLabel,
     getDailyChallengeRequiredLaps,
 } from '../daily-challenge/labels.js';
 import { normalizeCheckpointTimesSec } from '../shared/checkpoint-times.js';
@@ -228,26 +227,9 @@ export const challengeRunEngineMethods = {
         }
     },
 
-    getDailyChallengeProgressText() {
-        if (!this.currentChallengeRun) return '';
-        const requiredLaps = this.currentChallengeRun.requiredLaps || 1;
-        if (requiredLaps > 1) {
-            return `${Math.min(this.currentChallengeRun.completedLaps + 1, requiredLaps)} / ${requiredLaps}`;
-        }
-        return '1 / 1';
-    },
-
     updateDailyChallengeHud() {
-        if (!this.currentChallengeRun) {
-            this.dailyChallengeUi?.setDailyChallengeHud?.(null);
-            return;
-        }
+        if (!this.currentChallengeRun) return;
         this.syncChallengeHudPrimaryStats();
-        this.dailyChallengeUi?.setDailyChallengeHud?.({
-            visible: true,
-            typeText: getDailyChallengeObjectiveLabel(this.activeDailyChallenge),
-            progressText: this.getDailyChallengeProgressText(),
-        });
     },
 
     createDailyChallengeRun(challenge) {
