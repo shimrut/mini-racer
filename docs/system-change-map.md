@@ -260,7 +260,8 @@ flowchart LR
   directly beneath the schematic and the track's time, rank and medals follow.
   Everything below the artwork describes the track above it.
 - Daily and Campaign selector surfaces show the full bronze-to-author medal ladder
-  whenever height permits.
+  whenever height permits. Tapping that ladder on an unlocked poster opens the
+  same MEDALS mini overlay as the finish screen (stacked medal plus target time).
   The inline medal SVGs may shrink vertically inside the preview on Reddit's
   shorter WebView sizes; their intrinsic minimum height must not push the first
   or last medal outside the clipped card.
@@ -416,8 +417,9 @@ flowchart LR
   button-edge alignment, and Mini/Racer entrance delayed by `--dur-finish-headline`,
   and reuse those left-label / right-value comparison rows
   for MEDALS, VS PB, and RANK. Racing a standings ghost also shows VS opponent
-  on that shared row. Tapping MEDALS opens the shared finish mini
-  overlay with each medal and its time stacked, matching checkpoint splits.
+  on that shared row. Tapping MEDALS on the finish screen, or the medal ladder
+  on a Daily/Campaign poster, opens the shared mini overlay with each medal and
+  its time stacked, matching checkpoint splits.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,
   and frozen challenger Reddit avatar URL (no ghost or player ID in public post

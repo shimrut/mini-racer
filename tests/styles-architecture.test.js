@@ -149,6 +149,17 @@ describe('game stylesheet architecture', () => {
         expect(resultDetailStyles).not.toContain('.combined-medals-stat--interactive:active');
     });
 
+    it('covers the lobby with the shared medals overlay and no poster hover scale', () => {
+        expect(resultDetailStyles).toMatch(
+            /#start-overlay > \.combined-medal-times-overlay\s*\{[^}]*border-radius:\s*0;[^}]*z-index:\s*20;/,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel \.daily-playlist-hero-medal\s*\{[^}]*cursor:\s*pointer;/,
+        );
+        expect(trackCarouselStyles).not.toContain('.daily-playlist-hero-medal:hover');
+        expect(trackCarouselStyles).not.toContain('.daily-playlist-hero-medal:active');
+    });
+
     it('lays out Daily, Campaign, and Head to Head comparison stats as the same left-label rows', () => {
         expect(resultDetailStyles).toMatch(
             /\.combined-stats-grid\s*\{[^}]*flex-direction:\s*column;[^}]*margin-top:\s*2\.75rem;/s,

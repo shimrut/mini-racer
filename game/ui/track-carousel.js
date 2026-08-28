@@ -1,4 +1,6 @@
 import { createMedalIconSvg } from '../medals/medal-icon.js';
+import { getMedalRowSlots } from '../medals/medal-timing.js';
+import { openMedalTimesPopover } from '../race/ui-modal-content.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { createLockIconSvg } from './lock-icon.js';
@@ -495,9 +497,14 @@ export class TrackCarousel {
         requirement.append(requirementList);
         meta.append(bestCell, rank);
 
-        const medal = document.createElement('div');
+        const medal = document.createElement('button');
+        medal.type = 'button';
         medal.className = 'daily-playlist-hero-medal';
-        medal.setAttribute('aria-hidden', 'true');
+        medal.setAttribute('aria-label', 'View medal times');
+        medal.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.openSelectedMedalTimes();
+        });
 
         foot.append(requirement, meta, verificationError, medal);
 
@@ -618,6 +625,16 @@ export class TrackCarousel {
         setText(parts.verificationError, verificationError);
         parts.meta.hidden = locked || Boolean(verificationError);
         parts.medal.hidden = locked;
+        parts.medal.disabled = locked || !tiers.length;
+        if (locked || !tiers.length) {
+            parts.medal.removeAttribute('aria-label');
+        } else {
+            parts.medal.setAttribute(
+                'aria-label',
+                `View medal times for ${card.trackName || 'this track'}`,
+            );
+        }
+
         if (!locked) {
             parts.requirementList.replaceChildren();
             return;
@@ -646,6 +663,15 @@ export class TrackCarousel {
             item.append(status, copy);
             return item;
         }));
+    }
+
+    openSelectedMedalTimes() {
+        const card = this.getSelectedCard();
+        if (!card || card.locked) return;
+        const slots = getMedalRowSlots(card.trackKey, card.medal, card.laps);
+        if (!slots.length) return;
+        const host = globalThis.document?.getElementById?.('start-overlay') || this.root;
+        openMedalTimesPopover(host, slots);
     }
 
     previewPixelScale() {

@@ -30,6 +30,11 @@
     opacity: 1;
 }
 
+#start-overlay > .combined-medal-times-overlay {
+    border-radius: 0;
+    z-index: 20;
+}
+
 .combined-medal-times-modal {
     background: var(--bg-surface);
     border: 2px solid #334155;

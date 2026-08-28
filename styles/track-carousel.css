@@ -383,6 +383,21 @@ body[data-lobby-mode="campaign"] #start-overlay {
     width: auto;
     height: auto;
     margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.track-carousel .daily-playlist-hero-medal:disabled {
+    cursor: default;
+}
+
+.track-carousel .daily-playlist-hero-medal[hidden] {
+    display: none;
 }
 
 .track-carousel__medal {

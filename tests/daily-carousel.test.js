@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
 import {
     buildDailyCarouselCards,
     formatDailyCarouselDayLabel,
@@ -831,7 +832,7 @@ describe('TrackCarousel selection', () => {
             rankIcon: { hidden: true },
             rankValue: { hidden: true, textContent: '' },
             rankMedal: { hidden: true, dataset: {}, setAttribute: vi.fn() },
-            medal: { hidden: true, dataset: { medalKey: '' } },
+            medal: { hidden: true, disabled: false, dataset: { medalKey: '' }, setAttribute: vi.fn(), removeAttribute: vi.fn() },
             requirement: { hidden: false },
             requirementList: { replaceChildren: vi.fn() },
             meta: { hidden: true },
@@ -860,6 +861,93 @@ describe('TrackCarousel selection', () => {
             'aria-label',
             'Circuit standings. Your rank: #4',
         );
+        expect(parts.medal.disabled).toBe(true);
+        expect(parts.medal.removeAttribute).toHaveBeenCalledWith('aria-label');
+    });
+});
+
+describe('TrackCarousel medal times', () => {
+    const medalTiers = [
+        { tier: 'bronze', filled: false },
+        { tier: 'silver', filled: false },
+        { tier: 'gold', filled: false },
+        { tier: 'author', filled: false },
+    ];
+
+    function installDom() {
+        const originalDocument = global.document;
+        const originalRaf = global.requestAnimationFrame;
+        global.requestAnimationFrame = (cb) => cb();
+        const dom = new JSDOM('<div id="start-overlay"></div>');
+        global.document = dom.window.document;
+        return {
+            overlay: dom.window.document.getElementById('start-overlay'),
+            restore() {
+                global.requestAnimationFrame = originalRaf;
+                global.document = originalDocument;
+            },
+        };
+    }
+
+    it('opens the medals mini-modal from the poster medal cluster', () => {
+        const { overlay, restore } = installDom();
+        try {
+            const carousel = new TrackCarousel();
+            carousel._cards = [{
+                trackKey: 'circuit',
+                trackName: 'Classic Circuit',
+                medal: 'gold',
+                laps: 1,
+                locked: false,
+                medalTiers,
+            }];
+            carousel._selectedIndex = 0;
+            carousel._footParts = carousel.buildFoot();
+            carousel.paintFoot(carousel.getSelectedCard());
+
+            const medal = carousel._footParts.medal;
+            expect(medal.tagName).toBe('BUTTON');
+            expect(medal.disabled).toBe(false);
+            expect(medal.getAttribute('aria-label')).toBe(
+                'View medal times for Classic Circuit',
+            );
+            medal.click();
+
+            expect(overlay.querySelector('.combined-medal-times-title').textContent).toBe('MEDALS');
+            const rows = overlay.querySelectorAll('.combined-medal-times-row--medal');
+            expect(rows.length).toBe(4);
+            expect(rows[0].querySelector('.medal-svg--bronze')).toBeTruthy();
+            expect(rows[2].querySelector('.combined-medal-times-time').textContent)
+                .toMatch(/^\d+\.\d{3}s$/);
+        } finally {
+            restore();
+        }
+    });
+
+    it('does not open medal times for a locked poster', () => {
+        const { overlay, restore } = installDom();
+        try {
+            const carousel = new TrackCarousel();
+            carousel._cards = [{
+                trackKey: 'circuit',
+                trackName: 'Number Zero',
+                medal: null,
+                laps: 2,
+                locked: true,
+                medalTiers,
+            }];
+            carousel._selectedIndex = 0;
+            carousel._footParts = carousel.buildFoot();
+            carousel.paintFoot(carousel.getSelectedCard());
+
+            const medal = carousel._footParts.medal;
+            expect(medal.hidden).toBe(true);
+            expect(medal.disabled).toBe(true);
+            medal.click();
+            expect(overlay.querySelector('.combined-medal-times-overlay')).toBeNull();
+        } finally {
+            restore();
+        }
     });
 });
 

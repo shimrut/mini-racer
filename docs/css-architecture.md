@@ -134,6 +134,8 @@ maintaining mode-specific card layouts:
   fixed `4rem` status band and the artwork is clipped to the card itself. The
   personal-best icon, standings value, and medal ladder remain present for open cards,
   while locked cards replace that context with a two-item prerequisite checklist.
+  Tapping the medal ladder opens the same MEDALS mini overlay used on the finish
+  screen, mounted on `#start-overlay` so it covers the lobby.
 - The Daily/Campaign carousel stacks the schematic, the `current / total`
   counter, then the track's own footer (time, rank, medals) — everything below
   the artwork describes the track above it. Daily's expiry line and counter

@@ -364,6 +364,43 @@ export function mountCombinedPopoverOverlay(container, { title, overlayClass = '
     });
 }
 
+export function appendMedalTimesRows(listEl, slots) {
+    for (const { tier, filled, thresholdSec } of slots) {
+        const row = document.createElement('div');
+        row.className = 'combined-medal-times-row combined-medal-times-row--medal';
+
+        const icon = createMedalIconSvg(tier, {
+            className: filled
+                ? 'medal-svg--popover'
+                : 'medal-svg--popover medal-svg--row-placeholder',
+            outline: !filled,
+            showEmblem: filled,
+            centerText: null,
+            rowPlaceholder: !filled,
+        });
+        icon.setAttribute('aria-hidden', 'true');
+
+        const timeEl = document.createElement('span');
+        timeEl.className = 'combined-medal-times-time';
+        timeEl.textContent = Number.isFinite(thresholdSec)
+            ? `${thresholdSec.toFixed(3)}s`
+            : '--';
+
+        row.appendChild(icon);
+        row.appendChild(timeEl);
+        listEl.appendChild(row);
+    }
+}
+
+export function openMedalTimesPopover(container, slots) {
+    if (!container || !Array.isArray(slots) || slots.length === 0) return;
+    mountCombinedPopoverOverlay(container, {
+        title: 'MEDALS',
+        overlayClass: 'combined-medals-times-overlay',
+        buildRows: (listEl) => appendMedalTimesRows(listEl, slots),
+    });
+}
+
 export class ModalContentUi {
     constructor() {}
 
@@ -1012,37 +1049,7 @@ export class ModalContentUi {
     }
 
     openCombinedMedalsPopover(container, slots) {
-        mountCombinedPopoverOverlay(container, {
-            title: 'MEDALS',
-            overlayClass: 'combined-medals-times-overlay',
-            buildRows: (listEl) => {
-                for (const { tier, filled, thresholdSec } of slots) {
-                    const row = document.createElement('div');
-                    row.className = 'combined-medal-times-row combined-medal-times-row--medal';
-
-                    const icon = createMedalIconSvg(tier, {
-                        className: filled
-                            ? 'medal-svg--popover'
-                            : 'medal-svg--popover medal-svg--row-placeholder',
-                        outline: !filled,
-                        showEmblem: filled,
-                        centerText: null,
-                        rowPlaceholder: !filled,
-                    });
-                    icon.setAttribute('aria-hidden', 'true');
-
-                    const timeEl = document.createElement('span');
-                    timeEl.className = 'combined-medal-times-time';
-                    timeEl.textContent = Number.isFinite(thresholdSec)
-                        ? `${thresholdSec.toFixed(3)}s`
-                        : '--';
-
-                    row.appendChild(icon);
-                    row.appendChild(timeEl);
-                    listEl.appendChild(row);
-                }
-            },
-        });
+        openMedalTimesPopover(container, slots);
     }
 
     formatTime(seconds) {
