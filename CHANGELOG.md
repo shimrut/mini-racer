@@ -1,5 +1,7 @@
 # Changelog
 
+- Daily preview now puts the lap count under the track name. Time to beat stays on the right by itself.
+
 - New Daily races now use 1 or 2 laps only on tracks under 10 seconds (author time). Tracks of 10 seconds or more always run 1 lap. Days already published keep the lap count they had.
 
 - Settings → **Hide HUD** (off by default) hides the lap counter, timer, best time, speedo, and lap flash. Only the pause icon stays: top-right when **Pause on Timer** is on, bottom-right when it is off.

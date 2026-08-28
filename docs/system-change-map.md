@@ -677,7 +677,7 @@ These are useful, but they are not on the critical player path:
   data and remains bound to that dated Daily post; `daily` is the stable
   current-track launcher and explicitly ignores any frozen challenge payload.
   Both show the scaled gold-medal threshold as the player-facing time to beat,
-  with the uppercase `{laps} · TIME TO BEAT` caption above it, shared gold medal
+  with the lap count under the track name, `TIME TO BEAT` above the gold medal
   artwork, and the stock in-game car clearly past the start line. In-game
   schematic previews do not use that post-only treatment.
 - `campaign.html`, `campaign.js`, `campaign.css`
