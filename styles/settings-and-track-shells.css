@@ -200,16 +200,70 @@
 }
 
 #settings-modal .modal-sheet-settings-switch {
+    appearance: none;
+    -webkit-appearance: none;
     flex-shrink: 0;
     width: 2.5rem;
     height: 1.35rem;
     margin: 0;
+    padding: 0;
     cursor: pointer;
-    accent-color: var(--accent-color);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-full);
+    background-color: rgba(30, 41, 59, 0.8);
+    background-image: radial-gradient(
+        circle closest-side,
+        var(--text-color) 96%,
+        transparent 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 1.05rem 1.05rem;
+    background-position: 0.12rem 50%;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background-color var(--dur-base) var(--ease-standard),
+        background-position var(--dur-slow) var(--ease-settle),
+        border-color var(--dur-base) var(--ease-standard),
+        box-shadow var(--dur-base) var(--ease-standard);
+}
+
+#settings-modal .modal-sheet-settings-switch:hover {
+    border-color: var(--border-default);
+    background-color: rgba(51, 65, 85, 0.95);
+}
+
+#settings-modal .modal-sheet-settings-switch:checked {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    background-position: calc(100% - 0.12rem) 50%;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+#settings-modal .modal-sheet-settings-switch:checked:hover {
+    background-color: var(--accent-bright);
+    border-color: var(--accent-bright);
 }
 
 #settings-modal .modal-sheet-settings-switch:focus-visible {
     outline: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #settings-modal .modal-sheet-settings-switch {
+        transition: none;
+    }
+}
+
+@media (forced-colors: active) {
+    #settings-modal .modal-sheet-settings-switch {
+        appearance: auto;
+        width: auto;
+        height: auto;
+        border: none;
+        background: none;
+        box-shadow: none;
+    }
 }
 
 #settings-modal .modal-sheet-settings-identity-head:has(.modal-sheet-settings-switch.is-menu-selected) {

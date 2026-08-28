@@ -642,4 +642,20 @@ describe('game stylesheet architecture', () => {
         );
     });
 
+    it('paints settings on/off rows as pill switches, not native checkboxes', () => {
+        const trackShellStyles = readFileSync(
+            new URL('../styles/settings-and-track-shells.css', import.meta.url),
+            'utf8',
+        );
+        expect(trackShellStyles).toMatch(
+            /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*appearance:\s*none;[^}]*border-radius:\s*var\(--radius-full\);/s,
+        );
+        expect(trackShellStyles).toMatch(
+            /#settings-modal \.modal-sheet-settings-switch:checked\s*\{[^}]*background-color:\s*var\(--accent-color\);/s,
+        );
+        expect(trackShellStyles).not.toMatch(
+            /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*accent-color:/s,
+        );
+    });
+
 });
