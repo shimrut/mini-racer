@@ -1,6 +1,6 @@
 # Changelog
 
-- Garage Car and Trail now use the same rounded pill switch as Settings on/off, at the same height as the Garage title.
+- Garage Car and Trail now use the same rounded pill switch as Settings on/off.
 
 - Wall sparks now fade after you finish or pause, instead of freezing and keeping the game drawing in the background.
 

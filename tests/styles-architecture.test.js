@@ -702,7 +702,7 @@ describe('game stylesheet architecture', () => {
             /\.garage-tabs:has\(#garage-tab-trails\[aria-selected="true"\]\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
         );
         expect(garageStyles).toMatch(
-            /#garage-modal \.garage-tabs\s*\{[^}]*height:\s*1\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /#garage-modal \.garage-tabs\s*\{[^}]*height:\s*2\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
     });
 

@@ -802,7 +802,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     position: sticky;
     top: 0;
     z-index: 2;
-    height: 1.5rem;
+    height: 2.5rem;
     padding: 0.15rem;
     background: #1e293b;
     border-radius: var(--radius-full);
@@ -814,7 +814,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     padding: 0 0.5rem;
     border-radius: var(--radius-full);
     background: transparent;
-    font-size: 0.78rem;
+    font-size: 0.88rem;
     letter-spacing: .05em;
 }
 

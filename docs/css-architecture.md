@@ -32,7 +32,7 @@ top-to-bottom order.
 | 1 | `fonts.css` | Hosted Outfit and JetBrains Mono declarations |
 | 2 | `styles/foundation.css` | Tokens, reset, body, focus and global states |
 | 3 | `styles/race-hud-and-medals.css` | HUD, speed display and shared medal system |
-| 4 | `styles/lobby-and-garage.css` | Game canvas, start menu and garage rules. Garage Car/Trail uses the same sliding pill as Settings on/off: slate track (`#1e293b` so it reads on the garage sheet), red thumb, `--radius-full`, height matched to the Garage title (`1.5rem`). |
+| 4 | `styles/lobby-and-garage.css` | Game canvas, start menu and garage rules. Garage Car/Trail uses the same sliding pill as Settings on/off: slate track (`#1e293b` so it reads on the garage sheet), red thumb, `--radius-full`, `2.5rem` tall. |
 | 5 | `styles/lobby-modes.css` | Home, Daily, Campaign and Challenge lobby composition |
 | 6 | `styles/track-carousel.css` | Shared Daily/Campaign selector rail, cards and medal ladder |
 | 7 | `styles/race-controls-and-feedback.css` | Touch controls, countdown and lap feedback |
