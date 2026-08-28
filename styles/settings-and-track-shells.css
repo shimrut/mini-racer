@@ -322,14 +322,14 @@
     align-items: stretch;
     gap: 0.3rem;
     min-width: 0;
-    min-height: 9rem;
-    padding: 0.55rem 0.5rem 0.5rem;
+    min-height: 9.5rem;
+    padding: 0.55rem 0.5rem 0.7rem;
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
     box-shadow: none;
     text-align: center;
-    overflow: hidden;
+    overflow: visible;
     transform: none;
     transition: background var(--dur-fast) ease;
 }
@@ -370,9 +370,10 @@
 
 #daily-playlist-modal .daily-playlist-hero-title {
     display: block;
-    flex: 0 0 2.4em;
+    flex: 0 0 auto;
     width: 100%;
     min-width: 0;
+    min-height: 2.4em;
     height: 2.4em;
     font-family: var(--header-font);
     font-size: 0.92rem;
@@ -386,19 +387,20 @@
 
 #daily-playlist-modal .daily-playlist-hero-day {
     display: block;
-    flex: 0 0 1.2em;
+    flex: 0 0 auto;
     width: 100%;
     min-width: 0;
-    height: 1.2em;
+    min-height: 1.15rem;
+    height: auto;
     font-family: var(--mono-font);
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.08em;
-    line-height: 1.2;
+    line-height: 1.15rem;
     color: var(--text-dim);
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
     white-space: nowrap;
+    text-overflow: clip;
 }
 
 #daily-playlist-modal .daily-playlist-entry--hero.current .daily-playlist-hero-title,

@@ -649,10 +649,13 @@ describe('game stylesheet architecture', () => {
             /#daily-playlist-list\.daily-playlist-list\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s,
         );
         expect(trackShellStyles).toMatch(
-            /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*flex-direction:\s*column;[^}]*min-height:\s*9rem;/s,
+            /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*flex-direction:\s*column;[^}]*min-height:\s*9\.5rem;[^}]*overflow:\s*visible;/s,
         );
         expect(trackShellStyles).toMatch(
-            /#daily-playlist-modal \.daily-playlist-hero-title\s*\{[^}]*flex:\s*0 0 2\.4em;[^}]*height:\s*2\.4em;/s,
+            /#daily-playlist-modal \.daily-playlist-hero-title\s*\{[^}]*min-height:\s*2\.4em;[^}]*height:\s*2\.4em;/s,
+        );
+        expect(trackShellStyles).toMatch(
+            /#daily-playlist-modal \.daily-playlist-hero-day\s*\{[^}]*min-height:\s*1\.15rem;[^}]*overflow:\s*visible;/s,
         );
         expect(trackShellStyles).toMatch(
             /#daily-playlist-modal \.daily-playlist-entry--hero:hover\s*\{[^}]*transform:\s*none;[^}]*background:\s*#1e293b;[^}]*box-shadow:\s*none;/s,
