@@ -191,6 +191,70 @@ describe('ui race hud helpers', () => {
         expect(hud._lastSpeedText).toBe('64');
     });
 
+    it('writes the lap timer at most 30 times a second', () => {
+        const timeVal = { textContent: '0.000' };
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => (
+            id === 'time-val' ? timeVal : null
+        ));
+        let now = 1000;
+        vi.spyOn(performance, 'now').mockImplementation(() => now);
+
+        const hud = new RaceHud();
+        hud.syncHud({ time: 1.111, speed: 0 });
+        expect(timeVal.textContent).toBe('1.111');
+
+        now += 20;
+        hud.syncHud({ time: 1.222, speed: 0 });
+        expect(timeVal.textContent).toBe('1.111');
+
+        now += 14;
+        hud.syncHud({ time: 1.333, speed: 0 });
+        expect(timeVal.textContent).toBe('1.333');
+    });
+
+    it('still writes the exact lap time when forced inside the throttle window', () => {
+        const timeVal = { textContent: '0.000' };
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => (
+            id === 'time-val' ? timeVal : null
+        ));
+        let now = 1000;
+        vi.spyOn(performance, 'now').mockImplementation(() => now);
+
+        const hud = new RaceHud();
+        hud.syncHud({ time: 1.111, speed: 0 });
+        now += 10;
+        hud.syncHud({ time: 9.876, speed: 1, force: true });
+        expect(timeVal.textContent).toBe('9.876');
+    });
+
+    it('writes speed only on the visible speedometer', () => {
+        const speedVal = { textContent: '' };
+        const mobileSpeedVal = { textContent: '' };
+        const desktopTicks = Array.from({ length: 20 }, () => ({
+            classList: { toggle: vi.fn() },
+        }));
+        const mobileTicks = Array.from({ length: 20 }, () => ({
+            classList: { toggle: vi.fn() },
+        }));
+
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'speed-val': speedVal,
+            'mobile-speed-val': mobileSpeedVal,
+            'desktop-speedometer': { offsetWidth: 180, offsetHeight: 36 },
+            'mobile-speedometer': { offsetWidth: 0, offsetHeight: 0 },
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud._speedTicks = desktopTicks;
+        hud._mobileSpeedTicks = mobileTicks;
+        hud.syncHud({ time: 0, speed: 3.2, force: true });
+
+        expect(speedVal.textContent).toBe('64');
+        expect(mobileSpeedVal.textContent).toBe('');
+        expect(desktopTicks[0].classList.toggle).toHaveBeenCalled();
+        expect(mobileTicks[0].classList.toggle).not.toHaveBeenCalled();
+    });
+
     it('persists a best lap to the selected track card and reveals the best metric', () => {
         const persistTrackPersonalBest = vi.fn();
         const bestTimeDisplay = { style: {} };

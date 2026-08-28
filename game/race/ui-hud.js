@@ -4,7 +4,22 @@ import { isStandardMedalTier } from '../medals/medal-timing.js';
 import { getHideHudEnabled } from '../settings/hide-hud-preference.js';
 import { getPauseOnTimerEnabled } from '../settings/pause-on-timer-preference.js';
 
+const HUD_TIME_MIN_MS = 1000 / 30;
 const HUD_SPEED_MIN_MS = 1000 / 15;
+
+function isLaidOutHudElement(el) {
+    if (!el) return false;
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
+    if (typeof width !== 'number' && typeof height !== 'number') return true;
+    return (width || 0) > 0 || (height || 0) > 0;
+}
+
+function shouldWriteHudSurface(container, valueEl) {
+    if (!valueEl) return false;
+    if (!container) return true;
+    return isLaidOutHudElement(container);
+}
 
 export class RaceHud {
     constructor({
@@ -18,7 +33,9 @@ export class RaceHud {
         this._hudPrimaryMetricMode = 'time';
         this._lastTimeText = '0.000';
         this._lastSpeedText = '0';
+        this._lastHudTimeWrite = undefined;
         this._lastHudSpeedWrite = undefined;
+        this._lastActiveSpeedSurface = null;
         this._pauseAvailable = false;
         this._lapFlashTimer = null;
         this._hudAnchorResizeObserver = null;
@@ -124,43 +141,70 @@ export class RaceHud {
     }
 
 
-    syncHud({ time, speed, force = false }) {
-    const now = typeof performance !== 'undefined' ? performance.now() : 0;
-    const timeText = time.toFixed(3);
-    const speedText = Math.round(speed * 20).toString();
-    const useLapTimer = this._hudPrimaryMetricMode === 'time';
-
-    if (force) {
-        if (useLapTimer) {
-            if (this.timeVal) this.timeVal.textContent = timeText;
-            this._lastTimeText = timeText;
+    resolveVisibleSpeedSurfaces() {
+        const desktop = shouldWriteHudSurface(this.desktopSpeedometer, this.speedVal);
+        const mobile = shouldWriteHudSurface(this.mobileSpeedometer, this.mobileSpeedVal);
+        const surface = desktop && mobile ? 'both' : desktop ? 'desktop' : mobile ? 'mobile' : 'none';
+        if (surface !== this._lastActiveSpeedSurface) {
+            this._lastActiveSpeedSurface = surface;
+            this._lastActiveSpeedTicks = -1;
         }
-        if (this.speedVal) this.speedVal.textContent = speedText;
-        if (this.mobileSpeedVal) this.mobileSpeedVal.textContent = speedText;
-        this._lastSpeedText = speedText;
-        this._lastHudSpeedWrite = now;
-        return;
+        return { desktop, mobile };
     }
 
-    if (useLapTimer && this._lastTimeText !== timeText) {
-        if (this.timeVal) this.timeVal.textContent = timeText;
-        this._lastTimeText = timeText;
+    writeVisibleSpeed(speedText) {
+        const { desktop, mobile } = this.resolveVisibleSpeedSurfaces();
+        if (desktop) this.speedVal.textContent = speedText;
+        if (mobile) this.mobileSpeedVal.textContent = speedText;
+        this.updateSpeedTicks(Number(speedText), { desktop, mobile });
     }
 
-    const speedDue = !this._lastHudSpeedWrite || (now - this._lastHudSpeedWrite) >= HUD_SPEED_MIN_MS;
-    if (speedDue && (this._lastSpeedText !== speedText || force)) {
-        if (this.speedVal) this.speedVal.textContent = speedText;
-        if (this.mobileSpeedVal) this.mobileSpeedVal.textContent = speedText;
-        this.updateSpeedTicks(Number(speedText));
-        this._lastSpeedText = speedText;
-        this._lastHudSpeedWrite = now;
-    }
-}
+    syncHud({ time, speed, force = false }) {
+        const now = typeof performance !== 'undefined' ? performance.now() : 0;
+        const useLapTimer = this._hudPrimaryMetricMode === 'time';
 
-    updateSpeedTicks(speedKph) {
+        if (force) {
+            if (useLapTimer) {
+                const timeText = time.toFixed(3);
+                if (this.timeVal) this.timeVal.textContent = timeText;
+                this._lastTimeText = timeText;
+                this._lastHudTimeWrite = now;
+            }
+            const speedText = Math.round(speed * 20).toString();
+            this.writeVisibleSpeed(speedText);
+            this._lastSpeedText = speedText;
+            this._lastHudSpeedWrite = now;
+            return;
+        }
+
+        const timeDue = !this._lastHudTimeWrite
+            || (now - this._lastHudTimeWrite) >= HUD_TIME_MIN_MS;
+        if (useLapTimer && timeDue) {
+            const timeText = time.toFixed(3);
+            if (this._lastTimeText !== timeText) {
+                if (this.timeVal) this.timeVal.textContent = timeText;
+                this._lastTimeText = timeText;
+            }
+            this._lastHudTimeWrite = now;
+        }
+
+        const speedDue = !this._lastHudSpeedWrite
+            || (now - this._lastHudSpeedWrite) >= HUD_SPEED_MIN_MS;
+        if (speedDue) {
+            const speedText = Math.round(speed * 20).toString();
+            if (this._lastSpeedText !== speedText) {
+                this.writeVisibleSpeed(speedText);
+                this._lastSpeedText = speedText;
+            }
+            this._lastHudSpeedWrite = now;
+        }
+    }
+
+    updateSpeedTicks(speedKph, surfaces = null) {
         const totalTicks = 20;
-        const maxSpeed = this._maxSpeed || 240; 
+        const maxSpeed = this._maxSpeed || 240;
         const activeTicks = Math.min(totalTicks, Math.ceil((speedKph / maxSpeed) * totalTicks));
+        const { desktop, mobile } = surfaces || this.resolveVisibleSpeedSurfaces();
         if (activeTicks === this._lastActiveSpeedTicks) return;
         this._lastActiveSpeedTicks = activeTicks;
 
@@ -170,8 +214,8 @@ export class RaceHud {
             });
         };
 
-        updateBar(this._speedTicks);
-        updateBar(this._mobileSpeedTicks);
+        if (desktop) updateBar(this._speedTicks);
+        if (mobile) updateBar(this._mobileSpeedTicks);
     }
 
     setMaxSpeed(speedKph) {
@@ -184,11 +228,13 @@ export class RaceHud {
     if (this.speedVal) this.speedVal.textContent = '0';
     if (this.mobileSpeedVal) this.mobileSpeedVal.textContent = '0';
     this._lastActiveSpeedTicks = -1;
-    this.updateSpeedTicks(0);
+    this.updateSpeedTicks(0, { desktop: true, mobile: true });
     this._hudPrimaryMetricMode = 'time';
     this._lastTimeText = '0.000';
     this._lastSpeedText = '0';
+    this._lastHudTimeWrite = undefined;
     this._lastHudSpeedWrite = undefined;
+    this._lastActiveSpeedSurface = null;
 }
 
     setHudPrimaryMetric({ label = 'LAP', value = '0.000', useTimer = true, visible = true } = {}) {
