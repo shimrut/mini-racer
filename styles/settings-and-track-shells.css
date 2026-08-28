@@ -317,18 +317,20 @@
 }
 
 #daily-playlist-modal .daily-playlist-entry--hero {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.3rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(5.25rem, 1fr) auto;
+    align-items: start;
+    column-gap: 0.45rem;
+    row-gap: 0.35rem;
     min-width: 0;
     min-height: 9.5rem;
-    padding: 0.55rem 0.5rem 0.7rem;
+    padding: 0.55rem 0.55rem 0.65rem;
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
     box-shadow: none;
-    text-align: center;
+    text-align: left;
     overflow: visible;
     transform: none;
     transition: background var(--dur-fast) ease;
@@ -352,12 +354,12 @@
 
 #daily-playlist-modal .daily-playlist-hero-preview {
     position: relative;
-    flex: 1 1 auto;
+    grid-column: 1 / -1;
     width: 100%;
     min-width: 0;
     max-width: none;
-    min-height: 5rem;
-    height: auto;
+    min-height: 5.25rem;
+    height: 100%;
     overflow: hidden;
     border-radius: 0.2rem;
 }
@@ -370,8 +372,6 @@
 
 #daily-playlist-modal .daily-playlist-hero-title {
     display: block;
-    flex: 0 0 auto;
-    width: 100%;
     min-width: 0;
     min-height: 2.4em;
     height: 2.4em;
@@ -381,26 +381,29 @@
     font-style: italic;
     letter-spacing: 0.04em;
     line-height: 1.2;
+    text-align: left;
     color: #e2e8f0;
     overflow: hidden;
 }
 
 #daily-playlist-modal .daily-playlist-hero-day {
     display: block;
-    flex: 0 0 auto;
-    width: 100%;
+    flex: none;
+    width: auto;
+    max-width: 42%;
     min-width: 0;
     min-height: 1.15rem;
     height: auto;
+    padding-top: 0.12em;
     font-family: var(--mono-font);
     font-size: 0.68rem;
     font-weight: 800;
-    letter-spacing: 0.08em;
-    line-height: 1.15rem;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    text-align: right;
     color: var(--text-dim);
     overflow: visible;
     white-space: nowrap;
-    text-overflow: clip;
 }
 
 #daily-playlist-modal .daily-playlist-entry--hero.current .daily-playlist-hero-title,
