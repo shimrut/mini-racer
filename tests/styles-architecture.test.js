@@ -633,7 +633,7 @@ describe('game stylesheet architecture', () => {
         expect(ui).toContain('status.append(createRequirementMedalIcon(requirement))');
     });
 
-    it('lays the Tracks list as equal three-across tiles', () => {
+    it('lays the Tracks list as equal two-across tiles', () => {
         const trackShellStyles = readFileSync(
             new URL('../styles/settings-and-track-shells.css', import.meta.url),
             'utf8',
@@ -646,7 +646,7 @@ describe('game stylesheet architecture', () => {
             /#garage-modal \.garage-skin-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/s,
         );
         expect(trackShellStyles).toMatch(
-            /#daily-playlist-list\.daily-playlist-list\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/s,
+            /#daily-playlist-list\.daily-playlist-list\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s,
         );
         expect(trackShellStyles).toMatch(
             /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*grid-template-rows:\s*4\.85rem 2\.15rem 1\.05rem;/s,

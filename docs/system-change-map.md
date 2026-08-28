@@ -218,7 +218,7 @@ flowchart LR
   open the shared Tracks modal on the Daily playlist. The same icon and
   Campaign's `current / total` counter open that modal on Campaign stages: unlocked tiles start the
   stage, locked tiles close and centre that poster on the carousel. The list
-  layout is a three-across grid of equal tiles. Tiles show the drawing, name,
+  layout is a two-across grid of equal tiles. Tiles show the drawing, name,
   and laps; locked tiles dim the drawing and drop lock icons, empty medals,
   and LOCKED copy. Names keep a two-line slot so one-line and two-line titles
   do not change tile size. Hover is a CSS background only. Selection is a thin
