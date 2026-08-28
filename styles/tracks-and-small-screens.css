@@ -163,17 +163,15 @@
     }
 
     #daily-playlist-modal .daily-playlist-entry--hero {
-        grid-template-rows: 4.15rem 2.15rem 1.05rem;
-        padding: 0.45rem 0.3rem 0.4rem;
+        min-height: 8.5rem;
+        padding: 0.5rem 0.45rem 0.45rem;
     }
 
     #daily-playlist-modal .daily-playlist-hero-preview {
-        height: 4.15rem;
+        min-height: 4.5rem;
     }
 
     #daily-playlist-modal .daily-playlist-hero-title {
-        font-size: 0.76rem;
-        line-height: 1.075rem;
-        height: 2.15rem;
+        font-size: 0.88rem;
     }
 }
