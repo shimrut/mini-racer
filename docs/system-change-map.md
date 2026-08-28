@@ -218,11 +218,11 @@ flowchart LR
   open the shared Tracks modal on the Daily playlist. The same icon and
   Campaign's `current / total` counter open that modal on Campaign stages: unlocked tiles start the
   stage, locked tiles close and centre that poster on the carousel. The list
-  layout is a two-across grid of equal tiles. Tiles show the drawing, name,
-  and laps; locked tiles dim the drawing and drop lock icons, empty medals,
+  layout is a two-across grid of equal tiles. Tiles show the drawing, then the
+  name on the left and laps on the right; locked tiles dim the drawing and drop lock icons, empty medals,
   and LOCKED copy. Names keep a two-line slot so one-line and two-line titles
-  do not change tile size. Hover is a CSS background only. Selection is a thin
-  accent ring. Back keeps a reserved footer so it does not sit on the last row.
+  do not change tile size. Hover is a CSS background only. Back keeps a reserved
+  footer so it does not sit on the last row.
   Challenge keeps its mode subhead, opponent line, compact details panel, and
   full-width Accept action. A timeout, network failure, or server 5xx during
   challenge loading is contained in the challenge pane: the global loader is
