@@ -5,12 +5,14 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
 export const DAILY_GP_RULES_REVISION = 1;
 export const DAILY_GP_LEGACY_RULES_REVISION = 0;
-export const DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS = 10.95;
+/** Tracks strictly under this author time can publish 1 or 2 laps; at or above, always 1 lap. */
+export const DAILY_GP_TWO_LAP_AUTHOR_TIME_SECONDS = 10;
 
 export type DailyGpLapCount = 1 | 2 | 3;
 export type DailyGpRulesRevision = typeof DAILY_GP_LEGACY_RULES_REVISION | typeof DAILY_GP_RULES_REVISION;
 
-const DAILY_GP_CURRENT_ELIGIBLE_LAP_COUNTS = Object.freeze([1, 2] as const);
+const DAILY_GP_ONE_LAP_COUNTS = Object.freeze([1] as const);
+const DAILY_GP_ONE_OR_TWO_LAP_COUNTS = Object.freeze([1, 2] as const);
 
 export type DailyGpRaceContract = Pick<
     DailyGpChallenge,
@@ -174,11 +176,13 @@ function deterministicSeedIndex(seed: string, length: number): number {
     return (hash >>> 0) % length;
 }
 
-/** Publication is one or two laps; the persisted validator stays 1-3 so historical Daily records and Campaign races still read. */
+/** New Daily publication: under 10s author time is 1 or 2 laps; 10s+ is 1 lap. Validator stays 1-3 for history and Campaign. */
 export function getDailyGpEligibleLapCounts(trackKey: string): readonly DailyGpLapCount[] {
     const authorTime = getAuthorMedalSeconds(trackKey);
-    if (!Number.isFinite(authorTime)) return [1];
-    return DAILY_GP_CURRENT_ELIGIBLE_LAP_COUNTS;
+    if (!Number.isFinite(authorTime) || authorTime >= DAILY_GP_TWO_LAP_AUTHOR_TIME_SECONDS) {
+        return DAILY_GP_ONE_LAP_COUNTS;
+    }
+    return DAILY_GP_ONE_OR_TWO_LAP_COUNTS;
 }
 
 export function selectDailyGpLapCount(

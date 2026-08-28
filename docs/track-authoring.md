@@ -76,8 +76,8 @@ start/finish line and snaps onto that line's center axis when moved.
    track to the Daily schedule; wiring stages still happens in
    `game/campaign/manifest.js`.
 4. Add medal thresholds in `game/medals/medal-times.json`.
-   New Daily GP publication currently selects only 1–2 laps for every track
-   with valid Author data. Missing or invalid Author times conservatively
+   New Daily GP publication selects 1–2 laps when Author time is under 10s,
+   and one lap at or above 10s. Missing or invalid Author times conservatively
    publish as one lap. Campaign lap counts are declared separately in
    `game/campaign/manifest.js` and may remain 1, 2, or 3.
 5. Add or adjust `game/track/presentation.js` only when the track needs a

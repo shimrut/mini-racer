@@ -74,8 +74,9 @@ leaderboard, and retention rules.
 ### Daily GP
 
 - Each newly published challenge permanently records a lap count of 1 or 2.
-- The chosen lap count is random within `[1, 2]` for tracks with valid Author
-  data; missing or invalid Author data conservatively publishes one lap.
+- Tracks with an Author time under 10 seconds choose 1 or 2 laps. Tracks at or
+  above 10 seconds, and tracks with missing or invalid Author data, publish
+  one lap.
 - Previously published three-lap Daily challenges remain valid because their
   stored race contract is authoritative.
 - The shared race contract still allows three laps for Campaign and a future
@@ -111,16 +112,16 @@ leaderboard, and retention rules.
 
 ## Current Product Rule
 
-New Daily publication uses an equal chance between one and two laps for every
-track with valid Author data. Missing or invalid Author data falls back to one
-lap. The chosen value is seeded from the challenge identity and track, then
-persisted in the append-only challenge ledger; players, retries, old posts, and
-later app versions must never reroll a published challenge.
+New Daily publication uses an equal chance between one and two laps only for
+tracks whose Author time is under 10 seconds. Tracks at or above 10 seconds,
+and missing or invalid Author data, fall back to one lap. The chosen value is
+seeded from the challenge identity and track, then persisted in the append-only
+challenge ledger; players, retries, old posts, and later app versions must never
+reroll a published challenge.
 
 The shared contract and validators continue to accept three laps so historical
 three-lap Daily records remain playable and Campaign can keep its fixed 1-, 2-,
-and 3-lap stages. `DAILY_GP_MULTI_LAP_AUTHOR_TIME_SECONDS` remains available
-for a future Daily policy that reintroduces three-lap selection.
+and 3-lap stages.
 
 ## Historical implementation audit
 
@@ -509,9 +510,9 @@ leaderboards.
 ## Decisions Needed Before Implementation
 
 1. Decide whether and when a future Daily policy should reintroduce three-lap
-   selection, potentially using the retained 10.95-second threshold.
-2. Revisit the current equal random probability between one and two laps only
-   if the Daily publication policy changes.
+   selection.
+2. Revisit the under-10s one-or-two-lap chance only if the Daily publication
+   policy changes.
 3. Define a future Campaign version's track list, fixed lap counts, and unlock
    graph; `numbered-v1` is now defined in `game/campaign/manifest.js`.
 4. Decide whether Campaign launches with PB ghosts.

@@ -18,7 +18,7 @@ Share verified times or challenge other players Head to Head.
   random Garage car.
 - Guests can race Daily, Campaign, and Head to Head. Signing in keeps the faster
   Campaign result when guest progress is merged.
-- Daily races now use **1 or 2 laps**, with the last **7 days** available to replay.
+- Daily races use **1 or 2 laps** on tracks under 10s, and **1 lap** on longer tracks, with the last **7 days** available to replay.
 - Added **opponent ghost races** from Daily and Campaign standings.
 - Expanded the **Garage** to 22 car skins and 8 trails, including achievement
   unlocks. Car choices remain cosmetic.
