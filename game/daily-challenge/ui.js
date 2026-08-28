@@ -307,7 +307,7 @@ export class DailyChallengeUi {
                 ariaLabel: locked
                     ? `Locked. ${trackName}. ${stageLabel}`
                     : `Race ${trackName}. ${lapsLabel}. ${stageLabel}`,
-                statusText: locked ? '' : lapsLabel,
+                statusText: lapsLabel,
                 titleText: trackName,
                 medalTier: bestMedal,
                 onClick: () => {

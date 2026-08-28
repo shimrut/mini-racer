@@ -142,7 +142,7 @@ maintaining mode-specific card layouts:
   open the Tracks list; Campaign's counter opens the same list with Campaign
   stages. That list uses a header title (`Daily Tracks` / `Campaign Tracks`) and
   `#daily-playlist-list` as equal `repeat(3, minmax(0, 1fr))` tiles (preview,
-  a two-line name slot, laps when open), scoped under
+  a two-line name slot, laps), scoped under
   `#daily-playlist-modal` so lobby posters stay wide hero cards. Previous and Next leave that stack:
   they are circular icon buttons grid-placed into row 1 with `align-self:
   center` and `justify-self: start`/`end`, so they flank the schematic and stay

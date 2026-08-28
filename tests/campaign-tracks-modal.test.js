@@ -173,7 +173,8 @@ describe('Campaign Tracks list rows', () => {
         expect(list.children[0].attributes['aria-label']).not.toContain('Expired');
 
         expect(list.children[1].className).toContain('is-locked');
-        expect(findByClass(list.children[1], 'daily-playlist-hero-day').textContent).toBe('');
+        expect(findByClass(list.children[1], 'daily-playlist-hero-day').textContent)
+            .toBe('2 Laps');
         expect(findByClass(list.children[1], 'daily-playlist-hero-lock')).toBeNull();
         expect(findByClass(list.children[1], 'daily-playlist-hero-medal')).toBeNull();
         expect(list.children[1].attributes['aria-label']).toContain('Locked');

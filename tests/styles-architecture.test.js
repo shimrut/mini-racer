@@ -649,10 +649,10 @@ describe('game stylesheet architecture', () => {
             /#daily-playlist-list\.daily-playlist-list\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/s,
         );
         expect(trackShellStyles).toMatch(
-            /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*grid-template-rows:\s*4\.85rem 2\.3em 0\.85em;/s,
+            /#daily-playlist-modal \.daily-playlist-entry--hero\s*\{[^}]*grid-template-rows:\s*4\.85rem 2\.15rem 1\.05rem;/s,
         );
         expect(trackShellStyles).toMatch(
-            /#daily-playlist-modal \.daily-playlist-hero-title\s*\{[^}]*height:\s*2\.3em;[^}]*-webkit-line-clamp:\s*2;/s,
+            /#daily-playlist-modal \.daily-playlist-hero-title\s*\{[^}]*height:\s*2\.15rem;[^}]*line-height:\s*1\.075rem;/s,
         );
         expect(trackShellStyles).toMatch(
             /#daily-playlist-modal \.daily-playlist-entry--hero:hover\s*\{[^}]*transform:\s*none;[^}]*background:\s*#1e293b;[^}]*box-shadow:\s*none;/s,
