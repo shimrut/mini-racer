@@ -208,7 +208,7 @@
     margin: 0;
     padding: 0.15rem;
     cursor: pointer;
-    background: var(--bg-surface);
+    background: rgba(51, 65, 85, 0.7);
     border-radius: var(--radius-full);
 }
 

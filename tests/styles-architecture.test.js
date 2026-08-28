@@ -648,7 +648,7 @@ describe('game stylesheet architecture', () => {
             'utf8',
         );
         expect(trackShellStyles).toMatch(
-            /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*var\(--bg-surface\);[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*rgba\(51, 65, 85, 0\.7\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(trackShellStyles).toMatch(
             /#settings-modal \.modal-sheet-settings-switch::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
