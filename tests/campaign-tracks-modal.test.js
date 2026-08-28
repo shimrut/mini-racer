@@ -21,6 +21,7 @@ vi.mock('../game/track/preview-renderer.js', () => ({
 }));
 
 import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
+import * as dailyChallengeService from '../game/daily-challenge/service.js';
 import { campaignEngineMethods } from '../game/campaign/engine-methods.js';
 import { normalizeCampaignLobbyState } from '../game/lobby/service.js';
 
@@ -99,6 +100,7 @@ function campaignStages() {
                 unlocked: true,
                 medal: 'gold',
                 bestTimeMs: 18_400,
+                playerRank: 4,
             },
             {
                 id: 'numbered-v1-01',
@@ -168,7 +170,9 @@ describe('Campaign Tracks list rows', () => {
         expect(findByClass(list.children[0], 'daily-playlist-hero-title').textContent)
             .toBe('Number Zero');
         expect(findByClass(list.children[0], 'daily-playlist-hero-medal')).toBeTruthy();
+        expect(findByClass(list.children[0], 'daily-playlist-hero-rank').textContent).toBe('#4');
         expect(list.children[0].attributes['aria-label']).toContain('Race Number Zero');
+        expect(list.children[0].attributes['aria-label']).toContain('Rank #4');
         expect(list.children[0].attributes['aria-label']).toContain('Stage 00');
         expect(list.children[0].attributes['aria-label']).not.toContain('Expired');
 
@@ -177,6 +181,7 @@ describe('Campaign Tracks list rows', () => {
             .toBe('2 Laps');
         expect(findByClass(list.children[1], 'daily-playlist-hero-lock')).toBeNull();
         expect(findByClass(list.children[1], 'daily-playlist-hero-medal')).toBeNull();
+        expect(findByClass(list.children[1], 'daily-playlist-hero-rank')).toBeNull();
         expect(list.children[1].attributes['aria-label']).toContain('Locked');
         expect(JSON.stringify(list.children[1])).not.toContain('Expires');
         expect(findByClass(list.children[0], 'daily-playlist-hero-content')).toBeNull();
@@ -258,9 +263,15 @@ describe('Daily Tracks list rows', () => {
 
     afterEach(() => {
         global.document = originalDocument;
+        vi.restoreAllMocks();
     });
 
     it('keeps Daily tiles to name and laps, with Today on the live race', () => {
+        vi.spyOn(dailyChallengeService, 'getCachedDailyChallengeSnapshot').mockImplementation((id) => (
+            id === 'daily-today'
+                ? { playerRank: 12, playerRankLabel: '#12' }
+                : null
+        ));
         const ui = new DailyChallengeUi();
         ui.setDailyChallengeSummary({ challengeId: 'daily-today' });
         ui.renderPlaylist(dailyChallenges(), { onPlay: vi.fn() });
@@ -270,12 +281,15 @@ describe('Daily Tracks list rows', () => {
         expect(list.children[0].className).not.toContain('is-featured');
         expect(findByClass(list.children[0], 'daily-playlist-hero-day').textContent)
             .toBe('Today · 2 Laps');
+        expect(findByClass(list.children[0], 'daily-playlist-hero-rank').textContent).toBe('#12');
         expect(list.children[0].attributes['aria-label']).toContain('Today');
+        expect(list.children[0].attributes['aria-label']).toContain('Rank #12');
         expect(findByClass(list.children[1], 'daily-playlist-hero-day').textContent)
             .toBe('1 Lap');
         expect(list.children[1].attributes['aria-label']).toContain('Expired');
         expect(findByClass(list.children[1], 'daily-playlist-hero-lock')).toBeNull();
         expect(findByClass(list.children[1], 'daily-playlist-hero-medal')).toBeNull();
+        expect(findByClass(list.children[1], 'daily-playlist-hero-rank')).toBeNull();
     });
 });
 

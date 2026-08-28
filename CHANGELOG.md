@@ -1,5 +1,7 @@
 # Changelog
 
+- Daily and Campaign Tracks tiles now show your rank as `#x` in the top-right of the drawing, when a rank is known.
+
 - Daily and Campaign Tracks lists use two equal tiles per row: drawing on top, name on the left, laps on the right. Locked tracks are only dimmed. Empty medals and lock icons are gone. Hover is a CSS background only. Back sits in its own space at the bottom.
 
 - Daily preview now puts the lap count as a small label above the track name, the same way Time to Beat sits above the time.

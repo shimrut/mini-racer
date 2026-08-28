@@ -661,6 +661,9 @@ describe('game stylesheet architecture', () => {
             /#daily-playlist-modal \.daily-playlist-hero-day\s*\{[^}]*text-align:\s*right;/s,
         );
         expect(trackShellStyles).toMatch(
+            /#daily-playlist-modal \.daily-playlist-hero-rank\s*\{[^}]*top:\s*0\.28rem;[^}]*right:\s*0\.28rem;/s,
+        );
+        expect(trackShellStyles).toMatch(
             /#daily-playlist-modal \.daily-playlist-entry--hero:hover\s*\{[^}]*transform:\s*none;[^}]*background:\s*#1e293b;[^}]*box-shadow:\s*none;/s,
         );
         expect(trackShellStyles).not.toContain('#daily-playlist-modal .daily-playlist-entry--hero.current {');

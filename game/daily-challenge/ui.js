@@ -4,6 +4,7 @@ import {
     getDailyChallengeRequiredLaps,
 } from './labels.js';
 import {
+    getCachedDailyChallengeSnapshot,
     getDailyChallengeBestResult,
     getDailyChallengeTrackName
 } from './service.js';
@@ -35,6 +36,15 @@ function renderPlaylistMessage(list, text) {
     list.appendChild(empty);
 }
 
+function formatTrackPreviewRankLabel(playerRank, playerRankLabel) {
+    if (Number.isInteger(playerRank) && playerRank > 0) {
+        return `#${playerRank}`;
+    }
+    if (typeof playerRankLabel !== 'string') return null;
+    const label = playerRankLabel.trim();
+    return /^#\d+$/.test(label) ? label : null;
+}
+
 function buildTracksTile({
     isCurrent = false,
     locked = false,
@@ -42,6 +52,7 @@ function buildTracksTile({
     statusText = '',
     titleText,
     medalTier = null,
+    rankLabel = null,
     onClick,
 }) {
     const row = document.createElement('button');
@@ -69,6 +80,14 @@ function buildTracksTile({
             className: 'medal-svg--hero',
         }));
         preview.appendChild(medal);
+    }
+
+    if (rankLabel) {
+        const rank = document.createElement('span');
+        rank.className = 'daily-playlist-hero-rank';
+        rank.setAttribute('aria-hidden', 'true');
+        rank.textContent = rankLabel;
+        preview.appendChild(rank);
     }
 
     const title = document.createElement('span');
@@ -248,12 +267,20 @@ export class DailyChallengeUi {
                 Number(bestResult?.bestTime),
                 requiredLaps,
             );
+            const snapshot = getCachedDailyChallengeSnapshot(challenge.id);
+            const rankLabel = formatTrackPreviewRankLabel(
+                snapshot?.playerRank,
+                snapshot?.playerRankLabel,
+            );
             const { row, canvas } = buildTracksTile({
                 isCurrent: isCurrentTrack,
-                ariaLabel: `Race ${trackName}. ${lapsLabel}. ${availabilityLabel}`,
+                ariaLabel: rankLabel
+                    ? `Race ${trackName}. ${lapsLabel}. ${availabilityLabel}. Rank ${rankLabel}`
+                    : `Race ${trackName}. ${lapsLabel}. ${availabilityLabel}`,
                 statusText: availability.key === 'featured' ? `Today · ${lapsLabel}` : lapsLabel,
                 titleText: trackName,
                 medalTier: bestMedal,
+                rankLabel,
                 onClick: () => {
                     this.closePlaylistModal();
                     onPlay?.(challenge);
@@ -300,16 +327,23 @@ export class DailyChallengeUi {
                 Number(stage.bestTimeMs) > 0 ? stage.bestTimeMs / 1000 : null,
                 stage.laps,
             );
+            const rankLabel = formatTrackPreviewRankLabel(
+                stage.playerRank,
+                stage.playerRankLabel,
+            );
 
             const { row, canvas } = buildTracksTile({
                 isCurrent: isCurrentTrack,
                 locked,
                 ariaLabel: locked
                     ? `Locked. ${trackName}. ${stageLabel}`
-                    : `Race ${trackName}. ${lapsLabel}. ${stageLabel}`,
+                    : rankLabel
+                        ? `Race ${trackName}. ${lapsLabel}. ${stageLabel}. Rank ${rankLabel}`
+                        : `Race ${trackName}. ${lapsLabel}. ${stageLabel}`,
                 statusText: lapsLabel,
                 titleText: trackName,
                 medalTier: bestMedal,
+                rankLabel,
                 onClick: () => {
                     this.closePlaylistModal();
                     onChoose?.(stage);

@@ -413,6 +413,22 @@
     height: 1.15rem;
 }
 
+#daily-playlist-modal .daily-playlist-hero-rank {
+    position: absolute;
+    top: 0.28rem;
+    right: 0.28rem;
+    z-index: 1;
+    font-family: var(--mono-font);
+    font-size: 0.68rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    color: #f8fafc;
+    text-shadow: 0 1px 2px rgba(2, 6, 23, 0.85);
+    pointer-events: none;
+}
+
 #daily-playlist-modal .daily-playlist-entry--hero.is-locked {
     opacity: 0.7;
 }
