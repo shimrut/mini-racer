@@ -20,6 +20,10 @@
     pointer-events: none;
 }
 
+body.pause-on-timer .mobile-hud-bar {
+    justify-content: center;
+}
+
 .mobile-hud-bar .speedometer--desktop,
 .mobile-hud-bar .mobile-speedometer,
 .mobile-hud-bar .hud-pause-btn {

@@ -303,6 +303,7 @@ export class RaceHud {
     if (this.timerPauseIcon) {
         this.timerPauseIcon.hidden = !showTimerPause;
     }
+    document.body?.classList?.toggle?.('pause-on-timer', pauseOnTimer);
 }
 
     showStartLights() {

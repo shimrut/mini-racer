@@ -53,6 +53,10 @@
         padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
     }
 
+    body.pause-on-timer .mobile-hud-bar {
+        justify-content: center;
+    }
+
     .mobile-hud-bar .speedometer--desktop {
         display: none;
     }

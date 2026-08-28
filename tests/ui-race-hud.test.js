@@ -35,7 +35,10 @@ describe('ui race hud helpers', () => {
                     classList: { toggle: vi.fn() },
                     style: {}
                 };
-            })
+            }),
+            body: {
+                classList: { toggle: vi.fn() }
+            }
         });
         vi.stubGlobal('ResizeObserver', class ResizeObserver {
             constructor() {}
@@ -80,6 +83,7 @@ describe('ui race hud helpers', () => {
         expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause', true);
         expect(hudStatsBtn.setAttribute).toHaveBeenCalledWith('aria-label', 'Pause run');
         expect(timerPauseIcon.hidden).toBe(false);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', true);
     });
 
     it('forces the lap timer and speed values onto the HUD', () => {
