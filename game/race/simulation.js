@@ -527,6 +527,26 @@ export {
     suppressInwardContactMotion
 };
 
+export function ageSparkParticles(particles, dt, { maxParticles } = {}) {
+    if (!Array.isArray(particles) || particles.length === 0) return;
+    const cap = Number.isFinite(maxParticles) && maxParticles > 0
+        ? Math.trunc(maxParticles)
+        : particles.length;
+    const particleStart = Math.max(0, particles.length - cap);
+    const step = Number.isFinite(dt) ? dt : 0;
+    let writeIdx = 0;
+    for (let i = particleStart; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx * step;
+        p.y += p.vy * step;
+        p.life -= step;
+        if (p.life > 0) {
+            particles[writeIdx++] = p;
+        }
+    }
+    particles.length = writeIdx;
+}
+
 export function getCarRearAxleWorldPoint(pos, angle, config) {
     const vx = Math.cos(angle);
     const vy = Math.sin(angle);
@@ -788,20 +808,9 @@ export function updateSimulation(
         }
     }
 
-    const maxParticles = state.frameSkip > 0 ? 30 : 50;
-    const particles = state.particles;
-    const particleStart = Math.max(0, particles.length - maxParticles);
-    let writeIdx = 0;
-    for (let i = particleStart; i < particles.length; i++) {
-        const p = particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.life -= dt;
-        if (p.life > 0) {
-            particles[writeIdx++] = p;
-        }
-    }
-    particles.length = writeIdx;
+    ageSparkParticles(state.particles, dt, {
+        maxParticles: state.frameSkip > 0 ? 30 : 50,
+    });
 
     return _events;
 }

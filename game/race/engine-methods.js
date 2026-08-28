@@ -1,5 +1,9 @@
 import { CONFIG } from "../config.js";
-import { updateSimulation, getCarRearAxleWorldPoint } from "./simulation.js";
+import {
+  ageSparkParticles,
+  getCarRearAxleWorldPoint,
+  updateSimulation,
+} from "./simulation.js";
 import { getScoreboardReplayMaxFrames } from "./replay.js";
 import { createModalActions } from "./result-flow.js";
 import {
@@ -1116,6 +1120,10 @@ export const raceEngineMethods = {
         this.rankedSubmissionBlockedReason = timingAnomalyMessage;
         this.accumulator = 0;
       }
+    } else if (this.particles.length > 0) {
+      ageSparkParticles(this.particles, rawDt, {
+        maxParticles: this.frameSkip > 0 ? 30 : 50,
+      });
     }
 
     if (animateFrame || this._needsRender) {
@@ -1146,7 +1154,7 @@ export const raceEngineMethods = {
       maxSpeedKph: this.runtimeConfig.maxSpeed,
     });
 
-    if (animateFrame || shouldUpdate || this._needsRender) {
+    if (shouldUpdate || this.particles.length > 0 || this._needsRender) {
       this.requestFrame();
     }
   },

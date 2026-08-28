@@ -1,5 +1,7 @@
 # Changelog
 
+- Wall sparks now fade after you finish or pause, instead of freezing and keeping the game drawing in the background.
+
 - The loading circle on Start Race now sits to the left of the text instead of underneath it.
 
 - During a race the lap clock updates 30 times a second instead of every frame. There is one speedometer; phone and desktop only change where it sits. Finish times stay exact.
