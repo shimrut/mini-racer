@@ -39,10 +39,6 @@
         gap: .75rem
     }
 
-    .speedometer--desktop {
-        display: none
-    }
-
     .mobile-hud-bar {
         display: flex;
         align-items: center;
@@ -63,16 +59,6 @@
 
     body.hide-hud:not(.pause-on-timer) .mobile-hud-bar {
         justify-content: flex-end;
-    }
-
-    .mobile-hud-bar .speedometer--desktop {
-        display: none;
-    }
-
-    .mobile-hud-bar .mobile-speedometer {
-        display: block;
-        position: static;
-        transform: none;
     }
 
     .light {
@@ -184,12 +170,12 @@
 }
 
 @media(orientation:landscape)and (max-height:500px) {
-    .mobile-hud-bar .mobile-speedometer {
+    .mobile-hud-bar .speedometer {
         min-width: 5rem;
         padding: .55rem .8rem
     }
 
-    .mobile-speedometer-value {
+    .speedometer-value {
         font-size: 1.15rem
     }
 

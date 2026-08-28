@@ -157,7 +157,6 @@ function runAll() {
         'daily-challenge-hud--',
         'combined-rank-value--',
         'modal--',
-        'speedometer--',
         'garage-tab-panel--',
         'modal-sheet-panel--',
         'track-carousel__edge--'

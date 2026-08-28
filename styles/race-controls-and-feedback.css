@@ -29,7 +29,6 @@ body.hide-hud .lap-flash,
 body.hide-hud #time-val,
 body.hide-hud #best-time-display,
 body.hide-hud .speedometer,
-body.hide-hud .mobile-speedometer,
 body.hide-hud .hud-pause-label {
     display: none !important;
 }
@@ -51,17 +50,9 @@ body.hide-hud:not(.pause-on-timer) .hud-pause-btn .hud-pause-icon {
     height: 1.4rem;
 }
 
-.mobile-hud-bar .speedometer--desktop,
-.mobile-hud-bar .mobile-speedometer,
+.mobile-hud-bar .speedometer,
 .mobile-hud-bar .hud-pause-btn {
     pointer-events: auto;
-}
-
-.mobile-hud-bar .speedometer--desktop {
-    position: static;
-    left: auto;
-    bottom: auto;
-    transform: none;
 }
 
 .mobile-hud-bar .hud-pause-btn {
@@ -78,12 +69,6 @@ body.hide-hud:not(.pause-on-timer) .hud-pause-btn .hud-pause-icon {
 
 .mobile-hud-bar .hud-pause-btn:active {
     transform: none;
-}
-
-.mobile-speedometer {
-    display: none;
-    padding: .6rem .8rem;
-    pointer-events: auto;
 }
 
 .touch-btn {

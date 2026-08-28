@@ -23,8 +23,7 @@ export class InteractionsUi {
     get startBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get hudStatsBtn() { return document.getElementById('hud-stats-btn'); }
     get menuGarageBtn() { return document.getElementById('menu-btn-garage'); }
-    get desktopSpeedometer() { return document.getElementById('desktop-speedometer'); }
-    get mobileSpeedometer() { return document.getElementById('mobile-speedometer'); }
+    get speedometer() { return document.getElementById('speedometer'); }
     get pauseBtn() { return document.getElementById('pause-btn'); }
 
 
@@ -70,13 +69,8 @@ export class InteractionsUi {
                 }
             });
         }
-        if (this.desktopSpeedometer && this.onPauseRun)
-            this.desktopSpeedometer.addEventListener("click", () => {
-                if (getPauseOnTimerEnabled()) return;
-                this.onPauseRun();
-            });
-        if (this.mobileSpeedometer && this.onPauseRun)
-            this.bindTapAction(this.mobileSpeedometer, () => {
+        if (this.speedometer && this.onPauseRun)
+            this.speedometer.addEventListener("click", () => {
                 if (getPauseOnTimerEnabled()) return;
                 this.onPauseRun();
             });
@@ -97,28 +91,6 @@ export class InteractionsUi {
     }) {
         this.bindTouchButton(this.leftTouchBtn, onLeftDown, onLeftUp);
         this.bindTouchButton(this.rightTouchBtn, onRightDown, onRightUp);
-    }
-
-    bindTapAction(element, onTap) {
-        if (!element || !onTap) return;
-
-        if (window.PointerEvent) {
-            element.addEventListener("pointerup", (e) => {
-                if (e.button !== undefined && e.button !== 0) return;
-                e.preventDefault?.();
-                onTap();
-            });
-            return;
-        }
-
-        element.addEventListener(
-            "touchend",
-            (e) => {
-                e.preventDefault();
-                onTap();
-            },
-            { passive: false },
-        );
     }
 
     bindTouchButton(button, onDown, onUp) {

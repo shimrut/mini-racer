@@ -285,8 +285,9 @@ an embedded WebView. Keyboard navigation and pointer input are blocked while
 the veil is active, so the Daily/Campaign toggle stays interactive throughout.
 
 The race HUD keeps a stable `12px` top position during the race-start handoff.
-During a run the lap clock is written at 30 Hz and the speed readout at 15 Hz,
-and only the laid-out speedometer (desktop or phone) is updated.
+During a run the lap clock is written at 30 Hz and the speed readout at 15 Hz
+to one `#speedometer` in `.mobile-hud-bar`. Phone and desktop only change that
+bar's layout.
 `RaceHud.anchorHudBar()` does not measure the generic lobby `header`, because
 that header is inside the fading overlay and collapses when the overlay is
 hidden; observing it would make the HUD jump after its entrance animation.

@@ -210,8 +210,9 @@ flowchart LR
   keyboard navigation stay inactive during the handoff.
   The race HUD uses a stable `12px` race position throughout this handoff.
   During a run, `RaceHud.syncHud()` writes the lap clock at 30 Hz and speed at
-  15 Hz, and only paints the speedometer that currently has layout (desktop or
-  phone). Finish, reset, and test stepping still force an exact write.
+  15 Hz to the single `#speedometer` in `.mobile-hud-bar`. Phone and desktop
+  only change that bar's layout. Finish, reset, and test stepping still force
+  an exact write.
   `RaceHud.anchorHudBar()` deliberately does not observe the generic first
   `header`, which lives inside the fading lobby overlay and collapses when the
   overlay becomes `display: none`; this prevents the lap HUD from jumping after

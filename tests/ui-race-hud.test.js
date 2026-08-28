@@ -165,12 +165,10 @@ describe('ui race hud helpers', () => {
     it('forces the lap timer and speed values onto the HUD', () => {
         const timeVal = { textContent: '' };
         const speedVal = { textContent: '' };
-        const mobileSpeedVal = { textContent: '' };
 
         vi.spyOn(document, 'getElementById').mockImplementation((id) => {
             if (id === 'time-val') return timeVal;
             if (id === 'speed-val') return speedVal;
-            if (id === 'mobile-speed-val') return mobileSpeedVal;
             return null;
         });
 
@@ -186,7 +184,6 @@ describe('ui race hud helpers', () => {
 
         expect(timeVal.textContent).toBe('12.345');
         expect(speedVal.textContent).toBe('64');
-        expect(mobileSpeedVal.textContent).toBe('64');
         expect(hud._lastTimeText).toBe('12.345');
         expect(hud._lastSpeedText).toBe('64');
     });
@@ -225,34 +222,6 @@ describe('ui race hud helpers', () => {
         now += 10;
         hud.syncHud({ time: 9.876, speed: 1, force: true });
         expect(timeVal.textContent).toBe('9.876');
-    });
-
-    it('writes speed only on the visible speedometer', () => {
-        const speedVal = { textContent: '' };
-        const mobileSpeedVal = { textContent: '' };
-        const desktopTicks = Array.from({ length: 20 }, () => ({
-            classList: { toggle: vi.fn() },
-        }));
-        const mobileTicks = Array.from({ length: 20 }, () => ({
-            classList: { toggle: vi.fn() },
-        }));
-
-        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
-            'speed-val': speedVal,
-            'mobile-speed-val': mobileSpeedVal,
-            'desktop-speedometer': { offsetWidth: 180, offsetHeight: 36 },
-            'mobile-speedometer': { offsetWidth: 0, offsetHeight: 0 },
-        }[id] || null));
-
-        const hud = new RaceHud();
-        hud._speedTicks = desktopTicks;
-        hud._mobileSpeedTicks = mobileTicks;
-        hud.syncHud({ time: 0, speed: 3.2, force: true });
-
-        expect(speedVal.textContent).toBe('64');
-        expect(mobileSpeedVal.textContent).toBe('');
-        expect(desktopTicks[0].classList.toggle).toHaveBeenCalled();
-        expect(mobileTicks[0].classList.toggle).not.toHaveBeenCalled();
     });
 
     it('persists a best lap to the selected track card and reveals the best metric', () => {

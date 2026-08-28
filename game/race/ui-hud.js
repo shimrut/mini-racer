@@ -7,20 +7,6 @@ import { getPauseOnTimerEnabled } from '../settings/pause-on-timer-preference.js
 const HUD_TIME_MIN_MS = 1000 / 30;
 const HUD_SPEED_MIN_MS = 1000 / 15;
 
-function isLaidOutHudElement(el) {
-    if (!el) return false;
-    const width = el.offsetWidth;
-    const height = el.offsetHeight;
-    if (typeof width !== 'number' && typeof height !== 'number') return true;
-    return (width || 0) > 0 || (height || 0) > 0;
-}
-
-function shouldWriteHudSurface(container, valueEl) {
-    if (!valueEl) return false;
-    if (!container) return true;
-    return isLaidOutHudElement(container);
-}
-
 export class RaceHud {
     constructor({
         getTrackPersonalBest = () => null,
@@ -35,27 +21,22 @@ export class RaceHud {
         this._lastSpeedText = '0';
         this._lastHudTimeWrite = undefined;
         this._lastHudSpeedWrite = undefined;
-        this._lastActiveSpeedSurface = null;
         this._pauseAvailable = false;
         this._lapFlashTimer = null;
         this._hudAnchorResizeObserver = null;
         this._maxSpeed = 240;
         this._speedTicks = [];
-        this._mobileSpeedTicks = [];
         this._lastActiveSpeedTicks = -1;
         this.elements = {
             header: document.querySelector('header'),
             hudBar: document.querySelector('.hud-bar'),
             timeVal: document.getElementById('time-val'),
             speedVal: document.getElementById('speed-val'),
-            mobileSpeedVal: document.getElementById('mobile-speed-val'),
             speedBar: document.getElementById('speed-bar'),
-            mobileSpeedBar: document.getElementById('mobile-speed-bar'),
             bestTimeDisplay: document.getElementById('best-time-display'),
             bestTimeVal: document.getElementById('best-time-val'),
             bestTimeMedal: document.getElementById('best-time-medal'),
-            desktopSpeedometer: document.getElementById('desktop-speedometer'),
-            mobileSpeedometer: document.getElementById('mobile-speedometer'),
+            speedometer: document.getElementById('speedometer'),
             pauseBtn: document.getElementById('pause-btn'),
             hudStatsBtn: document.getElementById('hud-stats-btn'),
             timerPauseIcon: document.getElementById('hud-timer-pause-icon'),
@@ -90,16 +71,13 @@ export class RaceHud {
     get hudBar() { return this.elements.hudBar; }
     get timeVal() { return this.elements.timeVal; }
     get speedVal() { return this.elements.speedVal; }
-    get mobileSpeedVal() { return this.elements.mobileSpeedVal; }
     get speedBar() { return this.elements.speedBar; }
-    get mobileSpeedBar() { return this.elements.mobileSpeedBar; }
     get timeDisplay() { return this.elements.timeDisplay; }
     get timeLabel() { return this.elements.timeLabel; }
     get bestTimeDisplay() { return this.elements.bestTimeDisplay; }
     get bestTimeVal() { return this.elements.bestTimeVal; }
     get bestTimeMedal() { return this.elements.bestTimeMedal; }
-    get desktopSpeedometer() { return this.elements.desktopSpeedometer; }
-    get mobileSpeedometer() { return this.elements.mobileSpeedometer; }
+    get speedometer() { return this.elements.speedometer; }
     get pauseBtn() { return this.elements.pauseBtn; }
     get hudStatsBtn() { return this.elements.hudStatsBtn; }
     get timerPauseIcon() { return this.elements.timerPauseIcon; }
@@ -137,26 +115,11 @@ export class RaceHud {
         };
 
         this._speedTicks = createBar(this.speedBar);
-        this._mobileSpeedTicks = createBar(this.mobileSpeedBar);
     }
 
-
-    resolveVisibleSpeedSurfaces() {
-        const desktop = shouldWriteHudSurface(this.desktopSpeedometer, this.speedVal);
-        const mobile = shouldWriteHudSurface(this.mobileSpeedometer, this.mobileSpeedVal);
-        const surface = desktop && mobile ? 'both' : desktop ? 'desktop' : mobile ? 'mobile' : 'none';
-        if (surface !== this._lastActiveSpeedSurface) {
-            this._lastActiveSpeedSurface = surface;
-            this._lastActiveSpeedTicks = -1;
-        }
-        return { desktop, mobile };
-    }
-
-    writeVisibleSpeed(speedText) {
-        const { desktop, mobile } = this.resolveVisibleSpeedSurfaces();
-        if (desktop) this.speedVal.textContent = speedText;
-        if (mobile) this.mobileSpeedVal.textContent = speedText;
-        this.updateSpeedTicks(Number(speedText), { desktop, mobile });
+    writeSpeed(speedText) {
+        if (this.speedVal) this.speedVal.textContent = speedText;
+        this.updateSpeedTicks(Number(speedText));
     }
 
     syncHud({ time, speed, force = false }) {
@@ -171,7 +134,7 @@ export class RaceHud {
                 this._lastHudTimeWrite = now;
             }
             const speedText = Math.round(speed * 20).toString();
-            this.writeVisibleSpeed(speedText);
+            this.writeSpeed(speedText);
             this._lastSpeedText = speedText;
             this._lastHudSpeedWrite = now;
             return;
@@ -193,29 +156,23 @@ export class RaceHud {
         if (speedDue) {
             const speedText = Math.round(speed * 20).toString();
             if (this._lastSpeedText !== speedText) {
-                this.writeVisibleSpeed(speedText);
+                this.writeSpeed(speedText);
                 this._lastSpeedText = speedText;
             }
             this._lastHudSpeedWrite = now;
         }
     }
 
-    updateSpeedTicks(speedKph, surfaces = null) {
+    updateSpeedTicks(speedKph) {
         const totalTicks = 20;
         const maxSpeed = this._maxSpeed || 240;
         const activeTicks = Math.min(totalTicks, Math.ceil((speedKph / maxSpeed) * totalTicks));
-        const { desktop, mobile } = surfaces || this.resolveVisibleSpeedSurfaces();
         if (activeTicks === this._lastActiveSpeedTicks) return;
         this._lastActiveSpeedTicks = activeTicks;
 
-        const updateBar = (ticks) => {
-            ticks.forEach((tick, i) => {
-                tick.classList.toggle('active', i < activeTicks);
-            });
-        };
-
-        if (desktop) updateBar(this._speedTicks);
-        if (mobile) updateBar(this._mobileSpeedTicks);
+        this._speedTicks.forEach((tick, i) => {
+            tick.classList.toggle('active', i < activeTicks);
+        });
     }
 
     setMaxSpeed(speedKph) {
@@ -226,15 +183,13 @@ export class RaceHud {
     if (this.timeLabel) this.timeLabel.textContent = 'LAP';
     if (this.timeVal) this.timeVal.textContent = '0.000';
     if (this.speedVal) this.speedVal.textContent = '0';
-    if (this.mobileSpeedVal) this.mobileSpeedVal.textContent = '0';
     this._lastActiveSpeedTicks = -1;
-    this.updateSpeedTicks(0, { desktop: true, mobile: true });
+    this.updateSpeedTicks(0);
     this._hudPrimaryMetricMode = 'time';
     this._lastTimeText = '0.000';
     this._lastSpeedText = '0';
     this._lastHudTimeWrite = undefined;
     this._lastHudSpeedWrite = undefined;
-    this._lastActiveSpeedSurface = null;
 }
 
     setHudPrimaryMetric({ label = 'LAP', value = '0.000', useTimer = true, visible = true } = {}) {

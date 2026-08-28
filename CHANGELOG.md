@@ -1,6 +1,6 @@
 # Changelog
 
-- During a race the lap clock updates 30 times a second instead of every frame, and only the on-screen speedometer (phone or desktop) is updated. Finish times stay exact.
+- During a race the lap clock updates 30 times a second instead of every frame. There is one speedometer; phone and desktop only change where it sits. Finish times stay exact.
 
 - Daily and Campaign Tracks tiles now show your rank as `#x` in the top-right of the drawing, when a rank is known.
 

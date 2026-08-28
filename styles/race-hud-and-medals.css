@@ -520,23 +520,14 @@
     min-width: 3ch
 }
 
-.speedometer,
-.mobile-speedometer {
+.speedometer {
     border: 1px solid var(--hud-panel-border);
     border-radius: var(--radius-md);
     background: var(--hud-panel-bg);
     text-align: center;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.speedometer {
-    position: absolute;
-    left: 50%;
-    bottom: max(1rem, env(safe-area-inset-bottom));
-    transform: translate(-50%);
     padding: .6rem .8rem;
-    z-index: var(--z-hud);
-    pointer-events: none
+    pointer-events: auto;
 }
 
 .speedometer-content {
@@ -588,8 +579,7 @@
         min-width: 4.8rem;
     }
 
-    .speedometer-value,
-    .mobile-speedometer-value {
+    .speedometer-value {
         font-size: 1.2rem;
     }
 
@@ -598,8 +588,7 @@
     }
 }
 
-.speedometer-label,
-.mobile-speedometer-label {
+.speedometer-label {
     display: inline;
     color: #e2e8f0ad;
     font-size: .65rem;
@@ -608,8 +597,7 @@
     line-height: 1
 }
 
-.speedometer-value,
-.mobile-speedometer-value {
+.speedometer-value {
     display: inline;
     margin-top: 0;
     color: var(--accent-color);

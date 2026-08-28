@@ -29,28 +29,6 @@ describe('ui interaction helpers', () => {
         expect(handleStartAction).toHaveBeenCalledWith(ctx.onStartDailyChallenge);
     });
 
-    it('routes mobile taps through pointer events when available', () => {
-        const originalWindow = global.window;
-        const element = createEventTarget();
-        const onTap = vi.fn();
-        global.window = {
-            PointerEvent: class PointerEvent {}
-        };
-
-        InteractionsUi.prototype.bindTapAction.call({}, element, onTap);
-
-        const preventDefault = vi.fn();
-        element.listeners.get('pointerup')({
-            button: 0,
-            preventDefault
-        });
-
-        expect(preventDefault).toHaveBeenCalledTimes(1);
-        expect(onTap).toHaveBeenCalledTimes(1);
-
-        global.window = originalWindow;
-    });
-
     it('closes an open modal when the garage action is used', () => {
         const garageBtn = createEventTarget();
         const closeModal = vi.fn();
@@ -79,17 +57,17 @@ describe('ui interaction helpers', () => {
             },
         };
         const hudStatsBtn = createEventTarget();
-        const desktopSpeedometer = createEventTarget();
+        const speedometer = createEventTarget();
         const onPauseRun = vi.fn();
 
         InteractionsUi.prototype.bindPrimaryActions.call({
             hudStatsBtn,
-            desktopSpeedometer,
+            speedometer,
             onPauseRun,
         });
 
         hudStatsBtn.listeners.get('click')();
-        desktopSpeedometer.listeners.get('click')();
+        speedometer.listeners.get('click')();
 
         expect(onPauseRun).toHaveBeenCalledTimes(1);
         globalThis.window = originalWindow;
@@ -105,17 +83,17 @@ describe('ui interaction helpers', () => {
             },
         };
         const hudStatsBtn = createEventTarget();
-        const desktopSpeedometer = createEventTarget();
+        const speedometer = createEventTarget();
         const onPauseRun = vi.fn();
 
         InteractionsUi.prototype.bindPrimaryActions.call({
             hudStatsBtn,
-            desktopSpeedometer,
+            speedometer,
             onPauseRun,
         });
 
         hudStatsBtn.listeners.get('click')();
-        desktopSpeedometer.listeners.get('click')();
+        speedometer.listeners.get('click')();
 
         expect(onPauseRun).toHaveBeenCalledTimes(1);
         globalThis.window = originalWindow;
