@@ -34,6 +34,7 @@ const DEFAULT_PLAYER_PREFERENCES: DailyGpPlayerPreferences = {
     crashRestartDelaySec: 0.5,
     pbGhostEnabled: true,
     pauseOnTimerEnabled: true,
+    hideHudEnabled: false,
 };
 
 function readCarSkinPreference(value: unknown): string | null {
@@ -76,6 +77,7 @@ function readPlayerPreferenceFields(value: unknown): {
     crashRestartDelaySec: number | null;
     pbGhostEnabled: boolean | null;
     pauseOnTimerEnabled: boolean | null;
+    hideHudEnabled: boolean | null;
 } | null {
     if (!value || typeof value !== 'object') {
         return null;
@@ -97,6 +99,10 @@ function readPlayerPreferenceFields(value: unknown): {
             preferences.pauseOnTimerEnabled,
             DEFAULT_PLAYER_PREFERENCES.pauseOnTimerEnabled,
         ),
+        hideHudEnabled: readOptionalBooleanPreference(
+            preferences.hideHudEnabled,
+            DEFAULT_PLAYER_PREFERENCES.hideHudEnabled,
+        ),
     };
 }
 
@@ -113,6 +119,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         crashRestartDelaySec,
         pbGhostEnabled,
         pauseOnTimerEnabled,
+        hideHudEnabled,
     } = fields;
     if (
         carSkin === null
@@ -123,6 +130,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         || crashRestartDelaySec === null
         || pbGhostEnabled === null
         || pauseOnTimerEnabled === null
+        || hideHudEnabled === null
     ) {
         return null;
     }
@@ -136,6 +144,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         crashRestartDelaySec,
         pbGhostEnabled,
         pauseOnTimerEnabled,
+        hideHudEnabled,
     };
 }
 
@@ -155,6 +164,8 @@ export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferenc
         pbGhostEnabled: fields.pbGhostEnabled ?? DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled,
         pauseOnTimerEnabled: fields.pauseOnTimerEnabled
             ?? DEFAULT_PLAYER_PREFERENCES.pauseOnTimerEnabled,
+        hideHudEnabled: fields.hideHudEnabled
+            ?? DEFAULT_PLAYER_PREFERENCES.hideHudEnabled,
     };
 }
 

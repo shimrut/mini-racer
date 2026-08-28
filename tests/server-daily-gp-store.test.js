@@ -1578,6 +1578,7 @@ describe('server daily gp store submissions', () => {
             crashRestartDelaySec: 0.8,
             pbGhostEnabled: true,
             pauseOnTimerEnabled: true,
+            hideHudEnabled: false,
         };
 
         const saved = await updateServerPlayerPreferences({
@@ -1954,6 +1955,7 @@ describe('server daily gp store submissions', () => {
             ['a non-boolean crashAutoRestartEnabled', { crashAutoRestartEnabled: 'no' }],
             ['a non-boolean pbGhostEnabled', { pbGhostEnabled: 'sure' }],
             ['a non-boolean pauseOnTimerEnabled', { pauseOnTimerEnabled: 'sure' }],
+            ['a non-boolean hideHudEnabled', { hideHudEnabled: 'sure' }],
             ['a non-finite crashRestartDelaySec', { crashRestartDelaySec: 'slow' }],
             ['a negative crashRestartDelaySec', { crashRestartDelaySec: -0.1 }],
             ['a crashRestartDelaySec above 1', { crashRestartDelaySec: 1.1 }],
@@ -1979,6 +1981,8 @@ describe('server daily gp store submissions', () => {
             ['an explicit pbGhostEnabled of false', { pbGhostEnabled: false }, { pbGhostEnabled: false }],
             ['an omitted pauseOnTimerEnabled', { pauseOnTimerEnabled: undefined }, { pauseOnTimerEnabled: true }],
             ['an explicit pauseOnTimerEnabled of false', { pauseOnTimerEnabled: false }, { pauseOnTimerEnabled: false }],
+            ['an omitted hideHudEnabled', { hideHudEnabled: undefined }, { hideHudEnabled: false }],
+            ['an explicit hideHudEnabled of true', { hideHudEnabled: true }, { hideHudEnabled: true }],
         ])('accepts preferences with %s', async (_label, overrides, expected) => {
             const { updateServerPlayerPreferences } = await import('../src/server/daily-gp-store.ts');
 

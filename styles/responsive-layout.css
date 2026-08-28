@@ -57,6 +57,14 @@
         justify-content: center;
     }
 
+    body.hide-hud.pause-on-timer .mobile-hud-bar {
+        display: none !important;
+    }
+
+    body.hide-hud:not(.pause-on-timer) .mobile-hud-bar {
+        justify-content: flex-end;
+    }
+
     .mobile-hud-bar .speedometer--desktop {
         display: none;
     }

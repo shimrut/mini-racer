@@ -81,6 +81,14 @@
     transform: translateY(-50%);
 }
 
+.hud-stats--pause-only .hud-pause-icon {
+    position: static;
+    right: auto;
+    top: auto;
+    margin-right: 0;
+    transform: none;
+}
+
 .hud-label {
     font-size: .65rem;
     font-weight: 700;

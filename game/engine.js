@@ -514,6 +514,9 @@ export class RealTimeRacer {
       onPauseOnTimerChanged: () => {
         this.hud.syncPauseControls();
       },
+      onHideHudChanged: () => {
+        this.hud.syncPauseControls();
+      },
       onPbGhostChanged: (enabled) => {
         this.pbGhost.setEnabled(enabled);
         this.requestRender();
@@ -848,6 +851,7 @@ export class RealTimeRacer {
     this.settings.refreshCollisionAutoRestartPanel();
     this.settings.refreshCollisionRestartDelayPanel();
     this.settings.refreshPauseOnTimerPanel();
+    this.settings.refreshHideHudPanel();
     this.settings.refreshPbGhostPanel();
     this.hud.syncPauseControls();
     this.garage.syncSkinSelection();

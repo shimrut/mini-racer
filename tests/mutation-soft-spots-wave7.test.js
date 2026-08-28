@@ -234,6 +234,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
                 crashRestartDelaySec: 0.5,
                 pbGhostEnabled: true,
                 pauseOnTimerEnabled: true,
+                hideHudEnabled: false,
             },
         });
         expect(parseStoredPlayerProfile(JSON.stringify({
@@ -339,6 +340,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             crashRestartDelaySec: 0.6,
             pbGhostEnabled: false,
             pauseOnTimerEnabled: true,
+            hideHudEnabled: false,
         });
     });
 
@@ -362,6 +364,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             crashRestartDelaySec: 0.8,
             pbGhostEnabled: false,
             pauseOnTimerEnabled: true,
+            hideHudEnabled: false,
         });
     });
 
@@ -394,6 +397,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             crashRestartDelaySec: 0.5,
             pbGhostEnabled: true,
             pauseOnTimerEnabled: true,
+            hideHudEnabled: false,
         });
     });
 });

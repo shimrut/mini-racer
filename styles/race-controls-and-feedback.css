@@ -24,6 +24,33 @@ body.pause-on-timer .mobile-hud-bar {
     justify-content: center;
 }
 
+body.hide-hud .hud-left-cluster,
+body.hide-hud .lap-flash,
+body.hide-hud #time-val,
+body.hide-hud #best-time-display,
+body.hide-hud .speedometer,
+body.hide-hud .mobile-speedometer,
+body.hide-hud .hud-pause-label {
+    display: none !important;
+}
+
+body.hide-hud.pause-on-timer .mobile-hud-bar {
+    display: none !important;
+}
+
+body.hide-hud:not(.pause-on-timer) .hud-bar {
+    display: none !important;
+}
+
+body.hide-hud:not(.pause-on-timer) .mobile-hud-bar {
+    justify-content: flex-end;
+}
+
+body.hide-hud:not(.pause-on-timer) .hud-pause-btn .hud-pause-icon {
+    width: 1.4rem;
+    height: 1.4rem;
+}
+
 .mobile-hud-bar .speedometer--desktop,
 .mobile-hud-bar .mobile-speedometer,
 .mobile-hud-bar .hud-pause-btn {

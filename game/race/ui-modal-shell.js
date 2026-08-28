@@ -226,6 +226,7 @@ export class ModalShell {
             document.getElementById('settings-car-audio-switch'),
             document.getElementById('settings-music-switch'),
             document.getElementById('settings-pause-on-timer-switch'),
+            document.getElementById('settings-hide-hud-switch'),
             document.getElementById('settings-pb-ghost-switch'),
             document.getElementById('settings-collision-auto-restart-switch'),
             document.getElementById('settings-collision-restart-delay-minus'),

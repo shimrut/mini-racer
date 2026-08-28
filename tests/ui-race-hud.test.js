@@ -81,9 +81,85 @@ describe('ui race hud helpers', () => {
         expect(pauseBtn.style.display).toBe('none');
         expect(hudStatsBtn.disabled).toBe(false);
         expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause', true);
+        expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause-only', false);
         expect(hudStatsBtn.setAttribute).toHaveBeenCalledWith('aria-label', 'Pause run');
         expect(timerPauseIcon.hidden).toBe(false);
         expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', true);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('hide-hud', false);
+    });
+
+    it('keeps only the timer pause icon when hide HUD is on', () => {
+        const store = new Map([
+            ['VectorGpPauseOnTimerEnabled', '1'],
+            ['VectorGpHideHudEnabled', '1'],
+        ]);
+        vi.stubGlobal('window', {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        });
+        const pauseBtn = { hidden: false, style: { display: 'inline-flex' } };
+        const hudStatsBtn = {
+            disabled: true,
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+        };
+        const timerPauseIcon = { hidden: true };
+
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'pause-btn': pauseBtn,
+            'hud-stats-btn': hudStatsBtn,
+            'hud-timer-pause-icon': timerPauseIcon,
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud.setPauseVisible(true);
+
+        expect(pauseBtn.hidden).toBe(true);
+        expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause', true);
+        expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause-only', true);
+        expect(timerPauseIcon.hidden).toBe(false);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', true);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('hide-hud', true);
+    });
+
+    it('keeps only the bottom pause when hide HUD is on and pause-on-timer is off', () => {
+        const store = new Map([
+            ['VectorGpPauseOnTimerEnabled', '0'],
+            ['VectorGpHideHudEnabled', '1'],
+        ]);
+        vi.stubGlobal('window', {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        });
+        const pauseBtn = { hidden: true, style: {} };
+        const hudStatsBtn = {
+            disabled: false,
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+        };
+        const timerPauseIcon = { hidden: false };
+
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'pause-btn': pauseBtn,
+            'hud-stats-btn': hudStatsBtn,
+            'hud-timer-pause-icon': timerPauseIcon,
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud.setPauseVisible(true);
+
+        expect(pauseBtn.hidden).toBe(false);
+        expect(pauseBtn.style.display).toBe('inline-flex');
+        expect(hudStatsBtn.disabled).toBe(true);
+        expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause', false);
+        expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause-only', false);
+        expect(timerPauseIcon.hidden).toBe(true);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', false);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('hide-hud', true);
     });
 
     it('forces the lap timer and speed values onto the HUD', () => {

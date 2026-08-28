@@ -1,6 +1,7 @@
 import { TRACK_MODE_DAILY_GP } from '../config.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { isStandardMedalTier } from '../medals/medal-timing.js';
+import { getHideHudEnabled } from '../settings/hide-hud-preference.js';
 import { getPauseOnTimerEnabled } from '../settings/pause-on-timer-preference.js';
 
 const HUD_SPEED_MIN_MS = 1000 / 15;
@@ -285,8 +286,10 @@ export class RaceHud {
 
     syncPauseControls() {
     const pauseOnTimer = getPauseOnTimerEnabled();
+    const hideHud = getHideHudEnabled();
     const showBottomPause = this._pauseAvailable && !pauseOnTimer;
     const showTimerPause = this._pauseAvailable && pauseOnTimer;
+    const showTimerPauseOnly = showTimerPause && hideHud;
 
     if (this.pauseBtn) {
         this.pauseBtn.hidden = !showBottomPause;
@@ -295,6 +298,7 @@ export class RaceHud {
     if (this.hudStatsBtn) {
         this.hudStatsBtn.disabled = !showTimerPause;
         this.hudStatsBtn.classList.toggle('hud-stats--pause', showTimerPause);
+        this.hudStatsBtn.classList.toggle('hud-stats--pause-only', showTimerPauseOnly);
         this.hudStatsBtn.setAttribute(
             'aria-label',
             showTimerPause ? 'Pause run' : 'Race time',
@@ -304,6 +308,7 @@ export class RaceHud {
         this.timerPauseIcon.hidden = !showTimerPause;
     }
     document.body?.classList?.toggle?.('pause-on-timer', pauseOnTimer);
+    document.body?.classList?.toggle?.('hide-hud', hideHud);
 }
 
     showStartLights() {

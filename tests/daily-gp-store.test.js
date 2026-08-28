@@ -275,6 +275,7 @@ const playerPreferences = {
   crashRestartDelaySec: 0.8,
   pbGhostEnabled: true,
   pauseOnTimerEnabled: true,
+  hideHudEnabled: false,
 };
 
 function findPlayerProfileEntry(playerId) {

@@ -2,6 +2,8 @@
 
 - New Daily races now use 1 or 2 laps only on tracks under 10 seconds (author time). Tracks of 10 seconds or more always run 1 lap. Days already published keep the lap count they had.
 
+- Settings → **Hide HUD** (off by default) hides the lap counter, timer, best time, speedo, and lap flash. Only the pause icon stays: top-right when **Pause on Timer** is on, bottom-right when it is off.
+
 - Race HUD no longer shows “2 laps” under the top-left lap counter. The 1 / 2 number stays.
 
 - Pause on phones now lives on the race timer by default (a pause icon next to the time). That keeps Pause away from steering thumbs. The speedo sits in the middle of the bottom bar. Settings → **Pause on Timer** turns the old bottom Pause button and speedo-tap pause back on. The icon sits beside the digits without moving the timer.
