@@ -1,5 +1,7 @@
 # Changelog
 
+- Home after a missed Head to Head returns to the challenge screen immediately. It no longer reloads the challenge from the server first.
+
 - Head to Head finish now compares VS. YOUR PB and RANK against the same Daily or Campaign best those modes already use. A slower run no longer stays on "No lap times yet" or jumps the rank as if it were a first time.
 
 - Head to Head finish now shows your Daily or Campaign place when the run is a new personal best, including a first time on that board.

@@ -656,6 +656,9 @@ describe('Head to Head lobby and finish', () => {
                 bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 8_400, rank: 11 },
             });
         });
+        expect(context.activeHeadToHead.viewerBest).toEqual(
+            expect.objectContaining({ bestTimeMs: 8_400, rank: 11 }),
+        );
     });
 
     it('keeps a settled loss home when it does not beat the best already held', async () => {
@@ -1075,6 +1078,100 @@ describe('Head to Head lobby and finish', () => {
                 : expect.objectContaining({ challengeConfirmPhase: expectedPhase }),
             expect.objectContaining({ restartAction: expect.any(Function) }),
         );
+    });
+
+    it('sends a missed finish Home back to the loaded challenge lobby', async () => {
+        const showChallengeLobby = vi.fn();
+        const loadChallengeLobby = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+                viewerBest: { bestTimeMs: 8_200 },
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            showChallengeLobby,
+            loadChallengeLobby,
+            settings: { openSettings: vi.fn() },
+        };
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
+
+        context.modal.showModal.mock.calls[0][3].secondaryAction();
+        expect(showChallengeLobby).toHaveBeenCalledTimes(1);
+        expect(loadChallengeLobby).not.toHaveBeenCalled();
+    });
+
+    it('returns Home to the already-loaded challenge without asking the server again', () => {
+        const showChallenge = vi.fn();
+        const loadTrack = vi.fn();
+        const loadChallengeLobby = vi.fn();
+        const context = {
+            status: 'won',
+            currentChallengeRun: { id: 'run-1' },
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                challengerUsername: 'RaceFan',
+                challengerAvatarUrl: 'https://example.com/a.png',
+                viewerAvatarUrl: 'https://example.com/b.png',
+                trackKey: 'numberThree',
+                lapCount: 2,
+                targetTimeMs: 25_640,
+                medal: 'gold',
+                viewerBest: { bestTimeMs: 26_500, rank: 7 },
+            },
+            hasAnyData: true,
+            isReturningPlayer: true,
+            reset: vi.fn(),
+            startOverlay: { showStartOverlay: vi.fn() },
+            lobbyUi: {
+                challengeState: { signedIn: true, canRace: true },
+                showChallenge,
+            },
+            loadTrack,
+            loadChallengeLobby,
+        };
+
+        headToHeadEngineMethods.showChallengeLobby.call(context);
+
+        expect(headToHeadServiceMocks.getHeadToHead).not.toHaveBeenCalled();
+        expect(loadTrack).not.toHaveBeenCalled();
+        expect(loadChallengeLobby).not.toHaveBeenCalled();
+        expect(context.reset).toHaveBeenCalledWith(false);
+        expect(context.activeRaceMode).toBe('challenge');
+        expect(showChallenge).toHaveBeenCalledWith(expect.objectContaining({
+            signedIn: true,
+            canRace: true,
+            available: true,
+            canRetry: false,
+            challengerName: 'RaceFan',
+            trackKey: 'numberThree',
+            laps: 2,
+            targetTimeMs: 25_640,
+            viewerBestTimeMs: 26_500,
+            statusMessage: '',
+        }));
+    });
+
+    it('asks the server only when the challenge is no longer in memory', () => {
+        const loadChallengeLobby = vi.fn();
+        const context = {
+            activeHeadToHead: null,
+            headToHeadChallengeId: 'challenge-1',
+            loadChallengeLobby,
+        };
+
+        headToHeadEngineMethods.showChallengeLobby.call(context);
+
+        expect(loadChallengeLobby).toHaveBeenCalledWith('challenge-1');
     });
 
     it('carries a beaten outcome into the challenge poster it returns to', async () => {

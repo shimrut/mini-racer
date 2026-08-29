@@ -87,7 +87,7 @@ export const modeRouterEngineMethods = {
     returnToActiveLobby() {
         if (this.activeRaceMode === 'campaign') return this.showCampaignLobby();
         if (this.activeRaceMode === 'challenge') {
-            return this.loadChallengeLobby(this.activeHeadToHead?.challengeId);
+            return this.showChallengeLobby();
         }
         const racedChallengeId = this.activeDailyChallenge?.id
             || this.lastPlayedDailyChallenge?.id

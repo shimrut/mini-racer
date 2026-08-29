@@ -22,6 +22,7 @@ function createEngine(overrides = {}) {
         handleDailyChallengeWin: vi.fn(),
         handleDailyChallengeLapCompleted: vi.fn(),
         showCampaignLobby: vi.fn(() => 'campaign-lobby'),
+        showChallengeLobby: vi.fn(() => 'challenge-lobby'),
         loadChallengeLobby: vi.fn(() => 'challenge-lobby'),
         dailyCarousel: { getSelectedChallenge: vi.fn(() => ({ id: 'daily-visible' })) },
         campaignCarousel: {
@@ -97,7 +98,8 @@ describe('mode router', () => {
 
         const challenge = createEngine({ activeRaceMode: 'challenge' });
         expect(challenge.returnToActiveLobby()).toBe('challenge-lobby');
-        expect(challenge.loadChallengeLobby).toHaveBeenCalledWith('challenge-1');
+        expect(challenge.showChallengeLobby).toHaveBeenCalledTimes(1);
+        expect(challenge.loadChallengeLobby).not.toHaveBeenCalled();
 
         const daily = createEngine({ activeRaceMode: 'daily' });
         daily.returnToActiveLobby();

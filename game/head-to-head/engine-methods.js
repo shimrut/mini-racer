@@ -92,6 +92,31 @@ function toRaceChallenge(stage) {
     };
 }
 
+function showLoadedChallengeLobby(engine, challenge, extras = {}) {
+    const heldBest = resolveHeadToHeadHeldBest(engine, challenge);
+    const {
+        viewerAvatarUrl,
+        viewerBestTimeMs,
+        ...rest
+    } = extras;
+    engine.startOverlay.showStartOverlay(engine.hasAnyData, engine.isReturningPlayer);
+    engine.lobbyUi.showChallenge({
+        challengerName: challenge?.challengerUsername,
+        challengerAvatarUrl: challenge?.challengerAvatarUrl,
+        viewerAvatarUrl: viewerAvatarUrl ?? challenge?.viewerAvatarUrl ?? null,
+        trackKey: challenge?.trackKey,
+        trackName: getTrackName(challenge?.trackKey, challenge?.trackKey || ''),
+        laps: challenge?.lapCount,
+        targetTimeMs: challenge?.targetTimeMs,
+        viewerBestTimeMs: heldBest?.bestTimeMs
+            ?? viewerBestTimeMs
+            ?? challenge?.viewerBest?.bestTimeMs
+            ?? null,
+        medal: challenge?.medal,
+        ...rest,
+    });
+}
+
 export const headToHeadEngineMethods = {
     async loadChallengeLobby(challengeId = null, {
         outcome = null,
@@ -183,26 +208,47 @@ export const headToHeadEngineMethods = {
         const remembered = outcome
             ? null
             : readHeadToHeadWin(challenge?.challengeId || challengeId);
-        this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
-        this.lobbyUi.showChallenge({
+        showLoadedChallengeLobby(this, challenge, {
             signedIn: response.body?.viewerType === 'reddit',
             canRace: challengeReady,
             available: challengeReady || Boolean(challenge),
             canRetry: retryable,
-            challengerName: challenge?.challengerUsername,
-            challengerAvatarUrl: challenge?.challengerAvatarUrl,
             viewerAvatarUrl: response.body?.viewerAvatarUrl,
-            trackKey: challenge?.trackKey,
-            trackName: getTrackName(challenge?.trackKey, challenge?.trackKey || ''),
-            laps: challenge?.lapCount,
-            targetTimeMs: challenge?.targetTimeMs,
             viewerBestTimeMs: response.body?.viewerBest?.bestTimeMs ?? null,
-            medal: challenge?.medal,
             outcome: outcome || remembered?.outcome || null,
             bestTimeMs: outcome ? bestTimeMs : (remembered?.bestTimeMs ?? null),
             statusMessage: response.body?.error || (retryable
                 ? 'Could not load this challenge. Try again.'
                 : ''),
+        });
+    },
+
+    // Home / Back after a race. The challenge, track, and ghost are already in
+    // memory from the open that started it, so this only puts the lobby back on
+    // screen. loadChallengeLobby remains the cold open (first visit, Retry).
+    showChallengeLobby() {
+        cancelDeferredLobbyWork(this);
+        const challenge = this.activeHeadToHead;
+        if (!challenge) {
+            return this.loadChallengeLobby(this.headToHeadChallengeId);
+        }
+        if (this.status !== 'ready' || this.currentChallengeRun) {
+            this.reset(false);
+        }
+        this.activeRaceMode = 'challenge';
+        const remembered = readHeadToHeadWin(challenge.challengeId);
+        const existing = this.lobbyUi?.challengeState || {};
+        showLoadedChallengeLobby(this, challenge, {
+            signedIn: existing.signedIn,
+            canRace: existing.canRace !== false,
+            available: true,
+            canRetry: false,
+            challengeLoading: false,
+            startError: false,
+            outcome: remembered?.outcome || existing.outcome || null,
+            bestTimeMs: remembered?.bestTimeMs ?? existing.bestTimeMs ?? null,
+            statusMessage: '',
+            viewerAvatarUrl: challenge.viewerAvatarUrl ?? existing.viewerAvatarUrl,
         });
     },
 
@@ -361,7 +407,7 @@ export const headToHeadEngineMethods = {
                         modalKind: 'win',
                         primaryActionLabel: 'Retry',
                         secondaryActionLabel: 'Home',
-                        secondaryAction: () => this.loadChallengeLobby(challenge.challengeId),
+                        secondaryAction: () => this.showChallengeLobby(),
                     }),
                     restartAction: () => this.restartActiveRace(),
                     settingsAction: () => this.settings.openSettings(),
@@ -400,6 +446,18 @@ export const headToHeadEngineMethods = {
         const paintBestUpdate = (response) => {
             const bestUpdate = response?.body?.bestUpdate;
             if (!bestUpdate || !stillOnThisFinish()) return;
+            const bestTimeMs = finitePositiveMs(bestUpdate.bestTimeMs);
+            if (bestTimeMs && this.activeHeadToHead) {
+                const rank = Number(bestUpdate.rank);
+                this.activeHeadToHead = {
+                    ...this.activeHeadToHead,
+                    viewerBest: {
+                        ...(this.activeHeadToHead.viewerBest || {}),
+                        bestTimeMs,
+                        ...(Number.isInteger(rank) && rank > 0 ? { rank } : {}),
+                    },
+                };
+            }
             this.modal.updateChallengeFinishHero?.({ bestUpdate });
         };
         const claimSettledBest = async () => {
