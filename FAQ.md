@@ -203,7 +203,7 @@ Podium posts are for a day that just left rotation. **Play Now** always opens **
 
 ### How do I watch a podium replay?
 
-Tap **View Replays** next to **Play Now** on the final podium post. All three recordings are ready (gold / arctic / blaze cars) and wait until you tap play. Drag the progress bar, tap play/pause, use Gold / Silver / Bronze to show or hide a car, tap **Trail** to show each car’s path, and 0.5× / 1× / 2×, then **Back** to return to the list. **Play Now** still opens today’s race. If View Replays is missing, none of the top three had a saved recording.
+Tap **View Replays** next to **Play Now** on the final podium post. All three recordings are ready (gold / arctic / blaze cars) and wait until you tap play. Drag the progress bar, tap play/pause, 0.5× / 1× / 2×, and **Trail** on the row under it (time sits on the right). **Back** is on the left of the bottom row, with Gold / Silver / Bronze on that same line. **Play Now** still opens today’s race. If View Replays is missing, none of the top three had a saved recording.
 
 ### I still have a medal icon but my PB / ghost is gone
 

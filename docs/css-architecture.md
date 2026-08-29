@@ -12,8 +12,8 @@ import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 time in one grid, with identity tight to the rank. **View Replays** sits next
 to Play Now. Replay mode hides the list, gives the track its own band above
 the chrome, and puts a thin pill progress bar with a thicker grab knob above
-play/pause + 0.5× / 1× / 2× on the left, the clock in the middle, and Gold /
-Silver / Bronze plus a Trail toggle on the right, with Back in the footer. The moderator analytics page is one
+play/pause + 0.5× / 1× / 2× and Trail on the left, the clock on the right, and
+Back with Gold / Silver / Bronze on the footer row. The moderator analytics page is one
 sticky-header table: a row per UTC day, with the day's players split into new
 and returning and each mode's starts and finishes beside them. The newest row
 carries the red accent. The Head to Head surface uses a responsive

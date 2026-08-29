@@ -30,14 +30,16 @@ function replayDocument() {
             <button class="podium-replay__speed" data-rate="0.5" type="button">0.5×</button>
             <button class="podium-replay__speed" data-rate="1" type="button">1×</button>
             <button class="podium-replay__speed" data-rate="2" type="button">2×</button>
-            <button class="podium-replay__car" data-rank="1" type="button" aria-pressed="true">Gold</button>
-            <button class="podium-replay__car" data-rank="2" type="button" aria-pressed="true">Silver</button>
-            <button class="podium-replay__car" data-rank="3" type="button" aria-pressed="true">Bronze</button>
             <button id="podium-replay-trail" type="button" aria-pressed="false">Trail</button>
         </section>
         <button id="podium-view-replays" type="button" hidden>View Replays</button>
         <button id="podium-play" type="button">Play Now</button>
         <button id="podium-replay-back" type="button" hidden>Back</button>
+        <div id="podium-replay-cars" hidden>
+            <button class="podium-replay__car" data-rank="1" type="button" aria-pressed="true">Gold</button>
+            <button class="podium-replay__car" data-rank="2" type="button" aria-pressed="true">Silver</button>
+            <button class="podium-replay__car" data-rank="3" type="button" aria-pressed="true">Bronze</button>
+        </div>
         <canvas id="podium-track"></canvas>
     `).window.document;
 }
@@ -141,6 +143,7 @@ describe('podium in-post replay', () => {
         expect(documentRef.getElementById('podium-results').hasAttribute('inert')).toBe(true);
         expect(documentRef.getElementById('podium-play').hidden).toBe(true);
         expect(documentRef.getElementById('podium-replay-back').hidden).toBe(false);
+        expect(documentRef.getElementById('podium-replay-cars').hidden).toBe(false);
         expect(controller.isVisible(1)).toBe(true);
         expect(controller.isVisible(2)).toBe(false);
         expect(controller.showTrail).toBe(false);
