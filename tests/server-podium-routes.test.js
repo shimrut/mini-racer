@@ -28,6 +28,7 @@ describe('podium avatar compatibility route', () => {
             readContextPostId: () => 't3_podium',
             readContextPostData: () => ({ postType: 'daily-podium', podium }),
             resolveLegacyDailyGpPodiumAvatars,
+            resolveDailyPodiumReplay: vi.fn(),
         });
 
         const response = await fetch(`${baseUrl}/api/podium/avatars`);
@@ -44,10 +45,42 @@ describe('podium avatar compatibility route', () => {
             readContextPostId: () => 't3_race',
             readContextPostData: () => ({ postType: 'daily-race' }),
             resolveLegacyDailyGpPodiumAvatars,
+            resolveDailyPodiumReplay: vi.fn(),
         });
 
         const response = await fetch(`${baseUrl}/api/podium/avatars`);
         expect(response.status).toBe(404);
         expect(resolveLegacyDailyGpPodiumAvatars).not.toHaveBeenCalled();
+    });
+
+    it('returns frozen podium ghosts without player ids', async () => {
+        const resolveDailyPodiumReplay = vi.fn(async () => ({
+            trackKey: 'circuit',
+            ghosts: [
+                { rank: 1, ghost: { schemaVersion: 2 } },
+                { rank: 2, ghost: null },
+                { rank: 3, ghost: null },
+            ],
+        }));
+        const postData = { postType: 'daily-podium', challengeId: 'daily-gp-2026-08-21', replayDataHash: 'abc' };
+        const baseUrl = await start({
+            readContextPostId: () => 't3_podium',
+            readContextPostData: () => postData,
+            resolveLegacyDailyGpPodiumAvatars: vi.fn(),
+            resolveDailyPodiumReplay,
+        });
+
+        const response = await fetch(`${baseUrl}/api/podium/replays`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            trackKey: 'circuit',
+            ghosts: [
+                { rank: 1, ghost: { schemaVersion: 2 } },
+                { rank: 2, ghost: null },
+                { rank: 3, ghost: null },
+            ],
+        });
+        expect(JSON.stringify(await resolveDailyPodiumReplay.mock.results[0].value)).not.toContain('playerId');
+        expect(resolveDailyPodiumReplay).toHaveBeenCalledWith('t3_podium', postData);
     });
 });

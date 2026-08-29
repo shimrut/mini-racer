@@ -11,7 +11,7 @@
 </head>
 
 <body>
-    <main class="podium-shell" aria-labelledby="podium-title">
+    <main id="podium-shell" class="podium-shell" data-mode="podium" aria-labelledby="podium-title">
         <canvas id="podium-track" class="podium-track" aria-hidden="true"></canvas>
         <div class="ambient" aria-hidden="true">
             <span class="ambient__grain"></span>
@@ -32,7 +32,7 @@
             </div>
         </header>
 
-        <section class="podium-results" aria-label="Final podium results">
+        <section id="podium-results" class="podium-results" aria-label="Final podium results">
             <ol id="podium-list" class="podium-list">
                 <li class="podium-row podium-row--gold" data-rank="1">
                     <span class="podium-row__place" aria-label="First place">
@@ -46,6 +46,7 @@
                             <span class="podium-row__name">No verified finish</span>
                         </span>
                     </span>
+                    <button class="podium-row__replay" type="button" data-rank="1" hidden>Replay</button>
                     <span class="podium-row__time" aria-label="No verified time">—</span>
                 </li>
                 <li class="podium-row podium-row--silver" data-rank="2">
@@ -60,6 +61,7 @@
                             <span class="podium-row__name">No verified finish</span>
                         </span>
                     </span>
+                    <button class="podium-row__replay" type="button" data-rank="2" hidden>Replay</button>
                     <span class="podium-row__time" aria-label="No verified time">—</span>
                 </li>
                 <li class="podium-row podium-row--bronze" data-rank="3">
@@ -74,14 +76,32 @@
                             <span class="podium-row__name">No verified finish</span>
                         </span>
                     </span>
+                    <button class="podium-row__replay" type="button" data-rank="3" hidden>Replay</button>
                     <span class="podium-row__time" aria-label="No verified time">—</span>
                 </li>
             </ol>
         </section>
 
+        <section id="podium-replay" class="podium-replay" hidden>
+            <div class="podium-replay__clock" aria-live="polite">
+                <span id="podium-replay-time">0:00.000</span>
+            </div>
+            <div class="podium-replay__controls" role="toolbar" aria-label="Replay controls">
+                <button id="podium-replay-play" class="podium-replay__button" type="button">Play</button>
+                <button id="podium-replay-pause" class="podium-replay__button" type="button">Pause</button>
+                <button id="podium-replay-stop" class="podium-replay__button" type="button">Stop</button>
+                <div class="podium-replay__speeds" role="group" aria-label="Replay speed">
+                    <button class="podium-replay__speed" type="button" data-rate="0.5" aria-pressed="false">0.5×</button>
+                    <button class="podium-replay__speed" type="button" data-rate="1" aria-pressed="true">1×</button>
+                    <button class="podium-replay__speed" type="button" data-rate="2" aria-pressed="false">2×</button>
+                </div>
+            </div>
+        </section>
+
         <footer class="podium-footer">
             <span>More tracks. More podiums. Go claim your spot.</span>
             <button id="podium-play" class="podium-play" type="button">Play Now</button>
+            <button id="podium-replay-back" class="podium-play podium-play--back" type="button" hidden>Back</button>
         </footer>
     </main>
 </body>

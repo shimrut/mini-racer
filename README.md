@@ -52,7 +52,7 @@ Share verified times or challenge other players Head to Head.
 - Press **R** to restart while racing, paused, or on the finish screen
 - Keyboard navigation through menus now available
 - Leaderboard times show full **milliseconds** for more accurate ranking
-- Custom **podium** post after a track is out of rotation
+- Custom **podium** post after a track is out of rotation, with in-post replays of the top three
 
 ### 1.2
 

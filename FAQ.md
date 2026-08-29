@@ -201,6 +201,10 @@ That post’s day left the **7-day** play list. Expired posts send you to **toda
 
 Podium posts are for a day that just left rotation. **Play Now** always opens **today’s** featured race, not the podium day’s track.
 
+### How do I watch a podium replay?
+
+Tap **Replay** next to a racer on the final podium post. All three recordings play on that post (gold / arctic / blaze cars). Use play, pause, stop, and 0.5× / 1× / 2×, then **Back** to return to the list. **Play Now** still opens today’s race. If Replay is missing, that place had no saved recording.
+
 ### I still have a medal icon but my PB / ghost is gone
 
 Medal marks on your device can stick after the server’s best/ghost for that day expires (shortly after the track leaves Tracks). The icon doesn’t mean the ghost is still loadable.

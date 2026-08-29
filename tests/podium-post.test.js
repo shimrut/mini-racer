@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
     bindPodiumPlayNow,
+    bindPodiumReplay,
     hydrateMissingRedditAvatars,
     normalizePodium,
     readPodiumPostData,
@@ -26,18 +27,22 @@ const OFFICIAL_REDDIT_SNOO_URL =
 
 function createDocument() {
     return new JSDOM(`
-        <h1 id="podium-title"></h1>
-        <p id="challenge-date"></p>
-        <ol>
-            ${[1, 2, 3].map((rank) => `
-                <li data-rank="${rank}">
-                    <img class="podium-row__avatar podium-row__avatar--generic" src="${OFFICIAL_REDDIT_SNOO_URL}" alt="">
-                    <span class="podium-row__name"></span>
-                    <span class="podium-row__time"></span>
-                </li>
-            `).join('')}
-        </ol>
-        <button id="podium-play" type="button">Play Now</button>
+        <main id="podium-shell" data-mode="podium">
+            <h1 id="podium-title"></h1>
+            <p id="challenge-date"></p>
+            <ol id="podium-list">
+                ${[1, 2, 3].map((rank) => `
+                    <li data-rank="${rank}">
+                        <img class="podium-row__avatar podium-row__avatar--generic" src="${OFFICIAL_REDDIT_SNOO_URL}" alt="">
+                        <span class="podium-row__name"></span>
+                        <span class="podium-row__time"></span>
+                        <button class="podium-row__replay" type="button" data-rank="${rank}" hidden>Replay</button>
+                    </li>
+                `).join('')}
+            </ol>
+            <button id="podium-play" type="button">Play Now</button>
+            <button id="podium-replay-back" type="button" hidden>Back</button>
+        </main>
     `).window.document;
 }
 
@@ -84,7 +89,7 @@ describe('podium custom post', () => {
         expect(document.getElementById('podium-title').textContent).toBe('<img src=x onerror=alert(1)>');
         expect(document.getElementById('podium-title').querySelector('img')).toBeNull();
         expect(document.getElementById('challenge-date').textContent).toBe('JUL 10, 2026');
-        expect(document.querySelectorAll('[data-rank]')).toHaveLength(3);
+        expect(document.querySelectorAll('li[data-rank]')).toHaveLength(3);
         expect(Array.from(document.querySelectorAll('.podium-row__name'), (node) => node.textContent)).toEqual([
             'Winner',
             'No verified finish',
@@ -175,5 +180,52 @@ describe('podium custom post', () => {
 
         expect(requestFeaturedDailyChallengeStart).toHaveBeenCalledOnce();
         expect(requestExpandedMode).toHaveBeenCalledWith({ type: 'click' }, 'game');
+    });
+
+    it('enables Replay only for places with a frozen ghost and keeps Play Now on the post', async () => {
+        const document = createDocument();
+        const podium = {
+            trackName: 'Circuit ProMax',
+            positions: [
+                { rank: 1, displayName: 'RaceFan', identityType: 'reddit', formattedTime: '0:10.193' },
+                { rank: 2, displayName: 'Neon Viper', identityType: 'private', formattedTime: '0:10.199' },
+            ],
+        };
+        globalThis.devvit = { context: { postData: { podium } } };
+        renderPodium(document, podium);
+        const replay = bindPodiumReplay(document, {
+            fetchReplays: async () => ({
+                trackKey: 'circuit',
+                ghosts: [{
+                    rank: 1,
+                    ghost: {
+                        schemaVersion: 2,
+                        sampleIntervalMs: 50,
+                        finishTimeMs: 50,
+                        origin: [0, 0, 0],
+                        deltas: [1, 0, 0],
+                    },
+                }],
+            }),
+        });
+
+        await replay.prepareFromServer();
+
+        expect(document.querySelector('[data-rank="1"] .podium-row__replay').hidden).toBe(false);
+        expect(document.querySelector('[data-rank="2"] .podium-row__replay').hidden).toBe(true);
+        expect(document.getElementById('podium-play').textContent).toBe('Play Now');
+
+        document.querySelector('[data-rank="1"] .podium-row__replay').click();
+        expect(replay.mode).toBe('replay');
+        expect(document.getElementById('podium-play').hidden).toBe(true);
+        expect(document.getElementById('podium-replay-back').hidden).toBe(false);
+
+        document.getElementById('podium-replay-back').click();
+        expect(replay.mode).toBe('podium');
+        expect(document.getElementById('podium-play').hidden).toBe(false);
+        expect(document.querySelector('[data-rank="1"] .podium-row__name').textContent).toBe('RaceFan');
+        expect(document.querySelector('[data-rank="1"] .podium-row__replay').disabled).toBe(false);
+        expect(document.querySelector('[data-rank="2"] .podium-row__replay').hidden).toBe(true);
+        delete globalThis.devvit;
     });
 });

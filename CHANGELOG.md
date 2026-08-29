@@ -1,5 +1,7 @@
 # Changelog
 
+- Final podium posts now freeze the top-three ghosts in the post body (same packed replay as Head to Head) and play them on the post: Replay next to a racer, all three cars at once, play/pause/stop and 0.5× / 1× / 2×, Back to the list.
+
 - Home after a missed Head to Head returns to the challenge screen immediately. It no longer reloads the challenge from the server first.
 
 - Head to Head finish now compares VS. YOUR PB and RANK against the same Daily or Campaign best those modes already use. A slower run no longer stays on "No lap times yet" or jumps the rank as if it were a first time.

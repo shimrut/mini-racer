@@ -83,6 +83,7 @@ import {
     validateHeadToHeadReplay,
 } from './head-to-head-runtime.js';
 import { resolveLegacyDailyGpPodiumAvatars } from './daily-podium-avatar-backfill.js';
+import { loadDailyPodiumReplayForPost } from './daily-podium-replay.js';
 import { prepareServerLeaderboardRace } from './leaderboard-race-service.js';
 
 const headToHeadService = createHeadToHeadService({
@@ -116,6 +117,9 @@ function registerProductionRoutes(app: express.Application): void {
         readContextPostId,
         readContextPostData,
         resolveLegacyDailyGpPodiumAvatars,
+        resolveDailyPodiumReplay: (postId, postData) => (
+            loadDailyPodiumReplayForPost(postId, postData)
+        ),
     });
     registerCampaignRoutes(app, {
         getRequestUsername,

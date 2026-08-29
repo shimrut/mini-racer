@@ -35,6 +35,8 @@ import {
 } from './daily-gp-model.js';
 import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import type { FinalDailyGpPodium } from './daily-podium-model.js';
+import type { DailyPodiumReplayGhostSlot } from './daily-podium-replay.js';
+import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { toDailyCompetition } from './competition.js';
 import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import {
@@ -643,6 +645,58 @@ export async function getServerFinalDailyGpPodium(
         trackName: getTrackName(challenge.trackKey, challenge.trackKey),
         lapCount: challenge.objectiveParams.lapCount,
         positions: await readFinalPodiumPositions(challenge),
+    };
+}
+
+export type FinalDailyGpPodiumGhostPack = {
+    trackKey: string;
+    trackFingerprint: string;
+    ghosts: readonly [
+        DailyPodiumReplayGhostSlot,
+        DailyPodiumReplayGhostSlot,
+        DailyPodiumReplayGhostSlot,
+    ];
+};
+
+export async function getServerFinalDailyGpPodiumGhosts(
+    podium: Pick<FinalDailyGpPodium, 'challengeId' | 'trackKey' | 'lapCount'>,
+): Promise<FinalDailyGpPodiumGhostPack | null> {
+    const challenge = await readStoredOrBackfilledDailyGpChallenge(podium.challengeId);
+    const track = challenge ? TRACKS[challenge.trackKey] : null;
+    if (!challenge || !track || challenge.trackKey !== podium.trackKey) return null;
+
+    const fingerprint = createTrackFingerprint(track);
+
+    const rankedMembers = await redis.zRange(
+        createRedisChallengeLeaderboardKey(challenge.id),
+        0,
+        2,
+    );
+    const competition = toDailyCompetition(challenge);
+    const slots = await Promise.all((rankedMembers ?? []).map(async (member, index) => {
+        const rank = (index + 1) as 1 | 2 | 3;
+        if (rank > 3 || typeof member?.member !== 'string') {
+            return { rank, ghost: null } satisfies DailyPodiumReplayGhostSlot;
+        }
+        const record = await getPlayerTrackPbRecord({
+            playerId: member.member,
+            competition,
+            track,
+        });
+        return {
+            rank,
+            ghost: record?.ghost ?? null,
+        } satisfies DailyPodiumReplayGhostSlot;
+    }));
+
+    const ghosts = ([1, 2, 3] as const).map((rank) => (
+        slots.find((slot) => slot.rank === rank) ?? { rank, ghost: null }
+    )) as FinalDailyGpPodiumGhostPack['ghosts'];
+
+    return {
+        trackKey: challenge.trackKey,
+        trackFingerprint: fingerprint,
+        ghosts,
     };
 }
 

@@ -213,4 +213,54 @@ describe('track preview rendering', () => {
         expect(ctx.__fillStyles).not.toContain('#dc5a5a');
         global.Path2D = OriginalPath2D;
     });
+
+    it('draws multiple schematic replay cars from world positions', () => {
+        const OriginalPath2D = global.Path2D;
+        global.Path2D = class Path2DMock {
+            addPath() {}
+            moveTo() {}
+            lineTo() {}
+            closePath() {}
+        };
+        const ctx = createPreviewContext();
+        const canvas = {
+            width: 320,
+            height: 200,
+            getContext: vi.fn(() => ctx)
+        };
+        const gold = { id: 'gold' };
+        const arctic = { id: 'arctic' };
+
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: {
+                outer: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 8 },
+                    { x: 0, y: 8 }
+                ],
+                inner: [
+                    { x: 3, y: 3 },
+                    { x: 7, y: 3 },
+                    { x: 7, y: 5 },
+                    { x: 3, y: 5 }
+                ]
+            },
+            presentation: {},
+            startPos: { x: 0.5, y: 2 },
+            startAngle: 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            hideSchematicStartArrow: true,
+            schematicCars: [
+                { image: arctic, x: 4, y: 4, angle: 0.2 },
+                { image: gold, x: 5, y: 4, angle: 0.4 },
+            ]
+        });
+
+        expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+        expect(ctx.drawImage.mock.calls[0][0]).toBe(arctic);
+        expect(ctx.drawImage.mock.calls[1][0]).toBe(gold);
+        global.Path2D = OriginalPath2D;
+    });
 });

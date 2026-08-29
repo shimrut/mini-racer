@@ -4,6 +4,10 @@ import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/tr
 import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
 import { requestFeaturedDailyChallengeStart } from './game/daily-challenge/service.js';
 import { applyAvatar, GENERIC_SNOO_URL, resolveAvatarUrl } from './game/ui/avatar.js';
+import {
+    createPodiumReplayController,
+    fetchPodiumReplays,
+} from './podium-replay-view.js';
 
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
@@ -50,7 +54,7 @@ export function renderPodium(documentRef, value) {
         raceFormat.textContent = `${podium.lapCount} ${podium.lapCount === 1 ? 'LAP' : 'LAPS'}`;
     }
 
-    const rows = Array.from(documentRef.querySelectorAll('[data-rank]')).slice(0, PODIUM_SIZE);
+    const rows = Array.from(documentRef.querySelectorAll('li[data-rank]')).slice(0, PODIUM_SIZE);
     rows.forEach((row, index) => renderPosition(row, podium.positions[index]));
     return podium;
 }
@@ -110,6 +114,11 @@ function renderPosition(row, position) {
         );
     }
     row.classList.toggle('podium-row--empty', position.identityType === 'empty');
+    const replay = row.querySelector('.podium-row__replay');
+    if (replay) {
+        replay.hidden = position.identityType === 'empty';
+        replay.disabled = true;
+    }
 }
 
 function formatRedditName(value) {
@@ -162,12 +171,25 @@ function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+function syncReplayButtons(documentRef, controller) {
+    documentRef?.querySelectorAll('.podium-row__replay').forEach((button) => {
+        const available = controller.hasGhost(Number(button.dataset.rank));
+        button.hidden = !available;
+        button.disabled = !available;
+    });
+}
+
 async function boot() {
     const podium = renderPodium(document, readPodiumPostData());
     renderPodiumTrack(podium.trackName);
     bindPodiumPlayNow(document);
+    const replay = bindPodiumReplay(document, {
+        canvas: document.getElementById('podium-track'),
+        getTrackName: () => podium.trackName,
+    });
     const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
     if (hydrated !== podium) renderPodium(document, hydrated);
+    await replay?.prepareFromServer();
 }
 
 export function bindPodiumPlayNow(documentRef, openGame = openFeaturedGameFromPodium) {
@@ -189,6 +211,51 @@ export async function openFeaturedGameFromPodium(event) {
 }
 
 let trackCarPromise = null;
+let activeReplay = null;
+
+export function bindPodiumReplay(documentRef, {
+    canvas = documentRef?.getElementById('podium-track'),
+    getTrackName = () => '',
+    fetchReplays = fetchPodiumReplays,
+} = {}) {
+    if (!documentRef || documentRef.documentElement?.dataset.podiumReplayBound === '1') {
+        return activeReplay;
+    }
+    documentRef.documentElement.dataset.podiumReplayBound = '1';
+    const controller = createPodiumReplayController({
+        documentRef,
+        canvas,
+        getTrackName,
+    });
+    activeReplay = {
+        get mode() { return controller.mode; },
+        paint: () => controller.paint(),
+        async prepareFromServer(root = globalThis) {
+            const payload = await fetchReplays(root);
+            await controller.prepare(payload, getTrackName());
+            syncReplayButtons(documentRef, controller);
+            return controller.hasGhosts();
+        },
+    };
+
+    documentRef.querySelectorAll('.podium-row__replay').forEach((button) => {
+        button.addEventListener('click', () => controller.enter());
+    });
+    documentRef.getElementById('podium-replay-back')?.addEventListener('click', () => {
+        controller.exit();
+        const podium = renderPodium(documentRef, readPodiumPostData());
+        renderPodiumTrack(podium.trackName, documentRef);
+        syncReplayButtons(documentRef, controller);
+        documentRef.querySelector('.podium-row__replay:not([hidden])')?.focus();
+    });
+    documentRef.getElementById('podium-replay-play')?.addEventListener('click', () => controller.play());
+    documentRef.getElementById('podium-replay-pause')?.addEventListener('click', () => controller.pause());
+    documentRef.getElementById('podium-replay-stop')?.addEventListener('click', () => controller.stop());
+    documentRef.querySelectorAll('.podium-replay__speed').forEach((button) => {
+        button.addEventListener('click', () => controller.setRate(button.dataset.rate));
+    });
+    return activeReplay;
+}
 
 function loadTrackCar() {
     if (trackCarPromise) return trackCarPromise;
@@ -216,8 +283,8 @@ function resolveTrackByName(trackName) {
     return null;
 }
 
-function renderPodiumTrack(trackName) {
-    const canvas = document.getElementById('podium-track');
+function renderPodiumTrack(trackName, documentRef = typeof document !== 'undefined' ? document : null) {
+    const canvas = documentRef?.getElementById('podium-track');
     if (!canvas) return;
     const resolved = resolveTrackByName(trackName) || { trackKey: 'circuit', track: TRACKS.circuit };
     const { trackKey, track } = resolved;
@@ -263,7 +330,11 @@ if (typeof document !== 'undefined') {
     }
 
     window.addEventListener('resize', () => {
-        const podium = renderPodium(document, readPodiumPostData());
+        if (activeReplay?.mode === 'replay') {
+            activeReplay.paint();
+            return;
+        }
+        const podium = normalizePodium(readPodiumPostData());
         renderPodiumTrack(podium.trackName);
     });
 }

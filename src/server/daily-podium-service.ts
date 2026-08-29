@@ -19,6 +19,14 @@ import {
 } from './daily-podium-post-store.js';
 import { getRequestAppSlug } from './request-context.js';
 import { cacheSharedJson } from './shared-cache.js';
+import { getServerFinalDailyGpPodiumGhosts } from './daily-gp-store.js';
+import {
+    DAILY_PODIUM_REPLAY_MARKER,
+    DAILY_PODIUM_REPLAY_MAX_FALLBACK_CHARS,
+    encodeDailyPodiumReplay,
+    podiumReplayHasGhost,
+    type EncodedDailyPodiumReplay,
+} from './daily-podium-replay.js';
 
 const EMPTY_FINISH_LABEL = 'No verified finish';
 const PODIUM_RETRY_WINDOW_MS = 6 * 60 * 60 * 1000;
@@ -181,7 +189,7 @@ export function formatDailyMiniRacerPodiumTitle(podium: DailyGpPodiumPostData): 
     return `Mini Racer Podium, ${formatChallengeDate(podium.challengeDate)}: ${podium.trackName}`;
 }
 
-export function formatDailyMiniRacerPodiumTextFallback(
+function formatDailyMiniRacerPodiumHumanFallback(
     podium: DailyGpPodiumPostData,
 ): string {
     const lapCount = podium.lapCount === 2 || podium.lapCount === 3 ? podium.lapCount : 1;
@@ -200,6 +208,48 @@ export function formatDailyMiniRacerPodiumTextFallback(
         '',
         'These are the final verified results after the track left the seven-day playable window.',
     ].join('\n');
+}
+
+export function formatDailyMiniRacerPodiumTextFallback(
+    podium: DailyGpPodiumPostData,
+    replay: EncodedDailyPodiumReplay | null = null,
+): string {
+    const human = formatDailyMiniRacerPodiumHumanFallback(podium);
+    if (!replay) return human;
+    const text = [
+        human,
+        '',
+        DAILY_PODIUM_REPLAY_MARKER,
+        '',
+        '```text',
+        replay.token,
+        '```',
+    ].join('\n');
+    if (text.length > DAILY_PODIUM_REPLAY_MAX_FALLBACK_CHARS) {
+        throw new Error('Podium text fallback exceeds the Reddit limit.');
+    }
+    return text;
+}
+
+async function encodePodiumReplayForPost(
+    finalPodium: FinalDailyGpPodium,
+): Promise<EncodedDailyPodiumReplay | null> {
+    try {
+        const pack = await getServerFinalDailyGpPodiumGhosts(finalPodium);
+        if (!pack || !podiumReplayHasGhost(pack.ghosts)) return null;
+        return encodeDailyPodiumReplay({
+            challengeId: finalPodium.challengeId,
+            trackKey: pack.trackKey,
+            lapCount: finalPodium.lapCount === 2 || finalPodium.lapCount === 3
+                ? finalPodium.lapCount
+                : 1,
+            trackFingerprint: pack.trackFingerprint,
+            ghosts: pack.ghosts,
+        });
+    } catch (error) {
+        console.error('Failed to freeze Mini Racer podium ghosts:', error);
+        return null;
+    }
 }
 
 export async function enableDailyPodiumAutopost(subredditName: string): Promise<void> {
@@ -448,6 +498,20 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
         if (!isDailyGpPodiumPublicationOpen(finalPodium)) {
             throw new Error('This Mini Racer podium publication window has closed.');
         }
+        const replay = await encodePodiumReplayForPost(finalPodium);
+        let fallbackText = formatDailyMiniRacerPodiumTextFallback(podium);
+        let replayDataHash: string | undefined;
+        if (replay) {
+            try {
+                fallbackText = formatDailyMiniRacerPodiumTextFallback(podium, replay);
+                replayDataHash = replay.hash;
+            } catch (error) {
+                console.error('Failed to attach Mini Racer podium ghosts to the post body:', error);
+            }
+        }
+        if (!isDailyGpPodiumPublicationOpen(finalPodium)) {
+            throw new Error('This Mini Racer podium publication window has closed.');
+        }
         const post = await reddit.submitCustomPost({
             subredditName,
             title: formatDailyMiniRacerPodiumTitle(podium),
@@ -456,9 +520,10 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
                 postType: 'daily-podium',
                 challengeId: podium.challengeId,
                 podium,
+                ...(replayDataHash ? { replayDataHash } : {}),
             },
             textFallback: {
-                text: formatDailyMiniRacerPodiumTextFallback(podium),
+                text: fallbackText,
             },
         });
         if (

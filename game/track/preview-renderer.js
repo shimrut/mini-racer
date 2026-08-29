@@ -323,7 +323,8 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     carImage = null,
     carWorldSize = null,
     trackScale = null,
-    hideStartArrow = false
+    hideStartArrow = false,
+    cars = [],
 }) {
     const outer = trackGeometry.outer;
     const inner = trackGeometry.inner;
@@ -363,6 +364,24 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     ctx.lineWidth = Math.max(2.25, Math.min(width, height) * 0.012);
     ctx.stroke(outerPath);
     ctx.stroke(innerPath);
+
+    if (Array.isArray(cars) && cars.length > 0) {
+        const arrowScale = Math.min(width, height) / 420;
+        for (const car of cars) {
+            if (!car?.image || !Number.isFinite(car.x) || !Number.isFinite(car.y)) continue;
+            drawSchematicCarImage(
+                ctx,
+                car.image,
+                mapPoint({ x: car.x, y: car.y }),
+                Number.isFinite(car.angle) ? car.angle : 0,
+                arrowScale,
+                trackScale,
+                carWorldSize
+            );
+        }
+        ctx.restore();
+        return;
+    }
 
     if (startPos || (moveCarPastStartLine && startLine)) {
         const arrowScale = Math.min(width, height) / 420;
@@ -437,7 +456,8 @@ export function renderTrackPreviewCanvas(canvas, payload) {
             carImage: payload.schematicCarImage || null,
             carWorldSize: payload.schematicCarWorldSize || null,
             trackScale: boundsLayout.scale,
-            hideStartArrow: payload.hideSchematicStartArrow === true
+            hideStartArrow: payload.hideSchematicStartArrow === true,
+            cars: Array.isArray(payload.schematicCars) ? payload.schematicCars : [],
         });
         return;
     }

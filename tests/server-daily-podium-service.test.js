@@ -7,6 +7,7 @@ const {
     mockContext,
     mockSharedCache,
     mockSharedCacheValues,
+    mockDailyGpStore,
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
@@ -30,6 +31,9 @@ const {
     mockContext: { getRequestAppSlug: vi.fn() },
     mockSharedCache: vi.fn(),
     mockSharedCacheValues: new Map(),
+    mockDailyGpStore: {
+        getServerFinalDailyGpPodiumGhosts: vi.fn(async () => null),
+    },
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
@@ -37,6 +41,7 @@ vi.mock('../src/server/daily-podium-autopost-store.js', () => mockAutopostStore)
 vi.mock('../src/server/daily-podium-post-store.js', () => mockPostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
 vi.mock('../src/server/shared-cache.js', () => ({ cacheSharedJson: mockSharedCache }));
+vi.mock('../src/server/daily-gp-store.js', () => mockDailyGpStore);
 
 const {
     enableDailyPodiumAutopost,
@@ -98,6 +103,7 @@ describe('daily podium post workflow', () => {
         mockAutopostStore.upsertDailyPodiumAutopostSubscription.mockImplementation(
             async (_name, updater) => updater(null),
         );
+        mockDailyGpStore.getServerFinalDailyGpPodiumGhosts.mockResolvedValue(null);
         mockReddit.submitCustomPost.mockResolvedValue({
             id: 't3_podium',
             url: 'https://reddit.com/podium',
@@ -202,6 +208,34 @@ describe('daily podium post workflow', () => {
             key: 'lock',
             value: 'owner',
         });
+    });
+
+    it('packs verified ghosts into the post body the same way Head to Head does', async () => {
+        const ghost = {
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: 50,
+            origin: [0, 0, 0],
+            deltas: [1, 0, 0],
+        };
+        mockDailyGpStore.getServerFinalDailyGpPodiumGhosts.mockResolvedValue({
+            trackKey: 'circuit',
+            trackFingerprint: 'track-fingerprint',
+            ghosts: [
+                { rank: 1, ghost },
+                { rank: 2, ghost: null },
+                { rank: 3, ghost: null },
+            ],
+        });
+
+        await ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium);
+
+        const submitted = mockReddit.submitCustomPost.mock.calls[0][0];
+        expect(submitted.postData.replayDataHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(submitted.textFallback.text).toContain('Podium replay data:');
+        expect(submitted.textFallback.text).toContain('MINIRACER-PODIUM-REPLAY-V1');
+        expect(JSON.stringify(submitted.postData)).not.toContain('playerId');
+        expect(JSON.stringify(submitted.postData)).not.toContain('trackKey');
     });
 
     it('reuses the frozen sanitized snapshot after a failed post attempt', async () => {
