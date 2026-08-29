@@ -180,7 +180,7 @@ body {
     --tier: var(--ink);
     position: relative;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     min-height: clamp(3.8rem, 11vh, 5.4rem);
     padding-inline: clamp(0.85rem, 2.4vw, 1.35rem);
@@ -320,37 +320,6 @@ body {
     justify-self: end;
 }
 
-.podium-row__replay {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.15rem;
-    margin-inline: 0.15rem 0.35rem;
-    padding: 0.28rem 0.7rem;
-    border: 1px solid color-mix(in srgb, var(--tier) 42%, transparent);
-    border-radius: 0.4rem;
-    background: color-mix(in srgb, var(--tier) 12%, transparent);
-    color: var(--ink);
-    cursor: pointer;
-    font-family: var(--display);
-    font-size: clamp(0.62rem, 1.7vw, 0.74rem);
-    font-weight: 800;
-    font-style: italic;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}
-
-.podium-row__replay:hover,
-.podium-row__replay:focus-visible {
-    background: color-mix(in srgb, var(--tier) 22%, transparent);
-}
-
-.podium-row__replay:focus-visible {
-    outline: 2px solid var(--tier);
-    outline-offset: 2px;
-}
-
 .podium-replay {
     position: relative;
     z-index: 1;
@@ -371,6 +340,7 @@ body {
 
 .podium-shell[data-mode="replay"] .podium-results,
 .podium-shell[data-mode="replay"] #podium-play,
+.podium-shell[data-mode="replay"] #podium-view-replays,
 .podium-shell[data-mode="replay"] .podium-footer > span {
     display: none;
 }
@@ -408,6 +378,30 @@ body {
 
 .podium-replay__button,
 .podium-replay__speed {
+    min-width: 2.45rem;
+    min-height: 2.45rem;
+    padding: 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+    border-radius: 0.4rem;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.podium-replay__button svg,
+.podium-replay__speed svg {
+    display: block;
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.podium-replay__button:disabled,
+.podium-replay__speed:disabled {
+    cursor: default;
+    opacity: 0.4;
+}
+
+.podium-replay__car {
     min-height: 2.25rem;
     padding: 0.3rem 0.8rem;
     border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
@@ -425,6 +419,7 @@ body {
 
 .podium-replay__button:focus-visible,
 .podium-replay__speed:focus-visible,
+.podium-replay__car:focus-visible,
 .podium-play:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -435,21 +430,44 @@ body {
     background: color-mix(in srgb, var(--accent) 22%, var(--panel));
 }
 
-.podium-replay__speeds {
+.podium-replay__speeds,
+.podium-replay__cars {
     display: flex;
     gap: 0.35rem;
 }
 
+.podium-replay__car[aria-pressed="true"][data-rank="1"] {
+    border-color: var(--gold);
+    background: color-mix(in srgb, var(--gold) 22%, var(--panel));
+}
+
+.podium-replay__car[aria-pressed="true"][data-rank="2"] {
+    border-color: var(--silver);
+    background: color-mix(in srgb, var(--silver) 18%, var(--panel));
+}
+
+.podium-replay__car[aria-pressed="true"][data-rank="3"] {
+    border-color: var(--bronze);
+    background: color-mix(in srgb, var(--bronze) 22%, var(--panel));
+}
+
+.podium-replay__car[aria-pressed="false"] {
+    opacity: 0.45;
+}
+
+.podium-play.podium-play--view,
 .podium-play.podium-play--back {
     background: color-mix(in srgb, var(--ink) 14%, var(--panel));
 }
 
+.podium-play.podium-play--view:hover,
 .podium-play.podium-play--back:hover {
     background: color-mix(in srgb, var(--ink) 22%, var(--panel));
 }
 
+.podium-play--view[hidden],
 .podium-play--back[hidden],
-.podium-row__replay[hidden] {
+.podium-replay__car[hidden] {
     display: none;
 }
 
@@ -497,6 +515,13 @@ body {
 
 .podium-footer > span {
     min-width: 0;
+}
+
+.podium-footer__actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.55rem;
 }
 
 .podium-play {
@@ -549,7 +574,7 @@ body {
     }
 
     .podium-row {
-        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-columns: auto minmax(0, 1fr) auto;
         min-height: 3.45rem;
         padding-inline: 0.7rem;
     }
@@ -566,12 +591,6 @@ body {
         grid-template-columns: 2.15rem minmax(0, 1fr);
         gap: 0.4rem;
         padding-inline: 0.15rem 0.3rem;
-    }
-
-    .podium-row__replay {
-        min-height: 1.9rem;
-        padding: 0.2rem 0.45rem;
-        font-size: 0.58rem;
     }
 
     .podium-row__name {
