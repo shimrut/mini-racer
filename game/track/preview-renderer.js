@@ -244,6 +244,24 @@ function drawSchematicCarTrail(ctx, position, angle, scale = 1) {
     ctx.restore();
 }
 
+function drawSchematicGhostPath(ctx, points, mapPoint, color, scale = 1) {
+    if (!Array.isArray(points) || points.length < 2) return;
+    const first = mapPoint(points[0]);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < points.length; i += 1) {
+        const point = mapPoint(points[i]);
+        ctx.lineTo(point.x, point.y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.5, 2.25 * scale);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.restore();
+}
+
 function drawSchematicCarImage(
     ctx,
     image,
@@ -367,6 +385,11 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
 
     if (Array.isArray(cars) && cars.length > 0) {
         const arrowScale = Math.min(width, height) / 420;
+        for (const car of cars) {
+            if (Array.isArray(car?.trail) && car.trail.length > 1) {
+                drawSchematicGhostPath(ctx, car.trail, mapPoint, car.trailStyle || 'rgba(239, 68, 68, 0.78)', arrowScale);
+            }
+        }
         for (const car of cars) {
             if (!car?.image || !Number.isFinite(car.x) || !Number.isFinite(car.y)) continue;
             drawSchematicCarImage(

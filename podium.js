@@ -282,10 +282,13 @@ export function bindPodiumReplay(documentRef, {
     documentRef.querySelectorAll('.podium-replay__speed').forEach((button) => {
         button.addEventListener('click', () => controller.setRate(button.dataset.rate));
     });
-    documentRef.querySelectorAll('.podium-replay__car').forEach((button) => {
+    documentRef.querySelectorAll('.podium-replay__car[data-rank]').forEach((button) => {
         button.addEventListener('click', () => {
             controller.setVisible(button.dataset.rank, !controller.isVisible(button.dataset.rank));
         });
+    });
+    documentRef.getElementById('podium-replay-trail')?.addEventListener('click', () => {
+        controller.setShowTrail(!controller.showTrail);
     });
     return activeReplay;
 }

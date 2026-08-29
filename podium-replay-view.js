@@ -13,6 +13,11 @@ export const PODIUM_REPLAY_CAR_ASSETS = Object.freeze({
     2: EXTRA_CAR_ASSETS.arctic,
     3: EXTRA_CAR_ASSETS.blaze,
 });
+const PODIUM_REPLAY_TRAIL_STYLES = Object.freeze({
+    1: 'rgba(240, 200, 90, 0.82)',
+    2: 'rgba(203, 213, 225, 0.82)',
+    3: 'rgba(205, 139, 98, 0.82)',
+});
 
 const carLoader = new CarSpriteLoader();
 const carImages = new Map();
@@ -24,6 +29,18 @@ export function formatPodiumReplayClock(timeMs) {
     const seconds = Math.floor((totalMilliseconds % 60_000) / 1000);
     const milliseconds = totalMilliseconds % 1000;
     return `${minutes}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+}
+
+function trailPointsUntil(samples, timeMs) {
+    if (!Array.isArray(samples) || samples.length === 0) return [];
+    const points = [];
+    for (const sample of samples) {
+        if (sample.timeMs > timeMs) break;
+        points.push({ x: sample.x, y: sample.y });
+    }
+    const pose = interpolatePbGhostPose(samples, timeMs);
+    if (pose) points.push({ x: pose.x, y: pose.y });
+    return points;
 }
 
 function loadReplayCars() {
@@ -281,6 +298,7 @@ export function createPodiumReplayController({
         trackName: '',
         frameId: 0,
         lastTs: 0,
+        showTrail: false,
     };
 
     function syncChrome() {
@@ -321,13 +339,17 @@ export function createPodiumReplayController({
         documentRef?.querySelectorAll('.podium-replay__speed').forEach((button) => {
             button.setAttribute('aria-pressed', String(Number(button.dataset.rate) === state.rate));
         });
-        documentRef?.querySelectorAll('.podium-replay__car').forEach((button) => {
+        documentRef?.querySelectorAll('.podium-replay__car[data-rank]').forEach((button) => {
             const rank = Number(button.dataset.rank);
             const available = state.records.has(rank);
             button.hidden = !available;
             button.disabled = !available;
             button.setAttribute('aria-pressed', String(available && state.visible.has(rank)));
         });
+        const trailButton = documentRef?.getElementById('podium-replay-trail');
+        if (trailButton) {
+            trailButton.setAttribute('aria-pressed', String(state.showTrail));
+        }
     }
 
     function paint() {
@@ -354,6 +376,8 @@ export function createPodiumReplayController({
                 x: pose.x,
                 y: pose.y,
                 angle: pose.angle,
+                trail: state.showTrail ? trailPointsUntil(record.samples, state.timeMs) : undefined,
+                trailStyle: PODIUM_REPLAY_TRAIL_STYLES[rank],
             });
         }
 
@@ -409,6 +433,7 @@ export function createPodiumReplayController({
         get playing() { return state.playing; },
         get rate() { return state.rate; },
         get timeMs() { return state.timeMs; },
+        get showTrail() { return state.showTrail; },
         hasGhosts() { return state.records.size > 0; },
         hasGhost(rank) { return state.records.has(Number(rank)); },
         async prepare(payload, trackName) {
@@ -474,6 +499,11 @@ export function createPodiumReplayController({
         },
         isVisible(rank) {
             return state.visible.has(Number(rank));
+        },
+        setShowTrail(visible) {
+            state.showTrail = Boolean(visible);
+            paint();
+            syncChrome();
         },
         setRate(rate) {
             const next = Number(rate);

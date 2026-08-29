@@ -157,6 +157,60 @@ describe('track preview rendering', () => {
         global.Path2D = OriginalPath2D;
     });
 
+    it('draws podium schematic car paths under the cars', () => {
+        const OriginalPath2D = global.Path2D;
+        global.Path2D = class Path2DMock {
+            addPath() {}
+            moveTo() {}
+            lineTo() {}
+            quadraticCurveTo() {}
+            closePath() {}
+        };
+        const ctx = createPreviewContext();
+        const carImage = { width: 500, height: 500 };
+        const canvas = {
+            width: 320,
+            height: 200,
+            getContext: vi.fn(() => ctx)
+        };
+
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: {
+                outer: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 8 },
+                    { x: 0, y: 8 }
+                ],
+                inner: [
+                    { x: 3, y: 3 },
+                    { x: 7, y: 3 },
+                    { x: 7, y: 5 },
+                    { x: 3, y: 5 }
+                ]
+            },
+            presentation: {},
+            startLine: { p1: { x: 1, y: 1 }, p2: { x: 1, y: 3 } },
+            startPos: { x: 0.5, y: 2 },
+            startAngle: 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            hideSchematicStartArrow: true,
+            schematicCars: [{
+                image: carImage,
+                x: 4,
+                y: 4,
+                angle: 0,
+                trail: [{ x: 1, y: 2 }, { x: 4, y: 4 }],
+                trailStyle: 'rgba(240, 200, 90, 0.82)',
+            }],
+        });
+
+        expect(ctx.strokeStyle).toBe('rgba(240, 200, 90, 0.82)');
+        expect(ctx.drawImage).toHaveBeenCalledOnce();
+        global.Path2D = OriginalPath2D;
+    });
+
     it('replaces the lobby arrow with the selected car at the exact start pose', () => {
         const OriginalPath2D = global.Path2D;
         global.Path2D = class Path2DMock {

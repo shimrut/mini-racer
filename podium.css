@@ -604,8 +604,13 @@ body {
     background: color-mix(in srgb, var(--bronze) 22%, transparent);
 }
 
-.podium-replay__car[aria-pressed="false"] {
+.podium-replay__car[aria-pressed="false"][data-rank] {
     opacity: 0.45;
+}
+
+.podium-replay__trail[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .podium-play.podium-play--view,
