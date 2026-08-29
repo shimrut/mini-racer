@@ -363,9 +363,7 @@ body {
 }
 
 .podium-shell[data-mode="replay"] .podium-results,
-.podium-shell[data-mode="replay"] #podium-play,
-.podium-shell[data-mode="replay"] #podium-view-replays,
-.podium-shell[data-mode="replay"] .podium-footer > span {
+.podium-shell[data-mode="replay"] .podium-footer {
     display: none;
 }
 
@@ -376,23 +374,6 @@ body {
     gap: 0.65rem;
     padding-top: 0.35rem;
     background: transparent;
-}
-
-.podium-shell[data-mode="replay"] .podium-footer {
-    flex: 0 0 auto;
-    order: 4;
-    justify-content: flex-end;
-    background: transparent;
-}
-
-.podium-shell[data-mode="replay"] .podium-play--back {
-    display: inline-flex;
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
-}
-
-.podium-shell[data-mode="replay"] .podium-play--back:hover {
-    background: color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
 .podium-replay__seek-wrap {
@@ -470,12 +451,17 @@ body {
 
 .podium-replay__chrome {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "playback clock"
+        "cars back";
     align-items: center;
-    gap: 0.4rem;
+    column-gap: 0.4rem;
+    row-gap: 0.4rem;
 }
 
 .podium-replay__playback {
+    grid-area: playback;
     display: flex;
     align-items: center;
     justify-self: start;
@@ -484,14 +470,15 @@ body {
 }
 
 .podium-replay__clock {
+    grid-area: clock;
     color: var(--ink);
     font-family: var(--mono);
     font-size: clamp(0.92rem, 2.4vw, 1.2rem);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.05em;
-    text-align: center;
-    justify-self: center;
+    text-align: right;
+    justify-self: end;
 }
 
 .podium-replay__button .podium-replay__icon--pause {
@@ -551,6 +538,7 @@ body {
 }
 
 .podium-replay__car {
+    flex: 0 0 auto;
     min-height: 2.25rem;
     padding: 0.3rem 0.8rem;
     border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
@@ -564,6 +552,7 @@ body {
     font-style: italic;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .podium-replay__button:focus-visible,
@@ -586,6 +575,15 @@ body {
 }
 
 .podium-replay__cars {
+    grid-area: cars;
+    flex-wrap: wrap;
+    justify-self: start;
+    min-width: 0;
+}
+
+.podium-replay__back {
+    grid-area: back;
+    align-self: start;
     justify-self: end;
 }
 
@@ -613,18 +611,15 @@ body {
     background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.podium-play.podium-play--view,
-.podium-play.podium-play--back {
+.podium-play.podium-play--view {
     background: color-mix(in srgb, var(--ink) 14%, var(--panel));
 }
 
-.podium-play.podium-play--view:hover,
-.podium-play.podium-play--back:hover {
+.podium-play.podium-play--view:hover {
     background: color-mix(in srgb, var(--ink) 22%, var(--panel));
 }
 
 .podium-play--view[hidden],
-.podium-play--back[hidden],
 .podium-replay__car[hidden] {
     display: none;
 }
@@ -779,67 +774,6 @@ body {
         font-size: 1.08rem;
     }
 
-    .podium-shell[data-mode="replay"] {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-rows: auto minmax(0, 1fr) auto auto auto;
-        grid-template-areas:
-            "header header"
-            "track track"
-            "seek seek"
-            "playback clock"
-            "back cars";
-    }
-
-    .podium-shell[data-mode="replay"] .podium-header {
-        grid-area: header;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-track {
-        grid-area: track;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-replay,
-    .podium-shell[data-mode="replay"] .podium-replay__chrome,
-    .podium-shell[data-mode="replay"] .podium-footer,
-    .podium-shell[data-mode="replay"] .podium-footer__actions {
-        display: contents;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-replay__seek-wrap {
-        grid-area: seek;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-replay__playback {
-        grid-area: playback;
-        justify-self: start;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-replay__clock {
-        grid-area: clock;
-        justify-self: end;
-        text-align: right;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-play--back {
-        grid-area: back;
-        justify-self: start;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-replay__cars {
-        grid-area: cars;
-        justify-self: end;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-replay__speed {
-        min-width: 0;
-        padding: 0.3rem 0.4rem;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-play--back,
-    .podium-shell[data-mode="replay"] .podium-replay__car {
-        padding-inline: 0.55rem;
-    }
 }
 
 @media (max-height: 430px) {
