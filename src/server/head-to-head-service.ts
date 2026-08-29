@@ -70,11 +70,6 @@ export type HeadToHeadRequestContext = {
 export type HeadToHeadServiceResult = {
     status: number;
     body: Record<string, unknown>;
-    /**
-     * Origin personal-best / ghost work that must not hold the HTTP body. The submit route sends
-     * `body` first, then awaits this so Redis still finishes on the same request.
-     */
-    afterSend?: () => Promise<unknown>;
 };
 
 export type HeadToHeadReplayResult = {
@@ -115,6 +110,13 @@ export type HeadToHeadBestUpdate = {
     medal: HeadToHeadMedal;
     rank: number | null;
 };
+
+function bodyWithBestUpdate(
+    body: Record<string, unknown>,
+    bestUpdate: HeadToHeadBestUpdate | null,
+): Record<string, unknown> {
+    return bestUpdate ? { ...body, bestUpdate } : body;
+}
 
 export type HeadToHeadServiceDependencies = {
     resolveSource(
@@ -1032,7 +1034,7 @@ export function createHeadToHeadService(
             return { status: 422, body: { status: 'invalid_replay', error: 'This challenge run could not be verified.' } };
         }
         const differenceMs = verified.bestTimeMs - challenge.targetTimeMs;
-        const originSave = () => recordVerifiedBest(
+        const originSave = recordVerifiedBest(
             challenge,
             input.replay,
             viewer,
@@ -1040,17 +1042,15 @@ export function createHeadToHeadService(
             verified,
         );
         if (differenceMs >= 0) {
-            // Win/loss can leave as soon as the tape is judged. Origin personal best and ghost stay
-            // off this body and run after the route has already sent it.
+            const lost = targetNotBeaten(differenceMs);
             return {
-                ...targetNotBeaten(differenceMs),
-                afterSend: originSave,
+                ...lost,
+                body: bodyWithBestUpdate(lost.body, await originSave),
             };
         }
 
-        // Brag receipt and Head to Head unlocks belong on the first body. Origin save does not:
-        // those Daily/Campaign writes would hold the duel, and public Daily/Campaign HTTP cannot
-        // take this already-judged run.
+        // Brag, Head to Head unlocks, and the origin personal-best / place share this body so the
+        // finish sheet can replace RANK. Public Daily/Campaign HTTP still cannot take this tape.
         const acceptPromise = challenge.postId
             ? (async () => {
                 const acceptToken = createId();
@@ -1074,13 +1074,14 @@ export function createHeadToHeadService(
             await recordCompletedRace(viewer.playerId);
             await recordHeadToHeadWin(viewer.playerId, challengeId);
         })();
-        const [acceptToken] = await Promise.all([
+        const [acceptToken, bestUpdate] = await Promise.all([
             acceptPromise,
+            originSave,
             unlockWrites,
         ]);
         return {
             status: 200,
-            body: {
+            body: bodyWithBestUpdate({
                 status: 'accepted',
                 accepted: true,
                 outcome: 'won',
@@ -1090,8 +1091,7 @@ export function createHeadToHeadService(
                 differenceMs,
                 acceptToken,
                 carUnlocks: await readChallengeCarUnlocks(viewer.playerId),
-            },
-            afterSend: originSave,
+            }, bestUpdate),
         };
     }
 

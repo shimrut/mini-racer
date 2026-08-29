@@ -336,15 +336,21 @@ export const headToHeadEngineMethods = {
         // personal best it earned is not thrown away. A slower run would be refused anyway, so it stays home.
         const beatsViewerBest = finalTimeMs !== null
             && (!hasViewerBest || finalTimeMs < viewerBestMs);
+        const paintBestUpdate = (response) => {
+            const bestUpdate = response?.body?.bestUpdate;
+            if (!bestUpdate || !stillOnThisFinish()) return;
+            this.modal.updateChallengeFinishHero?.({ bestUpdate });
+        };
         const claimSettledBest = async () => {
             try {
-                // Same submit as a claimed win: origin personal best and ghost save after the
-                // first body, so this call does not wait on Daily/Campaign or paint origin place.
-                await submitHeadToHeadRun({
+                // Same submit as a claimed win: origin personal best and place come back on this
+                // body so the finish sheet can replace RANK.
+                const response = await submitHeadToHeadRun({
                     challengeId: challenge.challengeId,
                     replay,
                     bestTimeMs: finalTimeMs,
                 });
+                paintBestUpdate(response);
             } catch (submitError) {
                 console.error('Could not rank a settled Head to Head run:', submitError);
             }
@@ -403,6 +409,9 @@ export const headToHeadEngineMethods = {
                     this.modal.updateChallengeFinishHero?.({
                         phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
                         verdict: buildVerdict(serverDifferenceMs),
+                        ...(response.body?.bestUpdate
+                            ? { bestUpdate: response.body.bestUpdate }
+                            : {}),
                     });
                     revertOptimisticWin();
                     return;
@@ -426,10 +435,14 @@ export const headToHeadEngineMethods = {
                 });
             }
 
+            const bestUpdate = response.body?.bestUpdate
+                ? { bestUpdate: response.body.bestUpdate }
+                : {};
             if (outcome === 'won') {
                 this.modal.updateChallengeFinishHero?.({
                     phase: 'won',
                     verdict,
+                    ...bestUpdate,
                 });
                 rememberHeadToHeadWin(
                     challenge.challengeId,
@@ -441,6 +454,7 @@ export const headToHeadEngineMethods = {
             this.modal.updateChallengeFinishHero?.({
                 phase: outcome === 'tie' ? 'tie' : 'lost',
                 verdict,
+                ...bestUpdate,
             });
             revertOptimisticWin();
         })();

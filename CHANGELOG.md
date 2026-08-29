@@ -1,5 +1,7 @@
 # Changelog
 
+- Head to Head finish now shows your Daily or Campaign place when the run is a new personal best, including a first time on that board.
+
 - Winning a Head to Head no longer draws the browser's default outline around your finish time.
 
 - Garage Car and Trail now use the same rounded pill switch as Settings on/off.

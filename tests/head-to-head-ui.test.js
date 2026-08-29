@@ -212,6 +212,60 @@ describe('Head to Head lobby and finish', () => {
         });
     });
 
+    it('paints origin place on a first personal best', async () => {
+        const updateChallengeFinishHero = vi.fn();
+        const context = {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero,
+                setChallengeWinActions: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            showDailyLobby: vi.fn(),
+            showCampaignLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                outcome: 'won',
+                differenceMs: -500,
+                bestUpdate: { mode: 'campaign', improved: true, bestTimeMs: 7_500, rank: 18 },
+            },
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 7.5 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            expect.objectContaining({
+                previousPersonalBestSec: null,
+                challengeViewerBest: null,
+            }),
+            expect.anything(),
+        );
+        await vi.waitFor(() => {
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    phase: 'won',
+                    bestUpdate: { mode: 'campaign', improved: true, bestTimeMs: 7_500, rank: 18 },
+                }),
+            );
+        });
+    });
+
     it('does not strand a Head to Head finish when confirmation fails', async () => {
         const modalMsg = { style: {}, textContent: '' };
         const updateChallengeFinishHero = vi.fn();
@@ -504,7 +558,7 @@ describe('Head to Head lobby and finish', () => {
         });
     });
 
-    it('still sends a settled loss that can save an origin personal best, without painting origin place', async () => {
+    it('still sends a settled loss that can save an origin personal best, and paints origin place', async () => {
         const updateChallengeFinishHero = vi.fn();
         const context = {
             activeHeadToHead: {
@@ -525,12 +579,14 @@ describe('Head to Head lobby and finish', () => {
             settings: { openSettings: vi.fn() },
         };
         headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
-            ok: true,
+            ok: false,
+            status: 422,
             body: {
                 accepted: false,
                 status: 'target_not_beaten',
                 targetTimeMs: 8_000,
                 differenceMs: 400,
+                bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 8_400, rank: 11 },
             },
         });
 
@@ -539,7 +595,11 @@ describe('Head to Head lobby and finish', () => {
         await vi.waitFor(() => {
             expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
         });
-        expect(updateChallengeFinishHero).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith({
+                bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 8_400, rank: 11 },
+            });
+        });
     });
 
     it('keeps a settled loss home when it does not beat the best already held', async () => {
@@ -656,12 +716,12 @@ describe('Head to Head lobby and finish', () => {
         );
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledWith(
-                expect.objectContaining({ phase: 'won' }),
+                expect.objectContaining({
+                    phase: 'won',
+                    bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 7_500, rank: 1 },
+                }),
             );
         });
-        expect(updateChallengeFinishHero).not.toHaveBeenCalledWith(
-            expect.objectContaining({ bestUpdate: expect.anything() }),
-        );
     });
 
     it('leaves the finish unbraggable when a win comes back without an accept token', async () => {
