@@ -381,13 +381,8 @@ body {
 .podium-shell[data-mode="replay"] .podium-footer {
     flex: 0 0 auto;
     order: 4;
-    flex-wrap: nowrap;
-    justify-content: space-between;
+    justify-content: flex-end;
     background: transparent;
-}
-
-.podium-shell[data-mode="replay"] .podium-footer__actions {
-    display: none;
 }
 
 .podium-shell[data-mode="replay"] .podium-play--back {
@@ -474,15 +469,16 @@ body {
 }
 
 .podium-replay__chrome {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
     gap: 0.4rem;
 }
 
 .podium-replay__playback {
     display: flex;
     align-items: center;
+    justify-self: start;
     gap: 0.4rem;
     min-width: 0;
 }
@@ -494,8 +490,8 @@ body {
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.05em;
-    text-align: right;
-    flex: 0 0 auto;
+    text-align: center;
+    justify-self: center;
 }
 
 .podium-replay__button .podium-replay__icon--pause {
@@ -586,12 +582,11 @@ body {
 .podium-replay__speeds,
 .podium-replay__cars {
     display: flex;
-    flex: 0 0 auto;
     gap: 0.35rem;
 }
 
-.podium-replay__cars[hidden] {
-    display: none;
+.podium-replay__cars {
+    justify-self: end;
 }
 
 .podium-replay__car[aria-pressed="true"][data-rank="1"] {
@@ -783,6 +778,68 @@ body {
     .podium-row--gold .podium-row__time {
         font-size: 1.08rem;
     }
+
+    .podium-shell[data-mode="replay"] {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+        grid-template-areas:
+            "header header"
+            "track track"
+            "seek seek"
+            "playback clock"
+            "back cars";
+    }
+
+    .podium-shell[data-mode="replay"] .podium-header {
+        grid-area: header;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-track {
+        grid-area: track;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-replay,
+    .podium-shell[data-mode="replay"] .podium-replay__chrome,
+    .podium-shell[data-mode="replay"] .podium-footer,
+    .podium-shell[data-mode="replay"] .podium-footer__actions {
+        display: contents;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-replay__seek-wrap {
+        grid-area: seek;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-replay__playback {
+        grid-area: playback;
+        justify-self: start;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-replay__clock {
+        grid-area: clock;
+        justify-self: end;
+        text-align: right;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-play--back {
+        grid-area: back;
+        justify-self: start;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-replay__cars {
+        grid-area: cars;
+        justify-self: end;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-replay__speed {
+        min-width: 0;
+        padding: 0.3rem 0.4rem;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-play--back,
+    .podium-shell[data-mode="replay"] .podium-replay__car {
+        padding-inline: 0.55rem;
+    }
 }
 
 @media (max-height: 430px) {
@@ -805,22 +862,6 @@ body {
 
     .podium-footer {
         justify-content: flex-end;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-footer {
-        justify-content: space-between;
-    }
-}
-
-@media (max-width: 430px) {
-    .podium-replay__speed {
-        min-width: 0;
-        padding: 0.3rem 0.4rem;
-    }
-
-    .podium-shell[data-mode="replay"] .podium-play--back,
-    .podium-shell[data-mode="replay"] .podium-replay__car {
-        padding-inline: 0.55rem;
     }
 }
 

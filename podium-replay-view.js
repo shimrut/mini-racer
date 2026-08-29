@@ -318,7 +318,6 @@ export function createPodiumReplayController({
         playNow?.toggleAttribute('hidden', inReplay);
         viewReplays?.toggleAttribute('hidden', inReplay || state.records.size === 0);
         back?.toggleAttribute('hidden', !inReplay);
-        documentRef?.getElementById('podium-replay-cars')?.toggleAttribute('hidden', !inReplay);
         if (clock) clock.textContent = formatPodiumReplayClock(state.timeMs);
         if (toggle) {
             toggle.disabled = state.durationMs <= 0;
