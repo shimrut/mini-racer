@@ -382,7 +382,7 @@ body {
     flex: 0 0 auto;
     order: 4;
     flex-wrap: nowrap;
-    justify-content: flex-start;
+    justify-content: space-between;
     background: transparent;
 }
 
@@ -808,7 +808,7 @@ body {
     }
 
     .podium-shell[data-mode="replay"] .podium-footer {
-        justify-content: flex-start;
+        justify-content: space-between;
     }
 }
 
