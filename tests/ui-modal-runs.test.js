@@ -90,6 +90,52 @@ describe('challenge finish correction', () => {
             global.document = originalDocument;
         }
     });
+
+    it('fills VS. YOUR PB from a held origin best that this run did not beat', () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="finish" class="active-view">
+                <div id="combined-hero-medal"></div>
+                <span id="combined-best-lap" class="combined-stat-value--placeholder">No lap times yet</span>
+                <div id="combined-stats-right-group">
+                    <div id="combined-rank-value"></div>
+                    <div id="combined-rank-total"></div>
+                </div>
+            </div>
+        `);
+        global.document = dom.window.document;
+        const view = dom.window.document.getElementById('finish');
+        const context = {
+            modalCombinedView: view,
+            content: new ModalContentUi(),
+            _challengeFinishPhase: 'lost',
+            _combinedResultsLapData: {
+                lapTime: 11.844,
+                challengeConfirmPhase: 'lost',
+                previousPersonalBestSec: null,
+                challengeViewerBest: null,
+            },
+            combinedPlaylistBtn: null,
+        };
+
+        try {
+            ModalShell.prototype.updateChallengeFinishHero.call(context, {
+                bestUpdate: {
+                    mode: 'campaign',
+                    improved: false,
+                    bestTimeMs: 11_200,
+                    rank: 2,
+                },
+            });
+
+            expect(view.querySelector('#combined-best-lap').textContent).toBe('+0.644s');
+            expect(view.querySelector('#combined-best-lap').classList.contains('is-loss')).toBe(true);
+            expect(view.querySelector('.rank-num').textContent).toBe('2');
+            expect(context._combinedResultsLapData.previousPersonalBestSec).toBe(11.2);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
 });
 
 function withLeaderboardIntroMethods(context = {}) {

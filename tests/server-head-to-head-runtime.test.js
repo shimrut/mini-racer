@@ -366,10 +366,24 @@ describe('the best a challenge viewer already holds', () => {
         expect(mockRepairStandings).not.toHaveBeenCalled();
     });
 
-    it('holds nothing for a racer with no time there', async () => {
+    it('uses Campaign progress when the standings entry is missing', async () => {
         mockReadEntry.mockResolvedValue(null);
+        mockGetCampaignProgress.mockResolvedValue({
+            resultsByRaceId: Object.fromEntries(
+                CAMPAIGN_STAGES.map((stage) => [stage.raceId, {
+                    medal: 'gold',
+                    ...(stage.raceId === 'numbered-v1-03' ? { bestTimeMs: 24_100 } : {}),
+                }]),
+            ),
+        });
+        mockReadPlayerRank.mockResolvedValue(2);
 
-        expect(await readHeadToHeadViewerBest(campaignChallenge, 'reddit:racer')).toBeNull();
+        expect(await readHeadToHeadViewerBest(campaignChallenge, 'reddit:racer'))
+            .toMatchObject({
+                bestTimeMs: 24_100,
+                rank: 2,
+                trackLocked: false,
+            });
     });
 
     it('holds nothing without a player', async () => {

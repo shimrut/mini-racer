@@ -290,7 +290,10 @@ flowchart LR
   submit body, which is the official beat / not beat and can turn Brag on. A
   local loss or tie can still settle on that sheet immediately. Origin place
   arrives on that same submit body when the run is a personal best, so RANK
-  replaces "—" or the old number instead of staying empty. Brag stays off until a verified accept token. A rejected,
+  replaces "—" or the old number instead of staying empty. VS. YOUR PB uses the
+  same origin best Daily and Campaign finishes use (GET, Campaign progress, Daily
+  storage). A slower run that still returns the held origin time fills that row
+  instead of leaving "No lap times yet". Brag stays off until a verified accept token. A rejected,
   interrupted, or server-corrected confirmation patches the sheet in place with
   no remount. Challenge finishes never write Campaign medals, progress, or ranks.
   Campaign finish also paints RANK immediately while submitting, then replaces it

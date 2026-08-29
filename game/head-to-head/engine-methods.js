@@ -9,11 +9,71 @@ import {
     rememberHeadToHeadWin,
     submitHeadToHeadRun,
 } from './service.js';
+import { getDailyChallengeBestResult } from '../daily-challenge/service.js';
 import {
     cancelDeferredLobbyWork,
 } from '../lobby/deferred-work.js';
 import { createModalActions } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
+
+function finitePositiveMs(value) {
+    const ms = Number(value);
+    return Number.isFinite(ms) && ms > 0 ? Math.round(ms) : null;
+}
+
+/**
+ * Same origin best Daily and Campaign finishes already use: the challenge GET, then Campaign
+ * progress / Daily storage. Head to Head start wipes the in-race PB cache so the HUD stays
+ * opponent-only; this must not empty VS. YOUR PB.
+ */
+export function resolveHeadToHeadHeldBest(engine, challenge) {
+    const viewer = challenge?.viewerBest && typeof challenge.viewerBest === 'object'
+        ? challenge.viewerBest
+        : null;
+    if (viewer?.trackLocked) return viewer;
+
+    const origin = challenge?.origin;
+    const times = [];
+    const viewerMs = finitePositiveMs(viewer?.bestTimeMs);
+    if (viewerMs) times.push(viewerMs);
+
+    const raceId = origin?.mode === 'campaign'
+        ? origin.raceId
+        : (origin?.mode === 'daily' ? null : challenge?.raceId);
+    if (raceId) {
+        const progressMs = finitePositiveMs(
+            engine?.campaignBootstrap?.progress?.resultsByRaceId?.[raceId]?.bestTimeMs,
+        );
+        if (progressMs) times.push(progressMs);
+        const cachedSec = Number(engine?.trackPersonalBestByTrackKey?.[raceId]?.bestTime);
+        if (Number.isFinite(cachedSec) && cachedSec > 0) {
+            times.push(Math.round(cachedSec * 1000));
+        }
+    }
+    if (origin?.mode === 'daily') {
+        const daily = getDailyChallengeBestResult({
+            id: origin.challengeId,
+            trackKey: challenge.trackKey,
+        });
+        const dailySec = Number(daily?.bestTime);
+        if (Number.isFinite(dailySec) && dailySec > 0) {
+            times.push(Math.round(dailySec * 1000));
+        }
+    }
+
+    const bestTimeMs = times.length ? Math.min(...times) : null;
+    if (!bestTimeMs) return viewer;
+    const standingRank = Number(
+        engine?.campaignBootstrap?.standingsByRaceId?.[raceId]?.rank,
+    );
+    return {
+        ...(viewer || {}),
+        bestTimeMs,
+        rank: Number.isInteger(Number(viewer?.rank)) && Number(viewer.rank) > 0
+            ? Number(viewer.rank)
+            : (Number.isInteger(standingRank) && standingRank > 0 ? standingRank : (viewer?.rank ?? null)),
+    };
+}
 
 function toRaceChallenge(stage) {
     return {
@@ -261,10 +321,11 @@ export const headToHeadEngineMethods = {
             : null;
         const settlesLocally = localDifferenceMs !== null && localDifferenceMs >= 0;
 
-        // The best the player already holds on the stage or Daily behind this challenge. The finish
-        // sheet measures the run against it the way an ordinary finish does.
-        const viewerBestMs = Number(challenge.viewerBest?.bestTimeMs);
-        const hasViewerBest = Number.isFinite(viewerBestMs) && viewerBestMs > 0;
+        // Same origin best Daily and Campaign finishes already use. The GET can miss it; local
+        // Campaign progress and Daily storage still know.
+        const heldBest = resolveHeadToHeadHeldBest(this, challenge);
+        const viewerBestMs = finitePositiveMs(heldBest?.bestTimeMs);
+        const hasViewerBest = viewerBestMs !== null;
         const previousPersonalBestSec = hasViewerBest ? viewerBestMs / 1000 : null;
 
         const openPendingFinish = ({
@@ -288,7 +349,7 @@ export const headToHeadEngineMethods = {
                     challengeViewerAvatarUrl: challenge.viewerAvatarUrl ?? null,
                     challengeVerdict: buildVerdict(localDifferenceMs),
                     previousPersonalBestSec,
-                    challengeViewerBest: challenge.viewerBest ?? null,
+                    challengeViewerBest: heldBest ?? null,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
                     // Rank is already on this row; a personal best may replace the number, but the

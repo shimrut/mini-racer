@@ -1000,6 +1000,20 @@ export class ModalContentUi {
         this.bindChallengeTrackLockedRank(container, Boolean(snapshot?.trackLocked));
     }
 
+    /**
+     * Fill VS. YOUR PB from a held origin best. Used when the finish opened without one
+     * and the origin save later reports the time this run did not beat.
+     */
+    applyChallengePersonalBestStat(container, lapTimeSec, previousPersonalBestSec) {
+        if (!container) return;
+        this._applyCombinedWinPbDelta(
+            container.querySelector('#combined-best-lap'),
+            lapTimeSec,
+            previousPersonalBestSec,
+            null,
+        );
+    }
+
     bindChallengeTrackLockedRank(container, trackLocked) {
         bindCombinedStatButton(
             container?.querySelector('#combined-stats-right-group'),

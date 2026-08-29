@@ -1335,6 +1335,27 @@ export class ModalShell {
                 lapData?.challengeViewerBest,
             );
             if (lapData) lapData.challengeBestUpdate = nextBestUpdate;
+            // A run that did not beat the origin best still returns that held time. RANK can
+            // land from it; VS. YOUR PB must too, or a miss on the first GET stays "No lap times yet".
+            const heldBestSec = nextBestUpdate?.improved === true
+                ? null
+                : Number(nextBestUpdate?.bestTimeMs) / 1000;
+            const alreadyHasPb = Number(lapData?.previousPersonalBestSec) > 0;
+            if (Number.isFinite(heldBestSec) && heldBestSec > 0 && !alreadyHasPb) {
+                this.content.applyChallengePersonalBestStat?.(
+                    this.modalCombinedView,
+                    lapData?.lapTime,
+                    heldBestSec,
+                );
+                if (lapData) {
+                    lapData.previousPersonalBestSec = heldBestSec;
+                    lapData.challengeViewerBest = {
+                        ...(lapData.challengeViewerBest || {}),
+                        bestTimeMs: nextBestUpdate.bestTimeMs,
+                        rank: nextBestUpdate.rank ?? lapData.challengeViewerBest?.rank ?? null,
+                    };
+                }
+            }
         }
 
         if (shareRequest !== undefined) {

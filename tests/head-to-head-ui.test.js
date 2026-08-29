@@ -25,7 +25,7 @@ function stubLocalStorage() {
     return store;
 }
 
-import { headToHeadEngineMethods } from '../game/head-to-head/engine-methods.js';
+import { headToHeadEngineMethods, resolveHeadToHeadHeldBest } from '../game/head-to-head/engine-methods.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GENERIC_SNOO_URL } from '../game/ui/avatar.js';
 
@@ -264,6 +264,62 @@ describe('Head to Head lobby and finish', () => {
                 }),
             );
         });
+    });
+
+    it('uses the Campaign best Daily and Campaign finishes already use when the GET missed it', async () => {
+        const context = {
+            campaignBootstrap: {
+                progress: {
+                    resultsByRaceId: {
+                        'numbered-v1-03': { bestTimeMs: 11_200 },
+                    },
+                },
+                standingsByRaceId: {
+                    'numbered-v1-03': { rank: 2 },
+                },
+            },
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                trackKey: 'numberThree',
+                lapCount: 1,
+                targetTimeMs: 11_748,
+                origin: { mode: 'campaign', campaignId: 'numbered-v1', raceId: 'numbered-v1-03' },
+                raceId: 'numbered-v1-03',
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                updateChallengeFinishHero: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: false,
+            status: 422,
+            body: { accepted: false, status: 'target_not_beaten', differenceMs: 96 },
+        });
+
+        expect(resolveHeadToHeadHeldBest(context, context.activeHeadToHead)).toMatchObject({
+            bestTimeMs: 11_200,
+            rank: 2,
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 11.844 });
+
+        expect(context.modal.showModal).toHaveBeenCalledWith(
+            'Challenge complete',
+            null,
+            expect.objectContaining({
+                previousPersonalBestSec: 11.2,
+                challengeViewerBest: expect.objectContaining({ bestTimeMs: 11_200, rank: 2 }),
+            }),
+            expect.anything(),
+        );
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
     });
 
     it('does not strand a Head to Head finish when confirmation fails', async () => {

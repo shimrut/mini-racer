@@ -288,6 +288,7 @@ export async function readHeadToHeadViewerBest(
 ): Promise<HeadToHeadViewerBest | null> {
     if (!playerId) return null;
     const origin = getHeadToHeadOrigin(challenge);
+    let progressBestTimeMs: number | null = null;
     if (origin?.mode === 'campaign') {
         try {
             const progress = await getCampaignProgressForSelection(playerId);
@@ -299,6 +300,8 @@ export async function readHeadToHeadViewerBest(
                     trackLocked: true,
                 };
             }
+            const storedMs = Number(progress.resultsByRaceId?.[origin.raceId]?.bestTimeMs);
+            if (Number.isFinite(storedMs) && storedMs > 0) progressBestTimeMs = Math.round(storedMs);
         } catch {
             // A progress miss must not hide a real board rank; fall through and read the entry.
         }
@@ -314,8 +317,11 @@ export async function readHeadToHeadViewerBest(
         }
     }
     const entry = await readEntryByPlayerId(target.competition, playerId);
-    const bestTimeMs = Number(entry?.bestTimeMs);
-    if (!Number.isFinite(bestTimeMs) || bestTimeMs <= 0) return null;
+    const entryMs = Number(entry?.bestTimeMs);
+    const bestTimeMs = [entryMs, progressBestTimeMs]
+        .filter((ms) => Number.isFinite(ms) && ms > 0)
+        .reduce((fastest, ms) => Math.min(fastest, Math.round(ms)), Number.POSITIVE_INFINITY);
+    if (!Number.isFinite(bestTimeMs) || bestTimeMs === Number.POSITIVE_INFINITY) return null;
     return {
         bestTimeMs,
         medal: getMedalForRaceTime(target.trackKey, bestTimeMs / 1000, target.lapCount),
