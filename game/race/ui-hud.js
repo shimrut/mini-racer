@@ -293,9 +293,14 @@ export class RaceHud {
     syncPauseControls() {
     const placement = getPausePlacement();
     const hideHud = getHideHudEnabled();
-    const showBottomPause = this._pauseAvailable && placement === PAUSE_PLACEMENT_SEPARATE;
-    const showTimerPause = this._pauseAvailable && placement === PAUSE_PLACEMENT_TIMER;
-    const showSpeedoPause = this._pauseAvailable && placement === PAUSE_PLACEMENT_SPEEDO;
+    const pauseOnTimer = placement === PAUSE_PLACEMENT_TIMER;
+    const pauseOnSpeedo = placement === PAUSE_PLACEMENT_SPEEDO;
+    const showBottomPause = this._pauseAvailable && (
+        placement === PAUSE_PLACEMENT_SEPARATE
+        || (pauseOnSpeedo && hideHud)
+    );
+    const showTimerPause = this._pauseAvailable && pauseOnTimer;
+    const showSpeedoPause = this._pauseAvailable && pauseOnSpeedo && !hideHud;
     const showTimerPauseOnly = showTimerPause && hideHud;
 
     if (this.pauseBtn) {

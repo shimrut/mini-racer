@@ -490,6 +490,50 @@ describe('ui race hud helpers', () => {
         expect(hud.hideLapFlash).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps a centered pause icon when hide HUD is on and pause is on the speedo', () => {
+        const store = new Map([
+            ['VectorGpPausePlacement', 'speedo'],
+            ['VectorGpHideHudEnabled', '1'],
+        ]);
+        vi.stubGlobal('window', {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        });
+        const pauseBtn = { hidden: true, style: {} };
+        const hudStatsBtn = {
+            disabled: false,
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+        };
+        const timerPauseIcon = { hidden: false };
+        const speedometer = {
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+            removeAttribute: vi.fn(),
+        };
+
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'pause-btn': pauseBtn,
+            'hud-stats-btn': hudStatsBtn,
+            'hud-timer-pause-icon': timerPauseIcon,
+            speedometer,
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud.setPauseVisible(true);
+
+        expect(pauseBtn.hidden).toBe(false);
+        expect(pauseBtn.style.display).toBe('inline-flex');
+        expect(hudStatsBtn.disabled).toBe(true);
+        expect(timerPauseIcon.hidden).toBe(true);
+        expect(speedometer.classList.toggle).toHaveBeenCalledWith('speedometer--pause', false);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', false);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-speedo', true);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('hide-hud', true);
+    });
+
     it('hides the bottom pause and marks the speedo when placement is speedo', () => {
         const store = new Map([['VectorGpPausePlacement', 'speedo']]);
         vi.stubGlobal('window', {

@@ -16,7 +16,7 @@
 
 - New Daily races now use 1 or 2 laps only on tracks under 10 seconds (author time). Tracks of 10 seconds or more always run 1 lap. Days already published keep the lap count they had.
 
-- Settings → **Hide HUD** (off by default) hides the lap counter, timer, best time, speedo, and lap flash. Pause stays: on the timer, as a bottom-right button, or as the centered speedo — whichever **Pause** setting you picked.
+- Settings → **Hide HUD** (off by default) hides the lap counter, timer, best time, speedo, and lap flash. A pause icon stays in the spot you picked: timer, bottom-right, or centered speedo.
 
 - Settings → **Pause** has three spots: **Timer** (default, tap the time), **Separate** (bottom-right button), and **Speedo** (tap the centered speedometer, no extra button).
 

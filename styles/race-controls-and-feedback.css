@@ -34,10 +34,6 @@ body.hide-hud .hud-pause-label {
     display: none !important;
 }
 
-body.hide-hud.pause-on-speedo .speedometer {
-    display: block !important;
-}
-
 body.hide-hud.pause-on-timer .mobile-hud-bar {
     display: none !important;
 }
