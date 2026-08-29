@@ -38,6 +38,10 @@ body.hide-hud.pause-on-timer .mobile-hud-bar {
     display: none !important;
 }
 
+body.hide-hud.pause-on-timer .hud-bar {
+    justify-content: flex-end;
+}
+
 body.hide-hud:not(.pause-on-timer) .hud-bar {
     display: none !important;
 }

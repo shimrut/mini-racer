@@ -74,7 +74,7 @@ Pause is on the **timer** at the top by default, not next to steering. Settings 
 
 ### How do I hide the race numbers?
 
-Settings → **Hide HUD**. Pause stays as an icon in the spot you picked: timer, bottom-right, or centered speedo. Turn Hide HUD off to bring the timer, laps, and speedo back.
+Settings → **Hide HUD**. Pause stays as an icon in the spot you picked: timer (top-right), bottom-right, or centered speedo. Turn Hide HUD off to bring the timer, laps, and speedo back.
 
 ---
 
