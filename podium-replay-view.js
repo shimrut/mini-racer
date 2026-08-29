@@ -1,6 +1,7 @@
 import { EXTRA_CAR_ASSETS } from './game/car/car-unlock-policy.js';
 import { CarSpriteLoader, sanitizeCarSpriteAsset } from './game/car/sprite.js';
 import { interpolatePbGhostPose, normalizePbGhostRecord } from './game/ghost/pb-ghost.js';
+import { isLocalEnvironment } from './game/track/environment.js';
 import { TRACKS } from './game/track/tracks.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
@@ -62,6 +63,52 @@ export function normalizePodiumReplayGhosts(payload) {
         trackKey: typeof payload?.trackKey === 'string' ? payload.trackKey : null,
         records: byRank,
         durationMs: Math.max(0, ...Array.from(byRank.values(), (record) => record.finishTimeMs)),
+    };
+}
+
+export function shouldUseLocalPodiumPreview(root = globalThis) {
+    if (!isLocalEnvironment()) return false;
+    const search = root?.location?.search || '';
+    return new URLSearchParams(search).get('preview') === '1';
+}
+
+export function createLocalPodiumPreview() {
+    const track = TRACKS.circuit;
+    const origin = [
+        Math.round(track.startPos.x * 100),
+        Math.round(track.startPos.y * 100),
+        Math.round((track.startAngle || 0) * 1000),
+    ];
+    const ghost = (dx, dy) => {
+        const deltas = [];
+        for (let i = 0; i < 39; i += 1) deltas.push(dx, dy, 0);
+        return {
+            schemaVersion: 2,
+            sampleIntervalMs: 50,
+            finishTimeMs: 1950,
+            origin,
+            deltas,
+        };
+    };
+    return {
+        podium: {
+            trackName: track.name,
+            challengeDate: '2026-08-21',
+            lapCount: 1,
+            positions: [
+                { rank: 1, displayName: 'velvet_wombat', identityType: 'reddit', formattedTime: '0:10.193' },
+                { rank: 2, displayName: 'Neon Viper 45', identityType: 'private', formattedTime: '0:10.199' },
+                { rank: 3, displayName: 'shimroot', identityType: 'reddit', formattedTime: '0:10.227' },
+            ],
+        },
+        replays: {
+            trackKey: 'circuit',
+            ghosts: [
+                { rank: 1, ghost: ghost(8, 0) },
+                { rank: 2, ghost: ghost(6, 2) },
+                { rank: 3, ghost: ghost(4, -2) },
+            ],
+        },
     };
 }
 

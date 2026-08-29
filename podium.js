@@ -5,8 +5,10 @@ import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
 import { requestFeaturedDailyChallengeStart } from './game/daily-challenge/service.js';
 import { applyAvatar, GENERIC_SNOO_URL, resolveAvatarUrl } from './game/ui/avatar.js';
 import {
+    createLocalPodiumPreview,
     createPodiumReplayController,
     fetchPodiumReplays,
+    shouldUseLocalPodiumPreview,
 } from './podium-replay-view.js';
 
 const PODIUM_SIZE = 3;
@@ -179,13 +181,35 @@ function syncReplayButtons(documentRef, controller) {
     });
 }
 
+function installLocalPodiumPreview(preview) {
+    if (!preview || readPodiumPostData()) return;
+    const existing = globalThis.devvit && typeof globalThis.devvit === 'object'
+        ? globalThis.devvit
+        : {};
+    const context = existing.context && typeof existing.context === 'object'
+        ? existing.context
+        : {};
+    globalThis.devvit = {
+        ...existing,
+        context: {
+            ...context,
+            postData: { podium: preview.podium },
+        },
+    };
+}
+
 async function boot() {
+    const preview = shouldUseLocalPodiumPreview() ? createLocalPodiumPreview() : null;
+    installLocalPodiumPreview(preview);
     const podium = renderPodium(document, readPodiumPostData());
     renderPodiumTrack(podium.trackName);
     bindPodiumPlayNow(document);
     const replay = bindPodiumReplay(document, {
         canvas: document.getElementById('podium-track'),
         getTrackName: () => podium.trackName,
+        fetchReplays: preview
+            ? async () => preview.replays
+            : fetchPodiumReplays,
     });
     const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
     if (hydrated !== podium) renderPodium(document, hydrated);

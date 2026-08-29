@@ -1,10 +1,12 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    createLocalPodiumPreview,
     createPodiumReplayController,
     formatPodiumReplayClock,
     normalizePodiumReplayGhosts,
     PODIUM_REPLAY_CAR_ASSETS,
+    shouldUseLocalPodiumPreview,
 } from '../podium-replay-view.js';
 
 const ghost = {
@@ -57,6 +59,19 @@ describe('podium in-post replay', () => {
         expect(PODIUM_REPLAY_CAR_ASSETS[1]).toContain('gold');
         expect(PODIUM_REPLAY_CAR_ASSETS[2]).toContain('arctic');
         expect(PODIUM_REPLAY_CAR_ASSETS[3]).toContain('blaze');
+    });
+
+    it('builds a local preview only when preview=1 on a local host', () => {
+        const originalWindow = globalThis.window;
+        globalThis.window = { location: { hostname: '127.0.0.1', protocol: 'http:', search: '?preview=1' } };
+        expect(shouldUseLocalPodiumPreview({ location: { search: '?preview=1' } })).toBe(true);
+        expect(shouldUseLocalPodiumPreview({ location: { search: '' } })).toBe(false);
+        const preview = createLocalPodiumPreview();
+        expect(preview.replays.ghosts).toHaveLength(3);
+        expect(normalizePodiumReplayGhosts(preview.replays).records.size).toBe(3);
+        globalThis.window = { location: { hostname: 'reddit.com', protocol: 'https:', search: '?preview=1' } };
+        expect(shouldUseLocalPodiumPreview({ location: { search: '?preview=1' } })).toBe(false);
+        globalThis.window = originalWindow;
     });
 
     it('plays, pauses, stops, and changes speed without leaving the post', async () => {
