@@ -1,6 +1,6 @@
 # Changelog
 
-- Final podium posts now freeze the top-three ghosts in the post body (same packed replay as Head to Head) and play them on the post: **View Replays** next to Play Now, all three cars on by default, Gold / Silver / Bronze to show or hide a car, a progress bar with play/pause, and 0.5× / 1× / 2×, Back to the list.
+- Final podium posts now freeze the top-three ghosts in the post body (same packed replay as Head to Head) and play them on the post: **View Replays** next to Play Now, all three cars on by default, Gold / Silver / Bronze to show or hide a car, a progress bar with play/pause (starts paused), and 0.5× / 1× / 2×, Back to the list. Controls sit below the track, not over it.
 
 - Home after a missed Head to Head returns to the challenge screen immediately. It no longer reloads the challenge from the server first.
 

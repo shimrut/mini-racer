@@ -132,9 +132,9 @@ describe('podium in-post replay', () => {
         }, 'Circuit ProMax');
 
         expect(controller.enter()).toBe(true);
-        expect(controller.playing).toBe(true);
-        expect(documentRef.getElementById('podium-replay-toggle').dataset.playing).toBe('true');
-        expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Pause');
+        expect(controller.playing).toBe(false);
+        expect(documentRef.getElementById('podium-replay-toggle').dataset.playing).toBe('false');
+        expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Play');
         expect(documentRef.getElementById('podium-replay-seek').max).toBe('200');
         expect(documentRef.getElementById('podium-shell').dataset.mode).toBe('replay');
         expect(documentRef.getElementById('podium-results').hasAttribute('inert')).toBe(true);
@@ -147,6 +147,10 @@ describe('podium in-post replay', () => {
         expect(controller.isVisible(1)).toBe(false);
         controller.setVisible(1, true);
 
+        controller.play();
+        expect(controller.playing).toBe(true);
+        expect(documentRef.getElementById('podium-replay-toggle').dataset.playing).toBe('true');
+        expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Pause');
         controller.pause();
         expect(controller.playing).toBe(false);
         expect(documentRef.getElementById('podium-replay-toggle').dataset.playing).toBe('false');

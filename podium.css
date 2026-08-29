@@ -56,6 +56,7 @@ body {
 .podium-track {
     position: absolute;
     z-index: 0;
+    display: block;
     inset: 0 0 28% 0;
     width: 100%;
     height: auto;
@@ -327,11 +328,33 @@ body {
     width: 100%;
     max-width: 56rem;
     margin-inline: auto;
-    align-self: end;
+    align-self: stretch;
+}
+
+.podium-shell[data-mode="replay"] {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+}
+
+.podium-shell[data-mode="replay"] .podium-header {
+    flex: 0 0 auto;
+    order: 1;
 }
 
 .podium-shell[data-mode="replay"] .podium-track {
-    inset: 0;
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    flex: 1 1 0;
+    order: 2;
+    width: 100%;
+    height: auto;
+    min-height: 0;
     opacity: 1;
     pointer-events: none;
     -webkit-mask-image: none;
@@ -347,11 +370,18 @@ body {
 
 .podium-shell[data-mode="replay"] .podium-replay {
     display: grid;
+    flex: 0 0 auto;
+    order: 3;
     gap: 0.65rem;
+    padding-top: 0.35rem;
+    background: var(--night);
 }
 
 .podium-shell[data-mode="replay"] .podium-footer {
+    flex: 0 0 auto;
+    order: 4;
     justify-content: flex-end;
+    background: var(--night);
 }
 
 .podium-shell[data-mode="replay"] .podium-play--back {
@@ -413,7 +443,7 @@ body {
 .podium-replay__speed {
     min-width: 2.45rem;
     min-height: 2.45rem;
-    padding: 0.45rem;
+    padding: 0;
     border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
     border-radius: 0.4rem;
     background: var(--panel);
@@ -421,11 +451,30 @@ body {
     cursor: pointer;
 }
 
-.podium-replay__button svg,
-.podium-replay__speed svg {
+.podium-replay__button {
+    display: grid;
+    place-items: center;
+    line-height: 0;
+}
+
+.podium-replay__button svg {
+    grid-area: 1 / 1;
     display: block;
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1rem;
+    height: auto;
+}
+
+.podium-replay__button .podium-replay__icon--pause {
+    width: 0.85rem;
+}
+
+.podium-replay__speed {
+    padding: 0.3rem 0.55rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
 }
 
 .podium-replay__button:disabled,

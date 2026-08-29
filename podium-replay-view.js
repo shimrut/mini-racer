@@ -26,10 +26,6 @@ export function formatPodiumReplayClock(timeMs) {
     return `${minutes}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
 }
 
-export function prefersReducedPodiumMotion(root = globalThis) {
-    return Boolean(root?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
-}
-
 function loadReplayCars() {
     if (carLoadPromise) return carLoadPromise;
     if (typeof Image === 'undefined') {
@@ -423,12 +419,12 @@ export function createPodiumReplayController({
         enter() {
             if (state.records.size === 0) return false;
             state.mode = 'replay';
-            state.playing = !prefersReducedPodiumMotion();
+            state.playing = false;
             state.timeMs = 0;
             syncChrome();
             paint();
-            startLoop();
-            documentRef?.getElementById('podium-replay-toggle')?.focus();
+            requestFrame(() => paint());
+            documentRef?.getElementById('podium-replay-toggle')?.focus({ preventScroll: true });
             return true;
         },
         exit() {

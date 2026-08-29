@@ -10,9 +10,10 @@ Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The podium row keeps place, identity, and
 time in one grid, with identity tight to the rank. **View Replays** sits next
-to Play Now. Replay mode hides the list, fills the track canvas, and puts a
-progress bar with a play/pause toggle, 0.5× / 1× / 2×, and Gold / Silver / Bronze
-car toggles in the footer with Back. The moderator analytics page is one
+to Play Now. Replay mode hides the list, gives the track its own band above
+the chrome, and puts a progress bar with a play/pause toggle, 0.5× / 1× / 2×
+text speeds, and Gold / Silver / Bronze car toggles below the track with Back.
+The moderator analytics page is one
 sticky-header table: a row per UTC day, with the day's players split into new
 and returning and each mode's starts and finishes beside them. The newest row
 carries the red accent. The Head to Head surface uses a responsive
