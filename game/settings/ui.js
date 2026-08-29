@@ -45,9 +45,9 @@ import {
     setHideHudEnabled,
 } from './hide-hud-preference.js';
 import {
-    getPauseOnTimerEnabled,
-    setPauseOnTimerEnabled,
-} from './pause-on-timer-preference.js';
+    getPausePlacement,
+    setPausePlacement,
+} from './pause-placement-preference.js';
 import {
     getPbGhostEnabled,
     setPbGhostEnabled,
@@ -56,13 +56,13 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
-    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onPauseOnTimerChanged, onHideHudChanged, onPbGhostChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
+    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onPausePlacementChanged, onHideHudChanged, onPbGhostChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
         this.modal = modal;
         this.onCollisionAutoRestartChanged = onCollisionAutoRestartChanged;
         this.onCollisionRestartDelayChanged = onCollisionRestartDelayChanged;
         this.onCarAudioChanged = onCarAudioChanged;
         this.onMusicChanged = onMusicChanged;
-        this.onPauseOnTimerChanged = onPauseOnTimerChanged;
+        this.onPausePlacementChanged = onPausePlacementChanged;
         this.onHideHudChanged = onHideHudChanged;
         this.onPbGhostChanged = onPbGhostChanged;
         this.onLeaderboardIdentityChanged = onLeaderboardIdentityChanged;
@@ -74,7 +74,7 @@ export class SettingsUi {
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
         this.refreshCollisionRestartDelayPanel();
-        this.refreshPauseOnTimerPanel();
+        this.refreshPausePlacementPanel();
         this.refreshHideHudPanel();
         this.refreshPbGhostPanel();
     }
@@ -100,8 +100,8 @@ export class SettingsUi {
     get collisionRestartDelayHeading() { return document.getElementById('settings-collision-restart-delay-heading'); }
     get musicSwitch() { return document.getElementById('settings-music-switch'); }
     get musicHeading() { return document.getElementById('settings-music-heading'); }
-    get pauseOnTimerSwitch() { return document.getElementById('settings-pause-on-timer-switch'); }
-    get pauseOnTimerHeading() { return document.getElementById('settings-pause-on-timer-heading'); }
+    get pausePlacementGroup() { return document.getElementById('settings-pause-placement'); }
+    get pausePlacementHeading() { return document.getElementById('settings-pause-placement-heading'); }
     get hideHudSwitch() { return document.getElementById('settings-hide-hud-switch'); }
     get hideHudHeading() { return document.getElementById('settings-hide-hud-heading'); }
     get pbGhostSwitch() { return document.getElementById('settings-pb-ghost-switch'); }
@@ -243,12 +243,14 @@ export class SettingsUi {
                 this.refreshCollisionAutoRestartPanel();
             });
         }
-        if (this.pauseOnTimerSwitch) {
-            this.pauseOnTimerSwitch.addEventListener('change', () => {
-                const next = setPauseOnTimerEnabled(this.pauseOnTimerSwitch.checked);
-                this.onPauseOnTimerChanged?.(next);
+        if (this.pausePlacementGroup) {
+            this.pausePlacementGroup.addEventListener('click', (event) => {
+                const option = event.target.closest('[data-pause-placement]');
+                if (!option || !this.pausePlacementGroup.contains(option)) return;
+                const next = setPausePlacement(option.dataset.pausePlacement);
+                this.onPausePlacementChanged?.(next);
                 this.onPlayerPreferencesChanged?.();
-                this.refreshPauseOnTimerPanel();
+                this.refreshPausePlacementPanel();
             });
         }
         if (this.hideHudSwitch) {
@@ -367,13 +369,17 @@ export class SettingsUi {
         });
     }
 
-    refreshPauseOnTimerPanel() {
-        this._syncBooleanSettingRow({
-            getValue: getPauseOnTimerEnabled,
-            switchEl: this.pauseOnTimerSwitch,
-            headingEl: this.pauseOnTimerHeading,
-            title: 'Pause on Timer',
+    refreshPausePlacementPanel() {
+        const placement = getPausePlacement();
+        if (this.pausePlacementGroup) {
+            this.pausePlacementGroup.dataset.selected = placement;
+        }
+        this.pausePlacementGroup?.querySelectorAll?.('[data-pause-placement]').forEach((option) => {
+            option.setAttribute('aria-checked', option.dataset.pausePlacement === placement ? 'true' : 'false');
         });
+        if (this.pausePlacementHeading) {
+            this.pausePlacementHeading.textContent = 'Pause';
+        }
     }
 
     refreshHideHudPanel() {
@@ -467,7 +473,7 @@ export class SettingsUi {
         this.refreshCarAudioPanel();
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
-        this.refreshPauseOnTimerPanel();
+        this.refreshPausePlacementPanel();
         this.refreshHideHudPanel();
         this.refreshPbGhostPanel();
         this.wireCollisionRestartDelayMeter();

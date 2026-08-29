@@ -70,11 +70,11 @@ No. Standings just shows a generated racer name instead of your Reddit name. Tim
 
 ### I keep hitting Pause by accident on my phone
 
-Pause is on the **timer** at the top by default, not next to steering. If you still have a Pause button at the bottom, open Settings and turn **Pause on Timer** on. Turn it off if you want the old bottom Pause and tapping the speedo to pause.
+Pause is on the **timer** at the top by default, not next to steering. Settings → **Pause** can put it on the timer, a bottom-right button (**Separate**), or the centered speedometer (**Speedo**).
 
 ### How do I hide the race numbers?
 
-Settings → **Hide HUD**. That leaves only the pause icon (top-right if Pause on Timer is on, bottom-right if it is off). Turn it off to bring the timer, laps, and speedo back.
+Settings → **Hide HUD**. Pause stays: timer icon, bottom-right button, or the speedo — matching your **Pause** setting. Turn Hide HUD off to bring the timer, laps, and speedo back.
 
 ---
 

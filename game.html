@@ -539,16 +539,22 @@
 
                         <p class="leaderboard-subhead settings-subsection-label">Racing</p>
                         <div class="modal-sheet-panel modal-sheet-panel--racing-group">
-                            <div class="modal-sheet-settings-identity-head">
-                                <span id="settings-pause-on-timer-heading"
-                                    class="modal-sheet-settings-identity-heading">Pause on Timer</span>
-                                <label class="modal-sheet-settings-switch">
-                                    <input type="checkbox" id="settings-pause-on-timer-switch"
-                                        class="modal-sheet-settings-switch__input"
-                                        aria-labelledby="settings-pause-on-timer-heading" />
-                                    <span class="lobby-mode-switch__btn" data-settings-switch="off" aria-hidden="true">Off</span>
-                                    <span class="lobby-mode-switch__btn" data-settings-switch="on" aria-hidden="true">On</span>
-                                </label>
+                            <div class="modal-sheet-settings-pause-placement">
+                                <span id="settings-pause-placement-heading"
+                                    class="modal-sheet-settings-identity-heading">Pause</span>
+                                <div id="settings-pause-placement" class="modal-sheet-settings-choice"
+                                    role="radiogroup" aria-labelledby="settings-pause-placement-heading"
+                                    data-selected="timer">
+                                    <button type="button" id="settings-pause-placement-separate"
+                                        class="lobby-mode-switch__btn" role="radio" data-pause-placement="separate"
+                                        aria-checked="false">Separate</button>
+                                    <button type="button" id="settings-pause-placement-timer"
+                                        class="lobby-mode-switch__btn" role="radio" data-pause-placement="timer"
+                                        aria-checked="true">Timer</button>
+                                    <button type="button" id="settings-pause-placement-speedo"
+                                        class="lobby-mode-switch__btn" role="radio" data-pause-placement="speedo"
+                                        aria-checked="false">Speedo</button>
+                                </div>
                             </div>
                             <div class="modal-sheet-settings-row-divider"></div>
                             <div class="modal-sheet-settings-identity-head">

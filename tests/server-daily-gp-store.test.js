@@ -1577,6 +1577,7 @@ describe('server daily gp store submissions', () => {
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
             pbGhostEnabled: true,
+            pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
         };
@@ -1955,6 +1956,7 @@ describe('server daily gp store submissions', () => {
             ['a non-boolean crashAutoRestartEnabled', { crashAutoRestartEnabled: 'no' }],
             ['a non-boolean pbGhostEnabled', { pbGhostEnabled: 'sure' }],
             ['a non-boolean pauseOnTimerEnabled', { pauseOnTimerEnabled: 'sure' }],
+            ['an invalid pausePlacement', { pausePlacement: 'dash' }],
             ['a non-boolean hideHudEnabled', { hideHudEnabled: 'sure' }],
             ['a non-finite crashRestartDelaySec', { crashRestartDelaySec: 'slow' }],
             ['a negative crashRestartDelaySec', { crashRestartDelaySec: -0.1 }],
@@ -1979,8 +1981,9 @@ describe('server daily gp store submissions', () => {
             ['a crashRestartDelaySec of exactly 1', { crashRestartDelaySec: 1 }, { crashRestartDelaySec: 1 }],
             ['an omitted pbGhostEnabled', { pbGhostEnabled: undefined }, { pbGhostEnabled: true }],
             ['an explicit pbGhostEnabled of false', { pbGhostEnabled: false }, { pbGhostEnabled: false }],
-            ['an omitted pauseOnTimerEnabled', { pauseOnTimerEnabled: undefined }, { pauseOnTimerEnabled: true }],
-            ['an explicit pauseOnTimerEnabled of false', { pauseOnTimerEnabled: false }, { pauseOnTimerEnabled: false }],
+            ['an omitted pauseOnTimerEnabled', { pauseOnTimerEnabled: undefined }, { pausePlacement: 'timer', pauseOnTimerEnabled: true }],
+            ['an explicit pauseOnTimerEnabled of false', { pauseOnTimerEnabled: false }, { pausePlacement: 'separate', pauseOnTimerEnabled: false }],
+            ['an explicit pausePlacement of speedo', { pausePlacement: 'speedo' }, { pausePlacement: 'speedo', pauseOnTimerEnabled: false }],
             ['an omitted hideHudEnabled', { hideHudEnabled: undefined }, { hideHudEnabled: false }],
             ['an explicit hideHudEnabled of true', { hideHudEnabled: true }, { hideHudEnabled: true }],
         ])('accepts preferences with %s', async (_label, overrides, expected) => {

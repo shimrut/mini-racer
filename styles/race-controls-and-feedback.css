@@ -20,7 +20,8 @@
     pointer-events: none;
 }
 
-body.pause-on-timer .mobile-hud-bar {
+body.pause-on-timer .mobile-hud-bar,
+body.pause-on-speedo .mobile-hud-bar {
     justify-content: center;
 }
 
@@ -33,6 +34,10 @@ body.hide-hud .hud-pause-label {
     display: none !important;
 }
 
+body.hide-hud.pause-on-speedo .speedometer {
+    display: block !important;
+}
+
 body.hide-hud.pause-on-timer .mobile-hud-bar {
     display: none !important;
 }
@@ -41,8 +46,12 @@ body.hide-hud:not(.pause-on-timer) .hud-bar {
     display: none !important;
 }
 
-body.hide-hud:not(.pause-on-timer) .mobile-hud-bar {
+body.hide-hud:not(.pause-on-timer):not(.pause-on-speedo) .mobile-hud-bar {
     justify-content: flex-end;
+}
+
+body.hide-hud.pause-on-speedo .mobile-hud-bar {
+    justify-content: center;
 }
 
 body.hide-hud:not(.pause-on-timer) .hud-pause-btn .hud-pause-icon {

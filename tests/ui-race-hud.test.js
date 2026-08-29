@@ -52,7 +52,7 @@ describe('ui race hud helpers', () => {
         vi.unstubAllGlobals();
     });
 
-    it('puts pause on the timer and hides the bottom pause when the setting is on', () => {
+    it('puts pause on the timer and hides the bottom pause when placement is timer', () => {
         const store = new Map([['VectorGpPauseOnTimerEnabled', '1']]);
         vi.stubGlobal('window', {
             localStorage: {
@@ -85,6 +85,7 @@ describe('ui race hud helpers', () => {
         expect(hudStatsBtn.setAttribute).toHaveBeenCalledWith('aria-label', 'Pause run');
         expect(timerPauseIcon.hidden).toBe(false);
         expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', true);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-speedo', false);
         expect(document.body.classList.toggle).toHaveBeenCalledWith('hide-hud', false);
     });
 
@@ -121,10 +122,11 @@ describe('ui race hud helpers', () => {
         expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause-only', true);
         expect(timerPauseIcon.hidden).toBe(false);
         expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', true);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-speedo', false);
         expect(document.body.classList.toggle).toHaveBeenCalledWith('hide-hud', true);
     });
 
-    it('keeps only the bottom pause when hide HUD is on and pause-on-timer is off', () => {
+    it('keeps only the bottom pause when hide HUD is on and pause is separate', () => {
         const store = new Map([
             ['VectorGpPauseOnTimerEnabled', '0'],
             ['VectorGpHideHudEnabled', '1'],
@@ -159,6 +161,7 @@ describe('ui race hud helpers', () => {
         expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause-only', false);
         expect(timerPauseIcon.hidden).toBe(true);
         expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', false);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-speedo', false);
         expect(document.body.classList.toggle).toHaveBeenCalledWith('hide-hud', true);
     });
 
@@ -485,6 +488,48 @@ describe('ui race hud helpers', () => {
         expect(hud.hideLapFlash).not.toHaveBeenCalled();
         vi.advanceTimersByTime(1);
         expect(hud.hideLapFlash).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides the bottom pause and marks the speedo when placement is speedo', () => {
+        const store = new Map([['VectorGpPausePlacement', 'speedo']]);
+        vi.stubGlobal('window', {
+            localStorage: {
+                getItem: (key) => store.get(key) ?? null,
+                setItem: (key, value) => store.set(key, String(value)),
+            },
+        });
+        const pauseBtn = { hidden: false, style: { display: 'inline-flex' } };
+        const hudStatsBtn = {
+            disabled: false,
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+        };
+        const timerPauseIcon = { hidden: false };
+        const speedometer = {
+            classList: { toggle: vi.fn() },
+            setAttribute: vi.fn(),
+            removeAttribute: vi.fn(),
+        };
+
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'pause-btn': pauseBtn,
+            'hud-stats-btn': hudStatsBtn,
+            'hud-timer-pause-icon': timerPauseIcon,
+            speedometer,
+        }[id] || null));
+
+        const hud = new RaceHud();
+        hud.setPauseVisible(true);
+
+        expect(pauseBtn.hidden).toBe(true);
+        expect(hudStatsBtn.disabled).toBe(true);
+        expect(hudStatsBtn.classList.toggle).toHaveBeenCalledWith('hud-stats--pause', false);
+        expect(timerPauseIcon.hidden).toBe(true);
+        expect(speedometer.classList.toggle).toHaveBeenCalledWith('speedometer--pause', true);
+        expect(speedometer.setAttribute).toHaveBeenCalledWith('role', 'button');
+        expect(speedometer.setAttribute).toHaveBeenCalledWith('aria-label', 'Pause run');
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-timer', false);
+        expect(document.body.classList.toggle).toHaveBeenCalledWith('pause-on-speedo', true);
     });
 
     it('toggles the bottom pause button when pause-on-timer is off', () => {

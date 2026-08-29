@@ -49,7 +49,8 @@
         padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
     }
 
-    body.pause-on-timer .mobile-hud-bar {
+    body.pause-on-timer .mobile-hud-bar,
+    body.pause-on-speedo .mobile-hud-bar {
         justify-content: center;
     }
 
@@ -57,8 +58,12 @@
         display: none !important;
     }
 
-    body.hide-hud:not(.pause-on-timer) .mobile-hud-bar {
+    body.hide-hud:not(.pause-on-timer):not(.pause-on-speedo) .mobile-hud-bar {
         justify-content: flex-end;
+    }
+
+    body.hide-hud.pause-on-speedo .mobile-hud-bar {
+        justify-content: center;
     }
 
     .light {

@@ -32,9 +32,10 @@ import {
     setHideHudEnabled,
 } from '../settings/hide-hud-preference.js';
 import {
-    getPauseOnTimerEnabled,
-    setPauseOnTimerEnabled,
-} from '../settings/pause-on-timer-preference.js';
+    applyPausePlacementPreference,
+    getPausePlacement,
+    PAUSE_PLACEMENT_TIMER,
+} from '../settings/pause-placement-preference.js';
 import { getPbGhostEnabled, setPbGhostEnabled } from '../settings/pb-ghost-preference.js';
 import { isLocalEnvironment } from '../track/environment.js';
 
@@ -47,7 +48,8 @@ export function readPlayerPreferences() {
         musicEnabled: getMusicEnabled(),
         carAudioEnabled: getCarProceduralAudioEnabled(),
         pbGhostEnabled: getPbGhostEnabled(),
-        pauseOnTimerEnabled: getPauseOnTimerEnabled(),
+        pausePlacement: getPausePlacement(),
+        pauseOnTimerEnabled: getPausePlacement() === PAUSE_PLACEMENT_TIMER,
         hideHudEnabled: getHideHudEnabled(),
         // Legacy wire field retained so stored player profiles remain compatible.
         crashAutoRestartEnabled: getCollisionAutoRestartEnabled(),
@@ -65,7 +67,7 @@ export function applyPlayerPreferences(value) {
     setMusicEnabled(value.musicEnabled);
     setCarProceduralAudioEnabled(value.carAudioEnabled);
     setPbGhostEnabled(value.pbGhostEnabled !== false);
-    setPauseOnTimerEnabled(value.pauseOnTimerEnabled !== false);
+    applyPausePlacementPreference(value);
     setHideHudEnabled(value.hideHudEnabled === true);
     setCollisionAutoRestartEnabled(value.crashAutoRestartEnabled);
     setCollisionRestartDelaySec(value.crashRestartDelaySec);

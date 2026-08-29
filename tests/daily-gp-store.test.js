@@ -274,6 +274,7 @@ const playerPreferences = {
   crashAutoRestartEnabled: false,
   crashRestartDelaySec: 0.8,
   pbGhostEnabled: true,
+  pausePlacement: 'timer',
   pauseOnTimerEnabled: true,
   hideHudEnabled: false,
 };

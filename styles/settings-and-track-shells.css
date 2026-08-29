@@ -187,6 +187,64 @@
     padding: 0.25rem;
 }
 
+#settings-modal .modal-sheet-settings-pause-placement {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    margin: -0.25rem;
+    padding: 0.25rem;
+}
+
+#settings-modal .modal-sheet-settings-choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-items: center;
+    position: relative;
+    margin: 0;
+    padding: 0.15rem;
+    background: rgba(51, 65, 85, 0.7);
+    border-radius: var(--radius-full);
+}
+
+#settings-modal .modal-sheet-settings-choice::before {
+    content: "";
+    position: absolute;
+    top: 0.15rem;
+    bottom: 0.15rem;
+    left: 0.15rem;
+    width: calc((100% - 0.3rem) / 3);
+    background-color: var(--accent-color);
+    border-radius: var(--radius-full);
+    transition: transform var(--dur-slow) var(--ease-settle);
+    z-index: 0;
+}
+
+#settings-modal .modal-sheet-settings-choice[data-selected="timer"]::before {
+    transform: translateX(100%);
+}
+
+#settings-modal .modal-sheet-settings-choice[data-selected="speedo"]::before {
+    transform: translateX(200%);
+}
+
+#settings-modal .modal-sheet-settings-choice .lobby-mode-switch__btn {
+    min-width: 0;
+    padding: 0.35rem 0.2rem;
+    letter-spacing: 0.06em;
+    font-size: 0.7rem;
+}
+
+#settings-modal .modal-sheet-settings-choice [aria-checked="true"] {
+    color: var(--text-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #settings-modal .modal-sheet-settings-choice::before {
+        transition: none;
+    }
+}
+
 #settings-modal .modal-sheet-settings-identity-heading {
     font-size: 0.92rem;
     font-weight: 500;

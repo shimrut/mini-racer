@@ -530,6 +530,10 @@
     pointer-events: auto;
 }
 
+.speedometer--pause {
+    cursor: pointer;
+}
+
 .speedometer-content {
     display: flex;
     align-items: center;

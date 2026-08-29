@@ -144,6 +144,7 @@ export type DailyGpPlayerPreferences = {
     crashAutoRestartEnabled: boolean;
     crashRestartDelaySec: number;
     pbGhostEnabled: boolean;
+    pausePlacement: 'separate' | 'timer' | 'speedo';
     pauseOnTimerEnabled: boolean;
     hideHudEnabled: boolean;
 };

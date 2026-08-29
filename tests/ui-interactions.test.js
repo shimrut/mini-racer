@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { InteractionsUi } from '../game/race/ui-interactions.js';
-import { PAUSE_ON_TIMER_STORAGE_KEY } from '../game/settings/pause-on-timer-preference.js';
+import { PAUSE_PLACEMENT_STORAGE_KEY } from '../game/settings/pause-placement-preference.js';
 
 function createEventTarget() {
     const listeners = new Map();
@@ -10,6 +10,22 @@ function createEventTarget() {
             listeners.set(eventName, handler);
         })
     };
+}
+
+function withPausePlacement(placement, run) {
+    const originalWindow = globalThis.window;
+    const store = new Map([[PAUSE_PLACEMENT_STORAGE_KEY, placement]]);
+    globalThis.window = {
+        localStorage: {
+            getItem: (key) => store.get(key) ?? null,
+            setItem: (key, value) => store.set(key, String(value)),
+        },
+    };
+    try {
+        run();
+    } finally {
+        globalThis.window = originalWindow;
+    }
 }
 
 describe('ui interaction helpers', () => {
@@ -47,57 +63,60 @@ describe('ui interaction helpers', () => {
         expect(closeModal).toHaveBeenCalledTimes(1);
     });
 
-    it('pauses from the timer and ignores the speedo when pause-on-timer is on', () => {
-        const originalWindow = globalThis.window;
-        const store = new Map([[PAUSE_ON_TIMER_STORAGE_KEY, '1']]);
-        globalThis.window = {
-            localStorage: {
-                getItem: (key) => store.get(key) ?? null,
-                setItem: (key, value) => store.set(key, String(value)),
-            },
-        };
-        const hudStatsBtn = createEventTarget();
-        const speedometer = createEventTarget();
-        const onPauseRun = vi.fn();
+    it('pauses from the timer and ignores the speedo when pause is on the timer', () => {
+        withPausePlacement('timer', () => {
+            const hudStatsBtn = createEventTarget();
+            const speedometer = createEventTarget();
+            const onPauseRun = vi.fn();
 
-        InteractionsUi.prototype.bindPrimaryActions.call({
-            hudStatsBtn,
-            speedometer,
-            onPauseRun,
+            InteractionsUi.prototype.bindPrimaryActions.call({
+                hudStatsBtn,
+                speedometer,
+                onPauseRun,
+            });
+
+            hudStatsBtn.listeners.get('click')();
+            speedometer.listeners.get('click')();
+
+            expect(onPauseRun).toHaveBeenCalledTimes(1);
         });
-
-        hudStatsBtn.listeners.get('click')();
-        speedometer.listeners.get('click')();
-
-        expect(onPauseRun).toHaveBeenCalledTimes(1);
-        globalThis.window = originalWindow;
     });
 
-    it('pauses from the speedo and ignores the timer when pause-on-timer is off', () => {
-        const originalWindow = globalThis.window;
-        const store = new Map([[PAUSE_ON_TIMER_STORAGE_KEY, '0']]);
-        globalThis.window = {
-            localStorage: {
-                getItem: (key) => store.get(key) ?? null,
-                setItem: (key, value) => store.set(key, String(value)),
-            },
-        };
-        const hudStatsBtn = createEventTarget();
-        const speedometer = createEventTarget();
-        const onPauseRun = vi.fn();
+    it('pauses from the speedo and ignores the timer when pause is on the speedo', () => {
+        withPausePlacement('speedo', () => {
+            const hudStatsBtn = createEventTarget();
+            const speedometer = createEventTarget();
+            const onPauseRun = vi.fn();
 
-        InteractionsUi.prototype.bindPrimaryActions.call({
-            hudStatsBtn,
-            speedometer,
-            onPauseRun,
+            InteractionsUi.prototype.bindPrimaryActions.call({
+                hudStatsBtn,
+                speedometer,
+                onPauseRun,
+            });
+
+            hudStatsBtn.listeners.get('click')();
+            speedometer.listeners.get('click')();
+
+            expect(onPauseRun).toHaveBeenCalledTimes(1);
         });
-
-        hudStatsBtn.listeners.get('click')();
-        speedometer.listeners.get('click')();
-
-        expect(onPauseRun).toHaveBeenCalledTimes(1);
-        globalThis.window = originalWindow;
     });
 
+    it('ignores timer and speedo taps when pause is separate', () => {
+        withPausePlacement('separate', () => {
+            const hudStatsBtn = createEventTarget();
+            const speedometer = createEventTarget();
+            const onPauseRun = vi.fn();
 
+            InteractionsUi.prototype.bindPrimaryActions.call({
+                hudStatsBtn,
+                speedometer,
+                onPauseRun,
+            });
+
+            hudStatsBtn.listeners.get('click')();
+            speedometer.listeners.get('click')();
+
+            expect(onPauseRun).not.toHaveBeenCalled();
+        });
+    });
 });

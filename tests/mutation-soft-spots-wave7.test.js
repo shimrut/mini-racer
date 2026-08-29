@@ -233,6 +233,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
                 crashAutoRestartEnabled: true,
                 crashRestartDelaySec: 0.5,
                 pbGhostEnabled: true,
+                pausePlacement: 'timer',
                 pauseOnTimerEnabled: true,
                 hideHudEnabled: false,
             },
@@ -339,6 +340,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             crashAutoRestartEnabled: true,
             crashRestartDelaySec: 0.6,
             pbGhostEnabled: false,
+            pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
         });
@@ -363,6 +365,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             crashAutoRestartEnabled: true,
             crashRestartDelaySec: 0.8,
             pbGhostEnabled: false,
+            pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
         });
@@ -396,6 +399,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             crashAutoRestartEnabled: true,
             crashRestartDelaySec: 0.5,
             pbGhostEnabled: true,
+            pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
         });

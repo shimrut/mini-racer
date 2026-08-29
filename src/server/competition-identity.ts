@@ -10,6 +10,12 @@ import { mintGuestPlayerToken, verifyGuestPlayerToken } from './player-token.js'
 import { resolveGuestIdentityStatus, type GuestIdentityStatus } from './guest-retirement.js';
 import { STOCK_CAR_ASSET_NAME } from '../../game/car/car-unlock-policy.js';
 import {
+    DEFAULT_PAUSE_PLACEMENT,
+    PAUSE_PLACEMENT_SEPARATE,
+    PAUSE_PLACEMENT_TIMER,
+    normalizePausePlacement,
+} from '../../game/settings/pause-placement-preference.js';
+import {
     normalizeLeaderboardIdentityPreference,
     sanitizeRedditUsername,
 } from '../../game/shared/leaderboard-identity.js';
@@ -33,6 +39,7 @@ const DEFAULT_PLAYER_PREFERENCES: DailyGpPlayerPreferences = {
     crashAutoRestartEnabled: false,
     crashRestartDelaySec: 0.5,
     pbGhostEnabled: true,
+    pausePlacement: DEFAULT_PAUSE_PLACEMENT,
     pauseOnTimerEnabled: true,
     hideHudEnabled: false,
 };
@@ -68,6 +75,18 @@ function readOptionalBooleanPreference(value: unknown, defaultValue: boolean): b
     return readBooleanPreference(value);
 }
 
+function readPausePlacement(preferences: Record<string, unknown>): 'separate' | 'timer' | 'speedo' | null {
+    if (preferences.pausePlacement !== undefined) {
+        return normalizePausePlacement(preferences.pausePlacement);
+    }
+    const timerEnabled = readOptionalBooleanPreference(
+        preferences.pauseOnTimerEnabled,
+        DEFAULT_PLAYER_PREFERENCES.pauseOnTimerEnabled,
+    );
+    if (timerEnabled === null) return null;
+    return timerEnabled ? PAUSE_PLACEMENT_TIMER : PAUSE_PLACEMENT_SEPARATE;
+}
+
 function readPlayerPreferenceFields(value: unknown): {
     carSkin: string | null;
     trailId: string | null;
@@ -76,7 +95,7 @@ function readPlayerPreferenceFields(value: unknown): {
     crashAutoRestartEnabled: boolean | null;
     crashRestartDelaySec: number | null;
     pbGhostEnabled: boolean | null;
-    pauseOnTimerEnabled: boolean | null;
+    pausePlacement: 'separate' | 'timer' | 'speedo' | null;
     hideHudEnabled: boolean | null;
 } | null {
     if (!value || typeof value !== 'object') {
@@ -95,14 +114,18 @@ function readPlayerPreferenceFields(value: unknown): {
             preferences.pbGhostEnabled,
             DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled,
         ),
-        pauseOnTimerEnabled: readOptionalBooleanPreference(
-            preferences.pauseOnTimerEnabled,
-            DEFAULT_PLAYER_PREFERENCES.pauseOnTimerEnabled,
-        ),
+        pausePlacement: readPausePlacement(preferences),
         hideHudEnabled: readOptionalBooleanPreference(
             preferences.hideHudEnabled,
             DEFAULT_PLAYER_PREFERENCES.hideHudEnabled,
         ),
+    };
+}
+
+function withDerivedPauseFields(pausePlacement: 'separate' | 'timer' | 'speedo') {
+    return {
+        pausePlacement,
+        pauseOnTimerEnabled: pausePlacement === PAUSE_PLACEMENT_TIMER,
     };
 }
 
@@ -118,7 +141,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         crashAutoRestartEnabled,
         crashRestartDelaySec,
         pbGhostEnabled,
-        pauseOnTimerEnabled,
+        pausePlacement,
         hideHudEnabled,
     } = fields;
     if (
@@ -129,7 +152,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         || crashAutoRestartEnabled === null
         || crashRestartDelaySec === null
         || pbGhostEnabled === null
-        || pauseOnTimerEnabled === null
+        || pausePlacement === null
         || hideHudEnabled === null
     ) {
         return null;
@@ -143,7 +166,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         crashAutoRestartEnabled,
         crashRestartDelaySec,
         pbGhostEnabled,
-        pauseOnTimerEnabled,
+        ...withDerivedPauseFields(pausePlacement),
         hideHudEnabled,
     };
 }
@@ -152,6 +175,7 @@ export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferenc
     const fields = readPlayerPreferenceFields(value);
     if (!fields) return null;
 
+    const pausePlacement = fields.pausePlacement ?? DEFAULT_PLAYER_PREFERENCES.pausePlacement;
     return {
         carSkin: fields.carSkin ?? DEFAULT_PLAYER_PREFERENCES.carSkin,
         trailId: fields.trailId ?? DEFAULT_PLAYER_PREFERENCES.trailId,
@@ -162,8 +186,7 @@ export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferenc
         crashRestartDelaySec: fields.crashRestartDelaySec
             ?? DEFAULT_PLAYER_PREFERENCES.crashRestartDelaySec,
         pbGhostEnabled: fields.pbGhostEnabled ?? DEFAULT_PLAYER_PREFERENCES.pbGhostEnabled,
-        pauseOnTimerEnabled: fields.pauseOnTimerEnabled
-            ?? DEFAULT_PLAYER_PREFERENCES.pauseOnTimerEnabled,
+        ...withDerivedPauseFields(pausePlacement),
         hideHudEnabled: fields.hideHudEnabled
             ?? DEFAULT_PLAYER_PREFERENCES.hideHudEnabled,
     };

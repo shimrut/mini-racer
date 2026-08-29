@@ -511,7 +511,7 @@ export class RealTimeRacer {
           maxSpeedKph: this.runtimeConfig.maxSpeed,
         });
       },
-      onPauseOnTimerChanged: () => {
+      onPausePlacementChanged: () => {
         this.hud.syncPauseControls();
       },
       onHideHudChanged: () => {
@@ -850,7 +850,7 @@ export class RealTimeRacer {
     this.settings.refreshMusicPanel();
     this.settings.refreshCollisionAutoRestartPanel();
     this.settings.refreshCollisionRestartDelayPanel();
-    this.settings.refreshPauseOnTimerPanel();
+    this.settings.refreshPausePlacementPanel();
     this.settings.refreshHideHudPanel();
     this.settings.refreshPbGhostPanel();
     this.hud.syncPauseControls();

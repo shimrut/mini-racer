@@ -2,7 +2,12 @@ import { TRACK_MODE_DAILY_GP } from '../config.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { isStandardMedalTier } from '../medals/medal-timing.js';
 import { getHideHudEnabled } from '../settings/hide-hud-preference.js';
-import { getPauseOnTimerEnabled } from '../settings/pause-on-timer-preference.js';
+import {
+    getPausePlacement,
+    PAUSE_PLACEMENT_SEPARATE,
+    PAUSE_PLACEMENT_SPEEDO,
+    PAUSE_PLACEMENT_TIMER,
+} from '../settings/pause-placement-preference.js';
 
 const HUD_TIME_MIN_MS = 1000 / 30;
 const HUD_SPEED_MIN_MS = 1000 / 15;
@@ -286,10 +291,11 @@ export class RaceHud {
 }
 
     syncPauseControls() {
-    const pauseOnTimer = getPauseOnTimerEnabled();
+    const placement = getPausePlacement();
     const hideHud = getHideHudEnabled();
-    const showBottomPause = this._pauseAvailable && !pauseOnTimer;
-    const showTimerPause = this._pauseAvailable && pauseOnTimer;
+    const showBottomPause = this._pauseAvailable && placement === PAUSE_PLACEMENT_SEPARATE;
+    const showTimerPause = this._pauseAvailable && placement === PAUSE_PLACEMENT_TIMER;
+    const showSpeedoPause = this._pauseAvailable && placement === PAUSE_PLACEMENT_SPEEDO;
     const showTimerPauseOnly = showTimerPause && hideHud;
 
     if (this.pauseBtn) {
@@ -308,7 +314,18 @@ export class RaceHud {
     if (this.timerPauseIcon) {
         this.timerPauseIcon.hidden = !showTimerPause;
     }
-    document.body?.classList?.toggle?.('pause-on-timer', pauseOnTimer);
+    if (this.speedometer) {
+        this.speedometer.classList.toggle('speedometer--pause', showSpeedoPause);
+        if (showSpeedoPause) {
+            this.speedometer.setAttribute('role', 'button');
+            this.speedometer.setAttribute('aria-label', 'Pause run');
+        } else {
+            this.speedometer.removeAttribute?.('role');
+            this.speedometer.setAttribute('aria-label', 'Current speed');
+        }
+    }
+    document.body?.classList?.toggle?.('pause-on-timer', placement === PAUSE_PLACEMENT_TIMER);
+    document.body?.classList?.toggle?.('pause-on-speedo', placement === PAUSE_PLACEMENT_SPEEDO);
     document.body?.classList?.toggle?.('hide-hud', hideHud);
 }
 
