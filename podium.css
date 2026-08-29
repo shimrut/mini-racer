@@ -375,18 +375,24 @@ body {
     order: 3;
     gap: 0.65rem;
     padding-top: 0.35rem;
-    background: var(--night);
+    background: transparent;
 }
 
 .podium-shell[data-mode="replay"] .podium-footer {
     flex: 0 0 auto;
     order: 4;
     justify-content: flex-end;
-    background: var(--night);
+    background: transparent;
 }
 
 .podium-shell[data-mode="replay"] .podium-play--back {
     display: inline-flex;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+}
+
+.podium-shell[data-mode="replay"] .podium-play--back:hover {
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
 .podium-replay__seek-wrap {
@@ -507,7 +513,7 @@ body {
     padding: 0;
     border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
     border-radius: 0.4rem;
-    background: var(--panel);
+    background: transparent;
     color: var(--ink);
     cursor: pointer;
 }
@@ -549,7 +555,7 @@ body {
     padding: 0.3rem 0.8rem;
     border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
     border-radius: 0.4rem;
-    background: var(--panel);
+    background: transparent;
     color: var(--ink);
     cursor: pointer;
     font-family: var(--display);
@@ -570,7 +576,7 @@ body {
 
 .podium-replay__speed[aria-pressed="true"] {
     border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .podium-replay__speeds,
@@ -585,17 +591,17 @@ body {
 
 .podium-replay__car[aria-pressed="true"][data-rank="1"] {
     border-color: var(--gold);
-    background: color-mix(in srgb, var(--gold) 22%, var(--panel));
+    background: color-mix(in srgb, var(--gold) 22%, transparent);
 }
 
 .podium-replay__car[aria-pressed="true"][data-rank="2"] {
     border-color: var(--silver);
-    background: color-mix(in srgb, var(--silver) 18%, var(--panel));
+    background: color-mix(in srgb, var(--silver) 18%, transparent);
 }
 
 .podium-replay__car[aria-pressed="true"][data-rank="3"] {
     border-color: var(--bronze);
-    background: color-mix(in srgb, var(--bronze) 22%, var(--panel));
+    background: color-mix(in srgb, var(--bronze) 22%, transparent);
 }
 
 .podium-replay__car[aria-pressed="false"] {
