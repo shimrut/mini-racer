@@ -187,19 +187,13 @@
     padding: 0.25rem;
 }
 
-#settings-modal .modal-sheet-settings-pause-placement {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.55rem;
-    margin: -0.25rem;
-    padding: 0.25rem;
-}
-
 #settings-modal .modal-sheet-settings-choice {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     align-items: center;
+    flex: 0 1 auto;
+    width: max-content;
+    max-width: 100%;
     position: relative;
     margin: 0;
     padding: 0.15rem;
@@ -230,9 +224,10 @@
 
 #settings-modal .modal-sheet-settings-choice .lobby-mode-switch__btn {
     min-width: 0;
-    padding: 0.35rem 0.2rem;
+    width: auto;
+    padding: 0.4rem 0.9rem;
     letter-spacing: 0.06em;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
 }
 
 #settings-modal .modal-sheet-settings-choice [aria-checked="true"] {
@@ -255,6 +250,10 @@
     flex: 1 1 auto;
     min-width: 0;
     line-height: 1.25;
+}
+
+#settings-modal .modal-sheet-settings-identity-head:has(.modal-sheet-settings-choice) .modal-sheet-settings-identity-heading {
+    flex: 0 1 auto;
 }
 
 #settings-modal .modal-sheet-settings-switch {

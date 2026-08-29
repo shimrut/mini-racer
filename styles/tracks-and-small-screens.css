@@ -112,6 +112,12 @@
         gap: 0.55rem;
     }
 
+    #settings-modal .modal-sheet-settings-choice .lobby-mode-switch__btn {
+        padding: 0.35rem 0.65rem;
+        letter-spacing: 0.05em;
+        font-size: 0.68rem;
+    }
+
     #settings-modal .settings-collision-delay-control-row {
         gap: 0.5rem;
     }
