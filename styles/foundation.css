@@ -63,7 +63,9 @@
 
 button:focus-visible,
 .touch-btn:focus-visible,
-a:focus-visible {
+a:focus-visible,
+[role="button"]:focus,
+[role="button"]:focus-visible {
     outline: none !important;
 }
 

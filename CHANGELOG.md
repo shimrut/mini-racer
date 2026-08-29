@@ -1,5 +1,7 @@
 # Changelog
 
+- Winning a Head to Head no longer draws the browser's default outline around your finish time.
+
 - Garage Car and Trail now use the same rounded pill switch as Settings on/off.
 
 - Wall sparks now fade after you finish or pause, instead of freezing and keeping the game drawing in the background.

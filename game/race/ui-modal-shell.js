@@ -1623,11 +1623,22 @@ export class ModalShell {
         if (this._modalKind === 'pause' && this.modalResumeBtn?.offsetParent !== null) {
             return this.modalResumeBtn;
         }
-        if (
-            this._modalKind === 'win'
-            && this.combinedRestartBtn?.offsetParent !== null
-        ) {
-            return this.combinedRestartBtn;
+        if (this._modalKind === 'win') {
+            // Improve is hidden on a Head to Head win. The split-time control is
+            // also tabbable, so without a fallback the trap focuses that number
+            // and the browser paints its default outline on it.
+            const winFocusCandidates = [
+                this.combinedRestartBtn,
+                this.combinedPlaylistBtn,
+                this.combinedMoreBtn,
+                this.combinedMenuBtn,
+            ];
+            return winFocusCandidates.find((button) => (
+                button
+                && !button.disabled
+                && !button.hidden
+                && button.offsetParent !== null
+            )) || null;
         }
         return null;
     }

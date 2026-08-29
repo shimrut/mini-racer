@@ -47,6 +47,19 @@ describe('modal preferred focus', () => {
         };
         expect(getModalPreferredFocusTarget.call(context)).toBe(null);
     });
+
+    it('falls back to a visible finish action when Improve is gone', () => {
+        const daily = visibleButton('combined-more');
+        const context = {
+            _modalKind: 'win',
+            modalResumeBtn: visibleButton('resume'),
+            combinedRestartBtn: hiddenButton('combined-restart'),
+            combinedPlaylistBtn: { ...visibleButton('combined-playlist'), disabled: true },
+            combinedMoreBtn: daily,
+            combinedMenuBtn: visibleButton('combined-menu'),
+        };
+        expect(getModalPreferredFocusTarget.call(context)).toBe(daily);
+    });
 });
 
 describe('modal escape key', () => {
