@@ -2,6 +2,7 @@ import { EXTRA_CAR_ASSETS } from './game/car/car-unlock-policy.js';
 import { CarSpriteLoader, sanitizeCarSpriteAsset } from './game/car/sprite.js';
 import { interpolatePbGhostPose, normalizePbGhostRecord } from './game/ghost/pb-ghost.js';
 import { isLocalEnvironment } from './game/track/environment.js';
+import { buildTrackGeometry } from './game/track/runtime.js';
 import { TRACKS } from './game/track/tracks.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
@@ -72,24 +73,144 @@ export function shouldUseLocalPodiumPreview(root = globalThis) {
     return new URLSearchParams(search).get('preview') === '1';
 }
 
+const PREVIEW_FINISH_MS = Object.freeze({ 1: 10193, 2: 10199, 3: 10227 });
+const PREVIEW_LANE_OFFSET = Object.freeze({ 1: 0, 2: 0.32, 3: -0.32 });
+
+function shortestAngleDeltaMilli(next, previous) {
+    const halfTurn = Math.round(Math.PI * 1000);
+    const fullTurn = halfTurn * 2;
+    let delta = next - previous;
+    while (delta > halfTurn) delta -= fullTurn;
+    while (delta < -halfTurn) delta += fullTurn;
+    return delta;
+}
+
+function encodeGhostFromSamples(samples) {
+    if (!Array.isArray(samples) || samples.length < 2) return null;
+    const origin = [
+        Math.round(samples[0].x * 100),
+        Math.round(samples[0].y * 100),
+        Math.round(samples[0].angle * 1000),
+    ];
+    let xCm = origin[0];
+    let yCm = origin[1];
+    let angleMilli = origin[2];
+    const deltas = [];
+    for (let i = 1; i < samples.length; i += 1) {
+        const nextX = Math.round(samples[i].x * 100);
+        const nextY = Math.round(samples[i].y * 100);
+        const nextAngle = Math.round(samples[i].angle * 1000);
+        const dAngle = shortestAngleDeltaMilli(nextAngle, angleMilli);
+        deltas.push(nextX - xCm, nextY - yCm, dAngle);
+        xCm = nextX;
+        yCm = nextY;
+        angleMilli += dAngle;
+    }
+    return {
+        schemaVersion: 2,
+        sampleIntervalMs: 50,
+        finishTimeMs: samples[samples.length - 1].timeMs,
+        origin,
+        deltas,
+    };
+}
+
+function trackMidline(track) {
+    const geometry = buildTrackGeometry({
+        outer: track.outer,
+        inner: track.inner,
+        cornerRadius: track.cornerRadius ?? 3,
+    });
+    const count = Math.min(geometry.outer.length, geometry.inner.length);
+    const points = [];
+    for (let i = 0; i < count; i += 1) {
+        points.push({
+            x: (geometry.outer[i].x + geometry.inner[i].x) / 2,
+            y: (geometry.outer[i].y + geometry.inner[i].y) / 2,
+        });
+    }
+    return points;
+}
+
+function sampleClosedPath(points, distance) {
+    if (!points.length) return { x: 0, y: 0, angle: 0 };
+    const total = pathLength(points);
+    if (total <= 0) {
+        return { x: points[0].x, y: points[0].y, angle: 0 };
+    }
+    let remaining = ((distance % total) + total) % total;
+    for (let i = 0; i < points.length; i += 1) {
+        const from = points[i];
+        const to = points[(i + 1) % points.length];
+        const span = Math.hypot(to.x - from.x, to.y - from.y);
+        if (span <= 0.0001) continue;
+        if (remaining <= span) {
+            const t = remaining / span;
+            return {
+                x: from.x + (to.x - from.x) * t,
+                y: from.y + (to.y - from.y) * t,
+                angle: Math.atan2(to.y - from.y, to.x - from.x),
+            };
+        }
+        remaining -= span;
+    }
+    const last = points[0];
+    const next = points[1] || points[0];
+    return { x: last.x, y: last.y, angle: Math.atan2(next.y - last.y, next.x - last.x) };
+}
+
+function pathLength(points) {
+    let total = 0;
+    for (let i = 0; i < points.length; i += 1) {
+        const from = points[i];
+        const to = points[(i + 1) % points.length];
+        total += Math.hypot(to.x - from.x, to.y - from.y);
+    }
+    return total;
+}
+
+function startDistanceOnPath(points, startPos) {
+    if (!startPos || !points.length) return 0;
+    let bestDistance = 0;
+    let bestScore = Infinity;
+    let traveled = 0;
+    for (let i = 0; i < points.length; i += 1) {
+        const from = points[i];
+        const score = Math.hypot(from.x - startPos.x, from.y - startPos.y);
+        if (score < bestScore) {
+            bestScore = score;
+            bestDistance = traveled;
+        }
+        const to = points[(i + 1) % points.length];
+        traveled += Math.hypot(to.x - from.x, to.y - from.y);
+    }
+    return bestDistance;
+}
+
+function createTrackFollowingGhost(track, finishTimeMs, laneOffset) {
+    const midline = trackMidline(track);
+    const length = pathLength(midline);
+    if (length <= 0 || finishTimeMs <= 0) return null;
+    const startAt = startDistanceOnPath(midline, track.startPos);
+    const sampleCount = Math.ceil(finishTimeMs / 50) + 1;
+    const samples = [];
+    for (let i = 0; i < sampleCount; i += 1) {
+        const timeMs = i === sampleCount - 1 ? finishTimeMs : i * 50;
+        const pose = sampleClosedPath(midline, startAt + length * (timeMs / finishTimeMs));
+        const normalX = -Math.sin(pose.angle);
+        const normalY = Math.cos(pose.angle);
+        samples.push({
+            timeMs,
+            x: pose.x + normalX * laneOffset,
+            y: pose.y + normalY * laneOffset,
+            angle: pose.angle,
+        });
+    }
+    return encodeGhostFromSamples(samples);
+}
+
 export function createLocalPodiumPreview() {
     const track = TRACKS.circuit;
-    const origin = [
-        Math.round(track.startPos.x * 100),
-        Math.round(track.startPos.y * 100),
-        Math.round((track.startAngle || 0) * 1000),
-    ];
-    const ghost = (dx, dy) => {
-        const deltas = [];
-        for (let i = 0; i < 39; i += 1) deltas.push(dx, dy, 0);
-        return {
-            schemaVersion: 2,
-            sampleIntervalMs: 50,
-            finishTimeMs: 1950,
-            origin,
-            deltas,
-        };
-    };
     return {
         podium: {
             trackName: track.name,
@@ -103,11 +224,10 @@ export function createLocalPodiumPreview() {
         },
         replays: {
             trackKey: 'circuit',
-            ghosts: [
-                { rank: 1, ghost: ghost(8, 0) },
-                { rank: 2, ghost: ghost(6, 2) },
-                { rank: 3, ghost: ghost(4, -2) },
-            ],
+            ghosts: [1, 2, 3].map((rank) => ({
+                rank,
+                ghost: createTrackFollowingGhost(track, PREVIEW_FINISH_MS[rank], PREVIEW_LANE_OFFSET[rank]),
+            })),
         },
     };
 }
@@ -115,10 +235,10 @@ export function createLocalPodiumPreview() {
 export async function fetchPodiumReplays(root = globalThis) {
     try {
         const response = await root.fetch('/api/podium/replays');
-        if (!response?.ok) return normalizePodiumReplayGhosts(null);
-        return normalizePodiumReplayGhosts(await response.json());
+        if (!response?.ok) return null;
+        return await response.json();
     } catch {
-        return normalizePodiumReplayGhosts(null);
+        return null;
     }
 }
 
@@ -160,6 +280,7 @@ export function createPodiumReplayController({
         timeMs: 0,
         durationMs: 0,
         records: new Map(),
+        visible: new Set([1, 2, 3]),
         trackKey: null,
         trackName: '',
         frameId: 0,
@@ -171,20 +292,40 @@ export function createPodiumReplayController({
         const results = documentRef?.getElementById('podium-results');
         const replay = documentRef?.getElementById('podium-replay');
         const playNow = documentRef?.getElementById('podium-play');
+        const viewReplays = documentRef?.getElementById('podium-view-replays');
         const back = documentRef?.getElementById('podium-replay-back');
         const clock = documentRef?.getElementById('podium-replay-time');
-        const play = documentRef?.getElementById('podium-replay-play');
-        const pause = documentRef?.getElementById('podium-replay-pause');
+        const toggle = documentRef?.getElementById('podium-replay-toggle');
+        const seek = documentRef?.getElementById('podium-replay-seek');
+        const inReplay = state.mode === 'replay';
         if (shell) shell.dataset.mode = state.mode;
-        results?.toggleAttribute('inert', state.mode === 'replay');
-        replay?.toggleAttribute('hidden', state.mode !== 'replay');
-        playNow?.toggleAttribute('hidden', state.mode === 'replay');
-        back?.toggleAttribute('hidden', state.mode !== 'replay');
+        results?.toggleAttribute('inert', inReplay);
+        replay?.toggleAttribute('hidden', !inReplay);
+        playNow?.toggleAttribute('hidden', inReplay);
+        viewReplays?.toggleAttribute('hidden', inReplay || state.records.size === 0);
+        back?.toggleAttribute('hidden', !inReplay);
         if (clock) clock.textContent = formatPodiumReplayClock(state.timeMs);
-        if (play) play.disabled = state.playing || state.durationMs <= 0;
-        if (pause) pause.disabled = !state.playing;
+        if (toggle) {
+            toggle.disabled = state.durationMs <= 0;
+            toggle.dataset.playing = String(state.playing);
+            toggle.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+        }
+        if (seek) {
+            seek.disabled = state.durationMs <= 0;
+            seek.max = String(Math.max(1, Math.round(state.durationMs)));
+            if (seek.dataset.scrubbing !== '1') {
+                seek.value = String(Math.round(state.timeMs));
+            }
+        }
         documentRef?.querySelectorAll('.podium-replay__speed').forEach((button) => {
             button.setAttribute('aria-pressed', String(Number(button.dataset.rate) === state.rate));
+        });
+        documentRef?.querySelectorAll('.podium-replay__car').forEach((button) => {
+            const rank = Number(button.dataset.rank);
+            const available = state.records.has(rank);
+            button.hidden = !available;
+            button.disabled = !available;
+            button.setAttribute('aria-pressed', String(available && state.visible.has(rank)));
         });
     }
 
@@ -201,6 +342,7 @@ export function createPodiumReplayController({
 
         const schematicCars = [];
         for (const rank of [3, 2, 1]) {
+            if (!state.visible.has(rank)) continue;
             const record = state.records.get(rank);
             const image = carImages.get(rank);
             if (!record || !image) continue;
@@ -272,6 +414,7 @@ export function createPodiumReplayController({
             const normalized = normalizePodiumReplayGhosts(payload);
             state.records = normalized.records;
             state.durationMs = normalized.durationMs;
+            state.visible = new Set(normalized.records.keys());
             state.trackKey = normalized.trackKey;
             state.trackName = trackName || '';
             await loadReplayCars();
@@ -285,8 +428,7 @@ export function createPodiumReplayController({
             syncChrome();
             paint();
             startLoop();
-            documentRef?.getElementById(state.playing ? 'podium-replay-pause' : 'podium-replay-play')
-                ?.focus();
+            documentRef?.getElementById('podium-replay-toggle')?.focus();
             return true;
         },
         exit() {
@@ -305,13 +447,32 @@ export function createPodiumReplayController({
         },
         pause() {
             state.playing = false;
+            stopLoop();
             syncChrome();
         },
-        stop() {
-            state.playing = false;
-            state.timeMs = 0;
+        togglePlay() {
+            if (state.playing) this.pause();
+            else this.play();
+        },
+        seek(timeMs) {
+            if (state.mode !== 'replay' || state.durationMs <= 0) return;
+            const next = Math.min(state.durationMs, Math.max(0, Number(timeMs) || 0));
+            state.timeMs = next;
+            if (next >= state.durationMs) state.playing = false;
+            if (!state.playing) stopLoop();
             paint();
             syncChrome();
+        },
+        setVisible(rank, visible) {
+            const nextRank = Number(rank);
+            if (!state.records.has(nextRank)) return;
+            if (visible) state.visible.add(nextRank);
+            else state.visible.delete(nextRank);
+            paint();
+            syncChrome();
+        },
+        isVisible(rank) {
+            return state.visible.has(Number(rank));
         },
         setRate(rate) {
             const next = Number(rate);

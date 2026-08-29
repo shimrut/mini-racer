@@ -169,7 +169,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.
 - [ ] Podium automation can be enabled and disabled independently from race posts, retries hourly during the six-hour post-expiry window, freezes the first top-three snapshot, and reuses one canonical podium post.
 - [ ] Podium posts show exactly three positions, preserve publication-time username/private-name choices, expose no player IDs, and use explicit placeholders when fewer than three verified racers finished.
-- [ ] Podium Replay plays the frozen top-three ghosts on the post (not in the game), with play/pause/stop and 0.5× / 1× / 2×, and Back returns to the list. Places without a saved ghost omit Replay.
+- [ ] Podium **View Replays** plays the frozen top-three ghosts on the post (not in the game), starts with all cars visible, lets Gold / Silver / Bronze show or hide a car, has a progress bar with play/pause and 0.5× / 1× / 2×, and Back returns to the list. The button is omitted when no top-three ghost was saved.
 - [ ] Podium Reddit identities show the correct Snoovatar when Devvit exposes one and omit the `u/` prefix; standard-profile-icon accounts, private identities, unavailable avatars, and empty places show Reddit's official hosted default Snoo on desktop and mobile.
 - [ ] A podium created before avatar payloads were introduced backfills its public Reddit avatars through `/api/podium/avatars` without resolving or exposing private identities.
 

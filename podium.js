@@ -116,11 +116,6 @@ function renderPosition(row, position) {
         );
     }
     row.classList.toggle('podium-row--empty', position.identityType === 'empty');
-    const replay = row.querySelector('.podium-row__replay');
-    if (replay) {
-        replay.hidden = position.identityType === 'empty';
-        replay.disabled = true;
-    }
 }
 
 function formatRedditName(value) {
@@ -173,12 +168,12 @@ function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-function syncReplayButtons(documentRef, controller) {
-    documentRef?.querySelectorAll('.podium-row__replay').forEach((button) => {
-        const available = controller.hasGhost(Number(button.dataset.rank));
-        button.hidden = !available;
-        button.disabled = !available;
-    });
+function syncViewReplaysButton(documentRef, controller) {
+    const button = documentRef?.getElementById('podium-view-replays');
+    if (!button || !controller) return;
+    const available = controller.hasGhosts();
+    button.hidden = !available || controller.mode === 'replay';
+    button.disabled = !available;
 }
 
 function installLocalPodiumPreview(preview) {
@@ -257,26 +252,40 @@ export function bindPodiumReplay(documentRef, {
         async prepareFromServer(root = globalThis) {
             const payload = await fetchReplays(root);
             await controller.prepare(payload, getTrackName());
-            syncReplayButtons(documentRef, controller);
+            syncViewReplaysButton(documentRef, controller);
             return controller.hasGhosts();
         },
     };
 
-    documentRef.querySelectorAll('.podium-row__replay').forEach((button) => {
-        button.addEventListener('click', () => controller.enter());
+    documentRef.getElementById('podium-view-replays')?.addEventListener('click', () => {
+        controller.enter();
     });
     documentRef.getElementById('podium-replay-back')?.addEventListener('click', () => {
         controller.exit();
         const podium = renderPodium(documentRef, readPodiumPostData());
         renderPodiumTrack(podium.trackName, documentRef);
-        syncReplayButtons(documentRef, controller);
-        documentRef.querySelector('.podium-row__replay:not([hidden])')?.focus();
+        syncViewReplaysButton(documentRef, controller);
+        documentRef.getElementById('podium-view-replays')?.focus();
     });
-    documentRef.getElementById('podium-replay-play')?.addEventListener('click', () => controller.play());
-    documentRef.getElementById('podium-replay-pause')?.addEventListener('click', () => controller.pause());
-    documentRef.getElementById('podium-replay-stop')?.addEventListener('click', () => controller.stop());
+    documentRef.getElementById('podium-replay-toggle')?.addEventListener('click', () => {
+        controller.togglePlay();
+    });
+    const seek = documentRef.getElementById('podium-replay-seek');
+    if (seek) {
+        const endScrub = () => { delete seek.dataset.scrubbing; };
+        seek.addEventListener('pointerdown', () => { seek.dataset.scrubbing = '1'; });
+        seek.addEventListener('pointerup', endScrub);
+        seek.addEventListener('pointercancel', endScrub);
+        seek.addEventListener('change', endScrub);
+        seek.addEventListener('input', () => controller.seek(seek.value));
+    }
     documentRef.querySelectorAll('.podium-replay__speed').forEach((button) => {
         button.addEventListener('click', () => controller.setRate(button.dataset.rate));
+    });
+    documentRef.querySelectorAll('.podium-replay__car').forEach((button) => {
+        button.addEventListener('click', () => {
+            controller.setVisible(button.dataset.rank, !controller.isVisible(button.dataset.rank));
+        });
     });
     return activeReplay;
 }

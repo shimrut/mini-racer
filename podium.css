@@ -358,6 +358,14 @@ body {
     display: inline-flex;
 }
 
+.podium-replay__transport {
+    display: grid;
+    justify-items: center;
+    gap: 0.55rem;
+    width: min(36rem, 100%);
+    margin-inline: auto;
+}
+
 .podium-replay__clock {
     color: var(--ink);
     font-family: var(--mono);
@@ -366,6 +374,31 @@ body {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.05em;
     text-align: center;
+}
+
+.podium-replay__seek {
+    width: 100%;
+    height: 1.35rem;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.podium-replay__seek:disabled {
+    cursor: default;
+    opacity: 0.4;
+}
+
+.podium-replay__button .podium-replay__icon--pause {
+    display: none;
+}
+
+.podium-replay__button[data-playing="true"] .podium-replay__icon--play {
+    display: none;
+}
+
+.podium-replay__button[data-playing="true"] .podium-replay__icon--pause {
+    display: block;
 }
 
 .podium-replay__controls {

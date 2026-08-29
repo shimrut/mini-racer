@@ -8,10 +8,11 @@ an ordered manifest whose imports are bundled into the production `game.css`.
 Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
 `head-to-head.css`, `mod-analytics.css`)
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
-(`#ef4444`) tokens as the game. The podium row keeps place, identity, Replay,
-and time in one grid, with identity tight to the rank. Replay mode hides the
-list, fills the track canvas, and puts play/pause/stop plus 0.5× / 1× / 2×
-in the footer with Back. The moderator analytics page is one
+(`#ef4444`) tokens as the game. The podium row keeps place, identity, and
+time in one grid, with identity tight to the rank. **View Replays** sits next
+to Play Now. Replay mode hides the list, fills the track canvas, and puts a
+progress bar with a play/pause toggle, 0.5× / 1× / 2×, and Gold / Silver / Bronze
+car toggles in the footer with Back. The moderator analytics page is one
 sticky-header table: a row per UTC day, with the day's players split into new
 and returning and each mode's starts and finishes beside them. The newest row
 carries the red accent. The Head to Head surface uses a responsive

@@ -36,10 +36,10 @@ function createDocument() {
                         <img class="podium-row__avatar podium-row__avatar--generic" src="${OFFICIAL_REDDIT_SNOO_URL}" alt="">
                         <span class="podium-row__name"></span>
                         <span class="podium-row__time"></span>
-                        <button class="podium-row__replay" type="button" data-rank="${rank}" hidden>Replay</button>
                     </li>
                 `).join('')}
             </ol>
+            <button id="podium-view-replays" type="button" hidden>View Replays</button>
             <button id="podium-play" type="button">Play Now</button>
             <button id="podium-replay-back" type="button" hidden>Back</button>
         </main>
@@ -182,7 +182,7 @@ describe('podium custom post', () => {
         expect(requestExpandedMode).toHaveBeenCalledWith({ type: 'click' }, 'game');
     });
 
-    it('enables Replay only for places with a frozen ghost and keeps Play Now on the post', async () => {
+    it('shows View Replays next to Play Now when a frozen ghost exists', async () => {
         const document = createDocument();
         const podium = {
             trackName: 'Circuit ProMax',
@@ -211,21 +211,20 @@ describe('podium custom post', () => {
 
         await replay.prepareFromServer();
 
-        expect(document.querySelector('[data-rank="1"] .podium-row__replay').hidden).toBe(false);
-        expect(document.querySelector('[data-rank="2"] .podium-row__replay').hidden).toBe(true);
+        expect(document.getElementById('podium-view-replays').hidden).toBe(false);
         expect(document.getElementById('podium-play').textContent).toBe('Play Now');
 
-        document.querySelector('[data-rank="1"] .podium-row__replay').click();
+        document.getElementById('podium-view-replays').click();
         expect(replay.mode).toBe('replay');
         expect(document.getElementById('podium-play').hidden).toBe(true);
+        expect(document.getElementById('podium-view-replays').hidden).toBe(true);
         expect(document.getElementById('podium-replay-back').hidden).toBe(false);
 
         document.getElementById('podium-replay-back').click();
         expect(replay.mode).toBe('podium');
         expect(document.getElementById('podium-play').hidden).toBe(false);
         expect(document.querySelector('[data-rank="1"] .podium-row__name').textContent).toBe('RaceFan');
-        expect(document.querySelector('[data-rank="1"] .podium-row__replay').disabled).toBe(false);
-        expect(document.querySelector('[data-rank="2"] .podium-row__replay').hidden).toBe(true);
+        expect(document.getElementById('podium-view-replays').hidden).toBe(false);
         delete globalThis.devvit;
     });
 });
