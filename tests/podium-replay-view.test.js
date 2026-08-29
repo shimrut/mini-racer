@@ -161,6 +161,7 @@ describe('podium in-post replay', () => {
         controller.seek(80);
         expect(controller.timeMs).toBe(80);
         expect(documentRef.getElementById('podium-replay-seek').value).toBe('80');
+        expect(documentRef.getElementById('podium-replay-seek').style.getPropertyValue('--progress')).toBe('40%');
         controller.exit();
         expect(documentRef.getElementById('podium-shell').dataset.mode).toBe('podium');
         expect(documentRef.getElementById('podium-play').hidden).toBe(false);

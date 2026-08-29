@@ -312,6 +312,11 @@ export function createPodiumReplayController({
             if (seek.dataset.scrubbing !== '1') {
                 seek.value = String(Math.round(state.timeMs));
             }
+            const max = Number(seek.max) || 1;
+            const value = Number(seek.value) || 0;
+            const progress = value / max;
+            seek.style.setProperty('--progress', `${progress * 100}%`);
+            seek.parentElement?.style.setProperty('--progress-n', String(progress));
         }
         documentRef?.querySelectorAll('.podium-replay__speed').forEach((button) => {
             button.setAttribute('aria-pressed', String(Number(button.dataset.rate) === state.rate));
