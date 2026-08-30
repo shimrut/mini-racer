@@ -1,5 +1,7 @@
 # Changelog
 
+- Podium replay toggles now read #1, #2, and #3 and sit on the same row as play/pause.
+
 - The podium replay player now plays at normal speed only; the 0.5× and 2× speed buttons are gone.
 
 - The podium replay clock now shows seconds and milliseconds only (for example `10.193`), without a minutes prefix.

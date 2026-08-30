@@ -27,9 +27,11 @@ function replayDocument() {
             <span id="podium-replay-time">0.000</span>
             <input id="podium-replay-seek" type="range" min="0" max="1" value="0">
             <button id="podium-replay-toggle" type="button" data-playing="false" aria-label="Play">Play</button>
-            <button class="podium-replay__car" data-rank="1" type="button" aria-pressed="true">Gold</button>
-            <button class="podium-replay__car" data-rank="2" type="button" aria-pressed="true">Silver</button>
-            <button class="podium-replay__car" data-rank="3" type="button" aria-pressed="true">Bronze</button>
+            <div id="podium-replay-cars" class="podium-replay__cars">
+                <button class="podium-replay__car" data-rank="1" type="button" aria-pressed="true">#1</button>
+                <button class="podium-replay__car" data-rank="2" type="button" aria-pressed="true">#2</button>
+                <button class="podium-replay__car" data-rank="3" type="button" aria-pressed="true">#3</button>
+            </div>
             <button id="podium-replay-trail" type="button" aria-pressed="false">Trail</button>
         </section>
         <button id="podium-view-replays" type="button" hidden>View Replays</button>

@@ -99,16 +99,16 @@
                             <path fill="currentColor" d="M48 32C21.5 32 0 53.5 0 80L0 432c0 26.5 21.5 48 48 48l64 0c26.5 0 48-21.5 48-48l0-352c0-26.5-21.5-48-48-48L48 32zm224 0c-26.5 0-48 21.5-48 48l0 352c0 26.5 21.5 48 48 48l64 0c26.5 0 48-21.5 48-48l0-352c0-26.5-21.5-48-48-48l-64 0z"/>
                         </svg>
                     </button>
+                    <div id="podium-replay-cars" class="podium-replay__cars" role="group" aria-label="Finish positions to show">
+                        <button class="podium-replay__car" type="button" data-rank="1" aria-pressed="true">#1</button>
+                        <button class="podium-replay__car" type="button" data-rank="2" aria-pressed="true">#2</button>
+                        <button class="podium-replay__car" type="button" data-rank="3" aria-pressed="true">#3</button>
+                    </div>
                 </div>
                 <div class="podium-replay__clock" aria-live="polite">
                     <span id="podium-replay-time">0.000</span>
                 </div>
-                <div id="podium-replay-cars" class="podium-replay__cars" role="group" aria-label="Cars to show">
-                    <button class="podium-replay__car" type="button" data-rank="1" aria-pressed="true">Gold</button>
-                    <button class="podium-replay__car" type="button" data-rank="2" aria-pressed="true">Silver</button>
-                    <button class="podium-replay__car" type="button" data-rank="3" aria-pressed="true">Bronze</button>
-                    <button id="podium-replay-trail" class="podium-replay__car podium-replay__trail" type="button" aria-pressed="false">Trail</button>
-                </div>
+                <button id="podium-replay-trail" class="podium-replay__car podium-replay__trail" type="button" aria-pressed="false">Trail</button>
                 <button id="podium-replay-back" class="podium-replay__car podium-replay__back" type="button" hidden>Back</button>
             </div>
         </section>

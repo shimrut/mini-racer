@@ -481,7 +481,7 @@ body {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
         "playback clock"
-        "cars back";
+        "trail back";
     align-items: center;
     column-gap: 0.4rem;
     row-gap: 0.4rem;
@@ -575,13 +575,25 @@ body {
     outline-offset: 2px;
 }
 
+.podium-replay__car[data-rank] {
+    min-width: 2.45rem;
+    padding-inline: 0.45rem;
+    font-family: var(--mono);
+    font-style: normal;
+    letter-spacing: -0.03em;
+    text-transform: none;
+}
+
 .podium-replay__cars {
     display: flex;
     gap: 0.35rem;
-    grid-area: cars;
     flex-wrap: wrap;
-    justify-self: start;
     min-width: 0;
+}
+
+.podium-replay__trail {
+    grid-area: trail;
+    justify-self: start;
 }
 
 .podium-replay__back {
