@@ -24,7 +24,7 @@ function replayDocument() {
         <main id="podium-shell" data-mode="podium"></main>
         <section id="podium-results"></section>
         <section id="podium-replay" hidden>
-            <span id="podium-replay-time">0:00.000</span>
+            <span id="podium-replay-time">0.000</span>
             <input id="podium-replay-seek" type="range" min="0" max="1" value="0">
             <button id="podium-replay-toggle" type="button" data-playing="false" aria-label="Play">Play</button>
             <button class="podium-replay__speed" data-rate="0.5" type="button">0.5×</button>
@@ -57,8 +57,9 @@ describe('podium in-post replay', () => {
         expect(normalized.trackKey).toBe('circuit');
     });
 
-    it('formats the replay clock like podium times', () => {
-        expect(formatPodiumReplayClock(10193)).toBe('0:10.193');
+    it('formats the replay clock as seconds and milliseconds', () => {
+        expect(formatPodiumReplayClock(10193)).toBe('10.193');
+        expect(formatPodiumReplayClock(0)).toBe('0.000');
     });
 
     it('assigns gold, arctic, and blaze cars by place', () => {

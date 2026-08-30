@@ -25,10 +25,9 @@ let carLoadPromise = null;
 
 export function formatPodiumReplayClock(timeMs) {
     const totalMilliseconds = Math.max(0, Math.round(Number(timeMs) || 0));
-    const minutes = Math.floor(totalMilliseconds / 60_000);
-    const seconds = Math.floor((totalMilliseconds % 60_000) / 1000);
+    const seconds = Math.floor(totalMilliseconds / 1000);
     const milliseconds = totalMilliseconds % 1000;
-    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+    return `${seconds}.${String(milliseconds).padStart(3, '0')}`;
 }
 
 function trailPointsUntil(samples, timeMs) {

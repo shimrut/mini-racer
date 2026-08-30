@@ -1,5 +1,7 @@
 # Changelog
 
+- The podium replay clock now shows seconds and milliseconds only (for example `10.193`), without a minutes prefix.
+
 - Final podium posts on phones now use a smaller header, tighter place rows, and full-width View Replays / Play Now buttons, so the layout fits Reddit’s short post card.
 
 - Replay playback on the final podium now keeps only Mini Racer top left and the track name top right, so the track has more room.
