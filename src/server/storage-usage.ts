@@ -1,11 +1,15 @@
 import { redis } from '@devvit/redis';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../../game/campaign/manifest.js';
 import {
-    analyticsDateRange,
+    analyticsRetentionWindow,
     analyticsScope,
-    countsKey,
+    dayCountersKey,
+    dayModePlayersKey,
+    dayPlayersKey,
     firstSeenKey,
-    playersKey,
+    monthCountersKey,
+    monthModePlayersKey,
+    monthPlayersKey,
 } from './analytics-store.js';
 import { campaignProgressKey } from './campaign-progress-key.js';
 import { carUnlockHashKey } from './car-unlock-store.js';
@@ -294,7 +298,7 @@ function buildKeyGroups({
     now: Date;
 }): KeyGroup[] {
     const scope = analyticsScope(subredditName);
-    const { dates } = analyticsDateRange(now);
+    const { dates, months } = analyticsRetentionWindow(now);
     const challengeIds = dates.map((date) => createDailyChallengeId(date));
     const campaigns = CAMPAIGN_STAGES.map((stage) => toCampaignCompetition(CAMPAIGN_ID, stage));
     const guestExpiryKeys = [...new Set(
@@ -345,8 +349,16 @@ function buildKeyGroups({
             detail: 'This page: a mark per player per day, race counters, and the ledger of accounts seen',
             strings: [],
             hashes: [
-                ...dates.map((date) => playersKey(scope, date)),
-                ...dates.map((date) => countsKey(scope, date)),
+                ...dates.flatMap((date) => [
+                    dayPlayersKey(scope, date),
+                    dayModePlayersKey(scope, date),
+                    dayCountersKey(scope, date),
+                ]),
+                ...months.flatMap((month) => [
+                    monthPlayersKey(scope, month),
+                    monthModePlayersKey(scope, month),
+                    monthCountersKey(scope, month),
+                ]),
                 firstSeenKey(scope),
             ],
             sortedSets: [],

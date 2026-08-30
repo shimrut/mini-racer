@@ -164,6 +164,25 @@ function buildMonthRange(to: string, count: number): string[] {
     return months;
 }
 
+export {
+    sanitizeScope as analyticsScope,
+    firstSeenKey,
+    dayPlayersKey,
+    dayModePlayersKey,
+    dayCountersKey,
+    monthPlayersKey,
+    monthModePlayersKey,
+    monthCountersKey,
+};
+
+export function analyticsRetentionWindow(now = new Date()): { dates: string[]; months: string[] } {
+    const to = formatUtcChallengeDate(now);
+    return {
+        dates: buildDateRange(addUtcDays(to, -(ANALYTICS_RETENTION_DAYS - 1)), to),
+        months: buildMonthRange(toMonth(to), ANALYTICS_RETENTION_MONTHS),
+    };
+}
+
 function normalizeMode(mode: unknown): AnalyticsMode | null {
     return ANALYTICS_MODES.includes(mode as AnalyticsMode) ? mode as AnalyticsMode : null;
 }

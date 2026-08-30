@@ -109,10 +109,10 @@ function seedOneDayOfRacing({ players = ['reddit:racefan', 'reddit:pitwall'] } =
     putString(`dailygp:leaderboard:${CHALLENGE_ID}:standings-revision`, '7');
     putHash('dailygp:challenges', { [CHALLENGE_ID]: '{"id":"daily","trackKey":"numberOne"}' });
 
-    putHash(`dailygp:analytics:${SUBREDDIT}:${TODAY}:players`, Object.fromEntries(
+    putHash(`dailygp:analytics:${SUBREDDIT}:d:${TODAY}:players`, Object.fromEntries(
         players.map((playerId) => [playerId, 'n']),
     ));
-    putHash(`dailygp:analytics:${SUBREDDIT}:${TODAY}:counts`, { 'daily:start': '4', 'daily:finish': '2' });
+    putHash(`dailygp:analytics:${SUBREDDIT}:d:${TODAY}:counters`, { 'daily:start': '4', 'daily:finish': '2' });
     putHash(`dailygp:analytics:${SUBREDDIT}:first-seen`, Object.fromEntries(
         players.map((playerId) => [playerId, TODAY]),
     ));

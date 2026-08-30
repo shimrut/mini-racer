@@ -1,5 +1,8 @@
 # Changelog
 
+- Redis occupancy on moderator analytics now uses the current analytics Redis
+  key names, so the production build can include that page.
+
 - Moderator analytics now show how much Redis Mini Racer is using, broken down
   by the key families the game can name. Ghosts and leaderboards are sampled.
   Head to Head and other short-lived keys are called out as left out.

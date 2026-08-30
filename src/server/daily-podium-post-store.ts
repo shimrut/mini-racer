@@ -30,7 +30,7 @@ function normalizeSubredditName(subredditName: string): string {
     return subredditName.trim().toLowerCase();
 }
 
-function createPodiumPostRecordKey(subredditName: string, challengeId: string): string {
+export function createPodiumPostRecordKey(subredditName: string, challengeId: string): string {
     return `dailygp:podium-post:${normalizeSubredditName(subredditName)}:${challengeId}`;
 }
 

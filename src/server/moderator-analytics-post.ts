@@ -4,7 +4,7 @@ import {
     readContextSubredditName,
 } from './request-context.js';
 
-const MOD_ANALYTICS_POSTS_KEY = 'dailygp:mod-analytics:posts';
+export const MOD_ANALYTICS_POSTS_KEY = 'dailygp:mod-analytics:posts';
 
 export type ModAnalyticsPostRecord = {
     subredditName: string;

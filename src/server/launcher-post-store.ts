@@ -13,7 +13,7 @@ export type LauncherPostRecord = {
     createdAt: string;
 };
 
-const LAUNCHER_POSTS_KEY = 'miniracer:launcher-posts';
+export const LAUNCHER_POSTS_KEY = 'miniracer:launcher-posts';
 
 function normalizeSubredditName(subredditName: string): string {
     return subredditName.trim().toLowerCase();

@@ -24,7 +24,7 @@ function normalizeSubredditName(subredditName: string): string {
     return subredditName.trim().toLowerCase();
 }
 
-function createPostRecordKey(subredditName: string, challengeId: string): string {
+export function createPostRecordKey(subredditName: string, challengeId: string): string {
     return `dailygp:post:${normalizeSubredditName(subredditName)}:${challengeId}`;
 }
 

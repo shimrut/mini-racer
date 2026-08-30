@@ -6,7 +6,7 @@ import {
     type RedisLock,
 } from './redis-lock.js';
 
-const DAILY_AUTPOST_SUBREDDITS_KEY = 'dailygp:autopost:subreddits';
+export const DAILY_AUTPOST_SUBREDDITS_KEY = 'dailygp:autopost:subreddits';
 const DAILY_AUTOPOST_SUBSCRIPTION_LOCK_TTL_MS = 30_000;
 const DAILY_AUTOPOST_SUBSCRIPTION_LOCK_ATTEMPTS = 5;
 const DAILY_AUTOPOST_SUBSCRIPTION_LOCK_RETRY_MS = 5;
