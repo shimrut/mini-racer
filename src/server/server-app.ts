@@ -47,10 +47,8 @@ import {
 } from './daily-podium-autopost-store.js';
 import { ensureMiniRacerLauncherPostForSubreddit } from './launcher-post-service.js';
 import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator-access.js';
-import {
-    getServerAnalyticsSummary,
-    recordAnalyticsPodiumEvent,
-} from './analytics-store.js';
+import { recordAnalyticsPodiumEvent } from './analytics-store.js';
+import { getModeratorAnalyticsSummary } from './moderator-analytics-summary.js';
 import {
     ensureModeratorAnalyticsPostForSubreddit,
     resolveAnalyticsToolSubredditName,
@@ -98,7 +96,7 @@ function registerProductionRoutes(app: express.Application): void {
     registerAnalyticsRoutes(app, {
         resolveAnalyticsToolSubredditName,
         assertModeratorForSubreddit,
-        getServerAnalyticsSummary: () => getServerAnalyticsSummary(),
+        getServerAnalyticsSummary: () => getModeratorAnalyticsSummary(),
         getRequestUsername,
         recordRaceStart: (input) => recordServerRaceStart(input),
         recordPodiumEvent: (input) => recordAnalyticsPodiumEvent(input),

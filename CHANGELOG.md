@@ -1,5 +1,9 @@
 # Changelog
 
+- Moderator analytics now show how much Redis Mini Racer is using, broken down
+  by the key families the game can name. Ghosts and leaderboards are sampled.
+  Head to Head and other short-lived keys are called out as left out.
+
 - Daily preview again puts the lap count on the right, just before Time to Beat.
 
 - Moderator analytics now show Play Now taps and View Replays opens from final podium posts.

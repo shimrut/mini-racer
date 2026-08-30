@@ -8,6 +8,7 @@ const SECTION_IDS = [
     'analytics-trend',
     'analytics-modes',
     'analytics-months',
+    'analytics-storage',
     'analytics-days',
 ];
 const MODE_LABELS = { daily: 'Daily', campaign: 'Campaign', challenge: 'Challenge' };
@@ -23,6 +24,14 @@ function toCount(value) {
 
 function formatCount(value) {
     return toCount(value).toLocaleString('en-US');
+}
+
+function formatBytes(value) {
+    const bytes = Number(value);
+    if (!Number.isFinite(bytes) || bytes < 0) return '—';
+    if (bytes < 1024) return `${Math.round(bytes)} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 }
 
 function percent(part, total) {
@@ -463,6 +472,63 @@ function renderMonths(doc, months) {
     return nodes;
 }
 
+function renderStorage(doc, storage) {
+    if (!storage || typeof storage !== 'object') {
+        return [
+            cardHeading(doc, 'Redis', 'Could not measure named keys this time'),
+            element(doc, 'p', 'analytics-note', 'Player counts above are unaffected.'),
+        ];
+    }
+
+    const groups = Array.isArray(storage.groups) ? storage.groups : [];
+    const estimated = groups.some((group) => group?.estimated);
+    const nodes = [cardHeading(
+        doc,
+        'Redis',
+        estimated ? 'Sampled from named keys this app can walk' : 'Named keys this app can walk',
+    )];
+    nodes.push(element(doc, 'p', 'analytics-storage-total analytics-count', formatBytes(storage.totalBytes)));
+
+    if (groups.length === 0) {
+        nodes.push(element(doc, 'p', 'analytics-note', 'No named keys held data.'));
+    } else {
+        const table = element(doc, 'table', 'analytics-table');
+        const head = element(doc, 'thead');
+        const labels = element(doc, 'tr');
+        for (const label of ['Family', 'Size', 'Keys', 'Rows']) {
+            const cell = element(doc, 'th', undefined, label);
+            cell.scope = 'col';
+            labels.append(cell);
+        }
+        head.append(labels);
+
+        const body = element(doc, 'tbody');
+        for (const group of groups) {
+            const row = element(doc, 'tr');
+            const name = element(doc, 'th', undefined, group?.label || 'Unknown');
+            name.scope = 'row';
+            if (group?.detail) name.title = String(group.detail);
+            const size = formatBytes(group?.bytes);
+            row.append(
+                name,
+                element(doc, 'td', undefined, group?.estimated ? `~${size}` : size),
+                element(doc, 'td', undefined, formatCount(group?.keys)),
+                element(doc, 'td', undefined, formatCount(group?.rows)),
+            );
+            body.append(row);
+        }
+        table.append(head, body);
+        const wrap = element(doc, 'div', 'analytics-table-wrap');
+        wrap.append(table);
+        nodes.push(wrap);
+    }
+
+    for (const line of Array.isArray(storage.notCounted) ? storage.notCounted : []) {
+        if (line) nodes.push(element(doc, 'p', 'analytics-note', String(line)));
+    }
+    return nodes;
+}
+
 function renderDailyTable(doc, days) {
     const table = element(doc, 'table', 'analytics-table analytics-table--sticky');
     const head = element(doc, 'thead');
@@ -536,6 +602,7 @@ export function renderAnalyticsSummary(root, summary) {
     const trendNode = root.getElementById('analytics-trend');
     const modesNode = root.getElementById('analytics-modes');
     const monthsNode = root.getElementById('analytics-months');
+    const storageNode = root.getElementById('analytics-storage');
     const daysNode = root.getElementById('analytics-days');
     const stored = Array.isArray(summary?.days) ? summary.days : [];
     const months = Array.isArray(summary?.months) ? summary.months : [];
@@ -560,6 +627,7 @@ export function renderAnalyticsSummary(root, summary) {
 
     modesNode.replaceChildren(...renderModes(root, days));
     monthsNode.replaceChildren(...renderMonths(root, months));
+    storageNode?.replaceChildren(...renderStorage(root, summary?.storage));
 
     const dayHead = cardHeading(root, 'Daily breakdown', 'Newest first');
     if (stored.length === 0) {

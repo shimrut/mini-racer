@@ -100,6 +100,42 @@ describe('moderator analytics page', () => {
         expect(document.getElementById('analytics-days').textContent).toContain('Aug 15');
         expect(document.querySelector('.analytics-table')).toBeTruthy();
         expect(document.querySelector('#analytics-days .analytics-table__today th').textContent).toBe('Aug 15');
+        expect(document.getElementById('analytics-storage').textContent).toContain('Could not measure');
+    });
+
+    it('shows Redis occupancy by family when the summary includes it', () => {
+        const { window } = analyticsDom();
+        renderAnalyticsSummary(window.document, summaryFixture({
+            storage: {
+                totalBytes: 1536,
+                groups: [
+                    {
+                        label: 'Ghost replays',
+                        detail: 'Packed traces',
+                        bytes: 1024,
+                        keys: 12,
+                        rows: 40,
+                        estimated: true,
+                    },
+                    {
+                        label: 'Analytics',
+                        bytes: 512,
+                        keys: 3,
+                        rows: 3,
+                        estimated: false,
+                    },
+                ],
+                notCounted: ['Head to Head records expire quickly.'],
+            },
+        }));
+        const storage = window.document.getElementById('analytics-storage').textContent;
+
+        expect(storage).toContain('1.5 KB');
+        expect(storage).toContain('Ghost replays');
+        expect(storage).toContain('~1.0 KB');
+        expect(storage).toContain('Analytics');
+        expect(storage).toContain('Head to Head records expire quickly.');
+        expect(window.document.querySelector('#analytics-storage .analytics-table')).toBeTruthy();
     });
 
     it('reports the day-over-day direction on each tile', () => {
@@ -164,7 +200,7 @@ describe('moderator analytics page', () => {
         renderAnalyticsSummary(window.document, summaryFixture());
 
         for (const id of ['analytics-windows', 'analytics-main', 'analytics-trend', 'analytics-modes',
-            'analytics-months', 'analytics-days']) {
+            'analytics-months', 'analytics-storage', 'analytics-days']) {
             expect(window.document.getElementById(id).hidden).toBe(false);
         }
     });
