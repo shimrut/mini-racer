@@ -12,11 +12,10 @@ import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 time in one grid, with identity tight to the rank. On phones the title shrinks,
 the “Final podium” line hides, date and lap sit on one line, rows get shorter,
 and **View Replays** / **Play Now** share the footer width. **View Replays** sits next
-to Play Now. Replay mode hides the list and the podium subtitle/date/lap lines, keeps Mini
-Racer top left and the track name top right, gives the track its own band above
-the chrome, and puts a thin pill progress bar with a thicker grab knob above
-play/pause with #1 / #2 / #3 and Trail on the left and the clock on the right,
-with Back floating over the track above the progress bar.
+to Play Now. Replay mode fills the screen with the track, overlays Mini
+Racer and the track name at the top, and puts Back, the progress bar, and
+play/pause with #1 / #2 / #3 and Trail on top at the bottom. Those overlays
+auto-hide after 2 seconds and return when you tap the track.
 Back uses the same button shape as the place toggles. That chrome is the same
 on every viewport. The moderator analytics page is one
 sticky-header table: a row per UTC day, with the day's players split into new

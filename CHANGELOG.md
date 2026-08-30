@@ -1,5 +1,7 @@
 # Changelog
 
+- Podium replay now overlays the logo, track name, and controls on the track. They auto-hide after 2 seconds, and tapping the track shows or hides them again.
+
 - Podium replay now keeps Trail on the play row with #1 / #2 / #3, and floats Back over the track above the progress bar so the track keeps more height.
 
 - Podium replay toggles now read #1, #2, and #3 and sit on the same row as play/pause.

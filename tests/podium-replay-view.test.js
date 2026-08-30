@@ -5,9 +5,11 @@ import { TRACKS } from '../game/track/tracks.js';
 import {
     createLocalPodiumPreview,
     createPodiumReplayController,
+    createReplayChromeController,
     formatPodiumReplayClock,
     normalizePodiumReplayGhosts,
     PODIUM_REPLAY_CAR_ASSETS,
+    PODIUM_REPLAY_CHROME_HIDE_MS,
     shouldUseLocalPodiumPreview,
 } from '../podium-replay-view.js';
 
@@ -59,6 +61,61 @@ describe('podium in-post replay', () => {
     it('formats the replay clock as seconds and milliseconds', () => {
         expect(formatPodiumReplayClock(10193)).toBe('10.193');
         expect(formatPodiumReplayClock(0)).toBe('0.000');
+    });
+
+    it('auto-hides replay chrome after two seconds', () => {
+        const shell = {
+            attributes: {},
+            setAttribute(name, value) {
+                this.attributes[name] = value;
+            },
+            removeAttribute(name) {
+                delete this.attributes[name];
+            },
+        };
+        const timeouts = [];
+        const chrome = createReplayChromeController({
+            shell,
+            hideMs: PODIUM_REPLAY_CHROME_HIDE_MS,
+            setTimeoutFn: (callback, delay) => {
+                timeouts.push({ callback, delay });
+                return timeouts.length;
+            },
+            clearTimeoutFn: () => {},
+        });
+
+        chrome.show({ autoHide: true });
+        expect(shell.attributes['data-replay-chrome']).toBe('visible');
+        expect(timeouts).toHaveLength(1);
+        expect(timeouts[0].delay).toBe(2000);
+
+        timeouts[0].callback();
+        expect(chrome.isVisible()).toBe(false);
+        expect(shell.attributes['data-replay-chrome']).toBe('hidden');
+    });
+
+    it('toggles replay chrome visibility', () => {
+        const shell = {
+            attributes: {},
+            setAttribute(name, value) {
+                this.attributes[name] = value;
+            },
+            removeAttribute(name) {
+                delete this.attributes[name];
+            },
+        };
+        const chrome = createReplayChromeController({
+            shell,
+            setTimeoutFn: () => 0,
+            clearTimeoutFn: () => {},
+        });
+
+        chrome.hide();
+        expect(shell.attributes['data-replay-chrome']).toBe('hidden');
+        chrome.toggle();
+        expect(shell.attributes['data-replay-chrome']).toBe('visible');
+        chrome.toggle();
+        expect(shell.attributes['data-replay-chrome']).toBe('hidden');
     });
 
     it('assigns gold, arctic, and blaze cars by place', () => {
@@ -138,6 +195,8 @@ describe('podium in-post replay', () => {
         expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Play');
         expect(documentRef.getElementById('podium-replay-seek').max).toBe('200');
         expect(documentRef.getElementById('podium-shell').dataset.mode).toBe('replay');
+        expect(documentRef.getElementById('podium-shell').dataset.replayChrome).toBe('visible');
+        expect(controller.isChromeVisible()).toBe(true);
         expect(documentRef.getElementById('podium-results').hasAttribute('inert')).toBe(true);
         expect(documentRef.getElementById('podium-play').hidden).toBe(true);
         expect(documentRef.getElementById('podium-replay-back').hidden).toBe(false);
@@ -163,6 +222,12 @@ describe('podium in-post replay', () => {
         expect(controller.playing).toBe(false);
         expect(documentRef.getElementById('podium-replay-toggle').dataset.playing).toBe('false');
         expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Play');
+        controller.toggleChrome();
+        expect(controller.isChromeVisible()).toBe(false);
+        expect(documentRef.getElementById('podium-shell').dataset.replayChrome).toBe('hidden');
+        controller.toggleChrome();
+        expect(controller.isChromeVisible()).toBe(true);
+
         controller.seek(80);
         expect(controller.timeMs).toBe(80);
         expect(documentRef.getElementById('podium-replay-seek').value).toBe('80');

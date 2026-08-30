@@ -333,20 +333,33 @@ body {
 }
 
 .podium-shell[data-mode="replay"] {
-    display: flex;
-    flex-direction: column;
+    display: block;
+    position: relative;
     height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
-    gap: 0.4rem;
-    padding: 0.6rem 0.75rem 0.7rem;
+    padding: 0;
+    gap: 0;
+}
+
+.podium-shell[data-mode="replay"] .ambient {
+    display: none;
 }
 
 .podium-shell[data-mode="replay"] .podium-header {
-    flex: 0 0 auto;
-    order: 1;
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 2;
+    order: unset;
+    flex: none;
     align-items: center;
     gap: 0.75rem;
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    pointer-events: none;
+    transition: opacity 180ms ease;
 }
 
 .podium-shell[data-mode="replay"] .brand-lockup__mini {
@@ -373,18 +386,17 @@ body {
 }
 
 .podium-shell[data-mode="replay"] .podium-track {
-    position: relative;
-    top: auto;
-    right: auto;
-    bottom: auto;
-    left: auto;
-    flex: 1 1 0;
-    order: 2;
+    position: absolute;
+    inset: 0;
+    order: unset;
     width: 100%;
-    height: auto;
+    height: 100%;
     min-height: 0;
     opacity: 1;
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
+    touch-action: manipulation;
+    z-index: 0;
     -webkit-mask-image: none;
     mask-image: none;
 }
@@ -395,13 +407,29 @@ body {
 }
 
 .podium-shell[data-mode="replay"] .podium-replay {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
     display: grid;
-    position: relative;
-    flex: 0 0 auto;
-    order: 3;
+    flex: none;
+    order: unset;
     gap: 0.65rem;
-    padding-top: 0.35rem;
+    padding: 0 0.75rem 0.7rem;
     background: transparent;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+}
+
+.podium-shell[data-mode="replay"] .podium-replay > * {
+    pointer-events: auto;
+}
+
+.podium-shell[data-mode="replay"][data-replay-chrome="hidden"] .podium-header,
+.podium-shell[data-mode="replay"][data-replay-chrome="hidden"] .podium-replay {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .podium-replay__seek-wrap {
@@ -591,11 +619,7 @@ body {
 }
 
 .podium-replay__back {
-    position: absolute;
-    left: 0;
-    bottom: 100%;
-    z-index: 2;
-    margin-bottom: 0.35rem;
+    justify-self: start;
     background: color-mix(in srgb, var(--panel) 90%, transparent);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -869,13 +893,16 @@ body {
     }
 
     .podium-shell[data-mode="replay"] {
-        gap: 0.3rem;
-        padding: 0.45rem 0.6rem 0.55rem;
+        padding: 0;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-header {
+        padding: 0.45rem 0.6rem;
     }
 
     .podium-shell[data-mode="replay"] .podium-replay {
         gap: 0.4rem;
-        padding-top: 0.15rem;
+        padding: 0 0.6rem 0.55rem;
     }
 }
 
@@ -883,5 +910,10 @@ body {
     .podium-header,
     .podium-row {
         animation: none;
+    }
+
+    .podium-shell[data-mode="replay"] .podium-header,
+    .podium-shell[data-mode="replay"] .podium-replay {
+        transition: none;
     }
 }

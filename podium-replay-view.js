@@ -29,6 +29,64 @@ export function formatPodiumReplayClock(timeMs) {
     return `${seconds}.${String(milliseconds).padStart(3, '0')}`;
 }
 
+export const PODIUM_REPLAY_CHROME_HIDE_MS = 2000;
+
+export function createReplayChromeController({
+    shell,
+    hideMs = PODIUM_REPLAY_CHROME_HIDE_MS,
+    setTimeoutFn = (callback, delay) => setTimeout(callback, delay),
+    clearTimeoutFn = (id) => clearTimeout(id),
+} = {}) {
+    let visible = true;
+    let timer = 0;
+
+    function apply() {
+        if (!shell) return;
+        shell.setAttribute('data-replay-chrome', visible ? 'visible' : 'hidden');
+    }
+
+    function clearHideTimer() {
+        if (!timer) return;
+        clearTimeoutFn(timer);
+        timer = 0;
+    }
+
+    return {
+        isVisible() {
+            return visible;
+        },
+        show({ autoHide = false } = {}) {
+            visible = true;
+            clearHideTimer();
+            apply();
+            if (autoHide) {
+                timer = setTimeoutFn(() => {
+                    timer = 0;
+                    visible = false;
+                    apply();
+                }, hideMs);
+            }
+        },
+        hide() {
+            visible = false;
+            clearHideTimer();
+            apply();
+        },
+        toggle() {
+            if (visible) this.hide();
+            else this.show({ autoHide: true });
+        },
+        bump() {
+            this.show({ autoHide: true });
+        },
+        reset() {
+            visible = true;
+            clearHideTimer();
+            shell?.removeAttribute('data-replay-chrome');
+        },
+    };
+}
+
 function trailPointsUntil(samples, timeMs) {
     if (!Array.isArray(samples) || samples.length === 0) return [];
     const points = [];
@@ -297,6 +355,35 @@ export function createPodiumReplayController({
         lastTs: 0,
         showTrail: false,
     };
+    const shell = documentRef?.getElementById('podium-shell');
+    const chrome = createReplayChromeController({ shell });
+    let chromeKeepAliveBound = false;
+
+    function bumpReplayChrome() {
+        if (state.mode !== 'replay') return;
+        chrome.bump();
+    }
+
+    function onTrackPointerUp(event) {
+        if (state.mode !== 'replay' || event.target !== canvas) return;
+        chrome.toggle();
+    }
+
+    function bindChromeKeepAlive() {
+        const replay = documentRef?.getElementById('podium-replay');
+        if (!replay || chromeKeepAliveBound) return;
+        chromeKeepAliveBound = true;
+        replay.addEventListener('pointerdown', bumpReplayChrome);
+        replay.addEventListener('focusin', bumpReplayChrome);
+    }
+
+    function unbindChromeKeepAlive() {
+        const replay = documentRef?.getElementById('podium-replay');
+        if (!replay || !chromeKeepAliveBound) return;
+        chromeKeepAliveBound = false;
+        replay.removeEventListener('pointerdown', bumpReplayChrome);
+        replay.removeEventListener('focusin', bumpReplayChrome);
+    }
 
     function syncChrome() {
         const shell = documentRef?.getElementById('podium-shell');
@@ -445,6 +532,9 @@ export function createPodiumReplayController({
             state.playing = false;
             state.timeMs = 0;
             syncChrome();
+            bindChromeKeepAlive();
+            chrome.show({ autoHide: true });
+            canvas?.addEventListener('pointerup', onTrackPointerUp);
             paint();
             requestFrame(() => paint());
             documentRef?.getElementById('podium-replay-toggle')?.focus({ preventScroll: true });
@@ -455,17 +545,22 @@ export function createPodiumReplayController({
             state.playing = false;
             state.timeMs = 0;
             stopLoop();
+            canvas?.removeEventListener('pointerup', onTrackPointerUp);
+            unbindChromeKeepAlive();
+            chrome.reset();
             syncChrome();
         },
         play() {
             if (state.mode !== 'replay' || state.durationMs <= 0) return;
             if (state.timeMs >= state.durationMs) state.timeMs = 0;
             state.playing = true;
+            bumpReplayChrome();
             startLoop();
             syncChrome();
         },
         pause() {
             state.playing = false;
+            bumpReplayChrome();
             stopLoop();
             syncChrome();
         },
@@ -479,6 +574,7 @@ export function createPodiumReplayController({
             state.timeMs = next;
             if (next >= state.durationMs) state.playing = false;
             if (!state.playing) stopLoop();
+            bumpReplayChrome();
             paint();
             syncChrome();
         },
@@ -487,6 +583,7 @@ export function createPodiumReplayController({
             if (!state.records.has(nextRank)) return;
             if (visible) state.visible.add(nextRank);
             else state.visible.delete(nextRank);
+            bumpReplayChrome();
             paint();
             syncChrome();
         },
@@ -495,8 +592,15 @@ export function createPodiumReplayController({
         },
         setShowTrail(visible) {
             state.showTrail = Boolean(visible);
+            bumpReplayChrome();
             paint();
             syncChrome();
+        },
+        toggleChrome() {
+            chrome.toggle();
+        },
+        isChromeVisible() {
+            return chrome.isVisible();
         },
         advance(ms) {
             tick((state.lastTs || now()) + Number(ms) || 0);
