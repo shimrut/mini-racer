@@ -338,11 +338,38 @@ body {
     height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
+    gap: 0.4rem;
+    padding: 0.6rem 0.75rem 0.7rem;
 }
 
 .podium-shell[data-mode="replay"] .podium-header {
     flex: 0 0 auto;
     order: 1;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.podium-shell[data-mode="replay"] .brand-lockup__mini {
+    font-size: clamp(0.72rem, 1.8vw, 0.92rem);
+}
+
+.podium-shell[data-mode="replay"] .brand-lockup__racer {
+    font-size: clamp(1.05rem, 2.5vw, 1.4rem);
+}
+
+.podium-shell[data-mode="replay"] .result-heading {
+    max-width: min(72%, 36rem);
+}
+
+.podium-shell[data-mode="replay"] .result-heading__eyebrow,
+.podium-shell[data-mode="replay"] .result-heading__date {
+    display: none;
+}
+
+.podium-shell[data-mode="replay"] .result-heading__track {
+    margin: 0;
+    font-size: clamp(1rem, 3.4vw, 1.55rem);
+    line-height: 1;
 }
 
 .podium-shell[data-mode="replay"] .podium-track {
