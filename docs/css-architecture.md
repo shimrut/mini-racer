@@ -9,7 +9,9 @@ Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
 `head-to-head.css`, `mod-analytics.css`)
 import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The podium row keeps place, identity, and
-time in one grid, with identity tight to the rank. **View Replays** sits next
+time in one grid, with identity tight to the rank. On phones the title shrinks,
+the “Final podium” line hides, date and lap sit on one line, rows get shorter,
+and **View Replays** / **Play Now** share the footer width. **View Replays** sits next
 to Play Now. Replay mode hides the list and the podium subtitle/date/lap lines, keeps Mini
 Racer top left and the track name top right, gives the track its own band above
 the chrome, and puts a thin pill progress bar with a thicker grab knob above

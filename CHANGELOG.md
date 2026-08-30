@@ -1,5 +1,7 @@
 # Changelog
 
+- Final podium posts on phones now use a smaller header, tighter place rows, and full-width View Replays / Play Now buttons, so the layout fits Reddit’s short post card.
+
 - Replay playback on the final podium now keeps only Mini Racer top left and the track name top right, so the track has more room.
 
 - Final podium posts now freeze the top-three ghosts in the post body (same packed replay as Head to Head) and play them on the post: **View Replays** next to Play Now, all three cars on by default, Gold / Silver / Bronze to show or hide a car, **Trail** to show each car’s path, a pill progress bar with play/pause and 0.5× / 1× / 2× under it on the left, the clock on the right of that row, Gold / Silver / Bronze / Trail under the play controls, and **Back** under the clock in the same button shape (starts paused). Phone and desktop use that same chrome. Controls sit below the track, not over it.
