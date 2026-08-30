@@ -23,7 +23,7 @@ plays or pauses.
 Back uses the same button shape as the place toggles. That chrome is the same
 on every viewport. The moderator analytics page is one
 sticky-header table: a row per UTC day, with the day's players split into new
-and returning and each mode's starts and finishes beside them. The newest row
+and returning, each mode's starts, and podium Play Now / View Replays beside them. The newest row
 carries the red accent. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the
 verified track trace remains an open hero on the right, and the CTA anchors below

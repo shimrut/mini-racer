@@ -231,6 +231,33 @@ describe('server analytics store', () => {
         expect(summary.today.players).toBe(0);
     });
 
+    it('records podium Play Now and View Replays without counting a player', async () => {
+        const { recordAnalyticsPodiumEvent, getServerAnalyticsSummary } = await store();
+
+        await recordAnalyticsPodiumEvent({
+            action: 'play',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+        await recordAnalyticsPodiumEvent({
+            action: 'play',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T10:00:00.000Z'),
+        });
+        await recordAnalyticsPodiumEvent({
+            action: 'replay',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T11:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.today).toMatchObject({ podiumPlays: 2, podiumReplays: 1, players: 0 });
+    });
+
     it('treats an account that raced before the ledger existed as returning', async () => {
         const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
         profiles.set('reddit:veteran', { firstSeenAt: '2026-06-02T10:00:00.000Z' });

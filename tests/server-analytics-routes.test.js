@@ -36,6 +36,7 @@ describe('analytics route contracts', () => {
             getServerAnalyticsSummary,
             getRequestUsername: () => 'RaceFan',
             recordRaceStart: vi.fn(),
+            recordPodiumEvent: vi.fn(),
         }));
 
         const response = await fetch(`${baseUrl}/api/analytics/summary`);
@@ -54,6 +55,7 @@ describe('analytics route contracts', () => {
             getServerAnalyticsSummary: vi.fn(),
             getRequestUsername: () => 'RaceFan',
             recordRaceStart: vi.fn(),
+            recordPodiumEvent: vi.fn(),
         }));
 
         const response = await fetch(`${baseUrl}/api/analytics/summary`);
@@ -71,6 +73,7 @@ describe('analytics route contracts', () => {
             getServerAnalyticsSummary: vi.fn(),
             getRequestUsername: () => 'RaceFan',
             recordRaceStart,
+            recordPodiumEvent: vi.fn(),
         }));
 
         for (const mode of ['daily', 'campaign', 'challenge']) {
@@ -88,6 +91,30 @@ describe('analytics route contracts', () => {
                 guestToken: 'token-1',
                 redditUsername: 'RaceFan',
             }));
+        }
+    });
+
+    it('records Play Now and View Replays taps from the podium post', async () => {
+        const recordPodiumEvent = vi.fn(async () => {});
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
+            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
+            assertModeratorForSubreddit: vi.fn(),
+            getServerAnalyticsSummary: vi.fn(),
+            getRequestUsername: () => 'RaceFan',
+            recordRaceStart: vi.fn(),
+            recordPodiumEvent,
+        }));
+
+        for (const action of ['play', 'replay']) {
+            recordPodiumEvent.mockClear();
+            const recorded = await fetch(`${baseUrl}/api/analytics/podium`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ action }),
+            });
+
+            expect(recorded.status).toBe(204);
+            await vi.waitFor(() => expect(recordPodiumEvent).toHaveBeenCalledWith({ action }));
         }
     });
 

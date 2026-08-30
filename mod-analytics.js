@@ -186,6 +186,22 @@ function renderHeadline(doc, days) {
             hint: 'Not counted as players — one person can be many',
             spark: recent.map((day) => day.guestPlayers),
         }),
+        createStatTile(doc, {
+            label: 'Podium Play Now',
+            value: formatCount(today.podiumPlays),
+            delta: trend(today.podiumPlays, yesterday.podiumPlays),
+            deltaNote: 'vs yesterday',
+            hint: 'Taps on the final podium post',
+            spark: recent.map((day) => day.podiumPlays),
+        }),
+        createStatTile(doc, {
+            label: 'Podium View Replays',
+            value: formatCount(today.podiumReplays),
+            delta: trend(today.podiumReplays, yesterday.podiumReplays),
+            deltaNote: 'vs yesterday',
+            hint: 'Opened the in-post replay',
+            spark: recent.map((day) => day.podiumReplays),
+        }),
     ];
 }
 
@@ -382,6 +398,16 @@ function renderModes(doc, days) {
         const created = toCount(today.challengeCreates);
         nodes.push(element(doc, 'p', 'analytics-note', `${formatCount(created)} challenge${created === 1 ? '' : 's'} created today`));
     }
+    const podiumPlays = toCount(today.podiumPlays);
+    const podiumReplays = toCount(today.podiumReplays);
+    if (podiumPlays > 0 || podiumReplays > 0) {
+        nodes.push(element(
+            doc,
+            'p',
+            'analytics-note',
+            `${formatCount(podiumPlays)} Play Now · ${formatCount(podiumReplays)} View Replays on podium posts today`,
+        ));
+    }
     return nodes;
 }
 
@@ -441,7 +467,9 @@ function renderDailyTable(doc, days) {
     const table = element(doc, 'table', 'analytics-table analytics-table--sticky');
     const head = element(doc, 'thead');
     const groups = element(doc, 'tr', 'analytics-table__groups');
-    for (const [label, span, grouped] of [['', 1, false], ['Players', 4, false], ['Races started', 3, true]]) {
+    for (const [label, span, grouped] of [
+        ['', 1, false], ['Players', 4, false], ['Races started', 3, true], ['Podium', 2, true],
+    ]) {
         const cell = element(doc, 'th', grouped ? 'analytics-table__divide' : undefined, label);
         cell.colSpan = span;
         cell.scope = 'colgroup';
@@ -451,6 +479,7 @@ function renderDailyTable(doc, days) {
     for (const [label, grouped] of [
         ['Date', false], ['Players', false], ['New', false], ['Returning', false], ['Signed out', false],
         ['Daily', true], ['Campaign', false], ['Challenge', false],
+        ['Play Now', true], ['Replays', false],
     ]) {
         const cell = element(doc, 'th', grouped ? 'analytics-table__divide' : undefined, label);
         cell.scope = 'col';
@@ -478,6 +507,8 @@ function renderDailyTable(doc, days) {
             [byMode.get('daily'), true],
             [byMode.get('campaign'), false],
             [byMode.get('challenge'), false],
+            [day?.podiumPlays, true],
+            [day?.podiumReplays, false],
         ];
         for (const [value, grouped] of cells) {
             row.append(element(doc, 'td', grouped ? 'analytics-table__divide' : undefined, formatCount(value)));

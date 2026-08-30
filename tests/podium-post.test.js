@@ -174,6 +174,16 @@ describe('podium custom post', () => {
         expect(openGame).toHaveBeenCalledOnce();
     });
 
+    it('counts Play Now taps for moderator analytics', () => {
+        const document = createDocument();
+        const reportAnalytics = vi.fn();
+        const button = bindPodiumPlayNow(document, vi.fn(), reportAnalytics);
+
+        button.click();
+
+        expect(reportAnalytics).toHaveBeenCalledWith('play');
+    });
+
     it('featured open path stores the featured-start override before expanding', async () => {
         const { openFeaturedGameFromPodium } = await import('../podium.js');
         const { requestExpandedMode } = await import('@devvit/web/client');
@@ -208,7 +218,8 @@ describe('podium custom post', () => {
         renderPodium(document, podium);
         let release;
         const fetchReplays = vi.fn(() => new Promise((resolve) => { release = resolve; }));
-        const replay = bindPodiumReplay(document, { fetchReplays });
+        const reportAnalytics = vi.fn();
+        const replay = bindPodiumReplay(document, { fetchReplays, reportAnalytics });
         const button = document.getElementById('podium-view-replays');
         const progress = document.getElementById('podium-view-replays-progress');
         const wrap = document.querySelector('.podium-footer__view');
@@ -226,6 +237,7 @@ describe('podium custom post', () => {
         expect(progress.hidden).toBe(false);
         expect(replay.mode).toBe('podium');
         expect(fetchReplays).toHaveBeenCalledOnce();
+        expect(reportAnalytics).not.toHaveBeenCalled();
 
         release({
             trackKey: 'circuit',
@@ -241,6 +253,7 @@ describe('podium custom post', () => {
             }],
         });
         await vi.waitFor(() => expect(replay.mode).toBe('replay'));
+        expect(reportAnalytics).toHaveBeenCalledWith('replay');
         expect(document.getElementById('podium-play').hidden).toBe(true);
         expect(button.hidden).toBe(true);
         expect(wrap.hidden).toBe(true);

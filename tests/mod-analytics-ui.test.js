@@ -28,6 +28,8 @@ function summaryFixture(overrides = {}) {
         returningPlayers: 3,
         guestPlayers: 2,
         challengeCreates: 1,
+        podiumPlays: 7,
+        podiumReplays: 4,
         modes: modes({
             daily: { starts: 6, finishes: 3, players: 4 },
             campaign: { starts: 5, finishes: 5, players: 2 },
@@ -45,6 +47,8 @@ function summaryFixture(overrides = {}) {
                 returningPlayers: 2,
                 guestPlayers: 1,
                 challengeCreates: 0,
+                podiumPlays: 2,
+                podiumReplays: 1,
                 modes: modes({ daily: { starts: 2, finishes: 1, players: 2 } }),
             },
             today,
@@ -81,7 +85,10 @@ describe('moderator analytics page', () => {
 
         expect(document.getElementById('analytics-range').textContent).toBe('2026-07-02 to 2026-08-15');
         expect(document.getElementById('analytics-windows').textContent).toContain('Players today');
-        expect(document.getElementById('analytics-windows').textContent).toContain('Signed out today');
+        expect(document.getElementById('analytics-windows').textContent).toContain('Podium Play Now');
+        expect(document.getElementById('analytics-windows').textContent).toContain('Podium View Replays');
+        expect(document.getElementById('analytics-modes').textContent).toContain('7 Play Now');
+        expect(document.getElementById('analytics-days').textContent).toContain('Play Now');
         expect(document.getElementById('analytics-windows').textContent).toContain('4');
         expect(document.getElementById('analytics-modes').textContent).toContain('Modes today');
         expect(document.getElementById('analytics-modes').textContent).toContain('Challenge');

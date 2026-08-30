@@ -28,6 +28,9 @@ export type AnalyticsModeCounts = {
     players: number;
 };
 
+export const PODIUM_ANALYTICS_ACTIONS = ['play', 'replay'] as const;
+export type PodiumAnalyticsAction = (typeof PODIUM_ANALYTICS_ACTIONS)[number];
+
 export type AnalyticsDay = {
     date: string;
     players: number;
@@ -35,6 +38,8 @@ export type AnalyticsDay = {
     returningPlayers: number;
     guestPlayers: number;
     challengeCreates: number;
+    podiumPlays: number;
+    podiumReplays: number;
     modes: AnalyticsModeCounts[];
 };
 
@@ -45,6 +50,8 @@ export type AnalyticsMonth = {
     returningPlayers: number;
     guestPlayers: number;
     challengeCreates: number;
+    podiumPlays: number;
+    podiumReplays: number;
     modes: AnalyticsModeCounts[];
 };
 
@@ -71,6 +78,8 @@ type LoadedBucket = {
     returningPlayers: number;
     guestPlayers: number;
     challengeCreates: number;
+    podiumPlays: number;
+    podiumReplays: number;
     modes: AnalyticsModeCounts[];
 };
 
@@ -163,6 +172,12 @@ function normalizeAction(action: unknown): AnalyticsAction | null {
     return ANALYTICS_ACTIONS.includes(action as AnalyticsAction) ? action as AnalyticsAction : null;
 }
 
+function normalizePodiumAction(action: unknown): PodiumAnalyticsAction | null {
+    return PODIUM_ANALYTICS_ACTIONS.includes(action as PodiumAnalyticsAction)
+        ? action as PodiumAnalyticsAction
+        : null;
+}
+
 /**
  * Only a canonical id is usable here. A raw uuid from browser storage is not an
  * identity, and folding one into the player count is what made the old number junk.
@@ -204,6 +219,8 @@ function emptyBucket(): LoadedBucket {
         returningPlayers: 0,
         guestPlayers: 0,
         challengeCreates: 0,
+        podiumPlays: 0,
+        podiumReplays: 0,
         modes: emptyModes(),
     };
 }
@@ -349,6 +366,27 @@ export function recordAnalyticsChallengeCreateBestEffort(playerId: unknown): voi
     void recordAnalyticsChallengeCreate({ playerId });
 }
 
+export async function recordAnalyticsPodiumEvent({
+    action,
+    subredditName,
+    now = new Date(),
+}: {
+    action?: unknown;
+    subredditName?: unknown;
+    now?: Date;
+} = {}): Promise<void> {
+    try {
+        const normalizedAction = normalizePodiumAction(action);
+        if (!normalizedAction) return;
+        const scope = sanitizeScope(subredditName ?? readScopeFromContext());
+        const date = formatUtcChallengeDate(now);
+        await bumpCounter(scope, date, `podium:${normalizedAction}`);
+        await applyRetention(scope, date);
+    } catch (error) {
+        logAnalyticsFailure('podium', error);
+    }
+}
+
 function summarizeBucket(
     rawPlayers: Record<string, string> | undefined,
     rawModePlayers: Record<string, string> | undefined,
@@ -382,6 +420,8 @@ function summarizeBucket(
         players: modePlayers.get(mode) || 0,
     }));
     bucket.challengeCreates = toCount(counters['challenge:create']);
+    bucket.podiumPlays = toCount(counters['podium:play']);
+    bucket.podiumReplays = toCount(counters['podium:replay']);
     return bucket;
 }
 
@@ -426,6 +466,11 @@ export async function getServerAnalyticsSummary({
         to,
         today: days[days.length - 1] ?? emptyAnalyticsDay(to),
         days,
-        months: months.filter((month) => month.players > 0 || month.guestPlayers > 0),
+        months: months.filter((month) => (
+            month.players > 0
+            || month.guestPlayers > 0
+            || month.podiumPlays > 0
+            || month.podiumReplays > 0
+        )),
     };
 }

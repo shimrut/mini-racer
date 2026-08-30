@@ -49,6 +49,7 @@ import { ensureMiniRacerLauncherPostForSubreddit } from './launcher-post-service
 import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator-access.js';
 import {
     getServerAnalyticsSummary,
+    recordAnalyticsPodiumEvent,
 } from './analytics-store.js';
 import {
     ensureModeratorAnalyticsPostForSubreddit,
@@ -100,6 +101,7 @@ function registerProductionRoutes(app: express.Application): void {
         getServerAnalyticsSummary: () => getServerAnalyticsSummary(),
         getRequestUsername,
         recordRaceStart: (input) => recordServerRaceStart(input),
+        recordPodiumEvent: (input) => recordAnalyticsPodiumEvent(input),
     });
     registerPlayerRoutes(app, {
         getRequestUsername,

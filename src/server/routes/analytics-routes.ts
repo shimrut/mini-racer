@@ -6,7 +6,10 @@ export type AnalyticsRouteDependencies = {
     getServerAnalyticsSummary(): Promise<unknown>;
     getRequestUsername(): string | null;
     recordRaceStart(input: Record<string, unknown>): Promise<void>;
+    recordPodiumEvent(input: Record<string, unknown>): Promise<void>;
 };
+
+const PODIUM_ANALYTICS_ACTIONS = new Set(['play', 'replay']);
 
 // Campaign start stamps /api/campaign/start for progress only. Analytics starts
 // are counted here so Retry matches Daily and Head to Head.
@@ -34,6 +37,22 @@ export function registerAnalyticsRoutes(
             });
         } catch (error) {
             console.error('Failed to record Mini Racer race start:', error);
+        }
+    });
+
+    // Play Now and View Replays live on the podium post, so there is no race
+    // submit to hang this off. Fire-and-forget: analytics must never block the post.
+    app.post('/api/analytics/podium', async (req, res) => {
+        const { action } = req.body ?? {};
+        if (!PODIUM_ANALYTICS_ACTIONS.has(action)) {
+            res.status(400).json({ error: 'Unsupported podium analytics action.' });
+            return;
+        }
+        res.status(204).end();
+        try {
+            await dependencies.recordPodiumEvent({ action });
+        } catch (error) {
+            console.error('Failed to record Mini Racer podium analytics:', error);
         }
     });
 

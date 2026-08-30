@@ -168,6 +168,23 @@ function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+const PODIUM_ANALYTICS_URL = '/api/analytics/podium';
+
+export function reportPodiumAnalytics(action, root = globalThis) {
+    if ((action !== 'play' && action !== 'replay') || typeof root?.fetch !== 'function') return;
+    if (shouldUseLocalPodiumPreview(root)) return;
+    try {
+        void root.fetch(PODIUM_ANALYTICS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+            keepalive: true,
+        }).catch(() => {});
+    } catch {
+        // A podium tap is not worth an exception.
+    }
+}
+
 export function podiumPostHasPackedReplays(root = globalThis) {
     const hash = root?.devvit?.context?.postData?.replayDataHash;
     return typeof hash === 'string' && hash.length > 0;
@@ -225,11 +242,18 @@ async function boot() {
     if (hydrated !== podium) renderPodium(document, hydrated);
 }
 
-export function bindPodiumPlayNow(documentRef, openGame = openFeaturedGameFromPodium) {
+export function bindPodiumPlayNow(
+    documentRef,
+    openGame = openFeaturedGameFromPodium,
+    reportAnalytics = reportPodiumAnalytics,
+) {
     const playButton = documentRef?.getElementById('podium-play');
     if (!playButton || playButton.dataset.bound === '1') return playButton || null;
     playButton.dataset.bound = '1';
-    playButton.addEventListener('click', openGame);
+    playButton.addEventListener('click', (event) => {
+        reportAnalytics('play');
+        void openGame(event);
+    });
     return playButton;
 }
 
@@ -251,6 +275,7 @@ export function bindPodiumReplay(documentRef, {
     getTrackName = () => '',
     fetchReplays = fetchPodiumReplays,
     replaysAvailable = podiumPostHasPackedReplays(),
+    reportAnalytics = reportPodiumAnalytics,
 } = {}) {
     if (!documentRef || documentRef.documentElement?.dataset.podiumReplayBound === '1') {
         return activeReplay;
@@ -291,6 +316,7 @@ export function bindPodiumReplay(documentRef, {
             if (!ready) return false;
         }
         controller.enter();
+        reportAnalytics('replay');
         syncButton();
         return true;
     }
