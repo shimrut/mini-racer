@@ -30,7 +30,6 @@ export function formatPodiumReplayClock(timeMs) {
 }
 
 export const PODIUM_REPLAY_CHROME_HIDE_MS = 2000;
-export const PODIUM_REPLAY_CAR_SCALE = 0.75;
 
 export function createReplayChromeController({
     shell,
@@ -500,7 +499,6 @@ export function createPodiumReplayController({
             transparentBackground: true,
             previewRenderMode: 'schematic',
             hideSchematicStartArrow: true,
-            schematicCarScale: PODIUM_REPLAY_CAR_SCALE,
             schematicCars,
         });
     }

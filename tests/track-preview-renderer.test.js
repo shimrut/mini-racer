@@ -318,7 +318,7 @@ describe('track preview rendering', () => {
         global.Path2D = OriginalPath2D;
     });
 
-    it('scales schematic replay cars when schematicCarScale is set', () => {
+    it('draws schematic replay cars 25% smaller than the normal schematic marker', () => {
         const OriginalPath2D = global.Path2D;
         global.Path2D = class Path2DMock {
             addPath() {}
@@ -355,7 +355,6 @@ describe('track preview rendering', () => {
             transparentBackground: true,
             previewRenderMode: 'schematic',
             hideSchematicStartArrow: true,
-            schematicCarScale: 0.75,
             schematicCars: [{ image: carImage, x: 4, y: 4, angle: 0 }],
         });
 

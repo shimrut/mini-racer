@@ -1,6 +1,6 @@
 # Changelog
 
-- Podium replay cars now render 25% smaller so three finishers read more clearly on the track.
+- Podium replay cars now use the same schematic marker sizing as before, drawn 25% smaller so three finishers read more clearly on the track.
 
 - On desktop, final podium **View Replays** and **Play Now** sit bottom right again; phones still use full-width buttons.
 
