@@ -224,6 +224,14 @@ describe('podium in-post replay', () => {
         expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Play');
         controller.toggleChrome();
         expect(controller.isChromeVisible()).toBe(false);
+        const view = documentRef.defaultView;
+        documentRef.getElementById('podium-shell').dispatchEvent(new view.Event('pointermove', { bubbles: true }));
+        expect(controller.isChromeVisible()).toBe(true);
+
+        canvas.dispatchEvent(new view.Event('pointerup', { bubbles: true }));
+        expect(controller.playing).toBe(true);
+        canvas.dispatchEvent(new view.Event('pointerup', { bubbles: true }));
+        expect(controller.playing).toBe(false);
 
         controller.seek(200);
         expect(controller.timeMs).toBe(200);

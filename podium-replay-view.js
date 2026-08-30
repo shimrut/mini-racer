@@ -369,9 +369,28 @@ export function createPodiumReplayController({
         chrome.show();
     }
 
+    function togglePlayback() {
+        if (state.mode !== 'replay' || state.durationMs <= 0) return;
+        if (state.playing) {
+            state.playing = false;
+            stopLoop();
+        } else {
+            if (state.timeMs >= state.durationMs) state.timeMs = 0;
+            state.playing = true;
+            startLoop();
+        }
+        bumpReplayChrome();
+        syncChrome();
+    }
+
+    function onReplayPointerMove() {
+        if (state.mode !== 'replay') return;
+        bumpReplayChrome();
+    }
+
     function onTrackPointerUp(event) {
         if (state.mode !== 'replay' || event.target !== canvas) return;
-        chrome.toggle();
+        togglePlayback();
     }
 
     function bindChromeKeepAlive() {
@@ -380,6 +399,7 @@ export function createPodiumReplayController({
         chromeKeepAliveBound = true;
         replay.addEventListener('pointerdown', bumpReplayChrome);
         replay.addEventListener('focusin', bumpReplayChrome);
+        shell?.addEventListener('pointermove', onReplayPointerMove);
     }
 
     function unbindChromeKeepAlive() {
@@ -388,6 +408,7 @@ export function createPodiumReplayController({
         chromeKeepAliveBound = false;
         replay.removeEventListener('pointerdown', bumpReplayChrome);
         replay.removeEventListener('focusin', bumpReplayChrome);
+        shell?.removeEventListener('pointermove', onReplayPointerMove);
     }
 
     function syncChrome() {
@@ -571,8 +592,7 @@ export function createPodiumReplayController({
             syncChrome();
         },
         togglePlay() {
-            if (state.playing) this.pause();
-            else this.play();
+            togglePlayback();
         },
         seek(timeMs) {
             if (state.mode !== 'replay' || state.durationMs <= 0) return;

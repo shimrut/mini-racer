@@ -1,8 +1,10 @@
 # Changelog
 
+- Podium replay controls now return on mouse movement, and tapping the track plays or pauses instead of toggling the overlays.
+
 - Podium replay controls return when the replay finishes, even if they had auto-hidden during playback.
 
-- Podium replay now overlays the logo, track name, and controls on the track. They auto-hide after 2 seconds, and tapping the track shows or hides them again.
+- Podium replay now overlays the logo, track name, and controls on the track. They auto-hide after 2 seconds and return on mouse movement.
 
 - Podium replay now keeps Trail on the play row with #1 / #2 / #3, and floats Back over the track above the progress bar so the track keeps more height.
 

@@ -15,7 +15,8 @@ and **View Replays** / **Play Now** share the footer width. **View Replays** sit
 to Play Now. Replay mode fills the screen with the track, overlays Mini
 Racer and the track name at the top, and puts Back, the progress bar, and
 play/pause with #1 / #2 / #3 and Trail on top at the bottom. Those overlays
-auto-hide after 2 seconds and return when you tap the track.
+auto-hide after 2 seconds, return on mouse movement, and tapping the track
+plays or pauses.
 Back uses the same button shape as the place toggles. That chrome is the same
 on every viewport. The moderator analytics page is one
 sticky-header table: a row per UTC day, with the day's players split into new
