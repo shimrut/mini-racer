@@ -1,5 +1,7 @@
 # Changelog
 
+- Campaign moderator analytics now count a start on every attempt, including Retry, the same way Daily and Head to Head already did.
+
 - Podium replay cars now use the same schematic marker sizing as before, drawn 25% smaller so three finishers read more clearly on the track.
 
 - On desktop, final podium **View Replays** and **Play Now** sit bottom right again; phones still use full-width buttons.

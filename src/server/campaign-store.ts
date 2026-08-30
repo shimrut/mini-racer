@@ -558,7 +558,6 @@ export async function startServerCampaignRace({
         }
         throw error;
     }
-    recordAnalyticsRaceBestEffort('campaign', 'start', identity.canonicalPlayerId);
     return { status: 200, body: { race: stage, progress: publicProgress(startedProgress) } };
 }
 

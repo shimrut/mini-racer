@@ -63,7 +63,7 @@ describe('analytics route contracts', () => {
         });
     });
 
-    it('records a client-reported race start for the modes that have no server start', async () => {
+    it('records a client-reported race start for Daily, Campaign, and Head to Head', async () => {
         const recordRaceStart = vi.fn(async () => {});
         const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
             resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
@@ -73,39 +73,22 @@ describe('analytics route contracts', () => {
             recordRaceStart,
         }));
 
-        const started = await fetch(`${baseUrl}/api/analytics/race-start`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ mode: 'daily', playerId: 'guest-1', guestToken: 'token-1' }),
-        });
+        for (const mode of ['daily', 'campaign', 'challenge']) {
+            recordRaceStart.mockClear();
+            const started = await fetch(`${baseUrl}/api/analytics/race-start`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ mode, playerId: 'guest-1', guestToken: 'token-1' }),
+            });
 
-        expect(started.status).toBe(204);
-        await vi.waitFor(() => expect(recordRaceStart).toHaveBeenCalledWith({
-            mode: 'daily',
-            playerId: 'guest-1',
-            guestToken: 'token-1',
-            redditUsername: 'RaceFan',
-        }));
-    });
-
-    it('refuses a campaign race start so the server-side start is not double counted', async () => {
-        const recordRaceStart = vi.fn(async () => {});
-        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
-            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
-            assertModeratorForSubreddit: vi.fn(),
-            getServerAnalyticsSummary: vi.fn(),
-            getRequestUsername: () => 'RaceFan',
-            recordRaceStart,
-        }));
-
-        const response = await fetch(`${baseUrl}/api/analytics/race-start`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ mode: 'campaign', playerId: 'guest-1' }),
-        });
-
-        expect(response.status).toBe(400);
-        expect(recordRaceStart).not.toHaveBeenCalled();
+            expect(started.status).toBe(204);
+            await vi.waitFor(() => expect(recordRaceStart).toHaveBeenCalledWith({
+                mode,
+                playerId: 'guest-1',
+                guestToken: 'token-1',
+                redditUsername: 'RaceFan',
+            }));
+        }
     });
 
     it('no longer counts a player from the bootstrap request', async () => {

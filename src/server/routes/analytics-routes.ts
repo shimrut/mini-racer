@@ -8,9 +8,9 @@ export type AnalyticsRouteDependencies = {
     recordRaceStart(input: Record<string, unknown>): Promise<void>;
 };
 
-// Campaign is absent on purpose: it has a real server-side start, and accepting one here
-// would count every campaign attempt twice.
-const CLIENT_REPORTED_START_MODES = new Set(['daily', 'challenge']);
+// Campaign start stamps /api/campaign/start for progress only. Analytics starts
+// are counted here so Retry matches Daily and Head to Head.
+const CLIENT_REPORTED_START_MODES = new Set(['daily', 'campaign', 'challenge']);
 
 export function registerAnalyticsRoutes(
     app: Application,

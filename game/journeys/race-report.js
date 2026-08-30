@@ -1,8 +1,6 @@
 import { getGuestPlayerToken, getOrCreatePlayerId } from "../scoreboard/player-identity.js";
 
-// Campaign is excluded: its race start is already recorded server-side by
-// /api/campaign/start, and reporting it here would count every attempt twice.
-const REPORTED_MODES = new Set(["daily", "challenge"]);
+const REPORTED_MODES = new Set(["daily", "campaign", "challenge"]);
 
 export const RACE_START_URL = "/api/analytics/race-start";
 
