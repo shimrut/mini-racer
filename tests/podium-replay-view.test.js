@@ -224,8 +224,9 @@ describe('podium in-post replay', () => {
         expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Play');
         controller.toggleChrome();
         expect(controller.isChromeVisible()).toBe(false);
-        expect(documentRef.getElementById('podium-shell').dataset.replayChrome).toBe('hidden');
-        controller.toggleChrome();
+
+        controller.seek(200);
+        expect(controller.timeMs).toBe(200);
         expect(controller.isChromeVisible()).toBe(true);
 
         controller.seek(80);

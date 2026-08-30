@@ -364,6 +364,11 @@ export function createPodiumReplayController({
         chrome.bump();
     }
 
+    function revealReplayChrome() {
+        if (state.mode !== 'replay') return;
+        chrome.show();
+    }
+
     function onTrackPointerUp(event) {
         if (state.mode !== 'replay' || event.target !== canvas) return;
         chrome.toggle();
@@ -484,6 +489,7 @@ export function createPodiumReplayController({
             if (state.timeMs >= state.durationMs) {
                 state.playing = false;
                 state.timeMs = state.durationMs;
+                revealReplayChrome();
             }
         }
         state.lastTs = ts;
@@ -572,9 +578,13 @@ export function createPodiumReplayController({
             if (state.mode !== 'replay' || state.durationMs <= 0) return;
             const next = Math.min(state.durationMs, Math.max(0, Number(timeMs) || 0));
             state.timeMs = next;
-            if (next >= state.durationMs) state.playing = false;
+            if (next >= state.durationMs) {
+                state.playing = false;
+                revealReplayChrome();
+            } else {
+                bumpReplayChrome();
+            }
             if (!state.playing) stopLoop();
-            bumpReplayChrome();
             paint();
             syncChrome();
         },
