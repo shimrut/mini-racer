@@ -1,5 +1,7 @@
 # Changelog
 
+- Podium replay play, #1 / #2 / #3, and Trail buttons now use a more opaque background so they stay readable over the track.
+
 - Podium replay controls now return on mouse movement, and tapping the track plays or pauses instead of toggling the overlays.
 
 - Podium replay controls return when the replay finishes, even if they had auto-hidden during playback.

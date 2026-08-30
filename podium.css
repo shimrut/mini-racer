@@ -547,6 +547,15 @@ body {
     display: block;
 }
 
+.podium-replay__playback .podium-replay__button,
+.podium-replay__playback .podium-replay__car {
+    background: color-mix(in srgb, var(--panel) 94%, black);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-color: color-mix(in srgb, var(--ink) 28%, transparent);
+    box-shadow: 0 8px 18px -14px rgba(0, 0, 0, 0.95);
+}
+
 .podium-replay__button {
     min-width: 2.45rem;
     min-height: 2.45rem;
