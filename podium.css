@@ -45,7 +45,7 @@ body {
     display: grid;
     grid-template-rows: auto 1fr auto;
     gap: clamp(1rem, 3vh, 1.75rem);
-    padding: 1.5rem 1.4rem;
+    padding: clamp(1.1rem, 3.8vw, 2rem);
     overflow: hidden;
     background:
         radial-gradient(circle at 88% 8%, rgba(239, 68, 68, 0.1), transparent 32%),
@@ -751,6 +751,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: clamp(0.75rem, 3vw, 1.5rem);
+    padding: 0 0.35rem 1.1rem;
     color: var(--muted);
     font-family: var(--mono);
     font-size: clamp(0.58rem, 1.5vw, 0.72rem);
@@ -813,7 +814,7 @@ body {
 @media (max-width: 520px) {
     .podium-shell {
         gap: 0.7rem;
-        padding: 1.15rem;
+        padding: 0.75rem;
     }
 
     .podium-header {

@@ -1,7 +1,7 @@
 # Changelog
 
-- Final podium posts now pad the logo, title, place rows, and Play Now farther
-  from the card edges.
+- Final podium View Replays and Play Now now sit farther from the bottom-right
+  corner of the post.
 
 - Added Chelsea Boots, Stone Gate, Crakow Boot, Slingshot Run, Broken Antler,
   and Mantis Bend to Daily rotation, after Split Jaw.
