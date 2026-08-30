@@ -34,7 +34,7 @@ Empty values leave that button disabled.
 
 ## Generated assets
 
-`track.png` (hero background) is generated with the same custom-post preview track renderer as the Reddit post preview. The same command also writes `og.png` (1200×630 social card, Outfit lockup over the track) and the two icons, resized from `assets/icon.png`.
+`track.png` (hero background) is generated with the same custom-post preview track renderer as the Reddit post preview. `og.png`, `favicon.png`, and `apple-touch-icon.png` are kept as committed files; they are not rewritten by this command.
 
 From the repo root:
 

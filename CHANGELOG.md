@@ -1,5 +1,8 @@
 # Changelog
 
+- Reddit's review copy of the source no longer includes Cursor, VS Code, or
+  agent folders. Local Cursor skill caches also stay out of git.
+
 - Final podium View Replays and Play Now now sit farther from the bottom-right
   corner of the post.
 

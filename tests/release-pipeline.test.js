@@ -54,7 +54,10 @@ describe('release pipeline', () => {
     it('keeps non-product material out of the Devvit publish source archive', () => {
         expect(devvitConfig.sourceIgnores).toEqual(expect.arrayContaining([
             '**/.DS_Store',
+            '.agents/',
             '.claude/',
+            '.cursor/',
+            '.vscode/',
             'CHANGELOG.md',
             'FAQ.md',
             'IGNORE SUPABASE',

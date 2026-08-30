@@ -12,6 +12,7 @@ const mockRedis = {
     hScan: vi.fn(),
     hDel: vi.fn(),
     expire: vi.fn(),
+    incrBy: vi.fn(),
 };
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
@@ -33,6 +34,7 @@ describe('current daily gp week', () => {
         mockRedis.hScan.mockResolvedValue({ cursor: 0, fieldValues: [] });
         mockRedis.hDel.mockResolvedValue(0);
         mockRedis.expire.mockResolvedValue(true);
+        mockRedis.incrBy.mockResolvedValue(0);
     });
 
     it('keeps the June 11, 2026 playlist stable from published history', async () => {

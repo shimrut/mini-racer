@@ -3,12 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-    LP_ICON_SIZES,
-    LP_OG_HEIGHT,
-    LP_OG_WIDTH,
     LP_TRACK_HEIGHT,
     LP_TRACK_WIDTH,
-    generateLpMetaAssets,
     generateLpTrackAsset,
     getLpTrackAbsolutePath,
 } from '../tools/generate-lp-assets.js';
@@ -46,29 +42,5 @@ describe('generate-lp-assets', () => {
         const image = await loadImage(bytes);
         expect(image.width).toBe(LP_TRACK_WIDTH);
         expect(image.height).toBe(LP_TRACK_HEIGHT);
-    });
-
-    it('writes the social card and icons the LP head references', async () => {
-        tempRoot = mkdtempSync(join(tmpdir(), 'mini-racer-lp-'));
-        const lpRoot = join(tempRoot, 'LP');
-
-        const result = await generateLpMetaAssets({ lpRoot, trackKey: 'circuit' });
-        const written = new Map(result.written.map((asset) => [asset.outPath, asset]));
-
-        const { loadImage } = await import('@napi-rs/canvas');
-
-        const ogPath = join(lpRoot, 'og.png');
-        expect(written.has(ogPath)).toBe(true);
-        const og = await loadImage(readFileSync(ogPath));
-        expect(og.width).toBe(LP_OG_WIDTH);
-        expect(og.height).toBe(LP_OG_HEIGHT);
-
-        for (const [name, size] of Object.entries(LP_ICON_SIZES)) {
-            const iconPath = join(lpRoot, name);
-            expect(existsSync(iconPath)).toBe(true);
-            const icon = await loadImage(readFileSync(iconPath));
-            expect(icon.width).toBe(size);
-            expect(icon.height).toBe(size);
-        }
     });
 });

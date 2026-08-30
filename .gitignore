@@ -30,6 +30,7 @@ local-assets/
 .cursor/*
 !.cursor/skills/
 !.cursor/skills/**
+.cursor/**/node_modules/
 .agents/
 .vscode/
 progress.md

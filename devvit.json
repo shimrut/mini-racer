@@ -6,7 +6,10 @@
   },
   "sourceIgnores": [
     "**/.DS_Store",
+    ".agents/",
     ".claude/",
+    ".cursor/",
+    ".vscode/",
     ".gitignore",
     "CHANGELOG.md",
     "FAQ.md",
