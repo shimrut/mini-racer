@@ -269,7 +269,8 @@ function drawSchematicCarImage(
     angle,
     markerScale = 1,
     trackScale = null,
-    carWorldSize = null
+    carWorldSize = null,
+    carScale = 1
 ) {
     if (!image) return;
     const fallbackSize = 36 * markerScale;
@@ -279,8 +280,8 @@ function drawSchematicCarImage(
         && carWorldSize.width > 0
         && Number.isFinite(carWorldSize?.height)
         && carWorldSize.height > 0;
-    const width = hasWorldSize ? carWorldSize.width * trackScale : fallbackSize;
-    const height = hasWorldSize ? carWorldSize.height * trackScale : fallbackSize;
+    const width = (hasWorldSize ? carWorldSize.width * trackScale : fallbackSize) * carScale;
+    const height = (hasWorldSize ? carWorldSize.height * trackScale : fallbackSize) * carScale;
     const shadowScale = Math.min(width, height) / 36;
     ctx.save();
     ctx.translate(position.x, position.y);
@@ -342,6 +343,7 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     carWorldSize = null,
     trackScale = null,
     hideStartArrow = false,
+    schematicCarScale = 1,
     cars = [],
 }) {
     const outer = trackGeometry.outer;
@@ -399,7 +401,8 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
                 Number.isFinite(car.angle) ? car.angle : 0,
                 arrowScale,
                 trackScale,
-                carWorldSize
+                carWorldSize,
+                schematicCarScale
             );
         }
         ctx.restore();
@@ -480,6 +483,7 @@ export function renderTrackPreviewCanvas(canvas, payload) {
             carWorldSize: payload.schematicCarWorldSize || null,
             trackScale: boundsLayout.scale,
             hideStartArrow: payload.hideSchematicStartArrow === true,
+            schematicCarScale: payload.schematicCarScale ?? 1,
             cars: Array.isArray(payload.schematicCars) ? payload.schematicCars : [],
         });
         return;

@@ -317,4 +317,53 @@ describe('track preview rendering', () => {
         expect(ctx.drawImage.mock.calls[1][0]).toBe(gold);
         global.Path2D = OriginalPath2D;
     });
+
+    it('scales schematic replay cars when schematicCarScale is set', () => {
+        const OriginalPath2D = global.Path2D;
+        global.Path2D = class Path2DMock {
+            addPath() {}
+            moveTo() {}
+            lineTo() {}
+            closePath() {}
+        };
+        const ctx = createPreviewContext();
+        const carImage = { width: 500, height: 500 };
+        const canvas = {
+            width: 320,
+            height: 200,
+            getContext: vi.fn(() => ctx)
+        };
+
+        renderTrackPreviewCanvas(canvas, {
+            trackGeometry: {
+                outer: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 8 },
+                    { x: 0, y: 8 }
+                ],
+                inner: [
+                    { x: 3, y: 3 },
+                    { x: 7, y: 3 },
+                    { x: 7, y: 5 },
+                    { x: 3, y: 5 }
+                ]
+            },
+            presentation: {},
+            startPos: { x: 0.5, y: 2 },
+            startAngle: 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            hideSchematicStartArrow: true,
+            schematicCarScale: 0.75,
+            schematicCars: [{ image: carImage, x: 4, y: 4, angle: 0 }],
+        });
+
+        const markerScale = Math.min(canvas.width, canvas.height) / 420;
+        const expectedSize = 36 * markerScale * 0.75;
+        expect(ctx.drawImage).toHaveBeenCalledOnce();
+        expect(ctx.drawImage.mock.calls[0][3]).toBeCloseTo(expectedSize);
+        expect(ctx.drawImage.mock.calls[0][4]).toBeCloseTo(expectedSize);
+        global.Path2D = OriginalPath2D;
+    });
 });
