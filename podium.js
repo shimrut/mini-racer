@@ -168,12 +168,26 @@ function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-function syncViewReplaysButton(documentRef, controller) {
+export function podiumPostHasPackedReplays(root = globalThis) {
+    const hash = root?.devvit?.context?.postData?.replayDataHash;
+    return typeof hash === 'string' && hash.length > 0;
+}
+
+function syncViewReplaysButton(documentRef, controller, {
+    available = false,
+    loading = false,
+} = {}) {
     const button = documentRef?.getElementById('podium-view-replays');
+    const progress = documentRef?.getElementById('podium-view-replays-progress');
+    const wrap = button?.closest('.podium-footer__view');
     if (!button || !controller) return;
-    const available = controller.hasGhosts();
-    button.hidden = !available || controller.mode === 'replay';
-    button.disabled = !available;
+    const show = available && controller.mode !== 'replay';
+    button.hidden = !show;
+    button.disabled = !show || loading;
+    button.textContent = loading ? 'Loading' : 'View Replays';
+    button.setAttribute('aria-busy', loading ? 'true' : 'false');
+    if (progress) progress.hidden = !show || !loading;
+    if (wrap) wrap.hidden = !show;
 }
 
 function installLocalPodiumPreview(preview) {
@@ -188,7 +202,7 @@ function installLocalPodiumPreview(preview) {
         ...existing,
         context: {
             ...context,
-            postData: { podium: preview.podium },
+            postData: { podium: preview.podium, replayDataHash: 'local-preview' },
         },
     };
 }
@@ -199,16 +213,16 @@ async function boot() {
     const podium = renderPodium(document, readPodiumPostData());
     renderPodiumTrack(podium.trackName);
     bindPodiumPlayNow(document);
-    const replay = bindPodiumReplay(document, {
+    bindPodiumReplay(document, {
         canvas: document.getElementById('podium-track'),
         getTrackName: () => podium.trackName,
         fetchReplays: preview
             ? async () => preview.replays
             : fetchPodiumReplays,
+        replaysAvailable: Boolean(preview) || podiumPostHasPackedReplays(),
     });
     const hydrated = await hydrateMissingRedditAvatars(globalThis, podium);
     if (hydrated !== podium) renderPodium(document, hydrated);
-    await replay?.prepareFromServer();
 }
 
 export function bindPodiumPlayNow(documentRef, openGame = openFeaturedGameFromPodium) {
@@ -236,6 +250,7 @@ export function bindPodiumReplay(documentRef, {
     canvas = documentRef?.getElementById('podium-track'),
     getTrackName = () => '',
     fetchReplays = fetchPodiumReplays,
+    replaysAvailable = podiumPostHasPackedReplays(),
 } = {}) {
     if (!documentRef || documentRef.documentElement?.dataset.podiumReplayBound === '1') {
         return activeReplay;
@@ -246,25 +261,57 @@ export function bindPodiumReplay(documentRef, {
         canvas,
         getTrackName,
     });
+    let advertised = Boolean(replaysAvailable);
+    let loading = false;
+
+    function syncButton() {
+        syncViewReplaysButton(documentRef, controller, {
+            available: advertised || controller.hasGhosts(),
+            loading,
+        });
+    }
+
+    async function prepareFromServer(root = globalThis) {
+        const payload = await fetchReplays(root);
+        if (payload == null) return false;
+        await controller.prepare(payload, getTrackName());
+        advertised = controller.hasGhosts();
+        syncButton();
+        return advertised;
+    }
+
+    async function openReplays(root = globalThis) {
+        if (controller.mode === 'replay' || loading) return controller.hasGhosts();
+        if (!controller.hasGhosts()) {
+            loading = true;
+            syncButton();
+            const ready = await prepareFromServer(root);
+            loading = false;
+            syncButton();
+            if (!ready) return false;
+        }
+        controller.enter();
+        syncButton();
+        return true;
+    }
+
     activeReplay = {
         get mode() { return controller.mode; },
+        get loading() { return loading; },
         paint: () => controller.paint(),
-        async prepareFromServer(root = globalThis) {
-            const payload = await fetchReplays(root);
-            await controller.prepare(payload, getTrackName());
-            syncViewReplaysButton(documentRef, controller);
-            return controller.hasGhosts();
-        },
+        prepareFromServer,
+        openReplays,
     };
 
+    syncButton();
     documentRef.getElementById('podium-view-replays')?.addEventListener('click', () => {
-        controller.enter();
+        void openReplays();
     });
     documentRef.getElementById('podium-replay-back')?.addEventListener('click', () => {
         controller.exit();
         const podium = renderPodium(documentRef, readPodiumPostData());
         renderPodiumTrack(podium.trackName, documentRef);
-        syncViewReplaysButton(documentRef, controller);
+        syncButton();
         documentRef.getElementById('podium-view-replays')?.focus();
     });
     documentRef.getElementById('podium-replay-toggle')?.addEventListener('click', () => {

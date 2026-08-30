@@ -116,7 +116,10 @@
         <footer class="podium-footer">
             <span>More tracks. More podiums. Go claim your spot.</span>
             <div class="podium-footer__actions">
-                <button id="podium-view-replays" class="podium-play podium-play--view" type="button" hidden>View Replays</button>
+                <div class="podium-footer__view" hidden>
+                    <button id="podium-view-replays" class="podium-play podium-play--view" type="button" hidden>View Replays</button>
+                    <progress id="podium-view-replays-progress" class="podium-play-progress" hidden aria-label="Loading replays"></progress>
+                </div>
                 <button id="podium-play" class="podium-play" type="button">Play Now</button>
             </div>
         </footer>

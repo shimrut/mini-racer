@@ -5,6 +5,7 @@ import {
     bindPodiumReplay,
     hydrateMissingRedditAvatars,
     normalizePodium,
+    podiumPostHasPackedReplays,
     readPodiumPostData,
     renderPodium,
 } from '../podium.js';
@@ -39,7 +40,10 @@ function createDocument() {
                     </li>
                 `).join('')}
             </ol>
-            <button id="podium-view-replays" type="button" hidden>View Replays</button>
+            <div class="podium-footer__view" hidden>
+                <button id="podium-view-replays" type="button" hidden>View Replays</button>
+                <progress id="podium-view-replays-progress" hidden></progress>
+            </div>
             <button id="podium-play" type="button">Play Now</button>
             <button id="podium-replay-back" type="button" hidden>Back</button>
         </main>
@@ -182,7 +186,16 @@ describe('podium custom post', () => {
         expect(requestExpandedMode).toHaveBeenCalledWith({ type: 'click' }, 'game');
     });
 
-    it('shows View Replays next to Play Now when a frozen ghost exists', async () => {
+    it('treats a replay hash on the post as packed recordings', () => {
+        expect(podiumPostHasPackedReplays({
+            devvit: { context: { postData: { replayDataHash: 'abc' } } },
+        })).toBe(true);
+        expect(podiumPostHasPackedReplays({
+            devvit: { context: { postData: { podium: {} } } },
+        })).toBe(false);
+    });
+
+    it('shows View Replays immediately and loads recordings only after tap', async () => {
         const document = createDocument();
         const podium = {
             trackName: 'Circuit ProMax',
@@ -191,40 +204,63 @@ describe('podium custom post', () => {
                 { rank: 2, displayName: 'Neon Viper', identityType: 'private', formattedTime: '0:10.199' },
             ],
         };
-        globalThis.devvit = { context: { postData: { podium } } };
+        globalThis.devvit = { context: { postData: { podium, replayDataHash: 'abc' } } };
         renderPodium(document, podium);
-        const replay = bindPodiumReplay(document, {
-            fetchReplays: async () => ({
-                trackKey: 'circuit',
-                ghosts: [{
-                    rank: 1,
-                    ghost: {
-                        schemaVersion: 2,
-                        sampleIntervalMs: 50,
-                        finishTimeMs: 50,
-                        origin: [0, 0, 0],
-                        deltas: [1, 0, 0],
-                    },
-                }],
-            }),
-        });
+        let release;
+        const fetchReplays = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+        const replay = bindPodiumReplay(document, { fetchReplays });
+        const button = document.getElementById('podium-view-replays');
+        const progress = document.getElementById('podium-view-replays-progress');
+        const wrap = document.querySelector('.podium-footer__view');
 
-        await replay.prepareFromServer();
-
-        expect(document.getElementById('podium-view-replays').hidden).toBe(false);
+        expect(button.hidden).toBe(false);
+        expect(wrap.hidden).toBe(false);
+        expect(progress.hidden).toBe(true);
+        expect(fetchReplays).not.toHaveBeenCalled();
         expect(document.getElementById('podium-play').textContent).toBe('Play Now');
 
-        document.getElementById('podium-view-replays').click();
-        expect(replay.mode).toBe('replay');
+        button.click();
+        expect(button.textContent).toBe('Loading');
+        expect(button.getAttribute('aria-busy')).toBe('true');
+        expect(button.disabled).toBe(true);
+        expect(progress.hidden).toBe(false);
+        expect(replay.mode).toBe('podium');
+        expect(fetchReplays).toHaveBeenCalledOnce();
+
+        release({
+            trackKey: 'circuit',
+            ghosts: [{
+                rank: 1,
+                ghost: {
+                    schemaVersion: 2,
+                    sampleIntervalMs: 50,
+                    finishTimeMs: 50,
+                    origin: [0, 0, 0],
+                    deltas: [1, 0, 0],
+                },
+            }],
+        });
+        await vi.waitFor(() => expect(replay.mode).toBe('replay'));
         expect(document.getElementById('podium-play').hidden).toBe(true);
-        expect(document.getElementById('podium-view-replays').hidden).toBe(true);
+        expect(button.hidden).toBe(true);
+        expect(wrap.hidden).toBe(true);
         expect(document.getElementById('podium-replay-back').hidden).toBe(false);
 
         document.getElementById('podium-replay-back').click();
         expect(replay.mode).toBe('podium');
         expect(document.getElementById('podium-play').hidden).toBe(false);
         expect(document.querySelector('[data-rank="1"] .podium-row__name').textContent).toBe('RaceFan');
-        expect(document.getElementById('podium-view-replays').hidden).toBe(false);
+        expect(button.hidden).toBe(false);
+        expect(button.textContent).toBe('View Replays');
+        expect(progress.hidden).toBe(true);
         delete globalThis.devvit;
+    });
+
+    it('keeps View Replays hidden when the post has no packed recordings', () => {
+        const document = createDocument();
+        const fetchReplays = vi.fn();
+        bindPodiumReplay(document, { fetchReplays, replaysAvailable: false });
+        expect(document.getElementById('podium-view-replays').hidden).toBe(true);
+        expect(fetchReplays).not.toHaveBeenCalled();
     });
 });

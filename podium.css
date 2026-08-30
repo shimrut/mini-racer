@@ -663,6 +663,55 @@ body {
     background: color-mix(in srgb, var(--ink) 22%, var(--panel));
 }
 
+.podium-footer__view {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.podium-footer__view[hidden] {
+    display: none;
+}
+
+.podium-play-progress {
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: 0.28rem;
+    width: auto;
+    height: 0.18rem;
+    border: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: var(--radius-full);
+    background:
+        linear-gradient(var(--accent), var(--accent)) no-repeat,
+        color-mix(in srgb, var(--ink) 20%, transparent);
+    background-size: 36% 100%, 100% 100%;
+    animation: podium-play-progress 0.9s ease-in-out infinite alternate;
+}
+
+.podium-play-progress::-webkit-progress-bar {
+    background: transparent;
+}
+
+.podium-play-progress::-webkit-progress-value,
+.podium-play-progress::-moz-progress-bar {
+    background: transparent;
+}
+
+.podium-play-progress[hidden] {
+    display: none;
+}
+
+@keyframes podium-play-progress {
+    from { background-position: 0 0, 0 0; }
+    to { background-position: 100% 0, 0 0; }
+}
+
 .podium-play--view[hidden],
 .podium-replay__car[hidden] {
     display: none;
@@ -855,6 +904,14 @@ body {
     .podium-footer__actions {
         flex: 1;
         min-width: 0;
+    }
+
+    .podium-footer__view {
+        flex: 1;
+    }
+
+    .podium-footer__view .podium-play {
+        width: 100%;
     }
 
     .podium-play {

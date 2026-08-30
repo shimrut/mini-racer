@@ -1,5 +1,7 @@
 # Changelog
 
+- **View Replays** on the final podium post shows as soon as the post has saved recordings. Tapping it changes the button to **Loading** with a small bar underneath while the recordings unpack, then opens the replay.
+
 - Podium replay play, #1 / #2 / #3, and Trail buttons now use a more opaque background so they stay readable over the track.
 
 - Podium replay controls now return on mouse movement, and tapping the track plays or pauses instead of toggling the overlays.

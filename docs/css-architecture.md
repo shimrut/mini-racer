@@ -12,7 +12,9 @@ import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 time in one grid, with identity tight to the rank. On phones the title shrinks,
 the “Final podium” line hides, date and lap sit on one line, rows get shorter,
 and **View Replays** / **Play Now** share the footer width. **View Replays** sits next
-to Play Now. Replay mode fills the screen with the track, overlays Mini
+to Play Now and is visible immediately when the post has packed recordings;
+tapping it shows **Loading** with a small bar under that button while the
+ghosts unpack. Replay mode fills the screen with the track, overlays Mini
 Racer and the track name at the top, and puts Back, the progress bar, and
 play/pause with #1 / #2 / #3 and Trail on top at the bottom. Those overlays
 auto-hide after 2 seconds, return on mouse movement, and tapping the track
