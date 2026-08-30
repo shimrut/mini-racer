@@ -1,5 +1,8 @@
 # Changelog
 
+- Final podium posts now pad the logo, title, place rows, and Play Now farther
+  from the card edges.
+
 - Added Chelsea Boots, Stone Gate, Crakow Boot, Slingshot Run, Broken Antler,
   and Mantis Bend to Daily rotation, after Split Jaw.
 
