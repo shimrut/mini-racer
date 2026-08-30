@@ -1,5 +1,7 @@
 # Changelog
 
+- Podium replay now keeps Trail on the play row with #1 / #2 / #3, and floats Back over the track above the progress bar so the track keeps more height.
+
 - Podium replay toggles now read #1, #2, and #3 and sit on the same row as play/pause.
 
 - The podium replay player now plays at normal speed only; the 0.5× and 2× speed buttons are gone.

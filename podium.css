@@ -396,6 +396,7 @@ body {
 
 .podium-shell[data-mode="replay"] .podium-replay {
     display: grid;
+    position: relative;
     flex: 0 0 auto;
     order: 3;
     gap: 0.65rem;
@@ -479,12 +480,9 @@ body {
 .podium-replay__chrome {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-        "playback clock"
-        "trail back";
+    grid-template-areas: "playback clock";
     align-items: center;
     column-gap: 0.4rem;
-    row-gap: 0.4rem;
 }
 
 .podium-replay__playback {
@@ -492,6 +490,7 @@ body {
     display: flex;
     align-items: center;
     justify-self: start;
+    flex-wrap: wrap;
     gap: 0.4rem;
     min-width: 0;
 }
@@ -591,15 +590,15 @@ body {
     min-width: 0;
 }
 
-.podium-replay__trail {
-    grid-area: trail;
-    justify-self: start;
-}
-
 .podium-replay__back {
-    grid-area: back;
-    align-self: start;
-    justify-self: end;
+    position: absolute;
+    left: 0;
+    bottom: 100%;
+    z-index: 2;
+    margin-bottom: 0.35rem;
+    background: color-mix(in srgb, var(--panel) 90%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .podium-replay__car[aria-pressed="true"][data-rank="1"] {

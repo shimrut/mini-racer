@@ -80,6 +80,7 @@
         </section>
 
         <section id="podium-replay" class="podium-replay" hidden>
+            <button id="podium-replay-back" class="podium-replay__car podium-replay__back" type="button" hidden>Back</button>
             <div class="podium-replay__seek-wrap">
                 <div class="podium-replay__seek-track" aria-hidden="true">
                     <span class="podium-replay__seek-fill"></span>
@@ -104,12 +105,11 @@
                         <button class="podium-replay__car" type="button" data-rank="2" aria-pressed="true">#2</button>
                         <button class="podium-replay__car" type="button" data-rank="3" aria-pressed="true">#3</button>
                     </div>
+                    <button id="podium-replay-trail" class="podium-replay__car podium-replay__trail" type="button" aria-pressed="false">Trail</button>
                 </div>
                 <div class="podium-replay__clock" aria-live="polite">
                     <span id="podium-replay-time">0.000</span>
                 </div>
-                <button id="podium-replay-trail" class="podium-replay__car podium-replay__trail" type="button" aria-pressed="false">Trail</button>
-                <button id="podium-replay-back" class="podium-replay__car podium-replay__back" type="button" hidden>Back</button>
             </div>
         </section>
 

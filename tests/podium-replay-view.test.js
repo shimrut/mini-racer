@@ -24,6 +24,7 @@ function replayDocument() {
         <main id="podium-shell" data-mode="podium"></main>
         <section id="podium-results"></section>
         <section id="podium-replay" hidden>
+            <button id="podium-replay-back" type="button" hidden>Back</button>
             <span id="podium-replay-time">0.000</span>
             <input id="podium-replay-seek" type="range" min="0" max="1" value="0">
             <button id="podium-replay-toggle" type="button" data-playing="false" aria-label="Play">Play</button>
@@ -36,7 +37,6 @@ function replayDocument() {
         </section>
         <button id="podium-view-replays" type="button" hidden>View Replays</button>
         <button id="podium-play" type="button">Play Now</button>
-        <button id="podium-replay-back" type="button" hidden>Back</button>
         <canvas id="podium-track"></canvas>
     `).window.document;
 }
