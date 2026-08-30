@@ -73,23 +73,6 @@ body {
     padding: 0.5rem;
 }
 
-.track-identity {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.15rem;
-}
-
-.track-identity .hud-label {
-    font-family: var(--mono-font);
-    line-height: 1;
-}
-
-.track-identity .hud-label[hidden] {
-    display: none;
-}
-
 .track-title {
     display: flex;
     flex-direction: column;

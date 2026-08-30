@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-    formatDailyPreviewLapsLabel,
     formatDailyPreviewTimeLabel,
     getDailyPreviewChallengeOptions,
     isCurrentDailyLauncherPost,
@@ -25,9 +24,8 @@ describe('current Daily launcher preview', () => {
         })).toEqual({ allowExpiredPost: true, ignorePostData: true });
     });
 
-    it('uses the lap count as an eyebrow and time to beat on its own', () => {
-        expect(formatDailyPreviewLapsLabel(1)).toBe('1 LAP');
-        expect(formatDailyPreviewLapsLabel(2)).toBe('2 LAPS');
-        expect(formatDailyPreviewTimeLabel()).toBe('TIME TO BEAT');
+    it('frames the target as laps followed by time to beat', () => {
+        expect(formatDailyPreviewTimeLabel(1)).toBe('1 LAP · TIME TO BEAT');
+        expect(formatDailyPreviewTimeLabel(2)).toBe('2 LAPS · TIME TO BEAT');
     });
 });

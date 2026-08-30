@@ -1,5 +1,7 @@
 # Changelog
 
+- Daily preview again puts the lap count on the right, just before Time to Beat.
+
 - Moderator analytics now show Play Now taps and View Replays opens from final podium posts.
 
 - Campaign moderator analytics now count a start on every attempt, including Retry, the same way Daily and Head to Head already did.

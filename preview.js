@@ -28,7 +28,6 @@ export function getDailyPreviewChallengeOptions(root = globalThis) {
 export async function bootDailyPreview() {
     const playButton = document.getElementById('play-button');
     const trackNameEl = document.getElementById('track-name');
-    const trackLapsEl = document.getElementById('track-laps');
     const canvas = document.getElementById('track-preview');
 
     if (!playButton || !trackNameEl || !canvas) {
@@ -54,14 +53,12 @@ export async function bootDailyPreview() {
 
         const lapCount = getChallengeLapCount(challenge);
         setTrackName(trackNameEl, currentTrack.name);
-        setTrackLaps(trackLapsEl, lapCount);
         renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
         await applyTimeToBeat(timeToBeatEl, currentTrackKey, lapCount);
         renderChallengeStatus(challenge);
     } catch (error) {
         console.error('Error loading daily challenge preview:', error);
         setTrackName(trackNameEl, 'Challenge active');
-        setTrackLaps(trackLapsEl, 1);
         const carImage = await postPreviewCarPromise;
         if (fallbackTrack) {
             renderTrackPreview(canvas, 'circuit', fallbackTrack, 'default', carImage);
@@ -175,19 +172,15 @@ async function applyTimeToBeat(el, trackKey, lapCount = 1) {
         className: 'post-preview-gold-medal'
     }));
     if (labelEl) {
-        labelEl.textContent = formatDailyPreviewTimeLabel();
+        labelEl.textContent = formatDailyPreviewTimeLabel(lapCount);
     }
     if (textEl) {
         textEl.textContent = formatTimeToBeat(seconds);
     }
 }
 
-export function formatDailyPreviewTimeLabel() {
-    return 'TIME TO BEAT';
-}
-
-export function formatDailyPreviewLapsLabel(lapCount = 1) {
-    return formatLapsLabel(lapCount).toUpperCase();
+export function formatDailyPreviewTimeLabel(lapCount = 1) {
+    return `${formatLapsLabel(lapCount).toUpperCase()} · TIME TO BEAT`;
 }
 
 function formatTimeToBeat(seconds) {
@@ -233,12 +226,6 @@ function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage 
 }
 
 
-
-function setTrackLaps(el, lapCount) {
-    if (!el) return;
-    el.hidden = false;
-    el.textContent = formatDailyPreviewLapsLabel(lapCount);
-}
 
 function setTrackName(el, name) {
     if (!el) return;
