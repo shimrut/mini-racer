@@ -108,6 +108,12 @@ import twinWings from './definitions/twin-wings.js';
 import squareRoot from './definitions/square-root.js';
 import halfLife from './definitions/half-life.js';
 import splitJaw from './definitions/split-jaw.js';
+import chelseaBoots from './definitions/chelsea-boots.js';
+import stoneGate from './definitions/stone-gate.js';
+import crakowBoot from './definitions/crakow-boot.js';
+import slingshotRun from './definitions/slingshot-run.js';
+import brokenAntler from './definitions/broken-antler.js';
+import mantisBend from './definitions/mantis-bend.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -221,6 +227,12 @@ const TRACK_GEOMETRY = {
     squareRoot,
     halfLife,
     splitJaw,
+    chelseaBoots,
+    stoneGate,
+    crakowBoot,
+    slingshotRun,
+    brokenAntler,
+    mantisBend,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

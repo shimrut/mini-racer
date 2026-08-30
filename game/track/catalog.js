@@ -109,6 +109,12 @@ export const TRACK_CATALOG = {
     squareRoot: { name: "Square Root" },
     halfLife: { name: "Half Life" },
     splitJaw: { name: "Split Jaw" },
+    chelseaBoots: { name: "Chelsea Boots" },
+    stoneGate: { name: "Stone Gate" },
+    crakowBoot: { name: "Crakow Boot" },
+    slingshotRun: { name: "Slingshot Run" },
+    brokenAntler: { name: "Broken Antler" },
+    mantisBend: { name: "Mantis Bend" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -206,6 +212,12 @@ export const TRACK_SCHEDULE_KEYS = [
     'brokenWing',
     'twinWings',
     'splitJaw',
+    'chelseaBoots',
+    'stoneGate',
+    'crakowBoot',
+    'slingshotRun',
+    'brokenAntler',
+    'mantisBend',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

@@ -1,5 +1,8 @@
 # Changelog
 
+- Added Chelsea Boots, Stone Gate, Crakow Boot, Slingshot Run, Broken Antler,
+  and Mantis Bend to Daily rotation, after Split Jaw.
+
 - Redis occupancy on moderator analytics now uses the current analytics Redis
   key names, so the production build can include that page.
 
