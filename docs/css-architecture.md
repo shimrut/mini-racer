@@ -11,7 +11,8 @@ import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The podium row keeps place, identity, and
 time in one grid, with identity tight to the rank. On phones the title shrinks,
 the “Final podium” line hides, date and lap sit on one line, rows get shorter,
-and **View Replays** / **Play Now** share the footer width. **View Replays** sits next
+and **View Replays** / **Play Now** share the footer width on phones. On desktop they
+stay bottom right; the tagline stays bottom left. **View Replays** sits next
 to Play Now and is visible immediately when the post has packed recordings;
 tapping it shows **Loading** with a small bar under that button while the
 ghosts unpack. Replay mode fills the screen with the track, overlays Mini
