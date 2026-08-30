@@ -15,7 +15,7 @@ and **View Replays** / **Play Now** share the footer width. **View Replays** sit
 to Play Now. Replay mode hides the list and the podium subtitle/date/lap lines, keeps Mini
 Racer top left and the track name top right, gives the track its own band above
 the chrome, and puts a thin pill progress bar with a thicker grab knob above
-play/pause + 0.5× / 1× / 2× on the left and the clock on the right, with Gold /
+play/pause on the left and the clock on the right, with Gold /
 Silver / Bronze plus Trail under the play controls and Back under the clock.
 Back uses the same button shape as the medal toggles. That chrome is the same
 on every viewport. The moderator analytics page is one

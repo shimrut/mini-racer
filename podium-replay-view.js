@@ -7,7 +7,6 @@ import { TRACKS } from './game/track/tracks.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
 
-export const PODIUM_REPLAY_RATES = Object.freeze([0.5, 1, 2]);
 export const PODIUM_REPLAY_CAR_ASSETS = Object.freeze({
     1: EXTRA_CAR_ASSETS.gold,
     2: EXTRA_CAR_ASSETS.arctic,
@@ -288,7 +287,6 @@ export function createPodiumReplayController({
     const state = {
         mode: 'podium',
         playing: false,
-        rate: 1,
         timeMs: 0,
         durationMs: 0,
         records: new Map(),
@@ -335,9 +333,6 @@ export function createPodiumReplayController({
             seek.style.setProperty('--progress', `${progress * 100}%`);
             seek.parentElement?.style.setProperty('--progress-n', String(progress));
         }
-        documentRef?.querySelectorAll('.podium-replay__speed').forEach((button) => {
-            button.setAttribute('aria-pressed', String(Number(button.dataset.rate) === state.rate));
-        });
         documentRef?.querySelectorAll('.podium-replay__car[data-rank]').forEach((button) => {
             const rank = Number(button.dataset.rank);
             const available = state.records.has(rank);
@@ -398,7 +393,7 @@ export function createPodiumReplayController({
     function tick(ts) {
         if (state.playing) {
             const elapsed = state.lastTs ? ts - state.lastTs : 0;
-            state.timeMs = Math.min(state.durationMs, state.timeMs + elapsed * state.rate);
+            state.timeMs = Math.min(state.durationMs, state.timeMs + elapsed);
             if (state.timeMs >= state.durationMs) {
                 state.playing = false;
                 state.timeMs = state.durationMs;
@@ -430,7 +425,6 @@ export function createPodiumReplayController({
     return {
         get mode() { return state.mode; },
         get playing() { return state.playing; },
-        get rate() { return state.rate; },
         get timeMs() { return state.timeMs; },
         get showTrail() { return state.showTrail; },
         hasGhosts() { return state.records.size > 0; },
@@ -502,12 +496,6 @@ export function createPodiumReplayController({
         setShowTrail(visible) {
             state.showTrail = Boolean(visible);
             paint();
-            syncChrome();
-        },
-        setRate(rate) {
-            const next = Number(rate);
-            if (!PODIUM_REPLAY_RATES.includes(next)) return;
-            state.rate = next;
             syncChrome();
         },
         advance(ms) {

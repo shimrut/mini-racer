@@ -27,9 +27,6 @@ function replayDocument() {
             <span id="podium-replay-time">0.000</span>
             <input id="podium-replay-seek" type="range" min="0" max="1" value="0">
             <button id="podium-replay-toggle" type="button" data-playing="false" aria-label="Play">Play</button>
-            <button class="podium-replay__speed" data-rate="0.5" type="button">0.5×</button>
-            <button class="podium-replay__speed" data-rate="1" type="button">1×</button>
-            <button class="podium-replay__speed" data-rate="2" type="button">2×</button>
             <button class="podium-replay__car" data-rank="1" type="button" aria-pressed="true">Gold</button>
             <button class="podium-replay__car" data-rank="2" type="button" aria-pressed="true">Silver</button>
             <button class="podium-replay__car" data-rank="3" type="button" aria-pressed="true">Bronze</button>
@@ -164,9 +161,6 @@ describe('podium in-post replay', () => {
         expect(controller.playing).toBe(false);
         expect(documentRef.getElementById('podium-replay-toggle').dataset.playing).toBe('false');
         expect(documentRef.getElementById('podium-replay-toggle').getAttribute('aria-label')).toBe('Play');
-        controller.setRate(2);
-        controller.advance(50);
-        expect(controller.rate).toBe(2);
         controller.seek(80);
         expect(controller.timeMs).toBe(80);
         expect(documentRef.getElementById('podium-replay-seek').value).toBe('80');

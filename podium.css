@@ -520,8 +520,7 @@ body {
     display: block;
 }
 
-.podium-replay__button,
-.podium-replay__speed {
+.podium-replay__button {
     min-width: 2.45rem;
     min-height: 2.45rem;
     padding: 0;
@@ -530,9 +529,6 @@ body {
     background: transparent;
     color: var(--ink);
     cursor: pointer;
-}
-
-.podium-replay__button {
     display: grid;
     place-items: center;
     line-height: 0;
@@ -549,17 +545,7 @@ body {
     width: 0.85rem;
 }
 
-.podium-replay__speed {
-    padding: 0.3rem 0.55rem;
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.03em;
-}
-
-.podium-replay__button:disabled,
-.podium-replay__speed:disabled {
+.podium-replay__button:disabled {
     cursor: default;
     opacity: 0.4;
 }
@@ -583,25 +569,15 @@ body {
 }
 
 .podium-replay__button:focus-visible,
-.podium-replay__speed:focus-visible,
 .podium-replay__car:focus-visible,
 .podium-play:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 
-.podium-replay__speed[aria-pressed="true"] {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.podium-replay__speeds,
 .podium-replay__cars {
     display: flex;
     gap: 0.35rem;
-}
-
-.podium-replay__cars {
     grid-area: cars;
     flex-wrap: wrap;
     justify-self: start;
@@ -845,12 +821,6 @@ body {
         min-height: 2.35rem;
         padding-inline: 0.55rem;
         font-size: 0.72rem;
-    }
-
-    .podium-replay__button,
-    .podium-replay__speed {
-        min-width: 2.1rem;
-        min-height: 2.1rem;
     }
 
     .podium-replay__car {
