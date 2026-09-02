@@ -694,6 +694,41 @@
     "gold": 9.91,
     "silver": 10.22,
     "bronze": 10.53
+  },
+  "cloverLeaf": {
+    "author": 11.69,
+    "gold": 11.83,
+    "silver": 12.05,
+    "bronze": 12.37
+  },
+  "safariCircuit": {
+    "author": 7.71,
+    "gold": 7.89,
+    "silver": 8.07,
+    "bronze": 8.39
+  },
+  "monkeyWrench": {
+    "author": 12.35,
+    "gold": 12.61,
+    "silver": 12.89,
+    "bronze": 13.11
+  },
+  "ovenMitt": {
+    "author": 8.29,
+    "gold": 8.45,
+    "silver": 8.71,
+    "bronze": 8.98
+  },
+  "monkeyTail": {
+    "author": 9.01,
+    "gold": 9.27,
+    "silver": 9.52,
+    "bronze": 9.89
+  },
+  "bottleOpener": {
+    "author": 10.37,
+    "gold": 10.52,
+    "silver": 10.81,
+    "bronze": 11.08
   }
 }
- 

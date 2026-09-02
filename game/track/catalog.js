@@ -115,6 +115,12 @@ export const TRACK_CATALOG = {
     slingshotRun: { name: "Slingshot Run" },
     brokenAntler: { name: "Broken Antler" },
     mantisBend: { name: "Mantis Bend" },
+    cloverLeaf: { name: "Clover Leaf" },
+    safariCircuit: { name: "Safari Circuit" },
+    monkeyWrench: { name: "Monkey Wrench" },
+    ovenMitt: { name: "Oven Mitt" },
+    monkeyTail: { name: "Monkey Tail" },
+    bottleOpener: { name: "Bottle Opener" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -218,6 +224,12 @@ export const TRACK_SCHEDULE_KEYS = [
     'slingshotRun',
     'brokenAntler',
     'mantisBend',
+    'cloverLeaf',
+    'safariCircuit',
+    'monkeyWrench',
+    'ovenMitt',
+    'monkeyTail',
+    'bottleOpener',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

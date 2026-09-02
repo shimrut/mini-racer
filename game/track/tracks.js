@@ -114,6 +114,12 @@ import crakowBoot from './definitions/crakow-boot.js';
 import slingshotRun from './definitions/slingshot-run.js';
 import brokenAntler from './definitions/broken-antler.js';
 import mantisBend from './definitions/mantis-bend.js';
+import cloverLeaf from './definitions/clover-leaf.js';
+import safariCircuit from './definitions/safari-circuit.js';
+import monkeyWrench from './definitions/monkey-wrench.js';
+import ovenMitt from './definitions/oven-mitt.js';
+import monkeyTail from './definitions/monkey-tail.js';
+import bottleOpener from './definitions/bottle-opener.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -233,6 +239,12 @@ const TRACK_GEOMETRY = {
     slingshotRun,
     brokenAntler,
     mantisBend,
+    cloverLeaf,
+    safariCircuit,
+    monkeyWrench,
+    ovenMitt,
+    monkeyTail,
+    bottleOpener,
 };
 
 // Compatibility registry for existing gameplay and server consumers.
