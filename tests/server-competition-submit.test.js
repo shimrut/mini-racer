@@ -10,12 +10,14 @@ const mockUpsertPlayerTrackPersonalBest = vi.fn();
 const mockRedisIncrBy = vi.fn(async () => 1);
 const mockRedisExpire = vi.fn(async () => true);
 const mockRedisExpireTime = vi.fn(async () => Math.floor(Date.now() / 1000) + 60);
+const mockRedisGet = vi.fn(async () => null);
 
 vi.mock('@devvit/redis', () => ({
     redis: {
         incrBy: (...args) => mockRedisIncrBy(...args),
         expire: (...args) => mockRedisExpire(...args),
         expireTime: (...args) => mockRedisExpireTime(...args),
+        get: (...args) => mockRedisGet(...args),
     },
 }));
 
@@ -181,6 +183,27 @@ describe('submitCompetitionRun', () => {
         expect(locked.status).toBe(429);
         expect(locked.body.accepted).toBe(false);
         expect(locked.releaseLock).toEqual(expect.any(Promise));
+    });
+
+    it('waits when a guest transfer marker appears before the commit check', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        mockRedisGet.mockResolvedValueOnce('guest:pending-transfer');
+
+        const outcome = await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(outcome.status).toBe(503);
+        expect(outcome.body).toMatchObject({
+            accepted: false,
+            reason: 'progress_transfer_pending',
+            retryAfterSeconds: 1,
+        });
+        expect(mockWriteEntry).not.toHaveBeenCalled();
+        await outcome.releaseLock;
     });
 
     const matchingContract = {

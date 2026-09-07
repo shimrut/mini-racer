@@ -1170,6 +1170,7 @@ describe('Campaign server store', () => {
             }),
         ]]));
         const {
+            cleanupGuestCampaignProgress,
             getServerCampaignBootstrap,
             mergeGuestCampaignProgress,
         } = await import('../src/server/campaign-store.ts');
@@ -1189,10 +1190,14 @@ describe('Campaign server store', () => {
                     },
                 },
             });
-        expect(hashes.get(guestEntryKey)?.has(guestPlayerId)).toBe(false);
+        expect(hashes.get(guestEntryKey)?.has(guestPlayerId)).toBe(true);
         expect(hashes.get(guestEntryKey)?.has(redditPlayerId)).toBe(true);
-        expect(hashes.get(pbKey)?.has(guestPbField)).toBe(false);
+        expect(hashes.get(pbKey)?.has(guestPbField)).toBe(true);
         expect(hashes.get(pbKey)?.has(redditPbField)).toBe(true);
+
+        await expect(cleanupGuestCampaignProgress({ guestPlayerId })).resolves.toBe(false);
+        expect(hashes.get(guestEntryKey)?.has(guestPlayerId)).toBe(false);
+        expect(hashes.get(pbKey)?.has(guestPbField)).toBe(false);
     });
 
     it('keeps guest data for a retry when an account promotion write fails', async () => {
@@ -1244,7 +1249,7 @@ describe('Campaign server store', () => {
         mockRedis.hSet.mockImplementation(defaultHSet);
         await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
             .resolves.toEqual({ merged: true, mergedRaceIds: ['numbered-v1-00'] });
-        expect(strings.has(progressKeyFor(guestPlayerId))).toBe(false);
+        expect(strings.has(progressKeyFor(guestPlayerId))).toBe(true);
     });
 
     it('repairs an account rank when a prior promotion copied its entry but missed the sorted-set write', async () => {
@@ -1296,7 +1301,7 @@ describe('Campaign server store', () => {
             `campaign:numbered-v1:leaderboard:${raceId}`,
             { member: redditPlayerId, score: result.bestTimeMs },
         );
-        expect(hashes.get(entryKey)?.has(guestPlayerId)).toBe(false);
+        expect(hashes.get(entryKey)?.has(guestPlayerId)).toBe(true);
     });
 
     it('restores a missing Campaign rank from its retained strict entry during bootstrap', async () => {

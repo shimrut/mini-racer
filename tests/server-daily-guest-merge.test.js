@@ -130,7 +130,7 @@ describe('mergeGuestDailyProgress', () => {
         mockRedis.watch.mockImplementation(() => createMockTransaction());
     });
 
-    it('moves a faster guest Daily time onto the Reddit account and removes the guest row', async () => {
+    it('moves a faster guest Daily time while retaining the source for transfer retry', async () => {
         const challengeId = getTodayChallengeIdForTest();
         const trackKey = TRACK_SCHEDULE_KEYS[0];
         const guestPlayerId = 'guest:daily-guest-merge';
@@ -164,7 +164,10 @@ describe('mergeGuestDailyProgress', () => {
             ));
         });
 
-        const { mergeGuestDailyProgress } = await import('../src/server/daily-gp-store.ts');
+        const {
+            cleanupGuestDailyProgress,
+            mergeGuestDailyProgress,
+        } = await import('../src/server/daily-gp-store.ts');
         const result = await mergeGuestDailyProgress({
             guestPlayerId,
             redditPlayerId,
@@ -180,14 +183,15 @@ describe('mergeGuestDailyProgress', () => {
                 [redditPlayerId]: expect.stringContaining('"bestTimeMs":9000'),
             }),
         );
+        expect(mockRedis.zRem).not.toHaveBeenCalledWith(leaderboardKey, [guestPlayerId]);
+        expect(mockRedis.hDel).not.toHaveBeenCalledWith(entryHashKey, [guestPlayerId]);
+
+        await cleanupGuestDailyProgress({ guestPlayerId });
         expect(mockRedis.zRem).toHaveBeenCalledWith(leaderboardKey, [guestPlayerId]);
-        expect(mockRedis.hDel).toHaveBeenCalledWith(
-            entryHashKey,
-            [guestPlayerId],
-        );
+        expect(mockRedis.hDel).toHaveBeenCalledWith(entryHashKey, [guestPlayerId]);
     });
 
-    it('removes a slower guest row without overwriting a faster Reddit time', async () => {
+    it('retains a slower guest row without overwriting a faster Reddit time', async () => {
         const challengeId = getTodayChallengeIdForTest();
         const trackKey = TRACK_SCHEDULE_KEYS[0];
         const guestPlayerId = 'guest:daily-guest-slow';
@@ -232,8 +236,8 @@ describe('mergeGuestDailyProgress', () => {
         });
 
         expect(result).toEqual({ merged: false, mergedChallengeIds: [] });
-        expect(mockRedis.zRem).toHaveBeenCalledWith(leaderboardKey, [guestPlayerId]);
-        expect(mockRedis.hDel).toHaveBeenCalledWith(entryHashKey, [guestPlayerId]);
+        expect(mockRedis.zRem).not.toHaveBeenCalledWith(leaderboardKey, [guestPlayerId]);
+        expect(mockRedis.hDel).not.toHaveBeenCalledWith(entryHashKey, [guestPlayerId]);
         const redditWrites = mockRedis.hSet.mock.calls.filter((call) => (
             call[0] === entryHashKey
             && typeof call[1]?.[redditPlayerId] === 'string'

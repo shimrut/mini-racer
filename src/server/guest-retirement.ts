@@ -5,14 +5,32 @@ import { readGuestPromotionTarget } from './car-unlock-store.js';
 
 export type GuestIdentityStatus = 'active' | 'guest_promotion_pending' | 'guest_identity_retired';
 
-function guestProgressSelectionPendingKey(canonicalGuestPlayerId: string): string {
+export function guestProgressSelectionPendingKey(canonicalGuestPlayerId: string): string {
     return `dailygp:guest-progress-selection-pending:v1:${createHash('sha256')
         .update(canonicalGuestPlayerId, 'utf8')
         .digest('base64url')}`;
 }
 
+export function guestProgressSelectionAccountPendingKey(redditPlayerId: string): string {
+    return `dailygp:guest-progress-selection-account-pending:v1:${createHash('sha256')
+        .update(redditPlayerId, 'utf8')
+        .digest('base64url')}`;
+}
+
 export async function isGuestProgressSelectionPending(canonicalGuestPlayerId: string): Promise<boolean> {
     return Boolean(await redis.get(guestProgressSelectionPendingKey(canonicalGuestPlayerId)));
+}
+
+export async function isPlayerProgressSelectionPending(redditPlayerId: string): Promise<boolean> {
+    if (!redditPlayerId.startsWith('reddit:')) return false;
+    return Boolean(await redis.get(guestProgressSelectionAccountPendingKey(redditPlayerId)));
+}
+
+export async function isProgressTransferPending(playerId: string): Promise<boolean> {
+    if (playerId.startsWith('guest:')) {
+        return isGuestProgressSelectionPending(playerId);
+    }
+    return isPlayerProgressSelectionPending(playerId);
 }
 
 /**
@@ -28,14 +46,18 @@ export async function resolveGuestIdentityStatus(
         return { status: 'active', promotedPlayerId: null };
     }
 
+    const selectionPending = await isGuestProgressSelectionPending(canonicalGuestPlayerId);
     const promotedPlayerId = await readGuestPromotionTarget(canonicalGuestPlayerId);
     if (!promotedPlayerId) {
-        return { status: 'active', promotedPlayerId: null };
+        return {
+            status: selectionPending ? 'guest_promotion_pending' : 'active',
+            promotedPlayerId: null,
+        };
     }
 
     const migrationPending = Boolean(
         await redis.get(campaignProgressKey(canonicalGuestPlayerId))
-        || await isGuestProgressSelectionPending(canonicalGuestPlayerId),
+        || selectionPending,
     );
     return {
         status: migrationPending ? 'guest_promotion_pending' : 'guest_identity_retired',

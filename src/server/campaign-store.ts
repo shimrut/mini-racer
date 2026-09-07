@@ -49,6 +49,7 @@ import {
     type RedisLockLease,
 } from './redis-lock.js';
 import { recordAnalyticsRaceBestEffort } from './analytics-store.js';
+import { isPlayerProgressSelectionPending } from './guest-retirement.js';
 
 type CampaignMedal = 'bronze' | 'silver' | 'gold' | 'author';
 
@@ -475,11 +476,11 @@ export async function getServerCampaignBootstrap({
 } = {}) {
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     const canonicalPlayerId = identity.canonicalPlayerId;
-    let guestPromotionPending = false;
+    let guestPromotionPending = identity.guestStatus === 'guest_promotion_pending';
     let campaignProgressPromotionPending = false;
     await cleanupExpiredCampaignGuestsBestEffort();
 
-    if (canonicalPlayerId?.startsWith('reddit:')) {
+    if (canonicalPlayerId?.startsWith('reddit:') && !guestPromotionPending) {
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
         if (guestPlayerId) {
             const promotedTo = await readGuestPromotionTarget(`guest:${guestPlayerId}`);
@@ -528,7 +529,10 @@ export async function startServerCampaignRace({
 } = {}) {
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     if (!identity.canonicalPlayerId) return identityRequired();
-    if (identity.guestStatus === 'guest_promotion_pending') {
+    const progressTransferPending = identity.guestStatus === 'guest_promotion_pending'
+        || (identity.canonicalPlayerId.startsWith('reddit:')
+            && await isPlayerProgressSelectionPending(identity.canonicalPlayerId));
+    if (progressTransferPending) {
         return {
             status: 409,
             body: {
@@ -656,13 +660,17 @@ export async function submitServerCampaignRun({
             body: { accepted: false, error: 'Player identity is required to submit Campaign results.' },
         };
     }
-    if (identity.guestStatus === 'guest_promotion_pending') {
+    const progressTransferPending = identity.guestStatus === 'guest_promotion_pending'
+        || (identity.canonicalPlayerId.startsWith('reddit:')
+            && await isPlayerProgressSelectionPending(identity.canonicalPlayerId));
+    if (progressTransferPending) {
         return {
-            status: 409,
+            status: 503,
             body: {
                 accepted: false,
-                error: 'Choose which progress to keep before submitting a ranked Campaign result.',
-                reason: 'progress_selection_required',
+                error: 'A progress transfer is in progress. Retrying automatically.',
+                reason: 'progress_transfer_pending',
+                retryAfterSeconds: 1,
             },
         };
     }
@@ -1022,23 +1030,9 @@ export async function mergeGuestCampaignProgress({
             updatedAt: nowIso,
         }, redditProgressLock);
 
-        // Delete the guest only after every copy succeeded, so an earlier failure leaves a complete retry source.
-        await confirmMergeOwnership();
-        const cleanup = await beginOwnedRedisLockTransaction(guestProgressLock, redis);
-        if (!cleanup) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-        for (const stage of CAMPAIGN_STAGES) {
-            const competition = competitionFor(stage, guestPlayerId);
-            await cleanup.hDel(competition.entryHashKey, [guestPlayerId]);
-            await cleanup.zRem(competition.leaderboardKey, [guestPlayerId]);
-            await cleanup.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
-            await cleanup.incrBy(competition.standingsRevisionKey, 1);
-        }
-        await cleanup.del(progressKey(guestPlayerId));
-        await cleanup.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, [guestPlayerId]);
-        const cleanupResults = await cleanup.exec();
-        if (!Array.isArray(cleanupResults) || cleanupResults.length === 0) {
-            throw new CampaignProgressBusyError('Campaign guest cleanup was interrupted.');
-        }
+        // Keep the guest source until the transfer coordinator checkpoints the whole
+        // domain. A later retry must be able to reconstruct replacement progress if
+        // another domain or its checkpoint fails.
         return { merged: mergedRaceIds.length > 0, mergedRaceIds };
     } finally {
         if (lease) {
@@ -1049,6 +1043,50 @@ export async function mergeGuestCampaignProgress({
         for (const lock of [...locks].reverse()) {
             await releaseRedisLock(lock, redis).catch((error) => {
                 console.error('Campaign merge lock cleanup failed:', error);
+            });
+        }
+    }
+}
+
+export async function cleanupGuestCampaignProgress({
+    guestPlayerId,
+}: {
+    guestPlayerId: string;
+}): Promise<boolean> {
+    if (!guestPlayerId.startsWith('guest:')) return false;
+    const locks: RedisLock[] = [];
+    try {
+        for (const key of CAMPAIGN_STAGES.flatMap((stage) => {
+            const competition = competitionFor(stage, null);
+            return [competitionSubmissionLockKey(competition, guestPlayerId)];
+        }).concat(progressLockKey(guestPlayerId)).sort()) {
+            const lock = await acquireRedisLock(key, SUBMISSION_LOCK_TTL_MS, redis);
+            if (!lock) throw new CampaignProgressBusyError('Campaign cleanup is already in progress.');
+            locks.push(lock);
+        }
+        const progressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId));
+        if (!progressLock) throw new CampaignProgressBusyError('Campaign cleanup lock was lost.');
+        const hadProgress = Boolean(await redis.get(progressKey(guestPlayerId)));
+        const transaction = await beginOwnedRedisLockTransaction(progressLock, redis);
+        if (!transaction) throw new CampaignProgressBusyError('Campaign cleanup lock was lost.');
+        for (const stage of CAMPAIGN_STAGES) {
+            const competition = competitionFor(stage, guestPlayerId);
+            await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
+            await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
+            await transaction.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
+            await transaction.incrBy(competition.standingsRevisionKey, 1);
+        }
+        await transaction.del(progressKey(guestPlayerId));
+        await transaction.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, [guestPlayerId]);
+        const results = await transaction.exec();
+        if (!Array.isArray(results) || results.length === 0) {
+            throw new CampaignProgressBusyError('Campaign cleanup was interrupted.');
+        }
+        return hadProgress;
+    } finally {
+        for (const lock of [...locks].reverse()) {
+            await releaseRedisLock(lock, redis).catch((error) => {
+                console.error('Campaign cleanup lock cleanup failed:', error);
             });
         }
     }

@@ -50,6 +50,13 @@ These close the findings the hosted run left open, plus the residual windows it 
 - The selection coordinator records the first choice, retries idempotently, replaces or discards Daily/Campaign/car-unlock state as selected, and retires the guest only after all domains complete. A pending selection keeps the guest source and credential alive.
 - Local tests and the production build cover the client prompt and replacement paths. Hosted Reddit/Redis validation remains outstanding; no hosted identity or data was touched by this branch.
 
+## Guest transfer retry hardening — 2026-09-07
+
+- Guest-progress selection records now use a durable versioned transfer record with an account-scoped lock. A transfer cannot change destination or choice after it starts, and another guest cannot replace the same account concurrently.
+- Use Guest Progress copies Daily and Campaign data while retaining the guest source. The transfer records the seven-day Daily challenge IDs at start, so a retry after the playlist advances still copies the same races. Domain checkpoints are saved before guest cleanup, so a failed checkpoint retries from the intact source instead of treating it as empty replacement data. Cleanup is separately checkpointed and safe to repeat.
+- The guest and destination account carry pending markers for the full transfer. Ranked writes resolve those markers before saving, so a second device waits and retries while replacement is in progress. Completed transfers clear the markers only after cleanup.
+- Legacy pending records without the new transfer version, or a transfer whose frozen Daily history is no longer available, are stopped with `guest_progress_recovery_required`; the server does not guess at missing source data or repeat destructive replacement.
+
 ## Local gates
 
 Before the hosted run, 245 focused tests passed across the diagnostic, car unlock store, Campaign store, Daily store, and server route contracts. `npm run build` and `git diff --check` also passed. After capture, the normal build was restored and revalidated without the temporary diagnostic surface.

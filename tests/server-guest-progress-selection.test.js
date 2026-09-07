@@ -208,8 +208,14 @@ class RedisTestDouble {
       hSet: async (...args) => {
         commands.push(() => this.hSet(...args));
       },
+      hDel: async (...args) => {
+        commands.push(() => this.hDel(...args));
+      },
       zAdd: async (...args) => {
         commands.push(() => this.zAdd(...args));
+      },
+      zRem: async (...args) => {
+        commands.push(() => this.zRem(...args));
       },
       incrBy: async (...args) => {
         commands.push(() => this.incrBy(...args));
@@ -239,10 +245,17 @@ const {
   getGuestProgressSelection,
   getServerDailyGpChallenge,
   getServerDailyGpPlaylist,
+  selectGuestProgress,
 } = await import("../src/server/daily-gp-store.ts");
 const { startServerCampaignRace } = await import("../src/server/campaign-store.ts");
 const { recordCompletedRace } = await import("../src/server/car-unlock-store.ts");
 const { mintGuestPlayerToken } = await import("../src/server/player-token.ts");
+const {
+    guestProgressSelectionAccountPendingKey,
+    guestProgressSelectionPendingKey,
+    isPlayerProgressSelectionPending,
+} = await import("../src/server/guest-retirement.ts");
+const { resolveAuthorizedPlayerIdentity } = await import("../src/server/competition-identity.ts");
 
 const REDIS_METHODS = [
   "get", "mGet", "set", "del", "incrBy", "expire", "expireTime",
@@ -339,5 +352,37 @@ describe("guest progress selection", () => {
       campaignResults: 0,
       unlocks: false,
     });
+  });
+
+  it("persists a completed choice without an expiring transfer record", async () => {
+    await seedSevenDayPlaylist();
+
+    await expect(selectGuestProgress({
+      guestPlayerId: "guest:durable-choice",
+      redditPlayerId: "reddit:durable-choice",
+      choice: "account",
+    })).resolves.toEqual({ status: "completed", choice: "account" });
+
+    const transferKeys = [...redis.strings.keys()].filter((key) => (
+      key.includes("guest-progress-selection:v1:") && !key.endsWith(":lock")
+    ));
+    expect(transferKeys).toHaveLength(1);
+    expect(redis.expiresAtSeconds.has(transferKeys[0])).toBe(false);
+    expect([...redis.strings.keys()].some((key) => key.includes("account-pending"))).toBe(false);
+  });
+
+  it("blocks both identities while a transfer marker is present", async () => {
+    const guestToken = await mintGuestPlayerToken("pending-identity");
+    await redis.set(guestProgressSelectionPendingKey("guest:pending-identity"), "1");
+    expect((await resolveAuthorizedPlayerIdentity({
+      playerId: "pending-identity",
+      guestToken,
+    })).guestStatus).toBe("guest_promotion_pending");
+
+    await redis.set(
+      guestProgressSelectionAccountPendingKey("reddit:pending-identity"),
+      "guest:pending-identity",
+    );
+    expect(await isPlayerProgressSelectionPending("reddit:pending-identity")).toBe(true);
   });
 });

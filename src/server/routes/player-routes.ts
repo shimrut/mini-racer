@@ -69,7 +69,10 @@ export function registerPlayerRoutes(
         } catch (error) {
             const statusCode = Number(error?.statusCode);
             if (statusCode === 401 || statusCode === 409 || statusCode === 503) {
-                res.status(statusCode).json({ error: error.message });
+                res.status(statusCode).json({
+                    error: error.message,
+                    ...(typeof error?.reason === 'string' ? { reason: error.reason } : {}),
+                });
                 return;
             }
             console.error('Failed to select Reddit Mini Racer guest progress:', error);

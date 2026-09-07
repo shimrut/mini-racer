@@ -12,6 +12,7 @@ import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.
 import { sanitizeRedditUsername } from '../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import type { DailyGpLeaderboardEntry } from './daily-gp-model.js';
+import { isProgressTransferPending } from './guest-retirement.js';
 
 export const SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 export const SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
@@ -253,6 +254,25 @@ export async function submitCompetitionRun(
                 retryAfterSeconds: 1,
             },
             releaseLock,
+        };
+    }
+
+    // A submission may have passed the request-level identity check just before a
+    // guest transfer began. Recheck while holding the same per-race lock the
+    // transfer coordinator uses so it cannot write after the source was copied.
+    if (await isProgressTransferPending(playerId)) {
+        const pendingRelease = releaseRedisLock(submissionLock, redis).catch((error) => {
+            console.error('Pending transfer submission lock cleanup failed:', error);
+        });
+        return {
+            status: 503,
+            body: {
+                accepted: false,
+                error: 'A progress transfer is in progress. Retrying automatically.',
+                reason: 'progress_transfer_pending',
+                retryAfterSeconds: 1,
+            },
+            releaseLock: pendingRelease,
         };
     }
 
