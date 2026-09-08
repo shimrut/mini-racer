@@ -20,7 +20,7 @@ leaderboard, and retention rules.
 - Campaign starts, progress, per-stage bests, PB ghosts, and leaderboards are
   server records for guests and signed-in players. Shared stage leaderboards
   are permanent. Signed-in progress is permanent; guest progress, bests, and PB
-  ghosts use a rolling 90-day inactivity window.
+  ghosts use a rolling 365-day inactivity window.
 - A finish remains provisional in the client verification queue until the
   accepted submission response includes an equal-or-better server progress
   result. Campaign bootstrap repairs a missing progress row from that player's
@@ -497,7 +497,7 @@ Automated coverage must include:
 - client/server replay parity and replay-size boundaries;
 - PB/ghost separation across lap counts and modes;
 - Daily and Campaign leaderboard isolation;
-- Campaign progress and unlock derivation for ranked guests (rolling 90-day
+- Campaign progress and unlock derivation for ranked guests (rolling 365-day
   inactivity) and signed-in players (permanent);
 - campaign rules/track fingerprint migration behavior;
 - old Daily sharing and podium behavior.
@@ -524,7 +524,7 @@ leaderboards.
    version (recommended) or in-place migration.
 7. ~~Define campaign progress retention for guests and whether guest progress can
    be claimed by a later signed-in account.~~ **Resolved.** Guests are ranked
-   server-side with rolling 90-day inactivity retention. Signing in merges their
+   server-side with rolling 365-day inactivity retention. Signing in merges their
    verified results and keeps the faster result per stage. See the implemented
    contract above.
 

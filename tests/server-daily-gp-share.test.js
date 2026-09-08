@@ -960,6 +960,13 @@ describe('daily GP result sharing', () => {
         }, requestContext);
 
         expect(preview.body.expiresAt).toBe('2026-07-18T12:10:00.000Z');
+        const previewKey = `dailygp:share-preview:${preview.body.shareToken}`;
+        expect(redis.set).toHaveBeenCalledWith(
+            previewKey,
+            expect.any(String),
+            { expiration: new Date('2026-07-18T12:10:00.000Z') },
+        );
+        expect(redis.expire).not.toHaveBeenCalledWith(previewKey, expect.anything());
     });
 
     it('reports no verified result when the finished challenge cannot be found', async () => {

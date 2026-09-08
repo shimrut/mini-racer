@@ -246,24 +246,56 @@ export class ModalShell {
     }
 
     getTracksMenuContainer() {
-        return document.getElementById('daily-playlist-list')
+        const dailyPanel = document.getElementById('daily-playlist-list');
+        const campaignPanel = document.getElementById('campaign-playlist-list');
+        return campaignPanel && !campaignPanel.hidden
+            ? campaignPanel
+            : dailyPanel
             || document.getElementById('daily-playlist-modal');
     }
 
     getTracksMenuItems() {
-        return collectVisibleActionButtons(
-            this.getTracksMenuContainer(),
+        const activePanel = this.getTracksMenuContainer();
+        const trackItems = collectVisibleActionButtons(
+            activePanel,
             '.daily-playlist-entry--hero',
             { requireLaidOut: false },
         );
+        return filterVisibleMenuItems([
+            document.getElementById('tracks-tab-daily'),
+            document.getElementById('tracks-tab-campaign'),
+            ...trackItems,
+        ], { requireLaidOut: false });
     }
 
-    resetTracksMenuKeyboardNav() {
+    getTracksPreferredTabIndex(items) {
+        const activeTabId = document.getElementById('campaign-playlist-list')?.hidden === false
+            ? 'tracks-tab-campaign'
+            : 'tracks-tab-daily';
+        const activeTabIndex = items.findIndex((item) => item?.id === activeTabId);
+        return activeTabIndex >= 0 ? activeTabIndex : 0;
+    }
+
+    resetTracksMenuKeyboardNav({ keepCue = false } = {}) {
         const items = this.getTracksMenuItems();
+        const preferredIndex = this.getTracksPreferredTabIndex(items);
+        if (keepCue && this._tracksMenuKeyboardState?.keyboardNavActive && items.length) {
+            this._tracksMenuKeyboardState.selectedIndex = preferredIndex;
+            applyMenuSelection(items, preferredIndex, {
+                container: this.getTracksMenuContainer(),
+            });
+            return preferredIndex;
+        }
         return resetMenuKeyboardState(this._tracksMenuKeyboardState, items, {
-            preferredIndex: 0,
+            preferredIndex,
             container: this.getTracksMenuContainer(),
             focusPreferred: true,
+        });
+    }
+
+    onTracksTabChangedForKeyboardNav() {
+        this.resetTracksMenuKeyboardNav({
+            keepCue: Boolean(this._tracksMenuKeyboardState?.keyboardNavActive),
         });
     }
 
@@ -380,7 +412,7 @@ export class ModalShell {
         if (trapId === 'daily-playlist-modal') {
             dismissMenuKeyboardCue(this._tracksMenuKeyboardState, this.getTracksMenuItems(), {
                 container: this.getTracksMenuContainer(),
-                preferredIndex: 0,
+                preferredIndex: this.getTracksPreferredTabIndex(this.getTracksMenuItems()),
             });
             return;
         }
@@ -762,13 +794,14 @@ export class ModalShell {
 
     _showShareOutcome(panel, triggerButton, result, {
         bragged = false,
+        commented = false,
         keepShareAvailable = false,
     } = {}) {
         const isChallengeCreate = Boolean(result?.postUrl) && !result?.commentText;
         panel.replaceChildren();
         const title = document.createElement('h3');
         title.className = 'result-share-panel__title';
-        title.textContent = isChallengeCreate ? 'Challenge created' : 'Shared';
+        title.textContent = isChallengeCreate ? 'Challenge created' : commented ? 'Comment posted' : 'Shared';
         const copy = document.createElement('blockquote');
         copy.className = 'result-share-panel__copy';
         copy.textContent = result?.commentText
@@ -785,7 +818,7 @@ export class ModalShell {
         triggerButton.disabled = !keepShareAvailable;
         this._setShareButtonLabel(
             triggerButton,
-            keepShareAvailable ? 'Share' : bragged ? 'Bragged' : 'Shared',
+            keepShareAvailable ? 'Share' : bragged ? 'Bragged' : commented ? 'Commented' : 'Shared',
         );
         resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
             preferredIndex: 0,
@@ -852,6 +885,7 @@ export class ModalShell {
         if (!triggerButton || !hostView) return;
         const isChallenge = request?.kind === 'head-to-head';
         const isBrag = request?.kind === 'challenge-brag';
+        const isChallengeComment = request?.kind === 'challenge-comment';
         const isDailyShare = isChallenge
             ? request?.source === 'daily'
             : request?.source === 'finish';
@@ -861,7 +895,11 @@ export class ModalShell {
         scrim.setAttribute('role', 'dialog');
         scrim.setAttribute(
             'aria-label',
-            isChallenge ? 'Create player challenge' : isBrag ? 'Brag about this win' : 'Share race result',
+            isChallenge
+                ? 'Create player challenge'
+                : isBrag
+                    ? 'Brag about this win'
+                    : isChallengeComment ? 'Comment on this challenge' : 'Share race result',
         );
         scrim.dataset.savedScrollTop = String(this.modalLapTimes?.scrollTop || 0);
         const panel = document.createElement('div');
@@ -873,6 +911,7 @@ export class ModalShell {
             ? 'Challenge other racers'
             : isBrag
                 ? 'Brag about your win'
+                : isChallengeComment ? 'Comment on this challenge'
                 : 'Share your time';
         const status = document.createElement('p');
         status.className = 'result-share-panel__status';
@@ -899,6 +938,8 @@ export class ModalShell {
                 ? 'Sign in to Reddit to challenge other racers.'
                 : isBrag
                     ? 'Sign in to Reddit to brag about this win.'
+                    : isChallengeComment
+                        ? 'Sign in to Reddit to comment on this challenge.'
                     : 'Sign in to Reddit to share your time.';
             cancel.textContent = 'Close';
             cancel.focus();
@@ -909,13 +950,16 @@ export class ModalShell {
             return;
         }
         triggerButton.disabled = true;
-        status.textContent = 'Preparing your verified result…';
+        status.textContent = isChallengeComment
+            ? 'Preparing your comment…'
+            : 'Preparing your verified result…';
         try {
             const response = await this.previewShare(request);
             const body = response?.body || {};
             if (body.status === 'already_shared' || body.status === 'already_created') {
                 this._showShareOutcome(panel, triggerButton, body, {
                     bragged: isBrag,
+                    commented: isChallengeComment,
                     keepShareAvailable: isDailyShare,
                 });
                 return;
@@ -930,7 +974,9 @@ export class ModalShell {
             disclosureUser.className = 'result-share-panel__accent';
             disclosureUser.textContent = `u/${body.username}`;
             disclosure.append(
-                isChallenge ? 'Create this challenge post as ' : 'Post this comment as ',
+                isChallenge
+                    ? 'Create this challenge post as '
+                    : 'Post this comment as ',
                 disclosureUser,
                 '?',
             );
@@ -959,12 +1005,13 @@ export class ModalShell {
                     const confirmed = await this.confirmShare(shareToken, request);
                     const successfulStatuses = isChallenge
                         ? ['created', 'already_created']
-                        : ['shared', 'already_shared'];
+                        : isChallengeComment ? ['commented'] : ['shared', 'already_shared'];
                     if (!confirmed?.ok || !successfulStatuses.includes(confirmed?.body?.status)) {
                         throw new Error(confirmed?.body?.error || 'Could not share this result.');
                     }
                     this._showShareOutcome(panel, triggerButton, confirmed.body, {
                         bragged: isBrag,
+                        commented: isChallengeComment,
                         keepShareAvailable: isDailyShare,
                     });
                 } catch (error) {
@@ -1135,6 +1182,7 @@ export class ModalShell {
         const shareKind = options.shareRequest?.kind;
         const isChallengeShare = shareKind === 'head-to-head';
         const isChallengeBrag = shareKind === 'challenge-brag';
+        const isChallengeComment = shareKind === 'challenge-comment';
         const isDailyShare = !shareKind && options.shareRequest?.source === 'finish';
 
         this._hideCombinedModeShortcuts();
@@ -1158,6 +1206,8 @@ export class ModalShell {
             const shareEnabled = options.shareEnabled !== false;
             const shareLabel = isChallengeBrag
                 ? 'Brag'
+                : isChallengeComment
+                    ? 'Comment'
                 : isChallengeShare
                     ? 'Challenge'
                     : isDailyShare ? 'Share' : 'Share Time';
@@ -1165,6 +1215,8 @@ export class ModalShell {
                 ? (shareEnabled
                     ? 'Brag that you beat this challenge'
                     : 'Brag available after beating this challenge')
+                : isChallengeComment
+                    ? 'Comment on this challenge'
                 : isChallengeShare
                     ? 'Challenge other racers'
                     : isDailyShare ? 'Share result options' : 'Share time';
@@ -1361,24 +1413,33 @@ export class ModalShell {
         if (shareRequest !== undefined) {
             this._challengeFinishShareRequest = shareRequest;
         }
-        const bragRequest = this._challengeFinishShareRequest;
-        const bragEnabled = phase === 'won' && Boolean(bragRequest);
+        const challengeShareRequest = this._challengeFinishShareRequest;
+        const isChallengeBrag = challengeShareRequest?.kind === 'challenge-brag';
+        const isChallengeComment = challengeShareRequest?.kind === 'challenge-comment';
+        const finishPhase = phase ?? this._challengeFinishPhase;
+        const shareEnabled = Boolean(challengeShareRequest) && (
+            isChallengeBrag
+                ? finishPhase === 'won'
+                : isChallengeComment && (finishPhase === 'tie' || finishPhase === 'lost')
+        );
 
-        if (this.combinedPlaylistBtn && bragRequest) {
+        if (this.combinedPlaylistBtn && challengeShareRequest) {
             this.combinedPlaylistBtn.style.display = '';
-            this._setShareButtonLabel(this.combinedPlaylistBtn, 'Brag');
+            this._setShareButtonLabel(this.combinedPlaylistBtn, isChallengeComment ? 'Comment' : 'Brag');
             this.combinedPlaylistBtn.setAttribute(
                 'aria-label',
-                bragEnabled
-                    ? 'Brag that you beat this challenge'
-                    : 'Brag available after beating this challenge',
+                isChallengeComment
+                    ? 'Comment on this challenge'
+                    : shareEnabled
+                        ? 'Brag that you beat this challenge'
+                        : 'Brag available after beating this challenge',
             );
-            this.combinedPlaylistBtn.disabled = !bragEnabled;
+            this.combinedPlaylistBtn.disabled = !shareEnabled;
             this._bindClickAction(
                 this.combinedPlaylistBtn,
-                bragEnabled
+                shareEnabled
                     ? () => void this._startShare(
-                        bragRequest,
+                        challengeShareRequest,
                         this.combinedPlaylistBtn,
                         this.modalCombinedView,
                     )

@@ -606,6 +606,7 @@ export const campaignEngineMethods = {
             this.lobbyUi?.setCampaignSelectedStage?.(stage);
             return;
         }
+        this.activeRaceMode = 'campaign';
         void this.startCampaignStage(stage);
     },
 

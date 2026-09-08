@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     getHeadToHead,
+    previewHeadToHeadComment,
+    confirmHeadToHeadComment,
     submitHeadToHeadRun,
 } from '../game/head-to-head/service.js';
 
@@ -62,5 +64,37 @@ describe('head to head client service', () => {
 
         await rejection;
         expect(aborted).toBe(true);
+    });
+
+    it('sends a text-only challenge comment preview and confirmation', async () => {
+        const originalLocation = globalThis.location;
+        const originalDevvit = globalThis.devvit;
+        globalThis.location = { origin: 'https://miniracer.example' };
+        globalThis.devvit = { context: { postId: 't3_challenge1' } };
+        globalThis.fetch = vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({ status: 'ready' }),
+        }));
+        try {
+            await previewHeadToHeadComment({
+                challengeId: 'challenge-1',
+                reportedTimeMs: 10_011,
+            });
+            const previewBody = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+            expect(previewBody).toMatchObject({
+                challengeId: 'challenge-1',
+                reportedTimeMs: 10_011,
+                postId: 't3_challenge1',
+            });
+
+            await confirmHeadToHeadComment('share-1');
+            expect(JSON.parse(globalThis.fetch.mock.calls[1][1].body)).toEqual({
+                shareToken: 'share-1',
+            });
+        } finally {
+            globalThis.location = originalLocation;
+            globalThis.devvit = originalDevvit;
+        }
     });
 });

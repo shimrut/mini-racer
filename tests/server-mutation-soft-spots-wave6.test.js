@@ -8,6 +8,7 @@ const {
     mockContext,
     mockShareImage,
     mockStore,
+    mockPostFlair,
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
@@ -40,6 +41,7 @@ const {
         getServerDailyGpChallengeById: vi.fn(),
         persistServerDailyGpChallenge: vi.fn(),
     },
+    mockPostFlair: { resolveMiniRacerPostFlairId: vi.fn() },
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
@@ -49,6 +51,7 @@ vi.mock('../src/server/daily-autopost-store.js', () => mockAutopostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
 vi.mock('../src/server/share-image.js', () => mockShareImage);
 vi.mock('../src/server/daily-gp-store.js', () => mockStore);
+vi.mock('../src/server/post-flair-service.js', () => mockPostFlair);
 
 const { mockRedis } = vi.hoisted(() => ({
     mockRedis: {
@@ -109,6 +112,7 @@ describe('server mutation soft spots wave 6', () => {
         mockShare.ensureDailyGpScoreThread.mockImplementation(async (record) => record);
         mockShare.registerDailyGpPostWithScoreThread.mockResolvedValue({});
         mockShareImage.resolveDailyShareImageUrl.mockReturnValue(null);
+        mockPostFlair.resolveMiniRacerPostFlairId.mockResolvedValue('flair-daily-race');
         mockRedis.get.mockResolvedValue(null);
     });
 

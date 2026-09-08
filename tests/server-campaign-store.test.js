@@ -22,7 +22,8 @@ const mockRedis = {
     hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
     hMGet: vi.fn(async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null)),
-    mGet: vi.fn(async (keys) => keys.map((key) => strings.get(key) ?? null)),
+    // Delegate so a test that overrides get() also steers the batched read the lock layer uses.
+    mGet: vi.fn(async (keys) => await Promise.all(keys.map((key) => mockRedis.get(key)))),
     hDel: vi.fn(async (key, fields) => {
         const hash = hashes.get(key);
         if (!hash) return 0;
@@ -772,7 +773,7 @@ describe('Campaign server store', () => {
         );
     });
 
-    it('keeps shared Campaign collections permanent and expires only guest-owned progress', async () => {
+    it('keeps shared Campaign collections permanent and expires only guest-owned progress after one year', async () => {
         const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
         const guestToken = await mintGuestPlayerToken('guest-ttl');
         const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
@@ -792,7 +793,9 @@ describe('Campaign server store', () => {
         const progressSet = mockRedis.set.mock.calls.find(([key]) => String(key).includes(':progress:'));
         expect(progressSet?.[2]?.expiration).toBeInstanceOf(Date);
         expect(progressSet[2].expiration.getTime() - Date.now())
-            .toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
+            .toBeGreaterThan(364 * 24 * 60 * 60 * 1000);
+        expect(progressSet[2].expiration.getTime() - Date.now())
+            .toBeLessThanOrEqual((365 * 24 * 60 * 60 * 1000) + 1000);
         expect(mockRedis.zAdd).toHaveBeenCalledWith(
             'campaign:numbered-v1:guest-expiry',
             expect.objectContaining({ member: 'guest:guest-ttl' }),

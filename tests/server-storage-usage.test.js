@@ -116,6 +116,9 @@ function seedOneDayOfRacing({ players = ['reddit:racefan', 'reddit:pitwall'] } =
     putHash(`dailygp:analytics:${SUBREDDIT}:first-seen`, Object.fromEntries(
         players.map((playerId) => [playerId, TODAY]),
     ));
+    putHash(`dailygp:analytics:${SUBREDDIT}:cohort-starts`, Object.fromEntries(
+        players.map((playerId) => [playerId, TODAY]),
+    ));
 
     for (const playerId of players) {
         putString(`dailygp:player-profile:${playerField(playerId)}`, `{"playerId":"${playerId}"}`);
@@ -166,7 +169,7 @@ describe('server storage usage', () => {
         expect(groupById(usage, 'ghosts').rows).toBe(2);
         expect(groupById(usage, 'leaderboards').rows).toBe(5);
         expect(groupById(usage, 'challenges').rows).toBe(1);
-        expect(groupById(usage, 'analytics').keys).toBe(3);
+        expect(groupById(usage, 'analytics').keys).toBe(4);
         expect(groupById(usage, 'players').keys).toBe(6);
         expect(groupById(usage, 'posts').keys).toBe(2);
     });

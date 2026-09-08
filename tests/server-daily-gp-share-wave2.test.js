@@ -356,11 +356,14 @@ describe('daily GP share wave 2', () => {
 
         expect(preview.body.status).toBe('ready');
         expect(preview.body.username).toBe('RaceFan');
+        const previewKey = `dailygp:share-preview:${preview.body.shareToken}`;
         expect(redis.set).toHaveBeenCalledWith(
-            `dailygp:share-preview:${preview.body.shareToken}`,
+            previewKey,
             expect.any(String),
+            { expiration: expect.any(Date) },
         );
-        expect(strings.has(`dailygp:share-preview:${preview.body.shareToken}`)).toBe(true);
+        expect(redis.expire).not.toHaveBeenCalledWith(previewKey, expect.anything());
+        expect(strings.has(previewKey)).toBe(true);
     });
 
     it('rejects confirm when the preview subreddit does not match the signed-in context', async () => {

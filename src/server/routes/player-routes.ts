@@ -69,9 +69,12 @@ export function registerPlayerRoutes(
         } catch (error) {
             const statusCode = Number(error?.statusCode);
             if (statusCode === 401 || statusCode === 409 || statusCode === 503) {
+                const reason = typeof error?.reason === 'string' ? error.reason : undefined;
                 res.status(statusCode).json({
-                    error: error.message,
-                    ...(typeof error?.reason === 'string' ? { reason: error.reason } : {}),
+                    error: reason === 'progress_selection_retryable'
+                        ? 'Your save is busy. Wait a moment, then try again.'
+                        : error.message,
+                    ...(reason ? { reason } : {}),
                 });
                 return;
             }

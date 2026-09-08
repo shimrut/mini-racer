@@ -32,6 +32,14 @@ export type HeadToHeadRouteDependencies = {
         input: Record<string, unknown>,
         context: HeadToHeadRequestContext,
     ): Promise<HeadToHeadServiceResult>;
+    previewHeadToHeadComment(
+        input: Record<string, unknown>,
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
+    confirmHeadToHeadComment(
+        input: Record<string, unknown>,
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
 };
 
 function postChallengeId(postData: Record<string, unknown> | null): string | null {
@@ -153,6 +161,35 @@ export function registerHeadToHeadRoutes(
         } catch (error) {
             console.error('Failed to confirm Mini Racer challenge brag:', error);
             res.status(500).json({ status: 'challenge_failed', error: 'Could not post this brag.' });
+        }
+    });
+
+    app.post('/api/head-to-head/comment/preview', async (req, res) => {
+        try {
+            const result = await dependencies.previewHeadToHeadComment(
+                req.body ?? {},
+                withRequestIdentity(
+                    await dependencies.getHeadToHeadRequestContext(),
+                    req.body ?? {},
+                ),
+            );
+            res.status(result.status).json(result.body);
+        } catch (error) {
+            console.error('Failed to preview Mini Racer challenge comment:', error);
+            res.status(500).json({ status: 'challenge_failed', error: 'Could not prepare this comment.' });
+        }
+    });
+
+    app.post('/api/head-to-head/comment/confirm', async (req, res) => {
+        try {
+            const result = await dependencies.confirmHeadToHeadComment(
+                req.body ?? {},
+                await dependencies.getHeadToHeadRequestContext(),
+            );
+            res.status(result.status).json(result.body);
+        } catch (error) {
+            console.error('Failed to confirm Mini Racer challenge comment:', error);
+            res.status(500).json({ status: 'challenge_failed', error: 'Could not post this comment.' });
         }
     });
 }

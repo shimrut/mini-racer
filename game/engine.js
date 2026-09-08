@@ -83,9 +83,11 @@ import {
   subscribeToDailyChallengeSnapshots,
 } from "./daily-challenge/service.js";
 import {
+  confirmHeadToHeadComment,
   confirmHeadToHeadBrag,
   createHeadToHead,
   getHeadToHead,
+  previewHeadToHeadComment,
   previewHeadToHead,
   previewHeadToHeadBrag,
 } from "./head-to-head/service.js";
@@ -318,6 +320,13 @@ export class RealTimeRacer {
           this.startOverlay.isReturningPlayer,
         );
       },
+      onTracksTabChange: (tab) => {
+        if (tab === "campaign") {
+          void this.invokeModeMethod("campaign", "openCampaignTracks");
+          return;
+        }
+        void this.invokeModeMethod("daily", "openDailyChallengePlaylist");
+      },
       getModalShell: () => this.modal,
     });
     this.startOverlay = new StartOverlay({
@@ -446,6 +455,9 @@ export class RealTimeRacer {
         if (payload?.kind === "challenge-brag") {
           return previewHeadToHeadBrag(payload);
         }
+        if (payload?.kind === "challenge-comment") {
+          return previewHeadToHeadComment(payload);
+        }
         return previewDailyChallengeShare(payload);
       },
       confirmShare: async (shareToken, request) => {
@@ -459,6 +471,9 @@ export class RealTimeRacer {
         }
         if (request?.kind === "challenge-brag") {
           return confirmHeadToHeadBrag(shareToken);
+        }
+        if (request?.kind === "challenge-comment") {
+          return confirmHeadToHeadComment(shareToken);
         }
         return confirmDailyChallengeShare(shareToken);
       },

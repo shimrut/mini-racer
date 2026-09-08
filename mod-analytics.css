@@ -32,13 +32,14 @@
 
 html,
 body {
-    min-width: 280px;
+    min-width: 0;
     margin: 0;
 }
 
 body {
     min-height: 100vh;
     min-height: 100dvh;
+    overflow-x: clip;
     background: var(--night);
     color: var(--ink);
     font-family: var(--display);
@@ -48,8 +49,15 @@ body {
     display: grid;
     gap: 0.9rem;
     width: min(1180px, calc(100% - 1.5rem));
+    min-width: 0;
     margin: 0 auto;
     padding: 1.25rem 0 2.5rem;
+}
+
+.analytics-shell > *,
+.analytics-main > *,
+.analytics-summary > * {
+    min-width: 0;
 }
 
 /* Header */
@@ -59,8 +67,15 @@ body {
     align-items: end;
     justify-content: space-between;
     gap: 1rem;
+    min-width: 0;
     padding-bottom: 0.9rem;
     border-bottom: 1px solid var(--line);
+}
+
+.analytics-header > div,
+.analytics-header__range {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .brand-lockup {
@@ -89,15 +104,15 @@ h1 {
     font-family: var(--mono);
     font-size: 0.8rem;
     color: var(--ink);
-}.analytics-range, .analytics-range__note, .analytics-status, .analytics-note, .analytics-card__note, .analytics-kpi__hint {
+    overflow-wrap: anywhere;
+}
+
+.analytics-range,
+.analytics-status,
+.analytics-note {
     margin: 0;
     color: var(--muted);
     font-size: 0.78rem;
-}
-
-.analytics-range__note,
-.analytics-card__note {
-    color: var(--faint);
 }
 
 .analytics-status:empty {
@@ -108,7 +123,8 @@ h1 {
     color: var(--accent);
 }/* Cards */
 
-.analytics-card, .analytics-kpi {
+.analytics-card {
+    min-width: 0;
     padding: 0.9rem 1rem 1rem;
     background: var(--panel);
     border: 1px solid var(--line);
@@ -119,12 +135,8 @@ h1 {
     display: flex;
     align-items: baseline;
     gap: 0.6rem;
+    min-width: 0;
     margin-bottom: 0.85rem;
-}
-
-.analytics-card__note {
-    margin-left: auto;
-    text-align: right;
 }
 
 .analytics-section-title {
@@ -141,39 +153,70 @@ h1 {
     font-variant-numeric: tabular-nums;
 }
 
-/* KPI row */
+/* Today summary */
 
-.analytics-kpis {
+.analytics-summary {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1.35fr) repeat(5, minmax(0, 1fr));
+    gap: 0;
+    min-width: 0;
+    padding: 0.85rem 1rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.analytics-summary__title {
+    grid-column: 1 / -1;
+    margin: 0 0 0.65rem;
+    color: var(--faint);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
 
 .analytics-kpi {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    padding-bottom: 0.5rem;
+    min-width: 0;
+    padding: 0 0.85rem;
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--hair);
+    border-radius: 0;
+}
+
+.analytics-summary > .analytics-kpi:first-of-type {
+    padding-left: 0;
+    border-left: 0;
+}
+
+.analytics-summary > .analytics-kpi:last-of-type {
+    padding-right: 0;
 }
 
 .analytics-kpi__label {
     margin: 0;
     color: var(--muted);
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.08em;
+    line-height: 1.25;
+    text-transform: uppercase;
 }
 
 .analytics-kpi__value {
     margin: 0;
     font-family: var(--mono);
-    font-size: 1.9rem;
+    font-size: 1.8rem;
     line-height: 1.05;
     letter-spacing: -0.02em;
 }
 
 .analytics-kpi--hero .analytics-kpi__value {
-    font-size: 3rem;
+    font-size: 2.8rem;
 }
 
 .analytics-kpi__delta {
@@ -202,51 +245,12 @@ h1 {
     color: var(--faint);
 }
 
-.analytics-kpi__hint {
-    font-size: 0.74rem;
-}
-
-.analytics-spark {
-    display: block;
-    width: 100%;
-    height: 34px;
-    margin-top: auto;
-    padding-top: 0.55rem;
-    overflow: visible;
-}
-
-.analytics-spark__line {
-    fill: none;
-    stroke: var(--faint);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    vector-effect: non-scaling-stroke;
-}
-
-.analytics-spark__area {
-    fill: var(--faint);
-    opacity: 0.24;
-    stroke: none;
-}
-
-.analytics-spark__dot {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 8;
-    stroke-linecap: round;
-    vector-effect: non-scaling-stroke;
-}
-
-.analytics-spark--new .analytics-spark__dot {
-    stroke: var(--new);
-}
-
 /* Chart row */
 
 .analytics-main {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    min-width: 0;
     gap: 0.75rem;
 }
 
@@ -265,10 +269,6 @@ h1 {
     margin-left: auto;
     color: var(--muted);
     font-size: 0.74rem;
-}
-
-.analytics-card__note + .analytics-legend {
-    margin-left: 0;
 }
 
 .analytics-legend__item {
@@ -293,6 +293,7 @@ h1 {
 
 .analytics-plot {
     position: relative;
+    min-width: 0;
 }
 
 .analytics-chart {
@@ -450,6 +451,8 @@ h1 {
 /* Daily table */
 
 .analytics-table-wrap {
+    min-width: 0;
+    max-width: 100%;
     max-height: 26rem;
     overflow: auto;
     scrollbar-width: thin;
@@ -468,6 +471,7 @@ h1 {
 
 .analytics-table {
     width: 100%;
+    min-width: max-content;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 0.85rem;
@@ -540,9 +544,48 @@ h1 {
     box-shadow: inset 2px 0 0 var(--accent);
 }
 
+/* Cohort milestones are the one table where the columns are a progression. */
+.analytics-table--cohorts .analytics-table__milestone {
+    min-width: 7.5rem;
+    border-left: 1px solid var(--hair);
+}
+
+.analytics-table--cohorts thead .analytics-table__milestone {
+    color: var(--accent);
+}
+
+.analytics-table__latest th,
+.analytics-table__latest td {
+    color: var(--ink);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.analytics-table__latest th:first-child {
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+
 @media (max-width: 980px) {
-    .analytics-kpis {
-        grid-template-columns: 1fr 1fr;
+    .analytics-summary {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        row-gap: 0.75rem;
+    }
+
+    .analytics-summary > .analytics-kpi {
+        padding: 0 0.65rem;
+        border-left: 0;
+    }
+
+    .analytics-summary > .analytics-kpi:nth-of-type(n + 4) {
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--hair);
+    }
+
+    .analytics-summary > .analytics-kpi:first-of-type {
+        padding-left: 0;
+    }
+
+    .analytics-summary > .analytics-kpi:last-of-type {
+        padding-right: 0;
     }
 
     .analytics-main {
@@ -551,16 +594,79 @@ h1 {
 }
 
 @media (max-width: 620px) {
+    .analytics-shell {
+        width: calc(100% - 1rem);
+        gap: 0.75rem;
+        padding: 0.9rem 0 1.5rem;
+    }
+
     .analytics-header {
         display: grid;
+        align-items: start;
+        gap: 0.65rem;
     }
 
     .analytics-header__range {
         text-align: left;
     }
 
-    .analytics-kpis,
+    .analytics-summary {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0;
+        padding: 0.75rem;
+    }
+
+    .analytics-summary__title {
+        margin-bottom: 0.3rem;
+    }
+
+    .analytics-summary > .analytics-kpi,
+    .analytics-summary > .analytics-kpi:first-of-type,
+    .analytics-summary > .analytics-kpi:last-of-type {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        padding: 0.65rem 0;
+        border-top: 1px solid var(--hair);
+    }
+
+    .analytics-summary > .analytics-kpi:first-of-type {
+        padding-top: 0;
+        border-top: 0;
+    }
+
+    .analytics-kpi__label {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .analytics-kpi__value {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+
+    .analytics-kpi__delta {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
     .analytics-card__head {
         flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .analytics-table-wrap {
+        scrollbar-gutter: auto;
+    }
+
+    .analytics-table th,
+    .analytics-table td {
+        padding: 0.38rem 0.4rem;
+        font-size: 0.76rem;
+    }
+
+    .analytics-kpi--hero .analytics-kpi__value {
+        font-size: 2.5rem;
     }
 }

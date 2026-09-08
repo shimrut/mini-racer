@@ -1,8 +1,10 @@
 import { getTrackName } from '../track/catalog.js';
 import {
     createHeadToHead,
+    confirmHeadToHeadComment,
     getHeadToHead,
     previewHeadToHead,
+    previewHeadToHeadComment,
     previewHeadToHeadBrag,
     confirmHeadToHeadBrag,
     readHeadToHeadWin,
@@ -366,6 +368,11 @@ export const headToHeadEngineMethods = {
             ? finalTimeMs - targetTimeMs
             : null;
         const settlesLocally = localDifferenceMs !== null && localDifferenceMs >= 0;
+        const buildCommentShareRequest = (reportedTimeMs) => ({
+            kind: 'challenge-comment',
+            challengeId: challenge.challengeId,
+            reportedTimeMs: finitePositiveMs(reportedTimeMs) ?? finalTimeMs,
+        });
 
         // Same origin best Daily and Campaign finishes already use. The GET can miss it; local
         // Campaign progress and Daily storage still know.
@@ -378,6 +385,7 @@ export const headToHeadEngineMethods = {
             phase = 'pending',
             error = null,
         } = {}) => {
+            const canComment = phase === 'tie' || phase === 'lost';
             this.modal.showModal(
                 'Challenge complete',
                 null,
@@ -411,8 +419,10 @@ export const headToHeadEngineMethods = {
                     }),
                     restartAction: () => this.restartActiveRace(),
                     settingsAction: () => this.settings.openSettings(),
-                    shareRequest: { kind: 'challenge-brag', acceptToken: null },
-                    shareEnabled: false,
+                    shareRequest: canComment
+                        ? buildCommentShareRequest()
+                        : { kind: 'challenge-brag', acceptToken: null },
+                    shareEnabled: canComment,
                 },
             );
         };
@@ -525,9 +535,16 @@ export const headToHeadEngineMethods = {
                     response.body?.status === 'target_not_beaten'
                     && Number.isFinite(serverDifferenceMs)
                 ) {
+                    const serverTargetTimeMs = finitePositiveMs(response.body?.targetTimeMs)
+                        ?? targetTimeMs;
                     this.modal.updateChallengeFinishHero?.({
                         phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
                         verdict: buildVerdict(serverDifferenceMs),
+                        shareRequest: buildCommentShareRequest(
+                            serverTargetTimeMs === null
+                                ? null
+                                : serverTargetTimeMs + serverDifferenceMs,
+                        ),
                         ...(response.body?.bestUpdate
                             ? { bestUpdate: response.body.bestUpdate }
                             : {}),
@@ -573,6 +590,7 @@ export const headToHeadEngineMethods = {
             this.modal.updateChallengeFinishHero?.({
                 phase: outcome === 'tie' ? 'tie' : 'lost',
                 verdict,
+                shareRequest: buildCommentShareRequest(response.body?.bestTimeMs),
                 ...bestUpdate,
             });
             revertOptimisticWin();
@@ -595,7 +613,15 @@ export const headToHeadEngineMethods = {
         return previewHeadToHeadBrag(request);
     },
 
+    previewHeadToHeadComment(request) {
+        return previewHeadToHeadComment(request);
+    },
+
     confirmHeadToHeadBrag(token) {
         return confirmHeadToHeadBrag(token);
+    },
+
+    confirmHeadToHeadComment(token) {
+        return confirmHeadToHeadComment(token);
     },
 };

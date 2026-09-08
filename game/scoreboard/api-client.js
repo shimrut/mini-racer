@@ -33,6 +33,8 @@ export const API_ROUTES = Object.freeze({
     headToHeadSubmitUrl: `${API_BASE_URL}/head-to-head/submit`,
     headToHeadBragPreviewUrl: `${API_BASE_URL}/head-to-head/brag/preview`,
     headToHeadBragConfirmUrl: `${API_BASE_URL}/head-to-head/brag/confirm`,
+    headToHeadCommentPreviewUrl: `${API_BASE_URL}/head-to-head/comment/preview`,
+    headToHeadCommentConfirmUrl: `${API_BASE_URL}/head-to-head/comment/confirm`,
 });
 
 export function clampRequestLimit(limit, { defaultLimit, maxLimit = 100 } = {}) {

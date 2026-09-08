@@ -144,7 +144,9 @@ describe('Campaign Tracks list rows', () => {
         originalDocument = global.document;
         list = createElement('div');
         global.document = {
-            getElementById: (id) => (id === 'daily-playlist-list' ? list : null),
+            getElementById: (id) => (
+                id === 'daily-playlist-list' || id === 'campaign-playlist-list' ? list : null
+            ),
             createElement,
             createElementNS: (_namespace, tagName) => createElement(tagName),
             body: { classList: createClassList() },
@@ -203,7 +205,7 @@ describe('Campaign Tracks list rows', () => {
             .toBe('Number One');
     });
 
-    it('titles the overlay Daily Tracks or Campaign Tracks', () => {
+    it('keeps one Tracks title while the selected tab changes', () => {
         const title = createElement('span');
         const modal = createElement('div');
         modal.classList = createClassList();
@@ -211,7 +213,7 @@ describe('Campaign Tracks list rows', () => {
         modal.querySelector = (selector) => (selector === '[data-modal-title]' ? title : null);
 
         global.document.getElementById = (id) => {
-            if (id === 'daily-playlist-list') return list;
+            if (id === 'daily-playlist-list' || id === 'campaign-playlist-list') return list;
             if (id === 'daily-playlist-modal') return modal;
             return null;
         };
@@ -219,10 +221,48 @@ describe('Campaign Tracks list rows', () => {
         const ui = new DailyChallengeUi();
         ui.openTracksModal = vi.fn();
         ui.openPlaylistModal([]);
-        expect(title.textContent).toBe('Daily Tracks');
+        expect(title.textContent).toBe('Tracks');
 
         ui.openCampaignTracksModal([]);
-        expect(title.textContent).toBe('Campaign Tracks');
+        expect(title.textContent).toBe('Tracks');
+    });
+
+    it('switches tabs without replacing the other mode list', () => {
+        const dailyList = createElement('div');
+        const campaignList = createElement('div');
+        const dailyTab = createElement('button');
+        dailyTab.id = 'tracks-tab-daily';
+        const campaignTab = createElement('button');
+        campaignTab.id = 'tracks-tab-campaign';
+        const elements = new Map([
+            ['daily-playlist-list', dailyList],
+            ['campaign-playlist-list', campaignList],
+            ['tracks-tab-daily', dailyTab],
+            ['tracks-tab-campaign', campaignTab],
+        ]);
+        global.document.getElementById = (id) => elements.get(id) || null;
+
+        const ui = new DailyChallengeUi();
+        ui.renderPlaylist(dailyChallenges());
+        expect(dailyList.children).toHaveLength(2);
+        expect(campaignList.children).toHaveLength(0);
+
+        ui.setTracksTab('campaign');
+        ui.renderCampaignPlaylist(campaignStages());
+        expect(dailyList.children).toHaveLength(2);
+        expect(campaignList.children).toHaveLength(2);
+        expect(dailyTab.attributes['aria-selected']).toBe('false');
+        expect(campaignTab.attributes['aria-selected']).toBe('true');
+        expect(dailyList.hidden).toBe(true);
+        expect(campaignList.hidden).toBe(false);
+
+        ui.setTracksTab('daily');
+        expect(dailyList.children).toHaveLength(2);
+        expect(campaignList.children).toHaveLength(2);
+        expect(dailyTab.attributes['aria-selected']).toBe('true');
+        expect(campaignTab.attributes['aria-selected']).toBe('false');
+        expect(dailyList.hidden).toBe(false);
+        expect(campaignList.hidden).toBe(true);
     });
 
     it('starts an unlocked stage and scrolls the carousel for a locked one', () => {
@@ -324,10 +364,11 @@ describe('Campaign Tracks list engine', () => {
         expect(openCampaignTracksModal.mock.calls[0][0]).toBe(null);
     });
 
-    it('starts an unlocked stage from the list', () => {
+    it('switches into Campaign before starting an unlocked stage from the list', () => {
         const startCampaignStage = vi.fn();
         const selectChallenge = vi.fn();
         const engine = {
+            activeRaceMode: 'daily',
             startCampaignStage,
             campaignCarousel: { selectChallenge },
             lobbyUi: { setCampaignSelectedStage: vi.fn() },
@@ -337,6 +378,7 @@ describe('Campaign Tracks list engine', () => {
         campaignEngineMethods.handleCampaignTracksChoose.call(engine, stage);
 
         expect(startCampaignStage).toHaveBeenCalledWith(stage);
+        expect(engine.activeRaceMode).toBe('campaign');
         expect(selectChallenge).not.toHaveBeenCalled();
     });
 

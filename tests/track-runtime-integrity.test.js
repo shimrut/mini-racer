@@ -173,6 +173,10 @@ describe('track runtime integrity', () => {
             'ovenMitt',
             'monkeyTail',
             'bottleOpener',
+            'serpentHead',
+            'bullShield',
+            'battleHook',
+            'thunderCat',
         ]);
         const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -210,7 +214,7 @@ describe('track runtime integrity', () => {
             '2835aa8e12848f18df32725370f93af486477be964617a0fb1f4ecb5fe63db16',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'f365b9e810cc1b62bcaeea829075a272e5e31240d3b47a060e0c263d02fe3d92',
+            '1b7d23d65ea76de29eb88a17e7f63ddb951fa848cfff1de243d2e7d30958b05b',
         );
     });
 

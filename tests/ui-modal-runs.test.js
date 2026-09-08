@@ -1480,6 +1480,59 @@ describe('Daily finish share chooser', () => {
 
         global.document = originalDocument;
     });
+
+    it('prepares and posts a challenge loss Comment as text', async () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="modal">
+                <div id="modal-lap-times"></div>
+                <div id="modal-combined-view"></div>
+                <button id="combined-playlist-btn"><span class="combined-action-btn-label">COMMENT</span></button>
+            </div>
+        `, { url: 'http://localhost' });
+        global.document = dom.window.document;
+        const shell = new ModalShell({
+            getRedditUsername: () => 'OtherRacer',
+            previewShare: vi.fn(async () => ({
+                ok: true,
+                body: {
+                    status: 'ready',
+                    shareToken: 'share-1',
+                    username: 'OtherRacer',
+                    commentText: '10.011s. Can’t believe I lost by 0.011s😤',
+                },
+            })),
+            confirmShare: vi.fn(async () => ({
+                ok: true,
+                body: {
+                    status: 'commented',
+                    commentText: '10.011s. Can’t believe I lost by 0.011s😤',
+                },
+            })),
+        });
+        const request = {
+            kind: 'challenge-comment',
+            challengeId: 'challenge-1',
+            reportedTimeMs: 10_011,
+        };
+
+        try {
+            const triggerButton = dom.window.document.getElementById('combined-playlist-btn');
+            const hostView = dom.window.document.getElementById('modal-combined-view');
+            await shell._startShare(request, triggerButton, hostView);
+
+            const panel = dom.window.document.querySelector('.result-share-panel');
+            expect(panel.querySelector('.result-share-panel__copy').textContent).toBe(
+                '10.011s. Can’t believe I lost by 0.011s😤',
+            );
+
+            await panel.querySelector('.result-share-panel__button--primary').onclick();
+            expect(panel.querySelector('.result-share-panel__title').textContent).toBe('Comment posted');
+            expect(shell.confirmShare).toHaveBeenCalledWith('share-1', request);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
 });
 
 describe('combined finish next race button', () => {
@@ -1673,6 +1726,35 @@ describe('combined finish head to head win actions', () => {
             expect(byId(doc, 'combined-restart-btn').hidden).toBe(false);
             expect(isAccented(byId(doc, 'combined-restart-btn'))).toBe(true);
             expect(isAccented(byId(doc, 'combined-playlist-btn'))).toBe(false);
+        });
+    });
+
+    it('enables Comment for a settled challenge loss', () => {
+        withWinSheet((shell, doc) => {
+            shell.showCombinedResults(
+                {
+                    lapTime: 8.011,
+                    bestTime: 8,
+                    trackKey: 'number-zero',
+                    challengeFinish: true,
+                    challengeConfirmPhase: 'lost',
+                },
+                {
+                    modalKind: 'win',
+                    restartAction: vi.fn(),
+                    shareRequest: {
+                        kind: 'challenge-comment',
+                        challengeId: 'challenge-1',
+                        reportedTimeMs: 8_011,
+                    },
+                    shareEnabled: true,
+                },
+            );
+
+            const comment = byId(doc, 'combined-playlist-btn');
+            expect(comment.querySelector('.combined-action-btn-label').textContent).toBe('COMMENT');
+            expect(comment.disabled).toBe(false);
+            expect(comment.getAttribute('aria-label')).toBe('Comment on this challenge');
         });
     });
 

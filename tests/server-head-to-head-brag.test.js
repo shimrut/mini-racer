@@ -56,6 +56,7 @@ vi.mock('@devvit/redis', () => ({ redis }));
 vi.mock('@devvit/web/server', () => ({ reddit }));
 
 const {
+    challengeBragTier,
     formatChallengeBragComment,
     previewHeadToHeadBrag,
     confirmHeadToHeadBrag,
@@ -127,9 +128,20 @@ describe('head-to-head brag', () => {
         vi.clearAllMocks();
     });
 
-    it('formats a medal-free brag comment', () => {
-        expect(formatChallengeBragComment(9_478, 'numberOne')).toBe(
-            'I beat this challenge with 0:09.478 on Number One. 🏁',
+    it.each([
+        [1, 'blink', 'This was a close win. 9.999s on Number One 😅'],
+        [100, 'blink', 'This was a close win. 9.900s on Number One 😅'],
+        [101, 'chase', 'Comfortable win. 9.899s on Number One 😎'],
+        [500, 'chase', 'Comfortable win. 9.500s on Number One 😎'],
+        [501, 'got_away', 'I smoked you: 9.499s on Number One 🏎️💨'],
+    ])('selects and formats the %s Brag tier at %ims', (differenceMs, expectedTier, expectedCopy) => {
+        expect(challengeBragTier(differenceMs)).toBe(expectedTier);
+        expect(formatChallengeBragComment(10_000 - differenceMs, 10_000, 'Number One')).toBe(expectedCopy);
+    });
+
+    it('formats a tiered Brag from the verified lead', () => {
+        expect(formatChallengeBragComment(9_478, 9_729, 'Number One')).toBe(
+            'Comfortable win. 9.478s on Number One 😎',
         );
     });
 
@@ -142,7 +154,6 @@ describe('head-to-head brag', () => {
             bestTimeMs: 11_000,
             targetTimeMs: 10_000,
             medal: null,
-            commentText: formatChallengeBragComment(11_000, 'numberOne'),
         });
         const preview = await previewHeadToHeadBrag(
             { acceptToken: 'token-losing' },
@@ -161,7 +172,6 @@ describe('head-to-head brag', () => {
             bestTimeMs: 9_000,
             targetTimeMs: 10_000,
             medal: 'gold',
-            commentText: formatChallengeBragComment(9_000, 'numberOne'),
         });
         const preview = await previewHeadToHeadBrag(
             { acceptToken: 'token-own' },
@@ -180,7 +190,6 @@ describe('head-to-head brag', () => {
             bestTimeMs: 9_000,
             targetTimeMs: 10_000,
             medal: 'gold',
-            commentText: formatChallengeBragComment(9_000, 'numberOne'),
         });
 
         const preview = await previewHeadToHeadBrag(
@@ -191,7 +200,7 @@ describe('head-to-head brag', () => {
         expect(preview.body).toMatchObject({
             status: 'ready',
             username: 'OtherRacer',
-            commentText: 'I beat this challenge with 0:09.000 on Number One. 🏁',
+            commentText: 'I smoked you: 9.000s on Number One 🏎️💨',
         });
         expect(typeof preview.body.shareToken).toBe('string');
 

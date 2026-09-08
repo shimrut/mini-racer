@@ -3,22 +3,85 @@ import { presentPlayerChoiceOverlay } from './player-choice-overlay.js';
 
 export const PROGRESS_SELECTION_TIMEOUT_MS = 15_000;
 
-function summaryText(summary) {
-    const campaign = Number(summary?.campaignResults) || 0;
-    const daily = summary?.hasDailyResults ? 'Daily results saved' : 'No Daily results';
-    const unlocks = summary?.unlocks ? 'Unlocks saved' : 'No unlocks saved';
-    return `${daily} · ${campaign} Campaign result${campaign === 1 ? '' : 's'} · ${unlocks}`;
+function nonNegativeInteger(value) {
+    if (value === null || value === undefined) return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : null;
 }
 
-function sourceBlock(label, detail) {
-    const source = document.createElement('div');
+function summaryMetrics(summary) {
+    const metrics = [];
+    const dailySavedResults = nonNegativeInteger(summary?.dailySavedResults);
+    const dailyPlaylistSize = nonNegativeInteger(summary?.dailyPlaylistSize);
+    if (dailySavedResults !== null && dailyPlaylistSize !== null) {
+        metrics.push({
+            label: 'Daily',
+            value: `${dailySavedResults}/${dailyPlaylistSize}`,
+        });
+    }
+
+    const unlockedCampaign = nonNegativeInteger(summary?.campaignUnlockedTracks);
+    const campaignTotalStages = nonNegativeInteger(summary?.campaignTotalStages);
+    if (unlockedCampaign !== null && campaignTotalStages !== null) {
+        metrics.push({
+            label: 'Campaign',
+            value: `${unlockedCampaign}/${campaignTotalStages}`,
+        });
+    }
+
+    const carsUnlocked = nonNegativeInteger(summary?.carsUnlocked);
+    const carsTotal = nonNegativeInteger(summary?.carsTotal);
+    if (carsUnlocked !== null && carsTotal !== null) {
+        metrics.push({
+            label: 'Garage',
+            value: `${carsUnlocked}/${carsTotal}`,
+        });
+    }
+
+    return metrics;
+}
+
+function summaryBlock(summary) {
+    const metrics = summaryMetrics(summary);
+    const block = document.createElement('div');
+    block.className = 'guest-progress-selection__source-summary';
+    if (metrics.length === 0) {
+        block.classList.add('guest-progress-selection__source-summary--empty');
+        block.textContent = 'Progress details unavailable';
+        return block;
+    }
+    for (const metric of metrics) {
+        const item = document.createElement('span');
+        item.className = 'guest-progress-selection__source-stat';
+        const label = document.createElement('span');
+        label.className = 'guest-progress-selection__source-stat-label';
+        label.textContent = metric.label;
+        const value = document.createElement('strong');
+        value.className = 'guest-progress-selection__source-stat-value';
+        value.textContent = metric.value;
+        item.append(label, value);
+        block.append(item);
+    }
+    return block;
+}
+
+function sourceBlock({ choice, label, summary }) {
+    const source = document.createElement('label');
     source.className = 'guest-progress-selection__source';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'guest-progress-selection-choice';
+    input.value = choice;
+    input.dataset.choice = choice;
+    input.className = 'guest-progress-selection__source-input';
+    const content = document.createElement('span');
+    content.className = 'guest-progress-selection__source-content';
     const heading = document.createElement('strong');
+    heading.className = 'guest-progress-selection__source-label';
     heading.textContent = label;
-    const summary = document.createElement('span');
-    summary.textContent = detail;
-    source.append(heading, summary);
-    return source;
+    content.append(heading, summary);
+    source.append(input, content);
+    return { source, input };
 }
 
 export function requestGuestProgressSelection(selection) {
@@ -29,35 +92,48 @@ export function requestGuestProgressSelection(selection) {
     return new Promise((resolve) => {
         const sources = document.createElement('div');
         sources.className = 'guest-progress-selection__sources';
-        sources.append(
-            sourceBlock('Guest progress', summaryText(selection?.guestSummary)),
-            sourceBlock(
-                'Saved account progress',
-                selection?.accountHasProgress
-                    ? summaryText(selection?.accountSummary)
-                    : 'No saved account progress',
-            ),
-        );
+        const guestOption = sourceBlock({
+            choice: 'guest',
+            label: 'Guest',
+            summary: summaryBlock(selection?.guestSummary),
+        });
+        const accountOption = sourceBlock({
+            choice: 'account',
+            label: 'Account',
+            summary: selection?.accountHasProgress
+                ? summaryBlock(selection?.accountSummary)
+                : summaryBlock(null),
+        });
+        sources.append(guestOption.source, accountOption.source);
 
         const overlay = presentPlayerChoiceOverlay({
             titleId: 'guest-progress-selection-title',
-            title: 'CHOOSE YOUR PROGRESS',
-            message: 'You signed in while this browser had guest progress. Choose which progress to keep.',
+            title: 'Keep Progress',
+            message: 'Choose one save to keep.',
             extraNodes: [sources],
-            actions: [
-                { label: 'USE GUEST PROGRESS', choice: 'guest', primary: true },
-                {
-                    label: selection?.accountHasProgress ? 'USE SAVED PROGRESS' : 'START FRESH',
-                    choice: 'account',
-                },
-            ],
+            actions: [{ label: 'CONTINUE WITH GUEST', choice: 'confirm', primary: true }],
         });
 
-        const guestButton = overlay.buttons.find((button) => button.dataset.choice === 'guest');
-        const accountButton = overlay.buttons.find((button) => button.dataset.choice === 'account');
+        const choiceInputs = [guestOption.input, accountOption.input];
+        const continueButton = overlay.buttons[0];
+        let selectedChoice = 'guest';
+        guestOption.input.checked = true;
+        guestOption.source.classList.add('is-selected');
+
+        for (const input of choiceInputs) {
+            input.addEventListener('change', () => {
+                selectedChoice = input.value;
+                for (const option of [guestOption.source, accountOption.source]) {
+                    option.classList.toggle('is-selected', option.contains(input));
+                }
+                continueButton.textContent = `CONTINUE WITH ${input.value === 'guest' ? 'GUEST' : 'ACCOUNT'}`;
+            });
+        }
 
         const choose = async (choice) => {
+            if (choice !== 'guest' && choice !== 'account') return;
             overlay.setBusy(true);
+            for (const input of choiceInputs) input.disabled = true;
             overlay.setStatus('Saving your choice…');
             const controller = typeof AbortController === 'function' ? new AbortController() : null;
             const timeoutId = controller
@@ -82,6 +158,7 @@ export function requestGuestProgressSelection(selection) {
                 resolve({ choice, playerState: body });
             } catch (error) {
                 overlay.setBusy(false);
+                for (const input of choiceInputs) input.disabled = false;
                 overlay.setStatus(error?.name === 'AbortError'
                     ? 'Saving took too long. Try again.'
                     : error?.message || 'Could not save your choice. Try again.');
@@ -89,7 +166,6 @@ export function requestGuestProgressSelection(selection) {
                 if (timeoutId !== null) clearTimeout(timeoutId);
             }
         };
-        guestButton?.addEventListener('click', () => void choose('guest'));
-        accountButton?.addEventListener('click', () => void choose('account'));
+        continueButton?.addEventListener('click', () => void choose(selectedChoice));
     });
 }

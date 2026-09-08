@@ -131,7 +131,12 @@
       "Bash(perl -0pi -e 's/function isSupersededCampaignVerificationEntry\\\\\\(entry\\\\\\) \\\\{/function isSupersededCampaignVerificationEntry\\(entry\\) {\\\\n    return false; \\\\/\\\\/ TEMP: neutralised to prove the regression tests bite/' game/campaign/engine-methods.js)",
       "Bash(perl -0pi -e 's/        if \\\\\\(enqueued\\\\\\) applyPendingCampaignResult\\\\\\(this, stage, finalTime, medal\\\\\\);/        applyPendingCampaignResult\\(this, stage, finalTime, medal\\); \\\\/\\\\/ TEMP: unconditional/' game/campaign/engine-methods.js)",
       "Bash(perl -0pi -e 's/            this\\\\._headToHeadFinishAttempt === finishAttempt\\\\n            && this\\\\.status/            this.status/' game/head-to-head/engine-methods.js)",
-      "Bash(perl -0pi -e 's/const startRequest = this\\\\.awaitCampaignVerificationSettled\\\\\\(confirmUnlockFor\\\\\\)\\\\n                \\\\.then\\\\\\(\\\\\\(\\\\\\) => startServerCampaignRace\\\\\\(stage\\\\.raceId\\\\\\)\\\\\\)/const startRequest = startServerCampaignRace\\(stage.raceId\\)/' game/campaign/engine-methods.js)"
+      "Bash(perl -0pi -e 's/const startRequest = this\\\\.awaitCampaignVerificationSettled\\\\\\(confirmUnlockFor\\\\\\)\\\\n                \\\\.then\\\\\\(\\\\\\(\\\\\\) => startServerCampaignRace\\\\\\(stage\\\\.raceId\\\\\\)\\\\\\)/const startRequest = startServerCampaignRace\\(stage.raceId\\)/' game/campaign/engine-methods.js)",
+      "Bash(grep -n \"mGet\\\\|watch:\\\\|const strings\\\\|set: vi.fn\\\\|get: vi.fn\" tests/server-daily-guest-merge.test.js | head -20; echo \"---\"; sed -n '/watch: vi.fn/,/^    }\\),/p' tests/server-daily-guest-merge.test.js | head -40)",
+      "Bash(head -345 *)",
+      "Bash(REPORT_TRANSFER_COST=1 npx vitest run tests/server-guest-progress-selection.test.js)",
+      "Bash(REPORT_TRANSFER_COST=1 npx vitest run)",
+      "Bash(awk '{print $1, $9}')"
     ]
   }
 }

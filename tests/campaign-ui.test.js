@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { modeRouterEngineMethods } from '../game/modes/engine-methods.js';
 
 const campaignServiceMocks = vi.hoisted(() => ({
     getCampaignBootstrap: vi.fn(),
@@ -2790,6 +2791,31 @@ describe('Campaign lobby and shared modal adapters', () => {
             ...overrides,
         };
     }
+
+    it('routes a Campaign finish to the selected stage after switching from Daily in Tracks', async () => {
+        campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: {} });
+        const context = createStartContext({
+            // Tracks switches mode before invoking the selected Campaign start.
+            activeRaceMode: 'campaign',
+            activeCampaignStage: null,
+            currentTrackKey: 'circuit',
+            activeDailyChallenge: { id: 'previous-daily', trackKey: 'circuit' },
+            handleCampaignWin: vi.fn(),
+            handleDailyChallengeWin: vi.fn(),
+        });
+
+        await context.startCampaignStage({ id: 'numbered-v1-00', unlocked: true });
+        const result = { lapTime: 8.25 };
+        modeRouterEngineMethods.handleActiveRaceWin.call(context, result);
+
+        expect(context.startSequence).toHaveBeenCalledTimes(1);
+        expect(context.activeRaceMode).toBe('campaign');
+        expect(context.activeCampaignStage.raceId).toBe('numbered-v1-00');
+        expect(context.activeDailyChallenge.id).toBe('numbered-v1-00');
+        expect(context.handleCampaignWin).toHaveBeenCalledWith(result);
+        expect(context.handleDailyChallengeWin).not.toHaveBeenCalled();
+    });
 
     it('resets a completed same-track Campaign run before a ghost replay', async () => {
         campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });

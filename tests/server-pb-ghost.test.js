@@ -30,6 +30,9 @@ const { redis } = vi.hoisted(() => {
                 hashes.delete(key);
             }),
             hGet: vi.fn(async (key, field) => decodeCompressedValue(hashes.get(key)?.get(field) ?? null)),
+            hMGet: vi.fn(async (key, fields) => fields.map((field) => (
+                decodeCompressedValue(hashes.get(key)?.get(field) ?? null)
+            ))),
             hSet: vi.fn(async (key, values) => {
                 const hash = hashes.get(key) ?? new Map();
                 hashes.set(key, hash);
@@ -80,6 +83,7 @@ import {
 } from '../src/server/pb-ghost-trace.ts';
 import {
     getPlayerTrackPbRecord,
+    getPlayerTrackPbRecords,
     seedPlayerTrackPersonalBest,
     upsertPlayerTrackPersonalBest,
 } from '../src/server/pb-ghost-store.ts';
@@ -528,7 +532,7 @@ describe('PB ghost trace and storage', () => {
 
     it('rejects PB writes after the challenge retention deadline', async () => {
         vi.useFakeTimers();
-        vi.setSystemTime(new Date('2030-02-15T00:00:00.001Z'));
+        vi.setSystemTime(new Date('2031-01-01T00:00:00.001Z'));
         try {
             await expect(upsertPlayerTrackPersonalBest({
                 playerId: 'reddit:late',
@@ -705,6 +709,48 @@ describe('PB ghost trace and storage', () => {
             lapCompletionTimesSec: null,
             ghost: null,
         });
+    });
+
+    it('reads compatible PB records in bounded hash batches without cleanup', async () => {
+        const competition = toDailyCompetition(CHALLENGE);
+        const collectionKey = `dailygp:challenge-pbs:${CHALLENGE.id}`;
+        const playerIds = Array.from({ length: 11 }, (_, index) => `reddit:batch-${index}`);
+        const validRecord = {
+            schemaVersion: 2,
+            trackKey: competition.trackKey,
+            trackFingerprint: createTrackFingerprint(TRACK),
+            simulationRevision: PB_GHOST_SIMULATION_REVISION,
+            rulesRevision: 0,
+            lapCount: 1,
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8],
+            lapCompletionTimesSec: null,
+            ghost: GHOST,
+            updatedAt: '2030-01-01T00:00:00.000Z',
+        };
+        const incompatibleRecord = {
+            ...validRecord,
+            trackFingerprint: 'different-track',
+        };
+        redis.hashes.set(collectionKey, new Map([
+            [createHash('sha256').update(playerIds[0], 'utf8').digest('base64url'), JSON.stringify(validRecord)],
+            [createHash('sha256').update(playerIds[1], 'utf8').digest('base64url'), JSON.stringify(incompatibleRecord)],
+        ]));
+        redis.hMGet.mockClear();
+        redis.hDel.mockClear();
+
+        const records = await getPlayerTrackPbRecords({
+            playerIds,
+            competition,
+            track: TRACK,
+        });
+
+        expect(redis.hMGet).toHaveBeenCalledTimes(2);
+        expect(redis.hMGet.mock.calls.map(([, fields]) => fields.length)).toEqual([10, 1]);
+        expect(records.get(playerIds[0])).toMatchObject({ bestTimeMs: 12_000, ghost: GHOST });
+        expect(records.get(playerIds[1])).toBeNull();
+        expect(records.get(playerIds[2])).toBeNull();
+        expect(redis.hDel).not.toHaveBeenCalled();
     });
 
     it('stores exact lap boundaries while accepting historical and malformed records', async () => {

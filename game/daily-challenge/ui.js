@@ -107,14 +107,17 @@ export class DailyChallengeUi {
         previewQualityLevel = 0,
         previewFrameSkip = 0,
         onSummaryUpdated = null,
+        onTracksTabChange = null,
         getModalShell = () => null,
     } = {}) {
         this.previewQualityLevel = previewQualityLevel;
         this.previewFrameSkip = previewFrameSkip;
         this.onSummaryUpdated = onSummaryUpdated;
+        this.onTracksTabChange = onTracksTabChange;
         this.getModalShell = getModalShell;
         this._dailyChallengeSummary = null;
         this._tracksModalKind = null;
+        this._dailyTracksActions = null;
         this._campaignTracksActions = null;
         this._campaignTracksSelectedId = null;
     }
@@ -122,6 +125,11 @@ export class DailyChallengeUi {
     get dailyChallengeStartBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get dailyChallengePlaylistModal() { return document.getElementById('daily-playlist-modal'); }
     get dailyChallengePlaylistList() { return document.getElementById('daily-playlist-list'); }
+    get campaignChallengePlaylistList() { return document.getElementById('campaign-playlist-list'); }
+    get tracksTabDaily() { return document.getElementById('tracks-tab-daily'); }
+    get tracksTabCampaign() { return document.getElementById('tracks-tab-campaign'); }
+    get tracksPanelDaily() { return this.dailyChallengePlaylistList; }
+    get tracksPanelCampaign() { return this.campaignChallengePlaylistList; }
     get dailyChallengePlaylistCloseBtn() { return document.getElementById('daily-playlist-close-btn'); }
     get dailyChallengeHudInline() { return document.getElementById('daily-challenge-hud-inline'); }
 
@@ -165,12 +173,19 @@ export class DailyChallengeUi {
     openPlaylistModal(challenges = [], actions = null) {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
+        const keepCurrentTab = this.isPlaylistModalOpen() && this._tracksModalKind !== 'daily';
+        if (actions) this._dailyTracksActions = actions;
+        if (keepCurrentTab) {
+            this.renderPlaylist(challenges, actions);
+            return;
+        }
         this._tracksModalKind = 'daily';
         configureReusableModal(modal, {
-            title: 'Daily Tracks',
+            title: 'Tracks',
             subtitle: '',
             closeLabel: 'Back',
         });
+        this.setTracksTab('daily', { focusTab: false, notify: false });
         this.renderPlaylist(challenges, actions);
         this.openTracksModal();
     }
@@ -178,15 +193,51 @@ export class DailyChallengeUi {
     openCampaignTracksModal(stages = [], actions = null, { selectedStageId = null } = {}) {
         const modal = this.dailyChallengePlaylistModal;
         if (!modal) return;
+        const keepCurrentTab = this.isPlaylistModalOpen() && this._tracksModalKind !== 'campaign';
+        if (actions) this._campaignTracksActions = actions;
+        if (keepCurrentTab) {
+            this._campaignTracksSelectedId = selectedStageId;
+            this.renderCampaignPlaylist(stages, actions, { selectedStageId });
+            return;
+        }
         this._tracksModalKind = 'campaign';
         this._campaignTracksSelectedId = selectedStageId;
         configureReusableModal(modal, {
-            title: 'Campaign Tracks',
+            title: 'Tracks',
             subtitle: '',
             closeLabel: 'Back',
         });
+        this.setTracksTab('campaign', { focusTab: false, notify: false });
         this.renderCampaignPlaylist(stages, actions, { selectedStageId });
         this.openTracksModal();
+    }
+
+    setTracksTab(tab, { focusTab = true, notify = true } = {}) {
+        const nextTab = tab === 'campaign' ? 'campaign' : 'daily';
+        const tabChanged = this._tracksModalKind !== nextTab;
+        this._tracksModalKind = nextTab;
+
+        const tabButtons = [
+            ['daily', this.tracksTabDaily],
+            ['campaign', this.tracksTabCampaign],
+        ];
+        for (const [id, element] of tabButtons) {
+            const selected = id === nextTab;
+            element?.setAttribute('aria-selected', selected ? 'true' : 'false');
+            element?.classList.toggle('is-selected', selected);
+        }
+
+        if (this.tracksPanelDaily) this.tracksPanelDaily.hidden = nextTab !== 'daily';
+        if (this.tracksPanelCampaign) this.tracksPanelCampaign.hidden = nextTab !== 'campaign';
+
+        if (focusTab) {
+            const focusEl = tabButtons.find(([id]) => id === nextTab)?.[1];
+            focusEl?.focus?.();
+        }
+        if (notify) {
+            this.getModalShell?.()?.onTracksTabChangedForKeyboardNav?.();
+            if (tabChanged) this.onTracksTabChange?.(nextTab);
+        }
     }
 
     openTracksModal() {
@@ -226,19 +277,24 @@ export class DailyChallengeUi {
 
     bindPlaylistModal() {
         configureReusableModal(this.dailyChallengePlaylistModal, {
-            title: 'Daily Tracks',
+            title: 'Tracks',
             closeLabel: 'Back',
         });
         bindReusableModal(this.dailyChallengePlaylistModal, () => this.closePlaylistModal());
+        this.setTracksTab('daily', { focusTab: false, notify: false });
+        this.tracksTabDaily?.addEventListener('click', () => this.setTracksTab('daily'));
+        this.tracksTabCampaign?.addEventListener('click', () => this.setTracksTab('campaign'));
     }
 
     renderPlaylist(challenges = [], actions = null) {
         const list = this.dailyChallengePlaylistList;
         if (!list) return;
+        if (actions) this._dailyTracksActions = actions;
         list.replaceChildren();
-        const onPlay = typeof actions === 'function'
-            ? actions
-            : actions?.onPlay;
+        const playlistActions = actions || this._dailyTracksActions;
+        const onPlay = typeof playlistActions === 'function'
+            ? playlistActions
+            : playlistActions?.onPlay;
 
         if (challenges === null) {
             renderPlaylistMessage(list, 'Loading tracks...');
@@ -292,7 +348,7 @@ export class DailyChallengeUi {
     }
 
     renderCampaignPlaylist(stages = [], actions = null, { selectedStageId = this._campaignTracksSelectedId } = {}) {
-        const list = this.dailyChallengePlaylistList;
+        const list = this.campaignChallengePlaylistList;
         if (!list) return;
         if (actions) this._campaignTracksActions = actions;
         if (selectedStageId !== undefined) this._campaignTracksSelectedId = selectedStageId;

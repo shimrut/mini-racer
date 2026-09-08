@@ -498,4 +498,50 @@ describe('modal pause/finish menu keyboard nav', () => {
             global.document = originalDocument;
         }
     });
+
+    it('keeps the Tracks tabs in keyboard navigation with only the active panel cards', () => {
+        const dailyTab = makeMenuButton('tracks-tab-daily');
+        const campaignTab = makeMenuButton('tracks-tab-campaign');
+        const dailyTrack = makeMenuButton('daily-track');
+        const campaignTrack = makeMenuButton('campaign-track');
+        const dailyPanel = {
+            hidden: false,
+            querySelectorAll: () => [dailyTrack],
+        };
+        const campaignPanel = {
+            hidden: true,
+            querySelectorAll: () => [campaignTrack],
+        };
+        const elements = new Map([
+            ['tracks-tab-daily', dailyTab],
+            ['tracks-tab-campaign', campaignTab],
+            ['daily-playlist-list', dailyPanel],
+            ['campaign-playlist-list', campaignPanel],
+        ]);
+        const originalDocument = global.document;
+        global.document = {
+            getElementById: (id) => elements.get(id) || null,
+        };
+
+        try {
+            const context = {
+                getTracksMenuContainer: ModalShell.prototype.getTracksMenuContainer,
+            };
+            expect(ModalShell.prototype.getTracksMenuItems.call(context)).toEqual([
+                dailyTab,
+                campaignTab,
+                dailyTrack,
+            ]);
+
+            dailyPanel.hidden = true;
+            campaignPanel.hidden = false;
+            expect(ModalShell.prototype.getTracksMenuItems.call(context)).toEqual([
+                dailyTab,
+                campaignTab,
+                campaignTrack,
+            ]);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
 });

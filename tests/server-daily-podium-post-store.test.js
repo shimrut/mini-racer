@@ -164,7 +164,7 @@ describe('daily podium post store', () => {
             JSON.stringify(record),
             {
                 nx: true,
-                expiration: new Date(now + (45 * 24 * 60 * 60 * 1000)),
+                expiration: new Date(now + (365 * 24 * 60 * 60 * 1000)),
             },
         );
 

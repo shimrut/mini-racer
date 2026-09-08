@@ -134,4 +134,66 @@ describe('Head to Head route identity forwarding', () => {
             bestUpdate: { mode: 'daily', improved: true, bestTimeMs: 7_500, rank: 1 },
         });
     });
+
+    it('forwards signed post identity to challenge comment preview and confirm', async () => {
+        const context = {
+            username: 'OtherRacer',
+            subredditName: 'MiniRacer',
+            postId: null,
+        };
+        const previewHeadToHeadComment = vi.fn(async (input, requestContext) => ({
+            status: 200,
+            body: { input, requestContext },
+        }));
+        const confirmHeadToHeadComment = vi.fn(async (input, requestContext) => ({
+            status: 200,
+            body: { input, requestContext },
+        }));
+        const handlers = routeHandlers({
+            getHeadToHeadRequestContext: () => context,
+            readContextPostData: () => null,
+            previewHeadToHead: vi.fn(),
+            createHeadToHead: vi.fn(),
+            getHeadToHead: vi.fn(),
+            submitHeadToHead: vi.fn(),
+            previewHeadToHeadBrag: vi.fn(),
+            confirmHeadToHeadBrag: vi.fn(),
+            previewHeadToHeadComment,
+            confirmHeadToHeadComment,
+        });
+
+        const previewResponse = responseRecorder();
+        await handlers.post['/api/head-to-head/comment/preview']({
+            body: {
+                challengeId: 'challenge-1',
+                reportedTimeMs: 10_011,
+                postId: 't3_challenge1',
+                playerId: 'guest-1',
+                guestToken: 'signed-token',
+            },
+        }, previewResponse);
+        expect(previewHeadToHeadComment).toHaveBeenCalledWith({
+            challengeId: 'challenge-1',
+            reportedTimeMs: 10_011,
+            postId: 't3_challenge1',
+            playerId: 'guest-1',
+            guestToken: 'signed-token',
+        }, {
+            ...context,
+            postId: 't3_challenge1',
+            playerId: 'guest-1',
+            guestToken: 'signed-token',
+        });
+        expect(previewResponse.statusCode).toBe(200);
+
+        const confirmResponse = responseRecorder();
+        await handlers.post['/api/head-to-head/comment/confirm']({
+            body: { shareToken: 'share-1' },
+        }, confirmResponse);
+        expect(confirmHeadToHeadComment).toHaveBeenCalledWith(
+            { shareToken: 'share-1' },
+            context,
+        );
+        expect(confirmResponse.statusCode).toBe(200);
+    });
 });

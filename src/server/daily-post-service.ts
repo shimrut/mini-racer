@@ -22,6 +22,7 @@ import {
     getRequestUsername,
     readContextSubredditName,
 } from './request-context.js';
+import { resolveMiniRacerPostFlairId } from './post-flair-service.js';
 import { resolveDailyShareImageUrl } from './share-image.js';
 
 export type DailyPostResult = {
@@ -47,11 +48,14 @@ async function submitDailyMiniRacerPost(
     appSlug: string,
 ) {
     const shareImageUrl = resolveDailyShareImageUrl(challenge.trackKey);
+    const flairId = await resolveMiniRacerPostFlairId(subredditName, 'daily-race');
     const post = await reddit.submitCustomPost({
         subredditName,
         title: formatDailyMiniRacerPostTitle(challenge),
+        flairId,
         entry: 'default',
         postData: {
+            postType: 'daily-race',
             challengeId: challenge.id,
             challenge,
         },

@@ -98,7 +98,7 @@ describe('daily GP post store', () => {
             JSON.stringify(record),
             {
                 nx: true,
-                expiration: new Date(now + (45 * 24 * 60 * 60 * 1000)),
+                expiration: new Date(now + (365 * 24 * 60 * 60 * 1000)),
             },
         );
 
@@ -235,7 +235,7 @@ describe('daily GP post store', () => {
         );
         expect(mockRedis.expire).toHaveBeenCalledWith(
             `dailygp:post:miniracer:${record.challengeId}`,
-            45 * 24 * 60 * 60,
+            365 * 24 * 60 * 60,
         );
     });
 });

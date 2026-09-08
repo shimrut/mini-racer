@@ -121,6 +121,10 @@ export const TRACK_CATALOG = {
     ovenMitt: { name: "Oven Mitt" },
     monkeyTail: { name: "Monkey Tail" },
     bottleOpener: { name: "Bottle Opener" },
+    serpentHead: { name: "Serpent Head" },
+    bullShield: { name: "Bull Shield" },
+    battleHook: { name: "Battle Hook" },
+    thunderCat: { name: "Thunder Cat" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -230,6 +234,10 @@ export const TRACK_SCHEDULE_KEYS = [
     'ovenMitt',
     'monkeyTail',
     'bottleOpener',
+    'serpentHead',
+    'bullShield',
+    'battleHook',
+    'thunderCat',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

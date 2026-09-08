@@ -11,7 +11,7 @@ export const ANALYTICS_RETENTION_DAYS = Math.round(DAILY_GP_REDIS_TTL_SECONDS / 
 export const ANALYTICS_RETENTION_MONTHS = 13;
 
 // Months outlive the daily keys: a month-over-month comparison is worthless if the
-// history evaporates after six weeks.
+// history evaporates after a year.
 const MONTH_TTL_SECONDS = 400 * 24 * 60 * 60;
 
 export const ANALYTICS_MODES = ['daily', 'campaign', 'challenge'] as const;
@@ -61,6 +61,20 @@ export type AnalyticsSummary = {
     today: AnalyticsDay;
     days: AnalyticsDay[];
     months: AnalyticsMonth[];
+    cohorts: AnalyticsCohort[];
+};
+
+export type AnalyticsCohortRetention = {
+    retained: number | null;
+    rate: number | null;
+};
+
+export type AnalyticsCohort = {
+    date: string;
+    players: number;
+    d1: AnalyticsCohortRetention;
+    d7: AnalyticsCohortRetention;
+    d30: AnalyticsCohortRetention;
 };
 
 // A signed-in account is the only identity that survives a new device, a cleared
@@ -131,8 +145,16 @@ function firstSeenKey(scope: string): string {
     return scopedKey(scope, 'first-seen');
 }
 
+function cohortStartsKey(scope: string): string {
+    return scopedKey(scope, 'cohort-starts');
+}
+
 function toMonth(date: string): string {
     return date.slice(0, 7);
+}
+
+function isUtcDate(value: unknown): value is string {
+    return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function addUtcDays(date: string, days: number): string {
@@ -173,6 +195,7 @@ export {
     monthPlayersKey,
     monthModePlayersKey,
     monthCountersKey,
+    cohortStartsKey,
 };
 
 export function analyticsRetentionWindow(now = new Date()): { dates: string[]; months: string[] } {
@@ -301,6 +324,22 @@ async function markPlayerPresence(
     ]);
 }
 
+// Cohorts need the first date observed by analytics, not the profile's historical
+// firstSeenAt. The latter is deliberately backfilled for the new/returning label.
+async function markCohortStart(
+    scope: string,
+    date: string,
+    player: { id: string; isGuest: boolean },
+): Promise<void> {
+    if (player.isGuest) return;
+    try {
+        await redis.hSetNX(cohortStartsKey(scope), player.id, date);
+    } catch (error) {
+        // Cohort tracking is supplementary and must never block the race analytics write.
+        logAnalyticsFailure('cohort start', error);
+    }
+}
+
 async function applyRetention(scope: string, date: string): Promise<void> {
     const month = toMonth(date);
     await Promise.all([
@@ -311,6 +350,7 @@ async function applyRetention(scope: string, date: string): Promise<void> {
         redis.expire(monthModePlayersKey(scope, month), MONTH_TTL_SECONDS),
         redis.expire(monthCountersKey(scope, month), MONTH_TTL_SECONDS),
         redis.expire(firstSeenKey(scope), MONTH_TTL_SECONDS),
+        redis.expire(cohortStartsKey(scope), MONTH_TTL_SECONDS),
     ]);
 }
 
@@ -344,6 +384,7 @@ export async function recordAnalyticsRace({
         const date = formatUtcChallengeDate(now);
 
         // A finish also marks presence: it proves the player raced even if the start write was lost.
+        await markCohortStart(scope, date, player);
         await markPlayerPresence(scope, date, normalizedMode, player);
         await bumpCounter(scope, date, countField(normalizedMode, normalizedAction));
         await applyRetention(scope, date);
@@ -444,13 +485,21 @@ function summarizeBucket(
     return bucket;
 }
 
-async function loadAnalyticsDay(scope: string, date: string): Promise<AnalyticsDay> {
+type LoadedAnalyticsDay = {
+    day: AnalyticsDay;
+    rawPlayers: Record<string, string>;
+};
+
+async function loadAnalyticsDay(scope: string, date: string): Promise<LoadedAnalyticsDay> {
     const [players, modePlayers, counters] = await Promise.all([
         redis.hGetAll(dayPlayersKey(scope, date)),
         redis.hGetAll(dayModePlayersKey(scope, date)),
         redis.hGetAll(dayCountersKey(scope, date)),
     ]);
-    return { date, ...summarizeBucket(players, modePlayers, counters) };
+    return {
+        day: { date, ...summarizeBucket(players, modePlayers, counters) },
+        rawPlayers: players || {},
+    };
 }
 
 async function loadAnalyticsMonth(scope: string, month: string): Promise<AnalyticsMonth> {
@@ -460,6 +509,62 @@ async function loadAnalyticsMonth(scope: string, month: string): Promise<Analyti
         redis.hGetAll(monthCountersKey(scope, month)),
     ]);
     return { month, ...summarizeBucket(players, modePlayers, counters) };
+}
+
+function cohortRetention(
+    members: string[],
+    cohortDate: string,
+    offset: number,
+    to: string,
+    activityByDate: Map<string, Record<string, string>>,
+): AnalyticsCohortRetention {
+    const targetDate = addUtcDays(cohortDate, offset);
+    if (targetDate > to) return { retained: null, rate: null };
+
+    const active = activityByDate.get(targetDate) || {};
+    const retained = members.reduce((count, playerId) => (
+        Object.prototype.hasOwnProperty.call(active, playerId)
+            && active[playerId] !== PLAYER_GUEST
+            ? count + 1
+            : count
+    ), 0);
+    return {
+        retained,
+        rate: Math.round((retained / members.length) * 1000) / 10,
+    };
+}
+
+function buildCohorts(
+    rawCohortStarts: Record<string, string> | undefined,
+    loadedDays: LoadedAnalyticsDay[],
+    from: string,
+    to: string,
+): AnalyticsCohort[] {
+    const membersByDate = new Map<string, string[]>();
+    for (const [playerId, cohortDate] of Object.entries(rawCohortStarts || {})) {
+        if (
+            !playerId.startsWith('reddit:')
+            || !isUtcDate(cohortDate)
+            || cohortDate < from
+            || cohortDate > to
+        ) continue;
+        const members = membersByDate.get(cohortDate) || [];
+        members.push(playerId);
+        membersByDate.set(cohortDate, members);
+    }
+
+    const activityByDate = new Map(
+        loadedDays.map(({ day, rawPlayers }) => [day.date, rawPlayers]),
+    );
+    return [...membersByDate.entries()]
+        .sort(([first], [second]) => first.localeCompare(second))
+        .map(([date, members]) => ({
+            date,
+            players: members.length,
+            d1: cohortRetention(members, date, 1, to, activityByDate),
+            d7: cohortRetention(members, date, 7, to, activityByDate),
+            d30: cohortRetention(members, date, 30, to, activityByDate),
+        }));
 }
 
 export async function getServerAnalyticsSummary({
@@ -472,19 +577,22 @@ export async function getServerAnalyticsSummary({
     const scope = sanitizeScope(subredditName ?? readScopeFromContext());
     const to = formatUtcChallengeDate(now);
     const from = addUtcDays(to, -(ANALYTICS_RETENTION_DAYS - 1));
-    const [days, months] = await Promise.all([
+    const [loadedDays, months, cohortStarts] = await Promise.all([
         Promise.all(buildDateRange(from, to).map((date) => loadAnalyticsDay(scope, date))),
         Promise.all(
             buildMonthRange(toMonth(to), ANALYTICS_RETENTION_MONTHS)
                 .map((month) => loadAnalyticsMonth(scope, month)),
         ),
+        redis.hGetAll(cohortStartsKey(scope)),
     ]);
+    const days = loadedDays.map(({ day }) => day);
 
     return {
         from,
         to,
         today: days[days.length - 1] ?? emptyAnalyticsDay(to),
         days,
+        cohorts: buildCohorts(cohortStarts, loadedDays, from, to),
         months: months.filter((month) => (
             month.players > 0
             || month.guestPlayers > 0

@@ -29,6 +29,7 @@ import { requestGuestProgressSelection } from "./player/guest-progress-selection
 import { requestServerSyncFailureChoice } from "./player/server-sync-failure.js";
 import {
   hasVerificationEntriesForOwner,
+  getCampaignVerificationEntriesForOwner,
   resolveVerificationQueueAfterGuestProgressSelection,
 } from "./scoreboard/verification-queue.js";
 import { clearDailyChallengeStoredData } from "./daily-challenge/storage.js";
@@ -154,6 +155,34 @@ function getHostedFallbackPlayerProgressState() {
   };
 }
 
+function addLocalCampaignSelectionEvidence(summary, ownerPlayerId) {
+  const pendingEntries = getCampaignVerificationEntriesForOwner(ownerPlayerId);
+  const pendingResults = Object.values(pendingEntries)
+    .filter((entry) => entry?.verificationState === "pending" && entry?.progressConfirmed !== true)
+    .length;
+  return {
+    ...(summary && typeof summary === "object" ? summary : {}),
+    campaignPendingResults: pendingResults,
+  };
+}
+
+function enrichProgressSelection(selection, { guestOwnerId, accountOwnerId }) {
+  if (!selection || typeof selection !== "object") return selection;
+  const guestSummary = addLocalCampaignSelectionEvidence(selection.guestSummary, guestOwnerId);
+  const accountSummary = addLocalCampaignSelectionEvidence(selection.accountSummary, accountOwnerId);
+  return {
+    ...selection,
+    guestSummary,
+    accountSummary,
+    guestHasProgress: Boolean(
+      selection.guestHasProgress || guestSummary.campaignPendingResults > 0,
+    ),
+    accountHasProgress: Boolean(
+      selection.accountHasProgress || accountSummary.campaignPendingResults > 0,
+    ),
+  };
+}
+
 async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelectionRequired = null } = {}) {
   setGuestPlayerToken(remoteState.guestToken);
   const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
@@ -165,13 +194,36 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     setActivePlayerOwnerId(null);
     await onProgressSelectionRequired?.(remoteState.progressSelection);
     const selectionResult = await requestGuestProgressSelection(
-      remoteState.progressSelection || {
+      enrichProgressSelection(remoteState.progressSelection || {
         required: true,
         guestHasProgress: true,
         accountHasProgress: Boolean(remoteState.hasAnyData),
-        guestSummary: { hasDailyResults: true, campaignResults: 0, unlocks: false },
-        accountSummary: { hasDailyResults: false, campaignResults: 0, unlocks: false },
-      },
+        guestSummary: {
+          hasDailyResults: true,
+          campaignResults: 0,
+          campaignUnlockedTracks: null,
+          campaignTotalStages: null,
+          dailySavedResults: null,
+          dailyPlaylistSize: null,
+          carsUnlocked: null,
+          carsTotal: null,
+          unlocks: false,
+        },
+        accountSummary: {
+          hasDailyResults: false,
+          campaignResults: 0,
+          campaignUnlockedTracks: null,
+          campaignTotalStages: null,
+          dailySavedResults: null,
+          dailyPlaylistSize: null,
+          carsUnlocked: null,
+          carsTotal: null,
+          unlocks: false,
+        },
+      }, {
+        guestOwnerId,
+        accountOwnerId: remoteState.leaderboardPlayerId,
+      }),
     );
     const choice = selectionResult?.choice;
     if (!selectionResult?.playerState) {

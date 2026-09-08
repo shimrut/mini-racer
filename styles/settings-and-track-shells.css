@@ -353,6 +353,52 @@
     gap: 0.85rem;
 }
 
+#daily-playlist-modal .reusable-modal-content {
+    overflow: hidden;
+    padding-bottom: 0;
+}
+
+#daily-playlist-modal .reusable-modal-content::after {
+    display: none;
+}
+
+#daily-playlist-modal .tracks-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    flex: 0 0 auto;
+    height: 2.5rem;
+    padding: 0.15rem;
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 0 0.5rem var(--bg-color);
+}
+
+#daily-playlist-modal .tracks-tab {
+    min-height: 0;
+    padding: 0 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.88rem;
+    letter-spacing: 0.05em;
+}
+
+#daily-playlist-modal .tracks-tab.is-selected,
+#daily-playlist-modal .tracks-tab.is-selected:hover {
+    background: transparent;
+    color: #ffffff;
+}
+
+#daily-playlist-modal .tracks-tab-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#daily-playlist-modal .tracks-tab-panel[hidden] {
+    display: none;
+}
+
+#campaign-playlist-list.daily-playlist-list,
 #daily-playlist-list.daily-playlist-list {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -365,10 +411,12 @@
     box-sizing: border-box;
 }
 
+#campaign-playlist-list.daily-playlist-list::after,
 #daily-playlist-list.daily-playlist-list::after {
     display: none;
 }
 
+#campaign-playlist-list .daily-playlist-empty,
 #daily-playlist-list .daily-playlist-empty {
     grid-column: 1 / -1;
 }
@@ -490,6 +538,7 @@
     opacity: 0.7;
 }
 
+#campaign-playlist-list .daily-playlist-entry--hero.is-menu-selected,
 #daily-playlist-list .daily-playlist-entry--hero.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }

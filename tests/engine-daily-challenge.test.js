@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { RealTimeRacer } from "../game/engine.js";
+import { modeRouterEngineMethods } from "../game/modes/engine-methods.js";
 import { CarSpriteLoader, getCarAssetNameForPresetConfig, getCarAssetUrlCandidates } from "../game/car/sprite.js";
 import { readTrackLastLapMedal } from "../game/medals/last-lap-medal-storage.js";
 import {
@@ -942,6 +943,43 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.applyDailyChallenge).not.toHaveBeenCalledWith(featured);
     expect(engine.loadTrack).not.toHaveBeenCalled();
     expect(engine.startSequence).toHaveBeenCalled();
+  });
+
+  it("routes a Daily finish correctly after starting from Campaign in Tracks", async () => {
+    const challenge = {
+      id: "daily-from-campaign",
+      trackKey: "circuit",
+      objectiveType: "single_lap_fastest",
+    };
+    const engine = {
+      status: "ready",
+      startButtonPending: false,
+      activeRaceMode: "campaign",
+      activeCampaignStage: { raceId: "numbered-v1-00" },
+      activeHeadToHead: { challengeId: "previous-challenge" },
+      currentTrackKey: "numberZero",
+      trackCanvas: {},
+      startOverlay: { hideStartOverlay: vi.fn() },
+      loadTrack: vi.fn(),
+      applyDailyChallenge: vi.fn(),
+      startSequence: vi.fn(),
+      journeys: { startAttempt: vi.fn() },
+      handleDailyChallengeWin: vi.fn(),
+      handleCampaignWin: vi.fn(),
+      handleHeadToHeadWin: vi.fn(),
+    };
+
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
+    const result = { lapTime: 8.25 };
+    modeRouterEngineMethods.handleActiveRaceWin.call(engine, result);
+
+    expect(engine.startSequence).toHaveBeenCalledTimes(1);
+    expect(engine.handleDailyChallengeWin).toHaveBeenCalledWith(result);
+    expect(engine.handleCampaignWin).not.toHaveBeenCalled();
+    expect(engine.handleHeadToHeadWin).not.toHaveBeenCalled();
+    expect(engine.activeRaceMode).toBe("daily");
+    expect(engine.activeCampaignStage).toBeNull();
+    expect(engine.activeHeadToHead).toBeNull();
   });
 
   it("rebuilds a missing Daily canvas when the challenge track key is unchanged", async () => {

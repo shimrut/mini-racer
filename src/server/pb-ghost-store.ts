@@ -33,6 +33,7 @@ export type PlayerTrackPbRecord = {
 const PB_LOCK_TTL_MS = 30_000;
 const PB_LOCK_ACQUIRE_ATTEMPTS = 5;
 const PB_LOCK_ACQUIRE_RETRY_MS = 20;
+const PB_READ_BATCH_SIZE = 10;
 
 /** Losing this lock costs the player their ghost permanently — the browser drops the replay once the run is accepted — so contention is waited out. */
 async function acquirePersonalBestLock(lockKey: string): Promise<RedisLock | null> {
@@ -117,6 +118,26 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
     }
 }
 
+function readCompatibleRecordValue(
+    raw: string | null | undefined,
+    competition: Competition,
+    trackFingerprint: string,
+    raceIdentity: { rulesRevision: 0 | 1; lapCount: 1 | 2 | 3 },
+): PlayerTrackPbRecord | null {
+    const record = parseRecord(raw);
+    if (!record) return null;
+    if (
+        record.trackKey !== competition.trackKey
+        || record.trackFingerprint !== trackFingerprint
+        || record.simulationRevision !== PB_GHOST_SIMULATION_REVISION
+        || record.rulesRevision !== raceIdentity.rulesRevision
+        || record.lapCount !== raceIdentity.lapCount
+    ) {
+        return null;
+    }
+    return record;
+}
+
 /**
  * Discarding an unusable record is cleanup, not correctness: every caller treats it as absent either way.
  * Only the writer, holding this player's PB lock, may delete it — a lock-free reader would otherwise delete
@@ -136,21 +157,11 @@ async function readCompatibleRecord({
     const collectionKey = competition.pbHashKey;
     const field = playerField(playerId);
     const raw = await redis.hGet(collectionKey, field);
-    const record = parseRecord(raw);
     const fingerprint = createTrackFingerprint(track);
     const raceIdentity = getCompetitionRaceIdentity(competition);
+    const record = readCompatibleRecordValue(raw, competition, fingerprint, raceIdentity);
     if (!record) {
         if (raw && cleanupUnusable) await redis.hDel(collectionKey, [field]);
-        return null;
-    }
-    if (
-        record.trackKey !== competition.trackKey
-        || record.trackFingerprint !== fingerprint
-        || record.simulationRevision !== PB_GHOST_SIMULATION_REVISION
-        || record.rulesRevision !== raceIdentity.rulesRevision
-        || record.lapCount !== raceIdentity.lapCount
-    ) {
-        if (cleanupUnusable) await redis.hDel(collectionKey, [field]);
         return null;
     }
     return record;
@@ -162,6 +173,50 @@ export async function getPlayerTrackPbRecord(input: {
     track: Record<string, any>;
 }): Promise<PlayerTrackPbRecord | null> {
     return readCompatibleRecord(input);
+}
+
+/**
+ * Read compatible personal-best records for a page in bounded hash batches. This is read-only:
+ * malformed or incompatible records remain available for the writer-owned cleanup path.
+ */
+export async function getPlayerTrackPbRecords({
+    playerIds,
+    competition,
+    track,
+}: {
+    playerIds: string[];
+    competition: Competition;
+    track: Record<string, any>;
+}): Promise<Map<string, PlayerTrackPbRecord | null>> {
+    const uniquePlayerIds = [...new Set(playerIds)];
+    if (!uniquePlayerIds.length) return new Map();
+
+    const trackFingerprint = createTrackFingerprint(track);
+    const raceIdentity = getCompetitionRaceIdentity(competition);
+    const batches = Array.from(
+        { length: Math.ceil(uniquePlayerIds.length / PB_READ_BATCH_SIZE) },
+        (_, index) => uniquePlayerIds.slice(
+            index * PB_READ_BATCH_SIZE,
+            (index + 1) * PB_READ_BATCH_SIZE,
+        ),
+    );
+    const batchResults = await Promise.all(batches.map(async (batch) => {
+        const rawRecords = await redis.hMGet(
+            competition.pbHashKey,
+            batch.map(playerField),
+        );
+        return batch.map((playerId, index) => [
+            playerId,
+            readCompatibleRecordValue(
+                rawRecords[index],
+                competition,
+                trackFingerprint,
+                raceIdentity,
+            ),
+        ] as const);
+    }));
+
+    return new Map(batchResults.flat());
 }
 
 export async function upsertPlayerTrackPersonalBest({

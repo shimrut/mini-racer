@@ -19,6 +19,7 @@ import {
     normalizeLeaderboardIdentityPreference,
     sanitizeRedditUsername,
 } from '../../game/shared/leaderboard-identity.js';
+import { isRedisTransactionConflict } from './redis-transaction-conflict.js';
 
 export type ResolvedPlayerIdentity = {
     canonicalPlayerId: string | null;
@@ -455,15 +456,6 @@ export async function adoptExistingGuestPlayerProfile({
         guestToken,
         profile,
     };
-}
-
-/** Reddit reports a lost WATCH race as this gRPC error. There is no error type to match on, only the message. */
-function isRedisTransactionConflict(error: unknown): boolean {
-    if (!error || typeof error !== 'object') return false;
-    const { message, details } = error as { message?: unknown; details?: unknown };
-    return [message, details].some(
-        (text) => typeof text === 'string' && text.includes('redis: transaction failed'),
-    );
 }
 
 export async function upsertPlayerProfile({

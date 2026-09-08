@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
     },
     cacheSharedJson: vi.fn(),
     readPlayerProfileMap: vi.fn(),
-    getPlayerTrackPbRecord: vi.fn(),
+    getPlayerTrackPbRecords: vi.fn(),
 }));
 
 vi.mock('@devvit/redis', () => ({ redis: mocks.redis }));
@@ -22,7 +22,7 @@ vi.mock('../src/server/competition-identity.js', () => ({
     readPlayerProfileMap: mocks.readPlayerProfileMap,
 }));
 vi.mock('../src/server/pb-ghost-store.js', () => ({
-    getPlayerTrackPbRecord: mocks.getPlayerTrackPbRecord,
+    getPlayerTrackPbRecords: mocks.getPlayerTrackPbRecords,
 }));
 
 const { readSnapshot } = await import('../src/server/competition-leaderboard.ts');
@@ -88,7 +88,7 @@ describe('shared standings page reads', () => {
         mocks.redis.hGet.mockImplementation(async (key, playerId) => rawEntry(playerId));
         mocks.redis.hMGet.mockImplementation(async (key, playerIds) => playerIds.map(rawEntry));
         mocks.readPlayerProfileMap.mockImplementation(async (playerIds) => profileMap(playerIds));
-        mocks.getPlayerTrackPbRecord.mockResolvedValue(null);
+        mocks.getPlayerTrackPbRecords.mockResolvedValue(new Map());
         const values = new Map();
         mocks.cacheSharedJson.mockImplementation(async (source, options) => {
             if (values.has(options.key)) return values.get(options.key);
@@ -118,6 +118,9 @@ describe('shared standings page reads', () => {
         expect(second.currentPlayerRow.displayName).toBe('bravo');
         expect(mocks.redis.zRange).toHaveBeenCalledOnce();
         expect(mocks.redis.zCard).toHaveBeenCalledOnce();
+        expect(mocks.getPlayerTrackPbRecords).toHaveBeenCalledOnce();
+        expect(mocks.getPlayerTrackPbRecords.mock.calls[0][0].playerIds)
+            .toEqual(['reddit:alpha', 'reddit:bravo']);
         expect(mocks.cacheSharedJson).toHaveBeenCalledTimes(2);
         expect(mocks.cacheSharedJson.mock.calls[0][1]).toMatchObject({ ttl: 10 });
         expect(mocks.cacheSharedJson.mock.calls[0][1].key)

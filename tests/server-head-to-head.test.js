@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { mockResolveMiniRacerPostFlairId } = vi.hoisted(() => ({
+    mockResolveMiniRacerPostFlairId: vi.fn(async (_subredditName, postType) => `flair-${postType}`),
+}));
+
 const strings = new Map();
 const hashes = new Map();
 const redis = {
@@ -89,6 +93,9 @@ vi.mock('@devvit/web/server', () => ({
     reddit,
     cache: vi.fn(),
     context: undefined,
+}));
+vi.mock('../src/server/post-flair-service.js', () => ({
+    resolveMiniRacerPostFlairId: mockResolveMiniRacerPostFlairId,
 }));
 
 const {
@@ -202,14 +209,26 @@ describe('head-to-head service', () => {
         expect(preview.body.preview).not.toHaveProperty('ghost');
         expect(preview.body.preview).not.toHaveProperty('sourceId');
         expect(preview.body.preview.challengerAvatarUrl).toBe('https://i.redd.it/RaceFan.png');
+        const previewKey = `miniracer:head-to-head:preview:${preview.body.challengeToken}`;
+        expect(redis.set).toHaveBeenCalledWith(
+            previewKey,
+            expect.any(String),
+            { expiration: new Date('2026-07-23T12:10:00.000Z') },
+        );
+        expect(redis.expire).not.toHaveBeenCalledWith(previewKey, expect.anything());
 
         const created = await service.create(
             { challengeToken: preview.body.challengeToken },
             context,
         );
         expect(created.body.status).toBe('created');
+        const identitySetCall = redis.set.mock.calls.find(([key]) => (
+            String(key).startsWith('miniracer:head-to-head:post-identity:')
+        ));
+        expect(identitySetCall?.[2]).toEqual({ expiration: expect.any(Date) });
         expect(reddit.submitCustomPost).toHaveBeenCalledWith(expect.objectContaining({
             entry: 'head-to-head',
+            flairId: 'flair-head-to-head',
             runAs: 'USER',
             userGeneratedContent: {
                 text: 'Can you beat 25.640s on Number Three?',

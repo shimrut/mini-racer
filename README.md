@@ -16,6 +16,10 @@ Share verified times or challenge other players Head to Head.
   Race another player’s frozen ghost, beat their time, and Brag when signed in.
   You keep your current car skin; the challenger’s ghost uses a different
   random Garage car.
+- Challenge wins can now be shared with **Brag**, using three margin-specific
+  messages for 0.001–0.100s, 0.101–0.500s, and 0.501s+. Ties and losses use
+  **Comment**, with one tie message plus three margin-specific messages across
+  those same ranges as a text-only reply.
 - Guests can race Daily, Campaign, and Head to Head. Signing in keeps the faster
   Campaign result when guest progress is merged.
 - Daily races use **1 or 2 laps** on tracks under 10s, and **1 lap** on longer tracks, with the last **7 days** available to replay.

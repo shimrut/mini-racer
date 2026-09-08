@@ -16,6 +16,7 @@ import {
 } from './competition.js';
 import type { DailyGpLeaderboardEntry } from './daily-gp-model.js';
 import {
+    competitionHoldsPlayerRows,
     readEntryByPlayerId,
     readPlayerRank,
     readSnapshot,
@@ -42,12 +43,19 @@ import {
 } from './car-unlock-store.js';
 import {
     acquireRedisLock,
+    beginOwnedRedisLockGroupTransaction,
     beginOwnedRedisLockTransaction,
+    commitOwnedRedisLockTransaction,
     releaseRedisLock,
+    releaseRedisLockGroup,
+    renewRedisLockGroup,
     startRedisLockGroupLeaseRenewal,
     type RedisLock,
     type RedisLockLease,
+    type RedisLockMutation,
+    type RedisLockTransactionRunner,
 } from './redis-lock.js';
+import { GuestProgressSelectionRetryableError } from './guest-progress-selection-error.js';
 import { recordAnalyticsRaceBestEffort } from './analytics-store.js';
 import { isPlayerProgressSelectionPending } from './guest-retirement.js';
 
@@ -74,6 +82,10 @@ type CampaignProgress = {
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 const CAMPAIGN_PROGRESS_LOCK_TTL_MS = 30_000;
+const CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS = Math.max(
+    1,
+    Math.floor(CAMPAIGN_PROGRESS_LOCK_TTL_MS / 3),
+);
 const CAMPAIGN_GUEST_CLEANUP_THROTTLE_SECONDS = 60;
 const CAMPAIGN_GUEST_CLEANUP_LIMIT = 10;
 export const CAMPAIGN_GUEST_EXPIRY_KEY = `campaign:${CAMPAIGN_ID}:guest-expiry`;
@@ -217,29 +229,36 @@ export async function hasStoredCampaignProgress(playerId: string): Promise<boole
     return Boolean(await redis.get(progressKey(playerId)));
 }
 
-class CampaignProgressBusyError extends Error {}
+class CampaignProgressBusyError extends GuestProgressSelectionRetryableError {}
 
 async function writeProgressWithOwnedLock(
     playerId: string,
     progress: CampaignProgress,
     lock: RedisLock,
+    transactionRunner?: RedisLockTransactionRunner,
 ): Promise<void> {
+    const expiresAt = guestExpiresAt();
+    const enqueue: RedisLockMutation = async (transaction) => {
+        await transaction.set(
+            progressKey(playerId),
+            JSON.stringify(progress),
+            isGuestPlayerId(playerId) ? { expiration: expiresAt } : undefined,
+        );
+        if (isGuestPlayerId(playerId)) {
+            await transaction.zAdd(CAMPAIGN_GUEST_EXPIRY_KEY, {
+                member: playerId,
+                score: expiresAt.getTime(),
+            });
+        }
+    };
+    if (transactionRunner) {
+        await transactionRunner([lock], enqueue);
+        return;
+    }
     const transaction = await beginOwnedRedisLockTransaction(lock, redis);
     if (!transaction) throw new CampaignProgressBusyError('Campaign progress lock was lost.');
-    const expiresAt = guestExpiresAt();
-    await transaction.set(
-        progressKey(playerId),
-        JSON.stringify(progress),
-        isGuestPlayerId(playerId) ? { expiration: expiresAt } : undefined,
-    );
-    if (isGuestPlayerId(playerId)) {
-        await transaction.zAdd(CAMPAIGN_GUEST_EXPIRY_KEY, {
-            member: playerId,
-            score: expiresAt.getTime(),
-        });
-    }
-    const results = await transaction.exec();
-    if (!Array.isArray(results) || results.length === 0) {
+    await enqueue(transaction);
+    if (!await commitOwnedRedisLockTransaction(transaction)) {
         throw new CampaignProgressBusyError('Campaign progress save was interrupted.');
     }
 }
@@ -338,8 +357,17 @@ export async function getCampaignResultsForCarUnlocks(
     return (await readProgress(playerId)).resultsByRaceId;
 }
 
-export async function getCampaignProgressForSelection(playerId: string): Promise<CampaignProgress> {
-    return readProgress(playerId);
+export async function getCampaignProgressForSelection(
+    playerId: string,
+    { repairEmpty = true }: { repairEmpty?: boolean } = {},
+): Promise<CampaignProgress> {
+    const progress = await readProgress(playerId);
+    // Empty progress is common for a guest who only opened Campaign; avoid a full stage scan
+    // during the cheap selection evidence check when there is no stored result to repair.
+    if (!repairEmpty && !progress.startedAt && !Object.keys(progress.resultsByRaceId).length) {
+        return progress;
+    }
+    return repairCampaignProgressFromLeaderboard(playerId, progress);
 }
 
 function publicProgress(progress: CampaignProgress) {
@@ -849,10 +877,12 @@ export async function mergeGuestCampaignProgress({
     guestPlayerId,
     redditPlayerId,
     replace = false,
+    transactionRunner,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     replace?: boolean;
+    transactionRunner?: RedisLockTransactionRunner;
 }): Promise<{ merged: boolean; mergedRaceIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         return { merged: false, mergedRaceIds: [] };
@@ -870,6 +900,35 @@ export async function mergeGuestCampaignProgress({
     const confirmMergeOwnership = async () => {
         if (!lease || !await lease.confirmOwnership()) {
             throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
+        }
+    };
+    const runMutation = async (
+        domainLocks: readonly RedisLock[],
+        mutate: RedisLockMutation,
+    ): Promise<void> => {
+        if (transactionRunner) {
+            const activeLease = lease;
+            lease = null;
+            if (activeLease) {
+                await activeLease.stop().catch((error) => {
+                    console.error('Campaign merge lease pause failed:', error);
+                });
+            }
+            await transactionRunner(domainLocks, mutate);
+            lease = startRedisLockGroupLeaseRenewal(
+                locks,
+                Math.max(1, Math.floor(SUBMISSION_LOCK_TTL_MS / 3)),
+                redis,
+            );
+            return;
+        }
+        const lock = domainLocks[0];
+        if (!lock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
+        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
+        if (!transaction) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
+        await mutate(transaction);
+        if (!await commitOwnedRedisLockTransaction(transaction)) {
+            throw new CampaignProgressBusyError('Campaign leaderboard copy was interrupted.');
         }
     };
     try {
@@ -982,38 +1041,69 @@ export async function mergeGuestCampaignProgress({
                 : (!replace && redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs
                     ? redditEntry
                     : null);
-            if (entryToWrite || replace) {
-                const accountEntryLock = locks.find((lock) => (
-                    lock.key === competitionSubmissionLockKey(redditCompetition, redditPlayerId)
-                ));
+            const accountEntryLock = locks.find((lock) => (
+                lock.key === competitionSubmissionLockKey(redditCompetition, redditPlayerId)
+            ));
+            if (transactionRunner) {
                 if (!accountEntryLock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-                const transaction = await beginOwnedRedisLockTransaction(accountEntryLock, redis);
-                if (!transaction) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-                if (entryToWrite) {
-                    await writeEntry(redditCompetition, redditPlayerId, entryToWrite, transaction);
-                } else {
-                    await transaction.hDel(redditCompetition.entryHashKey, [redditPlayerId]);
-                    await transaction.zRem(redditCompetition.leaderboardKey, [redditPlayerId]);
-                    await transaction.incrBy(redditCompetition.standingsRevisionKey, 1);
+                let rawGuestPb: string | undefined;
+                if (guestCanSupplyWinningPb) {
+                    rawGuestPb = await redis.hGet(
+                        guestCompetition.pbHashKey,
+                        playerField(guestPlayerId),
+                    );
+                    if (!rawGuestPb) {
+                        throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
+                    }
                 }
-                const results = await transaction.exec();
-                if (!Array.isArray(results) || results.length === 0) {
-                    throw new CampaignProgressBusyError('Campaign leaderboard copy was interrupted.');
+                if (entryToWrite || replace || rawGuestPb) {
+                    await runMutation([accountEntryLock], async (transaction) => {
+                        if (entryToWrite) {
+                            await writeEntry(redditCompetition, redditPlayerId, entryToWrite, transaction);
+                        } else if (replace) {
+                            await transaction.hDel(redditCompetition.entryHashKey, [redditPlayerId]);
+                            await transaction.zRem(redditCompetition.leaderboardKey, [redditPlayerId]);
+                            await transaction.incrBy(redditCompetition.standingsRevisionKey, 1);
+                        }
+                        if (rawGuestPb) {
+                            await transaction.hSet(redditCompetition.pbHashKey, {
+                                [playerField(redditPlayerId)]: rawGuestPb,
+                            });
+                        } else if (replace) {
+                            await transaction.hDel(redditCompetition.pbHashKey, [playerField(redditPlayerId)]);
+                        }
+                    });
                 }
-            }
-            if (guestCanSupplyWinningPb) {
-                const rawGuestPb = await redisCompressed.hGet(
-                    guestCompetition.pbHashKey,
-                    playerField(guestPlayerId),
-                );
-                if (!rawGuestPb) {
-                    throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
+            } else {
+                if (entryToWrite || replace) {
+                    if (!accountEntryLock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
+                    const transaction = await beginOwnedRedisLockTransaction(accountEntryLock, redis);
+                    if (!transaction) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
+                    if (entryToWrite) {
+                        await writeEntry(redditCompetition, redditPlayerId, entryToWrite, transaction);
+                    } else {
+                        await transaction.hDel(redditCompetition.entryHashKey, [redditPlayerId]);
+                        await transaction.zRem(redditCompetition.leaderboardKey, [redditPlayerId]);
+                        await transaction.incrBy(redditCompetition.standingsRevisionKey, 1);
+                    }
+                    if (!await commitOwnedRedisLockTransaction(transaction)) {
+                        throw new CampaignProgressBusyError('Campaign leaderboard copy was interrupted.');
+                    }
                 }
-                await redisCompressed.hSet(redditCompetition.pbHashKey, {
-                    [playerField(redditPlayerId)]: rawGuestPb,
-                });
-            } else if (replace) {
-                await redisCompressed.hDel(redditCompetition.pbHashKey, [playerField(redditPlayerId)]);
+                if (guestCanSupplyWinningPb) {
+                    const rawGuestPb = await redisCompressed.hGet(
+                        guestCompetition.pbHashKey,
+                        playerField(guestPlayerId),
+                    );
+                    if (!rawGuestPb) {
+                        throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
+                    }
+                    await redisCompressed.hSet(redditCompetition.pbHashKey, {
+                        [playerField(redditPlayerId)]: rawGuestPb,
+                    });
+                } else if (replace) {
+                    await redisCompressed.hDel(redditCompetition.pbHashKey, [playerField(redditPlayerId)]);
+                }
             }
         }
 
@@ -1028,7 +1118,7 @@ export async function mergeGuestCampaignProgress({
                 : (redditProgress.startedAt || guestProgress.startedAt || nowIso),
             resultsByRaceId: mergedResults,
             updatedAt: nowIso,
-        }, redditProgressLock);
+        }, redditProgressLock, transactionRunner ? runMutation : undefined);
 
         // Keep the guest source until the transfer coordinator checkpoints the whole
         // domain. A later retry must be able to reconstruct replacement progress if
@@ -1040,11 +1130,7 @@ export async function mergeGuestCampaignProgress({
                 console.error('Campaign merge lease cleanup failed:', error);
             });
         }
-        for (const lock of [...locks].reverse()) {
-            await releaseRedisLock(lock, redis).catch((error) => {
-                console.error('Campaign merge lock cleanup failed:', error);
-            });
-        }
+        await releaseRedisLockGroup(locks, 'Campaign merge', redis);
     }
 }
 
@@ -1055,6 +1141,7 @@ export async function cleanupGuestCampaignProgress({
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:')) return false;
     const locks: RedisLock[] = [];
+    let lease: RedisLockLease | null = null;
     try {
         for (const key of CAMPAIGN_STAGES.flatMap((stage) => {
             const competition = competitionFor(stage, null);
@@ -1063,11 +1150,28 @@ export async function cleanupGuestCampaignProgress({
             const lock = await acquireRedisLock(key, SUBMISSION_LOCK_TTL_MS, redis);
             if (!lock) throw new CampaignProgressBusyError('Campaign cleanup is already in progress.');
             locks.push(lock);
+            // Start renewing as soon as the first lock is acquired. The array is
+            // intentionally shared so newly acquired locks join the lease.
+            lease ??= startRedisLockGroupLeaseRenewal(
+                locks,
+                CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS,
+                redis,
+            );
         }
         const progressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId));
         if (!progressLock) throw new CampaignProgressBusyError('Campaign cleanup lock was lost.');
         const hadProgress = Boolean(await redis.get(progressKey(guestPlayerId)));
-        const transaction = await beginOwnedRedisLockTransaction(progressLock, redis);
+        if (!lease || !await lease.confirmOwnership()) {
+            throw new CampaignProgressBusyError('Campaign cleanup ownership was lost.');
+        }
+        await lease.stop().catch((error) => {
+            console.error('Campaign cleanup lease pause failed:', error);
+        });
+        lease = null;
+        if (!await renewRedisLockGroup(locks, redis)) {
+            throw new CampaignProgressBusyError('Campaign cleanup ownership was lost.');
+        }
+        const transaction = await beginOwnedRedisLockGroupTransaction(locks, redis);
         if (!transaction) throw new CampaignProgressBusyError('Campaign cleanup lock was lost.');
         for (const stage of CAMPAIGN_STAGES) {
             const competition = competitionFor(stage, guestPlayerId);
@@ -1078,17 +1182,17 @@ export async function cleanupGuestCampaignProgress({
         }
         await transaction.del(progressKey(guestPlayerId));
         await transaction.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, [guestPlayerId]);
-        const results = await transaction.exec();
-        if (!Array.isArray(results) || results.length === 0) {
+        if (!await commitOwnedRedisLockTransaction(transaction)) {
             throw new CampaignProgressBusyError('Campaign cleanup was interrupted.');
         }
         return hadProgress;
     } finally {
-        for (const lock of [...locks].reverse()) {
-            await releaseRedisLock(lock, redis).catch((error) => {
-                console.error('Campaign cleanup lock cleanup failed:', error);
+        if (lease) {
+            await lease.stop().catch((error) => {
+                console.error('Campaign cleanup lease cleanup failed:', error);
             });
         }
+        await releaseRedisLockGroup(locks, 'Campaign cleanup', redis);
     }
 }
 
@@ -1099,6 +1203,7 @@ export async function discardGuestCampaignProgress({
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:')) return false;
     const locks: RedisLock[] = [];
+    let lease: RedisLockLease | null = null;
     try {
         for (const key of CAMPAIGN_STAGES.flatMap((stage) => {
             const competition = competitionFor(stage, null);
@@ -1109,31 +1214,85 @@ export async function discardGuestCampaignProgress({
             const lock = await acquireRedisLock(key, SUBMISSION_LOCK_TTL_MS, redis);
             if (!lock) throw new CampaignProgressBusyError('Campaign discard is already in progress.');
             locks.push(lock);
+            lease ??= startRedisLockGroupLeaseRenewal(
+                locks,
+                CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS,
+                redis,
+            );
         }
         const progressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId));
         if (!progressLock) throw new CampaignProgressBusyError('Campaign discard lock was lost.');
         const hadProgress = Boolean(await redis.get(progressKey(guestPlayerId)));
-        const transaction = await beginOwnedRedisLockTransaction(progressLock, redis);
-        if (!transaction) throw new CampaignProgressBusyError('Campaign discard lock was lost.');
-        for (const stage of CAMPAIGN_STAGES) {
+        if (!lease || !await lease.confirmOwnership()) {
+            throw new CampaignProgressBusyError('Campaign discard ownership was lost.');
+        }
+        await lease.stop().catch((error) => {
+            console.error('Campaign discard lease pause failed:', error);
+        });
+        lease = null;
+        if (!await renewRedisLockGroup(locks, redis)) {
+            throw new CampaignProgressBusyError('Campaign discard ownership was lost.');
+        }
+        // The lease is stopped for the writes below, so the group is refreshed on the same
+        // cadence it would have renewed on. On a fast store this never fires.
+        let renewedAtMs = Date.now();
+        const keepLocksFresh = async (): Promise<void> => {
+            if (Date.now() - renewedAtMs < CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS) return;
+            if (!await renewRedisLockGroup(locks, redis)) {
+                throw new CampaignProgressBusyError('Campaign discard ownership was lost.');
+            }
+            renewedAtMs = Date.now();
+        };
+        const commit = async (mutate: RedisLockMutation): Promise<void> => {
+            const transaction = await beginOwnedRedisLockGroupTransaction(locks, redis);
+            if (!transaction) throw new CampaignProgressBusyError('Campaign discard lock was lost.');
+            await mutate(transaction);
+            if (!await commitOwnedRedisLockTransaction(transaction)) {
+                throw new CampaignProgressBusyError('Campaign discard was interrupted.');
+            }
+        };
+
+        // One sweep decides which boards still hold this guest. A stage the guest never raced
+        // needs no transaction and no standings bump, and a stage a previous attempt already
+        // cleared reads empty — so a retry resumes here instead of repeating the whole campaign.
+        const stagesToClear = (await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
+            // Raw presence, not a parsed record: this sweep decides what never gets deleted, and
+            // the progress record that would prompt a retry is removed once it finishes. An entry
+            // that no longer parses, a PB from a superseded track revision, and a ranking left
+            // without its entry are all still this guest's rows to take with them.
+            const holdsRows = await competitionHoldsPlayerRows(
+                competitionFor(stage, guestPlayerId),
+                guestPlayerId,
+            );
+            return holdsRows ? stage : null;
+        }))).filter((stage): stage is (typeof CAMPAIGN_STAGES)[number] => stage !== null);
+
+        // One stage per transaction. Queuing every stage into a single MULTI held it open
+        // across the whole campaign, and a store that timed that out failed all of it.
+        for (const stage of stagesToClear) {
+            await keepLocksFresh();
             const competition = competitionFor(stage, guestPlayerId);
-            await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
-            await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
-            await transaction.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
-            await transaction.incrBy(competition.standingsRevisionKey, 1);
-        }
-        await transaction.del(progressKey(guestPlayerId));
-        await transaction.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, [guestPlayerId]);
-        const results = await transaction.exec();
-        if (!Array.isArray(results) || results.length === 0) {
-            throw new CampaignProgressBusyError('Campaign discard was interrupted.');
-        }
-        return hadProgress;
-    } finally {
-        for (const lock of [...locks].reverse()) {
-            await releaseRedisLock(lock, redis).catch((error) => {
-                console.error('Campaign discard lock cleanup failed:', error);
+            await commit(async (transaction) => {
+                await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
+                await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
+                await transaction.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
+                await transaction.incrBy(competition.standingsRevisionKey, 1);
             });
         }
+
+        // Last, so the progress record still names an unfinished discard for any retry.
+        await keepLocksFresh();
+        await commit(async (transaction) => {
+            await transaction.del(progressKey(guestPlayerId));
+            await transaction.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, [guestPlayerId]);
+        });
+        return hadProgress;
+    } finally {
+        if (lease) {
+            await lease.stop().catch((error) => {
+                console.error('Campaign discard lease cleanup failed:', error);
+            });
+        }
+        await releaseRedisLockGroup(locks, 'Campaign discard', redis);
     }
 }

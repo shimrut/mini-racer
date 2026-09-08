@@ -377,7 +377,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
         animation: none;
     }
 
-    .garage-tabs::before {
+    .garage-tabs::before,
+    .tracks-tabs::before {
         transition: none;
     }
 }
@@ -487,7 +488,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     filter: grayscale(1);
 }
 
-.garage-tabs {
+.garage-tabs,
+.tracks-tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
@@ -499,7 +501,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     border-radius: var(--radius-full);
 }
 
-.garage-tabs::before {
+.garage-tabs::before,
+.tracks-tabs::before {
     content: "";
     position: absolute;
     top: 0.15rem;
@@ -512,11 +515,13 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     z-index: 0;
 }
 
-.garage-tabs:has(#garage-tab-trails[aria-selected="true"])::before {
+.garage-tabs:has(#garage-tab-trails[aria-selected="true"])::before,
+.tracks-tabs:has(#tracks-tab-campaign[aria-selected="true"])::before {
     transform: translateX(100%);
 }
 
-.garage-tab {
+.garage-tab,
+.tracks-tab {
     appearance: none;
     min-width: 0;
     width: 100%;
@@ -540,20 +545,25 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     transition: color var(--dur-base) ease;
 }
 
-.garage-tab:hover {
+.garage-tab:hover,
+.tracks-tab:hover {
     background: transparent;
     color: var(--text-dim);
 }
 
 .garage-tab.is-selected,
-.garage-tab.is-selected:hover {
+.garage-tab.is-selected:hover,
+.tracks-tab.is-selected,
+.tracks-tab.is-selected:hover {
     background: transparent;
     color: var(--text-color);
     box-shadow: none;
 }
 
 .garage-tab.is-menu-selected,
-.garage-tab.is-selected.is-menu-selected {
+.garage-tab.is-selected.is-menu-selected,
+.tracks-tab.is-menu-selected,
+.tracks-tab.is-selected.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 

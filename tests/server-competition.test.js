@@ -125,14 +125,14 @@ describe('toCampaignCompetition', () => {
         expect(competition.ttlSeconds).toBeNull();
     });
 
-    it('keeps shared guest collections permanent and records per-player retention', () => {
+    it('keeps shared guest collections permanent and records one-year per-player retention', () => {
         const competition = toCampaignCompetition('numbered-v1', campaignStage, {
             playerId: 'guest:abc123',
         });
         expect(competition.ttlSeconds).toBeNull();
         expect(competition.guestExpiryKey).toBe('campaign:numbered-v1:guest-expiry');
         expect(competition.guestRetentionSeconds).toBe(CAMPAIGN_GUEST_TTL_SECONDS);
-        expect(CAMPAIGN_GUEST_TTL_SECONDS).toBeGreaterThan(7 * 24 * 60 * 60);
+        expect(CAMPAIGN_GUEST_TTL_SECONDS).toBe(365 * 24 * 60 * 60);
     });
 });
 

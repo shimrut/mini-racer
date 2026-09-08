@@ -4,7 +4,9 @@ vi.mock('@devvit/redis', () => ({ redis: {} }));
 
 const {
     acquireRedisLock,
+    beginOwnedRedisLockGroupTransaction,
     releaseRedisLock,
+    renewRedisLockGroup,
     renewRedisLock,
     startRedisLockLeaseRenewal,
 } = await import('../src/server/redis-lock.ts');
@@ -44,8 +46,10 @@ function createVersionedRedis() {
             bump(key);
             return 1;
         },
-        async watch(key) {
-            const watchedVersion = versions.get(key) || 0;
+        async watch(...keys) {
+            const watchedVersions = new Map(
+                keys.map((key) => [key, versions.get(key) || 0]),
+            );
             const commands = [];
             return {
                 async multi() {},
@@ -59,8 +63,10 @@ function createVersionedRedis() {
                         blockedExec = null;
                         await pending;
                     }
-                    if (beforeExec) beforeExec(execCalls, key);
-                    if ((versions.get(key) || 0) !== watchedVersion) return [];
+                    if (beforeExec) beforeExec(execCalls, keys[0]);
+                    if ([...watchedVersions.entries()].some(([watchedKey, version]) => (
+                        (versions.get(watchedKey) || 0) !== version
+                    ))) return [];
                     const results = [];
                     for (const command of commands) results.push(await command());
                     return results;
@@ -183,5 +189,57 @@ describe('owned Redis locks', () => {
         expect(lease.isOwned()).toBe(false);
         await expect(lease.confirmOwnership()).resolves.toBe(false);
         await lease.stop();
+    });
+
+    it('fences a transaction against every lock in the group', async () => {
+        const client = createVersionedRedis();
+        const first = await acquireRedisLock('first', 30_000, client);
+        const second = await acquireRedisLock('second', 30_000, client);
+        const transaction = await beginOwnedRedisLockGroupTransaction(
+            [first, second],
+            client,
+        );
+
+        await transaction.del('payload');
+        client.touch('second');
+
+        await expect(transaction.exec()).resolves.toEqual([]);
+    });
+
+    it('does not call a valid group lost when a lock is added during its ownership read', async () => {
+        const client = createVersionedRedis();
+        const first = await acquireRedisLock('first', 2_500, client);
+        // Campaign keeps acquiring into the very array its lease is renewing.
+        const group = [first];
+        const read = client.get.bind(client);
+        let grown = false;
+        client.get = async (key) => {
+            const value = await read(key);
+            if (!grown) {
+                grown = true;
+                group.push(await acquireRedisLock('second', 2_500, client));
+            }
+            return value;
+        };
+
+        await expect(renewRedisLockGroup(group, client)).resolves.toBe(true);
+        expect(await client.get('first')).toBe(first.value);
+    });
+
+    it('refreshes every lock in a group and stops when ownership changes', async () => {
+        const client = createVersionedRedis();
+        const first = await acquireRedisLock('first', 2_500, client);
+        const second = await acquireRedisLock('second', 2_500, client);
+        const firstBefore = client.expirations.get('first');
+        const secondBefore = client.expirations.get('second');
+
+        await expect(renewRedisLockGroup([first, second], client)).resolves.toBe(true);
+        expect(client.expirations.get('first')).toBeGreaterThan(firstBefore);
+        expect(client.expirations.get('second')).toBeGreaterThan(secondBefore);
+
+        await client.set('second', 'successor');
+        await expect(renewRedisLockGroup([first, second], client)).resolves.toBe(false);
+        expect(await client.get('first')).toBe(first.value);
+        expect(await client.get('second')).toBe('successor');
     });
 });

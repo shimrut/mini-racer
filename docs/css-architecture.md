@@ -21,10 +21,16 @@ play/pause with #1 / #2 / #3 and Trail on top at the bottom. Those overlays
 auto-hide after 2 seconds, return on mouse movement, and tapping the track
 plays or pauses.
 Back uses the same button shape as the place toggles. That chrome is the same
-on every viewport. The moderator analytics page is one
-sticky-header table: a row per UTC day, with the day's players split into new
-and returning, each mode's starts, and podium Play Now / View Replays beside them. The newest row
-carries the red accent. The Head to Head surface uses a responsive
+on every viewport. The moderator analytics page is a responsive dashboard with
+one compact Today summary panel, one players-per-day chart, a daily sticky-header
+table, and table scrolling contained inside the table on narrow screens: a row
+per UTC day, with the day's players split into new and returning, each mode's
+starts, and podium Play Now / View Replays beside them. The chart shows the most
+recent 45 daily buckets so individual bars stay legible; the daily table retains
+the full summary range. The newest row carries the red accent. The cohort-retention card uses a contained milestone table with
+exact UTC-day D1/D7/D30 return rates; signed-in racers are the denominator and
+immature milestones render as a dash. The page keeps its labels concise without
+implementation notes. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the
 verified track trace remains an open hero on the right, and the CTA anchors below
 that trace. Its brand uses the shared stacked Mini/Racer lockup, the duel row
@@ -97,6 +103,8 @@ The verdict lockup and Daily/Campaign status heading enter with the same
 after the finish modal fade starts. Comparison rows and buttons do not
 stagger. A local Head to Head beat can swap Improve/Home for Daily/Campaign
 while VERIFYING is still showing; Brag stays disabled until the judged win.
+The judged tie/loss state instead enables Comment. Its confirmation sheet shows
+the server-generated tiered copy as a text-only reply.
 Reduced motion turns the sequence off. Daily and Campaign put a
 status heading above the time in that same column — medal name, NEW BEST, or
 FINISHED. MEDALS, VS PB, and RANK stay the comparison rows. Racing a standings
@@ -154,11 +162,15 @@ maintaining mode-specific card layouts:
   counter, then the track's own footer (time, rank, medals) — everything below
   the artwork describes the track above it. Daily's expiry line and counter
   open the Tracks list; Campaign's counter opens the same list with Campaign
-  stages. That list uses a header title (`Daily Tracks` / `Campaign Tracks`) and
-  `#daily-playlist-list` as equal `repeat(2, minmax(0, 1fr))` tiles (preview
-  with medal top-left and rank `#x` top-right when known, name on the left,
-  laps on the right), scoped under
-  `#daily-playlist-modal` so lobby posters stay wide hero cards. Previous and Next leave that stack:
+  stages. That list uses a fixed `Tracks` header with `Daily` and `Campaign`
+  tabs below it. Each tab owns its own equal `repeat(2, minmax(0, 1fr))`
+  tile panel (preview with medal top-left and rank `#x` top-right when known,
+  name on the left, laps on the right), scoped under `#daily-playlist-modal`
+  so lobby posters stay wide hero cards. The tabs remain switchable while the
+  modal is open, and the two panels keep their rendered data independent. Both panels share the same
+  desktop/mobile grid and keyboard-selection rules; visibility uses the native
+  `hidden` property.
+  Previous and Next leave that stack:
   they are circular icon buttons grid-placed into row 1 with `align-self:
   center` and `justify-self: start`/`end`, so they flank the schematic and stay
   centred on artwork whose height is only resolved at layout time. Absolute

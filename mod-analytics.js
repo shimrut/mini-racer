@@ -1,17 +1,18 @@
 const SUMMARY_URL = '/api/analytics/summary';
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const SPARK_DAYS = 14;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SECTION_IDS = [
     'analytics-windows',
     'analytics-main',
     'analytics-trend',
     'analytics-modes',
+    'analytics-cohorts',
     'analytics-months',
     'analytics-storage',
     'analytics-days',
 ];
 const MODE_LABELS = { daily: 'Daily', campaign: 'Campaign', challenge: 'Challenge' };
+const ANALYTICS_CHART_DAYS = 45;
 
 function setText(node, value) {
     if (node) node.textContent = value;
@@ -24,6 +25,12 @@ function toCount(value) {
 
 function formatCount(value) {
     return toCount(value).toLocaleString('en-US');
+}
+
+function formatRate(value) {
+    const rate = Number(value);
+    if (!Number.isFinite(rate) || rate < 0) return '—';
+    return `${rate.toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
 }
 
 function formatBytes(value) {
@@ -58,10 +65,9 @@ function shape(doc, tag, attributes) {
     return node;
 }
 
-function cardHeading(doc, title, note) {
+function cardHeading(doc, title) {
     const header = element(doc, 'div', 'analytics-card__head');
     header.append(element(doc, 'h2', 'analytics-section-title', title));
-    if (note) header.append(element(doc, 'p', 'analytics-card__note', note));
     return header;
 }
 
@@ -96,48 +102,10 @@ function trend(current, previous) {
     const change = toCount(current) - toCount(previous);
     if (change > 0) return { direction: 'up', text: `▲ ${formatCount(change)}` };
     if (change < 0) return { direction: 'down', text: `▼ ${formatCount(-change)}` };
-    return { direction: 'flat', text: '– 0' };
+    return null;
 }
 
-function renderSparkline(doc, values, series) {
-    const width = 128;
-    const height = 34;
-    const pad = 4;
-    const points = values.map(toCount);
-    const svg = shape(doc, 'svg', {
-        class: `analytics-spark analytics-spark--${series}`,
-        viewBox: `0 0 ${width} ${height}`,
-        preserveAspectRatio: 'none',
-        'aria-hidden': 'true',
-        focusable: 'false',
-    });
-    if (points.length < 2) return svg;
-
-    // Sparklines read shape, not level, so they span the window's own min and max.
-    const low = Math.min(...points);
-    const span = Math.max(...points) - low || 1;
-    const stepX = (width - pad * 2) / (points.length - 1);
-    const coords = points.map((value, index) => [
-        pad + index * stepX,
-        height - pad - ((value - low) / span) * (height - pad * 2),
-    ]);
-    const line = coords.map(([x, y], index) => `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
-
-    svg.append(shape(doc, 'path', {
-        class: 'analytics-spark__area',
-        d: `${line} L${width - pad} ${height} L${pad} ${height} Z`,
-    }));
-    svg.append(shape(doc, 'path', { class: 'analytics-spark__line', d: line }));
-    // A round-capped zero-length stroke stays circular even though the box is stretched.
-    const [lastX, lastY] = coords[coords.length - 1];
-    svg.append(shape(doc, 'path', {
-        class: 'analytics-spark__dot',
-        d: `M${lastX.toFixed(1)} ${lastY.toFixed(1)} L${lastX.toFixed(1)} ${lastY.toFixed(1)}`,
-    }));
-    return svg;
-}
-
-function createStatTile(doc, { label, value, delta, deltaNote, hint, spark, series = 'accent', hero = false }) {
+function createStatTile(doc, { label, value, delta, deltaNote, hero = false }) {
     const tile = element(doc, 'article', hero ? 'analytics-kpi analytics-kpi--hero' : 'analytics-kpi');
     tile.append(element(doc, 'p', 'analytics-kpi__label', label));
     tile.append(element(doc, 'p', 'analytics-kpi__value', value));
@@ -149,67 +117,54 @@ function createStatTile(doc, { label, value, delta, deltaNote, hint, spark, seri
         if (deltaNote) row.append(element(doc, 'span', 'analytics-kpi__since', deltaNote));
         tile.append(row);
     }
-    if (hint) tile.append(element(doc, 'p', 'analytics-kpi__hint', hint));
-    if (Array.isArray(spark) && spark.length > 1) tile.append(renderSparkline(doc, spark, series));
     return tile;
 }
 
 function renderHeadline(doc, days) {
     const today = days[days.length - 1] ?? {};
     const yesterday = days[days.length - 2] ?? {};
-    const recent = days.slice(-SPARK_DAYS);
     const players = toCount(today.players);
-    const newPlayers = toCount(today.newPlayers);
+    const heading = element(doc, 'h2', 'analytics-summary__title', 'Today');
+    heading.id = 'analytics-summary-title';
 
     return [
+        heading,
         createStatTile(doc, {
-            label: 'Players today',
+            label: 'Players',
             value: formatCount(players),
             delta: trend(players, yesterday.players),
             deltaNote: 'vs yesterday',
-            hint: 'Signed-in accounts that started a race',
-            spark: recent.map((day) => day.players),
             hero: true,
         }),
         createStatTile(doc, {
-            label: 'New players today',
-            value: formatCount(newPlayers),
-            delta: trend(newPlayers, yesterday.newPlayers),
+            label: 'New',
+            value: formatCount(today.newPlayers),
+            delta: trend(today.newPlayers, yesterday.newPlayers),
             deltaNote: 'vs yesterday',
-            hint: `${Math.round(percent(newPlayers, players))}% of today's players`,
-            spark: recent.map((day) => day.newPlayers),
-            series: 'new',
         }),
         createStatTile(doc, {
-            label: 'Returning today',
+            label: 'Returning',
             value: formatCount(today.returningPlayers),
             delta: trend(today.returningPlayers, yesterday.returningPlayers),
             deltaNote: 'vs yesterday',
-            spark: recent.map((day) => day.returningPlayers),
         }),
         createStatTile(doc, {
-            label: 'Signed out today',
+            label: 'Signed out',
             value: formatCount(today.guestPlayers),
             delta: trend(today.guestPlayers, yesterday.guestPlayers),
             deltaNote: 'vs yesterday',
-            hint: 'Not counted as players — one person can be many',
-            spark: recent.map((day) => day.guestPlayers),
         }),
         createStatTile(doc, {
-            label: 'Podium Play Now',
+            label: 'Play Now',
             value: formatCount(today.podiumPlays),
             delta: trend(today.podiumPlays, yesterday.podiumPlays),
             deltaNote: 'vs yesterday',
-            hint: 'Taps on the final podium post',
-            spark: recent.map((day) => day.podiumPlays),
         }),
         createStatTile(doc, {
-            label: 'Podium View Replays',
+            label: 'View Replays',
             value: formatCount(today.podiumReplays),
             delta: trend(today.podiumReplays, yesterday.podiumReplays),
             deltaNote: 'vs yesterday',
-            hint: 'Opened the in-post replay',
-            spark: recent.map((day) => day.podiumReplays),
         }),
     ];
 }
@@ -380,7 +335,7 @@ function modeRow(doc, mode) {
 function renderModes(doc, days) {
     const today = days[days.length - 1] ?? {};
     const modes = Array.isArray(today.modes) ? today.modes : [];
-    const nodes = [cardHeading(doc, 'Modes today', 'Same events, same day, so the rows compare')];
+    const nodes = [cardHeading(doc, 'Modes today')];
     if (modes.length === 0) {
         nodes.push(element(doc, 'p', 'analytics-note', 'No races today'));
         return nodes;
@@ -420,8 +375,61 @@ function renderModes(doc, days) {
     return nodes;
 }
 
+function cohortMetricText(metric) {
+    if (metric?.retained === null || metric?.retained === undefined
+        || metric?.rate === null || metric?.rate === undefined) return '—';
+    return `${formatRate(metric.rate)} (${formatCount(metric.retained)})`;
+}
+
+function renderCohorts(doc, cohorts) {
+    const nodes = [
+        cardHeading(doc, 'Cohort retention'),
+        element(doc, 'p', 'analytics-note', 'Exact UTC-day return · signed-in racers only'),
+    ];
+    if (cohorts.length === 0) {
+        nodes.push(element(doc, 'p', 'analytics-note', 'No cohorts recorded yet'));
+        return nodes;
+    }
+
+    const table = element(doc, 'table', 'analytics-table analytics-table--cohorts');
+    const head = element(doc, 'thead');
+    const labels = element(doc, 'tr');
+    for (const [label, milestone] of [
+        ['Cohort', false], ['Started', false], ['D1', true], ['D7', true], ['D30', true],
+    ]) {
+        const cell = element(doc, 'th', milestone ? 'analytics-table__milestone' : undefined, label);
+        cell.scope = 'col';
+        labels.append(cell);
+    }
+    head.append(labels);
+
+    const body = element(doc, 'tbody');
+    const latest = cohorts[cohorts.length - 1]?.date;
+    for (const cohort of [...cohorts].reverse()) {
+        const row = element(doc, 'tr');
+        if (cohort?.date && cohort.date === latest) row.className = 'analytics-table__latest';
+        const date = element(doc, 'th', undefined, formatShortDate(cohort?.date) || 'Unknown');
+        date.scope = 'row';
+        date.title = typeof cohort?.date === 'string' ? cohort.date : '';
+        row.append(
+            date,
+            element(doc, 'td', undefined, formatCount(cohort?.players)),
+            element(doc, 'td', 'analytics-table__milestone', cohortMetricText(cohort?.d1)),
+            element(doc, 'td', 'analytics-table__milestone', cohortMetricText(cohort?.d7)),
+            element(doc, 'td', 'analytics-table__milestone', cohortMetricText(cohort?.d30)),
+        );
+        body.append(row);
+    }
+    table.append(head, body);
+
+    const wrap = element(doc, 'div', 'analytics-table-wrap');
+    wrap.append(table);
+    nodes.push(wrap);
+    return nodes;
+}
+
 function renderMonths(doc, months) {
-    const nodes = [cardHeading(doc, 'Players per month', 'Each player counted once per month')];
+    const nodes = [cardHeading(doc, 'Players per month')];
     if (months.length === 0) {
         nodes.push(element(doc, 'p', 'analytics-note', 'No months recorded yet'));
         return nodes;
@@ -475,18 +483,13 @@ function renderMonths(doc, months) {
 function renderStorage(doc, storage) {
     if (!storage || typeof storage !== 'object') {
         return [
-            cardHeading(doc, 'Redis', 'Could not measure named keys this time'),
-            element(doc, 'p', 'analytics-note', 'Player counts above are unaffected.'),
+            cardHeading(doc, 'Redis'),
+            element(doc, 'p', 'analytics-note', 'Unavailable'),
         ];
     }
 
     const groups = Array.isArray(storage.groups) ? storage.groups : [];
-    const estimated = groups.some((group) => group?.estimated);
-    const nodes = [cardHeading(
-        doc,
-        'Redis',
-        estimated ? 'Sampled from named keys this app can walk' : 'Named keys this app can walk',
-    )];
+    const nodes = [cardHeading(doc, 'Redis')];
     nodes.push(element(doc, 'p', 'analytics-storage-total analytics-count', formatBytes(storage.totalBytes)));
 
     if (groups.length === 0) {
@@ -523,9 +526,6 @@ function renderStorage(doc, storage) {
         nodes.push(wrap);
     }
 
-    for (const line of Array.isArray(storage.notCounted) ? storage.notCounted : []) {
-        if (line) nodes.push(element(doc, 'p', 'analytics-note', String(line)));
-    }
     return nodes;
 }
 
@@ -601,11 +601,14 @@ export function renderAnalyticsSummary(root, summary) {
     const windows = root.getElementById('analytics-windows');
     const trendNode = root.getElementById('analytics-trend');
     const modesNode = root.getElementById('analytics-modes');
+    const cohortsNode = root.getElementById('analytics-cohorts');
     const monthsNode = root.getElementById('analytics-months');
     const storageNode = root.getElementById('analytics-storage');
     const daysNode = root.getElementById('analytics-days');
     const stored = Array.isArray(summary?.days) ? summary.days : [];
     const months = Array.isArray(summary?.months) ? summary.months : [];
+    const cohorts = Array.isArray(summary?.cohorts) ? summary.cohorts : [];
+    const chartDays = stored.slice(-ANALYTICS_CHART_DAYS);
     const days = stored.length > 0
         ? stored
         : [summary?.today && typeof summary.today === 'object' ? summary.today : {}];
@@ -616,20 +619,24 @@ export function renderAnalyticsSummary(root, summary) {
 
     windows.replaceChildren(...renderHeadline(root, days));
 
-    const trendHead = cardHeading(root, 'Players per day', `${formatCount(stored.length)} days recorded`);
-    if (stored.length < 2) {
+    const trendTitle = stored.length > ANALYTICS_CHART_DAYS
+        ? `Players per day · last ${ANALYTICS_CHART_DAYS} days`
+        : 'Players per day';
+    const trendHead = cardHeading(root, trendTitle);
+    if (chartDays.length < 2) {
         const empty = element(root, 'p', 'analytics-chart-empty', 'Not enough days recorded yet');
         trendNode.replaceChildren(trendHead, empty);
     } else {
         trendHead.append(chartLegend(root));
-        trendNode.replaceChildren(trendHead, renderPlayersChart(root, stored));
+        trendNode.replaceChildren(trendHead, renderPlayersChart(root, chartDays));
     }
 
     modesNode.replaceChildren(...renderModes(root, days));
+    cohortsNode?.replaceChildren(...renderCohorts(root, cohorts));
     monthsNode.replaceChildren(...renderMonths(root, months));
     storageNode?.replaceChildren(...renderStorage(root, summary?.storage));
 
-    const dayHead = cardHeading(root, 'Daily breakdown', 'Newest first');
+    const dayHead = cardHeading(root, 'Daily breakdown');
     if (stored.length === 0) {
         daysNode.replaceChildren(dayHead, element(root, 'p', 'analytics-note', 'No stored days yet'));
     } else {

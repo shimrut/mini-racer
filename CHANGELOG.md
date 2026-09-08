@@ -1,5 +1,32 @@
 # Changelog
 
+- Fixed Daily races selected from Campaign’s Tracks tab retaining Campaign finish
+  routing and stopping without the correct result screen.
+
+- Simplified shared challenge commenting and Tracks layout rules. Comment
+  confirmation now checks the preview under its lock to reject stale retries.
+
+- Moderator player trend charts now show the most recent 45 daily buckets so
+  individual bars remain readable while the full retained history stays in the
+  daily breakdown.
+
+- Moderator analytics now include exact UTC-day D1/D7/D30 retention cohorts for
+  signed-in racers. Cohort starts are scoped per subreddit, guests stay outside
+  the denominator, and milestones that have not matured show as unavailable.
+
+- Daily GP leaderboard, PB, ghost, challenge-history, post, podium, analytics,
+  and share records now stay for one year after the race starts; the playable
+  playlist remains seven days.
+- Campaign guest progress, bests, and PB ghosts now stay for one year of
+  inactivity. Signed-in Campaign records remain permanent.
+
+- Challenge wins now offer **Brag** with three margin-specific messages for
+  0.001–0.100s, 0.101–0.500s, and 0.501s+. Ties and losses offer **Comment**
+  with one tie message plus three margin-specific messages over those same
+  ranges as a text-only reply.
+- Refined the Brag and Comment messages with the approved tier-specific copy,
+  player time, track name, and reaction emoji.
+
 - Reddit's review copy of the source no longer includes Cursor, VS Code, or
   agent folders. Local Cursor skill caches also stay out of git.
 

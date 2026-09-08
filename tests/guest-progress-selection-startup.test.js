@@ -49,8 +49,28 @@ describe('promoted guest startup selection', () => {
                     required: true,
                     guestHasProgress: true,
                     accountHasProgress: true,
-                    guestSummary: { hasDailyResults: true, campaignResults: 1, unlocks: true },
-                    accountSummary: { hasDailyResults: true, campaignResults: 2, unlocks: true },
+                    guestSummary: {
+                        hasDailyResults: true,
+                        campaignResults: 1,
+                        campaignUnlockedTracks: 2,
+                        campaignTotalStages: 16,
+                        dailySavedResults: 1,
+                        dailyPlaylistSize: 7,
+                        carsUnlocked: 15,
+                        carsTotal: 23,
+                        unlocks: true,
+                    },
+                    accountSummary: {
+                        hasDailyResults: true,
+                        campaignResults: 2,
+                        campaignUnlockedTracks: 3,
+                        campaignTotalStages: 16,
+                        dailySavedResults: 2,
+                        dailyPlaylistSize: 7,
+                        carsUnlocked: 16,
+                        carsTotal: 23,
+                        unlocks: true,
+                    },
                 },
             }))
             .mockResolvedValueOnce(response(200, selectedState));
@@ -67,7 +87,32 @@ describe('promoted guest startup selection', () => {
         });
 
         expect(document.body.classList.contains('loading-active')).toBe(false);
+        expect(document.querySelectorAll('.guest-progress-selection__source-input')).toHaveLength(2);
+        const sourcesText = document.querySelector('.guest-progress-selection__sources').textContent;
+        expect(sourcesText).toContain('Daily2/7');
+        expect(sourcesText).toContain('Campaign3/16');
+        expect(sourcesText).toContain('Garage16/23');
+        expect(sourcesText).not.toContain('Daily results saved');
+        expect(sourcesText).not.toContain('Car unlock progress saved');
+        expect(sourcesText).not.toContain(' · Daily · Unlocks');
+        expect(sourcesText).not.toContain('replaces saved account progress');
+        expect(sourcesText).not.toContain('discards guest progress');
+        expect(document.querySelector('.guest-progress-selection__message').textContent)
+            .toBe('Choose one save to keep.');
+        expect(document.querySelector('[data-choice="account"]')?.parentElement?.textContent)
+            .toContain('Account');
+        const continueButton = document.querySelector('.guest-progress-selection__button');
+        expect(document.querySelectorAll('.guest-progress-selection__button')).toHaveLength(1);
+        expect(continueButton.disabled).toBe(false);
+        expect(document.querySelector('.guest-progress-selection__source.is-selected'))
+            .toBe(document.querySelector('[data-choice="guest"]')?.parentElement);
+        expect(continueButton.textContent).toBe('CONTINUE WITH GUEST');
+        document.querySelector('[data-choice="account"]').click();
+        expect(continueButton.disabled).toBe(false);
+        expect(continueButton.textContent).toBe('CONTINUE WITH ACCOUNT');
         document.querySelector('[data-choice="guest"]').click();
+        expect(continueButton.textContent).toBe('CONTINUE WITH GUEST');
+        continueButton.click();
         const state = await statePromise;
 
         expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -83,6 +128,90 @@ describe('promoted guest startup selection', () => {
             redditUsername: 'RaceFan',
             leaderboardPlayerId: 'reddit:racefan',
         });
+    });
+
+    it('includes an account Campaign result that is still saving locally', async () => {
+        const dom = new JSDOM('<body class="loading-active"></body>', {
+            url: 'https://example.devvit.net/game.html',
+        });
+        dom.window.localStorage.setItem(PLAYER_ID_KEY, 'promoted-guest-pending');
+        dom.window.localStorage.setItem(GUEST_TOKEN_KEY, 'guest-token');
+        dom.window.localStorage.setItem('VectorGpVerificationQueue', JSON.stringify({
+            daily: {},
+            campaign: {
+                'reddit:racefan::numbered-v1-02': {
+                    raceId: 'numbered-v1-02',
+                    ownerPlayerId: 'reddit:racefan',
+                    bestTime: 12.345,
+                    verificationState: 'pending',
+                    nextAttemptAt: Date.now(),
+                    expiresAt: new Date(Date.now() + 86400000).toISOString(),
+                    replay: { inputs: [] },
+                },
+            },
+        }));
+        vi.stubGlobal('window', dom.window);
+        vi.stubGlobal('document', dom.window.document);
+        vi.stubGlobal('localStorage', dom.window.localStorage);
+        vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'new-guest') });
+
+        const selectedState = {
+            hasAnyData: true,
+            isReturningPlayer: true,
+            redditUsername: 'RaceFan',
+            playerId: 'reddit:racefan',
+            guestToken: null,
+            leaderboardIdentity: 'reddit',
+            playerPreferences: { carSkin: 'assets/cars/mr_extra_crimson.webp' },
+            progressSelection: { required: false },
+        };
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce(response(200, {
+                ...selectedState,
+                guestToken: 'guest-token',
+                progressSelection: {
+                    required: true,
+                    guestHasProgress: true,
+                    accountHasProgress: true,
+                    guestSummary: {
+                        hasDailyResults: true,
+                        campaignResults: 0,
+                        campaignUnlockedTracks: 1,
+                        campaignTotalStages: 16,
+                        dailySavedResults: 0,
+                        dailyPlaylistSize: 7,
+                        carsUnlocked: 14,
+                        carsTotal: 23,
+                        unlocks: true,
+                    },
+                    accountSummary: {
+                        hasDailyResults: true,
+                        campaignResults: 2,
+                        campaignUnlockedTracks: 3,
+                        campaignTotalStages: 16,
+                        dailySavedResults: 2,
+                        dailyPlaylistSize: 7,
+                        carsUnlocked: 16,
+                        carsTotal: 23,
+                        unlocks: true,
+                    },
+                },
+            }))
+            .mockResolvedValueOnce(response(200, selectedState)));
+
+        const { getPlayerProgressState } = await import('../game/storage.js');
+        const statePromise = getPlayerProgressState();
+        await vi.waitFor(() => {
+            expect(document.querySelector('.guest-progress-selection')).not.toBeNull();
+        });
+
+        expect(document.querySelector('.guest-progress-selection__sources').textContent)
+            .toContain('Campaign3/16');
+        expect(document.querySelector('.guest-progress-selection__sources').textContent)
+            .not.toContain('Campaign result pending');
+        document.querySelector('[data-choice="account"]').click();
+        document.querySelector('.guest-progress-selection__button').click();
+        await statePromise;
     });
 
     it('never asks a signed-out guest to resolve account progress because of a queued guest run', async () => {

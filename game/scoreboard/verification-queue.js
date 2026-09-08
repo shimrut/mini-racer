@@ -642,6 +642,30 @@ export function getCampaignVerificationEntries() {
   return entries;
 }
 
+/**
+ * Selection is shown while the active owner is deliberately cleared. Read the queue by its
+ * stamped owner so a pending Campaign result can be described without making another owner's
+ * result visible to the current session.
+ */
+export function getCampaignVerificationEntriesForOwner(ownerPlayerId) {
+  if (typeof ownerPlayerId !== 'string' || !ownerPlayerId.trim()) {
+    return Object.create(null);
+  }
+  const entries = Object.create(null);
+  const phoneGuestOwnerId = getPhoneGuestOwnerId();
+  const sessionId = getPlayerSessionId();
+  for (const entry of Object.values(readQueueState().campaign)) {
+    const isStampedOwner = entry?.ownerPlayerId === ownerPlayerId;
+    const isCurrentUnownedGuestRun = ownerPlayerId === phoneGuestOwnerId
+      && !entry?.ownerPlayerId
+      && entry?.sessionId === sessionId;
+    if (!isStampedOwner && !isCurrentUnownedGuestRun) continue;
+    const cloned = cloneEntry(entry);
+    if (cloned?.raceId) entries[cloned.raceId] = cloned;
+  }
+  return entries;
+}
+
 function isBetterCampaignCandidate(nextEntry, previousEntry) {
   if (!previousEntry) return true;
   if (previousEntry.verificationState !== "pending") return true;

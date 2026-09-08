@@ -187,6 +187,38 @@ describe('server route contracts', () => {
         });
     });
 
+    it('returns a retryable progress-selection response for temporary transfer contention', async () => {
+        const retryable = new Error('Campaign discard is temporarily busy.');
+        retryable.statusCode = 503;
+        retryable.reason = 'progress_selection_retryable';
+        const selectServerGuestProgress = vi.fn(async () => {
+            throw retryable;
+        });
+        const baseUrl = await startApp((app) => registerPlayerRoutes(app, {
+            getRequestUsername: () => 'RaceFan',
+            getServerPlayerBootstrap: vi.fn(),
+            selectServerGuestProgress,
+            updateServerPlayerIdentity: vi.fn(),
+            updateServerPlayerPreferences: vi.fn(),
+        }));
+
+        const response = await fetch(`${baseUrl}/api/player/progress-selection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: 'guest-1',
+                guestToken: 'signed-token',
+                choice: 'account',
+            }),
+        });
+
+        expect(response.status).toBe(503);
+        expect(await readJson(response)).toEqual({
+            error: 'Your save is busy. Wait a moment, then try again.',
+            reason: 'progress_selection_retryable',
+        });
+    });
+
     it('preserves player mutation forwarding, success, and invalid-preference responses', async () => {
         const updateServerPlayerIdentity = vi.fn(async () => ({
             playerId: 'guest:guest-1',

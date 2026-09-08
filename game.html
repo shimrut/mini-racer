@@ -627,12 +627,24 @@
                         <div class="reusable-modal-header">
                             <div class="reusable-modal-heading">
                                 <span id="modal-daily-playlist-title" class="leaderboard-hero-track"
-                                    data-modal-title>Daily Tracks</span>
+                                    data-modal-title>Tracks</span>
                                 <span class="leaderboard-subhead" data-modal-subtitle hidden></span>
                             </div>
                         </div>
-                        <div id="daily-playlist-list" class="daily-playlist-list reusable-modal-content"
-                            data-modal-content></div>
+                        <div class="reusable-modal-content" data-modal-content>
+                            <div class="tracks-tabs" role="tablist" aria-label="Tracks sections">
+                                <button id="tracks-tab-daily" class="tracks-tab" type="button" role="tab"
+                                    aria-selected="true" aria-controls="daily-playlist-list">Daily</button>
+                                <button id="tracks-tab-campaign" class="tracks-tab" type="button" role="tab"
+                                    aria-selected="false" aria-controls="campaign-playlist-list">Campaign</button>
+                            </div>
+                            <div id="daily-playlist-list" class="tracks-tab-panel daily-playlist-list" role="tabpanel"
+                                aria-labelledby="tracks-tab-daily">
+                            </div>
+                            <div id="campaign-playlist-list" class="tracks-tab-panel daily-playlist-list" role="tabpanel"
+                                aria-labelledby="tracks-tab-campaign" hidden>
+                            </div>
+                        </div>
                         <button id="daily-playlist-close-btn" class="combined-action-btn modal-sheet-dismiss" type="button" aria-label="Close" data-modal-close>
                             <span class="combined-action-btn-label">Close</span>
                         </button>

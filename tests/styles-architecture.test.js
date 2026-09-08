@@ -693,13 +693,13 @@ describe('game stylesheet architecture', () => {
             'utf8',
         );
         expect(garageStyles).toMatch(
-            /\.garage-tabs\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*#1e293b;[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.garage-tabs,\s*\.tracks-tabs\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*#1e293b;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(garageStyles).toMatch(
-            /\.garage-tabs::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(garageStyles).toMatch(
-            /\.garage-tabs:has\(#garage-tab-trails\[aria-selected="true"\]\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
+            /\.garage-tabs:has\(#garage-tab-trails\[aria-selected="true"\]\)::before,\s*\.tracks-tabs:has\(#tracks-tab-campaign\[aria-selected="true"\]\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
         );
         expect(garageStyles).toMatch(
             /#garage-modal \.garage-tabs\s*\{[^}]*height:\s*2\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,

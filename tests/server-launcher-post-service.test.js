@@ -4,6 +4,7 @@ const {
     mockReddit,
     mockStore,
     mockContext,
+    mockPostFlair,
 } = vi.hoisted(() => ({
     mockReddit: { submitCustomPost: vi.fn() },
     mockStore: {
@@ -13,11 +14,13 @@ const {
         writeLauncherPostRecord: vi.fn(),
     },
     mockContext: { getRequestAppSlug: vi.fn() },
+    mockPostFlair: { resolveMiniRacerPostFlairId: vi.fn() },
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
 vi.mock('../src/server/launcher-post-store.js', () => mockStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
+vi.mock('../src/server/post-flair-service.js', () => mockPostFlair);
 
 const {
     ensureMiniRacerLauncherPostForSubreddit,
@@ -27,6 +30,9 @@ describe('launcher post service', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockContext.getRequestAppSlug.mockReturnValue('mini-racer');
+        mockPostFlair.resolveMiniRacerPostFlairId.mockImplementation(
+            async (_subredditName, postType) => `flair-${postType}`,
+        );
         mockStore.readLauncherPostRecord.mockResolvedValue(null);
         mockStore.acquireLauncherPostCreationLock.mockResolvedValue({ key: 'lock', value: 'value' });
         mockStore.releaseLauncherPostCreationLock.mockResolvedValue(undefined);
@@ -57,6 +63,7 @@ describe('launcher post service', () => {
 
         expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(expect.objectContaining({
             subredditName: 'MiniRacer',
+            flairId: `flair-${postType}`,
             entry,
             postData: { postType, launchMode },
         }));

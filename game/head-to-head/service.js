@@ -111,6 +111,27 @@ export async function confirmHeadToHeadBrag(shareToken) {
     });
 }
 
+export async function previewHeadToHeadComment({ challengeId, reportedTimeMs }) {
+    return requestJson(API_ROUTES.headToHeadCommentPreviewUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(challengePostIdentityBody({
+            challengeId,
+            reportedTimeMs,
+        })),
+    });
+}
+
+export async function confirmHeadToHeadComment(shareToken) {
+    return requestJson(API_ROUTES.headToHeadCommentConfirmUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            shareToken,
+        }),
+    });
+}
+
 const WON_CHALLENGE_KEY = 'MiniRacerHeadToHeadWin';
 const WON_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 

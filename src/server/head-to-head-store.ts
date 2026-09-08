@@ -26,7 +26,6 @@ export type HeadToHeadAcceptRecord = {
     bestTimeMs: number;
     targetTimeMs: number;
     medal: HeadToHeadMedal;
-    commentText: string;
 };
 
 function keyPart(value: string): string {
@@ -75,8 +74,9 @@ function parseJson<T>(raw: string | null): T | null {
 }
 
 async function setWithTtl(key: string, value: unknown, ttlSeconds: number): Promise<void> {
-    await redis.set(key, JSON.stringify(value));
-    await redis.expire(key, ttlSeconds);
+    await redis.set(key, JSON.stringify(value), {
+        expiration: new Date(Date.now() + ttlSeconds * 1000),
+    });
 }
 
 function challengePostIdentityKey(challengeId: string): string {

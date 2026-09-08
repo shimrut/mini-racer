@@ -940,6 +940,9 @@ export const dailyChallengeEngineMethods = {
           this.preparedPbGhostChallengeId = null;
         }
       }
+      this.activeRaceMode = "daily";
+      this.activeCampaignStage = null;
+      this.activeHeadToHead = null;
       this.applyDailyChallenge(challenge);
       void this.journeys?.startAttempt?.({
         mode: "daily",

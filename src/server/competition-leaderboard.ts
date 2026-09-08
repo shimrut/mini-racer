@@ -1,4 +1,5 @@
 import { redis } from '@devvit/redis';
+import { createHash } from 'node:crypto';
 import {
     DAILY_GP_NEARBY_RADIUS,
     encodeDailyGpLeaderboardScore,
@@ -8,7 +9,7 @@ import {
 } from './daily-gp-model.js';
 import { createSharedStandingsCacheKey, type Competition } from './competition.js';
 import { readPlayerProfileMap } from './competition-identity.js';
-import { getPlayerTrackPbRecord, type PlayerTrackPbRecord } from './pb-ghost-store.js';
+import { getPlayerTrackPbRecords, type PlayerTrackPbRecord } from './pb-ghost-store.js';
 import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
 import { resolveLeaderboardDisplayName } from '../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../game/track/tracks.js';
@@ -129,6 +130,32 @@ export function isCompleteOpponentRecord(
     );
 }
 
+/**
+ * Does this identity still hold anything on this board: a stored entry, a ranking, or a stored
+ * personal best. Presence is read raw and unparsed on purpose — a cleanup has to remove a row it
+ * cannot parse just as surely as one it can, and a ranking can outlive the entry it came from.
+ */
+export async function competitionHoldsPlayerRows(
+    competition: Competition,
+    playerId: string,
+): Promise<boolean> {
+    const [rawEntry, rawPb, score] = await Promise.all([
+        redis.hGet(competition.entryHashKey, playerId),
+        redis.hGet(
+            competition.pbHashKey,
+            createHash('sha256').update(playerId, 'utf8').digest('base64url'),
+        ),
+        typeof redis.zScore === 'function'
+            ? redis.zScore(competition.leaderboardKey, playerId)
+            : Promise.resolve(undefined),
+    ]);
+    // Presence, not truthiness: hGet answers undefined for a field that is not there, so an
+    // empty stored value is a row that exists and still has to go.
+    const isStored = (value: unknown): boolean => value !== undefined && value !== null;
+    const isRanked = isStored(score) && Number.isFinite(Number(score));
+    return isStored(rawEntry) || isStored(rawPb) || isRanked;
+}
+
 export async function readEntryByPlayerId(
     competition: Competition,
     playerId: string,
@@ -161,33 +188,39 @@ async function readRowsForRankedMembers(
         return [];
     }
 
-    const rawEntries = await redis.hMGet(
-        competition.entryHashKey,
-        rankedMembers.map((member) => member.member),
-    );
-    const profileMap = await readPlayerProfileMap(
-        rankedMembers.map((member) => member.member),
-    );
+    const [rawEntries, profileMap] = await Promise.all([
+        redis.hMGet(
+            competition.entryHashKey,
+            rankedMembers.map((member) => member.member),
+        ),
+        readPlayerProfileMap(rankedMembers.map((member) => member.member)),
+    ]);
+    const storedEntries = rankedMembers.map((member, index) => ({
+        member,
+        entry: parseStoredEntry(rawEntries[index], competition.trackKey),
+    }));
+    const opponentIds = storedEntries
+        .filter(({ member, entry }) => entry && member.member !== currentPlayerId)
+        .map(({ member }) => member.member);
+    const pbRecords = await getPlayerTrackPbRecords({
+        playerIds: opponentIds,
+        competition,
+        track: TRACKS[competition.trackKey],
+    });
 
-    const rows = await Promise.all(rankedMembers
-        .map(async (member, index) => {
-            const storedEntry = parseStoredEntry(rawEntries[index], competition.trackKey);
-            if (!storedEntry) return null;
-            const record = member.member === currentPlayerId
-                ? null
-                : await getPlayerTrackPbRecord({
-                    playerId: member.member,
-                    competition,
-                    track: TRACKS[competition.trackKey],
-                });
-            return toSnapshotRow(
-                storedEntry,
-                start + index + 1,
-                currentPlayerId,
-                profileMap,
-                isCompleteOpponentRecord(storedEntry, record, competition),
-            );
-        }));
+    const rows = storedEntries.map(({ member, entry }, index) => {
+        if (!entry) return null;
+        const record = member.member === currentPlayerId
+            ? null
+            : pbRecords.get(member.member) ?? null;
+        return toSnapshotRow(
+            entry,
+            start + index + 1,
+            currentPlayerId,
+            profileMap,
+            isCompleteOpponentRecord(entry, record, competition),
+        );
+    });
     return rows
         .filter((entry): entry is SnapshotRow => Boolean(entry));
 }

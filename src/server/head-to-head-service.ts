@@ -30,8 +30,8 @@ import {
     writeHeadToHeadPostIdentity,
     writeHeadToHeadPostIdentityByChallengeId,
 } from './head-to-head-store.js';
-import { formatChallengeBragComment } from './head-to-head-brag.js';
 import { resolveHeadToHeadRecord, resolveHeadToHeadRecordResult } from './head-to-head-post.js';
+import { resolveMiniRacerPostFlairId } from './post-flair-service.js';
 import {
     encodeHeadToHeadReplay,
     formatHeadToHeadTextFallback as formatReplayTextFallback,
@@ -627,6 +627,7 @@ export function createHeadToHeadService(
             ...sourceInput
         } = input;
         const previewToken = createId();
+        const expiresAt = new Date(now().getTime() + PREVIEW_TTL_SECONDS * 1000);
         const previewRecord = {
             username: request.username,
             subredditName: request.subredditName,
@@ -635,10 +636,9 @@ export function createHeadToHeadService(
             createdAt,
             sourceInput,
             sourceContract: sourceContract(source),
-            expiresAt: new Date(now().getTime() + PREVIEW_TTL_SECONDS * 1000).toISOString(),
+            expiresAt: expiresAt.toISOString(),
         } satisfies PreviewTokenRecord;
-        await redis.set(previewKey(previewToken), JSON.stringify(previewRecord));
-        await redis.expire(previewKey(previewToken), PREVIEW_TTL_SECONDS);
+        await redis.set(previewKey(previewToken), JSON.stringify(previewRecord), { expiration: expiresAt });
         return {
             status: 200,
             body: {
@@ -647,7 +647,7 @@ export function createHeadToHeadService(
                 username: request.username,
                 title,
                 preview: buildPublicPostData(buildRecord(record, challengerAvatarUrl)),
-                expiresAt: new Date(now().getTime() + PREVIEW_TTL_SECONDS * 1000).toISOString(),
+                expiresAt: expiresAt.toISOString(),
             },
         };
     }
@@ -786,9 +786,14 @@ export function createHeadToHeadService(
             const challengerAvatarUrl = await resolveRedditAvatarUrl(preparedRecord.username);
             const record = buildRecord(preparedRecord, challengerAvatarUrl);
             const postData = buildPublicPostData(record);
+            const flairId = await resolveMiniRacerPostFlairId(
+                request.subredditName,
+                HEAD_TO_HEAD_POST_TYPE,
+            );
             const post = await reddit.submitCustomPost({
                 subredditName: request.subredditName,
                 title: preparedRecord.title,
+                flairId,
                 entry: HEAD_TO_HEAD_POST_TYPE,
                 postData,
                 textFallback: { text: formatHeadToHeadTextFallback(postData, record.frozenGhost) },
@@ -1062,10 +1067,6 @@ export function createHeadToHeadService(
                     bestTimeMs: verified.bestTimeMs,
                     targetTimeMs: challenge.targetTimeMs,
                     medal: verified.medal,
-                    commentText: formatChallengeBragComment(
-                        verified.bestTimeMs,
-                        challenge.trackKey,
-                    ),
                 });
                 return acceptToken;
             })()

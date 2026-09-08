@@ -32,7 +32,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The launch card works without inline scroll traps.
 - [ ] The expanded game works across phone and desktop layouts.
 - [ ] The retry flow is fast and predictable after a finish or an enabled collision auto-restart.
-- [ ] A verified PB ghost appears on the next attempt for that daily challenge and remains until 45 days after the race started, even after the challenge leaves the seven-day playlist.
+- [ ] A verified PB ghost appears on the next attempt for that daily challenge and remains until 365 days after the race started, even after the challenge leaves the seven-day playlist.
 - [ ] The PB ghost uses the player's currently selected car and is visibly more transparent than the live player car.
 - [ ] `Race Now` keeps the custom-post loading screen visible until the resolved track ghost is prepared: valid historical posts load their own ghost, while expired posts load today's featured-track ghost.
 - [ ] `Personal Best Ghost` defaults on, disables immediately in Settings, and stays disabled after reopening the app.
@@ -102,7 +102,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
   verified finish updates the normal Daily rank.
 - [ ] In Campaign standings, select an unlocked stage and opponent, verify the
   normal Campaign submission/progression path remains active, and confirm a
-  guest result is ranked server-side, retained for 90 days of inactivity, and
+  guest result is ranked server-side, retained for 365 days of inactivity, and
   merged into the Reddit account on sign-in with the faster result preserved.
 - [ ] Opponent loss/tie retries the same frozen ghost; a win offers the nearest
   raceable racer above the refreshed position, skipping unavailable ghosts,
@@ -164,6 +164,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The **Create Mini Racer post** menu item successfully creates a playable post.
 - [ ] The **Create current Daily launcher**, **Create Campaign launcher**, and **Create Lobby launcher** menu items each create the correct canonical post and navigate to it.
 - [ ] Repeating any launcher creation action reuses the existing subreddit launcher post instead of creating a duplicate.
+- [ ] The subreddit has the four Mini Racer post flair templates: `Launcher`, `Daily`, `Challenges`, and `Podiums`. `Challenges` allows user assignment for user-authored Head to Head posts; the other three remain moderator-only.
+- [ ] Reddit's post-flair navigation is enabled, and newly created launcher, dated Daily, Head to Head, and podium posts appear under `Launcher`, `Daily`, `Challenges`, and `Podiums` respectively.
 - [ ] At least one example post has been created and reviewed end to end.
 - [ ] Moderator, scheduler, and repeated create actions reuse the same canonical post for the subreddit and UTC day.
 - [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.
@@ -198,6 +200,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 ### Devvit Journeys playtest
 
 - [ ] `journeys` permission and the official `/api/telemetry` route are present. Custom moderator summary uses `/api/analytics/summary` and the restored `dailygp:analytics:*` Redis keys only, never Journey payloads.
+- [ ] Moderator analytics shows signed-in race cohorts with exact UTC-day D1/D7/D30 return rates, keeps immature milestones blank, and excludes guest browser IDs from the denominator.
 - [ ] `App.Ready` fires once after the expanded lobby becomes interactive; preview, Daily launcher, Campaign launcher, and podium entrypoints do not fire it.
 - [ ] Explicit Start/Retry/Improve/Restart begins an attempt with the matching Journey start reason, checkpoint progress never moves backward, pause/resume use fixed actions, and valid/incomplete endings match the race lifecycle.
 - [ ] Journey payloads contain no player identity, guest token, challenge or track identifier, replay data, device details, or lap score.

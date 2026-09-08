@@ -18,6 +18,7 @@ import {
     writeDailyGpPodiumPendingSnapshot,
 } from './daily-podium-post-store.js';
 import { getRequestAppSlug } from './request-context.js';
+import { resolveMiniRacerPostFlairId } from './post-flair-service.js';
 import { cacheSharedJson } from './shared-cache.js';
 import { getServerFinalDailyGpPodiumGhosts } from './daily-gp-store.js';
 import {
@@ -512,9 +513,11 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
         if (!isDailyGpPodiumPublicationOpen(finalPodium)) {
             throw new Error('This Mini Racer podium publication window has closed.');
         }
+        const flairId = await resolveMiniRacerPostFlairId(subredditName, 'daily-podium');
         const post = await reddit.submitCustomPost({
             subredditName,
             title: formatDailyMiniRacerPodiumTitle(podium),
+            flairId,
             entry: 'podium',
             postData: {
                 postType: 'daily-podium',

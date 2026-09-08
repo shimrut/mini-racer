@@ -520,8 +520,8 @@ export async function previewDailyGpShare(
 
     const shareToken = randomUUID();
     const key = createSharePreviewKey(shareToken);
-    await redis.set(key, JSON.stringify(preview));
-    await redis.expire(key, SHARE_PREVIEW_TTL_SECONDS);
+    const expiresAt = new Date(Date.now() + SHARE_PREVIEW_TTL_SECONDS * 1000);
+    await redis.set(key, JSON.stringify(preview), { expiration: expiresAt });
     return {
         status: 200,
         body: {
@@ -529,7 +529,7 @@ export async function previewDailyGpShare(
             shareToken,
             username: preview.username,
             commentText: preview.commentText,
-            expiresAt: new Date(Date.now() + SHARE_PREVIEW_TTL_SECONDS * 1000).toISOString(),
+            expiresAt: expiresAt.toISOString(),
         },
     };
 }

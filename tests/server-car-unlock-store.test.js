@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
     getCarUnlockSnapshot,
     mergeGuestCarUnlockProgress,
@@ -69,6 +70,11 @@ function createRedisMock() {
         },
     };
     return client;
+}
+
+function promotionLockKey(playerId) {
+    const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+    return `miniracer:car-unlocks:promotion:v1:${playerHash}:lock`;
 }
 
 describe('server car unlock store', () => {
@@ -197,5 +203,24 @@ describe('server car unlock store', () => {
         const redditSnapshot = await getCarUnlockSnapshot('reddit:driver', {}, client);
         expect(redditSnapshot.progress.completedRace).toBe(1);
         expect(redditSnapshot.progress.headToHeadWins).toBe(1);
+    });
+
+    it('does not replace account unlocks while the account writer owns its lock', async () => {
+        await recordCompletedRace('guest:driver', client);
+        await recordHeadToHeadWin('reddit:driver', 'account-win', client);
+        await client.set(promotionLockKey('reddit:driver'), 'account-writer');
+
+        await expect(mergeGuestCarUnlockProgress({
+            guestPlayerId: 'guest:driver',
+            redditPlayerId: 'reddit:driver',
+            client,
+            replace: true,
+        })).rejects.toMatchObject({
+            statusCode: 503,
+            reason: 'progress_selection_retryable',
+        });
+
+        expect((await getCarUnlockSnapshot('guest:driver', {}, client)).progress.completedRace).toBe(1);
+        expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.headToHeadWins).toBe(1);
     });
 });

@@ -76,6 +76,10 @@ import {
     previewHeadToHeadBrag,
 } from './head-to-head-brag.js';
 import {
+    confirmHeadToHeadComment,
+    previewHeadToHeadComment,
+} from './head-to-head-comment.js';
+import {
     readHeadToHeadViewerBest,
     recordHeadToHeadBest,
     resolveHeadToHeadSource,
@@ -146,6 +150,8 @@ function registerProductionRoutes(app: express.Application): void {
         submitHeadToHead: headToHeadService.submit,
         previewHeadToHeadBrag,
         confirmHeadToHeadBrag,
+        previewHeadToHeadComment,
+        confirmHeadToHeadComment,
     });
     registerLeaderboardRaceRoutes(app, {
         getRequestUsername,

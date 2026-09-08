@@ -3,6 +3,7 @@ import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../../game/campaign/manifest.js';
 import {
     analyticsRetentionWindow,
     analyticsScope,
+    cohortStartsKey,
     dayCountersKey,
     dayModePlayersKey,
     dayPlayersKey,
@@ -346,7 +347,7 @@ function buildKeyGroups({
         {
             id: 'analytics',
             label: 'Analytics',
-            detail: 'This page: a mark per player per day, race counters, and the ledger of accounts seen',
+            detail: 'This page: daily player marks, race counters, cohort starts, and the account ledger',
             strings: [],
             hashes: [
                 ...dates.flatMap((date) => [
@@ -360,6 +361,7 @@ function buildKeyGroups({
                     monthCountersKey(scope, month),
                 ]),
                 firstSeenKey(scope),
+                cohortStartsKey(scope),
             ],
             sortedSets: [],
         },

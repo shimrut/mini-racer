@@ -7,6 +7,7 @@ const {
     mockAutopostStore,
     mockContext,
     mockShareImage,
+    mockPostFlair,
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
@@ -32,6 +33,7 @@ const {
     mockShareImage: {
         resolveDailyShareImageUrl: vi.fn(),
     },
+    mockPostFlair: { resolveMiniRacerPostFlairId: vi.fn() },
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
@@ -40,6 +42,7 @@ vi.mock('../src/server/daily-gp-post-store.js', () => mockPostStore);
 vi.mock('../src/server/daily-autopost-store.js', () => mockAutopostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
 vi.mock('../src/server/share-image.js', () => mockShareImage);
+vi.mock('../src/server/post-flair-service.js', () => mockPostFlair);
 
 const {
     enableDailyAutopost,
@@ -78,6 +81,7 @@ describe('daily post workflow', () => {
         mockPostStore.releaseDailyGpPostCreationLock.mockResolvedValue(undefined);
         mockShare.registerDailyGpPostWithScoreThread.mockResolvedValue({});
         mockShareImage.resolveDailyShareImageUrl.mockReturnValue(null);
+        mockPostFlair.resolveMiniRacerPostFlairId.mockResolvedValue('flair-daily-race');
     });
 
     it('enables autoposting while retaining existing post history', async () => {
@@ -145,7 +149,9 @@ describe('daily post workflow', () => {
         expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(
             expect.objectContaining({
                 subredditName: 'MiniRacer',
+                flairId: 'flair-daily-race',
                 entry: 'default',
+                postData: expect.objectContaining({ postType: 'daily-race' }),
             }),
         );
         expect(mockReddit.submitCustomPost.mock.calls[0][0].styles).toBeUndefined();

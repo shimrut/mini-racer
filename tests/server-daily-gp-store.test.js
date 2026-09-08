@@ -668,12 +668,12 @@ describe('server daily gp store submissions', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2030-02-15T12:00:00.000Z'));
         const oldChallenge = {
-            id: 'daily-gp-2030-01-01',
-            challengeDate: '2030-01-01',
+            id: 'daily-gp-2029-01-01',
+            challengeDate: '2029-01-01',
             trackKey: 'circuit',
-            startsAt: '2030-01-01T00:00:00.000Z',
-            endsAt: '2030-01-02T00:00:00.000Z',
-            availableUntil: '2030-01-08T00:00:00.000Z',
+            startsAt: '2029-01-01T00:00:00.000Z',
+            endsAt: '2029-01-02T00:00:00.000Z',
+            availableUntil: '2029-01-08T00:00:00.000Z',
             status: 'active',
             objectiveType: 'single_lap_fastest',
             objectiveParams: {},
@@ -1619,7 +1619,7 @@ describe('server daily gp store submissions', () => {
         expect(mockRedis.expire).not.toHaveBeenCalledWith('dailygp:player-profiles', expect.anything());
     });
 
-    it('gives guest profiles the Campaign guest retention window', async () => {
+    it('gives guest profiles the one-year Campaign and Daily retention window', async () => {
         const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
         const beforeWrite = Date.now();
 
@@ -1628,10 +1628,10 @@ describe('server daily gp store submissions', () => {
         const guest = findWrittenPlayerProfile('guest:new-guest');
         expect(guest.options.expiration).toBeInstanceOf(Date);
         expect(guest.options.expiration.getTime()).toBeGreaterThan(
-            beforeWrite + (89 * 24 * 60 * 60 * 1000),
+            beforeWrite + (364 * 24 * 60 * 60 * 1000),
         );
         expect(guest.options.expiration.getTime()).toBeLessThanOrEqual(
-            beforeWrite + (90 * 24 * 60 * 60 * 1000) + 1000,
+            beforeWrite + (365 * 24 * 60 * 60 * 1000) + 1000,
         );
     });
 

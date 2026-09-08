@@ -423,6 +423,15 @@ describe('Head to Head lobby and finish', () => {
             shareEnabled: false,
             restartAction: expect.any(Function),
         });
+        const settledOptions = expect.objectContaining({
+            shareRequest: expect.objectContaining({
+                kind: 'challenge-comment',
+                challengeId: 'challenge-1',
+                reportedTimeMs: expect.any(Number),
+            }),
+            shareEnabled: true,
+            restartAction: expect.any(Function),
+        });
 
         const winShowModal = vi.fn();
         const winUpdateHero = vi.fn();
@@ -533,7 +542,7 @@ describe('Head to Head lobby and finish', () => {
             'Challenge complete',
             null,
             settledLap('lost', 0.4),
-            pendingOptions,
+            settledOptions,
         );
         // The verdict is settled on screen without waiting, and the hero is left alone
         // because this run earned no personal best to report.
@@ -557,7 +566,7 @@ describe('Head to Head lobby and finish', () => {
             'Challenge complete',
             null,
             settledLap('tie', 0),
-            pendingOptions,
+            settledOptions,
         );
         expect(tieUpdateHero).not.toHaveBeenCalled();
 
@@ -926,14 +935,19 @@ describe('Head to Head lobby and finish', () => {
             body: {
                 accepted: false,
                 status: 'target_not_beaten',
+                targetTimeMs: 8_000,
                 differenceMs: 400,
             },
         });
         await vi.waitFor(() => {
-            expect(updateChallengeFinishHero).toHaveBeenCalledWith({
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith(expect.objectContaining({
                 phase: 'lost',
                 verdict: { opponentName: 'shimroot', deltaSec: 0.4 },
-            });
+                shareRequest: expect.objectContaining({
+                    kind: 'challenge-comment',
+                    reportedTimeMs: 8_400,
+                }),
+            }));
         });
         expect(clearChallengeWinActions).toHaveBeenCalledWith({
             restartAction: expect.any(Function),

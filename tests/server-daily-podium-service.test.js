@@ -8,6 +8,7 @@ const {
     mockSharedCache,
     mockSharedCacheValues,
     mockDailyGpStore,
+    mockPostFlair,
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
@@ -34,6 +35,7 @@ const {
     mockDailyGpStore: {
         getServerFinalDailyGpPodiumGhosts: vi.fn(async () => null),
     },
+    mockPostFlair: { resolveMiniRacerPostFlairId: vi.fn() },
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
@@ -42,6 +44,7 @@ vi.mock('../src/server/daily-podium-post-store.js', () => mockPostStore);
 vi.mock('../src/server/request-context.js', () => mockContext);
 vi.mock('../src/server/shared-cache.js', () => ({ cacheSharedJson: mockSharedCache }));
 vi.mock('../src/server/daily-gp-store.js', () => mockDailyGpStore);
+vi.mock('../src/server/post-flair-service.js', () => mockPostFlair);
 
 const {
     enableDailyPodiumAutopost,
@@ -104,6 +107,7 @@ describe('daily podium post workflow', () => {
             async (_name, updater) => updater(null),
         );
         mockDailyGpStore.getServerFinalDailyGpPodiumGhosts.mockResolvedValue(null);
+        mockPostFlair.resolveMiniRacerPostFlairId.mockResolvedValue('flair-daily-podium');
         mockReddit.submitCustomPost.mockResolvedValue({
             id: 't3_podium',
             url: 'https://reddit.com/podium',
@@ -157,6 +161,7 @@ describe('daily podium post workflow', () => {
         expect(mockReddit.submitCustomPost).toHaveBeenCalledWith({
             subredditName: 'MiniRacer',
             title: 'Mini Racer Podium, 10 Jul: Circuit ProMax',
+            flairId: 'flair-daily-podium',
             entry: 'podium',
             postData: {
                 postType: 'daily-podium',

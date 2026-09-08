@@ -120,6 +120,10 @@ import monkeyWrench from './definitions/monkey-wrench.js';
 import ovenMitt from './definitions/oven-mitt.js';
 import monkeyTail from './definitions/monkey-tail.js';
 import bottleOpener from './definitions/bottle-opener.js';
+import serpentHead from './definitions/serpent-head.js';
+import bullShield from './definitions/bull-shield.js';
+import battleHook from './definitions/battle-hook.js';
+import thunderCat from './definitions/thunder-cat.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -245,6 +249,10 @@ const TRACK_GEOMETRY = {
     ovenMitt,
     monkeyTail,
     bottleOpener,
+    serpentHead,
+    bullShield,
+    battleHook,
+    thunderCat,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

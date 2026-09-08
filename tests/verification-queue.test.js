@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     clearCampaignVerification,
+    getCampaignVerificationEntriesForOwner,
     clearDailyChallengeVerification,
     createVerificationSnapshot,
     enqueueCampaignVerification,
@@ -822,6 +823,17 @@ describe('verification queue', () => {
         });
     }
 
+    function queueCampaignRun(raceId = 'numbered-v1-02', bestTime = 12.345) {
+        return enqueueCampaignVerification({
+            raceId,
+            trackKey: 'numberTwo',
+            bestTime,
+            lapCount: 1,
+            rulesRevision: 1,
+            replay: REPLAY,
+        });
+    }
+
     it('stamps queued results with the account that raced them', () => {
         queueDailyRun();
 
@@ -829,6 +841,20 @@ describe('verification queue', () => {
             ownerPlayerId: OWNER,
             sessionId: getPlayerSessionId(),
         });
+    });
+
+    it('reads queued Campaign results by their stamped owner while selection is open', () => {
+        queueCampaignRun('numbered-v1-02');
+
+        expect(getCampaignVerificationEntriesForOwner(OWNER)).toMatchObject({
+            'numbered-v1-02': {
+                ownerPlayerId: OWNER,
+                verificationState: 'pending',
+            },
+        });
+        setActivePlayerOwnerId('reddit:someone-else');
+        expect(getCampaignVerificationEntriesForOwner(OWNER)).toHaveProperty('numbered-v1-02');
+        expect(getCampaignVerificationEntriesForOwner('reddit:someone-else')).toEqual({});
     });
 
     it('holds another account\'s queued result instead of submitting it', () => {

@@ -23,9 +23,9 @@ export const DAILY_GP_MIN_TIME_SECONDS = 2;
 export const DAILY_GP_MAX_TIME_SECONDS = 60 * 60;
 export const DAILY_GP_NEARBY_RADIUS = 2;
 export const DAILY_GP_DEFAULT_LIMIT = 10;
-export const DAILY_GP_REDIS_TTL_SECONDS = 45 * 24 * 60 * 60;
+export const DAILY_GP_REDIS_TTL_SECONDS = 365 * 24 * 60 * 60;
 /** Matches `CAMPAIGN_GUEST_TTL_SECONDS`: a profile must outlive the progress it names. `tests/reddit-daily-gp-model.test.js` holds the two together. */
-export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 90 * 24 * 60 * 60;
+export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = null;
 export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = DAILY_GP_REDIS_TTL_SECONDS;
 export const DAILY_GP_PLAYLIST_DAYS = 7;

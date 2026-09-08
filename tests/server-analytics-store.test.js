@@ -107,6 +107,88 @@ describe('server analytics store', () => {
         expect(dayFor(summary, '2026-08-15')).toMatchObject({ newPlayers: 0, returningPlayers: 1 });
     });
 
+    it('builds exact-day cohorts from first observed race activity across modes', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:alpha',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-01T09:00:00.000Z'),
+        });
+        await recordAnalyticsRace({
+            mode: 'campaign',
+            action: 'start',
+            playerId: 'reddit:beta',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-01T10:00:00.000Z'),
+        });
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:alpha',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-02T09:00:00.000Z'),
+        });
+        for (const playerId of ['reddit:alpha', 'reddit:beta']) {
+            await recordAnalyticsRace({
+                mode: 'challenge',
+                action: 'start',
+                playerId,
+                subredditName: SUBREDDIT,
+                now: day('2026-08-08T09:00:00.000Z'),
+            });
+        }
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:alpha',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-31T09:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-31T23:00:00.000Z'),
+        });
+        const cohort = summary.cohorts.find((entry) => entry.date === '2026-08-01');
+
+        expect(cohort).toEqual({
+            date: '2026-08-01',
+            players: 2,
+            d1: { retained: 1, rate: 50 },
+            d7: { retained: 2, rate: 100 },
+            d30: { retained: 1, rate: 50 },
+        });
+    });
+
+    it('does not use a profile historical firstSeenAt as the cohort date', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+        profiles.set('reddit:veteran', { firstSeenAt: '2026-06-02T10:00:00.000Z' });
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:veteran',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+
+        const summary = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(summary.cohorts).toEqual([{
+            date: '2026-08-15',
+            players: 1,
+            d1: { retained: null, rate: null },
+            d7: { retained: null, rate: null },
+            d30: { retained: null, rate: null },
+        }]);
+    });
+
     it('keeps signed-out visitors out of the player count and reports them separately', async () => {
         const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
 
