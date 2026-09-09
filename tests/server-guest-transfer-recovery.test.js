@@ -522,3 +522,132 @@ describe("guest transfer Daily cleanup does not need history", () => {
     expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeUndefined();
   });
 });
+
+describe("guest transfer resumes from any interrupted checkpoint", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  // Every write of the transfer record is a checkpoint. Failing each one in turn covers the gap
+  // before and after each destination write, each cleanup step, and the final completion.
+  for (const failAt of [1, 2, 3, 4, 5, 6, 7]) {
+    for (const choice of ["guest", "account"]) {
+      it(`finishes a ${choice} choice after checkpoint ${failAt} was interrupted`, async () => {
+        const guestPlayerId = `guest:interrupt-${choice}-${failAt}`;
+        const redditPlayerId = `reddit:interrupt-${choice}-${failAt}`;
+        await seedTransferableGuest(guestPlayerId, redditPlayerId);
+
+        redis.failTransferRecordWriteAt = failAt;
+        let interrupted = false;
+        try {
+          await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
+        } catch {
+          interrupted = true;
+        }
+        redis.failTransferRecordWriteAt = null;
+
+        // Whether or not this checkpoint existed, the retry must reach the same end state.
+        const result = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
+        expect(result.status).toBe("completed");
+        expect(result.choice).toBe(choice);
+
+        const record = await readRecord(guestPlayerId, redditPlayerId);
+        expect(record.status).toBe("completed");
+        expect(record.phase).toBe("completed");
+        // The guest's own progress is gone under either choice.
+        expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeUndefined();
+        // A receipt exists exactly once, whatever happened on the way.
+        const receipt = JSON.parse(await redis.get(guestProgressTransferReceiptKey(result.transferId)));
+        expect(receipt.choice).toBe(choice);
+        expect(JSON.parse(await redis.get(guestProgressTransferIndexKey(redditPlayerId))))
+          .toEqual([result.transferId]);
+        expect(typeof interrupted).toBe("boolean");
+      });
+    }
+  }
+});
+
+describe("guest transfer normal sources", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("completes when the guest has only Garage unlocks", async () => {
+    const guestPlayerId = "guest:garage-only";
+    const redditPlayerId = "reddit:garage-only";
+    await recordCompletedRace(guestPlayerId);
+    await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .resolves.toMatchObject({ status: "completed" });
+    expect(await redis.hGetAll(carUnlockHashKey(guestPlayerId))).toEqual({});
+  });
+
+  it("completes when the guest has only Campaign progress", async () => {
+    const guestPlayerId = "guest:campaign-only";
+    const redditPlayerId = "reddit:campaign-only";
+    await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-09-01T09:00:00.000Z",
+      resultsByRaceId: {},
+      updatedAt: "2026-09-01T09:00:00.000Z",
+    }));
+    await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .resolves.toMatchObject({ status: "completed" });
+    expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeUndefined();
+  });
+
+  it("leaves a guest with nothing to transfer alone", async () => {
+    const selection = await getGuestProgressSelection({
+      guestPlayerId: "guest:nothing-here",
+      redditPlayerId: "reddit:nothing-here",
+    });
+
+    expect(selection.required).toBe(false);
+    expect(selection.guestHasProgress).toBe(false);
+    expect(await resolveAccountTransferState("reddit:nothing-here")).toBeNull();
+  });
+});
+
+describe("guest transfer ownership conflicts", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("refuses a second guest's transfer while the first is still pending", async () => {
+    const redditPlayerId = "reddit:one-at-a-time";
+    await seedTransferableGuest("guest:first-in", redditPlayerId);
+    redis.failTransferRecordWriteAt = 3;
+    await expect(selectGuestProgress({
+      guestPlayerId: "guest:first-in",
+      redditPlayerId,
+      choice: "guest",
+    })).rejects.toThrow();
+
+    await expect(selectGuestProgress({
+      guestPlayerId: "guest:second-in",
+      redditPlayerId,
+      choice: "guest",
+    })).rejects.toMatchObject({ statusCode: 409, reason: "progress_transfer_pending" });
+  });
+
+  it("refuses a different choice once one is recorded", async () => {
+    const guestPlayerId = "guest:one-choice";
+    const redditPlayerId = "reddit:one-choice";
+    await seedTransferableGuest(guestPlayerId, redditPlayerId);
+    redis.failTransferRecordWriteAt = 3;
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .rejects.toThrow();
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "account" }))
+      .rejects.toMatchObject({ statusCode: 409 });
+  });
+});

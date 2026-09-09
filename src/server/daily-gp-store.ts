@@ -449,9 +449,13 @@ function isValidPendingSelectionRecord(
             return false;
         }
         if (!isValidTransferPhase(value.phase)) return false;
-        // A record that already permits replacement must carry the inventory it will be checked
-        // against. Only `preparing` may still be missing one, because it can capture it again.
-        if (value.phase !== 'preparing' && !isValidSourceInventory(value.sourceInventory)) return false;
+        // A Guest choice replaces account data, so past preparation it must carry the inventory it
+        // will be checked against. An Account choice replaces nothing and captures none.
+        if (value.choice === 'guest'
+            && value.phase !== 'preparing'
+            && !isValidSourceInventory(value.sourceInventory)) {
+            return false;
+        }
         if (value.sourceInventory !== undefined && !isValidSourceInventory(value.sourceInventory)) {
             return false;
         }
