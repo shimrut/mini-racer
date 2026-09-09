@@ -54,11 +54,13 @@ export function registerPlayerRoutes(
 
     app.post('/api/player/progress-selection', async (req, res) => {
         try {
-            const { playerId, guestToken, choice } = req.body ?? {};
+            const { playerId, guestToken, choice, action, transferId } = req.body ?? {};
             const payload = await dependencies.selectServerGuestProgress({
                 playerId,
                 guestToken,
                 choice,
+                action,
+                transferId,
                 redditUsername: dependencies.getRequestUsername(),
             });
             if (!payload.playerId) {

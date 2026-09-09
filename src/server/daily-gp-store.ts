@@ -37,7 +37,7 @@ import { getBackfilledDailyGpChallenge } from './daily-gp-history-backfill.js';
 import type { FinalDailyGpPodium } from './daily-podium-model.js';
 import type { DailyPodiumReplayGhostSlot } from './daily-podium-replay.js';
 import { createTrackFingerprint } from './pb-ghost-trace.js';
-import { toDailyCompetition } from './competition.js';
+import { toCampaignCompetition, toDailyCompetition } from './competition.js';
 import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import {
     createEmptySnapshot,
@@ -78,13 +78,18 @@ import {
     type RedisLockMutation,
     type RedisLockTransactionRunner,
 } from './redis-lock.js';
-import { GuestProgressSelectionRetryableError } from './guest-progress-selection-error.js';
+import {
+    GuestProgressRecoveryRequiredError,
+    GuestProgressSelectionRetryableError,
+} from './guest-progress-selection-error.js';
 import {
     getCarUnlockSnapshot,
     discardGuestCarUnlockProgress,
+    cleanupGuestCarUnlockProgress,
     hasCarUnlockProgress,
     mergeGuestCarUnlockProgress,
     readGuestPromotionTarget,
+    carUnlockHashKey,
     recordCompletedRace,
     retireEmptyGuestIdentity,
     type CarUnlockSnapshot,
@@ -96,7 +101,9 @@ import {
     getCampaignProgressForSelection,
     mergeGuestCampaignProgress,
 } from './campaign-store.js';
+import { campaignProgressKey } from './campaign-progress-key.js';
 import {
+    CAMPAIGN_ID,
     CAMPAIGN_STAGES,
     getCampaignUnlockedRaceIds,
 } from '../../game/campaign/manifest.js';
@@ -108,6 +115,8 @@ import { GENERATED_PLAYER_SELECTABLE_CAR_ASSETS } from '../../game/car/generated
 import { verifyGuestPlayerToken } from './player-token.js';
 import {
     guestProgressSelectionAccountPendingKey,
+    guestProgressTransferReceiptKey,
+    guestProgressTransferIndexKey,
     guestProgressSelectionPendingKey,
     isPlayerProgressSelectionPending,
     isRetiredGuestPlayerId,
@@ -172,6 +181,10 @@ export type GuestProgressSelection = {
         unlocks: boolean;
     };
     choice?: 'guest' | 'account';
+    state?: 'choice_required' | 'resume_required' | 'recovery_required' | 'completed';
+    transferId?: string;
+    sourceGuestPlayerId?: string;
+    completedAt?: string;
 };
 
 function unavailableProgressSummary({
@@ -196,20 +209,196 @@ function unavailableProgressSummary({
     };
 }
 
+/**
+ * `preparing` permits no destination replacement, so preparation may repeat and may capture the
+ * source inventory again. From `copying` onward the inventory is frozen: the transfer never
+ * manufactures fresh evidence out of whatever happens to have survived.
+ */
+type GuestTransferPhase = 'preparing' | 'copying' | 'cleaning' | 'completed' | 'recovery_required';
+
 type GuestProgressSelectionRecord = {
-    version?: 2;
+    version?: 2 | 3 | 4;
+    transferId?: string;
     guestPlayerId: string;
     redditPlayerId: string;
     choice: 'guest' | 'account';
+    /** Kept beside `phase` so readers written against versions 2 and 3 stay correct. */
     status: 'pending' | 'completed' | 'recovery_required';
+    phase?: GuestTransferPhase;
     updatedAt: string;
     completedDomains: string[];
     cleanedDomains?: string[];
     dailyChallengeIds?: string[];
+    dailyChallengeSpecs?: GuestTransferDailyChallengeSpec[];
+    sourceInventory?: GuestTransferSourceInventory;
+    completedAt?: string;
 };
+
+/** What a finished transfer proves. Written once, and never expired. */
+type GuestTransferReceipt = {
+    version: 4;
+    transferId: string;
+    guestPlayerId: string;
+    redditPlayerId: string;
+    choice: 'guest' | 'account';
+    completedAt: string;
+};
+
+type GuestTransferDailyChallengeSpec = {
+    id: string;
+    trackKey: string;
+    lapCount: 1 | 2 | 3;
+    rulesRevision: number;
+    objectiveType: 'single_lap_fastest' | 'multi_lap_total';
+};
+
+/**
+ * Exact source evidence, captured before the first account replacement. Every value is a
+ * fingerprint of the raw stored bytes, so an absent value, an empty value, and a malformed value
+ * are three different answers. Campaign keeps one entry per stage and Daily one per frozen
+ * challenge, so partial loss is visible even when the other rows survive.
+ */
+type GuestTransferSourceInventory = {
+    campaignProgress: string;
+    campaignStages: Record<string, string>;
+    daily: Record<string, string>;
+    unlocks: string;
+};
+
+function stableFingerprint(value: unknown): string {
+    const serialize = (input: unknown): string => {
+        if (input === null || typeof input !== 'object') return JSON.stringify(input) ?? '';
+        if (Array.isArray(input)) return `[${input.map(serialize).join(',')}]`;
+        return `{${Object.keys(input).sort().map((key) => `${JSON.stringify(key)}:${serialize((input as Record<string, unknown>)[key])}`).join(',')}}`;
+    };
+    return createHash('sha256').update(serialize(value), 'utf8').digest('base64url');
+}
+
+function transferChallengeSpec(challenge: DailyGpChallenge): GuestTransferDailyChallengeSpec {
+    return {
+        id: challenge.id,
+        trackKey: challenge.trackKey,
+        lapCount: challenge.objectiveParams.lapCount,
+        rulesRevision: challenge.rulesRevision,
+        objectiveType: challenge.objectiveType,
+    };
+}
+
+function transferChallengeFromSpec(spec: GuestTransferDailyChallengeSpec): DailyGpChallenge {
+    return {
+        id: spec.id,
+        challengeDate: spec.id.replace(/^daily-gp-/, ''),
+        trackKey: spec.trackKey,
+        rulesRevision: spec.rulesRevision,
+        objectiveType: spec.objectiveType,
+        objectiveParams: { lapCount: spec.lapCount },
+        availableFrom: '',
+        availableUntil: '',
+    } as unknown as DailyGpChallenge;
+}
+
+/** Fingerprints one guest's Campaign stage rows without parsing them. */
+async function captureCampaignStageEvidence(
+    guestPlayerId: string,
+): Promise<Record<string, string>> {
+    const playerField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
+    const rows = await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
+        const competition = toCampaignCompetition(CAMPAIGN_ID, stage, { playerId: guestPlayerId });
+        const [entry, pb, rank] = await Promise.all([
+            redis.hGet(competition.entryHashKey, guestPlayerId),
+            redisCompressed.hGet(competition.pbHashKey, playerField),
+            typeof redis.zScore === 'function'
+                ? redis.zScore(competition.leaderboardKey, guestPlayerId)
+                : Promise.resolve(null),
+        ]);
+        return [
+            stage.raceId,
+            stableFingerprint({ entry: entry ?? null, pb: pb ?? null, rank: rank ?? null }),
+        ] as const;
+    }));
+    return Object.fromEntries(rows);
+}
+
+/** Fingerprints one guest's rows for the frozen Daily window. */
+async function captureDailyEvidence(
+    guestPlayerId: string,
+    challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
+): Promise<Record<string, string>> {
+    const field = dailyPlayerField(guestPlayerId);
+    const rows = await Promise.all(challengeSpecs.map(async (spec) => {
+        const competition = toDailyCompetition(transferChallengeFromSpec(spec));
+        const [entry, pb, rank] = await Promise.all([
+            redis.hGet(competition.entryHashKey, guestPlayerId),
+            redisCompressed.hGet(competition.pbHashKey, field),
+            typeof redis.zScore === 'function'
+                ? redis.zScore(competition.leaderboardKey, guestPlayerId)
+                : Promise.resolve(null),
+        ]);
+        return [
+            spec.id,
+            stableFingerprint({ entry: entry ?? null, pb: pb ?? null, rank: rank ?? null }),
+        ] as const;
+    }));
+    return Object.fromEntries(rows);
+}
+
+async function captureGuestTransferSourceInventory(
+    guestPlayerId: string,
+    challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
+): Promise<GuestTransferSourceInventory> {
+    const [campaignProgress, campaignStages, daily, unlocks] = await Promise.all([
+        redis.get(campaignProgressKey(guestPlayerId)),
+        captureCampaignStageEvidence(guestPlayerId),
+        captureDailyEvidence(guestPlayerId, challengeSpecs),
+        redis.hGetAll(carUnlockHashKey(guestPlayerId)),
+    ]);
+    return {
+        campaignProgress: stableFingerprint(campaignProgress ?? null),
+        campaignStages,
+        daily,
+        unlocks: stableFingerprint(unlocks ?? null),
+    };
+}
+
+/**
+ * Names the domains whose source no longer matches what preparation recorded. A domain with an
+ * added, changed, or missing row is reported, so partial loss stops replacement just as total
+ * loss does.
+ */
+function changedInventoryDomains(
+    expected: GuestTransferSourceInventory,
+    observed: Partial<GuestTransferSourceInventory>,
+): string[] {
+    const changed: string[] = [];
+    if (observed.campaignStages !== undefined || observed.campaignProgress !== undefined) {
+        const stagesMatch = observed.campaignStages === undefined
+            || stableFingerprint(observed.campaignStages) === stableFingerprint(expected.campaignStages);
+        const progressMatches = observed.campaignProgress === undefined
+            || observed.campaignProgress === expected.campaignProgress;
+        if (!stagesMatch || !progressMatches) changed.push('campaign');
+    }
+    if (observed.daily !== undefined
+        && stableFingerprint(observed.daily) !== stableFingerprint(expected.daily)) {
+        changed.push('daily');
+    }
+    if (observed.unlocks !== undefined && observed.unlocks !== expected.unlocks) {
+        changed.push('unlocks');
+    }
+    return changed;
+}
+
+function isValidSourceInventory(value: unknown): value is GuestTransferSourceInventory {
+    return isRecordObject(value)
+        && typeof value.campaignProgress === 'string'
+        && isRecordObject(value.campaignStages)
+        && isRecordObject(value.daily)
+        && typeof value.unlocks === 'string';
+}
 
 const TRANSFER_COMPLETION_DOMAINS = ['campaign', 'daily', 'unlocks'] as const;
 const TRANSFER_CLEANUP_DOMAINS = ['campaign', 'daily'] as const;
+/** An account transfers once in practice. The bound only stops an unbounded key from growing. */
+const ACCOUNT_TRANSFER_INDEX_LIMIT = 20;
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -231,7 +420,7 @@ function isValidPendingSelectionRecord(
     if (!isRecordObject(value)) return false;
     const completedDomains = value.completedDomains;
     if (
-        value.version !== 2
+        (value.version !== 2 && value.version !== 3 && value.version !== 4)
         || value.status !== 'pending'
         || value.guestPlayerId !== guestPlayerId
         || value.redditPlayerId !== redditPlayerId
@@ -255,7 +444,50 @@ function isValidPendingSelectionRecord(
     ) {
         return false;
     }
+    if (value.version === 4) {
+        if (value.transferId !== guestProgressSelectionTransferId(guestPlayerId, redditPlayerId)) {
+            return false;
+        }
+        if (!isValidTransferPhase(value.phase)) return false;
+        // A record that already permits replacement must carry the inventory it will be checked
+        // against. Only `preparing` may still be missing one, because it can capture it again.
+        if (value.phase !== 'preparing' && !isValidSourceInventory(value.sourceInventory)) return false;
+        if (value.sourceInventory !== undefined && !isValidSourceInventory(value.sourceInventory)) {
+            return false;
+        }
+        if (value.phase === 'preparing' && completedDomains.length > 0) return false;
+    }
+    if (value.version === 3 || value.version === 4) {
+        if (!isValidDailyChallengeSpecs(value.dailyChallengeSpecs, value.dailyChallengeIds)) {
+            return false;
+        }
+    }
     return true;
+}
+
+function isValidTransferPhase(value: unknown): value is GuestTransferPhase {
+    return value === 'preparing'
+        || value === 'copying'
+        || value === 'cleaning'
+        || value === 'completed'
+        || value === 'recovery_required';
+}
+
+function isValidDailyChallengeSpecs(
+    value: unknown,
+    challengeIds: readonly unknown[],
+): value is GuestTransferDailyChallengeSpec[] {
+    return Array.isArray(value)
+        && value.length === challengeIds.length
+        && value.every((spec, index) => (
+            isRecordObject(spec)
+            && typeof spec.id === 'string'
+            && spec.id === challengeIds[index]
+            && typeof spec.trackKey === 'string'
+            && [1, 2, 3].includes(spec.lapCount as number)
+            && typeof spec.rulesRevision === 'number'
+            && (spec.objectiveType === 'single_lap_fastest' || spec.objectiveType === 'multi_lap_total')
+        ));
 }
 
 function isValidCompletedSelectionRecord(
@@ -264,9 +496,18 @@ function isValidCompletedSelectionRecord(
     redditPlayerId: string,
 ): value is GuestProgressSelectionRecord {
     if (!isRecordObject(value) || value.status !== 'completed') return false;
+    if (value.version !== undefined
+        && value.version !== 2
+        && value.version !== 3
+        && value.version !== 4) {
+        return false;
+    }
     if (value.choice !== 'guest' && value.choice !== 'account') return false;
-    if (value.guestPlayerId !== undefined && value.guestPlayerId !== guestPlayerId) return false;
-    if (value.redditPlayerId !== undefined && value.redditPlayerId !== redditPlayerId) return false;
+    if (value.guestPlayerId !== guestPlayerId || value.redditPlayerId !== redditPlayerId) return false;
+    if (value.version === 4
+        && value.transferId !== guestProgressSelectionTransferId(guestPlayerId, redditPlayerId)) {
+        return false;
+    }
     return true;
 }
 
@@ -700,14 +941,8 @@ async function acquireDailyMergeLocks(
     }
 }
 
-function guestProgressRecoveryRequiredError(): Error & { reason: string; statusCode: number } {
-    const error = new Error('This progress transfer needs support before it can be retried.') as Error & {
-        reason: string;
-        statusCode: number;
-    };
-    error.statusCode = 409;
-    error.reason = 'guest_progress_recovery_required';
-    return error;
+function guestProgressRecoveryRequiredError(): GuestProgressRecoveryRequiredError {
+    return new GuestProgressRecoveryRequiredError();
 }
 
 async function resolveGuestTransferDailyChallenges(challengeIds?: string[]): Promise<DailyGpChallenge[]> {
@@ -952,12 +1187,17 @@ export async function mergeGuestDailyProgress({
     redditPlayerId,
     replace = false,
     challengeIds,
+    challengeSpecs,
+    verifyGuestSource,
     transactionRunner,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     replace?: boolean;
     challengeIds?: string[];
+    challengeSpecs?: GuestTransferDailyChallengeSpec[];
+    /** Called under each challenge's locks, before its first account write. See the Campaign merge. */
+    verifyGuestSource?: () => void | Promise<void>;
     transactionRunner?: RedisLockTransactionRunner;
 }): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
@@ -971,7 +1211,14 @@ export async function mergeGuestDailyProgress({
     for (const challenge of playlist) {
         const competition = toDailyCompetition(challenge);
         const track = TRACKS[challenge.trackKey];
-        if (!track) continue;
+        // A frozen day whose track left the catalog cannot be copied, and skipping it would let
+        // the domain checkpoint claim work it never did.
+        if (!track) {
+            if (challengeSpecs?.some((spec) => spec.id === challenge.id)) {
+                throw guestProgressRecoveryRequiredError();
+            }
+            continue;
+        }
 
         const peeked = await readDailyMergeState(
             competition,
@@ -993,6 +1240,7 @@ export async function mergeGuestDailyProgress({
             redditPlayerId,
         );
         try {
+            await verifyGuestSource?.();
             const {
                 guestEntry,
                 redditEntry,
@@ -1137,17 +1385,19 @@ export async function mergeGuestDailyProgress({
 export async function cleanupGuestDailyProgress({
     guestPlayerId,
     challengeIds,
+    challengeSpecs,
 }: {
     guestPlayerId: string;
     challengeIds?: string[];
+    challengeSpecs?: GuestTransferDailyChallengeSpec[];
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:')) return false;
-    const playlist = await resolveGuestTransferDailyChallenges(challengeIds);
+    const playlist = Array.isArray(challengeSpecs)
+        ? challengeSpecs.map(transferChallengeFromSpec)
+        : await resolveGuestTransferDailyChallenges(challengeIds);
     let cleaned = false;
     for (const challenge of playlist) {
         const competition = toDailyCompetition(challenge);
-        const track = TRACKS[challenge.trackKey];
-        if (!track) continue;
         if (!await guestOwnsDailyDay(competition, guestPlayerId)) continue;
         cleaned = true;
         const lock = await acquireRedisLock(
@@ -1186,17 +1436,19 @@ export async function cleanupGuestDailyProgress({
 export async function discardGuestDailyProgress({
     guestPlayerId,
     challengeIds,
+    challengeSpecs,
 }: {
     guestPlayerId: string;
     challengeIds?: string[];
+    challengeSpecs?: GuestTransferDailyChallengeSpec[];
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:')) return false;
-    const playlist = await resolveGuestTransferDailyChallenges(challengeIds);
+    const playlist = Array.isArray(challengeSpecs)
+        ? challengeSpecs.map(transferChallengeFromSpec)
+        : await resolveGuestTransferDailyChallenges(challengeIds);
     let discarded = false;
     for (const challenge of playlist) {
         const competition = toDailyCompetition(challenge);
-        const track = TRACKS[challenge.trackKey];
-        if (!track) continue;
         if (!await guestOwnsDailyDay(competition, guestPlayerId)) continue;
         discarded = true;
         const lock = await acquireRedisLock(
@@ -1307,6 +1559,339 @@ function toProgressSummary(evidence: Awaited<ReturnType<typeof readProgressEvide
     };
 }
 
+function guestProgressSelectionTransferId(guestPlayerId: string, redditPlayerId: string): string {
+    return `guest-transfer:${createHash('sha256')
+        .update(`${guestPlayerId}:${redditPlayerId}`, 'utf8')
+        .digest('base64url')}`;
+}
+
+function pendingSelectionPayload({
+    guestPlayerId,
+    redditPlayerId,
+    choice,
+    state,
+    required = true,
+    completedAt,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+    choice?: 'guest' | 'account';
+    state: 'choice_required' | 'resume_required' | 'recovery_required' | 'completed';
+    required?: boolean;
+    completedAt?: string;
+}): GuestProgressSelection {
+    return {
+        required,
+        state,
+        transferId: guestProgressSelectionTransferId(guestPlayerId, redditPlayerId),
+        sourceGuestPlayerId: guestPlayerId,
+        guestHasProgress: true,
+        accountHasProgress: false,
+        guestSummary: unavailableProgressSummary({ hasDailyResults: true, unlocks: true }),
+        accountSummary: unavailableProgressSummary(),
+        ...(choice ? { choice } : {}),
+        ...(completedAt ? { completedAt } : {}),
+    } as GuestProgressSelection;
+}
+
+/**
+ * A receipt names its own account, so a transfer id that reaches the wrong account proves nothing.
+ * The id identifies the record; the authenticated account authorizes reading it.
+ */
+async function readGuestTransferReceipt(
+    transferId: string,
+    redditPlayerId: string,
+): Promise<GuestTransferReceipt | null> {
+    const raw = await redis.get(guestProgressTransferReceiptKey(transferId));
+    if (!raw) return null;
+    try {
+        const receipt = JSON.parse(raw) as unknown;
+        if (!isRecordObject(receipt)) return null;
+        if (receipt.redditPlayerId !== redditPlayerId) return null;
+        if (receipt.transferId !== transferId) return null;
+        if (typeof receipt.guestPlayerId !== 'string' || !receipt.guestPlayerId.startsWith('guest:')) {
+            return null;
+        }
+        if (receipt.choice !== 'guest' && receipt.choice !== 'account') return null;
+        if (typeof receipt.completedAt !== 'string' || !receipt.completedAt) return null;
+        return receipt as GuestTransferReceipt;
+    } catch {
+        return null;
+    }
+}
+
+async function readAccountTransferIndex(redditPlayerId: string): Promise<string[]> {
+    const raw = await redis.get(guestProgressTransferIndexKey(redditPlayerId));
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((entry): entry is string => typeof entry === 'string' && Boolean(entry));
+    } catch {
+        return [];
+    }
+}
+
+/** Only a version-4 record carries the source evidence a Guest replacement must be checked against. */
+function resumableRecordState(
+    record: GuestProgressSelectionRecord,
+): 'resume_required' | 'recovery_required' {
+    if (record.choice === 'account') return 'resume_required';
+    if (record.version !== 4 || !isValidSourceInventory(record.sourceInventory)) {
+        return 'recovery_required';
+    }
+    return 'resume_required';
+}
+
+/**
+ * The account's own view of its transfer, found without the original guest token. A `transferId`
+ * asks about one specific transfer, so a browser holding an old local receipt still gets its own
+ * answer after a later transfer has moved the account on.
+ */
+export async function resolveAccountTransferState(
+    redditPlayerId: string,
+    { transferId }: { transferId?: string } = {},
+): Promise<GuestProgressSelection | null> {
+    if (!redditPlayerId.startsWith('reddit:')) return null;
+    if (transferId) {
+        const receipt = await readGuestTransferReceipt(transferId, redditPlayerId);
+        if (receipt) {
+            return pendingSelectionPayload({
+                guestPlayerId: receipt.guestPlayerId,
+                redditPlayerId,
+                choice: receipt.choice,
+                state: 'completed',
+                completedAt: receipt.completedAt,
+            });
+        }
+    }
+    const pendingGuest = await redis.get(guestProgressSelectionAccountPendingKey(redditPlayerId));
+    if (typeof pendingGuest === 'string' && pendingGuest.startsWith('guest:')) {
+        const raw = await redis.get(guestProgressSelectionKey(pendingGuest, redditPlayerId));
+        // Transfer records do not expire, so a marker with no record means the chooser was shown
+        // and never answered. Nothing was replaced, and the player still owes only a choice.
+        if (!raw) {
+            return pendingSelectionPayload({
+                guestPlayerId: pendingGuest,
+                redditPlayerId,
+                state: 'choice_required',
+            });
+        }
+        try {
+            const record = JSON.parse(raw) as unknown;
+            if (isValidCompletedSelectionRecord(record, pendingGuest, redditPlayerId)) {
+                // A completed record under a stale marker is a completion, not a repair case.
+                return pendingSelectionPayload({
+                    guestPlayerId: pendingGuest,
+                    redditPlayerId,
+                    choice: record.choice,
+                    state: 'completed',
+                    completedAt: record.completedAt || record.updatedAt,
+                });
+            }
+            if (isValidPendingSelectionRecord(record, pendingGuest, redditPlayerId)) {
+                return pendingSelectionPayload({
+                    guestPlayerId: pendingGuest,
+                    redditPlayerId,
+                    choice: record.choice,
+                    state: resumableRecordState(record),
+                });
+            }
+        } catch {
+            // A record that cannot be read is never guessed at.
+        }
+        return pendingSelectionPayload({
+            guestPlayerId: pendingGuest,
+            redditPlayerId,
+            state: 'recovery_required',
+        });
+    }
+    const index = await readAccountTransferIndex(redditPlayerId);
+    for (let position = index.length - 1; position >= 0; position -= 1) {
+        const receipt = await readGuestTransferReceipt(index[position], redditPlayerId);
+        if (receipt) {
+            return pendingSelectionPayload({
+                guestPlayerId: receipt.guestPlayerId,
+                redditPlayerId,
+                choice: receipt.choice,
+                state: 'completed',
+                completedAt: receipt.completedAt,
+            });
+        }
+    }
+    return null;
+}
+
+export type GuestTransferDiagnostic = {
+    found: boolean;
+    reason: string;
+    accountId: string | null;
+    guestId: string | null;
+    transferId: string | null;
+    pendingGuestMarker: string | null;
+    guestPendingMarker: boolean;
+    promotedTo: string | null;
+    recordParseable: boolean;
+    record: GuestProgressSelectionRecord | null;
+    receipt: GuestTransferReceipt | null;
+    accountTransferIds: string[];
+    completedDomains: string[];
+    cleanedDomains: string[];
+    survivingSource: GuestTransferSourceInventory | null;
+    changedDomains: string[] | null;
+    destinationEvidence: Record<string, unknown> | null;
+    expiredDailyChallengeIds: string[];
+    evidenceFingerprint: string | null;
+};
+
+/**
+ * Read-only case evidence for a reviewed repair. It answers one account, and one transfer at a
+ * time. Its caller is responsible for proving the reader is a moderator; this function never
+ * returns anything for an account it was not asked about.
+ */
+export async function getGuestProgressTransferDiagnostic({
+    redditPlayerId,
+    transferId,
+}: {
+    redditPlayerId?: unknown;
+    transferId?: unknown;
+}): Promise<GuestTransferDiagnostic> {
+    const empty: GuestTransferDiagnostic = {
+        found: false,
+        reason: 'invalid_account',
+        accountId: null,
+        guestId: null,
+        transferId: null,
+        pendingGuestMarker: null,
+        guestPendingMarker: false,
+        promotedTo: null,
+        recordParseable: true,
+        record: null,
+        receipt: null,
+        accountTransferIds: [],
+        completedDomains: [],
+        cleanedDomains: [],
+        survivingSource: null,
+        changedDomains: null,
+        destinationEvidence: null,
+        expiredDailyChallengeIds: [],
+        evidenceFingerprint: null,
+    };
+    const accountId = typeof redditPlayerId === 'string' && redditPlayerId.startsWith('reddit:')
+        ? redditPlayerId
+        : null;
+    if (!accountId) return empty;
+
+    const requestedTransferId = typeof transferId === 'string' && transferId ? transferId : null;
+    const [pendingMarker, accountTransferIds] = await Promise.all([
+        redis.get(guestProgressSelectionAccountPendingKey(accountId)),
+        readAccountTransferIndex(accountId),
+    ]);
+    const pendingGuestMarker = typeof pendingMarker === 'string' && pendingMarker.startsWith('guest:')
+        ? pendingMarker
+        : null;
+    const receipt = requestedTransferId
+        ? await readGuestTransferReceipt(requestedTransferId, accountId)
+        : null;
+    const guestId = pendingGuestMarker ?? receipt?.guestPlayerId ?? null;
+    if (!guestId) {
+        return {
+            ...empty,
+            accountId,
+            reason: accountTransferIds.length > 0 ? 'no_open_transfer' : 'no_transfer',
+            accountTransferIds,
+            transferId: requestedTransferId,
+            receipt,
+        };
+    }
+
+    const derivedTransferId = guestProgressSelectionTransferId(guestId, accountId);
+    if (requestedTransferId && requestedTransferId !== derivedTransferId && !receipt) {
+        return { ...empty, accountId, guestId, reason: 'transfer_id_mismatch', accountTransferIds };
+    }
+
+    const [raw, guestPendingMarker, promotedTo] = await Promise.all([
+        redis.get(guestProgressSelectionKey(guestId, accountId)),
+        redis.get(guestProgressSelectionPendingKey(guestId)),
+        readGuestPromotionTarget(guestId),
+    ]);
+    let record: GuestProgressSelectionRecord | null = null;
+    let recordParseable = true;
+    if (raw) {
+        try {
+            const parsed = JSON.parse(raw) as unknown;
+            record = isRecordObject(parsed) ? parsed as GuestProgressSelectionRecord : null;
+            recordParseable = record !== null;
+        } catch {
+            recordParseable = false;
+        }
+    }
+
+    const specs = Array.isArray(record?.dailyChallengeSpecs) ? record.dailyChallengeSpecs : [];
+    let survivingSource: GuestTransferSourceInventory | null = null;
+    let destinationEvidence: Record<string, unknown> | null = null;
+    const expiredDailyChallengeIds: string[] = [];
+    try {
+        survivingSource = await captureGuestTransferSourceInventory(guestId, specs);
+        destinationEvidence = {
+            campaignProgress: stableFingerprint(await redis.get(campaignProgressKey(accountId)) ?? null),
+            campaignStages: await captureCampaignStageEvidence(accountId),
+            daily: await captureDailyEvidence(accountId, specs),
+            unlocks: stableFingerprint(await redis.hGetAll(carUnlockHashKey(accountId)) ?? null),
+        };
+        for (const spec of specs) {
+            const competition = toDailyCompetition(transferChallengeFromSpec(spec));
+            const exists = await redis.hGet(competition.entryHashKey, guestId);
+            if (exists === undefined || exists === null) expiredDailyChallengeIds.push(spec.id);
+        }
+    } catch (error) {
+        console.error('Guest transfer diagnostic evidence read failed:', error);
+    }
+
+    const changedDomains = record && isValidSourceInventory(record.sourceInventory) && survivingSource
+        ? changedInventoryDomains(record.sourceInventory, survivingSource)
+        : null;
+    const reason = !recordParseable
+        ? 'record_unreadable'
+        : !record
+            ? 'record_missing'
+            : record.status === 'completed'
+                ? 'completed'
+                : changedDomains && changedDomains.length > 0
+                    ? `source_changed:${changedDomains.join(',')}`
+                    : record.version !== 4 && record.choice === 'guest'
+                        ? 'legacy_guest_choice_without_inventory'
+                        : 'resumable';
+
+    return {
+        found: true,
+        reason,
+        accountId,
+        guestId,
+        transferId: derivedTransferId,
+        pendingGuestMarker,
+        guestPendingMarker: Boolean(guestPendingMarker),
+        promotedTo: promotedTo ?? null,
+        recordParseable,
+        record,
+        receipt: receipt ?? await readGuestTransferReceipt(derivedTransferId, accountId),
+        accountTransferIds,
+        completedDomains: Array.isArray(record?.completedDomains) ? record.completedDomains : [],
+        cleanedDomains: Array.isArray(record?.cleanedDomains) ? record.cleanedDomains : [],
+        survivingSource,
+        changedDomains,
+        destinationEvidence,
+        expiredDailyChallengeIds,
+        evidenceFingerprint: stableFingerprint({
+            record,
+            survivingSource,
+            destinationEvidence,
+            promotedTo: promotedTo ?? null,
+            pendingGuestMarker,
+        }),
+    };
+}
+
 export async function getGuestProgressSelection({
     guestPlayerId,
     redditPlayerId,
@@ -1319,6 +1904,7 @@ export async function getGuestProgressSelection({
     if (existing) {
         const leaveSelectionPending = async (
             choice?: 'guest' | 'account',
+            state: 'resume_required' | 'recovery_required' = 'resume_required',
         ): Promise<GuestProgressSelection> => {
             await redis.set(guestProgressSelectionPendingKey(guestPlayerId), '1');
             await redis.set(
@@ -1326,14 +1912,7 @@ export async function getGuestProgressSelection({
                 guestPlayerId,
                 { nx: true },
             );
-            return {
-                required: true,
-                guestHasProgress: true,
-                accountHasProgress: false,
-                guestSummary: unavailableProgressSummary({ hasDailyResults: true, unlocks: true }),
-                accountSummary: unavailableProgressSummary(),
-                ...(choice ? { choice } : {}),
-            };
+            return pendingSelectionPayload({ guestPlayerId, redditPlayerId, choice, state });
         };
         try {
             const record = JSON.parse(existing) as unknown;
@@ -1345,6 +1924,9 @@ export async function getGuestProgressSelection({
                 await redis.del(guestProgressSelectionPendingKey(guestPlayerId));
                 return {
                     required: false,
+                    state: 'completed',
+                    transferId: guestProgressSelectionTransferId(guestPlayerId, redditPlayerId),
+                    sourceGuestPlayerId: guestPlayerId,
                     guestHasProgress: false,
                     accountHasProgress: true,
                     guestSummary: unavailableProgressSummary(),
@@ -1356,7 +1938,7 @@ export async function getGuestProgressSelection({
                 if (!isValidPendingSelectionRecord(record, guestPlayerId, redditPlayerId)) {
                     throw new Error('Guest progress selection record is invalid.');
                 }
-                return leaveSelectionPending(record.choice);
+                return leaveSelectionPending(record.choice, resumableRecordState(record));
             }
             if (
                 record.status === 'recovery_required'
@@ -1364,13 +1946,13 @@ export async function getGuestProgressSelection({
                 && (record.guestPlayerId === undefined || record.guestPlayerId === guestPlayerId)
                 && (record.redditPlayerId === undefined || record.redditPlayerId === redditPlayerId)
             ) {
-                return leaveSelectionPending(record.choice);
+                return leaveSelectionPending(record.choice, 'recovery_required');
             }
             throw new Error('Guest progress selection record is invalid.');
         } catch {
             // A malformed transfer record is left unresolved; selection must not silently
             // replace it and risk deleting an account's partial copy.
-            return leaveSelectionPending();
+            return leaveSelectionPending(undefined, 'recovery_required');
         }
     }
     const dailyPlaylist = await getServerDailyGpPlaylist();
@@ -1386,9 +1968,15 @@ export async function getGuestProgressSelection({
     const accountSummary = toProgressSummary(accountEvidence);
     if (guestHasProgress) {
         await redis.set(guestProgressSelectionPendingKey(guestPlayerId), '1');
+        await redis.set(guestProgressSelectionAccountPendingKey(redditPlayerId), guestPlayerId, { nx: true });
     }
     return {
         required: guestHasProgress,
+        state: guestHasProgress ? 'choice_required' : undefined,
+        transferId: guestHasProgress
+            ? guestProgressSelectionTransferId(guestPlayerId, redditPlayerId)
+            : undefined,
+        sourceGuestPlayerId: guestHasProgress ? guestPlayerId : undefined,
         guestHasProgress,
         accountHasProgress: accountEvidence.hasProgress,
         guestSummary,
@@ -1400,11 +1988,21 @@ export async function selectGuestProgress({
     guestPlayerId,
     redditPlayerId,
     choice,
+    resume = false,
+    transferId,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     choice: unknown;
-}): Promise<{ status: 'completed'; choice: 'guest' | 'account' }> {
+    resume?: boolean;
+    transferId?: unknown;
+}): Promise<{
+    status: 'completed';
+    choice: 'guest' | 'account';
+    transferId: string;
+    sourceGuestPlayerId: string;
+    completedAt: string;
+}> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         throw new Error('Guest progress selection requires a guest and Reddit identity.');
     }
@@ -1412,8 +2010,10 @@ export async function selectGuestProgress({
         throw new Error('Guest progress selection is invalid.');
     }
     const key = guestProgressSelectionKey(guestPlayerId, redditPlayerId);
+    const derivedTransferId = guestProgressSelectionTransferId(guestPlayerId, redditPlayerId);
     const pendingGuestKey = guestProgressSelectionPendingKey(guestPlayerId);
     const pendingAccountKey = guestProgressSelectionAccountPendingKey(redditPlayerId);
+    let indexedTransferIds: string[] = [];
     const locks: RedisLock[] = [];
     const lockKeys = [
         guestProgressSelectionAccountLockKey(redditPlayerId),
@@ -1446,9 +2046,14 @@ export async function selectGuestProgress({
             domainMs[domain] = (domainMs[domain] ?? 0) + (Date.now() - domainStartedAtMs);
         }
     };
-    const reportTiming = (outcome: 'completed' | 'failed'): void => {
+    let reportedPhase: GuestTransferPhase = 'preparing';
+    const reportTiming = (
+        outcome: 'completed' | 'retryable' | 'recovery_required' | 'failed',
+    ): void => {
         console.log('Guest progress transfer timing:', JSON.stringify({
             choice,
+            resumed: resume,
+            phase: reportedPhase,
             outcome,
             totalMs: Date.now() - startedAtMs,
             ...domainMs,
@@ -1521,6 +2126,31 @@ export async function selectGuestProgress({
         ): Promise<void> => {
             await runTransferMutation([], async (transaction) => {
                 if (next) await transaction.set(key, JSON.stringify(next));
+                if (next?.status === 'completed') {
+                    // The record, its receipt, the account index, and the marker clears commit
+                    // together, so a completion is never visible without the proof of it.
+                    const receipt: GuestTransferReceipt = {
+                        version: 4,
+                        transferId: derivedTransferId,
+                        guestPlayerId,
+                        redditPlayerId,
+                        choice: next.choice,
+                        completedAt: next.completedAt || next.updatedAt,
+                    };
+                    await transaction.set(
+                        guestProgressTransferReceiptKey(derivedTransferId),
+                        JSON.stringify(receipt),
+                    );
+                    if (!indexedTransferIds.includes(derivedTransferId)) {
+                        await transaction.set(
+                            guestProgressTransferIndexKey(redditPlayerId),
+                            JSON.stringify(
+                                [...indexedTransferIds, derivedTransferId]
+                                    .slice(-ACCOUNT_TRANSFER_INDEX_LIMIT),
+                            ),
+                        );
+                    }
+                }
                 if (markPending) {
                     await transaction.set(pendingGuestKey, '1');
                     await transaction.set(pendingAccountKey, guestPlayerId);
@@ -1532,6 +2162,7 @@ export async function selectGuestProgress({
             });
         };
         const currentRaw = await redis.get(key);
+        indexedTransferIds = await readAccountTransferIndex(redditPlayerId);
         const pendingGuestForAccount = await redis.get(
             pendingAccountKey,
         );
@@ -1546,6 +2177,9 @@ export async function selectGuestProgress({
             throw conflict;
         }
         let currentRecord: GuestProgressSelectionRecord | null = null;
+        if (resume && transferId !== derivedTransferId) {
+            throw guestProgressRecoveryRequiredError();
+        }
         if (currentRaw) {
             let parsedRecord: unknown;
             try {
@@ -1568,30 +2202,125 @@ export async function selectGuestProgress({
                 if (!isValidCompletedSelectionRecord(parsedRecord, guestPlayerId, redditPlayerId)) {
                     throw guestProgressRecoveryRequiredError();
                 }
-                await saveRecord(null, { clearPending: true });
-                return { status: 'completed', choice };
+                // Repeating a finished transfer answers with the completion it already has. A
+                // valid completed record may clear its own stale markers, and nothing else.
+                const completedAt = parsedRecord.completedAt || parsedRecord.updatedAt || new Date().toISOString();
+                reportedPhase = 'completed';
+                await saveRecord(
+                    { ...parsedRecord, completedAt },
+                    { clearPending: true },
+                );
+                reportTiming('completed');
+                return {
+                    status: 'completed',
+                    choice,
+                    transferId: derivedTransferId,
+                    sourceGuestPlayerId: guestPlayerId,
+                    completedAt,
+                };
             }
             if (!isValidPendingSelectionRecord(parsedRecord, guestPlayerId, redditPlayerId)) {
                 throw guestProgressRecoveryRequiredError();
             }
+            if (resumableRecordState(parsedRecord) === 'recovery_required') {
+                throw guestProgressRecoveryRequiredError();
+            }
             currentRecord = parsedRecord;
         }
+        const frozenChallenges = currentRecord?.dailyChallengeSpecs
+            ? currentRecord.dailyChallengeSpecs.map(transferChallengeFromSpec)
+            : currentRecord?.dailyChallengeIds
+                ? await resolveGuestTransferDailyChallenges(currentRecord.dailyChallengeIds)
+                : await getServerDailyGpPlaylist();
+        const dailyChallengeIds = currentRecord?.dailyChallengeIds
+            ?? frozenChallenges.map((challenge) => challenge.id);
+        const dailyChallengeSpecs = currentRecord?.dailyChallengeSpecs
+            ?? frozenChallenges.map(transferChallengeSpec);
+        if (dailyChallengeSpecs.length !== dailyChallengeIds.length) {
+            throw guestProgressRecoveryRequiredError();
+        }
+        // Preparation permits no destination replacement, so it may repeat and may look at the
+        // source again. From `copying` onward the recorded inventory is the only evidence used.
+        const inheritedPhase: GuestTransferPhase = currentRecord?.version === 4
+            && isValidTransferPhase(currentRecord.phase)
+            ? currentRecord.phase
+            : currentRecord
+                ? 'copying'
+                : 'preparing';
+        const preparing = inheritedPhase === 'preparing';
+        const sourceInventory = choice === 'account'
+            ? undefined
+            : preparing || !isValidSourceInventory(currentRecord?.sourceInventory)
+                ? await captureGuestTransferSourceInventory(guestPlayerId, dailyChallengeSpecs)
+                : currentRecord.sourceInventory;
+        if (choice === 'guest' && !isValidSourceInventory(sourceInventory)) {
+            throw guestProgressRecoveryRequiredError();
+        }
         const record: GuestProgressSelectionRecord = {
-            version: 2,
+            version: 4,
+            transferId: derivedTransferId,
             guestPlayerId,
             redditPlayerId,
             choice,
             status: 'pending',
+            phase: preparing ? 'preparing' : inheritedPhase,
             updatedAt: new Date().toISOString(),
             completedDomains: currentRecord?.completedDomains ?? [],
             cleanedDomains: currentRecord?.cleanedDomains ?? [],
-            dailyChallengeIds: currentRecord?.dailyChallengeIds
-                ?? (await getServerDailyGpPlaylist()).map((challenge) => challenge.id),
+            dailyChallengeIds,
+            dailyChallengeSpecs,
+            ...(sourceInventory ? { sourceInventory } : {}),
         };
         // A retry record freezes the exact Daily window that the transfer must use. Resolve it
         // before the first account mutation so an expired or corrupted history entry cannot
         // leave Campaign partially replaced before Daily reports recovery is required.
-        await resolveGuestTransferDailyChallenges(record.dailyChallengeIds);
+        if (!record.completedDomains.includes('daily')) {
+            await resolveGuestTransferDailyChallenges(record.dailyChallengeIds);
+        }
+        if (record.phase === 'preparing') {
+            reportedPhase = 'preparing';
+            await saveRecord(record, { markPending: true });
+        }
+        // Preparation is finished and recorded. Only now may a destination row be replaced.
+        record.phase = 'copying';
+        record.updatedAt = new Date().toISOString();
+        reportedPhase = 'copying';
+        // Each domain calls this while it holds its own locks, and immediately before its first
+        // destination write. Holding those locks drains that domain's writes, so what is observed
+        // here is the payload the copy uses. There is no unverified read in between.
+        const verifySourceDomain = (domain: 'campaign' | 'daily' | 'unlocks') => (
+            async (raw?: { unlocks: Record<string, string> }): Promise<void> => {
+                if (!record.sourceInventory) return;
+                let evidence: Partial<GuestTransferSourceInventory>;
+                if (raw) {
+                    // Garage hands over the exact fields it is about to copy.
+                    evidence = { unlocks: stableFingerprint(raw.unlocks ?? null) };
+                } else if (domain === 'campaign') {
+                    evidence = {
+                        campaignProgress: stableFingerprint(
+                            await redis.get(campaignProgressKey(guestPlayerId)) ?? null,
+                        ),
+                        campaignStages: await captureCampaignStageEvidence(guestPlayerId),
+                    };
+                } else if (domain === 'daily') {
+                    evidence = {
+                        daily: await captureDailyEvidence(
+                            guestPlayerId,
+                            record.dailyChallengeSpecs ?? [],
+                        ),
+                    };
+                } else {
+                    evidence = {
+                        unlocks: stableFingerprint(
+                            await redis.hGetAll(carUnlockHashKey(guestPlayerId)) ?? null,
+                        ),
+                    };
+                }
+                if (changedInventoryDomains(record.sourceInventory, evidence).includes(domain)) {
+                    throw guestProgressRecoveryRequiredError();
+                }
+            }
+        );
         await saveRecord(record, { markPending: true });
         if (choice === 'guest') {
             await confirmSelectionOwnership();
@@ -1600,6 +2329,7 @@ export async function selectGuestProgress({
                     guestPlayerId,
                     redditPlayerId,
                     replace: true,
+                    verifyGuestSource: verifySourceDomain('campaign'),
                     transactionRunner: runTransferMutation,
                 }));
                 record.completedDomains = [...record.completedDomains, 'campaign'];
@@ -1612,6 +2342,8 @@ export async function selectGuestProgress({
                     redditPlayerId,
                     replace: true,
                     challengeIds: record.dailyChallengeIds,
+                    challengeSpecs: record.dailyChallengeSpecs,
+                    verifyGuestSource: verifySourceDomain('daily'),
                     transactionRunner: runTransferMutation,
                 }));
                 record.completedDomains = [...record.completedDomains, 'daily'];
@@ -1623,12 +2355,20 @@ export async function selectGuestProgress({
                     guestPlayerId,
                     redditPlayerId,
                     replace: true,
+                    preserveSource: true,
+                    verifyGuestSource: verifySourceDomain('unlocks'),
                     transactionRunner: runTransferMutation,
                 }));
                 record.completedDomains = [...record.completedDomains, 'unlocks'];
                 await saveRecord(record);
             }
+            // Every copy is checkpointed. Only now may the sources be deleted.
             await confirmSelectionOwnership();
+            if (record.phase !== 'cleaning') {
+                record.phase = 'cleaning';
+                reportedPhase = 'cleaning';
+                await saveRecord(record);
+            }
             if (!record.cleanedDomains?.includes('campaign')) {
                 await timed('campaignCleanupMs', () => cleanupGuestCampaignProgress({ guestPlayerId }));
                 record.cleanedDomains = [...(record.cleanedDomains || []), 'campaign'];
@@ -1639,6 +2379,7 @@ export async function selectGuestProgress({
                 await timed('dailyCleanupMs', () => cleanupGuestDailyProgress({
                     guestPlayerId,
                     challengeIds: record.dailyChallengeIds,
+                    challengeSpecs: record.dailyChallengeSpecs,
                 }));
                 record.cleanedDomains = [...(record.cleanedDomains || []), 'daily'];
                 await saveRecord(record);
@@ -1655,6 +2396,7 @@ export async function selectGuestProgress({
                 await timed('dailyMs', () => discardGuestDailyProgress({
                     guestPlayerId,
                     challengeIds: record.dailyChallengeIds,
+                    challengeSpecs: record.dailyChallengeSpecs,
                 }));
                 record.completedDomains = [...record.completedDomains, 'daily'];
                 await saveRecord(record);
@@ -1666,14 +2408,42 @@ export async function selectGuestProgress({
                 await saveRecord(record);
             }
         }
+        const completedAt = new Date().toISOString();
+        if (choice === 'guest') {
+            // The Garage hash is the last source to go, because its promotion pointer is the
+            // proof the copy committed. Deleting it earlier would remove that proof.
+            await timed('unlockCleanupMs', () => cleanupGuestCarUnlockProgress({
+                guestPlayerId,
+                redditPlayerId,
+            }));
+        }
+        reportedPhase = 'completed';
         await saveRecord(
-            { ...record, status: 'completed', updatedAt: new Date().toISOString() },
+            {
+                ...record,
+                status: 'completed',
+                phase: 'completed',
+                completedAt,
+                updatedAt: completedAt,
+            },
             { clearPending: true },
         );
         reportTiming('completed');
-        return { status: 'completed', choice };
+        return {
+            status: 'completed',
+            choice,
+            transferId: derivedTransferId,
+            sourceGuestPlayerId: guestPlayerId,
+            completedAt,
+        };
     } catch (error) {
-        reportTiming('failed');
+        reportTiming(
+            (error as { reason?: string })?.reason === 'guest_progress_recovery_required'
+                ? 'recovery_required'
+                : error instanceof GuestProgressSelectionRetryableError
+                    ? 'retryable'
+                    : 'failed',
+        );
         console.error('Guest progress selection failed:', error);
         throw error;
     } finally {
@@ -1691,13 +2461,58 @@ export async function selectServerGuestProgress({
     redditUsername,
     guestToken,
     choice,
+    action,
+    transferId,
 }: {
     playerId?: unknown;
     redditUsername?: unknown;
     guestToken?: unknown;
     choice?: unknown;
+    action?: unknown;
+    transferId?: unknown;
 }): Promise<PlayerBootstrapPayload> {
     const safeUsername = sanitizeRedditUsername(redditUsername);
+    if (action === 'resume' || action === 'status') {
+        if (!safeUsername || typeof transferId !== 'string' || !transferId) {
+            throw guestProgressRecoveryRequiredError();
+        }
+        const redditPlayerId = `reddit:${safeUsername.toLowerCase()}`;
+        const known = await resolveAccountTransferState(redditPlayerId, { transferId });
+        // A browser that lost the response to its own successful request asks again and is told
+        // the same thing it missed. A finished transfer is never reported as a repair case.
+        if (known?.state === 'completed' && known.transferId === transferId) {
+            const state = await getServerPlayerBootstrap({ redditUsername: safeUsername });
+            return { ...state, progressSelection: known };
+        }
+        if (action === 'status') {
+            const state = await getServerPlayerBootstrap({ redditUsername: safeUsername });
+            return known ? { ...state, progressSelection: known } : state;
+        }
+        if (!known
+            || known.state !== 'resume_required'
+            || !known.sourceGuestPlayerId
+            || transferId !== known.transferId) {
+            throw guestProgressRecoveryRequiredError();
+        }
+        const result = await selectGuestProgress({
+            guestPlayerId: known.sourceGuestPlayerId,
+            redditPlayerId,
+            choice: known.choice,
+            resume: true,
+            transferId,
+        });
+        const state = await getServerPlayerBootstrap({ redditUsername: safeUsername });
+        return {
+            ...state,
+            progressSelection: pendingSelectionPayload({
+                guestPlayerId: result.sourceGuestPlayerId,
+                redditPlayerId,
+                choice: result.choice,
+                state: 'completed',
+                completedAt: result.completedAt,
+            }),
+        };
+    }
     const verifiedGuestPlayerId = await verifyGuestPlayerToken(guestToken);
     if (!safeUsername || !verifiedGuestPlayerId) {
         const error = new Error('Guest progress selection requires a signed-in Reddit account and valid guest token.');
@@ -1710,7 +2525,7 @@ export async function selectServerGuestProgress({
         (error as Error & { statusCode?: number }).statusCode = 401;
         throw error;
     }
-    await selectGuestProgress({
+    const result = await selectGuestProgress({
         guestPlayerId: `guest:${verifiedGuestPlayerId}`,
         redditPlayerId: `reddit:${safeUsername.toLowerCase()}`,
         choice,
@@ -1973,9 +2788,42 @@ export async function getServerPlayerBootstrap({
         };
     }
 
+    // Read the stored profile before the transfer check, and apply it after. Reading proves
+    // nothing about the player yet; a blocked account still returns below without it.
+    if (!profile) {
+        previousProfile ??= await readPlayerProfile(identity.canonicalPlayerId);
+    }
+
     if (identity.canonicalPlayerId.startsWith('reddit:')) {
+        // Checked before guest promotion, before guest retirement, and before any profile is
+        // applied, so an unresolved transfer cannot be overtaken by ordinary sign-in work.
+        const accountTransfer = await resolveAccountTransferState(identity.canonicalPlayerId);
+        // Only a recorded choice blocks sign-in. A marker with no record means the chooser was
+        // opened and never answered: nothing was replaced, so this visit still gets the ordinary
+        // chooser with its real summaries, exactly as it did before.
+        const transferBlocksSignIn = accountTransfer?.state === 'resume_required'
+            || accountTransfer?.state === 'recovery_required';
+        if (transferBlocksSignIn) {
+            return {
+                playerId: identity.canonicalPlayerId,
+                guestToken: typeof guestToken === 'string' ? guestToken.trim() : null,
+                redditUsername: safeRequestRedditUsername,
+                leaderboardIdentity: 'reddit',
+                playerPreferences: null,
+                hasAnyData: false,
+                isReturningPlayer: false,
+                firstSeenAt: null,
+                lastSeenAt: null,
+                carUnlocks: null,
+                retireGuestIdentity: false,
+                progressSelection: accountTransfer,
+            };
+        }
+        if (accountTransfer?.state === 'completed') {
+            progressSelection = accountTransfer;
+        }
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
-        if (guestPlayerId) {
+        if (guestPlayerId && accountTransfer?.state !== 'completed') {
             const promotedTo = await readGuestPromotionTarget(`guest:${guestPlayerId}`);
             if (promotedTo) {
                 retireGuestIdentity = true;
@@ -2013,7 +2861,6 @@ export async function getServerPlayerBootstrap({
     }
 
     if (!profile) {
-        previousProfile ??= await readPlayerProfile(identity.canonicalPlayerId);
         profile = await upsertPlayerProfile({
             playerId: identity.canonicalPlayerId,
             leaderboardIdentity,

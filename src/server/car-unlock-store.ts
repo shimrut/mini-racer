@@ -13,7 +13,10 @@ import {
     type RedisLockMutation,
     type RedisLockTransactionRunner,
 } from './redis-lock.js';
-import { GuestProgressSelectionRetryableError } from './guest-progress-selection-error.js';
+import {
+    GuestProgressRecoveryRequiredError,
+    GuestProgressSelectionRetryableError,
+} from './guest-progress-selection-error.js';
 
 type CampaignResultMap = Record<string, { medal?: unknown }>;
 export type CarUnlockSnapshot = ReturnType<typeof buildCarUnlockSnapshot>;
@@ -197,12 +200,20 @@ export async function mergeGuestCarUnlockProgress({
     redditPlayerId,
     client = redis,
     replace = false,
+    preserveSource = false,
+    verifyGuestSource,
     transactionRunner,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     client?: RedisClient;
     replace?: boolean;
+    preserveSource?: boolean;
+    /**
+     * Called under the promotion locks with the exact fields this merge is about to copy, so the
+     * check and the copy cannot see different data.
+     */
+    verifyGuestSource?: (observed: { unlocks: Record<string, string> }) => void | Promise<void>;
     transactionRunner?: RedisLockTransactionRunner;
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
@@ -225,9 +236,19 @@ export async function mergeGuestCarUnlockProgress({
     }
     try {
         const alreadyPromotedTo = await client.get(promotionKey(guestPlayerId));
-        if (alreadyPromotedTo) return false;
+        if (alreadyPromotedTo) {
+            // The pointer is the proof the copy committed. It is accepted only when it names this
+            // transfer's account. Another account is a conflict, and no retry can resolve it.
+            if (alreadyPromotedTo !== redditPlayerId) {
+                throw new GuestProgressRecoveryRequiredError(
+                    'This guest garage was already promoted to another account.',
+                );
+            }
+            return false;
+        }
         const guestKey = carUnlockHashKey(guestPlayerId);
         const fields = await client.hGetAll(guestKey);
+        await verifyGuestSource?.({ unlocks: fields });
         const hadGuestProgress = Object.keys(fields).length > 0;
         const enqueue: RedisLockMutation = async (transaction) => {
             if (replace) {
@@ -237,7 +258,7 @@ export async function mergeGuestCarUnlockProgress({
                 await transaction.hSet(carUnlockHashKey(redditPlayerId), fields);
             }
             await transaction.set(promotionKey(guestPlayerId), redditPlayerId);
-            await transaction.del(guestKey);
+            if (!preserveSource) await transaction.del(guestKey);
         };
         if (transactionRunner) {
             await transactionRunner(locks, enqueue);
@@ -264,6 +285,40 @@ export async function mergeGuestCarUnlockProgress({
                 console.error('Car unlock promotion lock cleanup failed:', error);
             }
         }));
+    }
+}
+
+/** Deletes the old Garage event hash only after the transfer coordinator checkpointed promotion. */
+export async function cleanupGuestCarUnlockProgress({
+    guestPlayerId,
+    redditPlayerId,
+    client = redis,
+}: {
+    guestPlayerId: string;
+    redditPlayerId: string;
+    client?: RedisClient;
+}): Promise<boolean> {
+    if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) return false;
+    const lock = await acquirePromotionLock(guestPlayerId, client);
+    try {
+        const promotedTo = await client.get(promotionKey(guestPlayerId));
+        if (promotedTo && promotedTo !== redditPlayerId) {
+            throw new GuestProgressRecoveryRequiredError(
+                'This guest garage was already promoted to another account.',
+            );
+        }
+        const hadGuestProgress = Object.keys(await client.hGetAll(carUnlockHashKey(guestPlayerId))).length > 0;
+        const transaction = await beginOwnedRedisLockTransaction(lock, client);
+        if (!transaction) throw new GuestProgressSelectionRetryableError('Garage cleanup lost its ownership lock.');
+        await transaction.del(carUnlockHashKey(guestPlayerId));
+        if (!await commitOwnedRedisLockTransaction(transaction)) {
+            throw new GuestProgressSelectionRetryableError('Garage cleanup was interrupted.');
+        }
+        return hadGuestProgress;
+    } finally {
+        await releaseRedisLock(lock, client).catch((error) => {
+            console.error('Garage cleanup lock release failed:', error);
+        });
     }
 }
 

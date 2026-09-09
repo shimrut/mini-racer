@@ -877,11 +877,18 @@ export async function mergeGuestCampaignProgress({
     guestPlayerId,
     redditPlayerId,
     replace = false,
+    verifyGuestSource,
     transactionRunner,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     replace?: boolean;
+    /**
+     * Called once the guest submission and progress locks are held, and before the first account
+     * write. A transfer uses it to prove the source still matches the inventory it recorded.
+     * Those locks stop every guest write, so what it sees is what this merge copies.
+     */
+    verifyGuestSource?: () => void | Promise<void>;
     transactionRunner?: RedisLockTransactionRunner;
 }): Promise<{ merged: boolean; mergedRaceIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
@@ -950,6 +957,7 @@ export async function mergeGuestCampaignProgress({
             redis,
         );
         await confirmMergeOwnership();
+        await verifyGuestSource?.();
 
         const guestProgressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId))!;
         const redditProgressLock = locks.find((lock) => lock.key === progressLockKey(redditPlayerId))!;

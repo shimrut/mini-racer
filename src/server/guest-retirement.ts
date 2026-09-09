@@ -17,6 +17,24 @@ export function guestProgressSelectionAccountPendingKey(redditPlayerId: string):
         .digest('base64url')}`;
 }
 
+/**
+ * The durable proof that one transfer finished. It is keyed by the transfer, not by the account,
+ * so a later transfer appends its own receipt instead of hiding an earlier completion. A browser
+ * holding an unfinished local receipt reads its own answer here after the markers are gone.
+ */
+export function guestProgressTransferReceiptKey(transferId: string): string {
+    return `dailygp:guest-progress-transfer-receipt:v1:${createHash('sha256')
+        .update(transferId, 'utf8')
+        .digest('base64url')}`;
+}
+
+/** Lets the server find an account's transfers without the original guest token. Oldest first. */
+export function guestProgressTransferIndexKey(redditPlayerId: string): string {
+    return `dailygp:guest-progress-transfer-index:v1:${createHash('sha256')
+        .update(redditPlayerId, 'utf8')
+        .digest('base64url')}`;
+}
+
 export async function isGuestProgressSelectionPending(canonicalGuestPlayerId: string): Promise<boolean> {
     return Boolean(await redis.get(guestProgressSelectionPendingKey(canonicalGuestPlayerId)));
 }
