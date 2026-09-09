@@ -1624,8 +1624,7 @@ async function readGuestTransferReceipt(
     }
 }
 
-async function readAccountTransferIndex(redditPlayerId: string): Promise<string[]> {
-    const raw = await redis.get(guestProgressTransferIndexKey(redditPlayerId));
+function parseAccountTransferIndex(raw: string | null | undefined): string[] {
     if (!raw) return [];
     try {
         const parsed = JSON.parse(raw) as unknown;
@@ -1634,6 +1633,12 @@ async function readAccountTransferIndex(redditPlayerId: string): Promise<string[
     } catch {
         return [];
     }
+}
+
+async function readAccountTransferIndex(redditPlayerId: string): Promise<string[]> {
+    return parseAccountTransferIndex(
+        await redis.get(guestProgressTransferIndexKey(redditPlayerId)),
+    );
 }
 
 /** Only a version-4 record carries the source evidence a Guest replacement must be checked against. */
@@ -1669,7 +1674,12 @@ export async function resolveAccountTransferState(
             });
         }
     }
-    const pendingGuest = await redis.get(guestProgressSelectionAccountPendingKey(redditPlayerId));
+    // Every signed-in bootstrap asks this, and almost every one has neither. Both answers come
+    // back in one round trip so the common case costs one call, not two.
+    const [pendingGuest, rawIndex] = await redis.mGet([
+        guestProgressSelectionAccountPendingKey(redditPlayerId),
+        guestProgressTransferIndexKey(redditPlayerId),
+    ]);
     if (typeof pendingGuest === 'string' && pendingGuest.startsWith('guest:')) {
         const raw = await redis.get(guestProgressSelectionKey(pendingGuest, redditPlayerId));
         // Transfer records do not expire, so a marker with no record means the chooser was shown
@@ -1710,7 +1720,7 @@ export async function resolveAccountTransferState(
             state: 'recovery_required',
         });
     }
-    const index = await readAccountTransferIndex(redditPlayerId);
+    const index = parseAccountTransferIndex(rawIndex);
     for (let position = index.length - 1; position >= 0; position -= 1) {
         const receipt = await readGuestTransferReceipt(index[position], redditPlayerId);
         if (receipt) {
