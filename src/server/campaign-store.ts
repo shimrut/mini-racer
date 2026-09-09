@@ -26,6 +26,7 @@ import {
 import {
     classifyStoredCampaignProgress,
     classifyStoredLeaderboardEntry,
+    readStoredUpdatedAt,
     type StoredRecordClassification,
 } from './guest-transfer-source-classification.js';
 import { encodeRedisCompressedValue } from './redis-compressed-value.js';
@@ -983,11 +984,13 @@ async function captureClassifiedGuestCampaignSource(
     };
 
     const rawProgress = await redis.get(progressKey(guestPlayerId));
+    // Taken from the stored value itself, so a record that is damaged elsewhere still dates the
+    // source it belongs to. This is what a held source's retention deadline is derived from.
+    observeTimestamp(readStoredUpdatedAt(rawProgress));
     const progressClass = classifyStoredCampaignProgress(rawProgress);
     if (progressClass.state === 'malformed') {
         malformed.push(`campaign:progress:${progressClass.reason}`);
     } else if (progressClass.state === 'valid') {
-        observeTimestamp(progressClass.record.updatedAt);
         for (const row of Object.values(progressClass.record.rows)) observeTimestamp(row.updatedAt);
         for (const raceId of progressClass.record.obsoleteRaceIds) {
             obsolete.push(`campaign:progress:${raceId}`);
@@ -1006,21 +1009,17 @@ async function captureClassifiedGuestCampaignSource(
         ]);
         const pbClass = classifyStoredPbRecordFor(rawPb, competition, TRACKS[stage.trackKey]);
         const entryClass = classifyStoredLeaderboardEntry(rawEntry, guestPlayerId, stage);
+        observeTimestamp(readStoredUpdatedAt(rawEntry));
+        observeTimestamp(readStoredUpdatedAt(rawPb));
         if (entryClass.state === 'malformed') {
             malformed.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
         } else if (entryClass.state === 'obsolete') {
             obsolete.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
-            observeTimestamp(entryClass.updatedAt);
-        } else if (entryClass.state === 'valid') {
-            observeTimestamp(entryClass.record.updatedAt);
         }
         if (pbClass.state === 'malformed') {
             malformed.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
         } else if (pbClass.state === 'obsolete') {
             obsolete.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
-            observeTimestamp(pbClass.updatedAt);
-        } else if (pbClass.state === 'valid') {
-            observeTimestamp(pbClass.record.updatedAt);
         }
         stages.set(stage.raceId, {
             rawEntry: rawEntry ?? null,

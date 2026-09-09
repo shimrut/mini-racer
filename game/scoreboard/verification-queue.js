@@ -399,9 +399,12 @@ function readStoredTransferBlocks() {
   // nothing to be unsure about. A window whose storage is missing or refuses to be read is the
   // case that matters: this browser is playing, and it cannot say whether a transfer is open.
   if (typeof window === "undefined") return { ok: true, blocks: {} };
-  if (!window.localStorage) return { ok: false, blocks: {} };
   try {
-    const raw = window.localStorage.getItem(TRANSFER_BLOCKS_STORAGE_KEY);
+    // Reading the property is itself the throwing operation when a browser denies site data, so
+    // it belongs inside the handler rather than in a guard in front of it.
+    const storage = window.localStorage;
+    if (!storage) return { ok: false, blocks: {} };
+    const raw = storage.getItem(TRANSFER_BLOCKS_STORAGE_KEY);
     if (!raw) return { ok: true, blocks: {} };
     const parsed = JSON.parse(raw);
     return {
@@ -435,7 +438,12 @@ function readTransferBlocks() {
   const merged = stored.ok ? { ...stored.blocks } : {};
   if (stored.ok) {
     for (const [accountPlayerId, block] of Object.entries(stored.blocks)) {
-      if (!knownTransferBlocks.has(accountPlayerId)) {
+      const cached = knownTransferBlocks.get(accountPlayerId);
+      // Refresh what storage already owns, rather than only adopting keys that are new. The same
+      // account can be named with a different guest later, and a stale cached copy would restore
+      // the older pairing on the next failed read, leaving the newer guest unblocked.
+      // An unpersisted entry is left alone: storage never took it, so storage cannot replace it.
+      if (!cached || cached.persisted) {
         knownTransferBlocks.set(accountPlayerId, { block, persisted: true });
       }
     }
@@ -466,9 +474,12 @@ export function confirmVerificationQueueTransferSafety() {
 }
 
 function writeTransferBlocks(blocks) {
-  if (typeof window === "undefined" || !window.localStorage) return false;
+  if (typeof window === "undefined") return false;
   try {
-    window.localStorage.setItem(TRANSFER_BLOCKS_STORAGE_KEY, JSON.stringify(blocks));
+    // Same as the read: the property access can throw before any method is called.
+    const storage = window.localStorage;
+    if (!storage) return false;
+    storage.setItem(TRANSFER_BLOCKS_STORAGE_KEY, JSON.stringify(blocks));
     return true;
   } catch (error) {
     console.error("Error writing transfer blocks:", error);

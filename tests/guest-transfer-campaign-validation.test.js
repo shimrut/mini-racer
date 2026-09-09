@@ -230,3 +230,97 @@ describe("a source held for review is still enrolled for collection", () => {
     );
   });
 });
+
+describe("a damaged leaderboard entry is damage, not obsolescence", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("classifies a wrong-typed lap count as malformed", async () => {
+    const { classifyStoredLeaderboardEntry } =
+      await import("../src/server/guest-transfer-source-classification.ts");
+
+    const classification = classifyStoredLeaderboardEntry(
+      JSON.stringify({
+        playerId: "guest:x",
+        bestTimeMs: 12_000,
+        updatedAt: "2026-09-01T09:30:00.000Z",
+        trackKey: "numberZero",
+        completedLaps: "broken",
+        validationMethod: "strict-replay",
+      }),
+      "guest:x",
+      { trackKey: "numberZero", lapCount: 2 },
+    );
+
+    expect(classification.state).toBe("malformed");
+  });
+
+  it("stops rather than deleting the entry and emptying the account", async () => {
+    const guestPlayerId = "guest:broken-entry";
+    const redditPlayerId = "reddit:broken-entry";
+    const competition = toCampaignCompetition(
+      "numbered-v1",
+      { raceId: "numbered-v1-00", trackKey: "numberZero", lapCount: 2, rulesRevision: 1 },
+      { playerId: guestPlayerId },
+    );
+    const damagedEntry = JSON.stringify({
+      playerId: guestPlayerId,
+      bestTimeMs: 12_000,
+      updatedAt: "2026-09-01T09:30:00.000Z",
+      trackKey: "numberZero",
+      completedLaps: "broken",
+      validationMethod: "strict-replay",
+    });
+
+    await seedAccountWithEarnedResult(redditPlayerId);
+    await recordCompletedRace(guestPlayerId);
+    await redis.hSet(competition.entryHashKey, { [guestPlayerId]: damagedEntry });
+    await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+
+    const account = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
+    expect(account.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000 });
+    expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBe(damagedEntry);
+  });
+
+  it("dates a held source from a damaged record that still says when it was written", async () => {
+    const guestPlayerId = "guest:damaged-but-dated";
+    const redditPlayerId = "reddit:damaged-but-dated";
+    const competition = toCampaignCompetition(
+      "numbered-v1",
+      { raceId: "numbered-v1-00", trackKey: "numberZero", lapCount: 2, rulesRevision: 1 },
+      { playerId: guestPlayerId },
+    );
+    const field = createHash("sha256").update(guestPlayerId, "utf8").digest("base64url");
+
+    await recordCompletedRace(guestPlayerId);
+    // Damaged in its revision field, honest about its timestamp, and the only thing this guest
+    // has. Nothing else can date the source.
+    await redis.hSet(competition.pbHashKey, {
+      [field]: JSON.stringify({
+        schemaVersion: 2,
+        trackKey: "numberZero",
+        trackFingerprint: "zz",
+        simulationRevision: 1,
+        rulesRevision: "broken",
+        lapCount: 2,
+        bestTimeMs: 12_000,
+        updatedAt: "2026-09-01T09:30:00.000Z",
+      }),
+    });
+    await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+
+    const score = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, guestPlayerId);
+    expect(Number.isFinite(Number(score))).toBe(true);
+    // One retention period after the record said it was written, not a fresh term from today.
+    expect(Number(score)).toBe(Date.parse("2026-09-01T09:30:00.000Z") + 365 * 24 * 60 * 60 * 1000);
+  });
+});

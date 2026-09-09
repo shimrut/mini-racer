@@ -86,6 +86,20 @@ function readTimestamp(value: unknown): string | null {
         : null;
 }
 
+/**
+ * Pulls a usable `updatedAt` out of a stored value without judging the rest of it.
+ *
+ * Retention for a source held for review is derived from when that data was last touched, and a
+ * record can be damaged in one field while still saying honestly when it was written. Reading the
+ * timestamp only from records that classified as usable throws away the very evidence a damaged
+ * record was kept for, and leaves it with no deadline at all.
+ */
+export function readStoredUpdatedAt(raw: string | null | undefined): string | null {
+    const json = readJson(raw);
+    if (json.ok !== true) return null;
+    return readTimestamp(json.value.updatedAt);
+}
+
 export type CampaignProgressRow = {
     raceId: string;
     trackKey: string;
@@ -261,6 +275,22 @@ export function classifyStoredLeaderboardEntry(
     }
 
     const updatedAt = readTimestamp(value.updatedAt);
+    // Types before values, the same as the progress and personal-best classifiers. A field of the
+    // wrong type differs from what the stage expects, and reading that difference as a supported
+    // change is how damage gets called obsolete and then quietly dropped.
+    if (value.trackKey !== undefined && (typeof value.trackKey !== 'string' || !value.trackKey)) {
+        return { state: 'malformed', reason: 'missing_fields' };
+    }
+    if (
+        value.completedLaps !== undefined
+        && (typeof value.completedLaps !== 'number' || !Number.isInteger(value.completedLaps))
+    ) {
+        return { state: 'malformed', reason: 'missing_fields' };
+    }
+    if (value.validationMethod !== undefined && typeof value.validationMethod !== 'string') {
+        return { state: 'malformed', reason: 'missing_fields' };
+    }
+
     const trackKey = typeof value.trackKey === 'string' && value.trackKey ? value.trackKey : null;
     if (stage) {
         if (trackKey && trackKey !== stage.trackKey) {
