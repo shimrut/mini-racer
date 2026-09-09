@@ -1,19 +1,28 @@
 import { presentPlayerChoiceOverlay } from './player-choice-overlay.js';
 
-export async function requestServerSyncFailureChoice({ retry } = {}) {
+/**
+ * `allowOffline` is false when this browser knows about an unfinished progress transfer. Racing on
+ * without the server would build results on top of progress the transfer may still replace, so the
+ * offline way out is not offered at all.
+ */
+export async function requestServerSyncFailureChoice({ retry, allowOffline = true } = {}) {
     if (typeof document === 'undefined' || !document.body) {
-        return { action: 'offline' };
+        return { action: allowOffline ? 'offline' : 'retry' };
     }
 
     return new Promise((resolve) => {
         const overlay = presentPlayerChoiceOverlay({
             titleId: 'server-sync-failure-title',
             title: 'SERVER SYNCHRONIZATION FAILED',
-            message: 'Could not confirm who is signed in. Retry, or continue with the last saved account on this phone.',
-            actions: [
-                { label: 'RETRY SYNC', choice: 'retry', primary: true },
-                { label: 'CONTINUE OFFLINE', choice: 'offline' },
-            ],
+            message: allowOffline
+                ? 'Could not confirm who is signed in. Retry, or continue with the last saved account on this phone.'
+                : 'Could not reach the server, and a progress transfer is still open. Retry to finish it. Racing stays paused until then.',
+            actions: allowOffline
+                ? [
+                    { label: 'RETRY SYNC', choice: 'retry', primary: true },
+                    { label: 'CONTINUE OFFLINE', choice: 'offline' },
+                ]
+                : [{ label: 'RETRY SYNC', choice: 'retry', primary: true }],
         });
         overlay.root.classList.add('server-sync-failure');
 

@@ -5,6 +5,7 @@ import {
   setDailyChallengeBestTime,
 } from "./storage.js";
 import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js";
+import { isVerificationQueueSubmissionBlocked } from "../scoreboard/verification-queue.js";
 import { normalizePbGhostRecord } from "../ghost/pb-ghost.js";
 import { createPersonalBestPaceBaseline, getLapPaceDeltaSec } from "../ghost/pb-pace.js";
 import {
@@ -855,6 +856,7 @@ export const dailyChallengeEngineMethods = {
   },
 
   async handleStartDailyChallenge(challengeOverride = null, options = {}) {
+    if (isVerificationQueueSubmissionBlocked()) return null;
     this.lobbyUi?.clearRaceStartError?.("daily");
     if (!options.preserveRaceComparisonTarget) {
       this.clearRaceComparisonTarget?.();

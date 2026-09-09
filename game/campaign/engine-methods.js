@@ -18,6 +18,7 @@ import {
 } from './service.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
 import { buildCampaignCarouselCards } from './carousel-model.js';
+import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
 import {
     deferLobbyWorkUntilAfterPaint,
     isLobbyPaintEligible,
@@ -640,6 +641,7 @@ export const campaignEngineMethods = {
         preserveRaceComparisonTarget = false,
         confirmUnlockFor = null,
     } = {}) {
+        if (isVerificationQueueSubmissionBlocked()) return null;
         if (this.startButtonPending) return;
         this.lobbyUi?.clearRaceStartError?.('campaign');
         if (!preserveRaceComparisonTarget) this.clearRaceComparisonTarget?.();

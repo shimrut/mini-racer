@@ -9,6 +9,7 @@ import { RingBuffer } from "./race/ring-buffer.js";
 import {
   getPlayerProgressState,
 } from "./storage.js";
+import { isVerificationQueueSubmissionBlocked } from "./scoreboard/verification-queue.js";
 import { createRunPolicy } from "./race/run-policy.js";
 import {
   detectDevicePerformance,
@@ -897,7 +898,15 @@ export class RealTimeRacer {
   }
 
   async invokeModeMethod(mode, method, ...args) {
+    const startsRace = [
+      "handleStartDailyChallenge",
+      "startCampaignStage",
+      "startHeadToHead",
+      "retryHeadToHead",
+    ].includes(method);
+    if (startsRace && isVerificationQueueSubmissionBlocked()) return null;
     await this.ensureModeRuntime(mode);
+    if (startsRace && isVerificationQueueSubmissionBlocked()) return null;
     const handler = this[method];
     if (typeof handler !== "function") return null;
     return handler.call(this, ...args);

@@ -20,6 +20,8 @@ const VERIFICATION_STAGE_ERROR = "error";
 const CAMPAIGN_EXPIRY_MESSAGE = "Result expired — race again.";
 const CAMPAIGN_GHOST_RETRY_MESSAGE = "Saving ghost...";
 const OWNER_KEY_SEPARATOR = "::";
+const TRANSFER_RECONCILIATIONS_KEY = "transferReconciliations";
+const TRANSFER_BLOCKS_KEY = "transferBlocks";
 
 const VERIFICATION_STAGE_TEXT = {
   [VERIFICATION_STAGE_SUBMITTING]: "Submitting...",
@@ -117,6 +119,11 @@ function readQueueState() {
           ? parsed.campaign
           : {},
     };
+    for (const transferKey of [TRANSFER_RECONCILIATIONS_KEY, TRANSFER_BLOCKS_KEY]) {
+      if (parsed?.[transferKey] && typeof parsed[transferKey] === "object") {
+        queueState[transferKey] = parsed[transferKey];
+      }
+    }
     if (purgeExpiredQueueState(queueState)) {
       window.localStorage.setItem(
         VERIFICATION_QUEUE_STORAGE_KEY,
@@ -342,14 +349,184 @@ function isVisibleQueueEntry(entry) {
 }
 
 function getDue(bucket, now = Date.now()) {
-  return Object.values(readQueueState()[bucket])
+  const queueState = readQueueState();
+  // Read the block from storage on every pass, so another tab's recovery cannot be missed and a
+  // completion in this tab releases the queue only once it is durable.
+  if (isBlockedByTransfer(queueState)) return [];
+  return Object.values(queueState[bucket])
     .filter(
       (entry) =>
         entry?.verificationState === "pending" &&
+        !entry?.transferRecoveryRequired &&
         isOwnedByActivePlayer(entry) &&
         normalizeNextAttemptAt(entry.nextAttemptAt) <= now,
     )
     .map((entry) => cloneEntry(entry));
+}
+
+function normalizedTransferValue(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function transferBlocksIn(queueState) {
+  const blocks = queueState?.[TRANSFER_BLOCKS_KEY];
+  return blocks && typeof blocks === "object" ? blocks : {};
+}
+
+/**
+ * A known transfer stops racing and submitting for the owners it names, and only for them.
+ * Signing into a different account does not inherit the first account's transfer. The marker
+ * lives in storage, so a reload followed by a network failure cannot slip into ordinary offline
+ * mode with the transfer still open.
+ */
+function isBlockedByTransfer(queueState, ownerPlayerId) {
+  const blocks = Object.values(transferBlocksIn(queueState));
+  if (blocks.length === 0) return false;
+  const owner = ownerPlayerId === undefined ? resolveQueuedOwnerId() : ownerPlayerId;
+  // Between signing in and the profile being confirmed there is no owner to compare against.
+  // An open transfer in this browser is reason enough to wait.
+  if (!owner) return true;
+  return blocks.some((block) => (
+    block?.accountPlayerId === owner || block?.guestPlayerId === owner
+  ));
+}
+
+export function isVerificationQueueSubmissionBlocked(ownerPlayerId) {
+  return isBlockedByTransfer(readQueueState(), ownerPlayerId);
+}
+
+/** Records that this browser knows about an unresolved transfer. Survives a reload. */
+export function recordVerificationQueueTransferBlock({
+  transferId = null,
+  guestPlayerId = null,
+  accountPlayerId,
+  state = "resume_required",
+} = {}) {
+  if (!normalizedTransferValue(accountPlayerId)) return false;
+  const queueState = readQueueState();
+  queueState[TRANSFER_BLOCKS_KEY] = {
+    ...transferBlocksIn(queueState),
+    [accountPlayerId]: {
+      transferId: normalizedTransferValue(transferId),
+      guestPlayerId: normalizedTransferValue(guestPlayerId),
+      accountPlayerId,
+      state,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+  return writeQueueState(queueState);
+}
+
+/** Lifts the block for one account once its reconciliation is durable. */
+export function clearVerificationQueueTransferBlock(accountPlayerId) {
+  if (!normalizedTransferValue(accountPlayerId)) return false;
+  const queueState = readQueueState();
+  const blocks = transferBlocksIn(queueState);
+  if (!blocks[accountPlayerId]) return true;
+  const next = { ...blocks };
+  delete next[accountPlayerId];
+  queueState[TRANSFER_BLOCKS_KEY] = next;
+  return writeQueueState(queueState);
+}
+
+export function readVerificationQueueTransferBlock(accountPlayerId) {
+  return transferBlocksIn(readQueueState())[accountPlayerId] ?? null;
+}
+
+function transferReceiptKey({ transferId, guestPlayerId, accountPlayerId }) {
+  return normalizedTransferValue(transferId)
+    || `guest-progress:${guestPlayerId}->${accountPlayerId}`;
+}
+
+function transferEntrySnapshot(entryKey, entry) {
+  return {
+    entryKey,
+    ownerPlayerId: entry?.ownerPlayerId ?? null,
+    sessionId: entry?.sessionId ?? null,
+    updatedAt: entry?.updatedAt ?? null,
+    bestTime: Number.isFinite(entry?.bestTime) ? entry.bestTime : null,
+    challengeId: entry?.challengeId ?? null,
+    raceId: entry?.raceId ?? null,
+  };
+}
+
+function matchesTransferEntrySnapshot(entry, snapshot) {
+  return Boolean(entry)
+    && (entry.ownerPlayerId ?? null) === snapshot.ownerPlayerId
+    && (entry.sessionId ?? null) === snapshot.sessionId
+    && (entry.updatedAt ?? null) === snapshot.updatedAt
+    && (Number.isFinite(entry.bestTime) ? entry.bestTime : null) === snapshot.bestTime
+    && (entry.challengeId ?? null) === snapshot.challengeId
+    && (entry.raceId ?? null) === snapshot.raceId;
+}
+
+/**
+ * An entry named by an unfinished reconciliation, or one already quarantined, is never claimed by
+ * whoever signs in next. Ownership it cannot prove is not ownership.
+ */
+function isEntryProtectedByTransfer(queueState, bucket, entryKey) {
+  if (queueState[bucket]?.[entryKey]?.transferRecoveryRequired) return true;
+  return Object.values(queueState[TRANSFER_RECONCILIATIONS_KEY] || {}).some((receipt) => (
+    !receipt?.completedAt
+      && receipt.entries?.["guest"]?.some((snapshot) => snapshot.bucket === bucket && snapshot.entryKey === entryKey)
+  ));
+}
+
+/** Marks entries this browser cannot prove ownership of, and keeps them out of every queue path. */
+function quarantineEntries(queueState, entries) {
+  for (const { bucket, entryKey, entry } of entries) {
+    queueState[bucket][entryKey] = {
+      ...entry,
+      verificationState: "error",
+      submissionStage: VERIFICATION_STAGE_ERROR,
+      statusText: "Transfer needs review before this result can be saved.",
+      nextAttemptAt: null,
+      transferRecoveryRequired: true,
+      updatedAt: entry.updatedAt,
+    };
+  }
+}
+
+/** Capture exact local entries before the server choice is sent. The first choice is immutable. */
+export function prepareVerificationQueueGuestProgressReconciliation({
+  transferId = null,
+  guestPlayerId,
+  accountPlayerId,
+  choice,
+} = {}) {
+  if (!normalizedTransferValue(guestPlayerId)
+    || !normalizedTransferValue(accountPlayerId)
+    || (choice !== "guest" && choice !== "account")) {
+    return { prepared: false };
+  }
+  const queueState = readQueueState();
+  queueState[TRANSFER_RECONCILIATIONS_KEY] ??= {};
+  const receiptKey = transferReceiptKey({ transferId, guestPlayerId, accountPlayerId });
+  const existing = queueState[TRANSFER_RECONCILIATIONS_KEY][receiptKey];
+  if (existing) {
+    return existing.choice === choice
+      ? { prepared: true, receiptKey }
+      : { prepared: false, receiptKey, choiceLocked: true };
+  }
+  const entries = { guest: [], account: [] };
+  for (const bucket of QUEUE_BUCKETS) {
+    for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
+      if (entry?.ownerPlayerId === guestPlayerId) {
+        entries.guest.push({ bucket, ...transferEntrySnapshot(entryKey, entry) });
+      } else if (entry?.ownerPlayerId === accountPlayerId) {
+        entries.account.push({ bucket, ...transferEntrySnapshot(entryKey, entry) });
+      }
+    }
+  }
+  queueState[TRANSFER_RECONCILIATIONS_KEY][receiptKey] = {
+    guestPlayerId,
+    accountPlayerId,
+    choice,
+    entries,
+    createdAt: new Date().toISOString(),
+  };
+  const persisted = writeQueueState(queueState);
+  return { prepared: persisted, receiptKey, persisted };
 }
 
 /**
@@ -373,6 +550,7 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
     for (const entryKey of Object.keys(queueState[bucket])) {
       const entry = queueState[bucket][entryKey];
       if (!entry) continue;
+      if (isEntryProtectedByTransfer(queueState, bucket, entryKey)) continue;
 
       let currentKey = entryKey;
       let current = entry;
@@ -417,6 +595,8 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
  * while choosing account removes the guest/current-session queue.
  */
 export function resolveVerificationQueueAfterGuestProgressSelection({
+  transferId = null,
+  completedAt = null,
   guestPlayerId,
   accountPlayerId,
   choice,
@@ -429,8 +609,101 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
     return { changed: false, removed: 0, moved: 0 };
   }
   const queueState = readQueueState();
+  const receiptKey = normalizedTransferValue(transferId)
+    ? transferReceiptKey({ transferId, guestPlayerId, accountPlayerId })
+    : null;
+  const receipt = receiptKey ? queueState[TRANSFER_RECONCILIATIONS_KEY]?.[receiptKey] : null;
+  if (receiptKey && (!receipt
+    || receipt.guestPlayerId !== guestPlayerId
+    || receipt.accountPlayerId !== accountPlayerId
+    || receipt.choice !== choice)) {
+    const completedMs = parseTimestamp(completedAt);
+    const ambiguous = [];
+    for (const bucket of QUEUE_BUCKETS) {
+      for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
+        if (entry?.ownerPlayerId !== guestPlayerId && entry?.ownerPlayerId !== accountPlayerId) continue;
+        const updatedMs = parseTimestamp(entry.updatedAt);
+        if (completedMs === null || updatedMs === null || updatedMs <= completedMs) {
+          ambiguous.push({ bucket, entryKey, entry });
+        }
+      }
+    }
+    // Another device, or a browser that lost its receipt. This browser cannot prove which entries
+    // the selection covered, so it invents no history: the ambiguous ones are quarantined, and the
+    // decision itself is written down. Once that decision is durable, results raced from here on
+    // save normally.
+    quarantineEntries(queueState, ambiguous);
+    queueState[TRANSFER_RECONCILIATIONS_KEY] ??= {};
+    queueState[TRANSFER_RECONCILIATIONS_KEY][receiptKey] = {
+      guestPlayerId,
+      accountPlayerId,
+      choice,
+      entries: { guest: [], account: [] },
+      quarantined: ambiguous.map(({ bucket, entryKey }) => ({ bucket, entryKey })),
+      createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+    };
+    const persisted = writeQueueState(queueState);
+    return {
+      changed: false,
+      removed: 0,
+      moved: 0,
+      preserved: 0,
+      quarantined: ambiguous.length,
+      missingReceipt: true,
+      persisted,
+      completed: persisted,
+    };
+  }
+  if (receipt?.completedAt) {
+    return { changed: false, removed: 0, moved: 0, preserved: 0, completed: true };
+  }
   let removed = 0;
   let moved = 0;
+  let preserved = 0;
+  if (receipt) {
+    if (choice === "guest") {
+      for (const snapshot of receipt.entries.account) {
+        const entry = queueState[snapshot.bucket]?.[snapshot.entryKey];
+        if (!matchesTransferEntrySnapshot(entry, snapshot)) {
+          if (entry) preserved += 1;
+          continue;
+        }
+        delete queueState[snapshot.bucket][snapshot.entryKey];
+        removed += 1;
+      }
+    }
+    for (const snapshot of receipt.entries.guest) {
+      const entry = queueState[snapshot.bucket]?.[snapshot.entryKey];
+      if (!matchesTransferEntrySnapshot(entry, snapshot)) {
+        if (entry) preserved += 1;
+        continue;
+      }
+      if (choice === "account") {
+        delete queueState[snapshot.bucket][snapshot.entryKey];
+        removed += 1;
+        continue;
+      }
+      const rawId = rawEntryIdFromKey(snapshot.entryKey, entry.ownerPlayerId);
+      const destinationKey = ownedEntryKey(rawId, accountPlayerId);
+      if (destinationKey !== snapshot.entryKey && queueState[snapshot.bucket][destinationKey]) {
+        preserved += 1;
+        continue;
+      }
+      rekeyOwnedEntry(queueState, snapshot.bucket, snapshot.entryKey, entry, accountPlayerId);
+      moved += 1;
+    }
+    receipt.completedAt = new Date().toISOString();
+    const persisted = writeQueueState(queueState);
+    return {
+      changed: (removed > 0 || moved > 0) && persisted,
+      removed,
+      moved,
+      preserved,
+      persisted,
+      completed: persisted,
+    };
+  }
   for (const bucket of QUEUE_BUCKETS) {
     const entries = Object.entries(queueState[bucket]);
     if (choice === "guest") {
@@ -454,13 +727,14 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
     }
   }
   const changed = removed > 0 || moved > 0;
-  if (changed) writeQueueState(queueState);
-  return { changed, removed, moved };
+  const persisted = changed ? writeQueueState(queueState) : true;
+  return { changed: changed && persisted, removed, moved, preserved, persisted, completed: persisted };
 }
 
 export function hasVerificationEntriesForOwner(ownerPlayerId) {
   if (typeof ownerPlayerId !== "string" || !ownerPlayerId.trim()) return false;
-  return Object.values(readQueueState())
+  return QUEUE_BUCKETS
+    .map((bucket) => readQueueState()[bucket])
     .some((bucket) => Object.values(bucket).some((entry) => entry?.ownerPlayerId === ownerPlayerId));
 }
 
@@ -744,6 +1018,7 @@ export function getDueCampaignVerifications(now = Date.now()) {
 
 export function getNextVerificationAttemptAt() {
   const queueState = readQueueState();
+  if (isBlockedByTransfer(queueState)) return null;
   const nextAttemptValues = QUEUE_BUCKETS
     .flatMap((bucket) => Object.values(queueState[bucket]))
     .filter(
@@ -791,5 +1066,5 @@ export function getVerificationSnapshotFromQueueEntry(entry) {
 }
 
 export function resetVerificationQueueForTests() {
-    writeQueueState(createEmptyState());
+  writeQueueState(createEmptyState());
 }

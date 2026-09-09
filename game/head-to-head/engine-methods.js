@@ -17,6 +17,7 @@ import {
 } from '../lobby/deferred-work.js';
 import { createModalActions } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
+import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
 
 function finitePositiveMs(value) {
     const ms = Number(value);
@@ -275,6 +276,7 @@ export const headToHeadEngineMethods = {
     },
 
     async startHeadToHead() {
+        if (isVerificationQueueSubmissionBlocked()) return null;
         const challenge = this.activeHeadToHead;
         if (!challenge || this.startButtonPending) return;
         this.startButtonPending = true;

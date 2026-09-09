@@ -30,7 +30,11 @@ import { requestServerSyncFailureChoice } from "./player/server-sync-failure.js"
 import {
   hasVerificationEntriesForOwner,
   getCampaignVerificationEntriesForOwner,
+  prepareVerificationQueueGuestProgressReconciliation,
   resolveVerificationQueueAfterGuestProgressSelection,
+  recordVerificationQueueTransferBlock,
+  clearVerificationQueueTransferBlock,
+  isVerificationQueueSubmissionBlocked,
 } from "./scoreboard/verification-queue.js";
 import { clearDailyChallengeStoredData } from "./daily-challenge/storage.js";
 import { clearTrackLastLapMedals } from "./medals/last-lap-medal-storage.js";
@@ -152,6 +156,7 @@ function getHostedFallbackPlayerProgressState() {
     playerPreferences: cached?.playerPreferences ?? null,
     carUnlocks: cached?.carUnlocks ?? null,
     authoritative: false,
+    progressTransferBlocked: isVerificationQueueSubmissionBlocked(),
   };
 }
 
@@ -190,11 +195,37 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     && remoteState.leaderboardPlayerId?.startsWith("reddit:");
   const hasPendingGuestRuns = isSignedInAccount
     && hasVerificationEntriesForOwner(guestOwnerId);
-  if (remoteState.progressSelection?.required || hasPendingGuestRuns) {
+  const progressSelection = remoteState.progressSelection;
+  const hasKnownTransfer = Boolean(
+    progressSelection?.required
+      || progressSelection?.state === "resume_required"
+      || progressSelection?.state === "recovery_required"
+      || progressSelection?.state === "completed"
+      || hasPendingGuestRuns,
+  );
+  if (hasKnownTransfer) {
+    // Written down before anything else, and scoped to the two identities this transfer names.
+    // A reload followed by a network failure finds it again, so this browser cannot slip into
+    // ordinary offline mode with the transfer still open.
+    recordVerificationQueueTransferBlock({
+      transferId: progressSelection?.transferId,
+      guestPlayerId: progressSelection?.sourceGuestPlayerId || guestOwnerId,
+      accountPlayerId: remoteState.leaderboardPlayerId,
+      state: progressSelection?.state || "choice_required",
+    });
     setActivePlayerOwnerId(null);
     await onProgressSelectionRequired?.(remoteState.progressSelection);
-    const selectionResult = await requestGuestProgressSelection(
-      enrichProgressSelection(remoteState.progressSelection || {
+    let selectionResult;
+    if (progressSelection?.state === "completed") {
+      selectionResult = {
+        choice: progressSelection.choice,
+        transferId: progressSelection.transferId,
+        sourceGuestPlayerId: progressSelection.sourceGuestPlayerId,
+        completedAt: progressSelection.completedAt,
+        playerState: remoteState,
+      };
+    } else {
+      const selection = enrichProgressSelection(progressSelection || {
         required: true,
         guestHasProgress: true,
         accountHasProgress: Boolean(remoteState.hasAnyData),
@@ -223,23 +254,53 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
       }, {
         guestOwnerId,
         accountOwnerId: remoteState.leaderboardPlayerId,
-      }),
-    );
+      });
+      selectionResult = await requestGuestProgressSelection(selection, {
+        onBeforeSubmit: (choice) => {
+          const prepared = prepareVerificationQueueGuestProgressReconciliation({
+            transferId: selection?.transferId,
+            guestPlayerId: selection?.sourceGuestPlayerId || guestOwnerId,
+            accountPlayerId: remoteState.leaderboardPlayerId,
+            choice,
+          });
+          if (!prepared.prepared) {
+            const error = new Error("This transfer is already being reconciled.");
+            error.reason = "guest_progress_recovery_required";
+            error.transferRecovery = true;
+            throw error;
+          }
+          return prepared;
+        },
+      });
+    }
     const choice = selectionResult?.choice;
     if (!selectionResult?.playerState) {
       throw new Error("Guest progress selection did not return account state.");
     }
     remoteState = normalizeRemotePlayerProgressState(selectionResult.playerState);
     setGuestPlayerToken(remoteState.guestToken);
-    resolveVerificationQueueAfterGuestProgressSelection({
-      guestPlayerId: guestOwnerId,
+    const reconciliation = resolveVerificationQueueAfterGuestProgressSelection({
+      transferId: selectionResult.transferId || progressSelection?.transferId,
+      completedAt: selectionResult.completedAt || progressSelection?.completedAt,
+      guestPlayerId: selectionResult.sourceGuestPlayerId
+        || progressSelection?.sourceGuestPlayerId
+        || guestOwnerId,
       accountPlayerId: remoteState.leaderboardPlayerId,
       choice,
     });
+    // Reconciliation must be on disk before the account's own state is applied and before any
+    // submission resumes. A storage failure is an unresolved recovery, not a success.
+    if (reconciliation.persisted === false) {
+      const error = new Error("Your saved result is being protected while this transfer is reconciled.");
+      error.reason = "guest_progress_recovery_required";
+      error.transferRecovery = true;
+      throw error;
+    }
     clearDailyChallengeStoredData();
     const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
     clearDailyChallengeClientCaches();
     clearTrackLastLapMedals();
+    clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
   }
   if (remoteState.retireGuestIdentity) {
     rotateGuestPlayerIdentity("completed guest promotion");
@@ -257,6 +318,9 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
   if (!remoteState.leaderboardPlayerId) {
     return { ...remoteState, authoritative: false };
   }
+  // The server named this account and reported no open transfer for it, so a marker left behind
+  // by an earlier visit is stale. Another owner's block is left alone.
+  if (!hasKnownTransfer) clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
   const authoritativeState = { ...remoteState, authoritative: true };
   setActivePlayerOwnerId(remoteState.leaderboardPlayerId);
   writeCachedPlayerProfile(remoteState.leaderboardPlayerId, authoritativeState);
@@ -289,6 +353,7 @@ export async function getPlayerProgressState({
 
     const decision = await requestServerSyncFailureChoice({
       retry: fetchHostedPlayerProgressState,
+      allowOffline: !getHostedFallbackPlayerProgressState().progressTransferBlocked,
     });
     if (decision?.action === "synced" && decision.remoteState) {
       try {

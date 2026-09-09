@@ -24,6 +24,7 @@ import {
   shouldCapturePbGhostSize,
 } from "../ghost/pb-ghost-size-debug.js";
 import { normalizeLapCompletionTimesSec } from "../shared/lap-completion-times.js";
+import { isVerificationQueueSubmissionBlocked } from "../scoreboard/verification-queue.js";
 
 const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;
@@ -327,6 +328,7 @@ export const raceEngineMethods = {
   },
 
   startSequence() {
+    if (isVerificationQueueSubmissionBlocked()) return;
     if (this.status !== "ready") return;
 
     this.beginPbGhostSizeRun?.();

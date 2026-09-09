@@ -2,6 +2,7 @@ import {
     cancelDeferredLobbyWork,
     deferLobbyWorkUntilAfterPaint,
 } from '../lobby/deferred-work.js';
+import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
 
 export const modeRouterEngineMethods = {
     showHomeLobby() {
@@ -74,6 +75,7 @@ export const modeRouterEngineMethods = {
     },
 
     restartActiveRace() {
+        if (isVerificationQueueSubmissionBlocked()) return;
         if (this.activeRaceMode === 'daily') {
             this.restartDailyChallenge({ reason: 'restart' });
             return;
