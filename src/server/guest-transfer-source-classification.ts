@@ -161,7 +161,12 @@ function classifyCampaignResultRow(
     raceId: string,
     candidate: unknown,
 ): StoredRecordClassification<CampaignProgressRow> {
-    if (candidate === null || candidate === undefined) return { state: 'absent' };
+    // The key exists, so something was written under it. A null or undefined value there is a
+    // row that was lost, not a row that was never there, and it must not read as absent: under a
+    // replacing transfer "absent" is what empties the account.
+    if (candidate === null || candidate === undefined) {
+        return { state: 'malformed', reason: 'missing_fields' };
+    }
     if (typeof candidate !== 'object' || Array.isArray(candidate)) {
         return { state: 'malformed', reason: 'not_an_object' };
     }
@@ -174,6 +179,18 @@ function classifyCampaignResultRow(
         || Number(row.bestTimeMs) <= 0
         || typeof row.updatedAt !== 'string'
         || !row.updatedAt
+    ) {
+        return { state: 'malformed', reason: 'missing_fields' };
+    }
+    // Types before values. A field of the wrong type cannot be compared against the manifest, so
+    // treating a mismatch as a supported change would call damage an obsolete stage.
+    if (
+        typeof row.trackKey !== 'string'
+        || !row.trackKey
+        || typeof row.lapCount !== 'number'
+        || !Number.isInteger(row.lapCount)
+        || typeof row.rulesRevision !== 'number'
+        || !Number.isInteger(row.rulesRevision)
     ) {
         return { state: 'malformed', reason: 'missing_fields' };
     }

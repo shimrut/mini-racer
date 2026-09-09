@@ -302,6 +302,46 @@ async function mutateProgress(
     }
 }
 
+/**
+ * Makes sure a guest whose Campaign source is being kept for review will still be collected.
+ *
+ * Guests are enrolled in the expiry ledger only when a progress row is written. A guest holding
+ * a personal best or a leaderboard row and no progress row was never enrolled, so preserving its
+ * source for a reviewer would keep it for ever. Holding data for review is not a reason to hold
+ * it without end.
+ *
+ * The deadline comes from the newest usable timestamp in the source plus the ordinary retention
+ * period, never from today: data that has already outlived its retention gets no extension. An
+ * existing ledger entry is left exactly as it is. A source with no usable timestamp is reported
+ * and left alone, because choosing a deadline for it would be inventing one.
+ */
+async function ensureGuestCampaignRetention(
+    guestPlayerId: string,
+    newestUpdatedAt: string | null,
+    nowMs = Date.now(),
+): Promise<void> {
+    if (!guestPlayerId.startsWith('guest:')) return;
+    if (typeof redis.zScore !== 'function') return;
+    const existing = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, guestPlayerId);
+    if (existing !== undefined && existing !== null && Number.isFinite(Number(existing))) return;
+
+    const observedMs = newestUpdatedAt ? Date.parse(newestUpdatedAt) : Number.NaN;
+    if (!Number.isFinite(observedMs)) {
+        console.error(
+            'Campaign guest source held for review carries no usable timestamp; '
+            + 'its retention needs an explicit decision:',
+            guestPlayerId,
+        );
+        return;
+    }
+    const expiresAtMs = observedMs + CAMPAIGN_GUEST_TTL_SECONDS * 1000;
+    await redis.zAdd(CAMPAIGN_GUEST_EXPIRY_KEY, {
+        member: guestPlayerId,
+        // Data already past its retention is due for the next sweep, not given a fresh term.
+        score: expiresAtMs <= nowMs ? nowMs : expiresAtMs,
+    });
+}
+
 export async function cleanupExpiredCampaignGuests(nowMs = Date.now()): Promise<number> {
     const candidates = await redis.zRange(CAMPAIGN_GUEST_EXPIRY_KEY, 0, nowMs, {
         by: 'score',
@@ -888,6 +928,9 @@ export async function getServerHeadToHeadSource({
 }
 
 type GuestCampaignStageSource = {
+    /** The three values the recorded inventory fingerprints, exactly as read. */
+    rawEntry: string | null;
+    rank: number | null;
     entry: DailyGpLeaderboardEntry | null;
     entryClass: StoredRecordClassification<unknown>;
     pb: PlayerTrackPbRecord | null;
@@ -902,10 +945,14 @@ type GuestCampaignStageSource = {
 type GuestCampaignSourceSnapshot = {
     progress: CampaignProgress;
     stages: Map<string, GuestCampaignStageSource>;
+    /** The progress row exactly as read, for the inventory check. */
+    rawProgress: string | null;
     /** Domain and reason for every row a person has to look at. Never carries player data. */
     malformed: string[];
     /** Rows a supported campaign, track, or simulation change made unusable. */
     obsolete: string[];
+    /** Newest usable timestamp anywhere in the source. Retention for a held source derives from it. */
+    newestUpdatedAt: string | null;
 };
 
 /**
@@ -927,12 +974,21 @@ async function captureClassifiedGuestCampaignSource(
 ): Promise<GuestCampaignSourceSnapshot> {
     const malformed: string[] = [];
     const obsolete: string[] = [];
+    let newestUpdatedAt: string | null = null;
+    const observeTimestamp = (value: string | null | undefined) => {
+        if (!value) return;
+        const parsed = Date.parse(value);
+        if (!Number.isFinite(parsed)) return;
+        if (!newestUpdatedAt || parsed > Date.parse(newestUpdatedAt)) newestUpdatedAt = value;
+    };
 
     const rawProgress = await redis.get(progressKey(guestPlayerId));
     const progressClass = classifyStoredCampaignProgress(rawProgress);
     if (progressClass.state === 'malformed') {
         malformed.push(`campaign:progress:${progressClass.reason}`);
-    } else if (progressClass.state === 'valid' && progressClass.record.obsoleteRaceIds.length) {
+    } else if (progressClass.state === 'valid') {
+        observeTimestamp(progressClass.record.updatedAt);
+        for (const row of Object.values(progressClass.record.rows)) observeTimestamp(row.updatedAt);
         for (const raceId of progressClass.record.obsoleteRaceIds) {
             obsolete.push(`campaign:progress:${raceId}`);
         }
@@ -941,9 +997,12 @@ async function captureClassifiedGuestCampaignSource(
     const stages = new Map<string, GuestCampaignStageSource>();
     for (const stage of CAMPAIGN_STAGES) {
         const competition = competitionFor(stage, guestPlayerId);
-        const [rawEntry, rawPb] = await Promise.all([
+        const [rawEntry, rawPb, rank] = await Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
             redisCompressed.hGet(competition.pbHashKey, playerField(guestPlayerId)),
+            typeof redis.zScore === 'function'
+                ? redis.zScore(competition.leaderboardKey, guestPlayerId)
+                : Promise.resolve(null),
         ]);
         const pbClass = classifyStoredPbRecordFor(rawPb, competition, TRACKS[stage.trackKey]);
         const entryClass = classifyStoredLeaderboardEntry(rawEntry, guestPlayerId, stage);
@@ -951,13 +1010,21 @@ async function captureClassifiedGuestCampaignSource(
             malformed.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
         } else if (entryClass.state === 'obsolete') {
             obsolete.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
+            observeTimestamp(entryClass.updatedAt);
+        } else if (entryClass.state === 'valid') {
+            observeTimestamp(entryClass.record.updatedAt);
         }
         if (pbClass.state === 'malformed') {
             malformed.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
         } else if (pbClass.state === 'obsolete') {
             obsolete.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
+            observeTimestamp(pbClass.updatedAt);
+        } else if (pbClass.state === 'valid') {
+            observeTimestamp(pbClass.record.updatedAt);
         }
         stages.set(stage.raceId, {
+            rawEntry: rawEntry ?? null,
+            rank: rank ?? null,
             // Parsed from the raw value already read, so this costs no extra round trip.
             entry: entryClass.state === 'valid'
                 ? parseStoredEntry(rawEntry, stage.trackKey)
@@ -965,15 +1032,17 @@ async function captureClassifiedGuestCampaignSource(
             entryClass,
             pb: pbClass.state === 'valid' ? pbClass.record : null,
             pbClass,
-            rawPb: pbClass.state === 'valid' ? (rawPb ?? null) : null,
+            rawPb: rawPb ?? null,
         });
     }
 
     return {
         progress: parseCampaignProgress(rawProgress),
+        rawProgress: rawProgress ?? null,
         stages,
         malformed,
         obsolete,
+        newestUpdatedAt,
     };
 }
 
@@ -990,9 +1059,14 @@ export async function mergeGuestCampaignProgress({
     /**
      * Called once the guest submission and progress locks are held, and before the first account
      * write. A transfer uses it to prove the source still matches the inventory it recorded.
-     * Those locks stop every guest write, so what it sees is what this merge copies.
+     *
+     * A replacing merge hands over the exact rows it is about to copy, so the check and the copy
+     * cannot see different data. Anything else calls it with nothing and lets it read for itself.
      */
-    verifyGuestSource?: () => void | Promise<void>;
+    verifyGuestSource?: (observed?: {
+        campaignProgress: string | null;
+        campaignStages: Record<string, { entry: string | null; pb: string | null; rank: number | null }>;
+    }) => void | Promise<void>;
     transactionRunner?: RedisLockTransactionRunner;
 }): Promise<{ merged: boolean; mergedRaceIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
@@ -1061,17 +1135,39 @@ export async function mergeGuestCampaignProgress({
             redis,
         );
         await confirmMergeOwnership();
-        await verifyGuestSource?.();
 
-        // A replacing merge reads and judges the entire guest source before it may write anything.
-        // Everything it copies afterwards comes from this snapshot.
+        // Read and judge the entire guest source before anything else. Everything below - the
+        // inventory check and the copy alike - works from this one snapshot, so the payload that
+        // is checked against the recorded inventory is the payload that gets written. Reading the
+        // source again between those two steps is what let an expiry in between be copied as
+        // absent, which under `replace` empties the account instead.
         const guestSource = replace
             ? await captureClassifiedGuestCampaignSource(guestPlayerId)
             : null;
+        // Damage is reported before the inventory check. The two stop the transfer for different
+        // reasons, and a damaged row that never moved would otherwise be reported as a changed
+        // source, which sends a reviewer looking for a change that did not happen.
         if (guestSource?.malformed.length) {
+            // The source stays for a reviewer, so it must still be enrolled for collection.
+            // A guest with rows but no progress row was never enrolled by ordinary play.
+            await ensureGuestCampaignRetention(guestPlayerId, guestSource.newestUpdatedAt);
             throw new GuestProgressRecoveryRequiredError(
                 `Campaign guest source needs review: ${guestSource.malformed.join(', ')}`,
             );
+        }
+        if (guestSource) {
+            await verifyGuestSource?.({
+                campaignProgress: guestSource.rawProgress,
+                campaignStages: Object.fromEntries(
+                    [...guestSource.stages].map(([raceId, source]) => [raceId, {
+                        entry: source.rawEntry,
+                        pb: source.rawPb,
+                        rank: source.rank,
+                    }]),
+                ),
+            });
+        } else {
+            await verifyGuestSource?.();
         }
 
         const guestProgressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId))!;

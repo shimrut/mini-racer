@@ -2372,14 +2372,21 @@ export async function selectGuestProgress({
         if (!record.completedDomains.includes('daily')) {
             await resolveGuestTransferDailyChallenges(record.dailyChallengeIds);
         }
-        // Freeze the account's Garage before the choice can act on it. Write-once, so a retry that
-        // re-enters preparation keeps the original: recapturing here would fold a reward earned
-        // since the choice into the next deletion baseline. Only a Guest choice replaces the
-        // account Garage, so only it needs the baseline.
-        if (choice === 'guest') {
-            await captureGuestTransferGarageBaseline(redditPlayerId);
-        }
         if (record.phase === 'preparing') {
+            // Freeze the account's Garage, and only here. Preparation is the one moment the
+            // account still holds what the player chose to give up.
+            //
+            // This must never run for a record already past preparation. Such a record was
+            // written before baselines existed, or its own preparation is long finished, and the
+            // account has since gained rewards. Capturing now would name those rewards as the
+            // Garage to delete. The evidence is simply gone, and today's account cannot stand in
+            // for it: the replacement takes the conservative path instead and keeps everything.
+            //
+            // The capture itself is write-once, so a retry that re-enters preparation keeps the
+            // original. Only a Guest choice replaces the account Garage, so only it needs one.
+            if (choice === 'guest') {
+                await captureGuestTransferGarageBaseline(redditPlayerId);
+            }
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
         }
@@ -2390,15 +2397,40 @@ export async function selectGuestProgress({
         // Each domain calls this while it holds its own locks, and immediately before its first
         // destination write. Holding those locks drains that domain's writes, so what is observed
         // here is the payload the copy uses. There is no unverified read in between.
+        type ObservedSource = {
+            unlocks?: Record<string, string>;
+            campaignProgress?: string | null;
+            campaignStages?: Record<
+                string,
+                { entry: string | null; pb: string | null; rank: number | null }
+            >;
+        };
         const verifySourceDomain = (domain: 'campaign' | 'daily' | 'unlocks') => (
-            async (raw?: { unlocks: Record<string, string> }): Promise<void> => {
+            async (raw?: ObservedSource): Promise<void> => {
                 if (!record.sourceInventory) return;
                 let evidence: Partial<GuestTransferSourceInventory>;
-                if (raw) {
+                if (raw?.unlocks) {
                     // Garage hands over the exact fields it is about to copy.
                     evidence = {
                         unlocks: stableFingerprint(raw.unlocks ?? null),
                         unlockFields: { ...(raw.unlocks ?? {}) },
+                    };
+                } else if (raw?.campaignStages) {
+                    // Campaign hands over the exact rows it is about to copy, fingerprinted the
+                    // same way preparation recorded them. Nothing is read here, so the payload
+                    // checked and the payload written are the same one.
+                    evidence = {
+                        campaignProgress: stableFingerprint(raw.campaignProgress ?? null),
+                        campaignStages: Object.fromEntries(
+                            Object.entries(raw.campaignStages).map(([raceId, row]) => [
+                                raceId,
+                                stableFingerprint({
+                                    entry: row.entry ?? null,
+                                    pb: row.pb ?? null,
+                                    rank: row.rank ?? null,
+                                }),
+                            ]),
+                        ),
                     };
                 } else if (domain === 'campaign') {
                     evidence = {

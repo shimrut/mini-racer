@@ -395,9 +395,11 @@ function normalizedTransferValue(value) {
 const knownTransferBlocks = new Map();
 
 function readStoredTransferBlocks() {
-  if (typeof window === "undefined" || !window.localStorage) {
-    return { ok: false, blocks: {} };
-  }
+  // No window at all is not a browser session, so there is no durable record to be missing and
+  // nothing to be unsure about. A window whose storage is missing or refuses to be read is the
+  // case that matters: this browser is playing, and it cannot say whether a transfer is open.
+  if (typeof window === "undefined") return { ok: true, blocks: {} };
+  if (!window.localStorage) return { ok: false, blocks: {} };
   try {
     const raw = window.localStorage.getItem(TRANSFER_BLOCKS_STORAGE_KEY);
     if (!raw) return { ok: true, blocks: {} };
@@ -413,12 +415,31 @@ function readStoredTransferBlocks() {
 }
 
 /**
+ * True once a bootstrap has confirmed, with the server, that this browser has nothing unresolved.
+ * Until then an unreadable store means transfer safety is simply unknown.
+ */
+let transferSafetyConfirmed = false;
+
+/** True when the last attempt to read the durable record failed rather than came back empty. */
+let storageReadFailed = false;
+
+/**
  * Every block this tab must honour: what storage holds, plus what it knows storage never took.
- * A failed read contributes nothing, and drops nothing either.
+ *
+ * A successful read is also adopted into memory. Without that a block only ever read back from
+ * storage lives nowhere else, and the first failed read afterwards releases it.
  */
 function readTransferBlocks() {
   const stored = readStoredTransferBlocks();
+  storageReadFailed = !stored.ok;
   const merged = stored.ok ? { ...stored.blocks } : {};
+  if (stored.ok) {
+    for (const [accountPlayerId, block] of Object.entries(stored.blocks)) {
+      if (!knownTransferBlocks.has(accountPlayerId)) {
+        knownTransferBlocks.set(accountPlayerId, { block, persisted: true });
+      }
+    }
+  }
   for (const [accountPlayerId, entry] of knownTransferBlocks) {
     if (!entry) continue;
     if (entry.persisted && stored.ok) {
@@ -431,6 +452,17 @@ function readTransferBlocks() {
     merged[accountPlayerId] ??= entry.block;
   }
   return merged;
+}
+
+/**
+ * Records that the server answered for this account and left nothing unresolved.
+ *
+ * This is the only thing that can settle transfer safety for a browser whose storage cannot be
+ * read. Without it a cold start with both storage and the server unavailable knows nothing, and
+ * an unresolved transfer would be indistinguishable from a clean browser.
+ */
+export function confirmVerificationQueueTransferSafety() {
+  transferSafetyConfirmed = true;
 }
 
 function writeTransferBlocks(blocks) {
@@ -453,7 +485,12 @@ function writeTransferBlocks(blocks) {
  */
 function isBlockedByTransfer(ownerPlayerId) {
   const blocks = Object.values(readTransferBlocks());
-  if (blocks.length === 0) return false;
+  if (blocks.length === 0) {
+    // Nothing is known, but nothing has been ruled out either. An unreadable store cannot say
+    // whether a transfer is open, and the agreed answer to that is a server connection rather
+    // than ordinary offline play.
+    return storageReadFailed && !transferSafetyConfirmed;
+  }
   const owner = ownerPlayerId === undefined ? getActivePlayerOwnerId() : ownerPlayerId;
   if (!owner) return true;
   return blocks.some((block) => (

@@ -118,3 +118,48 @@ describe("a known transfer keeps racing paused when browser storage fails", () =
     expect(reloaded.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(false);
   });
 });
+
+describe("a block only ever read back from storage is still held", () => {
+  let queue;
+
+  beforeEach(async () => {
+    store = new Map();
+    failWrites = false;
+    failReads = false;
+    installBrowserStorage();
+    vi.resetModules();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    queue = await import("../game/scoreboard/verification-queue.js");
+  });
+
+  it("survives a storage failure after a cold load found it", async () => {
+    // A previous session wrote this. This one has only ever read it.
+    store.set("VectorGpTransferBlocks", JSON.stringify({
+      "reddit:paused": { accountPlayerId: "reddit:paused", guestPlayerId: GUEST, state: "resume_required" },
+    }));
+    expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
+
+    failReads = true;
+
+    // Reading fails now. The block was never written by this session, so without adopting it on
+    // read there would be nothing left to hold the pause.
+    expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
+  });
+
+  it("refuses offline play on a cold start when storage cannot be read", () => {
+    failReads = true;
+
+    // Nothing is known and nothing is ruled out. The agreed answer is a server connection.
+    expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
+    expect(queue.isVerificationQueueSubmissionBlocked(undefined)).toBe(true);
+  });
+
+  it("releases that hold once the server confirms the account is clear", () => {
+    failReads = true;
+    expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
+
+    queue.confirmVerificationQueueTransferSafety();
+
+    expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(false);
+  });
+});

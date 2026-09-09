@@ -21,6 +21,12 @@ function selectionKey(guestPlayerId, redditPlayerId) {
     .digest("base64url")}`;
 }
 
+const RESULT = {
+  raceId: "numbered-v1-00", trackKey: "numberZero", lapCount: 2, rulesRevision: 1,
+  bestTimeMs: 12_000, medal: "gold", checkpointTimesSec: [4.2, 9.8],
+  updatedAt: "2026-09-01T09:30:00.000Z",
+};
+
 async function seedGuest(guestPlayerId, redditPlayerId) {
   await recordCompletedRace(guestPlayerId);
   await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
@@ -178,5 +184,27 @@ describe("a legitimate late guest event does not strand the transfer", () => {
 
     await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
       .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+  });
+});
+
+describe("an older interrupted transfer gets no invented baseline", () => {
+  beforeEach(() => { redis.reset(); vi.restoreAllMocks(); vi.spyOn(console,"error").mockImplementation(()=>{}); });
+
+  it("keeps an interruption reward on an older record with no baseline", async () => {
+    const g = "guest:old-record", r = "reddit:old-record";
+    await recordCompletedRace(g);
+    await redis.set(campaignProgressKey(g), JSON.stringify({
+      campaignId: "numbered-v1", startedAt: "2026-09-01T09:00:00.000Z",
+      resultsByRaceId: { "numbered-v1-00": RESULT }, updatedAt: "2026-09-01T09:30:00.000Z" }));
+    await getGuestProgressSelection({ guestPlayerId: g, redditPlayerId: r });
+    redis.failTransferRecordWriteAt = 3;
+    await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" })).rejects.toThrow();
+    redis.failTransferRecordWriteAt = null;
+    // Simulate a record written before baselines existed.
+    await redis.del(`miniracer:car-unlocks:transfer-baseline:v1:${createHash("sha256").update(r,"utf8").digest("base64url")}`);
+    await recordHeadToHeadPost(r, "numberZero");
+
+    await selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" });
+    expect((await redis.hGetAll(carUnlockHashKey(r)))["post:track:numberZero"]).toBe("1");
   });
 });

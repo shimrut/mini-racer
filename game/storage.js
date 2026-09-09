@@ -35,6 +35,7 @@ import {
   isVerificationQueueGuestProgressReconciled,
   recordVerificationQueueTransferBlock,
   clearVerificationQueueTransferBlock,
+  confirmVerificationQueueTransferSafety,
   isVerificationQueueSubmissionBlocked,
 } from "./scoreboard/verification-queue.js";
 import { clearDailyChallengeStoredData } from "./daily-challenge/storage.js";
@@ -352,6 +353,9 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
   // The server named this account and left nothing unresolved for it, so a marker from an earlier
   // visit is stale. Another owner's block is left alone.
   if (!hasKnownTransfer || alreadyReconciled) {
+    // The server named this account and left nothing unresolved for it. That is the only thing
+    // that can settle transfer safety for a browser whose storage cannot be read.
+    confirmVerificationQueueTransferSafety();
     if (!clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId)) {
       pauseReleaseFailed = true;
       console.error("Could not clear a stale transfer pause for", remoteState.leaderboardPlayerId);

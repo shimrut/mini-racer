@@ -9,12 +9,25 @@ const { getGuestProgressSelection, selectGuestProgress } =
   await import("../src/server/daily-gp-store.ts");
 const { recordCompletedRace } = await import("../src/server/car-unlock-store.ts");
 const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
+const { cleanupExpiredCampaignGuests, CAMPAIGN_GUEST_EXPIRY_KEY } =
+  await import("../src/server/campaign-store.ts");
+const { classifyStoredPbRecordValue } = await import("../src/server/pb-ghost-store.ts");
+const { classifyStoredCampaignProgress } =
+  await import("../src/server/guest-transfer-source-classification.ts");
+const { toCampaignCompetition } = await import("../src/server/competition.ts");
+
 
 function selectionKey(guestPlayerId, redditPlayerId) {
   return `dailygp:guest-progress-selection:v1:${createHash("sha256")
     .update(`${guestPlayerId}:${redditPlayerId}`, "utf8")
     .digest("base64url")}`;
 }
+
+const RESULT = {
+  raceId: "numbered-v1-00", trackKey: "numberZero", lapCount: 2, rulesRevision: 1,
+  bestTimeMs: 12_000, medal: "gold", checkpointTimesSec: [4.2, 9.8],
+  updatedAt: "2026-09-01T09:30:00.000Z",
+};
 
 const EARNED_RESULT = {
   raceId: "numbered-v1-00",
@@ -126,5 +139,94 @@ describe("a malformed Campaign source cannot replace an account", () => {
     expect(result.status).toBe("completed");
     const account = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
     expect(account.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000 });
+  });
+});
+
+describe("damage is never treated as absent or obsolete", () => {
+  beforeEach(() => { redis.reset(); vi.restoreAllMocks(); vi.spyOn(console,"error").mockImplementation(()=>{}); });
+
+  it("a null Campaign result is damage, not absence", () => {
+    const c = classifyStoredCampaignProgress(JSON.stringify({
+      campaignId: "numbered-v1", resultsByRaceId: { "numbered-v1-00": null },
+    }));
+    expect(c.state).toBe("malformed");
+  });
+
+  it("a null result stops the transfer and keeps both sides", async () => {
+    const g = "guest:null-row", r = "reddit:null-row";
+    await recordCompletedRace(g);
+    await redis.set(campaignProgressKey(g), JSON.stringify({
+      campaignId: "numbered-v1", resultsByRaceId: { "numbered-v1-00": null } }));
+    await redis.set(campaignProgressKey(r), JSON.stringify({
+      campaignId: "numbered-v1", resultsByRaceId: { "numbered-v1-00": RESULT } }));
+    await getGuestProgressSelection({ guestPlayerId: g, redditPlayerId: r });
+    await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" }))
+      .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+    expect(JSON.parse(await redis.get(campaignProgressKey(r))).resultsByRaceId["numbered-v1-00"])
+      .toMatchObject({ bestTimeMs: 12000 });
+    expect(await redis.get(campaignProgressKey(g))).toBeTruthy();
+  });
+
+  it("a PB with a wrong-typed revision is damage, not obsolete", () => {
+    const stage = { raceId: "numbered-v1-00", trackKey: "numberZero", lapCount: 2, rulesRevision: 1 };
+    const comp = toCampaignCompetition("numbered-v1", stage, { playerId: "guest:x" });
+    const c = classifyStoredPbRecordValue(JSON.stringify({
+      schemaVersion: 2, trackKey: "numberZero", trackFingerprint: "zz",
+      simulationRevision: 1, rulesRevision: "broken", lapCount: 2,
+      bestTimeMs: 12000, updatedAt: "2026-09-01T09:30:00.000Z",
+    }), comp, "zz", { rulesRevision: 1, lapCount: 2 });
+    expect(c.state).toBe("malformed");
+  });
+});
+
+describe("a source held for review is still enrolled for collection", () => {
+  beforeEach(() => { redis.reset(); vi.restoreAllMocks(); vi.spyOn(console,"error").mockImplementation(()=>{}); });
+
+  it("enrols a PB-only guest and lets a later sweep collect it", async () => {
+    const g = "guest:pb-only", r = "reddit:pb-only";
+    const stage = { raceId: "numbered-v1-00", trackKey: "numberZero", lapCount: 2, rulesRevision: 1 };
+    const comp = toCampaignCompetition("numbered-v1", stage, { playerId: g });
+    const field = createHash("sha256").update(g, "utf8").digest("base64url");
+    await recordCompletedRace(g);
+    // A damaged PB alongside a readable row that dates the source. No progress write ever
+    // enrolled this guest, because the row was seeded directly.
+    await redis.hSet(comp.pbHashKey, { [field]: "{ not json" });
+    await redis.set(campaignProgressKey(g), JSON.stringify({
+      campaignId: "numbered-v1", startedAt: "2026-09-01T09:00:00.000Z",
+      resultsByRaceId: { "numbered-v1-00": RESULT }, updatedAt: "2026-09-01T09:30:00.000Z" }));
+    await getGuestProgressSelection({ guestPlayerId: g, redditPlayerId: r });
+
+    await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" }))
+      .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+
+    // The source is kept for review...
+    expect(await redis.hGet(comp.pbHashKey, field)).toBe("{ not json");
+    // ...and it is now on the ledger, so it does not live for ever.
+    const score = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, g);
+    expect(Number.isFinite(Number(score))).toBe(true);
+    const collected = await cleanupExpiredCampaignGuests(Date.now() + 2 * 365 * 86400000);
+    expect(collected).toBeGreaterThan(0);
+    expect(await redis.hGet(comp.pbHashKey, field)).toBeFalsy();
+  });
+
+  it("does not invent a deadline when nothing in the source carries a timestamp", async () => {
+    const g = "guest:no-timestamp", r = "reddit:no-timestamp";
+    const stage = { raceId: "numbered-v1-00", trackKey: "numberZero", lapCount: 2, rulesRevision: 1 };
+    const comp = toCampaignCompetition("numbered-v1", stage, { playerId: g });
+    const field = createHash("sha256").update(g, "utf8").digest("base64url");
+    await recordCompletedRace(g);
+    await redis.hSet(comp.pbHashKey, { [field]: "{ not json" });
+    await getGuestProgressSelection({ guestPlayerId: g, redditPlayerId: r });
+
+    await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" }))
+      .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+
+    // Choosing a deadline here would be inventing one, so it is reported instead.
+    const score = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, g);
+    expect(Number.isFinite(Number(score))).toBe(false);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("explicit decision"),
+      g,
+    );
   });
 });

@@ -190,6 +190,19 @@ export function classifyStoredPbRecordValue(
         { state: 'obsolete', reason, updatedAt }
     );
 
+    // Types before values. A revision field of the wrong type is damage, and comparing it against
+    // this build's revision would answer "different" and call it a supported change instead.
+    if (
+        typeof value.schemaVersion !== 'number'
+        || typeof value.simulationRevision !== 'number'
+        || typeof value.rulesRevision !== 'number'
+        || !Number.isInteger(value.rulesRevision)
+        || typeof value.lapCount !== 'number'
+        || !Number.isInteger(value.lapCount)
+    ) {
+        return { state: 'malformed', reason: 'missing_fields' };
+    }
+
     if (value.schemaVersion !== PB_GHOST_SCHEMA_VERSION) return obsolete('schema_version');
     if (value.simulationRevision !== PB_GHOST_SIMULATION_REVISION) {
         return obsolete('simulation_revision');
