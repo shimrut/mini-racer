@@ -1,0 +1,130 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { RedisTestDouble } from "./redis-test-double.js";
+
+const redis = new RedisTestDouble();
+vi.mock("@devvit/redis", () => ({ redis, redisCompressed: redis }));
+
+const { getGuestProgressSelection, selectGuestProgress } =
+  await import("../src/server/daily-gp-store.ts");
+const { recordCompletedRace } = await import("../src/server/car-unlock-store.ts");
+const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
+
+function selectionKey(guestPlayerId, redditPlayerId) {
+  return `dailygp:guest-progress-selection:v1:${createHash("sha256")
+    .update(`${guestPlayerId}:${redditPlayerId}`, "utf8")
+    .digest("base64url")}`;
+}
+
+const EARNED_RESULT = {
+  raceId: "numbered-v1-00",
+  trackKey: "numberZero",
+  lapCount: 2,
+  rulesRevision: 1,
+  bestTimeMs: 12_000,
+  medal: "gold",
+  checkpointTimesSec: [4.2, 9.8],
+  updatedAt: "2026-09-01T09:30:00.000Z",
+};
+
+function campaignProgress(result, overrides = {}) {
+  return JSON.stringify({
+    campaignId: "numbered-v1",
+    startedAt: "2026-09-01T09:00:00.000Z",
+    resultsByRaceId: result ? { "numbered-v1-00": result } : {},
+    updatedAt: "2026-09-01T09:30:00.000Z",
+    ...overrides,
+  });
+}
+
+/** An account that already earned something, so a wrong replacement is visible. */
+async function seedAccountWithEarnedResult(redditPlayerId) {
+  await redis.set(campaignProgressKey(redditPlayerId), campaignProgress(EARNED_RESULT));
+}
+
+async function seedGuest(guestPlayerId, redditPlayerId, rawProgress) {
+  await recordCompletedRace(guestPlayerId);
+  await redis.set(campaignProgressKey(guestPlayerId), rawProgress);
+  await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
+}
+
+describe("a malformed Campaign source cannot replace an account", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  for (const [name, rawProgress] of [
+    ["damaged JSON", '{"campaignId":"numbered-v1","resultsByRaceId":{ TRUNCATED'],
+    ["another campaign's progress", campaignProgress(EARNED_RESULT, { campaignId: "other-v9" })],
+    ["a result with no usable time", campaignProgress({ ...EARNED_RESULT, bestTimeMs: "fast" })],
+    ["a result with no usable timestamp", campaignProgress({ ...EARNED_RESULT, updatedAt: 17 })],
+    ["a result whose key names another race", campaignProgress({ ...EARNED_RESULT, raceId: "numbered-v1-07" })],
+  ]) {
+    it(`stops for review and keeps both sides: ${name}`, async () => {
+      const guestPlayerId = `guest:malformed-${name.replace(/\W+/g, "-")}`;
+      const redditPlayerId = `reddit:malformed-${name.replace(/\W+/g, "-")}`;
+      await seedAccountWithEarnedResult(redditPlayerId);
+      await seedGuest(guestPlayerId, redditPlayerId, rawProgress);
+
+      await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+        .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+
+      // The account keeps the result it earned.
+      const account = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
+      expect(account.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000 });
+      // The evidence a reviewer needs is still there.
+      expect(await redis.get(campaignProgressKey(guestPlayerId))).toBe(rawProgress);
+      // Nothing claims the domain was copied.
+      const record = JSON.parse(await redis.get(selectionKey(guestPlayerId, redditPlayerId)));
+      expect(record.completedDomains).not.toContain("campaign");
+    });
+  }
+
+  it("treats a retired stage as a supported change, not as damage", async () => {
+    const guestPlayerId = "guest:retired-stage";
+    const redditPlayerId = "reddit:retired-stage";
+    await seedGuest(guestPlayerId, redditPlayerId, JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-09-01T09:00:00.000Z",
+      resultsByRaceId: {
+        "numbered-v1-00": EARNED_RESULT,
+        "numbered-v1-retired": { ...EARNED_RESULT, raceId: "numbered-v1-retired" },
+      },
+      updatedAt: "2026-09-01T09:30:00.000Z",
+    }));
+
+    const result = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+
+    expect(result.status).toBe("completed");
+    const account = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
+    expect(account.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000 });
+  });
+
+  it("still completes an ordinary Guest transfer", async () => {
+    const guestPlayerId = "guest:clean";
+    const redditPlayerId = "reddit:clean";
+    await seedGuest(guestPlayerId, redditPlayerId, campaignProgress(EARNED_RESULT));
+
+    const result = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+
+    expect(result.status).toBe("completed");
+    const account = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
+    expect(account.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000 });
+    expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeFalsy();
+  });
+
+  it("leaves an Account choice alone: it replaces nothing, so it needs no source validation", async () => {
+    const guestPlayerId = "guest:account-choice";
+    const redditPlayerId = "reddit:account-choice";
+    await seedAccountWithEarnedResult(redditPlayerId);
+    await seedGuest(guestPlayerId, redditPlayerId, '{"campaignId":"numbered-v1","resultsBy TRUNCATED');
+
+    const result = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "account" });
+
+    expect(result.status).toBe("completed");
+    const account = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
+    expect(account.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000 });
+  });
+});

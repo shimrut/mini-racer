@@ -15,6 +15,10 @@ import {
 } from './redis-lock.js';
 import { encodeRedisCompressedValue } from './redis-compressed-value.js';
 import { normalizeLapCompletionTimesSec } from '../../game/shared/lap-completion-times.js';
+import type {
+    ObsoleteReason,
+    StoredRecordClassification,
+} from './guest-transfer-source-classification.js';
 
 export type PlayerTrackPbRecord = {
     schemaVersion: typeof PB_GHOST_SCHEMA_VERSION;
@@ -136,6 +140,107 @@ function readCompatibleRecordValue(
         return null;
     }
     return record;
+}
+
+/**
+ * Classifies one stored personal best for a transfer.
+ *
+ * `parseRecord` cannot answer this. It folds a schema or simulation revision change into the same
+ * `null` it gives damaged JSON, and it *coerces* `rulesRevision` and `lapCount` instead of
+ * rejecting them, so its output does not faithfully describe what is stored. This reads the raw
+ * value and compares the stored fields as they are.
+ *
+ * Order matters. Damage is checked first, so a broken record is never excused as a supported
+ * revision change.
+ */
+export function classifyStoredPbRecordValue(
+    raw: string | null | undefined,
+    competition: Competition,
+    trackFingerprint: string,
+    raceIdentity: { rulesRevision: 0 | 1; lapCount: 1 | 2 | 3 },
+): StoredRecordClassification<PlayerTrackPbRecord> {
+    if (raw === null || raw === undefined || raw === '') return { state: 'absent' };
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (_error) {
+        return { state: 'malformed', reason: 'unparseable' };
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return { state: 'malformed', reason: 'not_an_object' };
+    }
+
+    const value = parsed as Record<string, unknown>;
+    // The fields every revision of this record has carried. Without them nothing can be salvaged,
+    // and no retention can be derived, so this is damage rather than an obsolete record.
+    if (
+        typeof value.trackKey !== 'string'
+        || !value.trackKey
+        || typeof value.trackFingerprint !== 'string'
+        || !Number.isFinite(value.bestTimeMs)
+        || typeof value.updatedAt !== 'string'
+        || !value.updatedAt
+    ) {
+        return { state: 'malformed', reason: 'missing_fields' };
+    }
+
+    const updatedAt = Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : null;
+    const obsolete = (reason: ObsoleteReason): StoredRecordClassification<PlayerTrackPbRecord> => (
+        { state: 'obsolete', reason, updatedAt }
+    );
+
+    if (value.schemaVersion !== PB_GHOST_SCHEMA_VERSION) return obsolete('schema_version');
+    if (value.simulationRevision !== PB_GHOST_SIMULATION_REVISION) {
+        return obsolete('simulation_revision');
+    }
+    if (value.trackKey !== competition.trackKey) return obsolete('track_retired');
+    if (value.trackFingerprint !== trackFingerprint) return obsolete('track_fingerprint');
+    // Compared as stored. `parseRecord` would map an unexpected value onto a supported one here,
+    // which can make a record that does not belong to this race look like one that does.
+    if (
+        value.rulesRevision !== raceIdentity.rulesRevision
+        || value.lapCount !== raceIdentity.lapCount
+    ) {
+        return obsolete('race_identity');
+    }
+
+    const record = parseRecord(raw);
+    if (!record) return { state: 'malformed', reason: 'missing_fields' };
+    return { state: 'valid', record };
+}
+
+/** Classifies an already-read personal best, deriving the track and race identity from `track`. */
+export function classifyStoredPbRecordFor(
+    raw: string | null | undefined,
+    competition: Competition,
+    track: Record<string, any>,
+): StoredRecordClassification<PlayerTrackPbRecord> {
+    return classifyStoredPbRecordValue(
+        raw,
+        competition,
+        createTrackFingerprint(track),
+        getCompetitionRaceIdentity(competition),
+    );
+}
+
+/** Reads and classifies one stored personal best. Never deletes: see `readCompatibleRecord`. */
+export async function classifyStoredPbRecord({
+    playerId,
+    competition,
+    track,
+}: {
+    playerId: string;
+    competition: Competition;
+    track: Record<string, any>;
+}): Promise<StoredRecordClassification<PlayerTrackPbRecord>> {
+    const raw = await redis.hGet(competition.pbHashKey, playerField(playerId));
+    return classifyStoredPbRecordValue(
+        raw,
+        competition,
+        createTrackFingerprint(track),
+        getCompetitionRaceIdentity(competition),
+    );
 }
 
 /**

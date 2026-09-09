@@ -85,6 +85,8 @@ import {
 import {
     getCarUnlockSnapshot,
     discardGuestCarUnlockProgress,
+    captureGuestTransferGarageBaseline,
+    isValidCarUnlockEventField,
     cleanupGuestCarUnlockProgress,
     hasCarUnlockProgress,
     mergeGuestCarUnlockProgress,
@@ -263,6 +265,14 @@ type GuestTransferSourceInventory = {
     campaignStages: Record<string, string>;
     daily: Record<string, string>;
     unlocks: string;
+    /**
+     * The guest's Garage field by field, recorded alongside the aggregate hash above.
+     *
+     * The hash alone cannot tell a lost field from an added one, so a guest who legitimately
+     * earned one more event during an open transfer could never finish it. Older records carry
+     * only the hash and keep exact-match checking.
+     */
+    unlockFields?: Record<string, string>;
 };
 
 function stableFingerprint(value: unknown): string {
@@ -357,6 +367,7 @@ async function captureGuestTransferSourceInventory(
         campaignStages,
         daily,
         unlocks: stableFingerprint(unlocks ?? null),
+        unlockFields: { ...(unlocks ?? {}) },
     };
 }
 
@@ -386,9 +397,7 @@ function changedInventoryDomains(
         changed.push('campaign');
     }
     if (rowsChanged(expected.daily, observed.daily)) changed.push('daily');
-    if (observed.unlocks !== undefined && observed.unlocks !== expected.unlocks) {
-        changed.push('unlocks');
-    }
+    if (unlocksChanged(expected, observed)) changed.push('unlocks');
     return changed;
 }
 
@@ -397,7 +406,37 @@ function isValidSourceInventory(value: unknown): value is GuestTransferSourceInv
         && typeof value.campaignProgress === 'string'
         && isRecordObject(value.campaignStages)
         && isRecordObject(value.daily)
-        && typeof value.unlocks === 'string';
+        && typeof value.unlocks === 'string'
+        // Optional, so a record written before per-field evidence existed still reads.
+        && (value.unlockFields === undefined || isRecordObject(value.unlockFields));
+}
+
+/**
+ * Whether the guest's Garage moved in a way that stops the copy.
+ *
+ * Losing a recorded field, or seeing one of them change, is loss and stops it. Gaining a field is
+ * not: a race or a post accepted just before the transfer opened can still land afterwards, and
+ * that reward is the player's. An addition is only allowed when it is an ordinary Garage event.
+ *
+ * An older inventory carrying only the aggregate hash keeps exact-match checking. A changed legacy
+ * hash must not be reinterpreted as a harmless addition, because nothing in it says which it was.
+ */
+function unlocksChanged(
+    expected: GuestTransferSourceInventory,
+    observed: Partial<GuestTransferSourceInventory>,
+): boolean {
+    if (observed.unlockFields !== undefined && expected.unlockFields !== undefined) {
+        const now = observed.unlockFields;
+        for (const [field, value] of Object.entries(expected.unlockFields)) {
+            if (now[field] !== value) return true;
+        }
+        for (const [field, value] of Object.entries(now)) {
+            if (field in expected.unlockFields) continue;
+            if (!isValidCarUnlockEventField(field, value)) return true;
+        }
+        return false;
+    }
+    return observed.unlocks !== undefined && observed.unlocks !== expected.unlocks;
 }
 
 const TRANSFER_COMPLETION_DOMAINS = ['campaign', 'daily', 'unlocks'] as const;
@@ -2333,6 +2372,13 @@ export async function selectGuestProgress({
         if (!record.completedDomains.includes('daily')) {
             await resolveGuestTransferDailyChallenges(record.dailyChallengeIds);
         }
+        // Freeze the account's Garage before the choice can act on it. Write-once, so a retry that
+        // re-enters preparation keeps the original: recapturing here would fold a reward earned
+        // since the choice into the next deletion baseline. Only a Guest choice replaces the
+        // account Garage, so only it needs the baseline.
+        if (choice === 'guest') {
+            await captureGuestTransferGarageBaseline(redditPlayerId);
+        }
         if (record.phase === 'preparing') {
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
@@ -2350,7 +2396,10 @@ export async function selectGuestProgress({
                 let evidence: Partial<GuestTransferSourceInventory>;
                 if (raw) {
                     // Garage hands over the exact fields it is about to copy.
-                    evidence = { unlocks: stableFingerprint(raw.unlocks ?? null) };
+                    evidence = {
+                        unlocks: stableFingerprint(raw.unlocks ?? null),
+                        unlockFields: { ...(raw.unlocks ?? {}) },
+                    };
                 } else if (domain === 'campaign') {
                     evidence = {
                         campaignProgress: stableFingerprint(
@@ -2366,10 +2415,10 @@ export async function selectGuestProgress({
                         ),
                     };
                 } else {
+                    const current = await redis.hGetAll(carUnlockHashKey(guestPlayerId));
                     evidence = {
-                        unlocks: stableFingerprint(
-                            await redis.hGetAll(carUnlockHashKey(guestPlayerId)) ?? null,
-                        ),
+                        unlocks: stableFingerprint(current ?? null),
+                        unlockFields: { ...(current ?? {}) },
                     };
                 }
                 if (changedInventoryDomains(record.sourceInventory, evidence).includes(domain)) {

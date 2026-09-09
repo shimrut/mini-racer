@@ -372,17 +372,65 @@ function normalizedTransferValue(value) {
  * read-modify-write of the queue key, so a tab holding a stale copy would otherwise wipe a block
  * another tab had just written, and quietly release racing during an open transfer.
  */
-function readTransferBlocks() {
-  if (typeof window === "undefined" || !window.localStorage) return {};
+/**
+ * What this tab knows about open transfers, whether or not storage accepted it.
+ *
+ * Storage is the durable record, and it is the only one that survives a reload. It can also be
+ * missing, full, or blocked by the browser, and a block that was never written is invisible to
+ * the very check that decides whether racing may continue. This map holds the same blocks in
+ * memory so a storage failure cannot quietly release the pause inside one session.
+ *
+ * `persisted` separates the two cases, and the difference matters when reading:
+ *  - persisted: storage accepted it. If a later read no longer finds it, another tab finished
+ *    the recovery and removed it, and this tab should let it go.
+ *  - unpersisted: storage never accepted it. A read that does not find it proves nothing, so it
+ *    is kept until this tab resolves it itself.
+ *
+ * The boundary this shares with `activePlayerOwnerId` in `game/player/active-owner.js`: both are
+ * module state, so a reload starts with neither. A browser whose storage failed comes back
+ * knowing nothing, and only the server can tell it about the transfer again. Missing durable
+ * evidence plus unavailable storage therefore needs an online confirmation; cleared browser data
+ * cannot be reconstructed from here.
+ */
+const knownTransferBlocks = new Map();
+
+function readStoredTransferBlocks() {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return { ok: false, blocks: {} };
+  }
   try {
     const raw = window.localStorage.getItem(TRANSFER_BLOCKS_STORAGE_KEY);
-    if (!raw) return {};
+    if (!raw) return { ok: true, blocks: {} };
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    return {
+      ok: true,
+      blocks: parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {},
+    };
   } catch (error) {
     console.error("Error reading transfer blocks:", error);
-    return {};
+    return { ok: false, blocks: {} };
   }
+}
+
+/**
+ * Every block this tab must honour: what storage holds, plus what it knows storage never took.
+ * A failed read contributes nothing, and drops nothing either.
+ */
+function readTransferBlocks() {
+  const stored = readStoredTransferBlocks();
+  const merged = stored.ok ? { ...stored.blocks } : {};
+  for (const [accountPlayerId, entry] of knownTransferBlocks) {
+    if (!entry) continue;
+    if (entry.persisted && stored.ok) {
+      // Storage had it and no longer does: another tab completed this recovery.
+      if (!(accountPlayerId in stored.blocks)) {
+        knownTransferBlocks.delete(accountPlayerId);
+        continue;
+      }
+    }
+    merged[accountPlayerId] ??= entry.block;
+  }
+  return merged;
 }
 
 function writeTransferBlocks(blocks) {
@@ -425,26 +473,36 @@ export function recordVerificationQueueTransferBlock({
   state = "resume_required",
 } = {}) {
   if (!normalizedTransferValue(accountPlayerId)) return false;
-  return writeTransferBlocks({
-    ...readTransferBlocks(),
-    [accountPlayerId]: {
-      transferId: normalizedTransferValue(transferId),
-      guestPlayerId: normalizedTransferValue(guestPlayerId),
-      accountPlayerId,
-      state,
-      updatedAt: new Date().toISOString(),
-    },
-  });
+  const block = {
+    transferId: normalizedTransferValue(transferId),
+    guestPlayerId: normalizedTransferValue(guestPlayerId),
+    accountPlayerId,
+    state,
+    updatedAt: new Date().toISOString(),
+  };
+  // Written down in memory before storage is asked. If the write fails this call still reports
+  // failure, so the caller treats the transfer as unresolved, but the pause itself holds for the
+  // guest, the account, and an identity this tab has not confirmed yet.
+  knownTransferBlocks.set(accountPlayerId, { block, persisted: false });
+  const persisted = writeTransferBlocks({ ...readTransferBlocks(), [accountPlayerId]: block });
+  if (persisted) knownTransferBlocks.set(accountPlayerId, { block, persisted: true });
+  return persisted;
 }
 
 /** Lifts the block for one account once its reconciliation is durable. */
 export function clearVerificationQueueTransferBlock(accountPlayerId) {
   if (!normalizedTransferValue(accountPlayerId)) return false;
   const blocks = readTransferBlocks();
-  if (!blocks[accountPlayerId]) return true;
+  if (!blocks[accountPlayerId]) {
+    knownTransferBlocks.delete(accountPlayerId);
+    return true;
+  }
   const next = { ...blocks };
   delete next[accountPlayerId];
-  return writeTransferBlocks(next);
+  // Only this account's block goes. Another account's pause is not this resolution's to lift.
+  const removed = writeTransferBlocks(next);
+  if (removed) knownTransferBlocks.delete(accountPlayerId);
+  return removed;
 }
 
 export function readVerificationQueueTransferBlock(accountPlayerId) {

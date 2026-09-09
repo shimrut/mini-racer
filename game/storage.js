@@ -190,6 +190,9 @@ function enrichProgressSelection(selection, { guestOwnerId, accountOwnerId }) {
 }
 
 async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelectionRequired = null } = {}) {
+  // Set when a resolved transfer's pause could not be taken off this browser. Availability, not
+  // safety: the player stays paused until a later start-up succeeds in removing it.
+  let pauseReleaseFailed = false;
   setGuestPlayerToken(remoteState.guestToken);
   const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
   const isSignedInAccount = Boolean(remoteState.redditUsername)
@@ -322,7 +325,13 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
     clearDailyChallengeClientCaches();
     clearTrackLastLapMedals();
-    clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
+    // The transfer is resolved and its reconciliation is durable, so the pause may go. A removal
+    // that storage refuses leaves this browser paused on work that is actually finished. That
+    // costs the player racing, not data, so it is reported rather than thrown.
+    pauseReleaseFailed = !clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
+    if (pauseReleaseFailed) {
+      console.error("Could not release the transfer pause for", remoteState.leaderboardPlayerId);
+    }
   }
   if (remoteState.retireGuestIdentity) {
     rotateGuestPlayerIdentity("completed guest promotion");
@@ -343,9 +352,16 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
   // The server named this account and left nothing unresolved for it, so a marker from an earlier
   // visit is stale. Another owner's block is left alone.
   if (!hasKnownTransfer || alreadyReconciled) {
-    clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
+    if (!clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId)) {
+      pauseReleaseFailed = true;
+      console.error("Could not clear a stale transfer pause for", remoteState.leaderboardPlayerId);
+    }
   }
-  const authoritativeState = { ...remoteState, authoritative: true };
+  const authoritativeState = {
+    ...remoteState,
+    authoritative: true,
+    ...(pauseReleaseFailed ? { transferPauseReleaseFailed: true } : {}),
+  };
   setActivePlayerOwnerId(remoteState.leaderboardPlayerId);
   writeCachedPlayerProfile(remoteState.leaderboardPlayerId, authoritativeState);
   return authoritativeState;
@@ -359,6 +375,21 @@ export async function getPlayerProgressState({
     return getLocalPlayerProgressState();
   }
 
+  // A transfer this browser knows about but could not resolve. Held for the whole call, because
+  // the browser storage that would normally remember it is exactly what may have failed.
+  let transferRecoveryUnresolved = false;
+  const isTransferRecoveryError = (error) => Boolean(
+    error?.transferRecovery || error?.reason === "guest_progress_recovery_required",
+  );
+  // An ordinary connection failure may fall back to offline play. An unresolved transfer may not:
+  // racing offline now would build results on top of a replacement that never finished.
+  const offlineState = () => {
+    const fallback = getHostedFallbackPlayerProgressState();
+    return transferRecoveryUnresolved
+      ? { ...fallback, progressTransferBlocked: true }
+      : fallback;
+  };
+
   while (true) {
     try {
       const remoteState = await fetchHostedPlayerProgressState();
@@ -369,15 +400,18 @@ export async function getPlayerProgressState({
       }
     } catch (error) {
       console.error("Error loading player progress state:", error);
+      if (isTransferRecoveryError(error)) transferRecoveryUnresolved = true;
     }
 
-    if (!promptOnSyncFailure) {
+    const mustStayOnline = transferRecoveryUnresolved
+      || getHostedFallbackPlayerProgressState().progressTransferBlocked;
+    if (!promptOnSyncFailure && !mustStayOnline) {
       return getHostedFallbackPlayerProgressState();
     }
 
     const decision = await requestServerSyncFailureChoice({
       retry: fetchHostedPlayerProgressState,
-      allowOffline: !getHostedFallbackPlayerProgressState().progressTransferBlocked,
+      allowOffline: !mustStayOnline,
     });
     if (decision?.action === "synced" && decision.remoteState) {
       try {
@@ -386,12 +420,15 @@ export async function getPlayerProgressState({
         });
       } catch (error) {
         console.error("Error loading player progress state:", error);
+        if (isTransferRecoveryError(error)) transferRecoveryUnresolved = true;
         continue;
       }
     }
     if (decision?.action === "retry") {
       continue;
     }
-    return getHostedFallbackPlayerProgressState();
+    // Offline was not on offer while the transfer is unresolved, so this is a dismissal rather
+    // than a choice to play offline. The state says so, and the queue keeps submissions paused.
+    return offlineState();
   }
 }

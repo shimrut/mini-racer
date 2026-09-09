@@ -17,11 +17,18 @@ import {
 import type { DailyGpLeaderboardEntry } from './daily-gp-model.js';
 import {
     competitionHoldsPlayerRows,
+    parseStoredEntry,
     readEntryByPlayerId,
     readPlayerRank,
     readSnapshot,
     writeEntry,
 } from './competition-leaderboard.js';
+import {
+    classifyStoredCampaignProgress,
+    classifyStoredLeaderboardEntry,
+    type StoredRecordClassification,
+} from './guest-transfer-source-classification.js';
+import { encodeRedisCompressedValue } from './redis-compressed-value.js';
 import { campaignProgressKey } from './campaign-progress-key.js';
 import { prepareCompetitionOpponentRace } from './competition-opponent-race.js';
 import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
@@ -34,7 +41,11 @@ import {
     SUBMISSION_LOCK_TTL_MS,
     type RankedSubmitReuseOptions,
 } from './competition-submit.js';
-import { getPlayerTrackPbRecord } from './pb-ghost-store.js';
+import {
+    classifyStoredPbRecordFor,
+    getPlayerTrackPbRecord,
+    type PlayerTrackPbRecord,
+} from './pb-ghost-store.js';
 import { redisCompressed } from '@devvit/redis';
 import {
     getCarUnlockSnapshot,
@@ -55,7 +66,10 @@ import {
     type RedisLockMutation,
     type RedisLockTransactionRunner,
 } from './redis-lock.js';
-import { GuestProgressSelectionRetryableError } from './guest-progress-selection-error.js';
+import {
+    GuestProgressRecoveryRequiredError,
+    GuestProgressSelectionRetryableError,
+} from './guest-progress-selection-error.js';
 import { recordAnalyticsRaceBestEffort } from './analytics-store.js';
 import { isPlayerProgressSelectionPending } from './guest-retirement.js';
 
@@ -873,6 +887,96 @@ export async function getServerHeadToHeadSource({
     };
 }
 
+type GuestCampaignStageSource = {
+    entry: DailyGpLeaderboardEntry | null;
+    entryClass: StoredRecordClassification<unknown>;
+    pb: PlayerTrackPbRecord | null;
+    pbClass: StoredRecordClassification<PlayerTrackPbRecord>;
+    /**
+     * The personal best exactly as it was validated, before compression. The copy re-encodes this
+     * rather than reading the field again, so the bytes written are the bytes that were judged.
+     */
+    rawPb: string | null;
+};
+
+type GuestCampaignSourceSnapshot = {
+    progress: CampaignProgress;
+    stages: Map<string, GuestCampaignStageSource>;
+    /** Domain and reason for every row a person has to look at. Never carries player data. */
+    malformed: string[];
+    /** Rows a supported campaign, track, or simulation change made unusable. */
+    obsolete: string[];
+};
+
+/**
+ * Reads the guest's whole Campaign source once and classifies every row in it.
+ *
+ * Two reasons this is one pass, taken before the loop rather than inside it:
+ *
+ * 1. Every row must be judged before the first destination write. A malformed row found halfway
+ *    through would otherwise stop a replacement that had already emptied earlier stages.
+ * 2. The copy then runs from this snapshot. Re-reading the source after validating it would let
+ *    a row that expired in between be copied as absent, which under `replace` deletes the
+ *    account's row instead.
+ *
+ * The read count matches what the loop used to do on its own: one entry and one personal best
+ * per stage, plus the progress row.
+ */
+async function captureClassifiedGuestCampaignSource(
+    guestPlayerId: string,
+): Promise<GuestCampaignSourceSnapshot> {
+    const malformed: string[] = [];
+    const obsolete: string[] = [];
+
+    const rawProgress = await redis.get(progressKey(guestPlayerId));
+    const progressClass = classifyStoredCampaignProgress(rawProgress);
+    if (progressClass.state === 'malformed') {
+        malformed.push(`campaign:progress:${progressClass.reason}`);
+    } else if (progressClass.state === 'valid' && progressClass.record.obsoleteRaceIds.length) {
+        for (const raceId of progressClass.record.obsoleteRaceIds) {
+            obsolete.push(`campaign:progress:${raceId}`);
+        }
+    }
+
+    const stages = new Map<string, GuestCampaignStageSource>();
+    for (const stage of CAMPAIGN_STAGES) {
+        const competition = competitionFor(stage, guestPlayerId);
+        const [rawEntry, rawPb] = await Promise.all([
+            redis.hGet(competition.entryHashKey, guestPlayerId),
+            redisCompressed.hGet(competition.pbHashKey, playerField(guestPlayerId)),
+        ]);
+        const pbClass = classifyStoredPbRecordFor(rawPb, competition, TRACKS[stage.trackKey]);
+        const entryClass = classifyStoredLeaderboardEntry(rawEntry, guestPlayerId, stage);
+        if (entryClass.state === 'malformed') {
+            malformed.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
+        } else if (entryClass.state === 'obsolete') {
+            obsolete.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
+        }
+        if (pbClass.state === 'malformed') {
+            malformed.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
+        } else if (pbClass.state === 'obsolete') {
+            obsolete.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
+        }
+        stages.set(stage.raceId, {
+            // Parsed from the raw value already read, so this costs no extra round trip.
+            entry: entryClass.state === 'valid'
+                ? parseStoredEntry(rawEntry, stage.trackKey)
+                : null,
+            entryClass,
+            pb: pbClass.state === 'valid' ? pbClass.record : null,
+            pbClass,
+            rawPb: pbClass.state === 'valid' ? (rawPb ?? null) : null,
+        });
+    }
+
+    return {
+        progress: parseCampaignProgress(rawProgress),
+        stages,
+        malformed,
+        obsolete,
+    };
+}
+
 export async function mergeGuestCampaignProgress({
     guestPlayerId,
     redditPlayerId,
@@ -959,10 +1063,21 @@ export async function mergeGuestCampaignProgress({
         await confirmMergeOwnership();
         await verifyGuestSource?.();
 
+        // A replacing merge reads and judges the entire guest source before it may write anything.
+        // Everything it copies afterwards comes from this snapshot.
+        const guestSource = replace
+            ? await captureClassifiedGuestCampaignSource(guestPlayerId)
+            : null;
+        if (guestSource?.malformed.length) {
+            throw new GuestProgressRecoveryRequiredError(
+                `Campaign guest source needs review: ${guestSource.malformed.join(', ')}`,
+            );
+        }
+
         const guestProgressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId))!;
         const redditProgressLock = locks.find((lock) => lock.key === progressLockKey(redditPlayerId))!;
         const [guestProgress, redditProgress] = await Promise.all([
-            readProgress(guestPlayerId),
+            guestSource ? Promise.resolve(guestSource.progress) : readProgress(guestPlayerId),
             readProgress(redditPlayerId),
         ]);
         const mergedResults = replace
@@ -977,14 +1092,21 @@ export async function mergeGuestCampaignProgress({
             await confirmMergeOwnership();
             const guestCompetition = competitionFor(stage, guestPlayerId);
             const redditCompetition = competitionFor(stage, redditPlayerId);
-            const [guestEntry, redditEntry, guestPb, redditPb, redditRankedScore] = await Promise.all([
-                readEntryByPlayerId(guestCompetition, guestPlayerId),
+            // Guest values come from the validated snapshot when one was taken. Only the account
+            // side is read here, so the source cannot change between its check and its copy.
+            const stageSource = guestSource?.stages.get(stage.raceId);
+            const [snapshotlessGuestEntry, redditEntry, snapshotlessGuestPb, redditPb, redditRankedScore] = await Promise.all([
+                guestSource
+                    ? Promise.resolve(null)
+                    : readEntryByPlayerId(guestCompetition, guestPlayerId),
                 readEntryByPlayerId(redditCompetition, redditPlayerId),
-                getPlayerTrackPbRecord({
-                    playerId: guestPlayerId,
-                    competition: guestCompetition,
-                    track: TRACKS[stage.trackKey],
-                }),
+                guestSource
+                    ? Promise.resolve(null)
+                    : getPlayerTrackPbRecord({
+                        playerId: guestPlayerId,
+                        competition: guestCompetition,
+                        track: TRACKS[stage.trackKey],
+                    }),
                 getPlayerTrackPbRecord({
                     playerId: redditPlayerId,
                     competition: redditCompetition,
@@ -992,6 +1114,8 @@ export async function mergeGuestCampaignProgress({
                 }),
                 redis.zScore(redditCompetition.leaderboardKey, redditPlayerId),
             ]);
+            const guestEntry = guestSource ? (stageSource?.entry ?? null) : snapshotlessGuestEntry;
+            const guestPb = guestSource ? (stageSource?.pb ?? null) : snapshotlessGuestPb;
             const guestEntryResult = campaignResultFromEntry(
                 stage,
                 guestEntry,
@@ -1056,10 +1180,13 @@ export async function mergeGuestCampaignProgress({
                 if (!accountEntryLock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
                 let rawGuestPb: string | undefined;
                 if (guestCanSupplyWinningPb) {
-                    rawGuestPb = await redis.hGet(
-                        guestCompetition.pbHashKey,
-                        playerField(guestPlayerId),
-                    );
+                    // From the validated snapshot when there is one, re-encoded the way the
+                    // compressing client would have. Reading the field again here would let a row
+                    // that expired since validation be copied as absent.
+                    const validated = guestSource ? stageSource?.rawPb ?? null : null;
+                    rawGuestPb = validated !== null
+                        ? encodeRedisCompressedValue(validated)
+                        : await redis.hGet(guestCompetition.pbHashKey, playerField(guestPlayerId));
                     if (!rawGuestPb) {
                         throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                     }
@@ -1099,10 +1226,12 @@ export async function mergeGuestCampaignProgress({
                     }
                 }
                 if (guestCanSupplyWinningPb) {
-                    const rawGuestPb = await redisCompressed.hGet(
-                        guestCompetition.pbHashKey,
-                        playerField(guestPlayerId),
-                    );
+                    const rawGuestPb = guestSource
+                        ? stageSource?.rawPb ?? null
+                        : await redisCompressed.hGet(
+                            guestCompetition.pbHashKey,
+                            playerField(guestPlayerId),
+                        );
                     if (!rawGuestPb) {
                         throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                     }

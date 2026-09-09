@@ -71,17 +71,140 @@ export async function readGuestPromotionTarget(
     return await client.get(promotionKey(guestPlayerId)) || null;
 }
 
+/**
+ * The account's Garage as it stood when its transfer was prepared. Replacement may delete only
+ * what this names, so a reward earned after the player chose is never taken away with the rest.
+ */
+function transferBaselineKey(accountPlayerId: string): string {
+    const playerHash = createHash('sha256').update(accountPlayerId, 'utf8').digest('base64url');
+    return `miniracer:car-unlocks:transfer-baseline:v1:${playerHash}`;
+}
+
+/**
+ * Events accepted for the account while its transfer was open.
+ *
+ * A baseline alone is not enough. `recordUniqueFieldUntil` returns without touching the hash when
+ * the field is already `'1'` or the event cap is reached, so an entitlement can be earned again
+ * and leave no trace. Deleting the baseline field would then lose it. This records the event even
+ * when the ordinary write is a no-op.
+ */
+function transferJournalKey(accountPlayerId: string): string {
+    const playerHash = createHash('sha256').update(accountPlayerId, 'utf8').digest('base64url');
+    return `miniracer:car-unlocks:transfer-journal:v1:${playerHash}`;
+}
+
+/** Keeps the journal from growing without bound if a transfer is left open for a long time. */
+const TRANSFER_JOURNAL_FIELD_LIMIT = 64;
+
+/**
+ * Whether one hash field is an ordinary Garage event this build writes.
+ *
+ * A transfer uses this to tell a legitimate late event from tampering. Every writer stores `'1'`,
+ * and only these three shapes exist, so anything else appearing under a guest mid-transfer is not
+ * something the game did.
+ */
+export function isValidCarUnlockEventField(field: string, value: unknown): boolean {
+    if (value !== '1') return false;
+    if (field === COMPLETED_RACE_FIELD) return true;
+    for (const prefix of [POSTED_TRACK_PREFIX, WON_CHALLENGE_PREFIX]) {
+        if (!field.startsWith(prefix)) continue;
+        const part = field.slice(prefix.length);
+        return Boolean(part) && readFieldPart(part) !== null;
+    }
+    return false;
+}
+
+/**
+ * Records one accepted reward event against an open transfer.
+ *
+ * Called while the promotion lock is held, so it cannot interleave with replacement. Costs one
+ * `GET` on a race finish for a signed-in account, and nothing at all for a guest: a guest hash is
+ * the transfer's source, and it is protected by the recorded source inventory instead.
+ */
+async function journalAcceptedTransferEvent(
+    accountPlayerId: string,
+    field: string,
+    client: RedisClient,
+): Promise<void> {
+    if (!accountPlayerId.startsWith('reddit:')) return;
+    const baseline = await client.get(transferBaselineKey(accountPlayerId));
+    if (!baseline) return;
+    const journalKey = transferJournalKey(accountPlayerId);
+    const existing = await client.hGetAll(journalKey);
+    if (existing[field] === '1') return;
+    if (Object.keys(existing).length >= TRANSFER_JOURNAL_FIELD_LIMIT) {
+        console.error('Guest transfer reward journal is full:', accountPlayerId);
+        return;
+    }
+    await client.hSetNX(journalKey, field, '1');
+}
+
 async function writeCarUnlockEvent(
     playerId: string,
+    field: string,
     write: (key: string) => Promise<void>,
     client: RedisClient,
 ): Promise<void> {
     const lock = await acquirePromotionLock(playerId, client);
     try {
-        await write(carUnlockHashKey(await resolvePromotedPlayerId(playerId, client)));
+        const ownerPlayerId = await resolvePromotedPlayerId(playerId, client);
+        await write(carUnlockHashKey(ownerPlayerId));
+        // After the ordinary write, and regardless of whether it changed anything.
+        await journalAcceptedTransferEvent(ownerPlayerId, field, client);
     } finally {
         await releaseRedisLock(lock, client);
     }
+}
+
+/**
+ * Freezes the account's Garage baseline for a transfer. Write-once: a retry, including one that
+ * re-enters preparation, keeps the original. Recapturing would fold rewards earned since the
+ * choice into the next deletion baseline, which is the loss this exists to prevent.
+ *
+ * Takes the account promotion lock, so it cannot run while a reward write or a replacement holds it.
+ */
+export async function captureGuestTransferGarageBaseline(
+    accountPlayerId: string,
+    client: RedisClient = redis,
+): Promise<boolean> {
+    if (!accountPlayerId.startsWith('reddit:')) return false;
+    const key = transferBaselineKey(accountPlayerId);
+    const lock = await acquirePromotionLock(accountPlayerId, client);
+    try {
+        if (await client.get(key)) return false;
+        await client.set(key, JSON.stringify({
+            version: 1,
+            accountPlayerId,
+            fields: await client.hGetAll(carUnlockHashKey(accountPlayerId)),
+            capturedAt: new Date().toISOString(),
+        }));
+        return true;
+    } finally {
+        await releaseRedisLock(lock, client);
+    }
+}
+
+function parseTransferBaseline(raw: string | null | undefined): Record<string, string> | null {
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+        const fields = (parsed as { fields?: unknown }).fields;
+        if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
+        return fields as Record<string, string>;
+    } catch (_error) {
+        return null;
+    }
+}
+
+/** Removes a finished transfer's baseline and journal. Safe to repeat. */
+export async function clearGuestTransferGarageEvidence(
+    accountPlayerId: string,
+    client: RedisClient = redis,
+): Promise<void> {
+    if (!accountPlayerId.startsWith('reddit:')) return;
+    await client.del(transferBaselineKey(accountPlayerId));
+    await client.del(transferJournalKey(accountPlayerId));
 }
 
 function safeFieldPart(value: string): string {
@@ -131,6 +254,7 @@ export async function recordCompletedRace(
 ): Promise<void> {
     await writeCarUnlockEvent(
         playerId,
+        COMPLETED_RACE_FIELD,
         async (key) => { await client.hSetNX(key, COMPLETED_RACE_FIELD, '1'); },
         client,
     );
@@ -142,15 +266,11 @@ export async function recordHeadToHeadPost(
     client: RedisClient = redis,
 ): Promise<void> {
     if (!trackKey.trim()) return;
+    const field = `${POSTED_TRACK_PREFIX}${safeFieldPart(trackKey)}`;
     await writeCarUnlockEvent(
         playerId,
-        async (key) => recordUniqueFieldUntil(
-            key,
-            `${POSTED_TRACK_PREFIX}${safeFieldPart(trackKey)}`,
-            POSTED_TRACK_PREFIX,
-            5,
-            client,
-        ),
+        field,
+        async (key) => recordUniqueFieldUntil(key, field, POSTED_TRACK_PREFIX, 5, client),
         client,
     );
 }
@@ -161,15 +281,11 @@ export async function recordHeadToHeadWin(
     client: RedisClient = redis,
 ): Promise<void> {
     if (!challengeId.trim()) return;
+    const field = `${WON_CHALLENGE_PREFIX}${safeFieldPart(challengeId)}`;
     await writeCarUnlockEvent(
         playerId,
-        async (key) => recordUniqueFieldUntil(
-            key,
-            `${WON_CHALLENGE_PREFIX}${safeFieldPart(challengeId)}`,
-            WON_CHALLENGE_PREFIX,
-            10,
-            client,
-        ),
+        field,
+        async (key) => recordUniqueFieldUntil(key, field, WON_CHALLENGE_PREFIX, 10, client),
         client,
     );
 }
@@ -250,10 +366,47 @@ export async function mergeGuestCarUnlockProgress({
         const fields = await client.hGetAll(guestKey);
         await verifyGuestSource?.({ unlocks: fields });
         const hadGuestProgress = Object.keys(fields).length > 0;
+
+        // Replacement discards the Garage the player chose to give up. It must not discard what
+        // they earned afterwards, while the transfer was still open.
+        const preserved: Record<string, string> = Object.create(null);
+        if (replace) {
+            const baseline = parseTransferBaseline(
+                await client.get(transferBaselineKey(redditPlayerId)),
+            );
+            const accountFields = await client.hGetAll(carUnlockHashKey(redditPlayerId));
+            if (!baseline) {
+                // No preparation evidence. This is a transfer recorded before baselines existed,
+                // and today's hash cannot be read backwards into what the account held when the
+                // player chose. Keep everything rather than treat earned rewards as disposable.
+                // The player keeps more than a Guest choice would normally leave, and loses none.
+                console.error(
+                    'Guest transfer Garage baseline missing; keeping the account Garage:',
+                    redditPlayerId,
+                );
+                Object.assign(preserved, accountFields);
+            } else {
+                const journal = await client.hGetAll(transferJournalKey(redditPlayerId));
+                for (const [field, value] of Object.entries(accountFields)) {
+                    // Absent from the baseline means earned since the choice.
+                    if (!(field in baseline)) preserved[field] = value;
+                }
+                for (const field of Object.keys(journal)) {
+                    // Earned again during the transfer. The ordinary write was a no-op, because
+                    // the field was already set or its event cap was reached, so the hash alone
+                    // cannot show it. The journal is the only record that it happened.
+                    preserved[field] = accountFields[field] ?? '1';
+                }
+            }
+        }
+
         const enqueue: RedisLockMutation = async (transaction) => {
             if (replace) {
                 await transaction.del(carUnlockHashKey(redditPlayerId));
-                if (hadGuestProgress) await transaction.hSet(carUnlockHashKey(redditPlayerId), fields);
+                const next = { ...fields, ...preserved };
+                if (Object.keys(next).length > 0) {
+                    await transaction.hSet(carUnlockHashKey(redditPlayerId), next);
+                }
             } else if (hadGuestProgress) {
                 await transaction.hSet(carUnlockHashKey(redditPlayerId), fields);
             }
@@ -275,6 +428,13 @@ export async function mergeGuestCarUnlockProgress({
                     'Car unlock promotion was interrupted.',
                 );
             }
+        }
+        // The promotion pointer is now committed, so a later retry returns above without reaching
+        // replacement again. The baseline and journal have done their work and may go.
+        if (replace) {
+            await clearGuestTransferGarageEvidence(redditPlayerId, client).catch((error) => {
+                console.error('Guest transfer Garage evidence cleanup failed:', error);
+            });
         }
         return hadGuestProgress;
     } finally {
