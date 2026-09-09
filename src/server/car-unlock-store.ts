@@ -344,6 +344,14 @@ export async function discardGuestCarUnlockProgress({
         throw error;
     }
     try {
+        // The pointer records which account claimed this guest. Discarding must not take it from
+        // another account that already copied this garage, so a foreign pointer is a conflict.
+        const promotedTo = await client.get(promotionKey(guestPlayerId));
+        if (promotedTo && promotedTo !== redditPlayerId) {
+            throw new GuestProgressRecoveryRequiredError(
+                'This guest garage was already promoted to another account.',
+            );
+        }
         const hadGuestProgress = Object.keys(await client.hGetAll(carUnlockHashKey(guestPlayerId))).length > 0;
         const transaction = await beginOwnedRedisLockTransaction(lock, client);
         if (!transaction) {

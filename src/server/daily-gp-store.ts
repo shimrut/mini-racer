@@ -369,18 +369,23 @@ function changedInventoryDomains(
     expected: GuestTransferSourceInventory,
     observed: Partial<GuestTransferSourceInventory>,
 ): string[] {
+    // Compared row by row, over the rows preparation recorded. A row that changed or disappeared
+    // is loss and stops the copy. A row that only exists now — a Campaign stage added to the
+    // manifest since — holds nothing this guest could have raced, so it is not evidence of change.
+    const rowsChanged = (
+        expectedRows: Record<string, string>,
+        observedRows: Record<string, string> | undefined,
+    ): boolean => (
+        observedRows !== undefined
+        && Object.entries(expectedRows).some(([key, value]) => observedRows[key] !== value)
+    );
     const changed: string[] = [];
-    if (observed.campaignStages !== undefined || observed.campaignProgress !== undefined) {
-        const stagesMatch = observed.campaignStages === undefined
-            || stableFingerprint(observed.campaignStages) === stableFingerprint(expected.campaignStages);
-        const progressMatches = observed.campaignProgress === undefined
-            || observed.campaignProgress === expected.campaignProgress;
-        if (!stagesMatch || !progressMatches) changed.push('campaign');
+    if (rowsChanged(expected.campaignStages, observed.campaignStages)
+        || (observed.campaignProgress !== undefined
+            && observed.campaignProgress !== expected.campaignProgress)) {
+        changed.push('campaign');
     }
-    if (observed.daily !== undefined
-        && stableFingerprint(observed.daily) !== stableFingerprint(expected.daily)) {
-        changed.push('daily');
-    }
+    if (rowsChanged(expected.daily, observed.daily)) changed.push('daily');
     if (observed.unlocks !== undefined && observed.unlocks !== expected.unlocks) {
         changed.push('unlocks');
     }
@@ -399,6 +404,8 @@ const TRANSFER_COMPLETION_DOMAINS = ['campaign', 'daily', 'unlocks'] as const;
 const TRANSFER_CLEANUP_DOMAINS = ['campaign', 'daily'] as const;
 /** An account transfers once in practice. The bound only stops an unbounded key from growing. */
 const ACCOUNT_TRANSFER_INDEX_LIMIT = 20;
+/** How long a completion stays worth volunteering to a browser that did not ask for it by id. */
+const TRANSFER_COMPLETION_NEWS_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -449,10 +456,11 @@ function isValidPendingSelectionRecord(
             return false;
         }
         if (!isValidTransferPhase(value.phase)) return false;
-        // A Guest choice replaces account data, so past preparation it must carry the inventory it
-        // will be checked against. An Account choice replaces nothing and captures none.
-        if (value.choice === 'guest'
-            && value.phase !== 'preparing'
+        // A record with a replacement still to make must carry the inventory it will be checked
+        // against. An Account choice replaces nothing, and a Guest record whose copies are all
+        // checkpointed has only deletions left, so neither needs one.
+        if (value.phase !== 'preparing'
+            && hasReplacementRemaining(value as GuestProgressSelectionRecord)
             && !isValidSourceInventory(value.sourceInventory)) {
             return false;
         }
@@ -1641,11 +1649,23 @@ async function readAccountTransferIndex(redditPlayerId: string): Promise<string[
     );
 }
 
-/** Only a version-4 record carries the source evidence a Guest replacement must be checked against. */
+/** True when this record still has an account row left to replace. */
+function hasReplacementRemaining(record: GuestProgressSelectionRecord): boolean {
+    return record.choice === 'guest'
+        && !TRANSFER_COMPLETION_DOMAINS.every(
+            (domain) => record.completedDomains?.includes(domain),
+        );
+}
+
+/**
+ * Only a version-4 record carries the source evidence a Guest replacement must be checked against.
+ * A record whose copies are all checkpointed has no replacement left to make: what remains is
+ * deleting guest rows, which needs no inventory, so an older one may still finish that work.
+ */
 function resumableRecordState(
     record: GuestProgressSelectionRecord,
 ): 'resume_required' | 'recovery_required' {
-    if (record.choice === 'account') return 'resume_required';
+    if (!hasReplacementRemaining(record)) return 'resume_required';
     if (record.version !== 4 || !isValidSourceInventory(record.sourceInventory)) {
         return 'recovery_required';
     }
@@ -1720,18 +1740,24 @@ export async function resolveAccountTransferState(
             state: 'recovery_required',
         });
     }
+    // Volunteering a completion is for a browser that may not have heard about it yet. After the
+    // reconciliation window it stops being news, and an account that transferred once should not
+    // be told about it on every sign-in for the rest of its life. A browser holding a receipt can
+    // still ask by transfer id above, and is answered whatever its age.
     const index = parseAccountTransferIndex(rawIndex);
+    const oldestNewsAt = Date.now() - TRANSFER_COMPLETION_NEWS_MS;
     for (let position = index.length - 1; position >= 0; position -= 1) {
         const receipt = await readGuestTransferReceipt(index[position], redditPlayerId);
-        if (receipt) {
-            return pendingSelectionPayload({
-                guestPlayerId: receipt.guestPlayerId,
-                redditPlayerId,
-                choice: receipt.choice,
-                state: 'completed',
-                completedAt: receipt.completedAt,
-            });
-        }
+        if (!receipt) continue;
+        const completedAtMs = Date.parse(receipt.completedAt);
+        if (Number.isFinite(completedAtMs) && completedAtMs < oldestNewsAt) return null;
+        return pendingSelectionPayload({
+            guestPlayerId: receipt.guestPlayerId,
+            redditPlayerId,
+            choice: receipt.choice,
+            state: 'completed',
+            completedAt: receipt.completedAt,
+        });
     }
     return null;
 }
@@ -1841,7 +1867,14 @@ export async function getGuestProgressTransferDiagnostic({
         }
     }
 
-    const specs = Array.isArray(record?.dailyChallengeSpecs) ? record.dailyChallengeSpecs : [];
+    // A version-2 record has no specs, and those are exactly the records that reach a review. Fall
+    // back to its frozen ids so the diagnostic is not blind about Daily for the cases it exists for.
+    const specs = Array.isArray(record?.dailyChallengeSpecs)
+        ? record.dailyChallengeSpecs
+        : Array.isArray(record?.dailyChallengeIds)
+            ? (await resolveGuestTransferDailyChallenges(record.dailyChallengeIds)
+                .catch(() => [] as DailyGpChallenge[])).map(transferChallengeSpec)
+            : [];
     let survivingSource: GuestTransferSourceInventory | null = null;
     let destinationEvidence: Record<string, unknown> | null = null;
     const expiredDailyChallengeIds: string[] = [];
@@ -1981,8 +2014,10 @@ export async function getGuestProgressSelection({
     };
     const accountSummary = toProgressSummary(accountEvidence);
     if (guestHasProgress) {
+        // Only the guest is marked here. The account marker gates its ranked play, and showing a
+        // chooser risks nothing yet, so it is claimed when a choice is recorded and not before. A
+        // player who dismisses the chooser must not be left unable to race.
         await redis.set(guestProgressSelectionPendingKey(guestPlayerId), '1');
-        await redis.set(guestProgressSelectionAccountPendingKey(redditPlayerId), guestPlayerId, { nx: true });
     }
     return {
         required: guestHasProgress,
@@ -2262,12 +2297,19 @@ export async function selectGuestProgress({
                 ? 'copying'
                 : 'preparing';
         const preparing = inheritedPhase === 'preparing';
-        const sourceInventory = choice === 'account'
-            ? undefined
+        // An Account choice replaces nothing, and a Guest record whose copies are all checkpointed
+        // has nothing left to replace either. Neither needs an inventory, and neither may invent
+        // one: capturing evidence now would be a fresh look at a source the copies already used.
+        const replacementRemaining = choice === 'guest'
+            && !TRANSFER_COMPLETION_DOMAINS.every(
+                (domain) => currentRecord?.completedDomains?.includes(domain),
+            );
+        const sourceInventory = !replacementRemaining
+            ? currentRecord?.sourceInventory
             : preparing || !isValidSourceInventory(currentRecord?.sourceInventory)
                 ? await captureGuestTransferSourceInventory(guestPlayerId, dailyChallengeSpecs)
                 : currentRecord.sourceInventory;
-        if (choice === 'guest' && !isValidSourceInventory(sourceInventory)) {
+        if (replacementRemaining && !isValidSourceInventory(sourceInventory)) {
             throw guestProgressRecoveryRequiredError();
         }
         const record: GuestProgressSelectionRecord = {
@@ -2451,14 +2493,18 @@ export async function selectGuestProgress({
             completedAt,
         };
     } catch (error) {
-        reportTiming(
-            (error as { reason?: string })?.reason === 'guest_progress_recovery_required'
-                ? 'recovery_required'
-                : error instanceof GuestProgressSelectionRetryableError
-                    ? 'retryable'
-                    : 'failed',
-        );
-        console.error('Guest progress selection failed:', error);
+        const reason = (error as { reason?: string })?.reason;
+        const outcome = reason === 'guest_progress_recovery_required'
+            ? 'recovery_required'
+            : error instanceof GuestProgressSelectionRetryableError
+                ? 'retryable'
+                : 'failed';
+        reportTiming(outcome);
+        // Contention and reviewed recovery are already reported by the outcome line above. Only an
+        // unclassified failure carries a stack worth keeping.
+        if (outcome === 'failed') {
+            console.error('Guest progress selection failed:', error);
+        }
         throw error;
     } finally {
         if (lease) {
@@ -2836,8 +2882,11 @@ export async function getServerPlayerBootstrap({
         if (accountTransfer?.state === 'completed') {
             progressSelection = accountTransfer;
         }
+        // A finished transfer is news for the browser to reconcile against, never a reason to
+        // ignore the guest in front of us. A different guest signing in later still gets its own
+        // chooser, and a spent one is still retired.
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
-        if (guestPlayerId && accountTransfer?.state !== 'completed') {
+        if (guestPlayerId) {
             const promotedTo = await readGuestPromotionTarget(`guest:${guestPlayerId}`);
             if (promotedTo) {
                 retireGuestIdentity = true;

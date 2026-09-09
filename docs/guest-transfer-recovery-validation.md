@@ -30,8 +30,31 @@ and do not import unrelated working-tree changes.
 | Hosted validation on isolated test identities | **not run** |
 | Documentation reports verified behavior and its limits | pass |
 
-New tests: `server-guest-transfer-recovery` (40), `verification-queue-transfer-recovery` (16),
+New tests: `server-guest-transfer-recovery` (44), `verification-queue-transfer-recovery` (20),
 `race-blocked-by-transfer` (7), and 4 added to `server-analytics-routes`.
+
+## Independent review
+
+Two bounded reviews ran against the integrated branch: one on server integrity, one on client
+ownership and queue correctness. Both were read-only. Eleven defects were confirmed and fixed;
+each now has a test. The ones worth naming, because they were introduced by this work:
+
+| Defect | Effect if shipped |
+|---|---|
+| The account marker was claimed by merely showing the chooser | A player who dismissed the chooser could never race ranked again. No server path cleared it. |
+| Bootstrap skipped the guest branch whenever any completion existed | A second guest signing into that account was silently orphaned: no chooser, no retirement. |
+| A completed selection re-normalized an already-normalized state | The account id became null, so reconciliation never ran, the block never lifted, and local Daily data and medals were wiped on every launch. |
+| The receipt key differed between capture and completion | The normal Guest choice quarantined every queued result instead of moving it. |
+| The race gate resolved the owner from a stale profile | Gates passed during a transfer, and Continue Offline was offered. |
+| Blocks shared the queue's storage key | Any ordinary queue write from another tab dropped the block. |
+| The status probe had no timeout | A hung probe left Retry disabled with no way forward, and stalled the finish handler behind it. |
+| Older records with every copy checkpointed | Sent to reviewed repair instead of finishing proven cleanup, contrary to this document. |
+| A Campaign stage-list change | Stranded every in-flight transfer permanently. |
+| The no-receipt branch ignored the choice | Quarantined account results that an Account choice never put at risk. |
+| The no-transferId branch deleted unowned entries | Removed results it could not prove ownership of. Branch removed. |
+
+Two further points were accepted as correct rather than fixed: a guest cannot lift a block until
+the account it names resolves, and a repeat completion is answered idempotently.
 
 ## Required regression scenarios
 

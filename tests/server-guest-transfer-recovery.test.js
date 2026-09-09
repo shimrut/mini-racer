@@ -459,14 +459,16 @@ describe("bootstrap reports the account's transfer before anything else", () => 
     expect(payload.retireGuestIdentity).toBe(false);
   });
 
-  it("still shows the ordinary chooser when a marker has no recorded choice", async () => {
+  it("does not claim the account until a choice is recorded", async () => {
     const guestPlayerId = "guest:never-chose";
     const redditPlayerId = "reddit:never-chose";
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
 
-    await expect(resolveAccountTransferState(redditPlayerId))
-      .resolves.toMatchObject({ state: "choice_required", sourceGuestPlayerId: guestPlayerId });
-    // Nothing was replaced, so a sign-in without the guest token is not held for review.
+    // Showing the chooser risks nothing, so the account is not marked and its ranked play is
+    // not gated. A player who dismisses the chooser must not be left unable to race.
+    expect(await redis.get(guestProgressSelectionAccountPendingKey(redditPlayerId)))
+      .toBeUndefined();
+    await expect(resolveAccountTransferState(redditPlayerId)).resolves.toBeNull();
     const payload = await getServerPlayerBootstrap({ redditUsername: "never-chose" });
     expect(payload.progressSelection).toBeUndefined();
   });
@@ -649,5 +651,109 @@ describe("guest transfer ownership conflicts", () => {
 
     await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "account" }))
       .rejects.toMatchObject({ statusCode: 409 });
+  });
+});
+
+describe("guest transfer does not strand the account or the next guest", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("still offers a second guest its own chooser after an earlier transfer completed", async () => {
+    const redditPlayerId = "reddit:second-guest";
+    await seedTransferableGuest("guest:first-guest", redditPlayerId);
+    await selectGuestProgress({
+      guestPlayerId: "guest:first-guest",
+      redditPlayerId,
+      choice: "account",
+    });
+
+    // A different guest on a different device now signs into the same account.
+    await seedTransferableGuest("guest:second-guest", redditPlayerId);
+    const selection = await getGuestProgressSelection({
+      guestPlayerId: "guest:second-guest",
+      redditPlayerId,
+    });
+
+    expect(selection.required).toBe(true);
+    expect(selection.sourceGuestPlayerId).toBe("guest:second-guest");
+    await expect(selectGuestProgress({
+      guestPlayerId: "guest:second-guest",
+      redditPlayerId,
+      choice: "guest",
+    })).resolves.toMatchObject({ status: "completed", sourceGuestPlayerId: "guest:second-guest" });
+  });
+
+  it("stops volunteering an old completion once it is no longer news", async () => {
+    const guestPlayerId = "guest:old-news";
+    const redditPlayerId = "reddit:old-news";
+    await seedTransferableGuest(guestPlayerId, redditPlayerId);
+    const done = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "account" });
+
+    await expect(resolveAccountTransferState(redditPlayerId))
+      .resolves.toMatchObject({ state: "completed" });
+
+    // Age the receipt past the window a browser could still be waiting to hear about it.
+    const receiptKey = guestProgressTransferReceiptKey(done.transferId);
+    const receipt = JSON.parse(await redis.get(receiptKey));
+    await redis.set(receiptKey, JSON.stringify({
+      ...receipt,
+      completedAt: new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)).toISOString(),
+    }));
+
+    await expect(resolveAccountTransferState(redditPlayerId)).resolves.toBeNull();
+    // A browser holding that receipt is still answered, whatever its age.
+    await expect(resolveAccountTransferState(redditPlayerId, { transferId: done.transferId }))
+      .resolves.toMatchObject({ state: "completed" });
+  });
+
+  it("finishes the proven cleanup of an older record instead of sending it to review", async () => {
+    const guestPlayerId = "guest:proven-cleanup";
+    const redditPlayerId = "reddit:proven-cleanup";
+    await seedTransferableGuest(guestPlayerId, redditPlayerId);
+    const challenge = await getServerDailyGpChallenge();
+    // A version-2 record from before this change, with every copy already checkpointed. All that
+    // is left is deleting guest rows, which needs no source inventory.
+    await redis.set(selectionKey(guestPlayerId, redditPlayerId), JSON.stringify({
+      version: 2,
+      guestPlayerId,
+      redditPlayerId,
+      choice: "guest",
+      status: "pending",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+      completedDomains: ["campaign", "daily", "unlocks"],
+      cleanedDomains: [],
+      dailyChallengeIds: [challenge.id],
+    }));
+    await redis.set(guestProgressSelectionAccountPendingKey(redditPlayerId), guestPlayerId);
+
+    await expect(resolveAccountTransferState(redditPlayerId))
+      .resolves.toMatchObject({ state: "resume_required", choice: "guest" });
+  });
+
+  it("does not strand a transfer when the Campaign stage list gains a stage", async () => {
+    const guestPlayerId = "guest:new-stage";
+    const redditPlayerId = "reddit:new-stage";
+    await seedTransferableGuest(guestPlayerId, redditPlayerId);
+    redis.failTransferRecordWriteAt = 2;
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .rejects.toThrow();
+    const record = await readRecord(guestPlayerId, redditPlayerId);
+
+    // A deploy adds a stage: the recorded inventory has no row for it, and the guest never raced
+    // it. That is not evidence the source changed.
+    const trimmed = { ...record.sourceInventory.campaignStages };
+    const [firstStage] = Object.keys(trimmed);
+    delete trimmed[firstStage];
+    await redis.set(selectionKey(guestPlayerId, redditPlayerId), JSON.stringify({
+      ...record,
+      phase: "copying",
+      sourceInventory: { ...record.sourceInventory, campaignStages: trimmed },
+    }));
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .resolves.toMatchObject({ status: "completed" });
   });
 });

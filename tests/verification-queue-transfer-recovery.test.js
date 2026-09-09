@@ -5,6 +5,7 @@ import {
     enqueueDailyChallengeVerification,
     getDueDailyChallengeVerifications,
     getNextVerificationAttemptAt,
+    isVerificationQueueGuestProgressReconciled,
     isVerificationQueueSubmissionBlocked,
     prepareVerificationQueueGuestProgressReconciliation,
     readVerificationQueueTransferBlock,
@@ -21,6 +22,7 @@ const GUEST = 'guest:transferring';
 const ACCOUNT = 'reddit:transferring';
 const OTHER_ACCOUNT = 'reddit:somebody-else';
 const STORAGE_KEY = 'VectorGpVerificationQueue';
+const BLOCKS_KEY = 'VectorGpTransferBlocks';
 const REPLAY = { inputs: [{ frames: 1, left: false, right: false }] };
 
 function installLocalStorage() {
@@ -133,13 +135,24 @@ describe('transfer blocking is durable and scoped to its owners', () => {
         queueRun(ACCOUNT, 'in-flight-race', 12);
         expect(getDueDailyChallengeVerifications()).toHaveLength(1);
 
-        const queueState = readStoredQueue();
-        queueState.transferBlocks = {
+        // Another tab writes the block directly, the way it lands in storage.
+        globalThis.window.localStorage.setItem(BLOCKS_KEY, JSON.stringify({
             [ACCOUNT]: { accountPlayerId: ACCOUNT, guestPlayerId: GUEST, state: 'resume_required' },
-        };
-        writeStoredQueue(queueState);
+        }));
 
         expect(getDueDailyChallengeVerifications()).toEqual([]);
+    });
+
+    it('keeps the block when another tab writes the queue from a stale copy', () => {
+        recordVerificationQueueTransferBlock({
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+        });
+        // A tab that read the queue before the block existed finishes an ordinary queue write.
+        const staleQueue = { daily: {}, campaign: {} };
+        writeStoredQueue(staleQueue);
+
+        expect(isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
     });
 
     it('waits when it does not yet know who this browser is', () => {
@@ -294,5 +307,89 @@ describe('queue reconciliation acts only on what it can prove', () => {
         claimVerificationEntriesForOwner(ACCOUNT);
 
         expect(storedEntry(GUEST, 'in-flight-race')).toMatchObject({ ownerPlayerId: GUEST });
+    });
+});
+
+describe('a receipt captured before the server named the transfer is still found', () => {
+    beforeEach(() => {
+        installLocalStorage();
+        resetVerificationQueueForTests();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        clearActivePlayerOwnerId();
+        delete globalThis.window;
+    });
+
+    it('moves the captured entries when the choice was sent without a transfer id', () => {
+        queueRun(GUEST, 'pre-named-race', 12);
+        // The chooser was built before the server had named the transfer, so the receipt is filed
+        // under the guest-and-account fallback key.
+        expect(prepareVerificationQueueGuestProgressReconciliation({
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice: 'guest',
+        }).prepared).toBe(true);
+
+        // The POST reply carries the server's real transfer id.
+        const result = resolveVerificationQueueAfterGuestProgressSelection({
+            transferId: 'guest-transfer:named-by-server',
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice: 'guest',
+        });
+
+        expect(result.moved).toBe(1);
+        expect(result.missingReceipt).toBeUndefined();
+        expect(storedEntry(ACCOUNT, 'pre-named-race')).toMatchObject({ ownerPlayerId: ACCOUNT });
+    });
+
+    it('leaves the account queue alone when the kept progress was the account\'s', () => {
+        queueRun(ACCOUNT, 'account-race', 11);
+
+        // No receipt: another device. The account chose to keep its own progress, so its queued
+        // runs were never at risk and must not be quarantined.
+        const result = resolveVerificationQueueAfterGuestProgressSelection({
+            transferId: 'guest-transfer:elsewhere',
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice: 'account',
+            completedAt: new Date(Date.now() + 60_000).toISOString(),
+        });
+
+        expect(result.quarantined).toBe(0);
+        setActivePlayerOwnerId(ACCOUNT);
+        expect(getDueDailyChallengeVerifications().map((entry) => entry.challengeId))
+            .toEqual(['account-race']);
+    });
+
+    it('reports a transfer this browser already reconciled', () => {
+        queueRun(GUEST, 'settled-race', 12);
+        prepareVerificationQueueGuestProgressReconciliation({
+            transferId: 'guest-transfer:abc',
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice: 'guest',
+        });
+        resolveVerificationQueueAfterGuestProgressSelection({
+            transferId: 'guest-transfer:abc',
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice: 'guest',
+        });
+
+        expect(isVerificationQueueGuestProgressReconciled({
+            transferId: 'guest-transfer:abc',
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice: 'guest',
+        })).toBe(true);
+        expect(isVerificationQueueGuestProgressReconciled({
+            transferId: 'guest-transfer:different',
+            guestPlayerId: 'guest:someone-else',
+            accountPlayerId: ACCOUNT,
+            choice: 'guest',
+        })).toBe(false);
     });
 });

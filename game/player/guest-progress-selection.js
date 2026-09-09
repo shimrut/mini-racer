@@ -107,14 +107,22 @@ async function postProgressSelection(body, controller = null) {
  */
 async function readCompletedTransfer(transferId) {
     if (typeof transferId !== 'string' || !transferId) return null;
+    // This runs between a failed attempt and its retry. Without its own deadline a hung request
+    // would strand the retry loop with its button disabled and no way forward.
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeoutId = controller
+        ? setTimeout(() => controller.abort(), PROGRESS_SELECTION_TIMEOUT_MS)
+        : null;
     try {
-        const payload = await postProgressSelection({ action: 'status', transferId });
+        const payload = await postProgressSelection({ action: 'status', transferId }, controller);
         return payload?.progressSelection?.state === 'completed'
             && payload.progressSelection.transferId === transferId
             ? payload
             : null;
     } catch {
         return null;
+    } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
     }
 }
 

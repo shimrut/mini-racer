@@ -22,6 +22,7 @@ import {
     markDailyChallengeVerificationRejected,
     resetVerificationQueueForTests,
     claimVerificationEntriesForOwner,
+    prepareVerificationQueueGuestProgressReconciliation,
     resolveVerificationQueueAfterGuestProgressSelection
 } from '../game/scoreboard/verification-queue.js';
 import {
@@ -99,7 +100,16 @@ describe('verification queue', () => {
             replay: REPLAY,
         });
 
+        // Reconciliation acts on the receipt captured before the choice was sent. Without one it
+        // cannot prove which entries the selection covered, and quarantines them instead.
+        prepareVerificationQueueGuestProgressReconciliation({
+            transferId: 'guest-transfer:selected',
+            guestPlayerId: 'guest:guest-choice',
+            accountPlayerId: OWNER,
+            choice: 'guest',
+        });
         const result = resolveVerificationQueueAfterGuestProgressSelection({
+            transferId: 'guest-transfer:selected',
             guestPlayerId: 'guest:guest-choice',
             accountPlayerId: OWNER,
             choice: 'guest',

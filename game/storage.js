@@ -32,6 +32,7 @@ import {
   getCampaignVerificationEntriesForOwner,
   prepareVerificationQueueGuestProgressReconciliation,
   resolveVerificationQueueAfterGuestProgressSelection,
+  isVerificationQueueGuestProgressReconciled,
   recordVerificationQueueTransferBlock,
   clearVerificationQueueTransferBlock,
   isVerificationQueueSubmissionBlocked,
@@ -203,20 +204,39 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
       || progressSelection?.state === "completed"
       || hasPendingGuestRuns,
   );
-  if (hasKnownTransfer) {
+  // A completion this browser already reconciled is old news. Doing the work again would wipe the
+  // local Daily caches and medals on every launch for as long as the server keeps reporting it.
+  const alreadyReconciled = progressSelection?.state === "completed"
+    && isVerificationQueueGuestProgressReconciled({
+      transferId: progressSelection.transferId,
+      guestPlayerId: progressSelection.sourceGuestPlayerId || guestOwnerId,
+      accountPlayerId: remoteState.leaderboardPlayerId,
+      choice: progressSelection.choice,
+    });
+  if (hasKnownTransfer && !alreadyReconciled) {
     // Written down before anything else, and scoped to the two identities this transfer names.
     // A reload followed by a network failure finds it again, so this browser cannot slip into
-    // ordinary offline mode with the transfer still open.
-    recordVerificationQueueTransferBlock({
+    // ordinary offline mode with the transfer still open. If it cannot be written, this browser
+    // cannot be trusted to hold the pause, so the transfer stays unresolved.
+    const blocked = recordVerificationQueueTransferBlock({
       transferId: progressSelection?.transferId,
       guestPlayerId: progressSelection?.sourceGuestPlayerId || guestOwnerId,
       accountPlayerId: remoteState.leaderboardPlayerId,
       state: progressSelection?.state || "choice_required",
     });
+    if (!blocked) {
+      const error = new Error("This device cannot pause racing while your transfer finishes.");
+      error.reason = "guest_progress_recovery_required";
+      error.transferRecovery = true;
+      throw error;
+    }
     setActivePlayerOwnerId(null);
     await onProgressSelectionRequired?.(remoteState.progressSelection);
     let selectionResult;
+    let selectionReturnedRawState = true;
     if (progressSelection?.state === "completed") {
+      // remoteState is already normalized here, so it must not be normalized a second time.
+      selectionReturnedRawState = false;
       selectionResult = {
         choice: progressSelection.choice,
         transferId: progressSelection.transferId,
@@ -277,7 +297,9 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     if (!selectionResult?.playerState) {
       throw new Error("Guest progress selection did not return account state.");
     }
-    remoteState = normalizeRemotePlayerProgressState(selectionResult.playerState);
+    remoteState = selectionReturnedRawState
+      ? normalizeRemotePlayerProgressState(selectionResult.playerState)
+      : selectionResult.playerState;
     setGuestPlayerToken(remoteState.guestToken);
     const reconciliation = resolveVerificationQueueAfterGuestProgressSelection({
       transferId: selectionResult.transferId || progressSelection?.transferId,
@@ -318,9 +340,11 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
   if (!remoteState.leaderboardPlayerId) {
     return { ...remoteState, authoritative: false };
   }
-  // The server named this account and reported no open transfer for it, so a marker left behind
-  // by an earlier visit is stale. Another owner's block is left alone.
-  if (!hasKnownTransfer) clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
+  // The server named this account and left nothing unresolved for it, so a marker from an earlier
+  // visit is stale. Another owner's block is left alone.
+  if (!hasKnownTransfer || alreadyReconciled) {
+    clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
+  }
   const authoritativeState = { ...remoteState, authoritative: true };
   setActivePlayerOwnerId(remoteState.leaderboardPlayerId);
   writeCachedPlayerProfile(remoteState.leaderboardPlayerId, authoritativeState);
