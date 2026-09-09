@@ -23,7 +23,7 @@ and do not import unrelated working-tree changes.
 | Gate | State |
 |---|---|
 | Focused transfer, lock, Campaign, Daily, Garage, queue, startup, and route tests pass | pass |
-| Full suite matches the recorded baseline failure set | pass — 2768 tests, the same 2 baseline failures |
+| Full suite matches the recorded baseline failure set | pass — 2779 tests, the same 2 baseline failures |
 | Production build passes | pass |
 | Diff carries no unrelated change | pass |
 | No assertion relaxed to hide a regression | pass |
@@ -31,7 +31,9 @@ and do not import unrelated working-tree changes.
 | Documentation reports verified behavior and its limits | pass |
 
 New tests: `server-guest-transfer-recovery` (44), `verification-queue-transfer-recovery` (20),
-`race-blocked-by-transfer` (7), and 4 added to `server-analytics-routes`.
+`race-blocked-by-transfer` (7), `guest-transfer-completed-startup` (3), and 4 added to
+`server-analytics-routes`. The startup suite drives `getPlayerProgressState` against a real
+bootstrap payload; all three of its tests were confirmed to fail with the fix reverted.
 
 ## Independent review
 
@@ -119,6 +121,8 @@ Each row must exercise the real failure path, not a stubbed result.
 - [x] A different account with no transfer is not stopped.
 - [x] The block survives a reload, because it lives in storage.
 - [x] The sync-failure prompt drops Continue Offline while a transfer is open.
+- [x] A finish still records when identity recovery is stuck behind an unanswered overlay: the
+  work runs on a bound rather than waiting forever.
 - [ ] Recovery becoming known during an active race — the gate stops the next start, but no test
   drives a finish that lands mid-recovery.
 
