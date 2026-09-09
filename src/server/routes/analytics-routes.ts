@@ -4,6 +4,10 @@ export type AnalyticsRouteDependencies = {
     resolveAnalyticsToolSubredditName(): Promise<string | null>;
     assertModeratorForSubreddit(subredditName: string): Promise<string>;
     getServerAnalyticsSummary(): Promise<unknown>;
+    getGuestProgressTransferDiagnostic(input: {
+        redditPlayerId?: unknown;
+        transferId?: unknown;
+    }): Promise<unknown>;
     getRequestUsername(): string | null;
     recordRaceStart(input: Record<string, unknown>): Promise<void>;
     recordPodiumEvent(input: Record<string, unknown>): Promise<void>;
@@ -72,6 +76,45 @@ export function registerAnalyticsRoutes(
                 ? error.message
                 : 'Analytics summary failed';
             const status = message.includes('Moderator access required') ? 403 : 500;
+            res.status(status).json({ error: message });
+        }
+    });
+
+    /**
+     * Read-only case evidence for one account's guest progress transfer, for a reviewed repair.
+     * It changes nothing. Its answer carries guest ids and stored evidence, so it is returned only
+     * to a verified moderator and never written to an ordinary log.
+     */
+    app.get('/api/analytics/guest-transfer', async (req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            await dependencies.assertModeratorForSubreddit(subredditName);
+
+            const username = typeof req.query?.username === 'string' ? req.query.username.trim() : '';
+            const transferId = typeof req.query?.transferId === 'string'
+                ? req.query.transferId.trim()
+                : undefined;
+            if (!username) {
+                res.status(400).json({ error: 'A Reddit username is required.' });
+                return;
+            }
+            res.status(200).json(await dependencies.getGuestProgressTransferDiagnostic({
+                redditPlayerId: `reddit:${username.toLowerCase()}`,
+                transferId,
+            }));
+        } catch (error) {
+            // The message may name the moderator check, never the case evidence.
+            const message = error instanceof Error && error.message
+                ? error.message
+                : 'Guest transfer diagnostic failed';
+            const status = message.includes('Moderator access required') ? 403 : 500;
+            if (status !== 403) {
+                console.error('Guest transfer diagnostic failed.');
+            }
             res.status(status).json({ error: message });
         }
     });

@@ -167,3 +167,78 @@ describe('analytics route contracts', () => {
         });
     });
 });
+
+describe('guest transfer diagnostic route', () => {
+    function diagnosticDependencies(overrides = {}) {
+        return {
+            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
+            assertModeratorForSubreddit: vi.fn(async () => 'RaceMod'),
+            getServerAnalyticsSummary: vi.fn(),
+            getGuestProgressTransferDiagnostic: vi.fn(async () => ({ found: true, reason: 'resumable' })),
+            getRequestUsername: () => 'RaceMod',
+            recordRaceStart: vi.fn(),
+            recordPodiumEvent: vi.fn(),
+            ...overrides,
+        };
+    }
+
+    it('returns case evidence to a moderator for one named account', async () => {
+        const dependencies = diagnosticDependencies();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, dependencies));
+
+        const response = await fetch(
+            `${baseUrl}/api/analytics/guest-transfer?username=Stuck-Player&transferId=guest-transfer:abc`,
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ found: true, reason: 'resumable' });
+        expect(dependencies.assertModeratorForSubreddit).toHaveBeenCalledWith('MiniRacer');
+        expect(dependencies.getGuestProgressTransferDiagnostic).toHaveBeenCalledWith({
+            redditPlayerId: 'reddit:stuck-player',
+            transferId: 'guest-transfer:abc',
+        });
+    });
+
+    it('denies a non-moderator and reads no evidence at all', async () => {
+        const getGuestProgressTransferDiagnostic = vi.fn();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, diagnosticDependencies({
+            assertModeratorForSubreddit: async () => {
+                throw new Error('Moderator access required for r/MiniRacer.');
+            },
+            getGuestProgressTransferDiagnostic,
+        })));
+
+        const response = await fetch(`${baseUrl}/api/analytics/guest-transfer?username=Stuck-Player`);
+
+        expect(response.status).toBe(403);
+        expect(getGuestProgressTransferDiagnostic).not.toHaveBeenCalled();
+    });
+
+    it('needs an account to look at', async () => {
+        const getGuestProgressTransferDiagnostic = vi.fn();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, diagnosticDependencies({
+            getGuestProgressTransferDiagnostic,
+        })));
+
+        const response = await fetch(`${baseUrl}/api/analytics/guest-transfer`);
+
+        expect(response.status).toBe(400);
+        expect(getGuestProgressTransferDiagnostic).not.toHaveBeenCalled();
+    });
+
+    it('keeps case evidence out of the ordinary log', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, diagnosticDependencies({
+            getGuestProgressTransferDiagnostic: async () => {
+                throw new Error('guest:secret-id lookup exploded');
+            },
+        })));
+
+        const response = await fetch(`${baseUrl}/api/analytics/guest-transfer?username=Stuck-Player`);
+
+        expect(response.status).toBe(500);
+        for (const call of consoleError.mock.calls) {
+            expect(JSON.stringify(call)).not.toContain('guest:secret-id');
+        }
+    });
+});
