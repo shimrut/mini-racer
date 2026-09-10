@@ -61,9 +61,12 @@ import {
 } from './competition-identity.js';
 import {
     challengeCollectionKey,
+    classifyStoredPbRecordFor,
     getPlayerTrackPbRecord,
     seedPlayerTrackPersonalBest,
 } from './pb-ghost-store.js';
+import { classifyStoredLeaderboardEntry } from './guest-transfer-source-classification.js';
+import { encodeRedisCompressedValue } from './redis-compressed-value.js';
 import {
     acquireRedisLock,
     beginOwnedRedisLockGroupTransaction,
@@ -120,6 +123,7 @@ import {
     guestProgressTransferReceiptKey,
     guestProgressTransferIndexKey,
     guestProgressSelectionPendingKey,
+    isGuestProgressSelectionPending,
     isPlayerProgressSelectionPending,
     isRetiredGuestPlayerId,
 } from './guest-retirement.js';
@@ -456,6 +460,26 @@ function isOrderedDomainPrefix(
 ): value is string[] {
     return Array.isArray(value)
         && value.every((domain, index) => domain === domains[index]);
+}
+
+/**
+ * A transfer that stopped for a reviewed repair.
+ *
+ * It is the pending record with its status changed, so it still carries the choice, the domain
+ * checkpoints and the source inventory that a repair needs. Only its status says it may not
+ * resume on its own. `isValidPendingSelectionRecord` demands `status: 'pending'`, so a reader
+ * that does not also ask this question reports the case without the choice behind it.
+ */
+function isValidRecoverySelectionRecord(
+    value: unknown,
+    guestPlayerId: string,
+    redditPlayerId: string,
+): value is GuestProgressSelectionRecord {
+    if (!isRecordObject(value)) return false;
+    return value.status === 'recovery_required'
+        && (value.choice === 'guest' || value.choice === 'account')
+        && (value.guestPlayerId === undefined || value.guestPlayerId === guestPlayerId)
+        && (value.redditPlayerId === undefined || value.redditPlayerId === redditPlayerId);
 }
 
 function isValidPendingSelectionRecord(
@@ -1024,15 +1048,23 @@ async function readDailyMergeState(
     track: Record<string, any>,
     guestPlayerId: string,
     redditPlayerId: string,
+    guestSource?: ClassifiedGuestDailySource | null,
 ) {
+    // With a snapshot in hand the guest side is not read again. Reading it a second time is what
+    // let a row that expired between the check and the copy be copied as absent, which under
+    // `replace` empties the account's row instead of replacing it.
     const [guestEntry, redditEntry, guestPb, redditPb, redditRankedScore] = await Promise.all([
-        readEntryByPlayerId(competition, guestPlayerId),
+        guestSource
+            ? Promise.resolve(guestSource.entry)
+            : readEntryByPlayerId(competition, guestPlayerId),
         readEntryByPlayerId(competition, redditPlayerId),
-        getPlayerTrackPbRecord({
-            playerId: guestPlayerId,
-            competition,
-            track,
-        }),
+        guestSource
+            ? Promise.resolve(guestSource.pb)
+            : getPlayerTrackPbRecord({
+                playerId: guestPlayerId,
+                competition,
+                track,
+            }),
         getPlayerTrackPbRecord({
             playerId: redditPlayerId,
             competition,
@@ -1233,6 +1265,78 @@ function dailyPlayerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
 }
 
+/**
+ * One frozen Daily day's guest rows, judged before anything is written from them.
+ *
+ * `pb` carries the decoded personal best. The stored value may be gzipped, so the copy re-encodes
+ * it for a transaction (which bypasses the compressing proxy) and hands the decoded value to the
+ * proxy otherwise. Both write exactly what was judged here, so nothing re-reads the source between
+ * its check and its copy.
+ */
+type ClassifiedGuestDailySource = {
+    entry: ReturnType<typeof parseStoredEntry>;
+    pb: Awaited<ReturnType<typeof getPlayerTrackPbRecord>>;
+    decodedPb: string | null;
+    /**
+     * Exactly what this read saw, in the shape preparation fingerprinted it in. The inventory
+     * check runs against these values rather than reading the source again.
+     */
+    observed: { entry: string | null; pb: string | null; rank: number | null };
+    malformed: string[];
+};
+
+/**
+ * Reads and judges one day's guest rows under that day's locks, before its first account write.
+ *
+ * The ordinary readers answer `null` for absent, obsolete and damaged alike. A replacement cannot
+ * treat those the same: copying "absent" onto an account row deletes that row, so a row this build
+ * merely fails to parse would silently empty the account's day. Daily judges one day at a time
+ * because its locks are per day; Campaign judges every stage at once because it holds every stage
+ * lock at once.
+ */
+async function captureClassifiedGuestDailySource(
+    competition: ReturnType<typeof toDailyCompetition>,
+    track: Record<string, any>,
+    challenge: DailyGpChallenge,
+    guestPlayerId: string,
+): Promise<ClassifiedGuestDailySource> {
+    const [rawEntry, decodedPb, rank] = await Promise.all([
+        redis.hGet(competition.entryHashKey, guestPlayerId),
+        redisCompressed.hGet(competition.pbHashKey, dailyPlayerField(guestPlayerId)),
+        typeof redis.zScore === 'function'
+            ? redis.zScore(competition.leaderboardKey, guestPlayerId)
+            : Promise.resolve(null),
+    ]);
+    const entryClass = classifyStoredLeaderboardEntry(rawEntry, guestPlayerId, {
+        trackKey: challenge.trackKey,
+        lapCount: challenge.objectiveParams.lapCount,
+    });
+    const pbClass = classifyStoredPbRecordFor(decodedPb, competition, track);
+
+    const malformed: string[] = [];
+    if (entryClass.state === 'malformed') {
+        malformed.push(`daily:entry:${challenge.id}:${entryClass.reason}`);
+    }
+    if (pbClass.state === 'malformed') {
+        malformed.push(`daily:pb:${challenge.id}:${pbClass.reason}`);
+    }
+
+    // An obsolete row is real but unreadable to every player-facing reader, so it is deliberately
+    // not copied. It stays under the guest and leaves on the ordinary Daily deadline with the rest
+    // of that day, exactly as it would have without a transfer.
+    return {
+        entry: entryClass.state === 'valid' ? parseStoredEntry(rawEntry, challenge.trackKey) : null,
+        pb: pbClass.state === 'valid' ? pbClass.record : null,
+        decodedPb: pbClass.state === 'valid' && typeof decodedPb === 'string' ? decodedPb : null,
+        observed: {
+            entry: rawEntry ?? null,
+            pb: decodedPb ?? null,
+            rank: rank ?? null,
+        },
+        malformed,
+    };
+}
+
 export async function mergeGuestDailyProgress({
     guestPlayerId,
     redditPlayerId,
@@ -1259,6 +1363,12 @@ export async function mergeGuestDailyProgress({
     const mergedChallengeIds: string[] = [];
     let hasGuestEvidence = false;
 
+    // One sweep across every day the inventory recorded, before any of them is touched. A day
+    // whose rows have gone entirely is skipped by the presence check below, so this is the only
+    // place that loss is reported. The per-day check inside the locks makes each copy atomic;
+    // this one makes the set complete.
+    await verifyGuestSource?.();
+
     for (const challenge of playlist) {
         const competition = toDailyCompetition(challenge);
         const track = TRACKS[challenge.trackKey];
@@ -1271,19 +1381,17 @@ export async function mergeGuestDailyProgress({
             continue;
         }
 
-        const peeked = await readDailyMergeState(
-            competition,
-            track,
-            guestPlayerId,
-            redditPlayerId,
-        );
-        if (
-            !peeked.guestEntry
-            && !peeked.guestPb
-            && !peeked.redditEntry
-            && !peeked.redditPb
-        ) continue;
-        hasGuestEvidence ||= Boolean(peeked.guestEntry || peeked.guestPb);
+        // Presence, read raw, on both identities. The peek this replaces parsed both sides and
+        // skipped the day when nothing came back, so a row this build cannot parse looked exactly
+        // like a day the player never raced: the day was skipped, `hasGuestEvidence` stayed false,
+        // and the domain checkpoint went on to claim work it had not done. Raw presence separates
+        // absent from damaged, and only the locked read below decides what any of it means.
+        const [guestHoldsRows, accountHoldsRows] = await Promise.all([
+            competitionHoldsPlayerRows(competition, guestPlayerId),
+            competitionHoldsPlayerRows(competition, redditPlayerId),
+        ]);
+        if (!guestHoldsRows && !accountHoldsRows) continue;
+        hasGuestEvidence ||= guestHoldsRows;
 
         const locks = await acquireDailyMergeLocks(
             competition,
@@ -1291,7 +1399,33 @@ export async function mergeGuestDailyProgress({
             redditPlayerId,
         );
         try {
-            await verifyGuestSource?.();
+            // A replacement judges this day's source before its first account write, then copies
+            // from exactly what it judged. Damage stops the copy right here: nothing is written,
+            // so no later checkpoint can claim this day was copied, and the guest rows stay where
+            // they are, on the ordinary Daily deadline.
+            const guestSource = replace
+                ? await captureClassifiedGuestDailySource(
+                    competition,
+                    track,
+                    challenge,
+                    guestPlayerId,
+                )
+                : null;
+            // Damage is reported before the inventory check, as the Campaign merge does. The two
+            // stop the transfer for different reasons, and a damaged row that never moved would
+            // otherwise be reported as a changed source, sending a reviewer to look for a change
+            // that did not happen.
+            if (guestSource?.malformed.length) {
+                throw guestProgressRecoveryRequiredError();
+            }
+            // Checked against the bytes just read, never against a second read. Reading the source
+            // again between the check and the copy is what let a row removed in between pass the
+            // check and then be copied as absent, which under `replace` empties the account's day.
+            if (guestSource) {
+                await verifyGuestSource?.({
+                    dailyDay: { challengeId: challenge.id, ...guestSource.observed },
+                });
+            }
             const {
                 guestEntry,
                 redditEntry,
@@ -1303,6 +1437,7 @@ export async function mergeGuestDailyProgress({
                 track,
                 guestPlayerId,
                 redditPlayerId,
+                guestSource,
             );
             if (!guestEntry && !guestPb && !replace) continue;
 
@@ -1344,10 +1479,18 @@ export async function mergeGuestDailyProgress({
                 }
                 let rawGuestPb: string | undefined;
                 if (guestCanSupplyWinningPb) {
-                    rawGuestPb = await redis.hGet(
-                        competition.pbHashKey,
-                        dailyPlayerField(guestPlayerId),
-                    );
+                    if (guestSource) {
+                        // A transaction bypasses the compressing proxy, so the decoded record from
+                        // the snapshot is re-encoded here the way that proxy would have stored it.
+                        rawGuestPb = guestSource.decodedPb === null
+                            ? undefined
+                            : encodeRedisCompressedValue(guestSource.decodedPb);
+                    } else {
+                        rawGuestPb = await redis.hGet(
+                            competition.pbHashKey,
+                            dailyPlayerField(guestPlayerId),
+                        );
+                    }
                     if (!rawGuestPb) {
                         throw new Error(`Daily guest PB disappeared during promotion: ${challenge.id}`);
                     }
@@ -1400,10 +1543,12 @@ export async function mergeGuestDailyProgress({
                     }
                 }
                 if (guestCanSupplyWinningPb) {
-                    const rawGuestPb = await redisCompressed.hGet(
-                        competition.pbHashKey,
-                        dailyPlayerField(guestPlayerId),
-                    );
+                    const rawGuestPb = guestSource
+                        ? guestSource.decodedPb
+                        : await redisCompressed.hGet(
+                            competition.pbHashKey,
+                            dailyPlayerField(guestPlayerId),
+                        );
                     if (!rawGuestPb) {
                         throw new Error(`Daily guest PB disappeared during promotion: ${challenge.id}`);
                     }
@@ -1704,6 +1849,11 @@ function hasReplacementRemaining(record: GuestProgressSelectionRecord): boolean 
 function resumableRecordState(
     record: GuestProgressSelectionRecord,
 ): 'resume_required' | 'recovery_required' {
+    // A transfer that already stopped for review said so in the record. Deriving the answer from
+    // the record's shape alone cannot see that: a version-4 record with a valid inventory derives
+    // as resumable, so a case stopped for a changed source would be retried, fail the same way,
+    // and be offered as resumable again on every reload.
+    if (record.phase === 'recovery_required') return 'recovery_required';
     if (!hasReplacementRemaining(record)) return 'resume_required';
     if (record.version !== 4 || !isValidSourceInventory(record.sourceInventory)) {
         return 'recovery_required';
@@ -1768,6 +1918,14 @@ export async function resolveAccountTransferState(
                     redditPlayerId,
                     choice: record.choice,
                     state: resumableRecordState(record),
+                });
+            }
+            if (isValidRecoverySelectionRecord(record, pendingGuest, redditPlayerId)) {
+                return pendingSelectionPayload({
+                    guestPlayerId: pendingGuest,
+                    redditPlayerId,
+                    choice: record.choice,
+                    state: 'recovery_required',
                 });
             }
         } catch {
@@ -2026,12 +2184,7 @@ export async function getGuestProgressSelection({
                 }
                 return leaveSelectionPending(record.choice, resumableRecordState(record));
             }
-            if (
-                record.status === 'recovery_required'
-                && (record.choice === 'guest' || record.choice === 'account')
-                && (record.guestPlayerId === undefined || record.guestPlayerId === guestPlayerId)
-                && (record.redditPlayerId === undefined || record.redditPlayerId === redditPlayerId)
-            ) {
+            if (isValidRecoverySelectionRecord(record, guestPlayerId, redditPlayerId)) {
                 return leaveSelectionPending(record.choice, 'recovery_required');
             }
             throw new Error('Guest progress selection record is invalid.');
@@ -2135,6 +2288,9 @@ export async function selectGuestProgress({
         }
     };
     let reportedPhase: GuestTransferPhase = 'preparing';
+    // Assigned once the record and its protected writer exist. The catch below uses it to make a
+    // reviewed case durable; until then there is no record to mark.
+    let persistRecoveryPhase: (() => Promise<void>) | null = null;
     const reportTiming = (
         outcome: 'completed' | 'retryable' | 'recovery_required' | 'failed',
     ): void => {
@@ -2366,6 +2522,21 @@ export async function selectGuestProgress({
             dailyChallengeSpecs,
             ...(sourceInventory ? { sourceInventory } : {}),
         };
+        // `record` is mutated in place as domains are checkpointed, so this closure always sees
+        // the latest checkpoints. It writes through `saveRecord`, the same protected transaction
+        // every other record write uses, and marks the pair pending again so the markers that
+        // protect the case survive with it.
+        persistRecoveryPhase = async (): Promise<void> => {
+            await saveRecord(
+                {
+                    ...record,
+                    status: 'recovery_required',
+                    phase: 'recovery_required',
+                    updatedAt: new Date().toISOString(),
+                },
+                { markPending: true },
+            );
+        };
         // A retry record freezes the exact Daily window that the transfer must use. Resolve it
         // before the first account mutation so an expired or corrupted history entry cannot
         // leave Campaign partially replaced before Daily reports recovery is required.
@@ -2404,11 +2575,32 @@ export async function selectGuestProgress({
                 string,
                 { entry: string | null; pb: string | null; rank: number | null }
             >;
+            /** One frozen Daily day, as it was read under that day's own locks. */
+            dailyDay?: {
+                challengeId: string;
+                entry: string | null;
+                pb: string | null;
+                rank: number | null;
+            };
         };
         const verifySourceDomain = (domain: 'campaign' | 'daily' | 'unlocks') => (
             async (raw?: ObservedSource): Promise<void> => {
                 if (!record.sourceInventory) return;
                 let evidence: Partial<GuestTransferSourceInventory>;
+                if (raw?.dailyDay) {
+                    // One day, compared on its own. The whole-domain comparison walks every
+                    // recorded day and would read the days not handed over as missing.
+                    const expectedRow = record.sourceInventory.daily[raw.dailyDay.challengeId];
+                    // A day preparation never recorded holds nothing this guest could have raced.
+                    if (expectedRow !== undefined && stableFingerprint({
+                        entry: raw.dailyDay.entry ?? null,
+                        pb: raw.dailyDay.pb ?? null,
+                        rank: raw.dailyDay.rank ?? null,
+                    }) !== expectedRow) {
+                        throw guestProgressRecoveryRequiredError();
+                    }
+                    return;
+                }
                 if (raw?.unlocks) {
                     // Garage hands over the exact fields it is about to copy.
                     evidence = {
@@ -2581,6 +2773,19 @@ export async function selectGuestProgress({
                 ? 'retryable'
                 : 'failed';
         reportTiming(outcome);
+        // Only a reviewed case is made durable. A retryable error is contention or a dropped
+        // connection, and a `failed` one is unclassified; writing either into the record would
+        // turn an outage that clears on its own into a case that waits for a person.
+        if (outcome === 'recovery_required' && persistRecoveryPhase) {
+            try {
+                await persistRecoveryPhase();
+            } catch (persistError) {
+                // The phase is what carries the case across a reload. Losing this write leaves
+                // the record exactly as it was, which the readers still judge on its shape, so
+                // the case stays protected either way. It must not replace the real reason.
+                console.error('Guest progress recovery phase write failed:', persistError);
+            }
+        }
         // Contention and reviewed recovery are already reported by the outcome line above. Only an
         // unclassified failure carries a stack worth keeping.
         if (outcome === 'failed') {
@@ -2935,10 +3140,11 @@ export async function getServerPlayerBootstrap({
         previousProfile ??= await readPlayerProfile(identity.canonicalPlayerId);
     }
 
+    let accountTransfer: GuestProgressSelection | null = null;
     if (identity.canonicalPlayerId.startsWith('reddit:')) {
         // Checked before guest promotion, before guest retirement, and before any profile is
         // applied, so an unresolved transfer cannot be overtaken by ordinary sign-in work.
-        const accountTransfer = await resolveAccountTransferState(identity.canonicalPlayerId);
+        accountTransfer = await resolveAccountTransferState(identity.canonicalPlayerId);
         // Only a recorded choice blocks sign-in. A marker with no record means the chooser was
         // opened and never answered: nothing was replaced, so this visit still gets the ordinary
         // chooser with its real summaries, exactly as it did before.
@@ -3016,7 +3222,18 @@ export async function getServerPlayerBootstrap({
     const isReturningPlayer = profile.hasSeenGame
         && Number.isFinite(firstSeenMs)
         && (Date.now() - firstSeenMs) > RETURNING_PLAYER_DELAY_MS;
-    if (profile.hasAnyData) {
+    // A transfer that is still open is midway through moving this identity's rewards. Backfilling
+    // here writes either onto a source the transfer is about to delete, losing the unlock, or onto
+    // one it already deleted, putting a row back under a guest that has been retired. The backfill
+    // is opportunistic, so it simply waits: the next bootstrap after the transfer finishes does it.
+    //
+    // The account side was resolved at sign-in above and costs nothing to reuse. `resume_required`
+    // and `recovery_required` already returned before this point, so the state this still catches
+    // is a marker whose chooser was never answered. Only a guest has to be asked.
+    const backfillBlockedByTransfer = identity.canonicalPlayerId.startsWith('reddit:')
+        ? Boolean(accountTransfer) && accountTransfer.state !== 'completed'
+        : await isGuestProgressSelectionPending(identity.canonicalPlayerId);
+    if (profile.hasAnyData && !backfillBlockedByTransfer) {
         try {
             await recordCompletedRace(identity.canonicalPlayerId);
         } catch (error) {

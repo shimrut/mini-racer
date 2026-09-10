@@ -49,6 +49,7 @@ import {
     resolveRedditAvatarUrl,
 } from './daily-podium-service.js';
 import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
+import { isProgressTransferPending } from './guest-retirement.js';
 import type { JudgedCompetitionContract } from './competition-submit.js';
 import type { ReplayValidationResult } from './replay-validator.js';
 
@@ -192,6 +193,13 @@ type ChallengeViewer = {
     displayName: string;
     signedIn: boolean;
     progressSelectionPending: boolean;
+    /**
+     * True while this identity has an open guest transfer, guest or account alike.
+     * `progressSelectionPending` only ever sees the guest side: `resolveGuestIdentityStatus`
+     * answers `active` for a signed-in account, so without this a pending account could post a
+     * challenge and score runs against data a transfer was midway through replacing.
+     */
+    transferPending: boolean;
 };
 
 async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promise<ChallengeViewer> {
@@ -209,6 +217,27 @@ async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promis
         displayName: username || (identity.canonicalPlayerId ? 'Guest racer' : 'You'),
         signedIn: Boolean(username),
         progressSelectionPending: identity.guestStatus === 'guest_promotion_pending',
+        transferPending: identity.canonicalPlayerId
+            ? await isProgressTransferPending(identity.canonicalPlayerId)
+            : false,
+    };
+}
+
+/**
+ * The same answer a Daily or Campaign submission gets while a transfer is open, so a Head to Head
+ * joins the retry path the browser already has instead of needing one of its own. See the pending
+ * recheck in `competition-submit.ts`.
+ */
+function transferPendingResult(): HeadToHeadServiceResult {
+    return {
+        status: 503,
+        body: {
+            accepted: false,
+            status: 'progress_transfer_pending',
+            reason: 'progress_transfer_pending',
+            error: 'A progress transfer is in progress. Retrying automatically.',
+            retryAfterSeconds: 1,
+        },
     };
 }
 
@@ -666,6 +695,12 @@ export function createHeadToHeadService(
                 },
             };
         }
+        // Before the preview is spent and before any post exists. Creating a challenge posts to
+        // the subreddit and awards a Garage unlock, and neither can be taken back if the transfer
+        // this account is waiting on then replaces the result the challenge was built from.
+        if (await isProgressTransferPending(playerIdForUsername(request.username))) {
+            return transferPendingResult();
+        }
         const token = typeof input.challengeToken === 'string' ? input.challengeToken : '';
         const prepared = parsePreview(token ? await redis.get(previewKey(token)) : null);
         if (!prepared) {
@@ -985,6 +1020,12 @@ export function createHeadToHeadService(
                     error: 'Choose which progress to keep before submitting a Head to Head result.',
                 },
             };
+        }
+        // A signed-in account reaches here with `progressSelectionPending` false, so this is the
+        // only check that stops it. It sits ahead of the rate limit so a retried submission does
+        // not burn its own attempts while it waits.
+        if (viewer.transferPending) {
+            return transferPendingResult();
         }
         const rateLimit = await checkHeadToHeadSubmissionRateLimit(
             submissionRateLimitIdentity(viewer, context),

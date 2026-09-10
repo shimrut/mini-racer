@@ -106,6 +106,9 @@ const {
 const {
     resolveHeadToHeadRecordResult,
 } = await import('../src/server/head-to-head-post.ts');
+const {
+    guestProgressSelectionAccountPendingKey,
+} = await import('../src/server/guest-retirement.ts');
 const context = {
     username: 'RaceFan',
     subredditName: 'MiniRacer',
@@ -1121,5 +1124,95 @@ describe('head-to-head formatting', () => {
     it('formats exact verified milliseconds', () => {
         expect(formatHeadToHeadTitle(9_005, 'numberZero'))
             .toBe('Can you beat 9.005s on Number Zero?');
+    });
+});
+
+
+describe('head-to-head waits for an open transfer', () => {
+    const accountPlayerId = 'reddit:racefan';
+
+    beforeEach(() => {
+        strings.clear();
+        hashes.clear();
+        activePosts.clear();
+        postNumber = 0;
+        vi.clearAllMocks();
+    });
+
+    function openTransferFor(playerId) {
+        strings.set(guestProgressSelectionAccountPendingKey(playerId), 'guest:mid-transfer');
+    }
+
+    it('refuses to create a challenge, and posts nothing, while the account has a transfer open', async () => {
+        const service = makeService();
+        const preview = await service.preview({ sourceKind: 'campaign' }, context);
+        openTransferFor(accountPlayerId);
+
+        const created = await service.create(
+            { challengeToken: preview.body.challengeToken },
+            context,
+        );
+
+        expect(created.status).toBe(503);
+        expect(created.body).toMatchObject({
+            status: 'progress_transfer_pending',
+            reason: 'progress_transfer_pending',
+            retryAfterSeconds: 1,
+        });
+        // The post is the side effect that cannot be taken back.
+        expect(activePosts.size).toBe(0);
+    });
+
+    it('refuses a submission, and spends no rate limit, while the submitter has a transfer open', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const challengeId = created.body.challengeId;
+        const acceptor = { ...context, username: 'ChallengerAce' };
+        openTransferFor('reddit:challengerace');
+
+        const refused = await service.submit(
+            { challengeId, replay: {}, bestTimeMs: 25_000 },
+            acceptor,
+        );
+
+        expect(refused.status).toBe(503);
+        expect(refused.body).toMatchObject({
+            accepted: false,
+            status: 'progress_transfer_pending',
+            reason: 'progress_transfer_pending',
+        });
+        // A submission that is told to retry must not burn the attempts it will need.
+        expect(redis.incrBy).not.toHaveBeenCalledWith(
+            'miniracer:head-to-head:submit-rate-limit:reddit%3Achallengerace',
+            1,
+        );
+    });
+
+    it('creates and submits normally once no transfer is open', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        expect(created.status).toBe(200);
+        const challengeId = created.body.challengeId;
+
+        const accepted = await service.submit(
+            { challengeId, replay: {}, bestTimeMs: 25_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(accepted.body).toMatchObject({ accepted: true });
+    });
+
+    it('does not let one account\'s open transfer block another account', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const challengeId = created.body.challengeId;
+        openTransferFor('reddit:someone-else');
+
+        const accepted = await service.submit(
+            { challengeId, replay: {}, bestTimeMs: 25_000 },
+            { ...context, username: 'ChallengerAce' },
+        );
+
+        expect(accepted.body).toMatchObject({ accepted: true });
     });
 });

@@ -14,8 +14,18 @@ The player reports one of these:
 - Racing stays paused, and Retry Transfer keeps failing.
 - A signed-in bootstrap keeps returning `recovery_required`.
 
-Automatic recovery has already stopped. The records are intact and unchanged. Nothing is
-degrading while the case waits, so there is no reason to hurry a repair.
+Automatic recovery has already stopped. The transfer record is protected: no automatic step
+rewrites it while the case waits.
+
+A record marked `recovery_required` does not resume on its own, and it never will. Every ordinary
+retry is refused with the same answer, including one from a player whose data has since come back.
+That refusal is the design: it is what stops a case looping in the background instead of waiting
+for you. Only a repair takes the mark off, in step 6.
+
+Guest Daily rows are the exception. They expire on the ordinary Daily deadline, and an open
+transfer does not extend it. `expiredDailyChallengeIds` names the frozen days whose guest rows
+have already gone, and that list can grow while the case waits. Capture the evidence in step 1
+promptly. Campaign and Garage evidence does not expire.
 
 ## 1. Capture the evidence before you change anything
 
@@ -68,21 +78,39 @@ Common reasons, and what each means:
 
 ## 3. Decide whether the selected progress can be rebuilt
 
-Compare `survivingSource` against `record.sourceInventory`, domain by domain.
+Read both sides before you decide anything. Compare `survivingSource` against
+`record.sourceInventory`, domain by domain, and read `destinationEvidence` for those same domains.
+One side alone cannot tell you what happened. This applies to both choices.
 
-- **Every domain still matches.** The case is resumable. Ask the player to retry; if it still
-  fails, the reason has changed, so return to step 1.
-- **A domain changed, and the account has not been replaced yet** (`completedDomains` does not
-  name it). The guest's newer data is the better source. Prepare a repair that copies what is
-  there now, under the recorded choice.
-- **A domain changed, and the account was already replaced** (`completedDomains` names it). That
-  copy is done. Do not repeat it.
-- **The source is gone and no copy was checkpointed.** The selected progress cannot be rebuilt.
-  Stop here and go to step 7.
+**A checkpoint proves a copy committed. A missing checkpoint proves nothing.** The transfer writes
+the destination first and its checkpoint second. A transfer that stopped between those two writes
+left a copy that is done and unrecorded. `completedDomains` is a floor, not a full account of the
+work, so it can never establish on its own that the account is unchanged. Only
+`destinationEvidence` reports what the account holds now.
 
-For a Guest choice, `destinationEvidence` shows what the account holds now. Check it against the
-copies the record claims. A domain checkpointed as copied whose destination evidence is empty is
-a contradiction: stop, and report it rather than writing over it.
+Work through the domains `record.sourceInventory` names:
+
+- **The source still matches the inventory, and `record.status` is `pending`.** Nothing marked
+  this case, so it can still resume on its own. Ask the player to retry; if it still fails, the
+  reason has changed, so return to step 1.
+- **The source still matches the inventory, and `record.status` is `recovery_required`.** Whatever
+  stopped this transfer has since resolved, but the mark stays until you take it off. A retry
+  cannot do it. Decide what remains, then hand the case back in step 6.
+- **Checkpointed, and the destination holds the copy.** That copy is done. Do not repeat it.
+- **Checkpointed, and the destination is empty.** This is a contradiction. Stop, and report it.
+  Do not write over it.
+- **Not checkpointed, and the destination holds the copy.** The copy committed and its checkpoint
+  did not. The copy is done. Record the checkpoint, and repeat no part of the copy.
+- **Not checkpointed, the destination is empty, and the source still matches the inventory.** This
+  copy is the work that remains. This is the only case this procedure repairs.
+- **Not checkpointed, the destination is empty, and the source changed or is gone.** The snapshot
+  the player chose against no longer exists. The selected progress cannot be rebuilt. Go to
+  step 7.
+
+Copy only what `record.sourceInventory` named, and only from the snapshot it describes. Guest data
+written after preparation froze that inventory is not part of this transfer. Copying it moves data
+the player never chose into a ranked account, and it makes the result depend on when the repair
+ran.
 
 ## 4. Prepare one explicit repair
 
@@ -111,6 +139,19 @@ same locks the transfer itself uses. Without them a concurrent submission can in
 repair. Execute the writes you wrote down in step 4, and nothing else.
 
 ## 6. Establish the state, then clear the markers
+
+A marked record is the first thing to settle, because nothing resumes while the mark is on it.
+`status` and `phase` both read `recovery_required`. There are two ways out, and the evidence from
+step 3 says which one this case takes:
+
+- **You finish the transfer.** Follow the order below. `completed` replaces the mark.
+- **You hand the case back to the player.** Put `status` back to `pending` and `phase` back to the
+  phase the transfer had reached, keeping the choice, the checkpoints, the source inventory and
+  both markers. Do this only once you have established that the work left over is safe to repeat.
+  The player's next retry then resumes the transfer normally.
+
+Never take the mark off to see what happens. It is on the record because a copy could not be
+proven safe, and taking it off is you saying it now is.
 
 Order matters, and it is the same order the transfer uses:
 
