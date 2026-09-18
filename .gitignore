@@ -1,6 +1,7 @@
 reports/
 output/
-node_modules/
+# No trailing slash: a worktree links node_modules as a symlink, which `node_modules/` does not match.
+node_modules
 
 # Dependencies & build
 dist/
