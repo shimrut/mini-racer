@@ -1,5 +1,10 @@
 # Changelog
 
+- Fixed a Garage transfer baseline outliving the transfer that froze it and then
+  being reused by that account's next transfer, which kept cars the player had
+  chosen to replace. A baseline now records the transfer it belongs to, and the
+  cleanup attempts both of its keys instead of stopping at the first failure.
+
 - Fixed the Keep Progress chooser leaving start-up waiting forever when this device
   could not save the transfer receipt. The choice now reports the failure, so the
   player gets the retry dialog instead of a dialog with no way forward.

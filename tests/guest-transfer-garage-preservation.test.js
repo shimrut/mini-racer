@@ -15,6 +15,10 @@ const {
 } = await import("../src/server/car-unlock-store.ts");
 const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
 
+const accountHash = (playerId) => createHash("sha256").update(playerId, "utf8").digest("base64url");
+const baselineKey = (playerId) => `miniracer:car-unlocks:transfer-baseline:v1:${accountHash(playerId)}`;
+const journalKey = (playerId) => `miniracer:car-unlocks:transfer-journal:v1:${accountHash(playerId)}`;
+
 function selectionKey(guestPlayerId, redditPlayerId) {
   return `dailygp:guest-progress-selection:v1:${createHash("sha256")
     .update(`${guestPlayerId}:${redditPlayerId}`, "utf8")
@@ -206,5 +210,71 @@ describe("an older interrupted transfer gets no invented baseline", () => {
 
     await selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" });
     expect((await redis.hGetAll(carUnlockHashKey(r)))["post:track:numberZero"]).toBe("1");
+  });
+});
+
+describe("a Garage evidence cleanup that fails cannot spoil the next transfer", () => {
+  const GUEST = "guest:evidence";
+  const ACCOUNT = "reddit:evidence";
+  const NEXT_GUEST = "guest:evidence-second";
+
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("completes the transfer and reports the refused delete rather than failing", async () => {
+    await seedGuest(GUEST, ACCOUNT);
+    await recordCompletedRace(ACCOUNT);
+
+    redis.failDelKeys = new Set(["transfer-baseline"]);
+    const result = await selectGuestProgress({
+      guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest",
+    });
+
+    // A cleanup is housekeeping. It must never turn a committed transfer into a failure.
+    expect(result.status).toBe("completed");
+    expect(await redis.get(baselineKey(ACCOUNT))).not.toBeNull();
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("attempts the journal delete even when the baseline delete is refused", async () => {
+    await seedGuest(GUEST, ACCOUNT);
+    await recordCompletedRace(ACCOUNT);
+    // The journal only records while a baseline is open, so the reward has to be earned after
+    // preparation froze one. Without this the journal is empty and proves nothing.
+    await interruptAfterPreparation(GUEST, ACCOUNT);
+    await recordHeadToHeadWin(ACCOUNT, "duringTransfer");
+    expect(Object.keys(await redis.hGetAll(journalKey(ACCOUNT)))).toContain("win:challenge:duringTransfer");
+
+    redis.failDelKeys = new Set(["transfer-baseline"]);
+    await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
+
+    // Awaited in sequence, a refused baseline delete skipped its partner and left both keys.
+    expect(await redis.hGetAll(journalKey(ACCOUNT))).toEqual({});
+  });
+
+  it("does not replace the next transfer against a baseline frozen for the last one", async () => {
+    await seedGuest(GUEST, ACCOUNT);
+    await recordHeadToHeadPost(ACCOUNT, "givenUpTrack");
+
+    // The first transfer's cleanup is refused, so its baseline outlives it.
+    redis.failDelKeys = new Set(["transfer-baseline"]);
+    await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
+    const leaked = JSON.parse(await redis.get(baselineKey(ACCOUNT)));
+
+    // A second guest, a second Guest choice. Its baseline must describe the Garage as it stands
+    // now, not the one the first transfer froze. The delete stays refused so it survives to be read.
+    await seedGuest(NEXT_GUEST, ACCOUNT);
+    await recordHeadToHeadWin(ACCOUNT, "earnedBeforeSecondChoice");
+    const beforeSecondChoice = await redis.hGetAll(carUnlockHashKey(ACCOUNT));
+
+    await selectGuestProgress({ guestPlayerId: NEXT_GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
+
+    const captured = JSON.parse(await redis.get(baselineKey(ACCOUNT)));
+    expect(captured.transferId).not.toBe(leaked.transferId);
+    expect(captured.fields).toEqual(beforeSecondChoice);
+    expect(Object.keys(captured.fields)).toContain("win:challenge:earnedBeforeSecondChoice");
   });
 });

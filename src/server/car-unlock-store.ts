@@ -157,24 +157,45 @@ async function writeCarUnlockEvent(
 }
 
 /**
- * Freezes the account's Garage baseline for a transfer. Write-once: a retry, including one that
- * re-enters preparation, keeps the original. Recapturing would fold rewards earned since the
- * choice into the next deletion baseline, which is the loss this exists to prevent.
+ * Freezes the account's Garage baseline for one transfer.
+ *
+ * Write-once **for that transfer**: a retry, including one that re-enters preparation, keeps the
+ * original, because recapturing would fold rewards earned since the choice into the deletion
+ * baseline. That is the loss this exists to prevent.
+ *
+ * A baseline belonging to a *different* transfer is replaced rather than reused. The keys are
+ * collected when a transfer finishes, but that cleanup is best-effort, and a completed transfer
+ * never re-enters the copy that would retry it. Reusing whatever survived would replace this
+ * account against a snapshot frozen for some earlier choice, and preserve Garage entries the player
+ * has just asked to give up. The journal goes with it: its fields record rewards accepted during
+ * the transfer that is now over.
  *
  * Takes the account promotion lock, so it cannot run while a reward write or a replacement holds it.
  */
 export async function captureGuestTransferGarageBaseline(
     accountPlayerId: string,
+    transferId: string,
     client: RedisClient = redis,
 ): Promise<boolean> {
     if (!accountPlayerId.startsWith('reddit:')) return false;
     const key = transferBaselineKey(accountPlayerId);
     const lock = await acquirePromotionLock(accountPlayerId, client);
     try {
-        if (await client.get(key)) return false;
+        const stored = await client.get(key);
+        if (stored) {
+            let storedTransferId: unknown = null;
+            try {
+                storedTransferId = (JSON.parse(stored) as { transferId?: unknown })?.transferId;
+            } catch (_error) {
+                // Unreadable, so it cannot prove it belongs to this transfer. Replace it.
+            }
+            if (storedTransferId === transferId) return false;
+            await client.del(transferJournalKey(accountPlayerId));
+        }
         await client.set(key, JSON.stringify({
-            version: 1,
+            version: 2,
             accountPlayerId,
+            transferId,
             fields: await client.hGetAll(carUnlockHashKey(accountPlayerId)),
             capturedAt: new Date().toISOString(),
         }));
@@ -197,14 +218,53 @@ function parseTransferBaseline(raw: string | null | undefined): Record<string, s
     }
 }
 
-/** Removes a finished transfer's baseline and journal. Safe to repeat. */
+/**
+ * Removes a finished transfer's baseline and journal. Safe to repeat.
+ *
+ * Both keys are attempted, whatever the other one does. Awaiting them in sequence meant a refused
+ * baseline delete skipped the journal delete entirely, so one failure left two keys behind.
+ *
+ * Returns false when either key survived. A leftover baseline is reused as the starting Garage for
+ * this account's next transfer, because the capture is write-once, and a leftover journal preserves
+ * fields that transfer never earned. The caller retries rather than leaving that for a person.
+ */
 export async function clearGuestTransferGarageEvidence(
     accountPlayerId: string,
     client: RedisClient = redis,
-): Promise<void> {
-    if (!accountPlayerId.startsWith('reddit:')) return;
-    await client.del(transferBaselineKey(accountPlayerId));
-    await client.del(transferJournalKey(accountPlayerId));
+): Promise<boolean> {
+    if (!accountPlayerId.startsWith('reddit:')) return true;
+    const outcomes = await Promise.allSettled([
+        client.del(transferBaselineKey(accountPlayerId)),
+        client.del(transferJournalKey(accountPlayerId)),
+    ]);
+    const failed = outcomes.filter((outcome) => outcome.status === 'rejected');
+    for (const outcome of failed) {
+        console.error('Guest transfer Garage evidence cleanup failed:', (outcome as PromiseRejectedResult).reason);
+    }
+    return failed.length === 0;
+}
+
+/**
+ * The account's frozen Garage baseline, for a reviewed repair. Read-only.
+ *
+ * A baseline outliving its transfer is itself the fault: the capture is write-once, so the next
+ * transfer for this account would replace against this snapshot instead of its own.
+ */
+export async function readGuestTransferGarageBaseline(
+    accountPlayerId: string,
+    client: RedisClient = redis,
+): Promise<Record<string, string> | null> {
+    if (!accountPlayerId.startsWith('reddit:')) return null;
+    return parseTransferBaseline(await client.get(transferBaselineKey(accountPlayerId)));
+}
+
+/** The reward events accepted while a transfer was open, for a reviewed repair. Read-only. */
+export async function readGuestTransferGarageJournalFields(
+    accountPlayerId: string,
+    client: RedisClient = redis,
+): Promise<string[]> {
+    if (!accountPlayerId.startsWith('reddit:')) return [];
+    return Object.keys(await client.hGetAll(transferJournalKey(accountPlayerId)) ?? {});
 }
 
 function safeFieldPart(value: string): string {
@@ -360,6 +420,10 @@ export async function mergeGuestCarUnlockProgress({
                     'This guest garage was already promoted to another account.',
                 );
             }
+            // The copy committed on an earlier attempt, but its evidence cleanup is best-effort and
+            // may not have. This is the only path a retry takes, so without this the keys are never
+            // collected: the baseline would be reused by this account's next transfer.
+            if (replace) await clearGuestTransferGarageEvidence(redditPlayerId, client);
             return false;
         }
         const guestKey = carUnlockHashKey(guestPlayerId);
@@ -431,11 +495,9 @@ export async function mergeGuestCarUnlockProgress({
         }
         // The promotion pointer is now committed, so a later retry returns above without reaching
         // replacement again. The baseline and journal have done their work and may go.
-        if (replace) {
-            await clearGuestTransferGarageEvidence(redditPlayerId, client).catch((error) => {
-                console.error('Guest transfer Garage evidence cleanup failed:', error);
-            });
-        }
+        // A failure here is reported by the helper and repaired by the retry above, which is the
+        // path a lost checkpoint response takes back into this function.
+        if (replace) await clearGuestTransferGarageEvidence(redditPlayerId, client);
         return hadGuestProgress;
     } finally {
         await Promise.all(locks.map(async (lock) => {

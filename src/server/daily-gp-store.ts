@@ -89,6 +89,8 @@ import {
     getCarUnlockSnapshot,
     discardGuestCarUnlockProgress,
     captureGuestTransferGarageBaseline,
+    readGuestTransferGarageBaseline,
+    readGuestTransferGarageJournalFields,
     isValidCarUnlockEventField,
     cleanupGuestCarUnlockProgress,
     hasCarUnlockProgress,
@@ -1978,6 +1980,10 @@ export type GuestTransferDiagnostic = {
     changedDomains: string[] | null;
     destinationEvidence: Record<string, unknown> | null;
     expiredDailyChallengeIds: string[];
+    /** The account's frozen Garage, if a transfer left one behind. A repair collects it. */
+    garageBaseline: Record<string, string> | null;
+    /** Rewards accepted while the transfer was open. A leftover journal preserves too much. */
+    garageJournalFields: string[];
     evidenceFingerprint: string | null;
 };
 
@@ -2012,6 +2018,8 @@ export async function getGuestProgressTransferDiagnostic({
         changedDomains: null,
         destinationEvidence: null,
         expiredDailyChallengeIds: [],
+        garageBaseline: null,
+        garageJournalFields: [],
         evidenceFingerprint: null,
     };
     const accountId = typeof redditPlayerId === 'string' && redditPlayerId.startsWith('reddit:')
@@ -2075,6 +2083,12 @@ export async function getGuestProgressTransferDiagnostic({
     let survivingSource: GuestTransferSourceInventory | null = null;
     let destinationEvidence: Record<string, unknown> | null = null;
     const expiredDailyChallengeIds: string[] = [];
+    // Both survive a cleanup that did not finish, and both change what a later transfer keeps, so a
+    // reviewer has to be able to see them.
+    const [garageBaseline, garageJournalFields] = await Promise.all([
+        readGuestTransferGarageBaseline(accountId),
+        readGuestTransferGarageJournalFields(accountId),
+    ]);
     try {
         survivingSource = await captureGuestTransferSourceInventory(guestId, specs);
         destinationEvidence = {
@@ -2126,6 +2140,8 @@ export async function getGuestProgressTransferDiagnostic({
         changedDomains,
         destinationEvidence,
         expiredDailyChallengeIds,
+        garageBaseline,
+        garageJournalFields,
         evidenceFingerprint: stableFingerprint({
             record,
             survivingSource,
@@ -2556,7 +2572,7 @@ export async function selectGuestProgress({
             // The capture itself is write-once, so a retry that re-enters preparation keeps the
             // original. Only a Guest choice replaces the account Garage, so only it needs one.
             if (choice === 'guest') {
-                await captureGuestTransferGarageBaseline(redditPlayerId);
+                await captureGuestTransferGarageBaseline(redditPlayerId, derivedTransferId);
             }
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });

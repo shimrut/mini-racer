@@ -168,6 +168,25 @@ For a `completed` case with stale markers, there is nothing to rebuild: the play
 request clears those markers on its own. Confirm the receipt exists, then ask the player to reload
 before you touch anything.
 
+### The two Garage keys
+
+Two keys exist only while a transfer is open, and the diagnostic reports both:
+
+- `miniracer:car-unlocks:transfer-baseline:v1:<account>` — `garageBaseline`. The account's Garage as
+  preparation froze it. A Guest choice deletes what this names and keeps everything else.
+- `miniracer:car-unlocks:transfer-journal:v1:<account>` — `garageJournalFields`. Rewards accepted
+  while the transfer was open, including ones whose ordinary write was a no-op. A Guest choice keeps
+  every field this names.
+
+Both are collected when the transfer finishes. That cleanup is deliberately best-effort, because a
+failed delete must never turn a committed transfer into a failed one, so either key can outlive its
+transfer. A leftover key is untidy rather than dangerous: the baseline records the transfer it
+belongs to, and a later transfer for the same account replaces it and clears the journal with it.
+
+If you see either key on an account with **no** open transfer, delete it. Check `garageBaseline`'s
+`transferId` against the case in front of you first: if it names this transfer, it is in use, and
+deleting it makes a Guest choice keep the whole account Garage instead of replacing it.
+
 ## 7. Record the outcome
 
 Write a recovery audit record for the case, whatever the outcome:

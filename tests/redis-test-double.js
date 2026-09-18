@@ -20,6 +20,8 @@ export class RedisTestDouble {
     this.execCount = 0;
     this.failTransferRecordWriteAt = null;
     this.transferRecordWriteCount = 0;
+    // Substrings of keys whose `del` must throw, for cleanup paths that swallow the failure.
+    this.failDelKeys = new Set();
   }
 
   _nowSeconds() {
@@ -79,6 +81,10 @@ export class RedisTestDouble {
   }
 
   async del(key) {
+    // Refused before the mutation: the key survives, which is what a failed delete means.
+    for (const fragment of this.failDelKeys) {
+      if (key.includes(fragment)) throw new Error(`simulated del failure: ${fragment}`);
+    }
     const failAfterMutation = this.failLockRelease && key.endsWith(":lock");
     this.strings.delete(key);
     this.hashes.delete(key);
