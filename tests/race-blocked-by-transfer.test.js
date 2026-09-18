@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
+import { LobbyUi } from '../game/lobby/ui.js';
 import { campaignEngineMethods } from '../game/campaign/engine-methods.js';
 import { dailyChallengeEngineMethods } from '../game/daily-challenge/engine-methods.js';
 import { headToHeadEngineMethods } from '../game/head-to-head/engine-methods.js';
@@ -50,29 +52,34 @@ describe('an open transfer stops every way into a race', () => {
         delete globalThis.window;
     });
 
-    it('stops the Campaign stage start', async () => {
+    it('stops the Campaign stage start, and says why', async () => {
         const engine = {
             ...campaignEngineMethods,
             startButtonPending: false,
             lobbyUi: { clearRaceStartError: vi.fn() },
             clearRaceComparisonTarget: vi.fn(),
+            reportRaceBlockedByTransfer: vi.fn(),
         };
         blockTransfer();
 
         await expect(engine.startCampaignStage('numbered-v1-00')).resolves.toBe(null);
         expect(engine.lobbyUi.clearRaceStartError).not.toHaveBeenCalled();
+        // Silence is what left the player at a lobby whose buttons had simply stopped working.
+        expect(engine.reportRaceBlockedByTransfer).toHaveBeenCalledWith('campaign');
     });
 
-    it('stops the Daily start', async () => {
+    it('stops the Daily start, and says why', async () => {
         const engine = {
             ...dailyChallengeEngineMethods,
             lobbyUi: { clearRaceStartError: vi.fn() },
             clearRaceComparisonTarget: vi.fn(),
+            reportRaceBlockedByTransfer: vi.fn(),
         };
         blockTransfer();
 
         await expect(engine.handleStartDailyChallenge()).resolves.toBe(null);
         expect(engine.lobbyUi.clearRaceStartError).not.toHaveBeenCalled();
+        expect(engine.reportRaceBlockedByTransfer).toHaveBeenCalledWith('daily');
     });
 
     it('stops the Head to Head start', async () => {
@@ -152,5 +159,57 @@ describe('an open transfer stops every way into a race', () => {
         }
 
         expect(engine.beginPbGhostSizeRun).toHaveBeenCalled();
+    });
+});
+
+describe('the lobby shows the reason a race was refused', () => {
+    beforeEach(() => {
+        installLocalStorage();
+        resetVerificationQueueForTests();
+        setActivePlayerOwnerId(ACCOUNT);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        clearActivePlayerOwnerId();
+        delete globalThis.window;
+        delete globalThis.document;
+    });
+
+    /** The two panes' message nodes, as game.html ships them: present, empty and hidden. */
+    function installLobbyPanes() {
+        const dom = new JSDOM(`<body>
+            <p id="daily-start-message" class="challenge-sign-in-message" hidden></p>
+            <p id="campaign-start-message" class="challenge-sign-in-message" hidden></p>
+        </body>`);
+        globalThis.document = dom.window.document;
+        return dom.window.document;
+    }
+
+    it('paints the reason above the Daily button and takes it away again', () => {
+        const document = installLobbyPanes();
+        const ui = Object.create(LobbyUi.prototype);
+
+        ui.setRaceStartError('daily', 'Finishing your progress transfer.');
+        const node = document.getElementById('daily-start-message');
+        expect(node.hidden).toBe(false);
+        expect(node.textContent).toBe('Finishing your progress transfer.');
+
+        ui.clearRaceStartError('daily');
+        expect(node.hidden).toBe(true);
+        expect(node.textContent).toBe('');
+    });
+
+    it('paints the reason above the Campaign button even with no primary button', () => {
+        const document = installLobbyPanes();
+        const ui = Object.create(LobbyUi.prototype);
+        ui.campaignState = { stages: [] };
+
+        ui.setRaceStartError('campaign', 'Finishing your progress transfer.');
+        const node = document.getElementById('campaign-start-message');
+        expect(node.hidden).toBe(false);
+        expect(node.textContent).toBe('Finishing your progress transfer.');
+        // The Daily pane is not this mode's to speak for.
+        expect(document.getElementById('daily-start-message').hidden).toBe(true);
     });
 });

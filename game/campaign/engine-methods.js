@@ -641,7 +641,10 @@ export const campaignEngineMethods = {
         preserveRaceComparisonTarget = false,
         confirmUnlockFor = null,
     } = {}) {
-        if (isVerificationQueueSubmissionBlocked()) return null;
+        if (isVerificationQueueSubmissionBlocked()) {
+            this.reportRaceBlockedByTransfer?.('campaign');
+            return null;
+        }
         if (this.startButtonPending) return;
         this.lobbyUi?.clearRaceStartError?.('campaign');
         if (!preserveRaceComparisonTarget) this.clearRaceComparisonTarget?.();

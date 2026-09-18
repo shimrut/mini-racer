@@ -856,7 +856,10 @@ export const dailyChallengeEngineMethods = {
   },
 
   async handleStartDailyChallenge(challengeOverride = null, options = {}) {
-    if (isVerificationQueueSubmissionBlocked()) return null;
+    if (isVerificationQueueSubmissionBlocked()) {
+        this.reportRaceBlockedByTransfer?.('daily');
+        return null;
+    }
     this.lobbyUi?.clearRaceStartError?.("daily");
     if (!options.preserveRaceComparisonTarget) {
       this.clearRaceComparisonTarget?.();

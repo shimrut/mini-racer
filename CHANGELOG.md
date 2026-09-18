@@ -1,5 +1,8 @@
 # Changelog
 
+- The Daily and Campaign lobbies now say when racing is paused for a progress
+  transfer, instead of leaving Start and Retry doing nothing with no explanation.
+
 - Guest transfer Garage steps now report ordinary lock contention as retryable
   rather than as an unknown server failure, so a busy moment no longer logs a
   stack trace.

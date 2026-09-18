@@ -617,7 +617,22 @@ export class LobbyUi {
         this.renderDaily();
     }
 
+    /**
+     * Paints the reason a race could not start, above the primary button.
+     *
+     * The label alone can only say `Retry Start`, and the start overlay rewrites that label on
+     * every paint, so the reason needs a node of its own. This is the same line and the same class
+     * the challenge pane already uses for exactly this job.
+     */
+    renderRaceStartMessage(elementId, message) {
+        const node = document.getElementById(elementId);
+        if (!node) return;
+        node.hidden = !message;
+        node.textContent = message || '';
+    }
+
     renderDaily() {
+        this.renderRaceStartMessage('daily-start-message', this._dailyStartError);
         setSwappingText(
             this.dailyPrimaryBtn?.querySelector('.main-menu__label'),
             this._dailyStartError ? 'Retry Start' : 'Start Race',
@@ -656,6 +671,8 @@ export class LobbyUi {
     }
 
     renderCampaign() {
+        // Painted before the early return, so the reason survives a pane with no primary button.
+        this.renderRaceStartMessage('campaign-start-message', this._campaignStartError);
         if (!this.campaignPrimaryBtn) return;
         const stage = this._campaignSelectedStage;
         this.campaignPrimaryBtn.hidden = false;

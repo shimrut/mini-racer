@@ -897,6 +897,21 @@ export class RealTimeRacer {
     return this.showHomeLobby();
   }
 
+  /**
+   * Says why a race was refused, on the pane the player is looking at.
+   *
+   * Every race entry point returns silently when a transfer is unresolved. That is right as a
+   * gate and wrong as an experience: the buttons simply stop working with nothing on screen. The
+   * per-mode gates return before their own `clearRaceStartError`, so the reason is set here,
+   * at the refusal itself.
+   */
+  reportRaceBlockedByTransfer(mode) {
+    this.lobbyUi?.setRaceStartError?.(
+      mode,
+      "Finishing your progress transfer. Racing continues once it is done.",
+    );
+  }
+
   async invokeModeMethod(mode, method, ...args) {
     const startsRace = [
       "handleStartDailyChallenge",
@@ -904,9 +919,15 @@ export class RealTimeRacer {
       "startHeadToHead",
       "retryHeadToHead",
     ].includes(method);
-    if (startsRace && isVerificationQueueSubmissionBlocked()) return null;
+    if (startsRace && isVerificationQueueSubmissionBlocked()) {
+      this.reportRaceBlockedByTransfer(mode);
+      return null;
+    }
     await this.ensureModeRuntime(mode);
-    if (startsRace && isVerificationQueueSubmissionBlocked()) return null;
+    if (startsRace && isVerificationQueueSubmissionBlocked()) {
+      this.reportRaceBlockedByTransfer(mode);
+      return null;
+    }
     const handler = this[method];
     if (typeof handler !== "function") return null;
     return handler.call(this, ...args);
