@@ -133,7 +133,8 @@ async function journalAcceptedTransferEvent(
     const existing = await client.hGetAll(journalKey);
     if (existing[field] === '1') return;
     if (Object.keys(existing).length >= TRANSFER_JOURNAL_FIELD_LIMIT) {
-        console.error('Guest transfer reward journal is full:', accountPlayerId);
+        // No identifier: one transfer's logging says what happened, never who it happened to.
+        console.error('Guest transfer reward journal is full.');
         return;
     }
     await client.hSetNX(journalKey, field, '1');
@@ -444,10 +445,7 @@ export async function mergeGuestCarUnlockProgress({
                 // and today's hash cannot be read backwards into what the account held when the
                 // player chose. Keep everything rather than treat earned rewards as disposable.
                 // The player keeps more than a Guest choice would normally leave, and loses none.
-                console.error(
-                    'Guest transfer Garage baseline missing; keeping the account Garage:',
-                    redditPlayerId,
-                );
+                console.error('Guest transfer Garage baseline missing; keeping the account Garage.');
                 Object.assign(preserved, accountFields);
             } else {
                 const journal = await client.hGetAll(transferJournalKey(redditPlayerId));

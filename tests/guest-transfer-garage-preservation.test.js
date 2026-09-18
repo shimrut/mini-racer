@@ -278,3 +278,51 @@ describe("a Garage evidence cleanup that fails cannot spoil the next transfer", 
     expect(Object.keys(captured.fields)).toContain("win:challenge:earnedBeforeSecondChoice");
   });
 });
+
+describe("the transfer's logging names no player", () => {
+  const GUEST = "guest:quiet";
+  const ACCOUNT = "reddit:quiet";
+
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  /** Every argument the transfer wrote to an ordinary log, flattened to strings. */
+  function loggedArguments() {
+    return [...console.error.mock.calls, ...console.log.mock.calls]
+      .flat()
+      .map((argument) => (typeof argument === "string" ? argument : JSON.stringify(argument) ?? ""));
+  }
+
+  it("keeps the account out of the missing-baseline log", async () => {
+    await seedGuest(GUEST, ACCOUNT);
+    await recordCompletedRace(ACCOUNT);
+    // A record written before baselines existed. Its replacement takes the keep-everything path,
+    // which is a normal path for a legacy transfer rather than a rare fault.
+    await interruptAfterPreparation(GUEST, ACCOUNT);
+    await redis.del(baselineKey(ACCOUNT));
+
+    await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
+
+    expect(console.error).toHaveBeenCalledWith(
+      "Guest transfer Garage baseline missing; keeping the account Garage.",
+    );
+    for (const argument of loggedArguments()) {
+      expect(argument).not.toMatch(/reddit:/);
+      expect(argument).not.toMatch(/guest:/);
+    }
+  });
+
+  it("keeps both identities out of a completed transfer's logging", async () => {
+    await seedGuest(GUEST, ACCOUNT);
+    await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
+
+    for (const argument of loggedArguments()) {
+      expect(argument).not.toMatch(/reddit:/);
+      expect(argument).not.toMatch(/guest:/);
+    }
+  });
+});

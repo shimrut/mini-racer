@@ -1,5 +1,8 @@
 # Changelog
 
+- Removed the player's Reddit name from two guest transfer log lines, so ordinary
+  application logs no longer say who ran a transfer.
+
 - Fixed a Garage transfer baseline outliving the transfer that froze it and then
   being reused by that account's next transfer, which kept cars the player had
   chosen to replace. A baseline now records the transfer it belongs to, and the
