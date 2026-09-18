@@ -262,7 +262,7 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
         return requestInterruptedTransfer(selection, { onBeforeSubmit });
     }
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const sources = document.createElement('div');
         sources.className = 'guest-progress-selection__sources';
         const guestOption = sourceBlock({
@@ -339,6 +339,19 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
                     playerState: body,
                 });
             } catch (error) {
+                // A terminal error can never succeed by pressing the button again, so it settles the
+                // promise instead of leaving startup waiting behind a dialog with no way forward.
+                // The resume path does the same, for the same reason. Everything else -- an
+                // ordinary network failure, a timeout -- stays retryable in place.
+                if (error?.transferRecovery
+                    || error?.reason === 'guest_progress_recovery_required'
+                    || error?.status === 401
+                    || error?.status === 403
+                    || error?.status === 409) {
+                    overlay.remove();
+                    reject(error);
+                    return;
+                }
                 overlay.setBusy(false);
                 for (const input of choiceInputs) input.disabled = Boolean(choiceLocked);
                 overlay.setStatus(error?.name === 'AbortError'

@@ -1,5 +1,9 @@
 # Changelog
 
+- Fixed the Keep Progress chooser leaving start-up waiting forever when this device
+  could not save the transfer receipt. The choice now reports the failure, so the
+  player gets the retry dialog instead of a dialog with no way forward.
+
 - Fixed Daily races selected from Campaign’s Tracks tab retaining Campaign finish
   routing and stopping without the correct result screen.
 
