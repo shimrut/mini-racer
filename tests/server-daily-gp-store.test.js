@@ -3925,8 +3925,10 @@ describe('server daily gp store submissions', () => {
         mockRedis.zCard.mockResolvedValue(1);
         mockRedis.zRange.mockResolvedValue([{ member: playerId, score: bestTimeMs }]);
         mockRedis.zRank.mockResolvedValue(undefined);
-        mockRedis.hMGet.mockImplementation(async (key) => (
-            String(key).endsWith(':entries') ? [JSON.stringify(entry)] : []
+        // The snapshot reads a page's entries and personal bests in bulk. Answer bulk reads from
+        // the same rows as single reads, so the two fakes cannot disagree about what is stored.
+        mockRedis.hMGet.mockImplementation(async (key, fields) => (
+            Promise.all(fields.map((field) => mockRedis.hGet(key, field)))
         ));
         mockRedis.mGet.mockResolvedValue([]);
         mockRedis.hGet.mockImplementation(async (key, field) => {
@@ -4028,8 +4030,10 @@ describe('server daily gp store submissions', () => {
         mockRedis.zCard.mockResolvedValue(1);
         mockRedis.zRange.mockResolvedValue([{ member: playerId, score: bestTimeMs }]);
         mockRedis.zRank.mockResolvedValue(undefined);
-        mockRedis.hMGet.mockImplementation(async (key) => (
-            String(key).endsWith(':entries') ? [JSON.stringify(entry)] : []
+        // The snapshot reads a page's entries and personal bests in bulk. Answer bulk reads from
+        // the same rows as single reads, so the two fakes cannot disagree about what is stored.
+        mockRedis.hMGet.mockImplementation(async (key, fields) => (
+            Promise.all(fields.map((field) => mockRedis.hGet(key, field)))
         ));
         mockRedis.mGet.mockResolvedValue([]);
         mockRedis.hGet.mockImplementation(async (key, field) => {
