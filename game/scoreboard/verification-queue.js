@@ -848,9 +848,22 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
       }
       const rawId = rawEntryIdFromKey(snapshot.entryKey, entry.ownerPlayerId);
       const destinationKey = ownedEntryKey(rawId, accountPlayerId);
-      if (destinationKey !== snapshot.entryKey && queueState[snapshot.bucket][destinationKey]) {
-        preserved += 1;
-        continue;
+      const occupant = destinationKey !== snapshot.entryKey
+        ? queueState[snapshot.bucket][destinationKey]
+        : null;
+      if (occupant) {
+        // The account raced this one again between the receipt and the completion, so its entry no
+        // longer matched its snapshot and was kept rather than removed. Both runs now want the same
+        // slot and only one can have it. Keeping whichever happened to arrive first threw away the
+        // guest's run with no comparison at all, and a rotated guest id meant nothing could ever
+        // claim it back. The faster run wins, exactly as it would have had the two been raced in
+        // sequence on one identity.
+        const isBetter = BUCKET_CANDIDATE_RULE[snapshot.bucket];
+        if (!isBetter?.(entry, occupant)) {
+          delete queueState[snapshot.bucket][snapshot.entryKey];
+          removed += 1;
+          continue;
+        }
       }
       rekeyOwnedEntry(queueState, snapshot.bucket, snapshot.entryKey, entry, accountPlayerId);
       moved += 1;
@@ -1076,6 +1089,17 @@ export function getCampaignVerificationEntriesForOwner(ownerPlayerId) {
   }
   return entries;
 }
+
+/**
+ * Which run wins one queue slot, per bucket.
+ *
+ * `enqueue` already answers this whenever two runs compete for the same key, so a transfer that
+ * moves a run onto an occupied key answers it the same way rather than inventing a second rule.
+ */
+const BUCKET_CANDIDATE_RULE = {
+  daily: isBetterDailyCandidate,
+  campaign: isBetterCampaignCandidate,
+};
 
 function isBetterCampaignCandidate(nextEntry, previousEntry) {
   if (!previousEntry) return true;

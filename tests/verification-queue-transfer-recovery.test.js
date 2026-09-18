@@ -393,3 +393,83 @@ describe('a receipt captured before the server named the transfer is still found
         })).toBe(false);
     });
 });
+
+describe('two runs wanting the same queue slot', () => {
+    beforeEach(() => {
+        installLocalStorage();
+        resetVerificationQueueForTests();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        clearActivePlayerOwnerId();
+        delete globalThis.window;
+    });
+
+    const CHALLENGE = 'contested-day';
+
+    function prepare(choice) {
+        return prepareVerificationQueueGuestProgressReconciliation({
+            transferId: 'guest-transfer:contested',
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice,
+        });
+    }
+
+    function resolve(choice) {
+        return resolveVerificationQueueAfterGuestProgressSelection({
+            transferId: 'guest-transfer:contested',
+            guestPlayerId: GUEST,
+            accountPlayerId: ACCOUNT,
+            choice,
+            completedAt: new Date().toISOString(),
+        });
+    }
+
+    /**
+     * The only way both runs end up wanting one slot.
+     *
+     * A Guest choice removes the account's captured entries first, which frees the slot. The
+     * account has to race that day *again* after the receipt was captured: its entry then no longer
+     * matches its snapshot, so it is kept rather than removed, and the guest's run collides with it.
+     */
+    function raceBothThenAccountAgain(guestTime, accountFirstTime, accountSecondTime) {
+        queueRun(GUEST, CHALLENGE, guestTime);
+        queueRun(ACCOUNT, CHALLENGE, accountFirstTime);
+        expect(prepare('guest').prepared).toBe(true);
+        queueRun(ACCOUNT, CHALLENGE, accountSecondTime);
+    }
+
+    it('keeps the faster guest run and drops the slower account run', () => {
+        raceBothThenAccountAgain(10, 12, 11.5);
+
+        const result = resolve('guest');
+
+        expect(storedEntry(ACCOUNT, CHALLENGE).bestTime).toBe(10);
+        expect(storedEntry(GUEST, CHALLENGE)).toBeNull();
+        expect(result.moved).toBe(1);
+    });
+
+    it('keeps the faster account run and drops the slower guest run', () => {
+        raceBothThenAccountAgain(14, 20, 9);
+
+        const result = resolve('guest');
+
+        expect(storedEntry(ACCOUNT, CHALLENGE).bestTime).toBe(9);
+        // The losing run does not linger under a guest id nothing can claim back.
+        expect(storedEntry(GUEST, CHALLENGE)).toBeNull();
+        expect(result.removed).toBeGreaterThan(0);
+    });
+
+    it('leaves an uncontested later account run alone', () => {
+        queueRun(GUEST, CHALLENGE, 10);
+        expect(prepare('guest').prepared).toBe(true);
+        queueRun(ACCOUNT, 'a-different-day', 30);
+
+        resolve('guest');
+
+        expect(storedEntry(ACCOUNT, CHALLENGE).bestTime).toBe(10);
+        expect(storedEntry(ACCOUNT, 'a-different-day').bestTime).toBe(30);
+    });
+});

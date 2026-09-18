@@ -1,5 +1,9 @@
 # Changelog
 
+- A guest run moving to the account during a transfer no longer loses its slot to
+  a slower run the account raced in the meantime. The faster time wins, and the
+  other is dropped instead of being stranded where nothing could submit it.
+
 - The Daily and Campaign lobbies now say when racing is paused for a progress
   transfer, instead of leaving Start and Retry doing nothing with no explanation.
 

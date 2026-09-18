@@ -158,7 +158,9 @@ reconciliation status. The source guest comes from the server. Unowned entries a
 assumed to belong to it.
 
 On completion the browser removes or moves only entries proven to belong to the captured
-selection. It preserves entries created or changed afterward. It preserves ambiguous entries in
+selection. It preserves entries created or changed afterward, except where one of them wants a slot
+a selected entry is moving into: two runs cannot share a key, so the faster one wins, by the same
+rule that decides any two runs competing for one slot. It preserves ambiguous entries in
 an explicit quarantine, excluded from submission and from automatic owner claiming. Other
 owners' queues are untouched. Reconciliation is persisted before authoritative profile state is
 applied and before submissions resume. A storage failure is an unresolved recovery, not a
