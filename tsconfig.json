@@ -1,0 +1,18 @@
+{
+  "//": "Type checking only. Vite and esbuild strip the annotations without reading them, so nothing else checks this code. Not wired into `npm test` yet: the files listed in docs/guest-transfer-audit-findings.md still report known errors.",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "allowJs": false,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}

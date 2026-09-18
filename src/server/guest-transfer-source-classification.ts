@@ -63,21 +63,30 @@ export function carriesCopyableData(
     return classification.state === 'valid';
 }
 
-function readJson(raw: string | null | undefined):
-    | { ok: true; value: Record<string, unknown> }
-    | { ok: false; reason: MalformedReason }
-    | { ok: null } {
-    if (raw === null || raw === undefined || raw === '') return { ok: null };
+/**
+ * Three outcomes, told apart by a string rather than by `true | false | null`.
+ *
+ * A `null` arm cannot be narrowed away when `strictNullChecks` is off, so every read of `value` or
+ * `reason` below was unchecked in a build that never type-checked this file. The names also say
+ * what each arm means at the call site.
+ */
+type ReadJsonResult =
+    | { ok: 'parsed'; value: Record<string, unknown> }
+    | { ok: 'damaged'; reason: MalformedReason }
+    | { ok: 'empty' };
+
+function readJson(raw: string | null | undefined): ReadJsonResult {
+    if (raw === null || raw === undefined || raw === '') return { ok: 'empty' };
     let parsed: unknown;
     try {
         parsed = JSON.parse(raw);
     } catch (_error) {
-        return { ok: false, reason: 'unparseable' };
+        return { ok: 'damaged', reason: 'unparseable' };
     }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return { ok: false, reason: 'not_an_object' };
+        return { ok: 'damaged', reason: 'not_an_object' };
     }
-    return { ok: true, value: parsed as Record<string, unknown> };
+    return { ok: 'parsed', value: parsed as Record<string, unknown> };
 }
 
 function readTimestamp(value: unknown): string | null {
@@ -96,7 +105,7 @@ function readTimestamp(value: unknown): string | null {
  */
 export function readStoredUpdatedAt(raw: string | null | undefined): string | null {
     const json = readJson(raw);
-    if (json.ok !== true) return null;
+    if (json.ok !== 'parsed') return null;
     return readTimestamp(json.value.updatedAt);
 }
 
@@ -129,8 +138,8 @@ export function classifyStoredCampaignProgress(
     raw: string | null | undefined,
 ): StoredRecordClassification<ClassifiedCampaignProgress> {
     const json = readJson(raw);
-    if (json.ok === null) return { state: 'absent' };
-    if (json.ok === false) return { state: 'malformed', reason: json.reason };
+    if (json.ok === 'empty') return { state: 'absent' };
+    if (json.ok === 'damaged') return { state: 'malformed', reason: json.reason };
 
     const value = json.value;
     // Another campaign's progress under this player's key is not this transfer's to interpret.
@@ -257,8 +266,8 @@ export function classifyStoredLeaderboardEntry(
     stage: { trackKey: string; lapCount: number } | null,
 ): StoredRecordClassification<ClassifiedLeaderboardEntry> {
     const json = readJson(raw);
-    if (json.ok === null) return { state: 'absent' };
-    if (json.ok === false) return { state: 'malformed', reason: json.reason };
+    if (json.ok === 'empty') return { state: 'absent' };
+    if (json.ok === 'damaged') return { state: 'malformed', reason: json.reason };
 
     const value = json.value;
     if (

@@ -251,6 +251,28 @@ guest stranded         = true   bestTime 10
 
 # Lower priority
 
+## 11. `verifyGuestSource` was typed to take no arguments
+
+**Severity: low.** Found by the typecheck in finding 10. Fixed.
+
+`src/server/daily-gp-store.ts` declared `verifyGuestSource?: () => void | Promise<void>` and called
+it with one argument. The Campaign equivalent (`src/server/campaign-store.ts:1065`) declares its
+parameter correctly.
+
+**Effect.** The per-day Daily check's contract was invisible to any caller reading the type. A
+caller supplying a conforming zero-argument callback would silently lose that check and fall back to
+the whole-domain re-read — the unverified read between check and write the design forbids.
+
+## 12. The cleaning-phase guard was dead
+
+**Severity: low.** Found by the typecheck in finding 10. Fixed.
+
+`src/server/daily-gp-store.ts` set `record.phase = 'copying'` unconditionally, so the
+`record.phase !== 'cleaning'` guard below it was always true.
+
+**Effect.** A transfer resumed in the cleaning phase was written back to `copying` and then forward
+to `cleaning` again: two redundant record writes, and the guard never did its job.
+
 ## 6. A Daily day can slip out between the sweep and the copy
 
 **Severity: low.** Retention-boundary correctness. Technically confirmed; revision 1 overstated it.
@@ -319,7 +341,35 @@ Revision 1's two pieces of evidence were both wrong and are withdrawn:
   build works, not evidence a type error escaped.
 
 The finding stands on its own terms: a semantic check is absent, and adding a `tsconfig.json` with
-`noEmit` would close it.
+`noEmit` closes it.
+
+### Fixed, and what is deferred
+
+`tsconfig.json` and `npm run typecheck` now exist. It is **not** wired into `npm test`: the files
+below still report errors, and gating on them would block every commit until they are cleared.
+
+Cleared as part of this work — the two real defects are findings 11 and 12:
+
+| File | Was | Now |
+|---|---|---|
+| `daily-gp-store.ts` | 4 | 0 |
+| `guest-transfer-source-classification.ts` | 5 | 0 |
+
+Deferred, unchanged, and none of them in the transfer path:
+
+| File | Errors |
+|---|---|
+| `head-to-head-service.ts` | 8 |
+| `head-to-head-post.ts` | 3 |
+| `competition-submit.ts` | 3 |
+| `replay-validator.ts` | 2 |
+| `daily-podium-service.ts` | 2 |
+| `daily-gp-model.ts` | 2 |
+| `pb-ghost-store.ts` | 1 |
+| `daily-podium-replay.ts` | 1 |
+| `competition-leaderboard.ts` | 1 |
+
+Clear those 23, then add `typecheck` to `pretest`.
 
 ---
 

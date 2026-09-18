@@ -1,5 +1,8 @@
 # Changelog
 
+- Added `npm run typecheck`. Nothing checked the server's TypeScript before: the
+  build strips the annotations without reading them.
+
 - A guest transfer no longer skips a frozen Daily day whose rows disappear while
   earlier days are being copied. The day is judged under its own locks, so the
   transfer reports a changed source instead of a false success.

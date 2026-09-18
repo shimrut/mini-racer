@@ -17,6 +17,7 @@
     "predev": "npm run --silent kill:watchers && npm run generate:car-assets && npm run generate:share-images",
     "pretest": "npm run generate:car-assets && npm run generate:share-images",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "test:watch": "vitest",
     "mutation": "stryker run",
     "mutation:dry-run": "stryker run --dryRunOnly"
