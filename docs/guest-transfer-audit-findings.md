@@ -1,6 +1,7 @@
 # Guest transfer audit — findings
 
-Read-only audit. No source file was changed.
+All ten findings are now fixed on this branch, plus two more (11 and 12) found while scoping
+finding 10. Each fix carries a regression test that fails without it. See the fix log at the end.
 
 - Branch: `codex/guest-transfer-safety-fixes`
 - Range: `42bc88c..f85324f`
@@ -471,3 +472,39 @@ narrow completeness exception, at the pre-lock skip.
   is the right way round.
 - **Lock ordering is consistent.** Every multi-lock acquisition sorts its keys before taking them,
   so the domain merges cannot deadlock against each other or against a submission.
+
+---
+
+# Fix log
+
+Landed on `codex/guest-transfer-safety-fixes`, one commit per finding.
+
+| Finding | Commit | Regression test |
+|---|---|---|
+| 1 | Settle the Keep Progress choice when the receipt cannot be saved | `tests/guest-transfer-choice-storage-failure.test.js` (new) |
+| 2 | Scope the Garage transfer baseline to the transfer that froze it | `tests/guest-transfer-garage-preservation.test.js` |
+| 4 | Keep the player's name out of the transfer's logging | `tests/guest-transfer-garage-preservation.test.js` |
+| 5 | Say why a race will not start during a transfer | `tests/race-blocked-by-transfer.test.js` |
+| 6, 11, 12 | Judge a recorded Daily day under its own locks | `tests/guest-transfer-daily-validation.test.js` |
+| 7 | Report Garage transfer contention as retryable from every path | `tests/server-car-unlock-store.test.js` |
+| 8 | Correct what the spec claims about the account transfer index | documentation only |
+| 9 | Give a contested queue slot to the faster run | `tests/verification-queue-transfer-recovery.test.js` |
+| 10 | Add a typecheck script, and clear the transfer files under it | `npm run typecheck` |
+| 3 | Not fixed. Downgraded to defensive coverage; no product bug to fix. | — |
+
+Two fixes went further than the finding described, because the finding was incomplete:
+
+- **Finding 2.** Retrying the cleanup only repairs an *interrupted* transfer. A completed one never
+  re-enters the copy, so a failed cleanup there could never be repaired. The baseline now records
+  its own transfer id and a later transfer replaces it, which removes the harm rather than the leak.
+- **Finding 9.** A plain two-entry setup never reaches the collision branch, because a Guest choice
+  clears the account's captured entries first. The test drives the real path: the account races that
+  day again between the receipt capture and the completion.
+
+After the fixes: 2,853 tests pass, the same 2 pre-existing failures remain in
+`tests/server-daily-gp-store.test.js`, `npm run typecheck` reports the 23 deferred errors and none
+in the transfer path, and `vite build` is clean.
+
+**Not verified:** finding 5's message line has never been seen rendered in the running game. Its
+show/hide logic and text have unit tests, and its CSS class and grid placement are the ones the
+challenge pane already ships, but nobody has looked at it on a phone-width screen in both themes.
