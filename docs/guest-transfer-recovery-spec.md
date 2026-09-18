@@ -58,7 +58,10 @@ frozen. The server never manufactures new evidence from whatever survived.
 - `guest-progress-transfer-index:v1:<account>` — the account's transfer ids, oldest first.
 
 The index lets the server find a pending or completed transfer without the original guest
-token. A later transfer appends to the index. It never hides an earlier completion.
+token. A later transfer appends to the index, which holds the most recent twenty ids. An
+unqualified lookup answers with the most recent completion, so a later transfer does hide an
+earlier one from that question. The receipts themselves are permanent and are not indexed by
+account, so a browser holding a transfer id always reads its own completion whatever its age.
 
 ## 3. Source inventory
 

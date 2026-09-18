@@ -1,5 +1,9 @@
 # Changelog
 
+- A guest transfer no longer skips a frozen Daily day whose rows disappear while
+  earlier days are being copied. The day is judged under its own locks, so the
+  transfer reports a changed source instead of a false success.
+
 - A guest run moving to the account during a transfer no longer loses its slot to
   a slower run the account raced in the meantime. The faster time wins, and the
   other is dropped instead of being stranded where nothing could submit it.
