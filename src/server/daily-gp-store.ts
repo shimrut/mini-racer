@@ -445,6 +445,25 @@ function unlocksChanged(
     return observed.unlocks !== undefined && observed.unlocks !== expected.unlocks;
 }
 
+/** What a day with no entry, no personal best and no ranking fingerprints as. */
+const EMPTY_DAILY_ROW_FINGERPRINT = stableFingerprint({ entry: null, pb: null, rank: null });
+
+/**
+ * The frozen days that actually held something.
+ *
+ * A day preparation recorded as empty holds nothing this guest could lose, so it stays skippable.
+ * Every other recorded day has to be judged under its own locks.
+ */
+function recordedDailyDays(
+    inventory: GuestTransferSourceInventory | undefined,
+): ReadonlySet<string> {
+    return new Set(
+        Object.entries(inventory?.daily ?? {})
+            .filter(([, fingerprint]) => fingerprint !== EMPTY_DAILY_ROW_FINGERPRINT)
+            .map(([challengeId]) => challengeId),
+    );
+}
+
 const TRANSFER_COMPLETION_DOMAINS = ['campaign', 'daily', 'unlocks'] as const;
 const TRANSFER_CLEANUP_DOMAINS = ['campaign', 'daily'] as const;
 /** An account transfers once in practice. The bound only stops an unbounded key from growing. */
@@ -969,12 +988,15 @@ async function readFinalPodiumPositions(
         };
     });
 
-    return ([1, 2, 3] as const).map((rank) => rankedPositions[rank - 1] ?? {
+    // Written out rather than mapped: a podium is exactly three places, and `.map` over a tuple
+    // answers an array, which then needed a cast that agreed with nothing.
+    const positionAt = (rank: 1 | 2 | 3) => rankedPositions[rank - 1] ?? {
         rank,
         displayName: 'No verified finish',
         identityType: 'empty' as const,
         formattedTime: null,
-    }) as FinalDailyGpPodium['positions'];
+    };
+    return [positionAt(1), positionAt(2), positionAt(3)];
 }
 
 
@@ -1185,9 +1207,9 @@ export async function getServerFinalDailyGpPodiumGhosts(
         } satisfies DailyPodiumReplayGhostSlot;
     }));
 
-    const ghosts = ([1, 2, 3] as const).map((rank) => (
-        slots.find((slot) => slot.rank === rank) ?? { rank, ghost: null }
-    )) as FinalDailyGpPodiumGhostPack['ghosts'];
+    // Three places, written out, for the same reason as the podium positions above.
+    const ghostAt = (rank: 1 | 2 | 3) => slots.find((slot) => slot.rank === rank) ?? { rank, ghost: null };
+    const ghosts: FinalDailyGpPodiumGhostPack['ghosts'] = [ghostAt(1), ghostAt(2), ghostAt(3)];
 
     return {
         trackKey: challenge.trackKey,
@@ -1346,6 +1368,7 @@ export async function mergeGuestDailyProgress({
     challengeIds,
     challengeSpecs,
     verifyGuestSource,
+    recordedDailyChallengeIds,
     transactionRunner,
 }: {
     guestPlayerId: string;
@@ -1353,8 +1376,23 @@ export async function mergeGuestDailyProgress({
     replace?: boolean;
     challengeIds?: string[];
     challengeSpecs?: GuestTransferDailyChallengeSpec[];
-    /** Called under each challenge's locks, before its first account write. See the Campaign merge. */
-    verifyGuestSource?: () => void | Promise<void>;
+    /**
+     * Called under each challenge's locks, before its first account write. See the Campaign merge.
+     *
+     * A replacing merge hands over the exact day it is about to copy, so the check and the copy
+     * cannot see different data. Called with nothing it checks the whole frozen window instead, by
+     * reading for itself. The two are not interchangeable: the per-day form is the one that has no
+     * read between the check and the write.
+     */
+    verifyGuestSource?: (observed?: {
+        dailyDay: { challengeId: string; entry: string | null; pb: string | null; rank: number | null };
+    }) => void | Promise<void>;
+    /**
+     * Days the frozen inventory recorded rows for. A day in this set is never skipped on presence:
+     * its rows are the player's, so their absence has to be judged under the locks rather than read
+     * as a day never raced.
+     */
+    recordedDailyChallengeIds?: ReadonlySet<string>;
     transactionRunner?: RedisLockTransactionRunner;
 }): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
@@ -1392,7 +1430,13 @@ export async function mergeGuestDailyProgress({
             competitionHoldsPlayerRows(competition, guestPlayerId),
             competitionHoldsPlayerRows(competition, redditPlayerId),
         ]);
-        if (!guestHoldsRows && !accountHoldsRows) continue;
+        // The sweep above checked the whole window once, before the loop and outside the locks. For
+        // a day late in the playlist the gap since then spans the processing of every earlier day.
+        // A day the inventory recorded rows for is therefore taken to its locks whatever this
+        // unlocked read says: skipping it would checkpoint the domain as copied while those rows
+        // went. The per-day check under the locks is what decides, and it reports a changed source.
+        const wasRecorded = recordedDailyChallengeIds?.has(challenge.id) ?? false;
+        if (!guestHoldsRows && !accountHoldsRows && !wasRecorded) continue;
         hasGuestEvidence ||= guestHoldsRows;
 
         const locks = await acquireDailyMergeLocks(
@@ -2578,9 +2622,13 @@ export async function selectGuestProgress({
             await saveRecord(record, { markPending: true });
         }
         // Preparation is finished and recorded. Only now may a destination row be replaced.
-        record.phase = 'copying';
+        //
+        // A transfer resumed in `cleaning` has already passed this point, and writing it back to
+        // `copying` moved the record backwards and made the `cleaning` guard below dead: the phase
+        // always differed, so it always wrote again. The phase only moves forward.
+        if (record.phase !== 'cleaning') record.phase = 'copying';
         record.updatedAt = new Date().toISOString();
-        reportedPhase = 'copying';
+        reportedPhase = record.phase;
         // Each domain calls this while it holds its own locks, and immediately before its first
         // destination write. Holding those locks drains that domain's writes, so what is observed
         // here is the payload the copy uses. There is no unverified read in between.
@@ -2689,6 +2737,7 @@ export async function selectGuestProgress({
                     challengeIds: record.dailyChallengeIds,
                     challengeSpecs: record.dailyChallengeSpecs,
                     verifyGuestSource: verifySourceDomain('daily'),
+                    recordedDailyChallengeIds: recordedDailyDays(record.sourceInventory),
                     transactionRunner: runTransferMutation,
                 }));
                 record.completedDomains = [...record.completedDomains, 'daily'];

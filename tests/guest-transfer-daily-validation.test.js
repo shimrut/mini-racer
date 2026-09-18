@@ -13,6 +13,7 @@ const {
   getGuestProgressSelection,
   getServerDailyGpChallenge,
   getServerPlayerBootstrap,
+  mergeGuestDailyProgress,
   resolveAccountTransferState,
   selectGuestProgress,
 } = await import("../src/server/daily-gp-store.ts");
@@ -418,5 +419,79 @@ describe("the bootstrap unlock backfill waits for an open transfer", () => {
 
     expect(await redis.hGet(carUnlockHashKey(redditPlayerId), completedRaceField))
       .toBe("1");
+  });
+});
+
+describe("a frozen Daily day cannot be skipped on a presence read", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  function specFor(challenge) {
+    return {
+      id: challenge.id,
+      trackKey: challenge.trackKey,
+      lapCount: challenge.objectiveParams.lapCount,
+      rulesRevision: challenge.rulesRevision,
+      objectiveType: challenge.objectiveType,
+    };
+  }
+
+  /**
+   * The whole-window sweep runs once, before the loop, and outside the locks. This day's presence
+   * check happens later, after every earlier day has been locked, read and written. A day that goes
+   * in that gap used to be skipped on presence, which checkpointed Daily as copied with the
+   * player's rows gone and reported a successful transfer.
+   */
+  it("takes a recorded day to its locks even when nothing is there any more", async () => {
+    const guestPlayerId = "guest:daily-vanished-before-presence";
+    const redditPlayerId = "reddit:daily-vanished-before-presence";
+    const challenge = await getServerDailyGpChallenge();
+    const competition = toDailyCompetition(challenge);
+
+    // Nothing at all on this day, for either identity: exactly what the presence check sees once
+    // the rows have gone, and the shape that used to be skipped in silence.
+    expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBeFalsy();
+    expect(await redis.hGet(competition.entryHashKey, redditPlayerId)).toBeFalsy();
+
+    const verifyGuestSource = vi.fn();
+    await mergeGuestDailyProgress({
+      guestPlayerId,
+      redditPlayerId,
+      replace: true,
+      challengeIds: [challenge.id],
+      challengeSpecs: [specFor(challenge)],
+      verifyGuestSource,
+      recordedDailyChallengeIds: new Set([challenge.id]),
+    });
+
+    // The per-day check under the locks is what judges the absence and reports a changed source.
+    // Reaching it at all is the fix; skipping the day never got here.
+    expect(verifyGuestSource).toHaveBeenCalledWith(
+      expect.objectContaining({ dailyDay: expect.objectContaining({ challengeId: challenge.id }) }),
+    );
+  });
+
+  it("still skips a day the inventory did not record", async () => {
+    const guestPlayerId = "guest:daily-never-raced";
+    const redditPlayerId = "reddit:daily-never-raced";
+    const challenge = await getServerDailyGpChallenge();
+
+    const verifyGuestSource = vi.fn();
+    await mergeGuestDailyProgress({
+      guestPlayerId,
+      redditPlayerId,
+      replace: true,
+      challengeIds: [challenge.id],
+      challengeSpecs: [specFor(challenge)],
+      verifyGuestSource,
+      recordedDailyChallengeIds: new Set(),
+    });
+
+    // A day the guest never raced holds nothing to lose. Only the whole-window sweep runs.
+    expect(verifyGuestSource).toHaveBeenCalledTimes(1);
+    expect(verifyGuestSource).toHaveBeenCalledWith();
   });
 });
