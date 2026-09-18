@@ -18,6 +18,7 @@ tools/*
 !tools/bust-client-asset-cache.js
 !tools/vitest-global-setup.js
 !tools/debug-module-stubs.js
+!tools/verify-transfer-fixes.sh
 !tools/mapmaker.html
 !tools/mapmaker.js
 !tools/mapmaker.css
