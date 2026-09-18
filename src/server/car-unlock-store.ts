@@ -58,6 +58,27 @@ async function acquirePromotionLock(playerId: string, client: RedisClient) {
     throw new CarUnlockProgressBusyError('Car unlock progress update is already in progress.');
 }
 
+/**
+ * The promotion lock, with contention reported the way the transfer contract names it.
+ *
+ * Every transfer path takes the lock through here. Contention is ordinary: another writer holds the
+ * account for a moment, and the browser's retry resolves it. Letting the raw busy error out instead
+ * answers 500 with a stack trace, which reads as an unclassified fault and sends someone looking for
+ * a problem that is not there. The contract calls this 503 progress_selection_retryable.
+ */
+async function acquireTransferPromotionLock(playerId: string, client: RedisClient) {
+    try {
+        return await acquirePromotionLock(playerId, client);
+    } catch (error) {
+        if (error instanceof CarUnlockProgressBusyError) {
+            throw new GuestProgressSelectionRetryableError(
+                'Garage progress is temporarily busy. Try again.',
+            );
+        }
+        throw error;
+    }
+}
+
 async function resolvePromotedPlayerId(playerId: string, client: RedisClient): Promise<string> {
     return await client.get(promotionKey(playerId)) || playerId;
 }
@@ -180,7 +201,7 @@ export async function captureGuestTransferGarageBaseline(
 ): Promise<boolean> {
     if (!accountPlayerId.startsWith('reddit:')) return false;
     const key = transferBaselineKey(accountPlayerId);
-    const lock = await acquirePromotionLock(accountPlayerId, client);
+    const lock = await acquireTransferPromotionLock(accountPlayerId, client);
     try {
         const stored = await client.get(key);
         if (stored) {
@@ -399,16 +420,11 @@ export async function mergeGuestCarUnlockProgress({
     const locks: RedisLock[] = [];
     try {
         for (const playerId of [guestPlayerId, redditPlayerId].sort()) {
-            const lock = await acquirePromotionLock(playerId, client);
+            const lock = await acquireTransferPromotionLock(playerId, client);
             locks.push(lock);
         }
     } catch (error) {
         await Promise.all(locks.map((lock) => releaseRedisLock(lock, client).catch(() => false)));
-        if (error instanceof CarUnlockProgressBusyError) {
-            throw new GuestProgressSelectionRetryableError(
-                'Garage progress is temporarily busy. Try again.',
-            );
-        }
         throw error;
     }
     try {
@@ -519,7 +535,7 @@ export async function cleanupGuestCarUnlockProgress({
     client?: RedisClient;
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) return false;
-    const lock = await acquirePromotionLock(guestPlayerId, client);
+    const lock = await acquireTransferPromotionLock(guestPlayerId, client);
     try {
         const promotedTo = await client.get(promotionKey(guestPlayerId));
         if (promotedTo && promotedTo !== redditPlayerId) {
@@ -552,17 +568,7 @@ export async function discardGuestCarUnlockProgress({
     client?: RedisClient;
 }): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) return false;
-    let lock;
-    try {
-        lock = await acquirePromotionLock(guestPlayerId, client);
-    } catch (error) {
-        if (error instanceof CarUnlockProgressBusyError) {
-            throw new GuestProgressSelectionRetryableError(
-                'Garage progress is temporarily busy. Try again.',
-            );
-        }
-        throw error;
-    }
+    const lock = await acquireTransferPromotionLock(guestPlayerId, client);
     try {
         // The pointer records which account claimed this guest. Discarding must not take it from
         // another account that already copied this garage, so a foreign pointer is a conflict.
@@ -606,7 +612,7 @@ export async function retireEmptyGuestIdentity({
     client?: RedisClient;
 }): Promise<void> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) return;
-    const lock = await acquirePromotionLock(guestPlayerId, client);
+    const lock = await acquireTransferPromotionLock(guestPlayerId, client);
     try {
         if (await client.get(promotionKey(guestPlayerId))) return;
         const transaction = await beginOwnedRedisLockTransaction(lock, client);

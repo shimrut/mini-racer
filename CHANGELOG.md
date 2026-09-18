@@ -1,5 +1,9 @@
 # Changelog
 
+- Guest transfer Garage steps now report ordinary lock contention as retryable
+  rather than as an unknown server failure, so a busy moment no longer logs a
+  stack trace.
+
 - Removed the player's Reddit name from two guest transfer log lines, so ordinary
   application logs no longer say who ran a transfer.
 

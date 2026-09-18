@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
+    captureGuestTransferGarageBaseline,
+    cleanupGuestCarUnlockProgress,
+    discardGuestCarUnlockProgress,
     getCarUnlockSnapshot,
     mergeGuestCarUnlockProgress,
     recordCompletedRace,
     recordHeadToHeadPost,
     recordHeadToHeadWin,
+    retireEmptyGuestIdentity,
 } from '../src/server/car-unlock-store.ts';
 import { EXTRA_CAR_ASSETS } from '../game/car/car-unlock-policy.js';
 
@@ -222,5 +226,47 @@ describe('server car unlock store', () => {
 
         expect((await getCarUnlockSnapshot('guest:driver', {}, client)).progress.completedRace).toBe(1);
         expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.headToHeadWins).toBe(1);
+    });
+});
+
+describe('every Garage transfer path reports contention as retryable', () => {
+    let client;
+
+    beforeEach(() => {
+        client = createRedisMock();
+    });
+
+    const RETRYABLE = { statusCode: 503, reason: 'progress_selection_retryable' };
+
+    /**
+     * Contention is ordinary and the browser's retry clears it. A path that lets the raw busy error
+     * out answers 500 with a stack trace instead, which reads as an unclassified fault.
+     */
+    it('translates it when preparation freezes the account baseline', async () => {
+        await client.set(promotionLockKey('reddit:driver'), 'account-writer');
+        await expect(captureGuestTransferGarageBaseline(
+            'reddit:driver', 'guest-transfer:x', client,
+        )).rejects.toMatchObject(RETRYABLE);
+    });
+
+    it('translates it when cleanup removes the guest Garage', async () => {
+        await client.set(promotionLockKey('guest:driver'), 'guest-writer');
+        await expect(cleanupGuestCarUnlockProgress({
+            guestPlayerId: 'guest:driver', redditPlayerId: 'reddit:driver', client,
+        })).rejects.toMatchObject(RETRYABLE);
+    });
+
+    it('translates it when an empty guest is retired', async () => {
+        await client.set(promotionLockKey('guest:driver'), 'guest-writer');
+        await expect(retireEmptyGuestIdentity({
+            guestPlayerId: 'guest:driver', redditPlayerId: 'reddit:driver', client,
+        })).rejects.toMatchObject(RETRYABLE);
+    });
+
+    it('still translates it on the discard path', async () => {
+        await client.set(promotionLockKey('guest:driver'), 'guest-writer');
+        await expect(discardGuestCarUnlockProgress({
+            guestPlayerId: 'guest:driver', redditPlayerId: 'reddit:driver', client,
+        })).rejects.toMatchObject(RETRYABLE);
     });
 });
