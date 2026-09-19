@@ -29,6 +29,7 @@ import { requestGuestProgressSelection } from "./player/guest-progress-selection
 import { requestServerSyncFailureChoice } from "./player/server-sync-failure.js";
 import {
   hasVerificationEntriesForOwner,
+  moveVerificationEntriesToOwner,
   getCampaignVerificationEntriesForOwner,
   prepareVerificationQueueGuestProgressReconciliation,
   resolveVerificationQueueAfterGuestProgressSelection,
@@ -83,6 +84,7 @@ function normalizeRemotePlayerProgressState(payload) {
         : null,
     carUnlocks: normalizeCarUnlockSnapshot(payload?.carUnlocks),
     retireGuestIdentity: Boolean(payload?.retireGuestIdentity),
+    guestJoinedAccount: payload?.guestJoinedAccount === true,
     progressSelection: payload?.progressSelection && typeof payload.progressSelection === "object"
       ? payload.progressSelection
       : null,
@@ -198,9 +200,19 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
   const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
   const isSignedInAccount = Boolean(remoteState.redditUsername)
     && remoteState.leaderboardPlayerId?.startsWith("reddit:");
-  const hasPendingGuestRuns = isSignedInAccount
-    && hasVerificationEntriesForOwner(guestOwnerId);
   const progressSelection = remoteState.progressSelection;
+  // A guest the server retired has no transfer left to make, so its unsent runs are no reason to
+  // ask. Asking anyway let a Guest choice replace the account with an empty guest. When the server
+  // joined that guest to this account, its runs are the account's now and move to it below. A guest
+  // joined to another account keeps its runs where they are.
+  const guestRetiredWithoutTransfer = isSignedInAccount
+    && remoteState.retireGuestIdentity
+    && !progressSelection;
+  const guestJoinedAccount = guestRetiredWithoutTransfer
+    && remoteState.guestJoinedAccount === true;
+  const hasPendingGuestRuns = isSignedInAccount
+    && !guestRetiredWithoutTransfer
+    && hasVerificationEntriesForOwner(guestOwnerId);
   const hasKnownTransfer = Boolean(
     progressSelection?.required
       || progressSelection?.state === "resume_required"
@@ -334,7 +346,20 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
       console.error("Could not release the transfer pause for", remoteState.leaderboardPlayerId);
     }
   }
-  if (remoteState.retireGuestIdentity) {
+  // Before the rotation below: after it, nothing on this device can name the old guest again.
+  let guestRunsStillUnmoved = false;
+  if (guestJoinedAccount) {
+    const { persisted } = moveVerificationEntriesToOwner(
+      guestOwnerId,
+      remoteState.leaderboardPlayerId,
+    );
+    guestRunsStillUnmoved = !persisted;
+    if (guestRunsStillUnmoved) {
+      // The server still reports the join on the next start-up, and the move is tried again then.
+      console.error("Could not move this device's unsent guest runs to the account.");
+    }
+  }
+  if (remoteState.retireGuestIdentity && !guestRunsStillUnmoved) {
     rotateGuestPlayerIdentity("completed guest promotion");
     // The server refused a spent guest credential: this browser needs a fresh identity before it owns anything again.
     if (!remoteState.leaderboardPlayerId) {

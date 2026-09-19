@@ -121,6 +121,20 @@ local receipt.
 Errors keep their existing shapes. Retryable contention is `503 progress_selection_retryable`.
 An unsafe case is `409 guest_progress_recovery_required`.
 
+A new transfer is checked under the transfer locks before anything is written. A retry and a
+repeated completion have a record, so this check does not apply to them.
+
+- A guest with nothing to carry is refused with `409 guest_progress_transfer_not_needed`. A
+  Guest choice would only empty the account. A row the server cannot parse counts as something.
+- A guest joined to this account with no record was retired empty. It is refused the same way.
+- A guest joined to another account is `409 guest_progress_recovery_required`. No Campaign or
+  Daily copy runs first.
+
+Bootstrap sets `guestJoinedAccount` when it finds, or makes, an empty guest joined to this
+account. The browser then moves that guest's unsent runs to the account. Where the account
+already has an unsent run for the same race, the faster run stays. The browser does not open the
+chooser for a guest that the server retired.
+
 ### Older records
 
 - A valid completed record may clear only its own stale markers, under the locks.

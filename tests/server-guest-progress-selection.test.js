@@ -275,6 +275,7 @@ describe("guest progress selection", () => {
 
   it("persists a completed choice without an expiring transfer record", async () => {
     await seedSevenDayPlaylist();
+    await recordCompletedRace("guest:durable-choice");
 
     await expect(selectGuestProgress({
       guestPlayerId: "guest:durable-choice",
@@ -292,6 +293,7 @@ describe("guest progress selection", () => {
 
   it("keeps a completed account choice successful when lock cleanup fails", async () => {
     await seedSevenDayPlaylist();
+    await recordCompletedRace("guest:release-failure");
     vi.spyOn(console, "error").mockImplementation(() => {});
     redis.failLockRelease = true;
 
@@ -320,6 +322,7 @@ describe("guest progress selection", () => {
 
   it("resumes after a domain completes but its checkpoint write fails", async () => {
     await seedSevenDayPlaylist();
+    await recordCompletedRace("guest:checkpoint-retry");
     vi.spyOn(console, "error").mockImplementation(() => {});
     redis.failTransferRecordWriteAt = 2;
 
@@ -474,6 +477,7 @@ describe("guest progress selection", () => {
     await seedSevenDayPlaylist();
     const guestPlayerId = "guest:stale-coordinator";
     const redditPlayerId = "reddit:stale-coordinator";
+    await recordCompletedRace(guestPlayerId);
     const accountProgressKey = campaignProgressKey(redditPlayerId);
     const accountProgress = {
       campaignId: "numbered-v1",
@@ -851,6 +855,7 @@ describe("guest transfer cost and recovery", () => {
 
   it("reports a thrown transaction conflict as retryable, not as a server error", async () => {
     await seedSevenDayPlaylist();
+    await recordCompletedRace("guest:thrown-conflict");
     vi.spyOn(console, "error").mockImplementation(() => {});
     // Reddit throws this instead of returning an empty EXEC.
     redis.throwTransactionConflictAt = 2;

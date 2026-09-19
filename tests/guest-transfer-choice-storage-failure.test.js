@@ -31,6 +31,9 @@ function chooserBootstrap() {
             sourceGuestPlayerId: GUEST,
             guestHasProgress: true,
             accountHasProgress: true,
+            // What the server sends. Without numbers the chooser picks nothing for the player.
+            guestSummary: { campaignUnlockedTracks: 2, campaignTotalStages: 16 },
+            accountSummary: { campaignUnlockedTracks: 5, campaignTotalStages: 16 },
         },
     };
 }

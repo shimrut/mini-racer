@@ -289,14 +289,25 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
 
         const choiceInputs = [guestOption.input, accountOption.input];
         const continueButton = overlay.buttons[0];
-        let selectedChoice = 'guest';
+        // A Guest choice replaces the account. Guest is offered as the default only when the player
+        // can see what each side holds. Otherwise the player picks, and nothing is picked for them.
+        const guestShowsProgress = summaryMetrics(selection?.guestSummary).length > 0;
+        const accountShowsProgress = !selection?.accountHasProgress
+            || summaryMetrics(selection?.accountSummary).length > 0;
+        let selectedChoice = guestShowsProgress && accountShowsProgress ? 'guest' : null;
         let choiceLocked = null;
-        guestOption.input.checked = true;
-        guestOption.source.classList.add('is-selected');
+        if (selectedChoice) {
+            guestOption.input.checked = true;
+            guestOption.source.classList.add('is-selected');
+        } else if (continueButton) {
+            continueButton.textContent = 'CHOOSE A SAVE';
+            continueButton.disabled = true;
+        }
 
         for (const input of choiceInputs) {
             input.addEventListener('change', () => {
                 selectedChoice = input.value;
+                if (continueButton) continueButton.disabled = false;
                 for (const option of [guestOption.source, accountOption.source]) {
                     option.classList.toggle('is-selected', option.contains(input));
                 }

@@ -881,6 +881,39 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
   }
 }
 
+/**
+ * Moves a guest's unsent runs to the account the server joined that guest to.
+ *
+ * Only for a guest the server joined with nothing to transfer: no progress was replaced, so each
+ * run simply belongs to the account now. Where the account already has a run for the same race,
+ * the faster one stays, by the rule `enqueue` uses. A run held by an unfinished transfer, or set
+ * aside for review, is left where it is.
+ */
+export function moveVerificationEntriesToOwner(fromOwnerId, toOwnerId) {
+  const from = normalizedTransferValue(fromOwnerId);
+  const to = normalizedTransferValue(toOwnerId);
+  if (!from || !to || from === to) return { moved: 0, removed: 0, persisted: true };
+  const queueState = readQueueState();
+  let moved = 0;
+  let removed = 0;
+  for (const bucket of QUEUE_BUCKETS) {
+    for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
+      if (entry?.ownerPlayerId !== from) continue;
+      if (isEntryProtectedByTransfer(queueState, bucket, entryKey)) continue;
+      const occupant = queueState[bucket][ownedEntryKey(rawEntryIdFromKey(entryKey, from), to)];
+      if (occupant && !BUCKET_CANDIDATE_RULE[bucket]?.(entry, occupant)) {
+        delete queueState[bucket][entryKey];
+        removed += 1;
+        continue;
+      }
+      rekeyOwnedEntry(queueState, bucket, entryKey, entry, to);
+      moved += 1;
+    }
+  }
+  if (moved === 0 && removed === 0) return { moved, removed, persisted: true };
+  return { moved, removed, persisted: writeQueueState(queueState) };
+}
+
 export function hasVerificationEntriesForOwner(ownerPlayerId) {
   if (typeof ownerPlayerId !== "string" || !ownerPlayerId.trim()) return false;
   return QUEUE_BUCKETS

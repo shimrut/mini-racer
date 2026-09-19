@@ -159,6 +159,8 @@ type PlayerBootstrapPayload = {
     lastSeenAt: string | null;
     carUnlocks: CarUnlockSnapshot | null;
     retireGuestIdentity: boolean;
+    /** The retired guest joined this account with nothing to transfer, so its unsent runs are the account's. */
+    guestJoinedAccount?: boolean;
     progressSelection?: GuestProgressSelection | null;
 };
 
@@ -1044,6 +1046,16 @@ function guestProgressRecoveryRequiredError(): GuestProgressRecoveryRequiredErro
     return new GuestProgressRecoveryRequiredError();
 }
 
+const GUEST_PROGRESS_TRANSFER_NOT_NEEDED_REASON = 'guest_progress_transfer_not_needed';
+
+/** A new transfer refused before anything was written, because the guest has nothing to carry. */
+function guestProgressTransferNotNeededError(): Error {
+    return Object.assign(
+        new Error('This guest has no progress to transfer. Reload to continue with your account.'),
+        { statusCode: 409, reason: GUEST_PROGRESS_TRANSFER_NOT_NEEDED_REASON },
+    );
+}
+
 async function resolveGuestTransferDailyChallenges(challengeIds?: string[]): Promise<DailyGpChallenge[]> {
     if (!Array.isArray(challengeIds)) {
         return getServerDailyGpPlaylist();
@@ -1787,6 +1799,45 @@ async function readProgressEvidence(playerId: string, dailyPlaylist: DailyGpChal
     };
 }
 
+/**
+ * Whether a guest holds anything a transfer could carry.
+ *
+ * A Guest choice replaces the account with the guest, so a guest with nothing turns the choice into
+ * a deletion of the account. Everything is read raw and read-only: a row this build cannot parse
+ * still counts, and it takes the transfer to the check that stops it for review. Only a guest with
+ * no trace at all answers false.
+ */
+async function guestHoldsTransferableProgress(
+    guestPlayerId: string,
+    dailyPlaylist: readonly DailyGpChallenge[],
+): Promise<boolean> {
+    const rawProgress = await redis.get(campaignProgressKey(guestPlayerId));
+    if (rawProgress) {
+        try {
+            const progress = JSON.parse(rawProgress) as { startedAt?: unknown; resultsByRaceId?: unknown };
+            const results = progress?.resultsByRaceId;
+            if (progress?.startedAt
+                || !results
+                || typeof results !== 'object'
+                || Object.keys(results).length > 0) {
+                return true;
+            }
+        } catch {
+            return true;
+        }
+    }
+    if (await hasCarUnlockProgress(guestPlayerId)) return true;
+    if ((await readPlayerProfile(guestPlayerId))?.hasAnyData) return true;
+    const competitions = [
+        ...CAMPAIGN_STAGES.map((stage) => toCampaignCompetition(CAMPAIGN_ID, stage, { playerId: guestPlayerId })),
+        ...dailyPlaylist.map((challenge) => toDailyCompetition(challenge)),
+    ];
+    const holds = await Promise.all(competitions.map((competition) => (
+        competitionHoldsPlayerRows(competition, guestPlayerId)
+    )));
+    return holds.some(Boolean);
+}
+
 function toProgressSummary(evidence: Awaited<ReturnType<typeof readProgressEvidence>>) {
     return {
         hasDailyResults: evidence.hasDailyResults,
@@ -2352,7 +2403,7 @@ export async function selectGuestProgress({
     // reviewed case durable; until then there is no record to mark.
     let persistRecoveryPhase: (() => Promise<void>) | null = null;
     const reportTiming = (
-        outcome: 'completed' | 'retryable' | 'recovery_required' | 'failed',
+        outcome: 'completed' | 'retryable' | 'recovery_required' | 'not_needed' | 'failed',
     ): void => {
         console.log('Guest progress transfer timing:', JSON.stringify({
             choice,
@@ -2484,6 +2535,25 @@ export async function selectGuestProgress({
         if (resume && transferId !== derivedTransferId) {
             throw guestProgressRecoveryRequiredError();
         }
+        // Only a new transfer is checked here. A retry and a repeated completion both have a
+        // record, written before anything was replaced, and they continue from it as before.
+        let newTransferPlaylist: DailyGpChallenge[] | null = null;
+        if (!currentRaw) {
+            // A guest joined to this account with no record was retired empty: nothing to carry.
+            // One joined to another account is the conflict the Garage copy reports, answered here
+            // before the Campaign and Daily copies can replace anything.
+            const joinedTo = await readGuestPromotionTarget(guestPlayerId);
+            if (joinedTo) {
+                throw joinedTo === redditPlayerId
+                    ? guestProgressTransferNotNeededError()
+                    : guestProgressRecoveryRequiredError();
+            }
+            // With nothing to carry, a Guest choice would only empty the account.
+            newTransferPlaylist = await getServerDailyGpPlaylist();
+            if (!await guestHoldsTransferableProgress(guestPlayerId, newTransferPlaylist)) {
+                throw guestProgressTransferNotNeededError();
+            }
+        }
         if (currentRaw) {
             let parsedRecord: unknown;
             try {
@@ -2535,7 +2605,7 @@ export async function selectGuestProgress({
             ? currentRecord.dailyChallengeSpecs.map(transferChallengeFromSpec)
             : currentRecord?.dailyChallengeIds
                 ? await resolveGuestTransferDailyChallenges(currentRecord.dailyChallengeIds)
-                : await getServerDailyGpPlaylist();
+                : newTransferPlaylist ?? await getServerDailyGpPlaylist();
         const dailyChallengeIds = currentRecord?.dailyChallengeIds
             ?? frozenChallenges.map((challenge) => challenge.id);
         const dailyChallengeSpecs = currentRecord?.dailyChallengeSpecs
@@ -2834,9 +2904,11 @@ export async function selectGuestProgress({
         const reason = (error as { reason?: string })?.reason;
         const outcome = reason === 'guest_progress_recovery_required'
             ? 'recovery_required'
-            : error instanceof GuestProgressSelectionRetryableError
-                ? 'retryable'
-                : 'failed';
+            : reason === GUEST_PROGRESS_TRANSFER_NOT_NEEDED_REASON
+                ? 'not_needed'
+                : error instanceof GuestProgressSelectionRetryableError
+                    ? 'retryable'
+                    : 'failed';
         reportTiming(outcome);
         // Only a reviewed case is made durable. A retryable error is contention or a dropped
         // connection, and a `failed` one is unclassified; writing either into the record would
@@ -3147,6 +3219,8 @@ export async function getServerPlayerBootstrap({
     let profile: DailyGpPlayerProfile | null = null;
     let retireGuestIdentity = identity.guestStatus === 'guest_identity_retired';
     let progressSelection: GuestProgressSelection | null = null;
+    // The browser moves this guest's unsent runs to the account only on this word.
+    let guestJoinedAccount = false;
 
     // Claiming or adopting a retired guest id would resurrect a credential whose progress already moved to an account.
     const retiredGuestId = !identity.canonicalPlayerId
@@ -3242,6 +3316,13 @@ export async function getServerPlayerBootstrap({
             const promotedTo = await readGuestPromotionTarget(`guest:${guestPlayerId}`);
             if (promotedTo) {
                 retireGuestIdentity = true;
+                // Joined here with no transfer record means an empty guest was retired into this
+                // account. A transfer, or a join into another account, keeps its own rules.
+                guestJoinedAccount = promotedTo === identity.canonicalPlayerId
+                    && !await redis.get(guestProgressSelectionKey(
+                        `guest:${guestPlayerId}`,
+                        identity.canonicalPlayerId,
+                    ));
             } else {
                 progressSelection = await getGuestProgressSelection({
                     guestPlayerId: `guest:${guestPlayerId}`,
@@ -3253,6 +3334,8 @@ export async function getServerPlayerBootstrap({
                             guestPlayerId: `guest:${guestPlayerId}`,
                             redditPlayerId: identity.canonicalPlayerId,
                         });
+                        guestJoinedAccount = await readGuestPromotionTarget(`guest:${guestPlayerId}`)
+                            === identity.canonicalPlayerId;
                     }
                     retireGuestIdentity = true;
                 } else {
@@ -3335,6 +3418,7 @@ export async function getServerPlayerBootstrap({
         lastSeenAt: profile.lastSeenAt,
         carUnlocks,
         retireGuestIdentity,
+        ...(guestJoinedAccount ? { guestJoinedAccount } : {}),
         ...(progressSelection?.required ? { progressSelection } : {}),
     };
 }

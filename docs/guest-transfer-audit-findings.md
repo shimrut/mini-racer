@@ -250,6 +250,40 @@ guest stranded         = true   bestTime 10
 
 ---
 
+## 13. A Guest choice for an empty guest empties the account
+
+**Severity: fix before ship.** Data loss. Found after revision 3, and fixed.
+
+Where:
+- `game/storage.js` — `finalizeHostedPlayerProgressState`, the unsent-runs trigger
+- `src/server/daily-gp-store.ts` — `selectGuestProgress`, which had no check for a new transfer
+
+The server retires a guest that has no saved progress, and it shows no chooser. The browser then
+saw an unsent guest run and opened the chooser anyway. Its fallback summaries show no numbers on
+either side, and Guest was preselected. The server accepted the Guest choice for the retired
+guest and replaced the account with nothing.
+
+Effect: the account lost all its Campaign progress and its Daily results for the last 7 days.
+Only the unsent guest runs remained, and those only if they are later sent and accepted.
+
+A guest already joined to another account had the same weakness. The Garage copy reported that
+conflict, but only after the Campaign and Daily copies had replaced the account.
+
+Fix:
+- The server checks a new transfer under the transfer locks. It refuses a guest with nothing to
+  carry. It sends a guest joined to another account to review before anything is written.
+  Retries and repeated completions have a record, and they are not checked.
+- The browser does not open the chooser for a retired guest. For a guest the server joined to
+  this account, it moves the unsent runs to the account. The faster run keeps a contested slot.
+- The chooser preselects Guest only when both sides show what they hold.
+
+Regression tests: `tests/guest-transfer-empty-guest.test.js` and
+`tests/guest-transfer-empty-guest-startup.test.js`. Five fixture setups in
+`tests/server-guest-progress-selection.test.js` used an empty guest. They now give that guest one
+accepted race, because an empty guest is now refused.
+
+---
+
 # Lower priority
 
 ## 11. `verifyGuestSource` was typed to take no arguments
