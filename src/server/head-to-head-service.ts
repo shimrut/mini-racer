@@ -568,8 +568,15 @@ async function recoverPost(
         pageSize: 100,
     });
     const posts = typeof listing?.all === 'function' ? await listing.all() : [];
+    // Reddit dates the post to the second, so the preview's own second still counts as newer.
+    const previewMs = Date.parse(preview.createdAt);
+    const cutoffMs = Number.isFinite(previewMs) ? Math.floor(previewMs / 1000) * 1000 : NaN;
     for (const post of posts) {
         if (normalizeName(post?.subredditName || '') !== normalizeName(preview.subredditName)) continue;
+        // Only a post made from this preview can carry its challenge id, so nothing older than the
+        // preview can match. The listing already carries the date; reading the post data does not.
+        const createdMs = new Date(post?.createdAt ?? NaN).getTime();
+        if (Number.isFinite(cutoffMs) && Number.isFinite(createdMs) && createdMs < cutoffMs) continue;
         try {
             const data = await post.getPostData();
             if (

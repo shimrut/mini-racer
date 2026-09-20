@@ -689,6 +689,62 @@ describe('head-to-head service', () => {
         expect(reddit.submitCustomPost).not.toHaveBeenCalled();
     });
 
+    it('never reads the post data of a post that predates the preview', async () => {
+        const service = makeService();
+        const preview = await service.preview({ sourceKind: 'campaign' }, context);
+        const olderPosts = Array.from({ length: 40 }, (_, index) => ({
+            id: `t3_older${index}`,
+            url: `https://reddit.com/r/miniracer/older${index}`,
+            authorName: 'racefan',
+            subredditName: 'MiniRacer',
+            removed: false,
+            createdAt: new Date('2026-07-23T11:59:59.000Z'),
+            getPostData: vi.fn(async () => ({
+                postType: 'head-to-head',
+                challengeId: `stale-${index}`,
+            })),
+        }));
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => olderPosts });
+
+        const created = await service.create({
+            challengeToken: preview.body.challengeToken,
+        }, context);
+
+        expect(created.body.status).toBe('created');
+        for (const post of olderPosts) {
+            expect(post.getPostData).not.toHaveBeenCalled();
+        }
+    });
+
+    it('still recovers a post made in the same second as the preview', async () => {
+        const service = makeService();
+        const preview = await service.preview({ sourceKind: 'campaign' }, context);
+        const recoveredPost = {
+            id: 't3_same_second',
+            url: 'https://reddit.com/r/miniracer/same-second',
+            authorName: 'racefan',
+            subredditName: 'MiniRacer',
+            removed: false,
+            // Reddit dates a post to the second, so it can read as earlier than the preview.
+            createdAt: new Date('2026-07-23T12:00:00.000Z'),
+            getPostData: vi.fn(async () => ({
+                postType: 'head-to-head',
+                challengeId: preview.body.preview.challengeId,
+            })),
+        };
+        reddit.getPostsByUser.mockResolvedValueOnce({ all: async () => [recoveredPost] });
+
+        const recovered = await service.create({
+            challengeToken: preview.body.challengeToken,
+        }, context);
+
+        expect(recovered).toMatchObject({
+            status: 200,
+            body: { status: 'already_created', postUrl: recoveredPost.url },
+        });
+        expect(reddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
     it('fails closed and releases the slot when Reddit falls back to the app author', async () => {
         const fallbackPost = {
             id: 't3_app_fallback',
