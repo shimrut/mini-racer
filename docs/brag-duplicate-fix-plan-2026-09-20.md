@@ -1,6 +1,7 @@
 # Fix the duplicate brag
 
-Revised after `docs/brag-duplicate-fix-plan-red-team-2026-09-20.md`.
+Revised after rounds 1 and 2 of
+`docs/brag-duplicate-fix-plan-red-team-2026-09-20.md`.
 
 ## The fault
 
@@ -41,23 +42,40 @@ meaning "the caller must remember to record this".
 The helper has everything it needs at two points: when `submitComment` returns a
 comment ([user-comment-submit.ts:175](../src/server/user-comment-submit.ts)),
 and when the throw path finds one in the thread
-([:194](../src/server/user-comment-submit.ts)). At both, write:
+([:194](../src/server/user-comment-submit.ts)). At both, update the claim with:
 
 - `postedAt`, the time Reddit answered.
 - `authorName`, as Reddit reported it.
 - `commentId` and `commentUrl`, only when the ID is a `t1_` ID **and** the author
   is the player.
 
-Keep `createdAt` as the claim time. Today's completion write resets it to the
-time after the post ([daily-gp-share.ts:647](../src/server/daily-gp-share.ts),
+Compare the author with `trim()` and `toLowerCase()`, the same compare the
+callers use ([head-to-head-share.ts:74](../src/server/head-to-head-share.ts)) and
+the walk already uses. A difference of case alone must not skip the ID.
+
+The write is an **update of the claim**. Keep `commentText`, `username`, and
+`createdAt`. `parseUserCommentRecord` returns null without the first two
+([user-comment-submit.ts:51](../src/server/user-comment-submit.ts)), and a
+receipt that does not parse looks like no receipt, so the next attempt posts
+again. That is worse than a failed write, which at least leaves the claim.
+
+Keep `createdAt` as the claim time for a second reason. Today's completion write
+resets it to the time after the post
+([daily-gp-share.ts:647](../src/server/daily-gp-share.ts),
 [head-to-head-share.ts:302](../src/server/head-to-head-share.ts)). Copy that into
 a no-ID receipt and the resolve walk searches from a time later than the comment,
 so it never finds it.
 
-Then return `posted`. Both callers stop writing receipts.
+Return the receipt with the outcome. Callers judge the receipt from here on, so
+`posted` and `posted_without_link` both carry it — the in-memory copy, even when
+the Redis write failed. A caller still reading `outcome.comment` sees no comment
+on `posted_without_link`, reads an empty author, and reports
+`user_action_unavailable` for the player's own comment.
 
 Add `postedAt` and `authorName` to `UserCommentRecord`. Both are optional. Keep
 `username` as the player, because the walk searches on it.
+
+Both callers stop writing receipts.
 
 A failed write still leaves only the claim, and that attempt can still duplicate.
 That is the same hole the completion write has today. State it. Do not claim the
@@ -65,14 +83,22 @@ duplicate is impossible.
 
 ## 2. A receipt with `postedAt` never posts
 
-In `submitUserComment`, `postedAt` means the app knows the comment is live. That
-receipt must never reach the submit path.
+In `submitUserComment`, check in this order:
 
-- Receipt has `commentId`: return it, as today.
-- Receipt has `postedAt` and no `commentId`: walk the thread for the link. Return
-  the comment when the walk finds it. Otherwise return `posted_without_link`. Do
-  not submit.
-- Receipt has neither: unchanged. That is the uncertain attempt. See Out of scope.
+1. `commentId`: return `already`, as today.
+2. `postedAt` and no `commentId`: walk the thread for the link. **Do not submit.**
+   - The walk finds it: complete the receipt with the ID — the author matched, so
+     the ID rule allows it — and return `already`. Returning the comment while the
+     receipt has no ID makes every later attempt answer `posted_without_link`.
+   - The walk misses or cannot finish: return `posted_without_link`, not
+     `unconfirmed`. Unconfirmed is for a claim that may never have posted.
+3. Neither: the existing linkless walk, unchanged. That is the uncertain attempt.
+   See Out of scope.
+
+The `postedAt` check must come **before** the existing `if (stored)` block
+([user-comment-submit.ts:144](../src/server/user-comment-submit.ts)). That block
+treats an empty listing as absent and posts. Handle `postedAt` inside it or after
+it and step 2 never runs on the path that duplicates.
 
 Steps 1 and 2 ship together. Step 1 alone does not stop the no-ID duplicate,
 because nothing reads `postedAt` until step 2.
@@ -106,6 +132,9 @@ panel nothing, and the comment is live.
 
 Use one name on the wire: `posted_without_link`.
 
+Leave the `user_action_unavailable` error string as it is. A test asserts the
+whole 409 body with `toEqual`. Add no field to that body.
+
 ## 4. Stop offering Try Again for a comment that is up
 
 The confirm button throws on any answer that is not `ok` and in a short success
@@ -114,17 +143,35 @@ the HTTP code. `user_action_unavailable` is a 409 today, so it already shows Try
 Again, and a 409 `posted_without_link` would too.
 
 Intercept both above that throw, where `comment_unconfirmed` is already
-intercepted ([ui-modal-shell.js:1019](../game/race/ui-modal-shell.js)). Show the
-posted state and offer no Try Again.
+intercepted ([ui-modal-shell.js:1019](../game/race/ui-modal-shell.js)).
 
-This is not a wording change to `_showShareOutcome`. That function titles the
-panel "Shared" and quotes the comment text
-([ui-modal-shell.js:806](../game/race/ui-modal-shell.js)). Both new states
-replace that quote:
+Scope the two interceptions differently:
+
+- `posted_without_link`: every confirm.
+- `user_action_unavailable`: Daily Share, Brag, and Challenge Comment only.
+  Create Challenge shares this confirm handler
+  ([ui-modal-shell.js:1012](../game/race/ui-modal-shell.js)) and returns the same
+  409 when Reddit attributes the **post** to the app
+  ([head-to-head-service.ts:815](../src/server/head-to-head-service.ts)). No
+  comment exists, the post slot is released, and "the comment went up" is false.
+  That flow keeps its failure.
+
+The panel supplies both sentences, keyed off the status, because the server
+strings are frozen:
 
 - `posted_without_link`: the comment went up, without a link to it.
 - `user_action_unavailable`: the comment went up under the app's name, not the
   player's.
+
+This is not a wording change to `_showShareOutcome`. That function titles the
+panel "Shared" and quotes the comment text
+([ui-modal-shell.js:806](../game/race/ui-modal-shell.js)). Both new states
+replace that quote.
+
+Mark the finish spent the way the success path does
+([ui-modal-shell.js:1042](../game/race/ui-modal-shell.js)). Copying the
+`comment_unconfirmed` branch instead leaves error styling and a Close button on a
+comment that is up.
 
 ## 5. Tests
 
@@ -137,8 +184,7 @@ Change:
 Watch:
 
 - [server-daily-gp-share-wave5.test.js:265](../tests/server-daily-gp-share-wave5.test.js)
-  asserts the 409 body with `toEqual`. Keep the `user_action_unavailable` body as
-  it is. Any added field fails it.
+  asserts the 409 body with `toEqual`. Any added field fails it.
 
 Extend:
 
@@ -152,14 +198,25 @@ Add, for Daily Share, Brag, and Challenge Comment:
   second confirm posts nothing and answers `posted_without_link`.
 - Reddit returns a comment from another author. The receipt stores no ID. A
   second confirm posts nothing and repeats `user_action_unavailable`.
+- A `postedAt` receipt whose walk cannot finish answers `posted_without_link` and
+  posts nothing.
+- A `postedAt` receipt whose walk finds the comment answers with the ID, not
+  `posted_without_link`.
 - A wrong-author comment with a valid ID never makes the Daily preview answer
   `already_shared`.
 - A wrong-author comment with no ID answers `user_action_unavailable`, not
   `posted_without_link`.
+- The completed receipt still parses: text, player, and the original `createdAt`
+  survive the update.
 - The resolve walk finds a no-ID comment whose claim time is the original
   `createdAt`.
 - A stale thread listing after either failure causes no second submit.
 - The panel shows the posted state, with no Try Again, for both statuses.
+
+And:
+
+- Create Challenge still reports `user_action_unavailable` as a failure, not as a
+  comment that went up.
 
 Head to Head has no existing no-ID throw test. Only Daily does.
 

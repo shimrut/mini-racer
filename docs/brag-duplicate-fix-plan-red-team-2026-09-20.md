@@ -243,3 +243,49 @@ styling and a Close button on a comment that is up.
 - Challenge create still surfaces `user_action_unavailable` as a failure, not as "the comment
   went up under the app's name".
 
+---
+
+# Round 3: all four folded in
+
+R1–R4 are in the document as described, including the author compare and the four tests.
+One remaining hole ships as a regression of the 19 September recovery.
+
+## What I checked and found clean
+
+- `postedAt` is ordered above the linkless walk, and an unfinished walk on that receipt is
+  `posted_without_link`.
+- The helper returns the receipt, completes on a find, and updates the claim in place.
+- The two intercepts are scoped so Create Challenge keeps its 409.
+- The new copy is client-side; the 409 body stays frozen.
+
+## S1. Do not run the author check on `already` (high)
+
+Live receipts have no `authorName`. A complete receipt is written only after the author
+passed, and the field does not exist yet (`src/server/daily-gp-share.ts:642`,
+`src/server/head-to-head-share.ts:297`).
+
+The two early returns that see a stored id never reach the new checks, and the plan leaves
+them alone. Helper `already` does reach them. That outcome is how a claim receipt is
+completed: the linkless walk finds the comment and returns `{ ...stored, commentId }`
+(`src/server/user-comment-submit.ts:153`), still with no `authorName`.
+
+That is the recovery for an unconfirmed share
+(`tests/server-daily-gp-share.test.js:1116`, `tests/server-head-to-head-share.test.js:160`).
+Move today's check — `normalize(authorName || '') !== player` — onto that receipt and an
+empty author is "not the player". The player who was told to share again to check is then
+told the comment went up under the app's name, and the result is stuck.
+
+The id rule already means `already` is the player's comment. Legacy ids are too. Run the
+author check on `posted` and `posted_without_link` only, where step 1 has written
+`authorName`. Leave the `already` success return as it is.
+
+## S2. Completing a find still needs the `t1_` rule (low)
+
+Step 2 stores the found id because the author matched. Store it only when it is a `t1_` id,
+the same rule as step 1. A non-`t1_` value makes `stored?.commentId` true
+(`src/server/user-comment-submit.ts:143`), so later attempts never walk and never recover a
+real link.
+
+## Settled except S1
+
+The rest of the shape can be built. S1 is the one change of rule, not of wording.
