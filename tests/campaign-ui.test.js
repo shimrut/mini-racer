@@ -413,6 +413,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                     kind: 'head-to-head',
                     source: 'campaign',
                     raceId: 'numbered-v1-00',
+                    replay: { revision: 1, segments: [] },
                 },
             }),
         );
@@ -451,7 +452,6 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         context.handleCampaignWin({ lapTime: finalTime });
 
-        expect(context.scoreboardReplay.getPayload).not.toHaveBeenCalled();
         expect(context.processVerificationQueue).not.toHaveBeenCalled();
         expect(context.modal.showModal).toHaveBeenCalledWith(
             'Campaign race complete',
@@ -473,6 +473,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                     kind: 'head-to-head',
                     source: 'campaign',
                     raceId: 'numbered-v1-00',
+                    replay: { revision: 1, segments: [] },
                 },
             }),
         );

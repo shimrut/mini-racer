@@ -212,12 +212,6 @@ export function parseStoredPlayerProfile(raw: string | null | undefined): DailyG
             firstSeenAt: typeof parsed.firstSeenAt === 'string' && parsed.firstSeenAt
                 ? parsed.firstSeenAt
                 : new Date(0).toISOString(),
-            lastSeenAt: typeof parsed.lastSeenAt === 'string' && parsed.lastSeenAt
-                ? parsed.lastSeenAt
-                : new Date(0).toISOString(),
-            updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt
-                ? parsed.updatedAt
-                : new Date(0).toISOString(),
         };
     } catch (_error) {
         return null;
@@ -231,18 +225,45 @@ export function createRedisPlayerProfileKey(playerId: string): string {
     return `dailygp:player-profile:${playerKey}`;
 }
 
+function playerProfileTtlSeconds(playerId: string): number | null {
+    return playerId.startsWith('guest:')
+        ? DAILY_GP_GUEST_PROFILE_TTL_SECONDS
+        : DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS;
+}
+
 function createPlayerProfileExpiration(
     playerId: string,
 ): { expiration: Date } | undefined {
-    const ttlSeconds = playerId.startsWith('guest:')
-        ? DAILY_GP_GUEST_PROFILE_TTL_SECONDS
-        : DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS;
+    const ttlSeconds = playerProfileTtlSeconds(playerId);
     return ttlSeconds === null
         ? undefined
         : { expiration: new Date(Date.now() + ttlSeconds * 1000) };
 }
 
 const PLAYER_PROFILE_WRITE_ATTEMPTS = 3;
+
+/**
+ * Parse and build list the same keys in the same order, and parse drops anything else stored, so
+ * equal strings mean equal profiles. A difference in preference key order only costs a write.
+ */
+function sameProfile(stored: DailyGpPlayerProfile, next: DailyGpPlayerProfile): boolean {
+    return JSON.stringify(stored) === JSON.stringify(next);
+}
+
+/**
+ * A skipped write must still give an active guest another year, as the rewrite it replaces did.
+ * EXPIRE is one command, not a transaction. It is extra to a write that was not needed, so its
+ * failure must not fail the request that skipped.
+ */
+async function renewSkippedProfileExpiry(profileKey: string, playerId: string): Promise<void> {
+    const ttlSeconds = playerProfileTtlSeconds(playerId);
+    if (ttlSeconds === null) return;
+    try {
+        await redis.expire(profileKey, ttlSeconds);
+    } catch (error) {
+        console.error('Player profile expiry renewal failed:', error);
+    }
+}
 
 function resolveStoredLeaderboardIdentity(
     leaderboardIdentity: unknown,
@@ -361,7 +382,6 @@ export function buildPlayerProfile({
     hasAnyData?: boolean;
     previousProfile?: DailyGpPlayerProfile | null;
 }): DailyGpPlayerProfile {
-    const nowIso = new Date().toISOString();
     return {
         playerId,
         leaderboardIdentity: resolveStoredLeaderboardIdentity(leaderboardIdentity, previousProfile || null),
@@ -371,9 +391,7 @@ export function buildPlayerProfile({
             : normalizePlayerPreferences(preferences),
         hasSeenGame: true,
         hasAnyData: Boolean(hasAnyData || previousProfile?.hasAnyData),
-        firstSeenAt: previousProfile?.firstSeenAt || nowIso,
-        lastSeenAt: nowIso,
-        updatedAt: nowIso,
+        firstSeenAt: previousProfile?.firstSeenAt || new Date().toISOString(),
     };
 }
 
@@ -472,6 +490,35 @@ export async function upsertPlayerProfile({
     hasAnyData?: boolean;
 }): Promise<DailyGpPlayerProfile> {
     const profileKey = createRedisPlayerProfileKey(playerId);
+    // Every start-up and every Daily finish reaches here. A WATCH holds one of the transactions
+    // Reddit allows an installation at a time (20 to 30), and on 2026-09-16 these writes filled
+    // the limit: start-ups and saved runs failed for an hour and a half. Most calls change nothing,
+    // and a new profile can be created without a transaction, so only a real change takes one.
+    const rawProfile = await redis.get(profileKey);
+    const storedProfile = parseStoredPlayerProfile(rawProfile);
+    const nextProfile = buildPlayerProfile({
+        playerId,
+        leaderboardIdentity,
+        redditUsername,
+        preferences,
+        hasAnyData,
+        previousProfile: storedProfile,
+    });
+    if (storedProfile && sameProfile(storedProfile, nextProfile)) {
+        // Skipping writes nothing, so a writer racing this read loses nothing to it.
+        await renewSkippedProfileExpiry(profileKey, playerId);
+        return storedProfile;
+    }
+    if (!rawProfile) {
+        // NX never overwrites. If another request created the profile first, the loop below
+        // reads that profile and merges this request onto it.
+        const created = await redis.set(
+            profileKey,
+            JSON.stringify(nextProfile),
+            { nx: true, ...createPlayerProfileExpiration(playerId) },
+        );
+        if (created) return nextProfile;
+    }
     for (let attempt = 0; attempt < PLAYER_PROFILE_WRITE_ATTEMPTS; attempt += 1) {
         const transaction = await redis.watch(profileKey);
         try {
@@ -508,9 +555,8 @@ export async function upsertPlayerProfile({
 }
 
 /**
- * A read path has no new identity to store; only lastSeenAt and updatedAt would move. Parallel reads
- * that all stamp the one profile key lose the WATCH race against each other, so they create the
- * profile if it is missing and otherwise leave it alone.
+ * A read path has no new identity to store. It creates the profile if it is missing and otherwise
+ * leaves it alone, so parallel reads never race each other on the one profile key.
  */
 export async function ensurePlayerProfileExists({
     playerId,

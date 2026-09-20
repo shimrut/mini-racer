@@ -215,8 +215,6 @@ describe('daily-gp-store mutation kills', () => {
                 updatedAt: '',
             }))).toMatchObject({
                 firstSeenAt: epoch,
-                lastSeenAt: epoch,
-                updatedAt: epoch,
             });
         });
     });

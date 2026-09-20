@@ -1346,8 +1346,10 @@ describe('server daily gp store submissions', () => {
         });
 
         expect(payload.leaderboardIdentity).toBe('reddit');
-        const storedProfile = findWrittenPlayerProfile('reddit:pm-user');
-        expect(storedProfile.profile.leaderboardIdentity).toBe('reddit');
+        // Nothing changed, so start-up leaves the stored profile as it is.
+        expect(findWrittenPlayerProfile('reddit:pm-user')).toBeNull();
+        expect(JSON.parse(storedStrings.get(playerProfileRedisKey('reddit:pm-user'))).leaderboardIdentity)
+            .toBe('reddit');
     });
 
     it('updates stored identity only when the player explicitly changes it', async () => {
@@ -1418,7 +1420,7 @@ describe('server daily gp store submissions', () => {
         const profile = await upsertPlayerProfile({
             playerId,
             redditUsername: 'Profile-Cas',
-            hasAnyData: false,
+            hasAnyData: true,
         });
 
         expect(profile.preferences.carSkin).toBe(concurrentProfile.preferences.carSkin);
@@ -1434,7 +1436,7 @@ describe('server daily gp store submissions', () => {
             redditUsername: 'Profile-Tx-Conflict',
             preferences: null,
             hasSeenGame: true,
-            hasAnyData: true,
+            hasAnyData: false,
             firstSeenAt: '2026-01-01T00:00:00.000Z',
             lastSeenAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
@@ -1459,7 +1461,7 @@ describe('server daily gp store submissions', () => {
         const profile = await upsertPlayerProfile({
             playerId,
             redditUsername: 'Profile-Tx-Conflict',
-            hasAnyData: false,
+            hasAnyData: true,
         });
 
         expect(watchCount).toBe(2);
@@ -1477,10 +1479,152 @@ describe('server daily gp store submissions', () => {
             discard: vi.fn().mockResolvedValue(undefined),
         }));
 
+        seedStoredPlayerProfile('reddit:profile-tx-broken', {
+            playerId: 'reddit:profile-tx-broken',
+            leaderboardIdentity: 'reddit',
+            hasSeenGame: true,
+            hasAnyData: false,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+        });
+
         await expect(upsertPlayerProfile({
             playerId: 'reddit:profile-tx-broken',
-            hasAnyData: false,
+            hasAnyData: true,
         })).rejects.toThrow('no connection established');
+    });
+
+    function storedProfile(playerId, overrides = {}) {
+        return {
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'Profile-Skip',
+            preferences: null,
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+            ...overrides,
+        };
+    }
+
+    it('opens no transaction when a stored profile would not change, however old it is', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'reddit:profile-skip';
+        // Written long ago, and still carrying the two stamps older builds stored.
+        const stored = storedProfile(playerId, {
+            lastSeenAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+        });
+        seedStoredPlayerProfile(playerId, stored);
+
+        const profile = await upsertPlayerProfile({ playerId, redditUsername: 'Profile-Skip', hasAnyData: true });
+
+        expect(mockRedis.watch).not.toHaveBeenCalled();
+        expect(mockRedis.expire).not.toHaveBeenCalled();
+        expect(JSON.parse(storedStrings.get(playerProfileRedisKey(playerId)))).toEqual(stored);
+        expect(profile).toEqual(storedProfile(playerId));
+    });
+
+    it('gives an unchanged guest profile another year, even with most of its year left', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'guest:profile-skip';
+        seedStoredPlayerProfile(playerId, storedProfile(playerId, { leaderboardIdentity: 'constructed', redditUsername: null }));
+
+        await upsertPlayerProfile({ playerId, hasAnyData: true });
+
+        expect(mockRedis.watch).not.toHaveBeenCalled();
+        expect(mockRedis.expire).toHaveBeenCalledWith(playerProfileRedisKey(playerId), 365 * 24 * 60 * 60);
+    });
+
+    it('still answers with the stored profile when the renewal fails', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'guest:profile-skip-renewal-fails';
+        const stored = storedProfile(playerId, { leaderboardIdentity: 'constructed', redditUsername: null });
+        seedStoredPlayerProfile(playerId, stored);
+        mockRedis.expire.mockRejectedValueOnce(new Error('2 UNKNOWN: i/o timeout'));
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        try {
+            await expect(upsertPlayerProfile({ playerId, hasAnyData: true })).resolves.toEqual(stored);
+            expect(consoleError).toHaveBeenCalledWith('Player profile expiry renewal failed:', expect.any(Error));
+        } finally {
+            consoleError.mockRestore();
+        }
+    });
+
+    it('writes a stored profile when the write changes what it holds', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'reddit:profile-skip-change';
+        seedStoredPlayerProfile(playerId, storedProfile(playerId, { hasAnyData: false }));
+
+        const profile = await upsertPlayerProfile({ playerId, redditUsername: 'Profile-Skip', hasAnyData: true });
+
+        expect(mockRedis.watch).toHaveBeenCalledTimes(1);
+        expect(profile.hasAnyData).toBe(true);
+        expect(JSON.parse(storedStrings.get(playerProfileRedisKey(playerId))).hasAnyData).toBe(true);
+    });
+
+    it('creates a missing profile without a transaction', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'reddit:profile-new';
+
+        const profile = await upsertPlayerProfile({ playerId, redditUsername: 'Profile-New', hasAnyData: false });
+
+        expect(mockRedis.watch).not.toHaveBeenCalled();
+        expect(mockRedis.set).toHaveBeenCalledWith(playerProfileRedisKey(playerId), expect.any(String), { nx: true });
+        expect(JSON.parse(storedStrings.get(playerProfileRedisKey(playerId)))).toEqual(profile);
+        expect(profile).toMatchObject({ playerId, redditUsername: 'Profile-New', hasSeenGame: true });
+    });
+
+    it('merges onto a profile that another request created first', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'reddit:profile-new-race';
+        const winner = storedProfile(playerId, {
+            redditUsername: 'Profile-New-Race',
+            preferences: { carSkin: 'assets/cars/mr_extra_crimson.webp' },
+            hasAnyData: false,
+        });
+        const set = mockRedis.set.getMockImplementation();
+        mockRedis.set.mockImplementationOnce(async () => {
+            // The other request's create lands between this request's read and its create.
+            seedStoredPlayerProfile(playerId, winner);
+            return '';
+        });
+
+        const profile = await upsertPlayerProfile({ playerId, redditUsername: 'Profile-New-Race', hasAnyData: true });
+
+        mockRedis.set.mockImplementation(set);
+        expect(mockRedis.watch).toHaveBeenCalledTimes(1);
+        expect(profile.preferences.carSkin).toBe('assets/cars/mr_extra_crimson.webp');
+        expect(profile.hasAnyData).toBe(true);
+    });
+
+    it('lets a real write retry past a renewal that lands inside its transaction', async () => {
+        const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const playerId = 'guest:profile-renewal-race';
+        seedStoredPlayerProfile(playerId, storedProfile(playerId, { leaderboardIdentity: 'constructed', redditUsername: null, hasAnyData: false }));
+        let watchCount = 0;
+        mockRedis.watch.mockImplementation(() => {
+            watchCount += 1;
+            if (watchCount > 1) return createMockTransaction();
+            // Another start-up's EXPIRE on this key aborts the first EXEC.
+            return {
+                multi: vi.fn().mockResolvedValue(undefined),
+                set: vi.fn().mockResolvedValue(undefined),
+                exec: vi.fn(async () => {
+                    throw Object.assign(new Error('2 UNKNOWN: redis: transaction failed'), {
+                        code: 2,
+                        details: 'redis: transaction failed',
+                    });
+                }),
+                discard: vi.fn().mockResolvedValue(undefined),
+            };
+        });
+
+        const profile = await upsertPlayerProfile({ playerId, hasAnyData: true });
+
+        expect(watchCount).toBe(2);
+        expect(profile.hasAnyData).toBe(true);
+        expect(JSON.parse(storedStrings.get(playerProfileRedisKey(playerId))).hasAnyData).toBe(true);
     });
 
     it('leaves an existing player profile alone when a snapshot is read', async () => {
@@ -2171,10 +2315,11 @@ describe('server daily gp store submissions', () => {
                 updatedAt: '2026-01-01T00:00:00.000Z',
             });
 
-            await getServerPlayerBootstrap({ redditUsername: 'Has-Any-Data-Player' });
+            const payload = await getServerPlayerBootstrap({ redditUsername: 'Has-Any-Data-Player' });
 
-            const storedProfile = findWrittenPlayerProfile('reddit:has-any-data-player');
-            expect(storedProfile.profile.hasAnyData).toBe(true);
+            expect(payload.hasAnyData).toBe(true);
+            expect(JSON.parse(storedStrings.get(playerProfileRedisKey('reddit:has-any-data-player'))).hasAnyData)
+                .toBe(true);
         });
 
         it('backfills Crimson for a player with an accepted race predating unlock tracking', async () => {
@@ -2205,12 +2350,41 @@ describe('server daily gp store submissions', () => {
                 .toContain('assets/cars/mr_extra_crimson.webp');
         });
 
+        it('skips the start-up reward repair when the completed-race record already exists', async () => {
+            const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+            seedStoredPlayerProfile('reddit:recorded-racer', {
+                playerId: 'reddit:recorded-racer',
+                leaderboardIdentity: 'reddit',
+                redditUsername: 'Recorded-Racer',
+                hasSeenGame: true,
+                hasAnyData: true,
+                firstSeenAt: '2026-01-01T00:00:00.000Z',
+            });
+            const playerHash = createHash('sha256')
+                .update('reddit:recorded-racer', 'utf8')
+                .digest('base64url');
+            mockRedis.hGet.mockImplementation(async (key, field) => (
+                key === `miniracer:car-unlocks:v1:${playerHash}` && field === 'race:completed' ? '1' : null
+            ));
+
+            const payload = await getServerPlayerBootstrap({ redditUsername: 'Recorded-Racer' });
+
+            expect(mockRedis.hSetNX).not.toHaveBeenCalledWith(expect.any(String), 'race:completed', '1');
+            expect(mockRedis.set).not.toHaveBeenCalledWith(
+                `miniracer:car-unlocks:promotion:v1:${playerHash}:lock`,
+                expect.any(String),
+                expect.anything(),
+            );
+            expect(mockRedis.watch).not.toHaveBeenCalled();
+            expect(payload.carUnlocks.progress.completedRace).toBe(1);
+        });
+
         it('preserves the original firstSeenAt across profile updates', async () => {
             const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
             seedStoredPlayerProfile('reddit:preserve-first-seen', {
                 playerId: 'reddit:preserve-first-seen',
                 leaderboardIdentity: 'reddit',
-                redditUsername: 'Preserve-First-Seen',
+                redditUsername: null,
                 hasSeenGame: true,
                 hasAnyData: true,
                 firstSeenAt: '2020-01-01T00:00:00.000Z',
@@ -2221,6 +2395,7 @@ describe('server daily gp store submissions', () => {
             await getServerPlayerBootstrap({ redditUsername: 'Preserve-First-Seen' });
 
             const storedProfile = findWrittenPlayerProfile('reddit:preserve-first-seen');
+            expect(storedProfile.profile.redditUsername).toBe('Preserve-First-Seen');
             expect(storedProfile.profile.firstSeenAt).toBe('2020-01-01T00:00:00.000Z');
         });
 
@@ -2933,7 +3108,7 @@ describe('server daily gp store submissions', () => {
             const payload = await getServerPlayerBootstrap({ redditUsername: 'Timestamp-Fallback' });
 
             expect(payload.firstSeenAt).toBe('2026-01-01T00:00:00.000Z');
-            expect(payload.lastSeenAt).toEqual(expect.any(String));
+            expect(payload).not.toHaveProperty('lastSeenAt');
         });
 
         it('falls back to the epoch timestamp for non-string firstSeenAt fields', async () => {
@@ -2945,7 +3120,6 @@ describe('server daily gp store submissions', () => {
                 hasSeenGame: true,
                 hasAnyData: true,
                 firstSeenAt: 123,
-                lastSeenAt: null,
                 updatedAt: false,
             });
 
@@ -3213,7 +3387,6 @@ describe('server daily gp store submissions', () => {
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
-                lastSeenAt: null,
             });
         });
 
@@ -3246,7 +3419,6 @@ describe('server daily gp store submissions', () => {
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
-                lastSeenAt: null,
             });
             mintSpy.mockRestore();
         });
@@ -3367,7 +3539,6 @@ describe('server daily gp store submissions', () => {
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
-                lastSeenAt: null,
             });
         });
 

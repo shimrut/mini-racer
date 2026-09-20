@@ -941,8 +941,8 @@ describe("daily-gp-store submission hardening", () => {
       hasAnyData: false,
       isReturningPlayer: false,
       firstSeenAt: null,
-      lastSeenAt: null,
     });
+    expect(payload).not.toHaveProperty("lastSeenAt");
   });
 
   it("resolves today's playable challenge even when it has not been written to the ledger yet", async () => {
@@ -1013,5 +1013,91 @@ describe("daily-gp-store submission hardening", () => {
     expect(snapshot.nearbyRows).toEqual([]);
     expect(snapshot.hasMore).toBe(true);
     expect(snapshot.nextOffset).toBe(10);
+  });
+});
+
+const carUnlockStore = await import("../src/server/car-unlock-store.ts");
+const leaderboard = await import("../src/server/competition-leaderboard.ts");
+const identityStore = await import("../src/server/competition-identity.ts");
+
+describe("Daily finish after the run is saved", () => {
+  beforeEach(() => {
+    redis.reset();
+    vi.restoreAllMocks();
+    validateDailyGpReplayDetailedMock.mockReset();
+    validateDailyGpReplayDetailedMock.mockReturnValue({
+      ok: true,
+      run: { bestTimeSec: 3, bestTimeMs: 3000, completedLaps: 1, checkpointTimesSec: [0.8, 1.6], method: "finish" },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  async function finishDaily(guestPlayerId) {
+    const challenge = await getServerDailyGpChallenge();
+    const guestToken = await mintGuestPlayerToken(guestPlayerId);
+    let result = null;
+    let thrown = null;
+    try {
+      result = await submitServerDailyGpRun({
+        playerId: guestPlayerId,
+        guestToken,
+        challengeId: challenge.id,
+        trackKey: challenge.trackKey,
+        replay: { targetLapNumber: 1, inputs: [{ frames: 180, left: false, right: false, relaunchDelay: false }] },
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    const snapshot = await getServerDailyGpSnapshot({ challengeId: challenge.id, playerId: guestPlayerId, guestToken });
+    return { result, thrown, boardTimeMs: snapshot.currentPlayerRow?.bestTimeMs ?? null };
+  }
+
+  it("answers saved without a rank when the rank read fails", async () => {
+    vi.spyOn(leaderboard, "readPlayerRank").mockRejectedValueOnce(new Error("rank unavailable"));
+    const { result, thrown, boardTimeMs } = await finishDaily("guest-after-save-rank");
+    expect(thrown).toBeNull();
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ accepted: true, bestTimeMs: 3000, playerRank: null, leaderboardEntryCount: null });
+    expect(result.body.carUnlocks).toBeTruthy();
+    expect(boardTimeMs).toBe(3000);
+  });
+
+  it("answers saved without a Garage when the Garage read fails", async () => {
+    vi.spyOn(carUnlockStore, "getCarUnlockSnapshot").mockRejectedValueOnce(new Error("garage unavailable"));
+    const { result, thrown, boardTimeMs } = await finishDaily("guest-after-save-garage");
+    expect(thrown).toBeNull();
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ accepted: true, bestTimeMs: 3000, playerRank: 1 });
+    expect(result.body).not.toHaveProperty("carUnlocks");
+    expect(boardTimeMs).toBe(3000);
+  });
+
+  it("answers saved without a Garage when the reward write fails", async () => {
+    vi.spyOn(carUnlockStore, "recordCompletedRace").mockRejectedValueOnce(new Error("reward busy"));
+    const { result, thrown, boardTimeMs } = await finishDaily("guest-after-save-reward");
+    expect(thrown).toBeNull();
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ accepted: true, bestTimeMs: 3000, playerRank: 1 });
+    expect(result.body).not.toHaveProperty("carUnlocks");
+    expect(boardTimeMs).toBe(3000);
+  });
+
+  it("answers saved when the profile write fails", async () => {
+    vi.spyOn(identityStore, "upsertPlayerProfile").mockRejectedValueOnce(new Error("profile busy"));
+    const { result, thrown, boardTimeMs } = await finishDaily("guest-after-save-profile");
+    expect(thrown).toBeNull();
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ accepted: true, bestTimeMs: 3000, playerRank: 1 });
+    expect(result.body.carUnlocks).toBeTruthy();
+    expect(boardTimeMs).toBe(3000);
+  });
+
+  it("keeps the failure answer when both record writes fail, with the time already saved", async () => {
+    vi.spyOn(carUnlockStore, "recordCompletedRace").mockRejectedValueOnce(new Error("reward busy"));
+    vi.spyOn(identityStore, "upsertPlayerProfile").mockRejectedValueOnce(new Error("profile busy"));
+    const { result, thrown, boardTimeMs } = await finishDaily("guest-after-save-both");
+    expect(result).toBeNull();
+    expect(thrown?.message).toBe("reward busy");
+    expect(boardTimeMs).toBe(3000);
   });
 });

@@ -136,7 +136,25 @@
       "Bash(head -345 *)",
       "Bash(REPORT_TRANSFER_COST=1 npx vitest run tests/server-guest-progress-selection.test.js)",
       "Bash(REPORT_TRANSFER_COST=1 npx vitest run)",
-      "Bash(awk '{print $1, $9}')"
+      "Bash(awk '{print $1, $9}')",
+      "Bash(node --experimental-strip-types -e ' *)",
+      "Bash(find . -maxdepth 3 -name \"tsconfig*.json\" -not -path \"./node_modules/*\" | head; echo \"---\"; ls -a | head -30)",
+      "Bash(tee /dev/stderr)",
+      "Bash(node -e \"const t=require\\('./game/medals/medal-times.json'\\);const k=Object.keys\\(t\\);console.log\\('medal rows:',k.length\\);console.log\\(k.join\\(', '\\)\\);const noAuthor=k.filter\\(x=>!t[x].author\\);console.log\\('without author:',noAuthor.length, noAuthor.join\\(','\\)\\);\")",
+      "Bash(node --input-type=module -e \"import t from './game/medals/medal-times.json' with {type:'json'}; const k=Object.keys\\(t\\); console.log\\(k.length, k.join\\(', '\\)\\);\")",
+      "Bash(grep -vE \"^\\\\S*-\\\\s*$\")",
+      "Bash(git rev-parse *)",
+      "Bash(grep -E \"^\\(tsx|ts-node|vitest|jest\\)$\")",
+      "Bash(node --experimental-strip-types --no-warnings -e ' *)",
+      "Bash(git diff *)",
+      "WebFetch(domain:developers.reddit.com)",
+      "Bash(ls node_modules/@devvit 2>/dev/null | head; grep -rIl \"40,000\\\\|40000 commands\\\\|pipelin\" node_modules/@devvit 2>/dev/null | head -5; grep -rIn -i \"concurrent transactions\\\\|max concurrency\" node_modules/@devvit docs 2>/dev/null | head -10)",
+      "Read(//Users/bpopa/.claude/skills/**)",
+      "Read(//Users/bpopa/Documents/DailyGP/.claude/**)",
+      "Read(//Users/bpopa/.claude/**)",
+      "Bash(node .cursor/skills/devvit-docs/scripts/ensure-docs.cjs)",
+      "Bash(D=node_modules/.cache/devvit-skills/devvit-docs; R=$D/versioned_docs/version-0.14; ls $R/capabilities/server 2>/dev/null | head -30; rg -n -i \"concurren|pipelin|commands per second|commands/s|40,000|40000|timeout|transactions? \\(limit|block\\)\" $R/capabilities/server/redis.md* $D/docs/capabilities/server/redis.md* 2>/dev/null | head -40)",
+      "Bash(awk 'NR>=2366 && NR<=2692 && /pendingAccountKey|pendingGuestKey|saveRecord\\\\\\(/ {print NR\": \"$0}' src/server/daily-gp-store.ts)"
     ]
   }
 }

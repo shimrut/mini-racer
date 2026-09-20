@@ -53,6 +53,57 @@ describe('standings return flow', () => {
     });
 });
 
+describe('a challenge finish that has spent its comment', () => {
+    function finishContext(dom, spent) {
+        return {
+            modalCombinedView: dom.window.document.getElementById('finish'),
+            content: new ModalContentUi(),
+            _challengeFinishPhase: 'lost',
+            _challengeFinishShareRequest: { kind: 'challenge-comment', challengeId: 'c1' },
+            _challengeFinishCommentSpent: spent,
+            _combinedResultsLapData: { challengeConfirmPhase: 'lost' },
+            combinedPlaylistBtn: dom.window.document.getElementById('combined-playlist-btn'),
+            _setShareButtonLabel: ModalShell.prototype._setShareButtonLabel,
+            _bindClickAction: ModalShell.prototype._bindClickAction,
+            _startShare: () => {},
+        };
+    }
+
+    function finishDom() {
+        return new JSDOM(`
+            <div id="finish" class="active-view">
+                <div id="combined-hero-medal"></div>
+                <button id="combined-playlist-btn">
+                    <span class="combined-action-btn-label">Comment</span>
+                </button>
+            </div>
+        `);
+    }
+
+    it.each([
+        ['posted', true, 'COMMENTED'],
+        ['unconfirmed', true, 'COMMENT'],
+        [null, false, 'COMMENT'],
+    ])('leaves the button %s when a late rank answer repaints it', (spent, disabled, label) => {
+        const originalDocument = global.document;
+        const dom = finishDom();
+        global.document = dom.window.document;
+        const context = finishContext(dom, spent);
+
+        try {
+            ModalShell.prototype.updateChallengeFinishHero.call(context, {
+                bestUpdate: { mode: 'campaign', improved: false, bestTimeMs: 11_200, rank: 2 },
+            });
+
+            expect(context.combinedPlaylistBtn.disabled).toBe(disabled);
+            expect(context.combinedPlaylistBtn.querySelector('.combined-action-btn-label').textContent)
+                .toBe(label);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+});
+
 describe('challenge finish correction', () => {
     it('repaints the opponent row when the asynchronous verdict changes', () => {
         const originalDocument = global.document;
@@ -1533,6 +1584,188 @@ describe('Daily finish share chooser', () => {
             global.document = originalDocument;
         }
     });
+
+    it.each([
+        ['created', 'Challenge created', 'Your verified challenge post is ready.'],
+        ['already_created', 'Already posted', 'This time is already up.'],
+    ])('tells the player what a challenge confirm returned: %s', async (status, expectedTitle, expectedCopy) => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="modal">
+                <div id="modal-lap-times"></div>
+                <div id="modal-combined-view"></div>
+                <button id="combined-playlist-btn"><span class="combined-action-btn-label">CHALLENGE</span></button>
+            </div>
+        `, { url: 'http://localhost' });
+        global.document = dom.window.document;
+        const shell = new ModalShell({
+            getRedditUsername: () => 'Racer',
+            previewShare: vi.fn(async () => ({
+                ok: true,
+                body: {
+                    status: 'ready',
+                    challengeToken: 'challenge-token-1',
+                    username: 'Racer',
+                    title: 'Can you beat 25.640s on Number Three?',
+                },
+            })),
+            confirmShare: vi.fn(async () => ({
+                ok: true,
+                body: {
+                    status,
+                    challengeId: 'challenge-1',
+                    postUrl: 'https://reddit.com/r/miniracer/challenge1',
+                },
+            })),
+        });
+
+        try {
+            const triggerButton = dom.window.document.getElementById('combined-playlist-btn');
+            const hostView = dom.window.document.getElementById('modal-combined-view');
+            await shell._startShare({ kind: 'head-to-head', source: 'campaign' }, triggerButton, hostView);
+
+            const panel = dom.window.document.querySelector('.result-share-panel');
+            await panel.querySelector('.result-share-panel__button--primary').onclick();
+
+            expect(panel.querySelector('.result-share-panel__title').textContent).toBe(expectedTitle);
+            expect(panel.querySelector('.result-share-panel__copy').textContent).toBe(expectedCopy);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('offers no second Brag when Reddit cannot confirm the first', async () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="modal">
+                <div id="modal-lap-times"></div>
+                <div id="modal-combined-view"></div>
+                <button id="combined-playlist-btn"><span class="combined-action-btn-label">BRAG</span></button>
+            </div>
+        `, { url: 'http://localhost' });
+        global.document = dom.window.document;
+        const error = 'Reddit did not confirm this brag. Check the post before you brag again.';
+        const shell = new ModalShell({
+            getRedditUsername: () => 'Racer',
+            previewShare: vi.fn(async () => ({
+                ok: true,
+                body: { status: 'ready', shareToken: 'share-1', username: 'Racer', commentText: 'Comfortable win.' },
+            })),
+            confirmShare: vi.fn(async () => ({
+                ok: false,
+                body: { status: 'comment_unconfirmed', error },
+            })),
+        });
+
+        try {
+            const triggerButton = dom.window.document.getElementById('combined-playlist-btn');
+            const hostView = dom.window.document.getElementById('modal-combined-view');
+            await shell._startShare({ kind: 'challenge-brag', acceptToken: 'accept-1' }, triggerButton, hostView);
+
+            const panel = dom.window.document.querySelector('.result-share-panel');
+            await panel.querySelector('.result-share-panel__button--primary').onclick();
+
+            expect(panel.querySelector('.result-share-panel__status').textContent).toBe(error);
+            expect(panel.querySelector('.result-share-panel__button--primary')).toBeNull();
+            const close = panel.querySelector('.result-share-panel__button');
+            expect(close.textContent).toBe('Close');
+            close.onclick();
+            expect(dom.window.document.querySelector('.result-share-panel')).toBeNull();
+            expect(triggerButton.disabled).toBe(true);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    function shareDom() {
+        return new JSDOM(`
+            <div id="modal">
+                <div id="modal-lap-times"></div>
+                <div id="modal-combined-view"></div>
+                <button id="combined-playlist-btn"><span class="combined-action-btn-label">BRAG</span></button>
+            </div>
+        `, { url: 'http://localhost' });
+    }
+
+    async function confirmWith(dom, body, request, previewBody = {}) {
+        const shell = new ModalShell({
+            getRedditUsername: () => 'Racer',
+            previewShare: vi.fn(async () => ({
+                ok: true,
+                body: {
+                    status: 'ready',
+                    shareToken: 'share-1',
+                    challengeToken: 'challenge-1',
+                    username: 'Racer',
+                    commentText: 'Comfortable win.',
+                    title: 'Beat my time',
+                    ...previewBody,
+                },
+            })),
+            confirmShare: vi.fn(async () => ({ ok: false, body })),
+        });
+        const triggerButton = dom.window.document.getElementById('combined-playlist-btn');
+        const hostView = dom.window.document.getElementById('modal-combined-view');
+        await shell._startShare(request, triggerButton, hostView);
+        const panel = dom.window.document.querySelector('.result-share-panel');
+        await panel.querySelector('.result-share-panel__button--primary').onclick();
+        return { shell, panel, triggerButton };
+    }
+
+    // A comment Reddit has already taken must never be offered a second post.
+    it.each([
+        [
+            'posted_without_link',
+            'Reddit did not return a link to your comment.',
+            'Your comment is up. Reddit did not return a link to it.',
+        ],
+        [
+            'user_action_unavailable',
+            'Reddit user-attributed sharing is not available for this app version.',
+            "Your comment is up under the app's name, not yours.",
+        ],
+    ])('shows a Brag as posted, with no Try Again, for %s', async (status, error, note) => {
+        const originalDocument = global.document;
+        const dom = shareDom();
+        global.document = dom.window.document;
+
+        try {
+            const { shell, panel } = await confirmWith(
+                dom,
+                { status, error },
+                { kind: 'challenge-brag', acceptToken: 'accept-1' },
+            );
+
+            expect(panel.querySelector('.result-share-panel__copy').textContent).toBe(note);
+            expect(panel.querySelector('.result-share-panel__button--primary')).toBeNull();
+            expect(panel.querySelector('.result-share-panel__button').textContent).toBe('Done');
+            expect(shell._challengeFinishCommentSpent).toBe('posted');
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('keeps Create Challenge failing on user_action_unavailable', async () => {
+        const originalDocument = global.document;
+        const dom = shareDom();
+        global.document = dom.window.document;
+        const error = 'Reddit user-attributed posting is not available for this app version.';
+
+        try {
+            // That answer describes a post Reddit gave the app, not a live comment.
+            const { panel } = await confirmWith(
+                dom,
+                { status: 'user_action_unavailable', error },
+                { kind: 'head-to-head', source: 'daily' },
+            );
+
+            const retry = panel.querySelector('.result-share-panel__button--primary');
+            expect(retry.textContent).toBe('Try Again');
+            expect(panel.querySelector('.result-share-panel__status').textContent).toBe(error);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
 });
 
 describe('combined finish next race button', () => {
@@ -1755,6 +1988,30 @@ describe('combined finish head to head win actions', () => {
             expect(comment.querySelector('.combined-action-btn-label').textContent).toBe('COMMENT');
             expect(comment.disabled).toBe(false);
             expect(comment.getAttribute('aria-label')).toBe('Comment on this challenge');
+        });
+    });
+
+    it('starts the next finish with nothing spent', () => {
+        withWinSheet((shell, doc) => {
+            shell._challengeFinishCommentSpent = 'posted';
+
+            shell.showCombinedResults(
+                {
+                    lapTime: 8.011,
+                    bestTime: 8,
+                    trackKey: 'number-zero',
+                    challengeFinish: true,
+                    challengeConfirmPhase: 'lost',
+                },
+                {
+                    restartAction: vi.fn(),
+                    shareRequest: { kind: 'challenge-comment', challengeId: 'challenge-2' },
+                    shareEnabled: true,
+                },
+            );
+
+            expect(shell._challengeFinishCommentSpent).toBeNull();
+            expect(byId(doc, 'combined-playlist-btn').disabled).toBe(false);
         });
     });
 

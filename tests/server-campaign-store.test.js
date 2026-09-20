@@ -1507,7 +1507,7 @@ describe('Campaign server store', () => {
         expect(result).not.toHaveProperty('releaseLock');
     });
 
-    it('awaits releaseLock when post-accept unlock work rejects', async () => {
+    it('answers saved and awaits releaseLock when the Garage read after the save rejects', async () => {
         const competitionSubmit = await import('../src/server/competition-submit.ts');
         let releaseResolved = false;
         const releaseLock = Promise.resolve().then(() => {
@@ -1526,13 +1526,50 @@ describe('Campaign server store', () => {
         const carUnlockStore = await import('../src/server/car-unlock-store.ts');
         vi.spyOn(carUnlockStore, 'getCarUnlockSnapshot').mockRejectedValueOnce(new Error('unlock snapshot failed'));
         const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
-        await expect(submitServerCampaignRun({
+        const result = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
             playerId: 'browser-player-id',
             redditUsername: 'Pm-User',
             replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
-        })).rejects.toThrow('unlock snapshot failed');
+        });
+        expect(result.status).toBe(200);
+        expect(result.body).toMatchObject({ accepted: true, bestTimeMs: 12_345 });
+        expect(result.body.progress.resultsByRaceId['numbered-v1-00']).toMatchObject({ bestTimeMs: 12_345 });
+        expect(result.body).not.toHaveProperty('carUnlocks');
+        expect(releaseResolved).toBe(true);
+    });
+
+    it('answers saved without a Garage and awaits releaseLock when the reward write rejects', async () => {
+        const competitionSubmit = await import('../src/server/competition-submit.ts');
+        let releaseResolved = false;
+        const releaseLock = Promise.resolve().then(() => {
+            releaseResolved = true;
+        });
+        vi.spyOn(competitionSubmit, 'submitCompetitionRun').mockResolvedValueOnce({
+            status: 200,
+            body: {
+                accepted: true,
+                improved: true,
+                bestTimeMs: 12_345,
+                checkpointTimesSec: [4.2, 9.8],
+            },
+            releaseLock,
+        });
+        const carUnlockStore = await import('../src/server/car-unlock-store.ts');
+        vi.spyOn(carUnlockStore, 'recordCompletedRace').mockRejectedValueOnce(new Error('reward busy'));
+        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const result = await submitServerCampaignRun({
+            raceId: 'numbered-v1-00',
+            trackKey: 'numberZero',
+            playerId: 'browser-player-id',
+            redditUsername: 'Pm-User',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+        expect(result.status).toBe(200);
+        expect(result.body).toMatchObject({ accepted: true, bestTimeMs: 12_345 });
+        expect(result.body.progress.resultsByRaceId['numbered-v1-00']).toMatchObject({ bestTimeMs: 12_345 });
+        expect(result.body).not.toHaveProperty('carUnlocks');
         expect(releaseResolved).toBe(true);
     });
 });

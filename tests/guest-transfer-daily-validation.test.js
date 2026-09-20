@@ -18,7 +18,11 @@ const {
   selectGuestProgress,
 } = await import("../src/server/daily-gp-store.ts");
 const { toDailyCompetition } = await import("../src/server/competition.ts");
-const { recordCompletedRace, carUnlockHashKey } = await import("../src/server/car-unlock-store.ts");
+const {
+  recordCompletedRace,
+  recordHeadToHeadWin,
+  carUnlockHashKey,
+} = await import("../src/server/car-unlock-store.ts");
 const { upsertPlayerProfile } = await import("../src/server/competition-identity.ts");
 const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
 const {
@@ -404,6 +408,55 @@ describe("the bootstrap unlock backfill waits for an open transfer", () => {
 
     expect(await redis.hGet(carUnlockHashKey(redditPlayerId), completedRaceField))
       .toBeFalsy();
+  });
+
+  it("grants a Garage credit that a won challenge could not write", async () => {
+    const redditPlayerId = "reddit:owed-credit";
+    const winField = "win:challenge:challenge-owed";
+    await upsertPlayerProfile({
+      playerId: redditPlayerId,
+      leaderboardIdentity: "reddit",
+      redditUsername: "Owed-Credit",
+      hasAnyData: true,
+    });
+    vi.spyOn(redis, "hSetNX").mockRejectedValueOnce(new Error("reward busy"));
+    await expect(recordHeadToHeadWin(redditPlayerId, "challenge-owed"))
+      .rejects.toThrow("reward busy");
+    expect(await redis.hGet(carUnlockHashKey(redditPlayerId), winField)).toBeFalsy();
+
+    await getServerPlayerBootstrap({ redditUsername: "Owed-Credit" });
+
+    expect(await redis.hGet(carUnlockHashKey(redditPlayerId), winField)).toBe("1");
+  });
+
+  it("repairs the first-race reward for a player who has only raced Campaign", async () => {
+    const redditPlayerId = "reddit:campaign-only";
+    await upsertPlayerProfile({
+      playerId: redditPlayerId,
+      leaderboardIdentity: "reddit",
+      redditUsername: "Campaign-Only",
+      hasAnyData: false,
+    });
+    await redis.set(campaignProgressKey(redditPlayerId), JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-09-01T09:00:00.000Z",
+      resultsByRaceId: {
+        "numbered-v1-00": {
+          raceId: "numbered-v1-00",
+          trackKey: "numberZero",
+          lapCount: 2,
+          rulesRevision: 1,
+          bestTimeMs: 12_000,
+          medal: "gold",
+          checkpointTimesSec: [4.2, 9.8],
+          updatedAt: "2026-09-01T09:30:00.000Z",
+        },
+      },
+    }));
+
+    await getServerPlayerBootstrap({ redditUsername: "Campaign-Only" });
+
+    expect(await redis.hGet(carUnlockHashKey(redditPlayerId), completedRaceField)).toBe("1");
   });
 
   it("backfills once no transfer is open", async () => {

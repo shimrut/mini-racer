@@ -120,11 +120,7 @@ function bodyWithBestUpdate(
 }
 
 export type HeadToHeadServiceDependencies = {
-    resolveSource(
-        input: Record<string, unknown>,
-        username: string,
-        context?: HeadToHeadRequestContext,
-    ): Promise<HeadToHeadSource | null>;
+    resolveSource(input: Record<string, unknown>): Promise<HeadToHeadSource | null>;
     validateReplay(
         challenge: HeadToHeadRecord,
         replay: unknown,
@@ -324,6 +320,7 @@ async function resolveChallengeRecord(
             challengeId: challengeId || null,
             postId: context.postId || null,
             reason: result.reason,
+            ...('detail' in result && result.detail ? { detail: result.detail } : {}),
         });
     }
     if (context.postId || !challengeId) return { record: null, reason: result.reason, diff };
@@ -592,15 +589,6 @@ async function recoverPost(
     return null;
 }
 
-async function deletePostBestEffort(post: unknown): Promise<void> {
-    try {
-        if (post && typeof (post as { delete?: unknown }).delete === 'function') {
-            await (post as { delete: () => Promise<unknown> }).delete();
-        }
-    } catch {
-    }
-}
-
 async function savePost(
     record: HeadToHeadRecord,
     post: { postId: `t3_${string}`; postUrl: string },
@@ -634,7 +622,7 @@ export function createHeadToHeadService(
         if (!request) {
             return { status: 401, body: { status: 'signed_in_required', error: 'Sign in to Reddit to challenge other players.' } };
         }
-        const source = await dependencies.resolveSource(input, request.username, context);
+        const source = await dependencies.resolveSource(input);
         if (!isValidSource(source)) {
             return { status: 404, body: { status: 'result_unavailable', error: 'No verified result is available for this challenge.' } };
         }
@@ -716,17 +704,7 @@ export function createHeadToHeadService(
             return { status: 403, body: { status: 'challenge_forbidden', error: 'This preview belongs to another Reddit account or community.' } };
         }
 
-        const sourceInput = {
-            ...prepared.sourceInput,
-            ...(prepared.sourceContract.originMode === 'daily'
-                ? { replay: input.replay }
-                : {}),
-        };
-        const source = await dependencies.resolveSource(
-            sourceInput,
-            request.username,
-            context,
-        );
+        const source = await dependencies.resolveSource({ ...prepared.sourceInput, replay: input.replay });
         if (!isValidSource(source) || !sameSourceContract(source, prepared.sourceContract)) {
             return {
                 status: 409,
@@ -828,7 +806,6 @@ export function createHeadToHeadService(
             const post = await reddit.submitCustomPost({
                 subredditName: request.subredditName,
                 title: preparedRecord.title,
-                flairId,
                 entry: HEAD_TO_HEAD_POST_TYPE,
                 postData,
                 textFallback: { text: formatHeadToHeadTextFallback(postData, record.frozenGhost) },
@@ -836,7 +813,6 @@ export function createHeadToHeadService(
                 userGeneratedContent: { text: preparedRecord.title },
             });
             if (normalizeName((post as any)?.authorName || '') !== normalizeName(request.username)) {
-                await deletePostBestEffort(post);
                 await releaseHeadToHeadPostSlot(
                     request.subredditName,
                     request.username,
@@ -867,6 +843,17 @@ export function createHeadToHeadService(
                 postId: post.id as `t3_${string}`,
                 postUrl: post.url,
             });
+            // Reddit drops the flair from a post that the player makes. The app is a moderator, so
+            // it sets the flair. The post is live either way, so a failure is only logged.
+            try {
+                await reddit.setPostFlair({
+                    subredditName: request.subredditName,
+                    postId: post.id as `t3_${string}`,
+                    flairTemplateId: flairId,
+                });
+            } catch (error) {
+                console.error('Head to Head post was created without its flair:', error);
+            }
             const carUnlocks = await recordChallengePostUnlock(
                 playerIdForUsername(request.username),
                 saved.trackKey,
@@ -1112,15 +1099,32 @@ export function createHeadToHeadService(
                 return acceptToken;
             })()
             : Promise.resolve(null);
-        const unlockWrites = (async () => {
-            await recordCompletedRace(viewer.playerId);
+        // After the origin save, never beside it. That save records the same completed race for the
+        // same player, so the two fought over one Garage lock, and every day the loser failed either
+        // the win or the rank in its own mode. The origin save never rejects.
+        // The win goes first. Both writes take the same Garage lock, and a failed first write
+        // would skip the second: only the win has no repair of its own beyond what it records.
+        const unlockWrites = originSave.then(async () => {
             await recordHeadToHeadWin(viewer.playerId, challengeId);
-        })();
-        const [acceptToken, bestUpdate] = await Promise.all([
-            acceptPromise,
-            originSave,
-            unlockWrites,
-        ]);
+            await recordCompletedRace(viewer.playerId);
+        });
+        // The win is verified and its origin best is saved. Nothing below can undo that, so each job
+        // settles on its own: a failed brag record leaves no brag button, and a failed Garage read
+        // leaves the Garage out. Before, any one of them turned a won race into a 500.
+        const [accept, unlocks] = await Promise.allSettled([acceptPromise, unlockWrites]);
+        const bestUpdate = await originSave;
+        if (accept.status === 'rejected') {
+            console.error('Head to Head win saved, but its brag record failed:', accept.reason);
+        }
+        if (unlocks.status === 'rejected') {
+            console.error('Head to Head win saved, but its rewards failed:', unlocks.reason);
+        }
+        let carUnlocks: Awaited<ReturnType<typeof readChallengeCarUnlocks>> | null = null;
+        try {
+            carUnlocks = await readChallengeCarUnlocks(viewer.playerId);
+        } catch (error) {
+            console.error('Head to Head win saved, but its Garage could not be read:', error);
+        }
         return {
             status: 200,
             body: bodyWithBestUpdate({
@@ -1131,8 +1135,8 @@ export function createHeadToHeadService(
                 bestTimeMs: verified.bestTimeMs,
                 targetTimeMs: challenge.targetTimeMs,
                 differenceMs,
-                acceptToken,
-                carUnlocks: await readChallengeCarUnlocks(viewer.playerId),
+                acceptToken: accept.status === 'fulfilled' ? accept.value : null,
+                ...(carUnlocks ? { carUnlocks } : {}),
             }, bestUpdate),
         };
     }

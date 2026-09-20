@@ -87,9 +87,11 @@ In `submitUserComment`, check in this order:
 
 1. `commentId`: return `already`, as today.
 2. `postedAt` and no `commentId`: walk the thread for the link. **Do not submit.**
-   - The walk finds it: complete the receipt with the ID — the author matched, so
-     the ID rule allows it — and return `already`. Returning the comment while the
-     receipt has no ID makes every later attempt answer `posted_without_link`.
+   - The walk finds it: complete the receipt and return `already`. Returning the
+     comment while the receipt has no ID makes every later attempt answer
+     `posted_without_link`. Store the ID only when it is a `t1_` ID, the same rule
+     as step 1. Anything else is a publication with no usable link, so the receipt
+     keeps `postedAt` with no ID and the answer is `posted_without_link`.
    - The walk misses or cannot finish: return `posted_without_link`, not
      `unconfirmed`. Unconfirmed is for a claim that may never have posted.
 3. Neither: the existing linkless walk, unchanged. That is the uncertain attempt.
@@ -105,8 +107,8 @@ because nothing reads `postedAt` until step 2.
 
 ## 3. Judge the publication from the receipt
 
-Both callers keep the two checks, and read them off the receipt, on `posted`,
-`already`, and `posted_without_link`:
+Both callers keep the two checks, and read them off the receipt, on `posted` and
+`posted_without_link` — the two outcomes this work writes `authorName` on:
 
 | Receipt | Answer |
 |---|---|
@@ -118,6 +120,17 @@ The author check comes first, including on `posted_without_link`. The walk
 matches the player ([user-comment-submit.ts:115](../src/server/user-comment-submit.ts)),
 so an app-authored comment is never found and would otherwise be reported as the
 player's comment posted without a link.
+
+**Do not run the author check on `already`.** Leave that success path as it is.
+Receipts already in the wild carry no `authorName`, and a missing name would read
+as "not the player". `already` is also how a leftover claim becomes a real
+receipt: the thread walk finds the comment and returns it, which is the "share
+again to check" recovery. Break that and the recovery tells the player their
+comment went up under the app's name, and the result stays stuck.
+
+An ID on a receipt already means the comment is the player's. The walk matches
+only the player, and step 1 writes an ID only when the author is the player. The
+check would be redundant as well as harmful.
 
 Step 1 stores no `commentId` for an app-authored comment, so the three places
 that read a stored ID as success stay correct and stay unchanged:
@@ -202,6 +215,10 @@ Add, for Daily Share, Brag, and Challenge Comment:
   posts nothing.
 - A `postedAt` receipt whose walk finds the comment answers with the ID, not
   `posted_without_link`.
+- A claim receipt with no `authorName`, whose walk finds the comment, answers
+  success. It must not answer `user_action_unavailable`.
+- A walk that finds a comment without a `t1_` ID answers `posted_without_link`
+  and stores no ID.
 - A wrong-author comment with a valid ID never makes the Daily preview answer
   `already_shared`.
 - A wrong-author comment with no ID answers `user_action_unavailable`, not

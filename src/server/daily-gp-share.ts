@@ -16,6 +16,11 @@ import {
 } from './daily-gp-post-store.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 import {
+    readUserCommentRecord,
+    submitUserComment,
+    type UserCommentRecord,
+} from './user-comment-submit.js';
+import {
     acquireRedisLock,
     beginOwnedRedisLockTransaction,
     releaseRedisLock,
@@ -207,13 +212,6 @@ async function stopAndReleaseLock(lease: RedisLockLease, lock: RedisLock): Promi
 
 async function stillOwnLock(lease: RedisLockLease): Promise<boolean> {
     return lease.isOwned() && await lease.confirmOwnership();
-}
-
-async function deleteCommentBestEffort(comment: any): Promise<void> {
-    try {
-        await comment?.delete?.();
-    } catch (_error) {
-    }
 }
 
 async function checkRateLimit(username: string): Promise<number | null> {
@@ -428,17 +426,19 @@ async function readActiveSharedResult(record: SharePreviewRecord): Promise<Share
         const comment = await reddit.getCommentById(shared.commentId);
         if (!(comment as any)?.removed) return shared;
     } catch (_error) {
+        // A failed call proves nothing.
+        return shared;
     }
     await redis.del(key);
     return null;
 }
 
-function alreadySharedBody(shared: SharedResultRecord): Record<string, unknown> {
+function alreadySharedBody(shared: UserCommentRecord): Record<string, unknown> {
     return {
         status: 'already_shared',
         username: shared.username,
         commentText: shared.commentText,
-        commentUrl: shared.commentUrl,
+        commentUrl: shared.commentUrl ?? '',
     };
 }
 
@@ -565,14 +565,30 @@ export async function confirmDailyGpShare(
     });
     try {
         if (!await stillOwnLock(lease)) return ownershipLost();
-        const shared = await readActiveSharedResult(preview);
-        if (shared) {
+        // The preview above was read before the lock. Another confirmation may have finished in
+        // between, so the copy this one works from is read again inside the lock.
+        const locked = parseSharePreviewRecord(await redis.get(tokenKey));
+        if (!locked) {
+            return { status: 409, body: { status: 'preview_expired', error: 'This share preview expired. Try again.' } };
+        }
+        if (
+            normalizeName(locked.username) !== normalizeName(validContext.username)
+            || normalizeName(locked.subredditName) !== normalizeName(validContext.subredditName)
+        ) {
+            return { status: 403, body: { status: 'share_forbidden', error: 'This share preview belongs to another Reddit account.' } };
+        }
+        // A record with a comment answers here, from Redis alone: no score thread to resolve, and
+        // no second lock. The check that asks Reddit whether that comment still exists belongs to
+        // the preview, which is where a player who deleted it asks to share again.
+        const recordKey = createSharedResultKey(locked);
+        const stored = await readUserCommentRecord(recordKey);
+        if (stored?.commentId) {
             await redis.del(tokenKey);
-            return { status: 200, body: alreadySharedBody(shared) };
+            return { status: 200, body: alreadySharedBody(stored) };
         }
         const post = await resolveDailyGpPostRecord({
-            subredditName: preview.subredditName,
-            challengeId: preview.challengeId,
+            subredditName: locked.subredditName,
+            challengeId: locked.challengeId,
             appSlug: validContext.appSlug,
             preferredPostUrl: validContext.preferredPostUrl,
         });
@@ -585,20 +601,34 @@ export async function confirmDailyGpShare(
         if (!withThread.scoreThreadCommentId) {
             throw new Error('The score thread is unavailable.');
         }
-        const comment = await reddit.submitComment({
-            id: withThread.scoreThreadCommentId,
-            text: preview.commentText,
-            runAs: 'USER',
+        const outcome = await submitUserComment({
+            postId: post.postId,
+            parentId: withThread.scoreThreadCommentId,
+            username: locked.username,
+            text: locked.commentText,
+            record: { key: recordKey, ttlSeconds: DAILY_GP_REDIS_TTL_SECONDS, stored },
+            fallbackCommentUrl: post.postUrl,
+            confirmOwnership: () => stillOwnLock(lease),
         });
-        if (!await stillOwnLock(lease)) {
-            await deleteCommentBestEffort(comment);
-            return ownershipLost();
+        if (outcome.status === 'lock_lost') return ownershipLost();
+        if (outcome.status === 'already') {
+            await redis.del(tokenKey);
+            return { status: 200, body: alreadySharedBody(outcome.record) };
         }
-        if (normalizeName((comment as any)?.authorName || '') !== normalizeName(preview.username)) {
-            try {
-                await (comment as any).delete();
-            } catch (_error) {
-            }
+        if (outcome.status === 'unconfirmed') {
+            return {
+                status: 409,
+                body: {
+                    status: 'comment_unconfirmed',
+                    error: 'Reddit did not confirm this share. Share again to check.',
+                },
+            };
+        }
+        // The helper recorded the publication. Both answers below describe a live comment, so
+        // nothing here deletes it: Reddit lets only the author delete a comment, and on an
+        // approved app the author is the player, not the app.
+        const published = outcome.record;
+        if (normalizeName(published.authorName || '') !== normalizeName(locked.username)) {
             return {
                 status: 409,
                 body: {
@@ -607,36 +637,24 @@ export async function confirmDailyGpShare(
                 },
             };
         }
-        if (typeof (comment as any)?.id !== 'string' || !(comment as any).id.startsWith('t1_')) {
-            throw new Error('Reddit did not return a shared-comment ID.');
+        if (outcome.status === 'posted_without_link') {
+            return {
+                status: 409,
+                body: {
+                    status: 'posted_without_link',
+                    error: 'Reddit did not return a link to your comment.',
+                },
+            };
         }
-        const saved: SharedResultRecord = {
-            commentId: (comment as any).id,
-            commentUrl: typeof (comment as any)?.url === 'string' ? (comment as any).url : post.postUrl,
-            commentText: preview.commentText,
-            username: preview.username,
-            createdAt: new Date().toISOString(),
-        };
-        const sharedKey = createSharedResultKey(preview);
-        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
-        if (!transaction) {
-            await deleteCommentBestEffort(comment);
-            return ownershipLost();
-        }
-        await transaction.set(sharedKey, JSON.stringify(saved));
-        await transaction.expire(sharedKey, DAILY_GP_REDIS_TTL_SECONDS);
-        await transaction.del(tokenKey);
-        const transactionResults = await transaction.exec();
-        if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
-            await deleteCommentBestEffort(comment);
-            return ownershipLost();
-        }
+        await redis.del(tokenKey).catch((error: unknown) => {
+            console.error('Daily GP share preview cleanup failed:', error);
+        });
         return {
             status: 200,
             body: {
                 status: 'shared',
-                commentText: saved.commentText,
-                commentUrl: saved.commentUrl,
+                commentText: published.commentText,
+                commentUrl: published.commentUrl ?? '',
             },
         };
     } finally {

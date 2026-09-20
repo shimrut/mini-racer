@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACKS } from '../game/track/tracks.js';
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { getMedalForRaceTime } from '../game/medals/medal-timing.js';
 import { createTrackFingerprint } from '../src/server/pb-ghost-trace.ts';
 
 const mockDailyChallenge = vi.hoisted(() => vi.fn());
@@ -14,7 +15,6 @@ const mockGetCampaignProgress = vi.hoisted(() => vi.fn());
 const mockRepairStandings = vi.hoisted(() => vi.fn());
 
 vi.mock('../src/server/campaign-store.js', () => ({
-    getServerHeadToHeadSource: vi.fn(),
     submitServerCampaignRun: mockSubmitCampaignRun,
     getCampaignProgressForSelection: mockGetCampaignProgress,
     repairCampaignStandingsFromEntries: mockRepairStandings,
@@ -82,7 +82,7 @@ describe('head-to-head runtime', () => {
             source: 'daily',
             challengeId: dailyChallenge.id,
             replay,
-        }, 'RaceFan');
+        });
 
         expect(source).toMatchObject({
             sourceKind: 'daily',
@@ -94,9 +94,62 @@ describe('head-to-head runtime', () => {
         });
         expect(mockDailyChallenge).toHaveBeenCalledWith(dailyChallenge.id);
         expect(mockValidateReplay).toHaveBeenCalledWith({
-            challenge: dailyChallenge,
+            challenge: {
+                trackKey,
+                rulesRevision: 1,
+                objectiveType: 'single_lap_fastest',
+                objectiveParams: { lapCount: 1 },
+            },
             replay,
         });
+    });
+
+    it('builds a Campaign challenge source from the exact submitted finish, not the saved best', async () => {
+        const stage = CAMPAIGN_STAGES[0];
+        const replay = {
+            rulesRevision: stage.rulesRevision,
+            targetLapNumber: stage.lapCount,
+            inputs: [{ frames: 240, left: false, right: false, relaunchDelay: false }],
+        };
+        const source = await resolveHeadToHeadSource({ source: 'campaign', raceId: stage.raceId, replay });
+
+        expect(source).toEqual({
+            sourceKind: 'campaign',
+            sourceId: stage.raceId,
+            campaignId: 'numbered-v1',
+            raceId: stage.raceId,
+            trackKey: stage.trackKey,
+            lapCount: stage.lapCount,
+            bestTimeMs: 12_345,
+            medal: getMedalForRaceTime(stage.trackKey, 12.345, stage.lapCount),
+            rulesRevision: stage.rulesRevision,
+            trackFingerprint: createTrackFingerprint(TRACKS[stage.trackKey]),
+            ghost: { schemaVersion: 2, finishTimeMs: 12_345 },
+        });
+        expect(mockValidateReplay).toHaveBeenCalledWith({
+            challenge: expect.objectContaining({ trackKey: stage.trackKey, rulesRevision: stage.rulesRevision }),
+            replay,
+        });
+        expect(mockDailyChallenge).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['a Campaign finish without its run', { source: 'campaign', raceId: CAMPAIGN_STAGES[0].raceId }],
+        ['a Campaign race the manifest does not define', { source: 'campaign', raceId: 'numbered-v1-99', replay: {} }],
+        ['a Daily finish without its run', { source: 'daily', challengeId: dailyChallenge.id }],
+    ])('refuses %s', async (_case, input) => {
+        expect(await resolveHeadToHeadSource(input)).toBeNull();
+        expect(mockValidateReplay).not.toHaveBeenCalled();
+    });
+
+    it('refuses a run the replay check rejects', async () => {
+        mockValidateReplay.mockReturnValueOnce({ ok: false, failure: { reason: 'target_lap_mismatch' } });
+
+        expect(await resolveHeadToHeadSource({
+            source: 'campaign',
+            raceId: CAMPAIGN_STAGES[0].raceId,
+            replay: {},
+        })).toBeNull();
     });
 
     it('validates an embedded Daily challenge after its normal window expires', () => {

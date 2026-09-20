@@ -833,7 +833,9 @@ export async function submitServerCampaignRun({
             };
         }
 
-        const [carUnlocks] = await Promise.all([
+        // The progress is saved, and it is the record the Keep Progress chooser reads. Neither job
+        // below can unsave it, so each settles on its own and only what failed is left out.
+        const [carUnlocks, reward] = await Promise.allSettled([
             getCarUnlockSnapshot(
                 canonicalPlayerId,
                 savedProgress.resultsByRaceId,
@@ -841,15 +843,24 @@ export async function submitServerCampaignRun({
                 true,
             ),
             recordCompletedRace(canonicalPlayerId),
-            outcome.releaseLock,
         ]);
+        if (carUnlocks.status === 'rejected') {
+            console.error('Campaign run saved, but its Garage could not be read:', carUnlocks.reason);
+        }
+        if (reward.status === 'rejected') {
+            console.error('Campaign run saved, but its completed-race reward failed:', reward.reason);
+        }
 
         return {
             status: 200,
             body: {
                 ...outcome.body as Record<string, unknown>,
                 progress: publicProgress(savedProgress),
-                carUnlocks,
+                // This Garage counts the finish before the reward is stored. Without the reward,
+                // the next start-up could lock the car again, so the answer shows no Garage at all.
+                ...(carUnlocks.status === 'fulfilled' && reward.status === 'fulfilled'
+                    ? { carUnlocks: carUnlocks.value }
+                    : {}),
             },
         };
     } finally {
@@ -886,45 +897,6 @@ export async function getServerCampaignPbGhost({
             trackKey: stage.trackKey,
             personalBest,
         },
-    };
-}
-
-export async function getServerHeadToHeadSource({
-    raceId,
-    playerId,
-    redditUsername,
-    guestToken,
-}: {
-    raceId?: unknown;
-    playerId?: unknown;
-    redditUsername?: unknown;
-    guestToken?: unknown;
-} = {}) {
-    const identity = await identityFor({ playerId, redditUsername, guestToken });
-    const stage = getCampaignStage(raceId);
-    if (!identity.canonicalPlayerId || !stage) return null;
-    await cleanupExpiredCampaignGuestsBestEffort();
-    const competition = competitionFor(stage, identity.canonicalPlayerId);
-    const personalBest = await getPlayerTrackPbRecord({
-        playerId: identity.canonicalPlayerId,
-        competition,
-        track: TRACKS[stage.trackKey],
-    });
-    if (!personalBest?.ghost) return null;
-    const result = (await readProgress(identity.canonicalPlayerId))
-        .resultsByRaceId[stage.raceId] ?? null;
-    return {
-        sourceKind: 'campaign' as const,
-        sourceId: stage.raceId,
-        campaignId: CAMPAIGN_ID,
-        raceId: stage.raceId,
-        trackKey: stage.trackKey,
-        lapCount: stage.lapCount,
-        bestTimeMs: personalBest.bestTimeMs,
-        medal: result?.medal ?? null,
-        rulesRevision: stage.rulesRevision,
-        trackFingerprint: personalBest.trackFingerprint,
-        ghost: personalBest.ghost,
     };
 }
 

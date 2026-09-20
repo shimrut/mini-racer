@@ -24,35 +24,58 @@ export type CarUnlockSnapshot = ReturnType<typeof buildCarUnlockSnapshot>;
 const COMPLETED_RACE_FIELD = 'race:completed';
 const POSTED_TRACK_PREFIX = 'post:track:';
 const WON_CHALLENGE_PREFIX = 'win:challenge:';
+/** How many of each kind a Garage counts. One table, read by the reward write and by the settle. */
+const REWARD_FIELD_RULES = [
+    { prefix: POSTED_TRACK_PREFIX, limit: 5 },
+    { prefix: WON_CHALLENGE_PREFIX, limit: 10 },
+] as const;
 const CAR_UNLOCK_PROMOTION_LOCK_TTL_MS = 30_000;
-const CAR_UNLOCK_PROMOTION_LOCK_ATTEMPTS = 5;
+/** Pauses between attempts. A transfer answers busy fast and lets the browser retry. */
+const TRANSFER_LOCK_RETRY_DELAYS_MS = [5, 5, 5, 5];
+/**
+ * A reward write holds the lock for about nine Redis calls. Four 5 ms pauses gave up before
+ * another write for the same player finished, and the loser failed a run that was already saved.
+ * These pauses wait up to about 0.6 s in all.
+ */
+const REWARD_LOCK_RETRY_DELAYS_MS = [10, 20, 40, 80, 160, 320];
 
 class CarUnlockProgressBusyError extends Error {}
 
+function playerKeyHash(playerId: string): string {
+    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
+}
+
 export function carUnlockHashKey(playerId: string): string {
-    const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
-    return `miniracer:car-unlocks:v1:${playerHash}`;
+    return `miniracer:car-unlocks:v1:${playerKeyHash(playerId)}`;
 }
 
 function promotionKey(playerId: string): string {
-    const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
-    return `miniracer:car-unlocks:promotion:v1:${playerHash}`;
+    return `miniracer:car-unlocks:promotion:v1:${playerKeyHash(playerId)}`;
+}
+
+/** Holds the rewards a failed write still owes a player. */
+function owedRewardKey(playerId: string): string {
+    return `miniracer:car-unlocks:owed:v1:${playerKeyHash(playerId)}`;
 }
 
 function promotionLockKey(playerId: string): string {
     return `${promotionKey(playerId)}:lock`;
 }
 
-async function acquirePromotionLock(playerId: string, client: RedisClient) {
-    for (let attempt = 0; attempt < CAR_UNLOCK_PROMOTION_LOCK_ATTEMPTS; attempt += 1) {
+async function acquirePromotionLock(
+    playerId: string,
+    client: RedisClient,
+    retryDelaysMs: readonly number[] = TRANSFER_LOCK_RETRY_DELAYS_MS,
+) {
+    for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
         const lock = await acquireRedisLock(
             promotionLockKey(playerId),
             CAR_UNLOCK_PROMOTION_LOCK_TTL_MS,
             client,
         );
         if (lock) return lock;
-        if (attempt < CAR_UNLOCK_PROMOTION_LOCK_ATTEMPTS - 1) {
-            await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        if (attempt < retryDelaysMs.length) {
+            await new Promise<void>((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
         }
     }
     throw new CarUnlockProgressBusyError('Car unlock progress update is already in progress.');
@@ -97,8 +120,7 @@ export async function readGuestPromotionTarget(
  * what this names, so a reward earned after the player chose is never taken away with the rest.
  */
 function transferBaselineKey(accountPlayerId: string): string {
-    const playerHash = createHash('sha256').update(accountPlayerId, 'utf8').digest('base64url');
-    return `miniracer:car-unlocks:transfer-baseline:v1:${playerHash}`;
+    return `miniracer:car-unlocks:transfer-baseline:v1:${playerKeyHash(accountPlayerId)}`;
 }
 
 /**
@@ -110,8 +132,7 @@ function transferBaselineKey(accountPlayerId: string): string {
  * when the ordinary write is a no-op.
  */
 function transferJournalKey(accountPlayerId: string): string {
-    const playerHash = createHash('sha256').update(accountPlayerId, 'utf8').digest('base64url');
-    return `miniracer:car-unlocks:transfer-journal:v1:${playerHash}`;
+    return `miniracer:car-unlocks:transfer-journal:v1:${playerKeyHash(accountPlayerId)}`;
 }
 
 /** Keeps the journal from growing without bound if a transfer is left open for a long time. */
@@ -161,20 +182,98 @@ async function journalAcceptedTransferEvent(
     await client.hSetNX(journalKey, field, '1');
 }
 
+/**
+ * Writes one reward field by its own rule. The rules live here, in one place, because the settle
+ * grants a field it was handed and has no other way to know which rule that field follows.
+ */
+async function writeRewardField(
+    hashKey: string,
+    field: string,
+    client: RedisClient,
+): Promise<void> {
+    if (field === COMPLETED_RACE_FIELD) {
+        await client.hSetNX(hashKey, field, '1');
+        return;
+    }
+    const rule = REWARD_FIELD_RULES.find(({ prefix }) => field.startsWith(prefix));
+    if (!rule) return;
+    await recordUniqueFieldUntil(hashKey, field, rule.prefix, rule.limit, client);
+}
+
+/**
+ * Grants one reward. The player has already been told they earned it, so a failure records the
+ * field as owed and a later start-up grants it.
+ */
 async function writeCarUnlockEvent(
     playerId: string,
     field: string,
-    write: (key: string) => Promise<void>,
     client: RedisClient,
 ): Promise<void> {
-    const lock = await acquirePromotionLock(playerId, client);
     try {
-        const ownerPlayerId = await resolvePromotedPlayerId(playerId, client);
-        await write(carUnlockHashKey(ownerPlayerId));
-        // After the ordinary write, and regardless of whether it changed anything.
-        await journalAcceptedTransferEvent(ownerPlayerId, field, client);
-    } finally {
-        await releaseRedisLock(lock, client);
+        const lock = await acquirePromotionLock(playerId, client, REWARD_LOCK_RETRY_DELAYS_MS);
+        try {
+            const ownerPlayerId = await resolvePromotedPlayerId(playerId, client);
+            await writeRewardField(carUnlockHashKey(ownerPlayerId), field, client);
+            // After the ordinary write, and regardless of whether it changed anything.
+            await journalAcceptedTransferEvent(ownerPlayerId, field, client);
+        } finally {
+            await releaseRedisLock(lock, client);
+        }
+    } catch (error) {
+        await rememberOwedReward(playerId, field, client);
+        throw error;
+    }
+}
+
+/**
+ * Remembers one owed reward. Best effort, and without the promotion lock the write just lost: a
+ * second failure here would only repeat the loss this record exists to repair.
+ */
+async function rememberOwedReward(
+    playerId: string,
+    field: string,
+    client: RedisClient,
+): Promise<void> {
+    try {
+        // Garage caps bound this list.
+        await writeRewardField(owedRewardKey(playerId), field, client);
+    } catch (error) {
+        console.error('An earned reward could not be remembered:', error);
+    }
+}
+
+/**
+ * Grants the rewards whose writes failed. Start-up calls this, and it never throws: a repair must
+ * not fail the request that runs it. It answers whether the list is empty, for a caller that has to
+ * know, and a reward it cannot grant stays owed.
+ */
+export async function settleOwedRewards(
+    playerId: string,
+    client: RedisClient = redis,
+): Promise<boolean> {
+    const key = owedRewardKey(playerId);
+    try {
+        const owed = await client.hGetAll(key);
+        for (const field of Object.keys(owed ?? {})) {
+            await writeCarUnlockEvent(playerId, field, client);
+            await client.hDel(key, [field]);
+        }
+        return true;
+    } catch (error) {
+        console.error('An owed Garage reward could not be granted:', error);
+        return false;
+    }
+}
+
+/** Drops a player's owed rewards, for a save the player has chosen to give up. */
+export async function clearOwedRewards(
+    playerId: string,
+    client: RedisClient = redis,
+): Promise<void> {
+    try {
+        await client.del(owedRewardKey(playerId));
+    } catch (error) {
+        console.error('An owed reward list could not be cleared:', error);
     }
 }
 
@@ -289,6 +388,10 @@ export async function readGuestTransferGarageJournalFields(
     return Object.keys(await client.hGetAll(transferJournalKey(accountPlayerId)) ?? {});
 }
 
+function wonChallengeField(challengeId: string): string {
+    return `${WON_CHALLENGE_PREFIX}${safeFieldPart(challengeId)}`;
+}
+
 function safeFieldPart(value: string): string {
     return encodeURIComponent(value.trim());
 }
@@ -330,16 +433,26 @@ export async function hasCarUnlockProgress(
     return Object.keys(await readEventFields(playerId, client)).length > 0;
 }
 
+/**
+ * Whether the owner already holds the completed-race field, read without the lock.
+ *
+ * Only start-up's repair may skip on this. The repair earns nothing: it restates a field the owner
+ * already has. A finish must still take the locked write, because a reward accepted while a
+ * transfer is open is journaled even when the field already exists.
+ */
+export async function hasRecordedCompletedRace(
+    playerId: string,
+    client: RedisClient = redis,
+): Promise<boolean> {
+    const ownerPlayerId = await resolvePromotedPlayerId(playerId, client);
+    return await client.hGet(carUnlockHashKey(ownerPlayerId), COMPLETED_RACE_FIELD) === '1';
+}
+
 export async function recordCompletedRace(
     playerId: string,
     client: RedisClient = redis,
 ): Promise<void> {
-    await writeCarUnlockEvent(
-        playerId,
-        COMPLETED_RACE_FIELD,
-        async (key) => { await client.hSetNX(key, COMPLETED_RACE_FIELD, '1'); },
-        client,
-    );
+    await writeCarUnlockEvent(playerId, COMPLETED_RACE_FIELD, client);
 }
 
 export async function recordHeadToHeadPost(
@@ -348,13 +461,7 @@ export async function recordHeadToHeadPost(
     client: RedisClient = redis,
 ): Promise<void> {
     if (!trackKey.trim()) return;
-    const field = `${POSTED_TRACK_PREFIX}${safeFieldPart(trackKey)}`;
-    await writeCarUnlockEvent(
-        playerId,
-        field,
-        async (key) => recordUniqueFieldUntil(key, field, POSTED_TRACK_PREFIX, 5, client),
-        client,
-    );
+    await writeCarUnlockEvent(playerId, `${POSTED_TRACK_PREFIX}${safeFieldPart(trackKey)}`, client);
 }
 
 export async function recordHeadToHeadWin(
@@ -363,13 +470,7 @@ export async function recordHeadToHeadWin(
     client: RedisClient = redis,
 ): Promise<void> {
     if (!challengeId.trim()) return;
-    const field = `${WON_CHALLENGE_PREFIX}${safeFieldPart(challengeId)}`;
-    await writeCarUnlockEvent(
-        playerId,
-        field,
-        async (key) => recordUniqueFieldUntil(key, field, WON_CHALLENGE_PREFIX, 10, client),
-        client,
-    );
+    await writeCarUnlockEvent(playerId, wonChallengeField(challengeId), client);
 }
 
 export async function getCarUnlockSnapshot(

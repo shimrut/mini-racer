@@ -132,8 +132,6 @@ export type DailyGpPlayerProfile = {
     hasSeenGame: boolean;
     hasAnyData: boolean;
     firstSeenAt: string;
-    lastSeenAt: string;
-    updatedAt: string;
 };
 
 export type DailyGpPlayerPreferences = {

@@ -86,6 +86,7 @@ const reddit = {
         activePosts.set(post.id, post);
         return post;
     }),
+    setPostFlair: vi.fn(async () => undefined),
 };
 
 vi.mock('@devvit/redis', () => ({ redis }));
@@ -231,7 +232,6 @@ describe('head-to-head service', () => {
         expect(identitySetCall?.[2]).toEqual({ expiration: expect.any(Date) });
         expect(reddit.submitCustomPost).toHaveBeenCalledWith(expect.objectContaining({
             entry: 'head-to-head',
-            flairId: 'flair-head-to-head',
             runAs: 'USER',
             userGeneratedContent: {
                 text: 'Can you beat 25.640s on Number Three?',
@@ -245,6 +245,12 @@ describe('head-to-head service', () => {
         }));
         expect(reddit.submitCustomPost.mock.calls[0][0].postData).not.toHaveProperty('ghost');
         const submitted = reddit.submitCustomPost.mock.calls[0][0];
+        expect(submitted).not.toHaveProperty('flairId');
+        expect(reddit.setPostFlair).toHaveBeenCalledWith({
+            subredditName: 'MiniRacer',
+            postId: 't3_challenge1',
+            flairTemplateId: 'flair-head-to-head',
+        });
         expect(submitted.postData.replayDataHash).toMatch(/^[a-f0-9]{64}$/);
         expect(submitted.textFallback.text).toContain('Beat **25.640** on **Number Three** (2 laps).');
         expect(submitted.textFallback.text).toContain('Challenge replay data:');
@@ -453,6 +459,48 @@ describe('head-to-head service', () => {
         });
     });
 
+    it('names the failing field when a challenge post holds data that fails the check', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        const postData = await post.getPostData();
+        post.getPostData = vi.fn(async () => ({ ...postData, medal: 'platinum' }));
+
+        const resolved = await resolveHeadToHeadRecordResult(created.body.challengeId, context);
+
+        expect(resolved).toEqual({
+            ok: false,
+            reason: 'post_data_invalid',
+            detail: 'fetched medal:string:"platinum"; request missing',
+        });
+    });
+
+    it('says when a challenge post has no data at all', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        activePosts.get('t3_challenge1').getPostData = vi.fn(async () => undefined);
+
+        const resolved = await resolveHeadToHeadRecordResult(created.body.challengeId, context);
+
+        expect(resolved).toMatchObject({ reason: 'post_data_invalid', detail: 'fetched missing; request missing' });
+    });
+
+    it('tells a deleted challenger account from a different author, without logging a name', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+
+        post.authorName = '[deleted]';
+        expect(await resolveHeadToHeadRecordResult(created.body.challengeId, context))
+            .toMatchObject({ reason: 'post_author_mismatch', detail: 'author_deleted' });
+        post.authorName = 'SomeoneElse';
+        expect(await resolveHeadToHeadRecordResult(created.body.challengeId, context))
+            .toMatchObject({ reason: 'post_author_mismatch', detail: 'author_differs' });
+        post.authorName = undefined;
+        expect(await resolveHeadToHeadRecordResult(created.body.challengeId, context))
+            .toMatchObject({ reason: 'post_author_mismatch', detail: 'author_missing' });
+    });
+
     it('does not revive a challenge when its replay body is missing', async () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         const service = makeService();
@@ -492,6 +540,53 @@ describe('head-to-head service', () => {
         });
     });
 
+    it('creates and loads a challenge from every Campaign stage, including the last ones', async () => {
+        const { CAMPAIGN_STAGES } = await import('../game/campaign/manifest.js');
+        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const viewer = {
+            subredditName: context.subredditName,
+            playerId: 'campaign-h2h-racer',
+            guestToken: await mintGuestPlayerToken('campaign-h2h-racer'),
+        };
+        for (const stage of CAMPAIGN_STAGES) {
+            const service = createHeadToHeadService({
+                resolveSource: vi.fn(async () => ({
+                    ...source(),
+                    sourceId: stage.raceId,
+                    raceId: stage.raceId,
+                    trackKey: stage.trackKey,
+                    lapCount: stage.lapCount,
+                })),
+                validateReplay: vi.fn(),
+                now: () => new Date('2026-07-23T12:00:00.000Z'),
+                createId: () => `challenge-${stage.raceId}`,
+            });
+            const preview = await service.preview({ sourceKind: 'campaign' }, context);
+            expect(preview.body.status, stage.raceId).toBe('ready');
+            const created = await service.create({ challengeToken: preview.body.challengeToken }, context);
+            expect(created.body.status, stage.raceId).toBe('created');
+            const loaded = await service.get(created.body.challengeId, viewer);
+            expect(loaded.body.status, stage.raceId).toBe('ready');
+        }
+    });
+
+    it('refuses a Campaign race that the manifest does not define', async () => {
+        const service = createHeadToHeadService({
+            resolveSource: vi.fn(async () => ({
+                ...source(),
+                sourceId: 'numbered-v1-16',
+                raceId: 'numbered-v1-16',
+            })),
+            validateReplay: vi.fn(),
+            now: () => new Date('2026-07-23T12:00:00.000Z'),
+            createId: () => 'challenge-unknown-stage',
+        });
+        expect(await service.preview({ sourceKind: 'campaign' }, context)).toMatchObject({
+            status: 404,
+            body: { status: 'result_unavailable' },
+        });
+    });
+
     it('requires a signed-in Reddit user and current subreddit', async () => {
         const service = makeService();
         expect((await service.preview({}, { subredditName: 'MiniRacer' })).status).toBe(401);
@@ -516,6 +611,26 @@ describe('head-to-head service', () => {
             },
         });
         expect(reddit.submitCustomPost).toHaveBeenCalledTimes(1);
+    });
+
+    it('still reports the post as created when the app cannot set its flair', async () => {
+        reddit.setPostFlair.mockRejectedValueOnce(new Error('flair refused'));
+        const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        try {
+            const created = await createChallenge(makeService());
+
+            expect(created).toMatchObject({
+                status: 200,
+                body: { status: 'created', postUrl: 'https://reddit.com/r/miniracer/challenge1' },
+            });
+            expect(error).toHaveBeenCalledWith(
+                'Head to Head post was created without its flair:',
+                expect.any(Error),
+            );
+        } finally {
+            error.mockRestore();
+        }
     });
 
     it('does not recognize or reuse an app-authored challenge post', async () => {
@@ -593,7 +708,8 @@ describe('head-to-head service', () => {
                 error: 'Reddit user-attributed posting is not available for this app version.',
             },
         });
-        expect(fallbackPost.delete).toHaveBeenCalledOnce();
+        expect(fallbackPost.delete).not.toHaveBeenCalled();
+        expect(reddit.setPostFlair).not.toHaveBeenCalled();
         expect(result.body).not.toHaveProperty('carUnlocks');
         expect([...hashes.values()].every((hash) => !hash.has('post:track:numberThree'))).toBe(true);
         expect(strings.get(
@@ -837,6 +953,87 @@ describe('head-to-head service', () => {
                 lapCount: 2,
                 objectiveType: 'multi_lap_total',
             }),
+        });
+    });
+
+    it('records the win rewards only after the origin save, which writes the same reward', async () => {
+        let originFinished = false;
+        let rewardBeforeOrigin = false;
+        const recordBest = vi.fn(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            originFinished = true;
+            return { mode: 'campaign', improved: true, bestTimeMs: 25_000, medal: 'gold', rank: 4 };
+        });
+        const hSetNX = redis.hSetNX.getMockImplementation();
+        redis.hSetNX.mockImplementation(async (key, field, value) => {
+            if (field === 'race:completed' && !originFinished) rewardBeforeOrigin = true;
+            return hSetNX(key, field, value);
+        });
+        try {
+            const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000, recordBest });
+            const created = await createChallenge(service);
+
+            const won = await service.submit(
+                { challengeId: created.body.challengeId, replay: { frames: ['viewer'] }, bestTimeMs: 25_000 },
+                { ...context, username: 'ChallengerAce' },
+            );
+
+            expect(won.body).toMatchObject({ accepted: true, outcome: 'won', bestUpdate: { rank: 4 } });
+            expect(redis.hSetNX).toHaveBeenCalledWith(expect.any(String), 'race:completed', '1');
+            expect(rewardBeforeOrigin).toBe(false);
+        } finally {
+            redis.hSetNX.mockImplementation(hSetNX);
+        }
+    });
+
+    describe('a won race whose extra steps fail after it is saved', () => {
+        async function winWith(failure) {
+            const recordBest = vi.fn(async () => ({
+                mode: 'campaign', improved: true, bestTimeMs: 25_000, medal: 'gold', rank: 4,
+            }));
+            const service = makeService({ bestTimeMs: 25_640, validatedTimeMs: 25_000, recordBest });
+            const created = await createChallenge(service);
+            const restore = await failure();
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+            try {
+                return await service.submit(
+                    { challengeId: created.body.challengeId, replay: { frames: ['viewer'] }, bestTimeMs: 25_000 },
+                    { ...context, username: 'ChallengerAce' },
+                );
+            } finally {
+                consoleError.mockRestore();
+                restore.mockRestore();
+            }
+        }
+
+        it('still answers the win, without a brag button, when the brag record fails', async () => {
+            const store = await import('../src/server/head-to-head-store.ts');
+            const won = await winWith(async () => vi.spyOn(store, 'writeHeadToHeadAccept')
+                .mockRejectedValueOnce(new Error('brag record failed')));
+
+            expect(won.status).toBe(200);
+            expect(won.body).toMatchObject({ accepted: true, outcome: 'won', acceptToken: null, bestUpdate: { rank: 4 } });
+            expect(won.body.carUnlocks).toBeTruthy();
+        });
+
+        it('still answers the win when the rewards fail', async () => {
+            const unlockStore = await import('../src/server/car-unlock-store.ts');
+            const won = await winWith(async () => vi.spyOn(unlockStore, 'recordHeadToHeadWin')
+                .mockRejectedValueOnce(new Error('reward busy')));
+
+            expect(won.status).toBe(200);
+            expect(won.body).toMatchObject({ accepted: true, outcome: 'won', bestUpdate: { rank: 4 } });
+            expect(typeof won.body.acceptToken).toBe('string');
+        });
+
+        it('still answers the win, without a Garage, when the Garage read fails', async () => {
+            const unlockStore = await import('../src/server/car-unlock-store.ts');
+            const won = await winWith(async () => vi.spyOn(unlockStore, 'getCarUnlockSnapshot')
+                .mockRejectedValueOnce(new Error('garage unavailable')));
+
+            expect(won.status).toBe(200);
+            expect(won.body).toMatchObject({ accepted: true, outcome: 'won', bestUpdate: { rank: 4 } });
+            expect(won.body).not.toHaveProperty('carUnlocks');
         });
     });
 

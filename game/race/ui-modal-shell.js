@@ -796,16 +796,26 @@ export class ModalShell {
         bragged = false,
         commented = false,
         keepShareAvailable = false,
+        noteText = '',
     } = {}) {
         const isChallengeCreate = Boolean(result?.postUrl) && !result?.commentText;
+        // The server made no new post: this race and time already has a live one.
+        const isChallengeRepeat = isChallengeCreate && result?.status === 'already_created';
         panel.replaceChildren();
         const title = document.createElement('h3');
         title.className = 'result-share-panel__title';
-        title.textContent = isChallengeCreate ? 'Challenge created' : commented ? 'Comment posted' : 'Shared';
+        title.textContent = isChallengeRepeat
+            ? 'Already posted'
+            : isChallengeCreate ? 'Challenge created' : commented ? 'Comment posted' : 'Shared';
         const copy = document.createElement('blockquote');
         copy.className = 'result-share-panel__copy';
-        copy.textContent = result?.commentText
-            || (isChallengeCreate ? 'Your verified challenge post is ready.' : 'Your result is already in the score thread.');
+        copy.textContent = noteText
+            || result?.commentText
+            || (isChallengeRepeat
+                ? 'This time is already up.'
+                : isChallengeCreate
+                    ? 'Your verified challenge post is ready.'
+                    : 'Your result is already in the score thread.');
         const actions = document.createElement('div');
         actions.className = 'result-share-panel__actions';
         const done = document.createElement('button');
@@ -932,6 +942,10 @@ export class ModalShell {
             focusPreferred: true,
         });
 
+        const markCommentSpent = (reason) => {
+            if (isBrag || isChallengeComment) this._challengeFinishCommentSpent = reason;
+        };
+
         const username = this.getRedditUsername?.();
         if (!username) {
             status.textContent = isChallenge
@@ -957,6 +971,7 @@ export class ModalShell {
             const response = await this.previewShare(request);
             const body = response?.body || {};
             if (body.status === 'already_shared' || body.status === 'already_created') {
+                markCommentSpent('posted');
                 this._showShareOutcome(panel, triggerButton, body, {
                     bragged: isBrag,
                     commented: isChallengeComment,
@@ -1003,12 +1018,48 @@ export class ModalShell {
                 try {
                     const shareToken = isChallenge ? body.challengeToken : body.shareToken;
                     const confirmed = await this.confirmShare(shareToken, request);
+                    if (confirmed?.body?.status === 'comment_unconfirmed') {
+                        // The comment may be live: offer no second post from this finish, and
+                        // record that, or the next repaint offers the button again.
+                        markCommentSpent('unconfirmed');
+                        confirm.remove();
+                        cancelReady.disabled = false;
+                        cancelReady.textContent = 'Close';
+                        cancelReady.onclick = () => this._closeSharePanel();
+                        disclosure.textContent = confirmed.body.error;
+                        disclosure.classList.add('is-error');
+                        resetMenuKeyboardState(this._shareMenuKeyboardState, [cancelReady], {
+                            preferredIndex: 0,
+                            container: actions,
+                            focusPreferred: true,
+                        });
+                        return;
+                    }
+                    // Reddit has the comment. Try Again would post a second one.
+                    // Create Challenge answers user_action_unavailable for a post, not a comment,
+                    // so it keeps its failure.
+                    const publishedNote = confirmed?.body?.status === 'posted_without_link'
+                        ? 'Your comment is up. Reddit did not return a link to it.'
+                        : (!isChallenge && confirmed?.body?.status === 'user_action_unavailable')
+                            ? 'Your comment is up under the app\'s name, not yours.'
+                            : '';
+                    if (publishedNote) {
+                        markCommentSpent('posted');
+                        this._showShareOutcome(panel, triggerButton, confirmed.body, {
+                            bragged: isBrag,
+                            commented: isChallengeComment,
+                            keepShareAvailable: isDailyShare,
+                            noteText: publishedNote,
+                        });
+                        return;
+                    }
                     const successfulStatuses = isChallenge
                         ? ['created', 'already_created']
                         : isChallengeComment ? ['commented'] : ['shared', 'already_shared'];
                     if (!confirmed?.ok || !successfulStatuses.includes(confirmed?.body?.status)) {
                         throw new Error(confirmed?.body?.error || 'Could not share this result.');
                     }
+                    markCommentSpent('posted');
                     this._showShareOutcome(panel, triggerButton, confirmed.body, {
                         bragged: isBrag,
                         commented: isChallengeComment,
@@ -1168,6 +1219,7 @@ export class ModalShell {
 
         if (lapData.challengeFinish || lapData.challengeConfirmPhase) {
             this._challengeFinishShareRequest = options.shareRequest || null;
+            this._challengeFinishCommentSpent = null;
             this._challengeFinishPhase = lapData.challengeConfirmPhase
                 ?? (lapData.lapMedal === 'challenge' ? 'won' : 'pending');
         } else {
@@ -1417,7 +1469,10 @@ export class ModalShell {
         const isChallengeBrag = challengeShareRequest?.kind === 'challenge-brag';
         const isChallengeComment = challengeShareRequest?.kind === 'challenge-comment';
         const finishPhase = phase ?? this._challengeFinishPhase;
-        const shareEnabled = Boolean(challengeShareRequest) && (
+        // This finish may have spent its comment already. A repaint that recomputed the button from
+        // the phase alone offered it again, and a late rank answer is exactly such a repaint.
+        const spent = this._challengeFinishCommentSpent;
+        const shareEnabled = !spent && Boolean(challengeShareRequest) && (
             isChallengeBrag
                 ? finishPhase === 'won'
                 : isChallengeComment && (finishPhase === 'tie' || finishPhase === 'lost')
@@ -1425,7 +1480,12 @@ export class ModalShell {
 
         if (this.combinedPlaylistBtn && challengeShareRequest) {
             this.combinedPlaylistBtn.style.display = '';
-            this._setShareButtonLabel(this.combinedPlaylistBtn, isChallengeComment ? 'Comment' : 'Brag');
+            this._setShareButtonLabel(
+                this.combinedPlaylistBtn,
+                spent === 'posted'
+                    ? (isChallengeComment ? 'Commented' : 'Bragged')
+                    : (isChallengeComment ? 'Comment' : 'Brag'),
+            );
             this.combinedPlaylistBtn.setAttribute(
                 'aria-label',
                 isChallengeComment

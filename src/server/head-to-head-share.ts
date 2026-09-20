@@ -8,11 +8,21 @@ import { resolveHeadToHeadRecord } from './head-to-head-post.js';
 import type { HeadToHeadRecord } from './head-to-head-model.js';
 import {
     acquireRedisLock,
-    releaseRedisLock,
+    releaseRedisLocksSafely,
     startRedisLockLeaseRenewal,
 } from './redis-lock.js';
+import {
+    readUserCommentRecord,
+    submitUserComment,
+    type UserCommentRecord,
+} from './user-comment-submit.js';
 
 export const HEAD_TO_HEAD_SHARE_PREVIEW_TTL_SECONDS = 10 * 60;
+/**
+ * The record that guards one brag or one comment. It must outlive any attempt that could follow it,
+ * so it keeps the term the Daily share record keeps.
+ */
+export const HEAD_TO_HEAD_SHARE_RECORD_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const HEAD_TO_HEAD_SHARE_LOCK_TTL_MS = 30_000;
 export const HEAD_TO_HEAD_SHARE_LOCK_RENEWAL_INTERVAL_MS = 10_000;
 
@@ -26,7 +36,33 @@ export type HeadToHeadSharePreview = {
     subredditName: string;
     postId: `t3_${string}`;
     commentText: string;
+    /** The result this preview posts about. Its record guards it, and its lock serialises it. */
+    resultKey: string;
 };
+
+/**
+ * One key per result, and the action is part of it: a brag and a comment on one challenge hold
+ * different opinions of the same race, and must never share a record or a lock.
+ */
+export function headToHeadShareResultKey({
+    action,
+    challengeId,
+    username,
+    timeMs,
+}: {
+    action: 'brag' | 'comment';
+    challengeId: string;
+    username: string;
+    timeMs: number;
+}): string {
+    return [
+        'miniracer:head-to-head:shared',
+        action,
+        challengeId,
+        normalizeHeadToHeadName(username),
+        timeMs,
+    ].join(':');
+}
 
 export type HeadToHeadShareChallengeResolution = {
     challenge: HeadToHeadRecord;
@@ -72,6 +108,8 @@ async function readHeadToHeadSharePreview(key: string): Promise<HeadToHeadShareP
             || typeof parsed?.postId !== 'string'
             || !parsed.postId.startsWith('t3_')
             || typeof parsed?.commentText !== 'string'
+            || typeof parsed?.resultKey !== 'string'
+            || !parsed.resultKey
         ) return null;
         return parsed as HeadToHeadSharePreview;
     } catch {
@@ -134,15 +172,6 @@ export async function resolveHeadToHeadShareChallenge(
     return { challenge };
 }
 
-export async function deleteRedditCommentBestEffort(
-    comment: { delete?: () => Promise<unknown> } | null,
-): Promise<void> {
-    try {
-        await comment?.delete?.();
-    } catch {
-    }
-}
-
 export async function submitHeadToHeadShareComment({
     tokenKey,
     request,
@@ -164,8 +193,12 @@ export async function submitHeadToHeadShareComment({
             error: `This ${action} is already being posted.`,
         },
     };
+    // The preview names the result, and the result names the lock. Two previews of one result
+    // therefore wait for each other, which is what lets a record left behind be treated as dead.
+    const claimed = await readHeadToHeadSharePreview(tokenKey);
+    if (!claimed) return expiredResult;
     const lock = await acquireRedisLock(
-        `${tokenKey}:lock`,
+        `${claimed.resultKey}:lock`,
         HEAD_TO_HEAD_SHARE_LOCK_TTL_MS,
         redis,
     );
@@ -176,8 +209,18 @@ export async function submitHeadToHeadShareComment({
         HEAD_TO_HEAD_SHARE_LOCK_RENEWAL_INTERVAL_MS,
         redis,
     );
+    const postedBody = (record: UserCommentRecord, postUrl: string) => ({
+        status: 200,
+        body: {
+            status: action === 'brag' ? 'shared' : 'commented',
+            commentText: record.commentText,
+            commentUrl: record.commentUrl || postUrl,
+            commentId: record.commentId as `t1_${string}`,
+        },
+    });
     try {
-        // Read only after acquiring the lock: a prior confirmation may have consumed the token.
+        // Read again inside the lock: the copy above was read before it, and another confirmation
+        // may have finished in between.
         const preview = await readHeadToHeadSharePreview(tokenKey);
         if (!preview) return expiredResult;
         if (
@@ -192,6 +235,12 @@ export async function submitHeadToHeadShareComment({
                 },
             };
         }
+        // A record with a comment answers from Redis alone, so a repeat asks Reddit nothing.
+        const stored = await readUserCommentRecord(preview.resultKey);
+        if (stored?.commentId) {
+            await redis.del(tokenKey);
+            return postedBody(stored, '');
+        }
         const post = await reddit.getPostById(preview.postId) as { url?: string } | null;
         if (!post) {
             return {
@@ -199,23 +248,40 @@ export async function submitHeadToHeadShareComment({
                 body: { status: 'post_unavailable', error: 'The challenge post is unavailable.' },
             };
         }
-
-        if (!await lease.confirmOwnership()) return inProgressResult;
-        const comment = await reddit.submitComment({
-            id: preview.postId,
+        const postUrl = typeof post.url === 'string' ? post.url : '';
+        const outcome = await submitUserComment({
+            postId: preview.postId,
+            username: preview.username,
             text: preview.commentText,
-            runAs: 'USER',
-        }) as {
-            id?: string;
-            url?: string;
-            authorName?: string;
-            delete?: () => Promise<unknown>;
-        };
+            record: {
+                key: preview.resultKey,
+                ttlSeconds: HEAD_TO_HEAD_SHARE_RECORD_TTL_SECONDS,
+                stored,
+            },
+            fallbackCommentUrl: postUrl,
+            confirmOwnership: () => lease.confirmOwnership(),
+        });
+        if (outcome.status === 'lock_lost') return inProgressResult;
+        if (outcome.status === 'unconfirmed') {
+            return {
+                status: 409,
+                body: {
+                    status: 'comment_unconfirmed',
+                    error: `Reddit did not confirm this ${action}. Try again to check.`,
+                },
+            };
+        }
+        if (outcome.status === 'already') {
+            await redis.del(tokenKey);
+            return postedBody(outcome.record, postUrl);
+        }
+        // The helper recorded the publication. Both answers below describe a live comment, so
+        // nothing here deletes it.
+        const published = outcome.record;
         if (
-            normalizeHeadToHeadName(comment?.authorName || '')
+            normalizeHeadToHeadName(published.authorName || '')
             !== normalizeHeadToHeadName(preview.username)
         ) {
-            await deleteRedditCommentBestEffort(comment);
             return {
                 status: 409,
                 body: {
@@ -224,27 +290,22 @@ export async function submitHeadToHeadShareComment({
                 },
             };
         }
-        const commentId = comment?.id;
-        if (typeof commentId !== 'string' || !commentId.startsWith('t1_')) {
-            await deleteRedditCommentBestEffort(comment);
-            throw new Error(action === 'brag'
-                ? 'Reddit did not return a brag comment ID.'
-                : 'Reddit did not return a comment ID.');
+        if (outcome.status === 'posted_without_link') {
+            return {
+                status: 409,
+                body: {
+                    status: 'posted_without_link',
+                    error: 'Reddit did not return a link to your comment.',
+                },
+            };
         }
-        await redis.del(tokenKey);
-        return {
-            status: 200,
-            body: {
-                status: action === 'brag' ? 'shared' : 'commented',
-                commentText: preview.commentText,
-                commentUrl: typeof comment.url === 'string'
-                    ? comment.url
-                    : (typeof post.url === 'string' ? post.url : ''),
-                commentId: commentId as `t1_${string}`,
-            },
-        };
+        await redis.del(tokenKey).catch((error: unknown) => {
+            console.error('Head to Head share preview cleanup failed:', error);
+        });
+        return postedBody(published, postUrl);
     } finally {
+        // The comment may already be live, so cleanup must not replace the result.
         await lease.stop();
-        await releaseRedisLock(lock, redis);
+        await releaseRedisLocksSafely([lock], 'Head to Head share', redis);
     }
 }

@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
     captureGuestTransferGarageBaseline,
+    hasRecordedCompletedRace,
     cleanupGuestCarUnlockProgress,
     discardGuestCarUnlockProgress,
     getCarUnlockSnapshot,
@@ -10,6 +11,7 @@ import {
     recordHeadToHeadPost,
     recordHeadToHeadWin,
     retireEmptyGuestIdentity,
+    settleOwedRewards,
 } from '../src/server/car-unlock-store.ts';
 import { EXTRA_CAR_ASSETS } from '../game/car/car-unlock-policy.js';
 
@@ -34,11 +36,19 @@ function createRedisMock() {
         async hGetAll(key) {
             return Object.fromEntries(getHash(key));
         },
+        async hGet(key, field) {
+            return getHash(key).get(field);
+        },
         async hSetNX(key, field, value) {
             const hash = getHash(key);
             if (hash.has(field)) return 0;
             hash.set(field, String(value));
             return 1;
+        },
+        async hDel(key, fields) {
+            const hash = getHash(key);
+            for (const field of fields) hash.delete(field);
+            return fields.length;
         },
         async hSet(key, fields) {
             const hash = getHash(key);
@@ -133,6 +143,50 @@ describe('server car unlock store', () => {
         expect(snapshot.unlockedAssets).toContain(EXTRA_CAR_ASSETS.onyx);
     });
 
+    function failTheNextGarageWrite() {
+        const hSetNX = client.hSetNX.bind(client);
+        let failedOnce = false;
+        client.hSetNX = async (key, field, value) => {
+            if (!failedOnce && key.startsWith('miniracer:car-unlocks:v1:')) {
+                failedOnce = true;
+                throw new Error('reward busy');
+            }
+            return hSetNX(key, field, value);
+        };
+    }
+
+    it('grants a win whose reward write failed, and grants it once', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        failTheNextGarageWrite();
+
+        await expect(recordHeadToHeadWin('reddit:driver', 'challenge-owed', client))
+            .rejects.toThrow('reward busy');
+        expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.headToHeadWins)
+            .toBe(0);
+
+        await settleOwedRewards('reddit:driver', client);
+        await settleOwedRewards('reddit:driver', client);
+
+        expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.headToHeadWins)
+            .toBe(1);
+        consoleError.mockRestore();
+    });
+
+    it('grants a first race whose reward write failed', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        failTheNextGarageWrite();
+
+        await expect(recordCompletedRace('reddit:driver', client)).rejects.toThrow('reward busy');
+        expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.completedRace)
+            .toBe(0);
+
+        await settleOwedRewards('reddit:driver', client);
+
+        expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.completedRace)
+            .toBe(1);
+        consoleError.mockRestore();
+    });
+
     it('merges guest unlock events into the Reddit identity without revoking either side', async () => {
         await recordCompletedRace('guest:driver', client);
         await recordHeadToHeadWin('reddit:driver', 'challenge-existing', client);
@@ -207,6 +261,43 @@ describe('server car unlock store', () => {
         const redditSnapshot = await getCarUnlockSnapshot('reddit:driver', {}, client);
         expect(redditSnapshot.progress.completedRace).toBe(1);
         expect(redditSnapshot.progress.headToHeadWins).toBe(1);
+    });
+
+    it('reads a recorded completed race without taking the lock', async () => {
+        expect(await hasRecordedCompletedRace('reddit:driver', client)).toBe(false);
+        await recordCompletedRace('reddit:driver', client);
+        await client.set(promotionLockKey('reddit:driver'), 'another-writer');
+
+        expect(await hasRecordedCompletedRace('reddit:driver', client)).toBe(true);
+    });
+
+    it("reads a promoted guest's completed race from the account it joined", async () => {
+        await recordCompletedRace('guest:driver', client);
+        await mergeGuestCarUnlockProgress({
+            guestPlayerId: 'guest:driver',
+            redditPlayerId: 'reddit:driver',
+            client,
+        });
+
+        expect((await getCarUnlockSnapshot('guest:driver', {}, client)).progress.completedRace).toBe(0);
+        expect(await hasRecordedCompletedRace('guest:driver', client)).toBe(true);
+    });
+
+    it('waits for another reward write on the same player instead of failing at once', async () => {
+        await client.set(promotionLockKey('reddit:driver'), 'other-reward-write');
+        setTimeout(() => client.strings.delete(promotionLockKey('reddit:driver')), 100);
+
+        await recordCompletedRace('reddit:driver', client);
+
+        expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.completedRace).toBe(1);
+    });
+
+    it('still reports busy when the lock stays held past the whole wait', async () => {
+        await client.set(promotionLockKey('reddit:driver'), 'stuck-writer');
+
+        await expect(recordCompletedRace('reddit:driver', client))
+            .rejects.toThrow('Car unlock progress update is already in progress.');
+        expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.completedRace).toBe(0);
     });
 
     it('does not replace account unlocks while the account writer owns its lock', async () => {

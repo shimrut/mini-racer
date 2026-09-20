@@ -1,4 +1,4 @@
-import { CAMPAIGN_ID } from '../../game/campaign/manifest.js';
+import { CAMPAIGN_ID, getCampaignStage } from '../../game/campaign/manifest.js';
 
 export { CAMPAIGN_ID };
 
@@ -58,8 +58,9 @@ export type HeadToHeadRecord = HeadToHeadPostData & {
     postUrl: string | null;
 };
 
+/** The Campaign manifest decides which races exist, so a stage added there can be challenged at once. */
 export function isHeadToHeadRaceId(value: unknown): value is string {
-    return typeof value === 'string' && /^numbered-v1-(?:0[0-9]|1[0-3])$/.test(value);
+    return getCampaignStage(value) !== null;
 }
 
 export function isHeadToHeadOrigin(value: unknown): value is HeadToHeadOrigin {

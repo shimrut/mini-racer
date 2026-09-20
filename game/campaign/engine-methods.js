@@ -1017,16 +1017,16 @@ export const campaignEngineMethods = {
                 : null,
         );
 
+        const replay = this.scoreboardReplay.getPayload(stage.lapCount);
+        // A challenge posts this run, as a Daily challenge does.
+        const shareRequest = { kind: 'head-to-head', source: 'campaign', raceId: stage.raceId, replay };
+
         if (!isCampaignBest) {
             this.showCampaignFinish(stage, {
                 finalTime,
                 medal,
                 previousMedal,
-                shareRequest: {
-                    kind: 'head-to-head',
-                    source: 'campaign',
-                    raceId: stage.raceId,
-                },
+                shareRequest,
                 scoreboardSnapshot: getExistingCampaignScoreboardSnapshot(this, stage),
             });
             this.configureLeaderboardOpponentFinish?.({
@@ -1039,7 +1039,6 @@ export const campaignEngineMethods = {
             return;
         }
 
-        const replay = this.scoreboardReplay.getPayload(stage.lapCount);
         const blockedReason = this.rankedSubmissionBlockedReason
             || (replay
                 ? null
@@ -1074,11 +1073,7 @@ export const campaignEngineMethods = {
                 finalTime,
                 medal,
                 previousMedal,
-                shareRequest: {
-                    kind: 'head-to-head',
-                    source: 'campaign',
-                    raceId: stage.raceId,
-                },
+                shareRequest,
                 scoreboardSnapshot: enqueued
                     ? campaignPendingSnapshot(finalTime)
                     : campaignErrorSnapshot(finalTime, null),

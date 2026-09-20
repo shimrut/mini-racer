@@ -114,7 +114,7 @@ function judgedContractMatches(
         && judged.objectiveType === competition.objectiveType;
 }
 
-function validateCompetitionReplay(competition: Competition, replay: unknown) {
+export function validateCompetitionReplay(competition: Competition, replay: unknown) {
     return validateDailyGpReplayDetailed({
         challenge: {
             trackKey: competition.trackKey,

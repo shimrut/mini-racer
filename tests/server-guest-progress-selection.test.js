@@ -148,6 +148,36 @@ describe("guest progress selection", () => {
     });
   });
 
+  it("counts an account whose only record is a Daily result as having progress", async () => {
+    await seedSevenDayPlaylist();
+    const accountPlayerId = "reddit:selection-daily-only";
+    // No profile flag and no Garage reward: both background writes of that run failed.
+    const [challenge] = await getServerDailyGpPlaylist();
+    const competition = toDailyCompetition(challenge);
+    await redis.hSet(competition.entryHashKey, {
+      [accountPlayerId]: JSON.stringify({
+        playerId: accountPlayerId,
+        trackKey: challenge.trackKey,
+        bestTimeMs: 31_234,
+        updatedAt: new Date().toISOString(),
+        completedLaps: challenge.objectiveParams.lapCount,
+        checkpointTimesSec: null,
+        validationMethod: "strict-replay",
+        strictReplayFailureReason: null,
+      }),
+    });
+    await redis.zAdd(competition.leaderboardKey, { member: accountPlayerId, score: 31_234 });
+    await recordCompletedRace("guest:selection-daily-only");
+
+    const selection = await getGuestProgressSelection({
+      guestPlayerId: "guest:selection-daily-only",
+      redditPlayerId: accountPlayerId,
+    });
+
+    expect(selection.accountHasProgress).toBe(true);
+    expect(selection.accountSummary).toMatchObject({ dailySavedResults: 1, hasDailyResults: true });
+  });
+
   it("reports unlocked Campaign tracks separately from completed results", async () => {
     await seedSevenDayPlaylist();
     const accountPlayerId = "reddit:selection-unlocked-tracks";

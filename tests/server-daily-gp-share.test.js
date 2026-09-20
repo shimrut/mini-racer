@@ -301,6 +301,7 @@ describe('daily GP result sharing', () => {
             String(key).endsWith(':lock') && seconds === 30
         ))).toBe(true);
 
+        // The result's lock holds while the first post runs, so nothing else posts it.
         const overlapping = await confirmDailyGpShare(
             { shareToken: preview.body.shareToken },
             requestContext,
@@ -312,7 +313,7 @@ describe('daily GP result sharing', () => {
         expect(reddit.submitComment.mock.calls.filter(([input]) => input.runAs === 'USER')).toHaveLength(1);
     });
 
-    it('fails closed and removes its comment after losing share-lock ownership', async () => {
+    it('records a posted share after losing share-lock ownership, without touching the successor', async () => {
         const preview = await previewDailyGpShare({
             source: 'standings',
             challengeId: challenge.id,
@@ -333,15 +334,17 @@ describe('daily GP result sharing', () => {
         finishUserComment();
 
         await expect(pending).resolves.toMatchObject({
-            status: 409,
-            body: { status: 'share_in_progress' },
+            status: 200,
+            body: { status: 'shared' },
         });
-        expect(userComment.delete).toHaveBeenCalledTimes(1);
-        expect([...strings.keys()].some((key) => String(key).startsWith('dailygp:shared-result:') && !String(key).endsWith(':lock'))).toBe(false);
+        expect(userComment.delete).not.toHaveBeenCalled();
+        // The comment is live, so its record is written without the lock. Without it, the next
+        // Share posts the same result again.
+        expect([...strings.keys()].some((key) => String(key).startsWith('dailygp:shared-result:') && !String(key).endsWith(':lock'))).toBe(true);
         expect(strings.get(shareLockKey)).toBe('successor-token');
     });
 
-    it('fails closed and deletes a comment if Reddit does not attribute it to the player', async () => {
+    it('fails closed without deleting if Reddit does not attribute the comment to the player', async () => {
         const preview = await previewDailyGpShare({
             source: 'standings',
             challengeId: challenge.id,
@@ -357,7 +360,7 @@ describe('daily GP result sharing', () => {
             status: 409,
             body: { status: 'user_action_unavailable' },
         });
-        expect(userComment.delete).toHaveBeenCalledTimes(1);
+        expect(userComment.delete).not.toHaveBeenCalled();
     });
 
     it('allows a result to be shared again after its prior comment is deleted', async () => {
@@ -924,7 +927,7 @@ describe('daily GP result sharing', () => {
         });
     });
 
-    it('fails closed when the share-result transaction commits with no results', async () => {
+    it('reports a posted share when its record commits with no results', async () => {
         const setup = await previewDailyGpShare({
             source: 'standings',
             challengeId: challenge.id,
@@ -947,7 +950,7 @@ describe('daily GP result sharing', () => {
 
         const confirmed = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
 
-        expect(confirmed).toMatchObject({ status: 409, body: { status: 'share_in_progress' } });
+        expect(confirmed).toMatchObject({ status: 200, body: { status: 'shared' } });
     });
 
     it('expires a ready preview exactly ten minutes after it is created', async () => {
@@ -994,7 +997,7 @@ describe('daily GP result sharing', () => {
         });
     });
 
-    it('fails closed when Reddit returns a user comment without a t1_ id', async () => {
+    it('answers posted_without_link when Reddit returns a comment with no t1_ id', async () => {
         const preview = await previewDailyGpShare({
             source: 'standings',
             challengeId: challenge.id,
@@ -1003,13 +1006,53 @@ describe('daily GP result sharing', () => {
             runAs === 'APP' ? anchor : { ...userComment, id: 'not-a-comment-id' }
         ));
 
-        await expect(confirmDailyGpShare(
+        const confirmed = await confirmDailyGpShare(
             { shareToken: preview.body.shareToken },
             requestContext,
-        )).rejects.toThrow('Reddit did not return a shared-comment ID.');
+        );
+
+        expect(confirmed).toMatchObject({ status: 409, body: { status: 'posted_without_link' } });
+        // The comment is live. Without this mark the next Share walks the thread and posts again.
+        const recordKey = [...strings.keys()].find((key) => (
+            String(key).startsWith('dailygp:shared-result:') && !String(key).endsWith(':lock')
+        ));
+        const stored = JSON.parse(strings.get(recordKey));
+        expect(stored.postedAt).toEqual(expect.any(String));
+        expect(stored.commentId).toBeUndefined();
+
+        const userPosts = () => reddit.submitComment.mock.calls
+            .filter(([input]) => input.runAs === 'USER').length;
+        const posted = userPosts();
+        const retry = await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        );
+
+        expect(retry.body.status).toBe('posted_without_link');
+        expect(userPosts()).toBe(posted);
     });
 
-    it('returns share_in_progress when confirm loses ownership before persisting the shared result', async () => {
+    it('does not let an app-authored comment make the next preview answer already_shared', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        submittedUserAuthor = 'mini-racer';
+
+        expect((await confirmDailyGpShare(
+            { shareToken: preview.body.shareToken },
+            requestContext,
+        )).body.status).toBe('user_action_unavailable');
+
+        const again = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect(again.body.status).toBe('ready');
+    });
+
+    it('reports shared when confirm loses ownership before recording the shared result', async () => {
         const preview = await previewDailyGpShare({
             source: 'standings',
             challengeId: challenge.id,
@@ -1030,29 +1073,134 @@ describe('daily GP result sharing', () => {
         finishUserComment();
 
         await expect(pending).resolves.toMatchObject({
-            status: 409,
-            body: { status: 'share_in_progress' },
+            status: 200,
+            body: { status: 'shared' },
         });
     });
 
-    it('still fails closed when comment cleanup throws after Reddit misattributes the author', async () => {
+    it('reports shared when Reddit posts the comment but its reply fails', async () => {
         const preview = await previewDailyGpShare({
             source: 'standings',
             challengeId: challenge.id,
         }, requestContext);
-        submittedUserAuthor = 'mini-racer';
-        userComment.delete.mockRejectedValueOnce(new Error('delete unavailable'));
-
-        const confirmed = await confirmDailyGpShare(
-            { shareToken: preview.body.shareToken },
-            requestContext,
-        );
-
-        expect(confirmed).toMatchObject({
-            status: 409,
-            body: { status: 'user_action_unavailable' },
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        reddit.submitComment.mockImplementation(async ({ runAs }) => {
+            if (runAs === 'APP') return anchor;
+            throw new Error('failed to look up created comment');
         });
-        expect(userComment.delete).toHaveBeenCalledTimes(1);
+        reddit.getComments.mockImplementation(async ({ commentId }) => ({
+            all: async () => (commentId === anchor.id
+                ? [{
+                    ...userComment,
+                    authorName: 'racefan',
+                    body: preview.body.commentText,
+                    createdAt: new Date(),
+                }]
+                : []),
+        }));
+
+        const confirmed = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(confirmed).toMatchObject({ status: 200, body: { status: 'shared', commentUrl: userComment.url } });
+        expect(reddit.getComments).toHaveBeenCalledWith(expect.objectContaining({
+            postId: 't3_daily',
+            commentId: anchor.id,
+            sort: 'new',
+        }));
+        expect(strings.has(`dailygp:share-preview:${preview.body.shareToken}`)).toBe(false);
+        warn.mockRestore();
+    });
+
+    it('answers unconfirmed, and again, while the score thread cannot be read', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        reddit.submitComment.mockImplementation(async ({ runAs }) => {
+            if (runAs === 'APP') return anchor;
+            throw new Error('failed to look up created comment');
+        });
+        reddit.getComments.mockImplementation(async ({ commentId }) => {
+            if (commentId) throw new Error('listing unavailable');
+            return { all: async () => [] };
+        });
+
+        const confirmed = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+        const retry = await confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext);
+
+        expect(confirmed).toMatchObject({ status: 409, body: { status: 'comment_unconfirmed' } });
+        expect(retry).toMatchObject({ status: 409, body: { status: 'comment_unconfirmed' } });
+        expect(reddit.submitComment.mock.calls.filter(([input]) => input.runAs === 'USER')).toHaveLength(1);
+        error.mockRestore();
+    });
+
+    it('posts one comment for two previews of the same result', async () => {
+        const first = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        const second = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+
+        expect((await confirmDailyGpShare({ shareToken: first.body.shareToken }, requestContext)).body)
+            .toMatchObject({ status: 'shared' });
+        const repeat = await confirmDailyGpShare({ shareToken: second.body.shareToken }, requestContext);
+
+        expect(repeat.body).toMatchObject({ status: 'already_shared', commentUrl: userComment.url });
+        expect(reddit.submitComment.mock.calls.filter(([input]) => input.runAs === 'USER')).toHaveLength(1);
+    });
+
+    it('finds the comment an unconfirmed share left, and posts nothing', async () => {
+        const first = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        reddit.submitComment.mockImplementation(async ({ runAs }) => {
+            if (runAs === 'APP') return anchor;
+            throw new Error('failed to look up created comment');
+        });
+        reddit.getComments.mockImplementation(async () => ({ all: async () => [] }));
+        expect((await confirmDailyGpShare({ shareToken: first.body.shareToken }, requestContext)).body.status)
+            .toBe('comment_unconfirmed');
+
+        reddit.getComments.mockImplementation(async ({ commentId }) => ({
+            all: async () => (commentId === anchor.id
+                ? [{
+                    ...userComment,
+                    authorName: 'racefan',
+                    body: first.body.commentText,
+                    createdAt: new Date(),
+                }]
+                : []),
+        }));
+        const second = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        const repeat = await confirmDailyGpShare({ shareToken: second.body.shareToken }, requestContext);
+
+        expect(repeat.body).toMatchObject({ status: 'already_shared', commentUrl: userComment.url });
+        expect(reddit.submitComment.mock.calls.filter(([input]) => input.runAs === 'USER')).toHaveLength(1);
+        error.mockRestore();
+    });
+
+    it('keeps the preview for retry when Reddit refuses the comment', async () => {
+        const preview = await previewDailyGpShare({
+            source: 'standings',
+            challengeId: challenge.id,
+        }, requestContext);
+        reddit.submitComment.mockImplementation(async ({ runAs }) => {
+            if (runAs === 'APP') return anchor;
+            throw new Error('This user account is not valid');
+        });
+
+        await expect(confirmDailyGpShare({ shareToken: preview.body.shareToken }, requestContext))
+            .rejects.toThrow('This user account is not valid');
+        expect(strings.has(`dailygp:share-preview:${preview.body.shareToken}`)).toBe(true);
     });
 
     it('logs share-lock cleanup failures without replacing a completed share', async () => {

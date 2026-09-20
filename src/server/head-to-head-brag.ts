@@ -7,6 +7,7 @@ import { getTrackName } from '../../game/track/catalog.js';
 import { readHeadToHeadAccept } from './head-to-head-store.js';
 import {
     HEAD_TO_HEAD_SHARE_PREVIEW_TTL_SECONDS,
+    headToHeadShareResultKey,
     getSignedHeadToHeadContext,
     headToHeadSharePreviewKey,
     normalizeHeadToHeadName,
@@ -111,6 +112,12 @@ export async function previewHeadToHeadBrag(
         subredditName: request.subredditName,
         postId: challenge.postId,
         commentText,
+        resultKey: headToHeadShareResultKey({
+            action: 'brag',
+            challengeId: acceptRecord.challengeId,
+            username: request.username,
+            timeMs: acceptRecord.bestTimeMs,
+        }),
     };
     const shareToken = randomUUID();
     await writeHeadToHeadSharePreview(

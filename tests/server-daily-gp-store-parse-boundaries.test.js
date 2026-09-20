@@ -155,7 +155,7 @@ describe('daily-gp-store parse boundaries', () => {
             })).hasSeenGame).toBe(false);
         });
 
-        it('preserves ISO timestamps and falls back to epoch for non-strings', () => {
+        it('preserves an ISO firstSeenAt, falls back to epoch for a non-string, and drops the old stamps', () => {
             const epoch = new Date(0).toISOString();
             const preserved = parseStoredPlayerProfile(JSON.stringify({
                 playerId: 'reddit:a',
@@ -163,23 +163,15 @@ describe('daily-gp-store parse boundaries', () => {
                 lastSeenAt: '2021-01-01T00:00:00.000Z',
                 updatedAt: '2022-01-01T00:00:00.000Z',
             }));
-            expect(preserved).toMatchObject({
-                firstSeenAt: '2020-01-01T00:00:00.000Z',
-                lastSeenAt: '2021-01-01T00:00:00.000Z',
-                updatedAt: '2022-01-01T00:00:00.000Z',
-            });
+            expect(preserved).toMatchObject({ firstSeenAt: '2020-01-01T00:00:00.000Z' });
+            expect(preserved).not.toHaveProperty('lastSeenAt');
+            expect(preserved).not.toHaveProperty('updatedAt');
 
             const fallback = parseStoredPlayerProfile(JSON.stringify({
                 playerId: 'reddit:a',
                 firstSeenAt: 12345,
-                lastSeenAt: true,
-                updatedAt: { iso: 'nope' },
             }));
-            expect(fallback).toMatchObject({
-                firstSeenAt: epoch,
-                lastSeenAt: epoch,
-                updatedAt: epoch,
-            });
+            expect(fallback).toMatchObject({ firstSeenAt: epoch });
         });
     });
 

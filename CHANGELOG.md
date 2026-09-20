@@ -1,8 +1,89 @@
 # Changelog
 
+- Fixed a Brag, Challenge Comment or Daily Share that posted a second comment.
+  The app posted the comment, then checked what Reddit sent back. A comment with
+  no link, or one Reddit put under the app's name, made the app report an error
+  before it recorded the comment. Try Again found no record, looked in the
+  thread, saw nothing there yet, and posted again. The same check failed again,
+  so the error never changed. Now:
+  - The app records the comment as soon as Reddit accepts it, before it checks
+    anything else.
+  - A recorded comment is never posted again. The app looks for its link, and
+    tells the player the comment is up when it cannot find one.
+  - The finish says the comment is up. It no longer offers Try Again for a
+    comment Reddit has already taken.
+  - A comment Reddit puts under the app's name is recorded, but never as the
+    player's shared result.
+  This corrects the entry below, which claimed this kind of double post was
+  already fixed. It fixed the Brag that Reddit never answered. It did not fix
+  the Brag that Reddit answered badly.
+
 - Head to Head no longer shows UNVERIFIED for a dropped or server-failed
   confirmation. The finish stays on VERIFYING and retries. UNVERIFIED is only
   for a run the server actually rejected.
+
+- Fixed Head to Head posts without the "Challenges" flair. Reddit dropped the
+  flair from a post that the player makes. Now the app sets it after the post.
+- A Campaign challenge now posts the run the player just finished, as a Daily
+  challenge does. Before, it posted the player's saved best on that race.
+
+- Fixed Brag, Challenge Comment and Daily Share posting twice, and saying "Could
+  not post" when the comment was posted. On 19 Sep 2026 Reddit posted two Brags
+  and then failed to send them back. Now:
+  - Each result keeps a record. The app writes it before it posts the comment and
+    adds the comment to it after. A later Share, Brag or Comment on the same
+    result finds that record and shows the comment instead of posting again.
+  - A record with no comment sends the next attempt to look in the thread. If the
+    comment is there, the player is told it posted. If the thread shows nothing,
+    the attempt posts. An older comment with the same words never counts as this
+    one.
+  - When Reddit's reply fails, the player is asked to share again to check.
+  - A Brag and a Challenge Comment now wait for each other on the result, as a
+    Daily Share already did, so two previews of one result post one comment.
+  - A failed record no longer turns a posted comment into an error, and a failed
+    lock cleanup does not either.
+- A Garage reward whose write fails now waits on an owed list, and the next
+  start-up grants it. Before, a player was told they won and the win never
+  reached the Garage.
+- Start-up repairs the first-race reward for a player who has only raced
+  Campaign. Before, only a saved Daily run led to that repair.
+- Choosing Guest in Keep Progress now drops a reward the account was still owed,
+  with the rest of the Garage the player gave up.
+- A late rank answer on a challenge finish no longer offers Comment again after
+  the comment was posted.
+- Fixed start-ups and saved runs failing when Reddit's database is slow. Reddit
+  lets an installation hold only 20 to 30 Redis transactions at a time, and on
+  16 Sep 2026 the game went past that for an hour and a half. A returning or new
+  player's start-up now opens none:
+  - The profile is written only when something in it changes. A new profile is
+    created with `SET NX`. An unchanged guest profile still gets another year
+    with one `EXPIRE`.
+  - The start-up reward repair is skipped when the player already has the
+    reward.
+  - The profile no longer stores `lastSeenAt` or `updatedAt`. Nothing read them.
+- Fixed Head to Head wins failing every day because two writes of the same reward
+  fought over one lock. The win's rewards are now written after the Daily or
+  Campaign save. A reward write also waits up to about 0.6 s for the lock, not
+  20 ms.
+- A Daily, Campaign or Head to Head finish no longer reports "submit failed"
+  after the run is saved. A failed rank, Garage or brag step is left out of the
+  answer. A Daily finish still asks the game to retry when both of its record
+  writes fail, because the Keep Progress chooser needs one of them.
+- The Keep Progress chooser now counts the account's Daily results, as it does
+  for the guest. Before, an account whose only record was a Daily result looked
+  empty, and a Guest choice could replace that result.
+- A challenge post that fails to open now logs which check failed: the data field
+  and its type, or whether the author's account was deleted.
+
+- Fixed Head to Head refusing a challenge from the last two Campaign stages,
+  Square Root and Half Life, with "No verified result is available for this
+  challenge." The check allowed only the first 14 stages. It now reads the
+  Campaign's own stage list, so a new stage can be challenged at once.
+
+- Sharing a result and making a Head to Head post no longer try to delete the
+  Reddit comment or post when the step fails. Reddit lets only the author delete,
+  so the app could never remove a player's comment. On a test version, where
+  Reddit posts from the app's account, that comment or post now stays up.
 
 - Added `npm run typecheck`. Nothing checked the server's TypeScript before: the
   build strips the annotations without reading them.

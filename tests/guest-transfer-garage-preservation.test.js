@@ -12,6 +12,7 @@ const {
   recordCompletedRace,
   recordHeadToHeadPost,
   recordHeadToHeadWin,
+  settleOwedRewards,
 } = await import("../src/server/car-unlock-store.ts");
 const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
 
@@ -76,6 +77,22 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
 
     expect((await redis.hGetAll(carUnlockHashKey(redditPlayerId)))["post:track:numberZero"])
       .toBe("1");
+  });
+
+  it("drops a reward the account is owed when the player chooses Guest", async () => {
+    const guestPlayerId = "guest:owed-drop";
+    const redditPlayerId = "reddit:owed-drop";
+    await seedGuest(guestPlayerId, redditPlayerId);
+    // The win is owed, not held: its Garage write failed after the player was told they won.
+    vi.spyOn(redis, "hSetNX").mockRejectedValueOnce(new Error("reward busy"));
+    await expect(recordHeadToHeadWin(redditPlayerId, "challenge-owed"))
+      .rejects.toThrow("reward busy");
+
+    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+    await settleOwedRewards(redditPlayerId);
+
+    expect((await redis.hGetAll(carUnlockHashKey(redditPlayerId)))["win:challenge:challenge-owed"])
+      .toBeUndefined();
   });
 
   it("keeps a reward earned again whose ordinary write was a no-op", async () => {

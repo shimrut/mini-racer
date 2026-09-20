@@ -5,6 +5,7 @@ import type {
 } from './head-to-head-service.js';
 import {
     HEAD_TO_HEAD_SHARE_PREVIEW_TTL_SECONDS,
+    headToHeadShareResultKey,
     getSignedHeadToHeadContext,
     headToHeadSharePreviewKey,
     resolveHeadToHeadShareChallenge,
@@ -99,6 +100,12 @@ export async function previewHeadToHeadComment(
             subredditName: request.subredditName,
             postId: challenge.postId,
             commentText,
+            resultKey: headToHeadShareResultKey({
+                action: 'comment',
+                challengeId,
+                username: request.username,
+                timeMs: reportedTimeMs,
+            }),
         },
     );
     return {

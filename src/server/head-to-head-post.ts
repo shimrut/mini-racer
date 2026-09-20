@@ -40,6 +40,8 @@ export type HeadToHeadResolution = {
     ok: false;
     reason: HeadToHeadResolutionFailureReason;
     diff?: Record<string, unknown>;
+    /** Which check failed, for the log. Field names and value types only, never a player's name. */
+    detail?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -54,44 +56,54 @@ function validPostUrl(value: unknown): value is string {
     return typeof value === 'string' && Boolean(value);
 }
 
+/** Fields whose values are game settings, not player data, so the log may show them. */
+const LOGGABLE_POST_DATA_VALUES = new Set(['postType', 'lapCount', 'medal', 'rulesRevision']);
+
+/**
+ * The first check a post's data fails, or null when it passes.
+ *
+ * About thirty live challenge posts fail here for everyone who opens them, and the log said only
+ * `post_data_invalid`. Naming the field is what tells a stale shape from a bad write.
+ */
+function postDataProblem(value: unknown, challengeId: string): string | null {
+    if (value === undefined || value === null) return 'missing';
+    if (!isRecord(value)) return 'not_an_object';
+    const origin = getHeadToHeadOrigin(value as HeadToHeadPostData);
+    const checks: [string, boolean][] = [
+        ['postType', value.postType === HEAD_TO_HEAD_POST_TYPE],
+        ['challengeId', value.challengeId === challengeId],
+        ['origin', origin !== null && (
+            isHeadToHeadOrigin(value.origin)
+            || (value.campaignId === CAMPAIGN_ID && isHeadToHeadRaceId(value.raceId))
+        )],
+        ['challengerUsername', typeof value.challengerUsername === 'string' && Boolean(value.challengerUsername)],
+        ['challengerAvatarUrl', value.challengerAvatarUrl === null || typeof value.challengerAvatarUrl === 'string'],
+        ['trackKey', typeof value.trackKey === 'string' && Boolean(value.trackKey)],
+        ['lapCount', value.lapCount === 1 || value.lapCount === 2 || value.lapCount === 3],
+        ['targetTimeMs', Number.isSafeInteger(value.targetTimeMs) && Number(value.targetTimeMs) > 0],
+        ['medal', isHeadToHeadMedal(value.medal)],
+        ['rulesRevision', Number.isSafeInteger(value.rulesRevision) && Number(value.rulesRevision) >= 0],
+        ['trackFingerprint', typeof value.trackFingerprint === 'string' && Boolean(value.trackFingerprint)],
+        ['createdAt', typeof value.createdAt === 'string' && Boolean(value.createdAt)],
+        ['replayDataHash', value.replayDataHash === undefined || (
+            typeof value.replayDataHash === 'string' && /^[a-f0-9]{64}$/.test(value.replayDataHash)
+        )],
+    ];
+    const failed = checks.find(([, passed]) => !passed);
+    if (!failed) return null;
+    const [field] = failed;
+    const found = field === 'origin' ? value.origin : value[field];
+    const shape = found === null ? 'null' : Array.isArray(found) ? 'array' : typeof found;
+    return LOGGABLE_POST_DATA_VALUES.has(field)
+        ? `${field}:${shape}:${String(JSON.stringify(found)).slice(0, 40)}`
+        : `${field}:${shape}`;
+}
+
 function validPostData(
     value: unknown,
     challengeId: string,
 ): value is HeadToHeadPostData {
-    if (!isRecord(value)) return false;
-    const origin = getHeadToHeadOrigin(value as HeadToHeadPostData);
-    return value.postType === HEAD_TO_HEAD_POST_TYPE
-        && value.challengeId === challengeId
-        && origin !== null
-        && (
-            isHeadToHeadOrigin(value.origin)
-            || (
-                value.campaignId === CAMPAIGN_ID
-                && isHeadToHeadRaceId(value.raceId)
-            )
-        )
-        && typeof value.challengerUsername === 'string'
-        && Boolean(value.challengerUsername)
-        && (value.challengerAvatarUrl === null || typeof value.challengerAvatarUrl === 'string')
-        && typeof value.trackKey === 'string'
-        && Boolean(value.trackKey)
-        && (value.lapCount === 1 || value.lapCount === 2 || value.lapCount === 3)
-        && Number.isSafeInteger(value.targetTimeMs)
-        && Number(value.targetTimeMs) > 0
-        && isHeadToHeadMedal(value.medal)
-        && Number.isSafeInteger(value.rulesRevision)
-        && Number(value.rulesRevision) >= 0
-        && typeof value.trackFingerprint === 'string'
-        && Boolean(value.trackFingerprint)
-        && typeof value.createdAt === 'string'
-        && Boolean(value.createdAt)
-        && (
-            value.replayDataHash === undefined
-            || (
-                typeof value.replayDataHash === 'string'
-                && /^[a-f0-9]{64}$/.test(value.replayDataHash)
-            )
-        );
+    return postDataProblem(value, challengeId) === null;
 }
 
 const FALLBACK_TEXT_KEYS = [
@@ -150,21 +162,27 @@ async function getPostData(
 ): Promise<{
     data: Record<string, unknown> | null;
     fetchFailed: boolean;
+    problem: string;
 }> {
     let fetchFailed = false;
+    let fetchedProblem = 'not_fetched';
     if (isRecord(post) && typeof post.getPostData === 'function') {
         try {
             const fetched = await (post.getPostData as () => Promise<unknown>)();
             if (validPostData(fetched, challengeId)) {
-                return { data: fetched, fetchFailed: false };
+                return { data: fetched, fetchFailed: false, problem: '' };
             }
+            fetchedProblem = postDataProblem(fetched, challengeId) ?? 'invalid';
         } catch {
             fetchFailed = true;
+            fetchedProblem = 'fetch_threw';
         }
     }
+    const contextProblem = postDataProblem(contextPostData, challengeId);
     return {
-        data: validPostData(contextPostData, challengeId) ? contextPostData : null,
+        data: contextProblem === null ? contextPostData ?? null : null,
         fetchFailed,
+        problem: `fetched ${fetchedProblem}; request ${contextProblem ?? 'ok'}`,
     };
 }
 
@@ -214,15 +232,22 @@ export async function resolveHeadToHeadRecordResult(
         return {
             ok: false,
             reason: postDataResult.fetchFailed ? 'post_data_fetch_failed' : 'post_data_invalid',
+            detail: postDataResult.problem,
         };
     }
     const rawPostData = postDataResult.data;
+    const authorName: unknown = (post as any)?.authorName;
     if (
-        typeof (post as any)?.authorName !== 'string'
-        || (post as any).authorName.trim().toLowerCase()
-            !== rawPostData.challengerUsername.trim().toLowerCase()
+        typeof authorName !== 'string'
+        || authorName.trim().toLowerCase() !== rawPostData.challengerUsername.trim().toLowerCase()
     ) {
-        return { ok: false, reason: 'post_author_mismatch' };
+        return {
+            ok: false,
+            reason: 'post_author_mismatch',
+            detail: typeof authorName !== 'string' || !authorName.trim()
+                ? 'author_missing'
+                : authorName === '[deleted]' ? 'author_deleted' : 'author_differs',
+        };
     }
     const fallbackTexts = postFallbackTexts(post);
     let lastReplayReason: HeadToHeadResolutionFailureReason | undefined;
@@ -265,6 +290,7 @@ export async function resolveHeadToHeadRecord(
             challengeId: challengeId || null,
             postId: validPostId(context.postId) ? context.postId : null,
             reason: result.reason,
+            ...('detail' in result && result.detail ? { detail: result.detail } : {}),
         });
     }
     return null;

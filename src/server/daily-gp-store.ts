@@ -97,8 +97,11 @@ import {
     mergeGuestCarUnlockProgress,
     readGuestPromotionTarget,
     carUnlockHashKey,
+    hasRecordedCompletedRace,
     recordCompletedRace,
     retireEmptyGuestIdentity,
+    settleOwedRewards,
+    clearOwedRewards,
     type CarUnlockSnapshot,
 } from './car-unlock-store.js';
 import {
@@ -156,7 +159,6 @@ type PlayerBootstrapPayload = {
     hasAnyData: boolean;
     isReturningPlayer: boolean;
     firstSeenAt: string | null;
-    lastSeenAt: string | null;
     carUnlocks: CarUnlockSnapshot | null;
     retireGuestIdentity: boolean;
     /** The retired guest joined this account with nothing to transfer, so its unsent runs are the account's. */
@@ -2315,7 +2317,14 @@ export async function getGuestProgressSelection({
         ...toProgressSummary(guestEvidence),
         hasDailyResults: guestEvidence.hasDailyResults || (guestHasProgress && !guestEvidence.hasProgress),
     };
-    const accountSummary = toProgressSummary(accountEvidence);
+    // Daily rows count for the account as they do for the guest. Without them, an account whose
+    // only record was a Daily result looked empty, Guest was preselected, and a Guest choice
+    // replaced that result.
+    const accountHasProgress = accountEvidence.hasProgress || accountEvidence.dailySavedResults > 0;
+    const accountSummary = {
+        ...toProgressSummary(accountEvidence),
+        hasDailyResults: accountEvidence.hasDailyResults || (accountHasProgress && !accountEvidence.hasProgress),
+    };
     if (guestHasProgress) {
         // Only the guest is marked here. The account marker gates its ranked play, and showing a
         // chooser risks nothing yet, so it is claimed when a choice is recorded and not before. A
@@ -2330,7 +2339,7 @@ export async function getGuestProgressSelection({
             : undefined,
         sourceGuestPlayerId: guestHasProgress ? guestPlayerId : undefined,
         guestHasProgress,
-        accountHasProgress: accountEvidence.hasProgress,
+        accountHasProgress,
         guestSummary,
         accountSummary,
     };
@@ -2687,6 +2696,11 @@ export async function selectGuestProgress({
             // original. Only a Guest choice replaces the account Garage, so only it needs one.
             if (choice === 'guest') {
                 await captureGuestTransferGarageBaseline(redditPlayerId, derivedTransferId);
+                // The account's Garage is being given up, and a reward it is still owed would come
+                // back at the next start-up. The retired guest's list goes with it: after promotion
+                // nothing reads it. A failed delete leaves the behaviour this replaces.
+                await clearOwedRewards(redditPlayerId);
+                await clearOwedRewards(guestPlayerId);
             }
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
@@ -3267,7 +3281,6 @@ export async function getServerPlayerBootstrap({
             hasAnyData: false,
             isReturningPlayer: false,
             firstSeenAt: null,
-            lastSeenAt: null,
             carUnlocks: null,
             retireGuestIdentity,
         };
@@ -3299,7 +3312,6 @@ export async function getServerPlayerBootstrap({
                 hasAnyData: false,
                 isReturningPlayer: false,
                 firstSeenAt: null,
-                lastSeenAt: null,
                 carUnlocks: null,
                 retireGuestIdentity: false,
                 progressSelection: accountTransfer,
@@ -3348,7 +3360,6 @@ export async function getServerPlayerBootstrap({
                         hasAnyData: false,
                         isReturningPlayer: false,
                         firstSeenAt: null,
-                        lastSeenAt: null,
                         carUnlocks: null,
                         retireGuestIdentity: false,
                         progressSelection,
@@ -3381,17 +3392,28 @@ export async function getServerPlayerBootstrap({
     const backfillBlockedByTransfer = identity.canonicalPlayerId.startsWith('reddit:')
         ? Boolean(accountTransfer) && accountTransfer.state !== 'completed'
         : await isGuestProgressSelectionPending(identity.canonicalPlayerId);
-    if (profile.hasAnyData && !backfillBlockedByTransfer) {
-        try {
-            await recordCompletedRace(identity.canonicalPlayerId);
-        } catch (error) {
-            console.error('Completed-race unlock backfill failed:', error);
-        }
-    }
     const carUnlocks = await readPlayerCarUnlocks(
         identity.canonicalPlayerId,
         profile.hasAnyData,
     );
+    if (!backfillBlockedByTransfer) {
+        try {
+            // The snapshot counts a Campaign result as a finished race, so a player who has never
+            // raced Daily is repaired here too. The locked write costs a lock and a release
+            // transaction, so it is skipped when the field is already there.
+            if (
+                carUnlocks?.progress?.completedRace
+                && !await hasRecordedCompletedRace(identity.canonicalPlayerId)
+            ) {
+                await recordCompletedRace(identity.canonicalPlayerId);
+            }
+        } catch (error) {
+            console.error('Completed-race unlock backfill failed:', error);
+        }
+        // Grant a reward whose write failed. It logs its own failures, and a reward it cannot grant
+        // stays owed for the next start-up.
+        await settleOwedRewards(identity.canonicalPlayerId);
+    }
     const playerPreferences = preferencesAllowedByCarUnlocks(profile.preferences, carUnlocks);
     if (
         playerPreferences
@@ -3415,7 +3437,6 @@ export async function getServerPlayerBootstrap({
         hasAnyData: previousProfile ? (profile.hasSeenGame || profile.hasAnyData) : false,
         isReturningPlayer,
         firstSeenAt: profile.firstSeenAt,
-        lastSeenAt: profile.lastSeenAt,
         carUnlocks,
         retireGuestIdentity,
         ...(guestJoinedAccount ? { guestJoinedAccount } : {}),
@@ -3687,12 +3708,13 @@ export async function submitServerDailyGpRun({
         return { status: outcome.status, body: outcome.body };
     }
 
+    // The run is saved. What follows cannot unsave it, so each job settles on its own and only
+    // what failed is left out of the answer.
     const normalizedPlayerId = identity.canonicalPlayerId;
-    const [standing, carUnlocks] = await Promise.all([
+    const [standing, carUnlocks, reward, profile] = await Promise.allSettled([
         readPlayerStandingSummary(competition, normalizedPlayerId),
         readPlayerCarUnlocks(normalizedPlayerId, true),
         recordCompletedRace(normalizedPlayerId),
-        outcome.releaseLock,
         upsertPlayerProfile({
             playerId: normalizedPlayerId,
             leaderboardIdentity,
@@ -3700,15 +3722,38 @@ export async function submitServerDailyGpRun({
             hasAnyData: true,
         }),
     ]);
+    await outcome.releaseLock;
+    // Either record tells the Keep Progress chooser this account has played. With neither, the
+    // account looks empty there and a Guest choice replaces this run, so the browser must retry.
+    if (reward.status === 'rejected' && profile.status === 'rejected') {
+        console.error('Daily run saved, but its profile write also failed:', profile.reason);
+        throw reward.reason;
+    }
+    if (standing.status === 'rejected') {
+        console.error('Daily run saved, but its rank could not be read:', standing.reason);
+    }
+    if (carUnlocks.status === 'rejected') {
+        console.error('Daily run saved, but its Garage could not be read:', carUnlocks.reason);
+    }
+    if (reward.status === 'rejected') {
+        console.error('Daily run saved, but its completed-race reward failed:', reward.reason);
+    }
+    if (profile.status === 'rejected') {
+        console.error('Daily run saved, but its profile write failed:', profile.reason);
+    }
     recordAnalyticsRaceBestEffort('daily', 'finish', normalizedPlayerId);
     return {
         status: 200,
         body: {
             ...(outcome.body as Record<string, unknown>),
-            playerRank: standing.playerRank,
-            playerRankLabel: standing.playerRankLabel,
-            leaderboardEntryCount: standing.leaderboardEntryCount,
-            carUnlocks,
+            playerRank: standing.status === 'fulfilled' ? standing.value.playerRank : null,
+            playerRankLabel: standing.status === 'fulfilled' ? standing.value.playerRankLabel : null,
+            leaderboardEntryCount: standing.status === 'fulfilled' ? standing.value.leaderboardEntryCount : null,
+            // This Garage counts the finish before the reward is stored. Without the reward, the
+            // next start-up could lock the car again, so the answer shows no Garage at all.
+            ...(carUnlocks.status === 'fulfilled' && reward.status === 'fulfilled'
+                ? { carUnlocks: carUnlocks.value }
+                : {}),
         },
     };
 }

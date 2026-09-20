@@ -463,10 +463,7 @@ export class RealTimeRacer {
       },
       confirmShare: async (shareToken, request) => {
         if (request?.kind === "head-to-head") {
-          const response = await createHeadToHead(
-            shareToken,
-            request?.source === "daily" ? { replay: request.replay } : {},
-          );
+          const response = await createHeadToHead(shareToken, { replay: request.replay });
           if (response?.ok) this.applyCarUnlockSnapshot?.(response.body?.carUnlocks);
           return response;
         }

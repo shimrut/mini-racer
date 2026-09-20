@@ -174,7 +174,7 @@ Sharing posts a comment as **you**. Guests can’t share — sign in and try aga
 
 ### “Reddit user-attributed sharing is not available for this app version.”
 
-Reddit wouldn’t post the comment as your account, so Mini Racer cancelled instead of posting as the app. Update Reddit / reopen the post while signed in, then share again.
+Reddit posted the comment from the app’s account instead of yours, so Mini Racer did not count it as your share. This happens only on a test version of Mini Racer, not on the live game.
 
 ### “No verified result is available to share.”
 

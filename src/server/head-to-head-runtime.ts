@@ -4,7 +4,6 @@ import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
 import { TRACKS } from '../../game/track/tracks.js';
 import {
     getCampaignProgressForSelection,
-    getServerHeadToHeadSource,
     repairCampaignStandingsFromEntries,
     submitServerCampaignRun,
 } from './campaign-store.js';
@@ -13,6 +12,7 @@ import {
     submitServerDailyGpRun,
 } from './daily-gp-store.js';
 import { readEntryByPlayerId, readPlayerRank } from './competition-leaderboard.js';
+import { validateCompetitionReplay } from './competition-submit.js';
 import {
     toCampaignCompetition,
     toDailyCompetition,
@@ -24,7 +24,6 @@ import {
     type HeadToHeadRecord,
     type HeadToHeadSource,
 } from './head-to-head-model.js';
-import type { HeadToHeadPostContext } from './head-to-head-post.js';
 import type {
     HeadToHeadBestContext,
     HeadToHeadBestUpdate,
@@ -33,48 +32,41 @@ import type {
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 
+/** A challenge posts the run the player just finished, in Campaign and Daily alike. */
 export async function resolveHeadToHeadSource(
     input: Record<string, unknown>,
-    username: string,
-    context: HeadToHeadPostContext = {},
 ): Promise<HeadToHeadSource | null> {
-    if (input.source === 'campaign' && typeof input.raceId === 'string') {
-        return getServerHeadToHeadSource({
-            raceId: input.raceId,
-            redditUsername: username,
-        });
-    }
-    if (input.source === 'daily' && typeof input.challengeId === 'string') {
-        const challenge = await getServerDailyGpPlayableChallenge(input.challengeId);
-        const track = challenge ? TRACKS[challenge.trackKey] : null;
-        if (!challenge || !track || input.replay == null) return null;
-        const validation = validateDailyGpReplayDetailed({
-            challenge,
-            replay: input.replay,
-        });
-        if (!validation.ok || !validation.run.ghost) return null;
-        return {
-            sourceKind: 'daily',
-            sourceId: challenge.id,
-            origin: {
-                mode: 'daily',
-                challengeId: challenge.id,
-            },
-            trackKey: challenge.trackKey,
-            lapCount: challenge.objectiveParams.lapCount,
-            bestTimeMs: validation.run.bestTimeMs,
-            medal: getMedalForRaceTime(
-                challenge.trackKey,
-                validation.run.bestTimeSec,
-                challenge.objectiveParams.lapCount,
-            ),
-            rulesRevision: challenge.rulesRevision,
-            trackFingerprint: createTrackFingerprint(track),
-            ghost: validation.run.ghost,
-        };
-    }
+    const stage = input.source === 'campaign' ? getCampaignStage(input.raceId) : null;
+    const daily = input.source === 'daily' && typeof input.challengeId === 'string'
+        ? await getServerDailyGpPlayableChallenge(input.challengeId)
+        : null;
     // A Head to Head is only ever issued from a Campaign stage or a Daily run: nothing about one outlives its post.
-    return null;
+    const race = stage
+        ? {
+            competition: toCampaignCompetition(CAMPAIGN_ID, stage),
+            id: { sourceKind: 'campaign' as const, sourceId: stage.raceId, campaignId: CAMPAIGN_ID, raceId: stage.raceId },
+        }
+        : daily
+            ? {
+                competition: toDailyCompetition(daily),
+                id: { sourceKind: 'daily' as const, sourceId: daily.id, origin: { mode: 'daily' as const, challengeId: daily.id } },
+            }
+            : null;
+    const track = race ? TRACKS[race.competition.trackKey] : null;
+    if (!race || !track || input.replay == null) return null;
+    const { competition } = race;
+    const validation = validateCompetitionReplay(competition, input.replay);
+    if (!validation.ok || !validation.run.ghost) return null;
+    return {
+        ...race.id,
+        trackKey: competition.trackKey,
+        lapCount: competition.lapCount,
+        bestTimeMs: validation.run.bestTimeMs,
+        medal: getMedalForRaceTime(competition.trackKey, validation.run.bestTimeSec, competition.lapCount),
+        rulesRevision: competition.rulesRevision,
+        trackFingerprint: createTrackFingerprint(track),
+        ghost: validation.run.ghost,
+    };
 }
 
 export function validateHeadToHeadReplay(
