@@ -12,6 +12,7 @@ import {
     submitHeadToHeadShareComment,
     writeHeadToHeadSharePreview,
 } from './head-to-head-share.js';
+import { readUserCommentRecord } from './user-comment-submit.js';
 
 const COMMENT_PREFIX = 'miniracer:head-to-head:comment';
 
@@ -92,6 +93,27 @@ export async function previewHeadToHeadComment(
         };
     }
     const commentText = formatChallengeComment(reportedTimeMs, differenceMs);
+    const resultKey = headToHeadShareResultKey({
+        action: 'comment',
+        challengeId,
+        username: request.username,
+        timeMs: reportedTimeMs,
+    });
+    // A tie is always the target time to the millisecond, so a second tie is the same result as
+    // the first. Say so here, as the Daily share does, instead of asking the player to confirm a
+    // post that the confirmation would only answer from the record.
+    const posted = await readUserCommentRecord(resultKey);
+    if (posted?.commentId) {
+        return {
+            status: 200,
+            body: {
+                status: 'already_commented',
+                username: posted.username,
+                commentText: posted.commentText,
+                commentUrl: posted.commentUrl ?? '',
+            },
+        };
+    }
     const token = randomUUID();
     await writeHeadToHeadSharePreview(
         headToHeadSharePreviewKey(COMMENT_PREFIX, token),
@@ -100,12 +122,7 @@ export async function previewHeadToHeadComment(
             subredditName: request.subredditName,
             postId: challenge.postId,
             commentText,
-            resultKey: headToHeadShareResultKey({
-                action: 'comment',
-                challengeId,
-                username: request.username,
-                timeMs: reportedTimeMs,
-            }),
+            resultKey,
         },
     );
     return {

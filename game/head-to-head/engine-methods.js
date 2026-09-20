@@ -22,6 +22,9 @@ import {
 
 export const HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
 
+/** Finishes the player has to lose before the sheet offers Concede. A tie never waits. */
+export const HEAD_TO_HEAD_CONCEDE_AFTER_LOSSES = 3;
+
 function finitePositiveMs(value) {
     const ms = Number(value);
     return Number.isFinite(ms) && ms > 0 ? Math.round(ms) : null;
@@ -412,11 +415,38 @@ export const headToHeadEngineMethods = {
             ? finalTimeMs - targetTimeMs
             : null;
         const settlesLocally = localDifferenceMs !== null && localDifferenceMs >= 0;
-        const buildCommentShareRequest = (reportedTimeMs) => ({
+        const buildCommentShareRequest = (reportedTimeMs, outcome) => ({
             kind: 'challenge-comment',
             challengeId: challenge.challengeId,
             reportedTimeMs: finitePositiveMs(reportedTimeMs) ?? finalTimeMs,
+            // Never sent to the server. It is what lets a posted concession restart the count
+            // while a posted tie leaves it alone.
+            outcome,
         });
+        // The middle button of the finish sheet. A finish that is not a win is one of the tries
+        // toward Concede, counted once whichever verdict settles it: the server answer can land
+        // after the local one, and repainting the same finish must not count it twice.
+        const resolveFinishShare = (phase, reportedTimeMs = null) => {
+            if (
+                (phase === 'lost' || phase === 'tie')
+                && this._headToHeadUnwonCountedAttempt !== finishAttempt
+            ) {
+                this._headToHeadUnwonCountedAttempt = finishAttempt;
+                this._headToHeadUnwonFinishes = (this._headToHeadUnwonFinishes ?? 0) + 1;
+            }
+            // A tie says its own line at once. A loss waits for the third try, and waits again
+            // after every concession.
+            const triesSinceConcede = (this._headToHeadUnwonFinishes ?? 0)
+                - (this._headToHeadConcedeBaseline ?? 0);
+            const offered = phase === 'tie'
+                || (phase === 'lost' && triesSinceConcede >= HEAD_TO_HEAD_CONCEDE_AFTER_LOSSES);
+            return {
+                shareRequest: offered
+                    ? buildCommentShareRequest(reportedTimeMs, phase)
+                    : { kind: 'challenge-brag', acceptToken: null },
+                shareEnabled: offered,
+            };
+        };
 
         // Same origin best Daily and Campaign finishes already use. The GET can miss it; local
         // Campaign progress and Daily storage still know.
@@ -429,7 +459,7 @@ export const headToHeadEngineMethods = {
             phase = 'pending',
             error = null,
         } = {}) => {
-            const canComment = phase === 'tie' || phase === 'lost';
+            const { shareRequest, shareEnabled } = resolveFinishShare(phase);
             this.modal.showModal(
                 'Challenge complete',
                 null,
@@ -463,10 +493,8 @@ export const headToHeadEngineMethods = {
                     }),
                     restartAction: () => this.restartActiveRace(),
                     settingsAction: () => this.settings.openSettings(),
-                    shareRequest: canComment
-                        ? buildCommentShareRequest()
-                        : { kind: 'challenge-brag', acceptToken: null },
-                    shareEnabled: canComment,
+                    shareRequest,
+                    shareEnabled,
                 },
             );
         };
@@ -581,14 +609,16 @@ export const headToHeadEngineMethods = {
                     ) {
                         const serverTargetTimeMs = finitePositiveMs(response.body?.targetTimeMs)
                             ?? targetTimeMs;
+                        const serverPhase = serverDifferenceMs === 0 ? 'tie' : 'lost';
                         this.modal.updateChallengeFinishHero?.({
-                            phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
+                            phase: serverPhase,
                             verdict: buildVerdict(serverDifferenceMs),
-                            shareRequest: buildCommentShareRequest(
+                            shareRequest: resolveFinishShare(
+                                serverPhase,
                                 serverTargetTimeMs === null
                                     ? null
                                     : serverTargetTimeMs + serverDifferenceMs,
-                            ),
+                            ).shareRequest,
                             ...(response.body?.bestUpdate
                                 ? { bestUpdate: response.body.bestUpdate }
                                 : {}),
@@ -640,16 +670,28 @@ export const headToHeadEngineMethods = {
                     applyWinActions();
                     return;
                 }
+                const settledPhase = outcome === 'tie' ? 'tie' : 'lost';
                 this.modal.updateChallengeFinishHero?.({
-                    phase: outcome === 'tie' ? 'tie' : 'lost',
+                    phase: settledPhase,
                     verdict,
-                    shareRequest: buildCommentShareRequest(response.body?.bestTimeMs),
+                    shareRequest: resolveFinishShare(
+                        settledPhase,
+                        response.body?.bestTimeMs,
+                    ).shareRequest,
                     ...bestUpdate,
                 });
                 revertOptimisticWin();
                 return;
             }
         })();
+    },
+
+    /**
+     * A posted concession restarts the count: the next offer waits for three more losses.
+     * Declining the offer leaves the count alone, so it stays available until it is used.
+     */
+    recordHeadToHeadConcede() {
+        this._headToHeadConcedeBaseline = this._headToHeadUnwonFinishes ?? 0;
     },
 
     previewHeadToHeadBrag(request) {

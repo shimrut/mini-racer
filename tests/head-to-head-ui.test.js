@@ -517,11 +517,12 @@ describe('Head to Head lobby and finish', () => {
             shareEnabled: false,
             restartAction: expect.any(Function),
         });
-        const settledOptions = expect.objectContaining({
+        const settledOptions = (outcome) => expect.objectContaining({
             shareRequest: expect.objectContaining({
                 kind: 'challenge-comment',
                 challengeId: 'challenge-1',
                 reportedTimeMs: expect.any(Number),
+                outcome,
             }),
             shareEnabled: true,
             restartAction: expect.any(Function),
@@ -632,11 +633,13 @@ describe('Head to Head lobby and finish', () => {
             { lapTime: 8.4 },
         );
         expect(lossShowModal).toHaveBeenCalledTimes(1);
+        // A first loss offers nothing: the locked Brag stays, exactly as it looks while a
+        // result is still confirming. Concede waits for the third try.
         expect(lossShowModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
             settledLap('lost', 0.4),
-            settledOptions,
+            pendingOptions,
         );
         // The verdict is settled on screen without waiting, and the hero is left alone
         // because this run earned no personal best to report.
@@ -656,11 +659,12 @@ describe('Head to Head lobby and finish', () => {
             { lapTime: 8 },
         );
         expect(tieShowModal).toHaveBeenCalledTimes(1);
+        // A tie never waits. It has its own line and says it at once.
         expect(tieShowModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
             settledLap('tie', 0),
-            settledOptions,
+            settledOptions('tie'),
         );
         expect(tieUpdateHero).not.toHaveBeenCalled();
 
@@ -1033,14 +1037,13 @@ describe('Head to Head lobby and finish', () => {
                 differenceMs: 400,
             },
         });
+        // The server took the win away, so the button goes back to the locked Brag. This is the
+        // player's first loss, and Concede is not offered until the third.
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledWith(expect.objectContaining({
                 phase: 'lost',
                 verdict: { opponentName: 'shimroot', deltaSec: 0.4 },
-                shareRequest: expect.objectContaining({
-                    kind: 'challenge-comment',
-                    reportedTimeMs: 8_400,
-                }),
+                shareRequest: { kind: 'challenge-brag', acceptToken: null },
             }));
         });
         expect(clearChallengeWinActions).toHaveBeenCalledWith({
@@ -1917,5 +1920,131 @@ describe('Head to Head poster after the duel is beaten', () => {
         global.document = originalDocument;
         expect(onSelectDaily).toHaveBeenCalledTimes(1);
         expect(onSelectCampaign).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('Concede after three losses', () => {
+    // One engine for the whole visit: Improve restarts the race on the same object, so the
+    // count of unwon finishes lives across every retry until the post is closed.
+    function visitContext(showModal) {
+        return {
+            activeHeadToHead: {
+                challengeId: 'challenge-1',
+                challengerUsername: 'shimroot',
+                trackKey: 'numberZero',
+                lapCount: 1,
+                targetTimeMs: 8_000,
+            },
+            journeys: { endAttempt: vi.fn() },
+            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal,
+                updateChallengeFinishHero: vi.fn(),
+            },
+            restartActiveRace: vi.fn(),
+            loadChallengeLobby: vi.fn(),
+            settings: { openSettings: vi.fn() },
+        };
+    }
+
+    const finish = (context, lapTime) => (
+        headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime })
+    );
+
+    it('withholds the offer for two losses, then keeps it until a concession is posted', async () => {
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body: {} });
+        const showModal = vi.fn();
+        const context = visitContext(showModal);
+        const sheet = (index) => showModal.mock.calls[index][3];
+
+        await finish(context, 8.4);
+        await finish(context, 8.5);
+        expect(sheet(0)).toMatchObject({
+            shareRequest: { kind: 'challenge-brag', acceptToken: null },
+            shareEnabled: false,
+        });
+        expect(sheet(1).shareEnabled).toBe(false);
+
+        await finish(context, 8.6);
+        expect(sheet(2)).toMatchObject({
+            shareRequest: { kind: 'challenge-comment', outcome: 'lost' },
+            shareEnabled: true,
+        });
+
+        // Declining costs nothing: the offer stays up until the player uses it.
+        await finish(context, 8.7);
+        expect(sheet(3).shareEnabled).toBe(true);
+
+        // A posted concession starts the three again.
+        headToHeadEngineMethods.recordHeadToHeadConcede.call(context);
+        await finish(context, 8.8);
+        await finish(context, 8.9);
+        expect(sheet(4).shareEnabled).toBe(false);
+        expect(sheet(5).shareEnabled).toBe(false);
+        await finish(context, 9);
+        expect(sheet(6).shareEnabled).toBe(true);
+    });
+
+    it('offers a tie its own line at once, and still counts it as one of the three', async () => {
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body: {} });
+        const showModal = vi.fn();
+        const context = visitContext(showModal);
+        const sheet = (index) => showModal.mock.calls[index][3];
+
+        await finish(context, 8);
+        expect(sheet(0)).toMatchObject({
+            shareRequest: { kind: 'challenge-comment', outcome: 'tie' },
+            shareEnabled: true,
+        });
+
+        await finish(context, 8.4);
+        expect(sheet(1).shareEnabled).toBe(false);
+        await finish(context, 8.5);
+        expect(sheet(2)).toMatchObject({
+            shareRequest: { kind: 'challenge-comment', outcome: 'lost' },
+            shareEnabled: true,
+        });
+    });
+
+    it('counts one finish once when the server verdict follows the local one', async () => {
+        const showModal = vi.fn();
+        const updateChallengeFinishHero = vi.fn();
+        const context = visitContext(showModal);
+        context.modal.updateChallengeFinishHero = updateChallengeFinishHero;
+        // A run faster than the target opens on pending and waits for the server, which then
+        // takes the win away. That is one loss, not two.
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: false,
+            body: {
+                accepted: false,
+                status: 'target_not_beaten',
+                targetTimeMs: 8_000,
+                differenceMs: 400,
+            },
+        });
+
+        await finish(context, 7.9);
+        await vi.waitFor(() => {
+            expect(updateChallengeFinishHero).toHaveBeenCalledWith(expect.objectContaining({
+                phase: 'lost',
+            }));
+        });
+        await finish(context, 7.8);
+        await vi.waitFor(() => {
+            expect(updateChallengeFinishHero).toHaveBeenCalledTimes(2);
+        });
+        // Two finishes, two counts. Had the pending open counted as well, this second repaint
+        // would already be offering Concede.
+        for (const call of updateChallengeFinishHero.mock.calls) {
+            expect(call[0].shareRequest).toEqual({ kind: 'challenge-brag', acceptToken: null });
+        }
+
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body: {} });
+        await finish(context, 8.6);
+        expect(showModal.mock.calls.at(-1)[3]).toMatchObject({
+            shareRequest: { kind: 'challenge-comment', outcome: 'lost' },
+            shareEnabled: true,
+        });
     });
 });

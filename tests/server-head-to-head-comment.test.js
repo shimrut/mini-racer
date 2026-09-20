@@ -165,6 +165,42 @@ describe('head-to-head comments', () => {
         }));
     });
 
+    it('answers a repeated result with the comment it already posted', async () => {
+        const first = await previewHeadToHeadComment(
+            { challengeId: challenge.challengeId, reportedTimeMs: 10_000 },
+            context,
+        );
+        const posted = await confirmHeadToHeadComment(
+            { shareToken: first.body.shareToken },
+            context,
+        );
+        expect(posted.body).toMatchObject({ status: 'commented' });
+        expect(reddit.submitComment).toHaveBeenCalledTimes(1);
+
+        // A tie is the target time to the millisecond, so a second tie is the same result. The
+        // preview says so instead of offering a confirmation that could only repeat the first
+        // comment and report it as new.
+        const repeat = await previewHeadToHeadComment(
+            { challengeId: challenge.challengeId, reportedTimeMs: 10_000 },
+            context,
+        );
+        expect(repeat.status).toBe(200);
+        expect(repeat.body).toEqual({
+            status: 'already_commented',
+            username: 'OtherRacer',
+            commentText: 'I tried so hard and all I got was a tie 🙄',
+            commentUrl: 'https://reddit.com/r/miniracer/challenge1/comment1',
+        });
+        expect(reddit.submitComment).toHaveBeenCalledTimes(1);
+
+        // A different finish is a different result, and still gets its own preview.
+        const other = await previewHeadToHeadComment(
+            { challengeId: challenge.challengeId, reportedTimeMs: 10_400 },
+            context,
+        );
+        expect(other.body).toMatchObject({ status: 'ready' });
+    });
+
     it('confirms a tie as text', async () => {
         const preview = await previewHeadToHeadComment(
             { challengeId: challenge.challengeId, reportedTimeMs: 10_000 },

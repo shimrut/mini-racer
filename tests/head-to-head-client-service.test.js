@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+    concedesHeadToHead,
     getHeadToHead,
     previewHeadToHeadComment,
     confirmHeadToHeadComment,
@@ -80,6 +81,9 @@ describe('head to head client service', () => {
             await previewHeadToHeadComment({
                 challengeId: 'challenge-1',
                 reportedTimeMs: 10_011,
+                // Which verdict this finish settled on is the client's own business: it decides
+                // whether a post restarts the concede count, and the server never sees it.
+                outcome: 'lost',
             });
             const previewBody = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
             expect(previewBody).toMatchObject({
@@ -87,6 +91,7 @@ describe('head to head client service', () => {
                 reportedTimeMs: 10_011,
                 postId: 't3_challenge1',
             });
+            expect(previewBody).not.toHaveProperty('outcome');
 
             await confirmHeadToHeadComment('share-1');
             expect(JSON.parse(globalThis.fetch.mock.calls[1][1].body)).toEqual({
@@ -96,5 +101,32 @@ describe('head to head client service', () => {
             globalThis.location = originalLocation;
             globalThis.devvit = originalDevvit;
         }
+    });
+});
+
+describe('concedesHeadToHead', () => {
+    const lost = { kind: 'challenge-comment', outcome: 'lost' };
+
+    // Anything that leaves the comment on the post ends the concession, including the answer
+    // Reddit would not confirm: the comment may be live, and a second concession must not follow.
+    it.each([
+        'commented',
+        'already_commented',
+        'posted_without_link',
+        'user_action_unavailable',
+        'comment_unconfirmed',
+    ])('ends the concession on %s', (status) => {
+        expect(concedesHeadToHead(lost, { status })).toBe(true);
+    });
+
+    it.each([
+        ['a preview that has not posted yet', lost, { status: 'ready' }],
+        ['a failure', lost, { status: 'challenge_failed' }],
+        ['no answer at all', lost, undefined],
+        ['a tie', { kind: 'challenge-comment', outcome: 'tie' }, { status: 'commented' }],
+        ['a brag', { kind: 'challenge-brag' }, { status: 'shared' }],
+        ['a finish with no verdict', { kind: 'challenge-comment' }, { status: 'commented' }],
+    ])('leaves the count alone for %s', (_case, request, body) => {
+        expect(concedesHeadToHead(request, body)).toBe(false);
     });
 });

@@ -550,6 +550,20 @@ export class ModalShell {
         btn.onclick = typeof action === 'function' ? action : null;
     }
 
+    /**
+     * The middle button of a challenge finish when the share on it is a comment. A tie says its
+     * own line at once; a loss that has earned the offer concedes. A finish that has spent its
+     * comment falls back to the locked Brag, the same button the sheet showed before the offer.
+     */
+    _challengeCommentButtonText(phase, spent = null) {
+        if (spent) {
+            return { label: 'Brag', aria: 'Brag available after beating this challenge' };
+        }
+        return phase === 'tie'
+            ? { label: 'A tie?', aria: 'Comment that you tied this challenge' }
+            : { label: 'Concede', aria: 'Concede this challenge' };
+    }
+
     _setShareButtonLabel(button, label) {
         const labelNode = button?.querySelector?.('.combined-action-btn-label');
         if (labelNode) labelNode.textContent = label.toUpperCase();
@@ -800,7 +814,8 @@ export class ModalShell {
     } = {}) {
         const isChallengeCreate = Boolean(result?.postUrl) && !result?.commentText;
         // The server made no new post: this race and time already has a live one.
-        const isChallengeRepeat = isChallengeCreate && result?.status === 'already_created';
+        const isChallengeRepeat = (isChallengeCreate && result?.status === 'already_created')
+            || result?.status === 'already_commented';
         panel.replaceChildren();
         const title = document.createElement('h3');
         title.className = 'result-share-panel__title';
@@ -826,10 +841,20 @@ export class ModalShell {
         actions.appendChild(done);
         panel.append(title, copy, actions);
         triggerButton.disabled = !keepShareAvailable;
+        // A challenge comment is spent for good, so the finish goes back to the button it showed
+        // before the offer: the locked Brag, which the next race can still unlock.
+        const spentCommentText = !keepShareAvailable && commented
+            ? this._challengeCommentButtonText(null, 'posted')
+            : null;
         this._setShareButtonLabel(
             triggerButton,
-            keepShareAvailable ? 'Share' : bragged ? 'Bragged' : commented ? 'Commented' : 'Shared',
+            spentCommentText
+                ? spentCommentText.label
+                : keepShareAvailable ? 'Share' : bragged ? 'Bragged' : 'Shared',
         );
+        if (spentCommentText) {
+            triggerButton.setAttribute('aria-label', spentCommentText.aria);
+        }
         resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
             preferredIndex: 0,
             container: actions,
@@ -970,7 +995,11 @@ export class ModalShell {
         try {
             const response = await this.previewShare(request);
             const body = response?.body || {};
-            if (body.status === 'already_shared' || body.status === 'already_created') {
+            if (
+                body.status === 'already_shared'
+                || body.status === 'already_created'
+                || body.status === 'already_commented'
+            ) {
                 markCommentSpent('posted');
                 this._showShareOutcome(panel, triggerButton, body, {
                     bragged: isBrag,
@@ -1256,10 +1285,13 @@ export class ModalShell {
             const hasAuxiliaryAction = Boolean(options.shareRequest || options.playlistAction);
             this.combinedPlaylistBtn.style.display = hasAuxiliaryAction ? '' : 'none';
             const shareEnabled = options.shareEnabled !== false;
+            const commentText = isChallengeComment
+                ? this._challengeCommentButtonText(lapData.challengeConfirmPhase)
+                : null;
             const shareLabel = isChallengeBrag
                 ? 'Brag'
-                : isChallengeComment
-                    ? 'Comment'
+                : commentText
+                    ? commentText.label
                 : isChallengeShare
                     ? 'Challenge'
                     : isDailyShare ? 'Share' : 'Share Time';
@@ -1267,8 +1299,8 @@ export class ModalShell {
                 ? (shareEnabled
                     ? 'Brag that you beat this challenge'
                     : 'Brag available after beating this challenge')
-                : isChallengeComment
-                    ? 'Comment on this challenge'
+                : commentText
+                    ? commentText.aria
                 : isChallengeShare
                     ? 'Challenge other racers'
                     : isDailyShare ? 'Share result options' : 'Share time';
@@ -1479,17 +1511,20 @@ export class ModalShell {
         );
 
         if (this.combinedPlaylistBtn && challengeShareRequest) {
+            const commentText = isChallengeComment
+                ? this._challengeCommentButtonText(finishPhase, spent)
+                : null;
             this.combinedPlaylistBtn.style.display = '';
             this._setShareButtonLabel(
                 this.combinedPlaylistBtn,
-                spent === 'posted'
-                    ? (isChallengeComment ? 'Commented' : 'Bragged')
-                    : (isChallengeComment ? 'Comment' : 'Brag'),
+                commentText
+                    ? commentText.label
+                    : (spent === 'posted' ? 'Bragged' : 'Brag'),
             );
             this.combinedPlaylistBtn.setAttribute(
                 'aria-label',
-                isChallengeComment
-                    ? 'Comment on this challenge'
+                commentText
+                    ? commentText.aria
                     : shareEnabled
                         ? 'Brag that you beat this challenge'
                         : 'Brag available after beating this challenge',

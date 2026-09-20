@@ -1,5 +1,22 @@
 # Changelog
 
+- A lost Head to Head no longer asks the player to comment on the first loss.
+  The finish keeps the locked Brag button for the first two losses. The third
+  loss offers CONCEDE, which posts the loss comment the app already writes.
+  - CONCEDE does not stop the player. Improve starts the next race as before.
+  - A posted concession starts the three losses again. The player who declines
+    the offer keeps it until they use it.
+  - The count is for this visit. It starts at zero when the player opens the
+    post again.
+  - A tie does not wait. The button reads A TIE? on every tie and posts the tie
+    comment at once. A tie still counts as one of the three losses.
+
+- A repeated comment now says it is already posted. A tie is always the target
+  time, so a second tie is the same result as the first. Before, the app asked
+  the player to confirm the comment, posted nothing, and said "Comment posted".
+  The app now tells the player the comment is up, and shows the comment, before
+  it offers to post anything.
+
 - Fixed a Brag, Challenge Comment or Daily Share that posted a second comment.
   The app posted the comment, then checked what Reddit sent back. A comment with
   no link, or one Reddit put under the app's name, made the app report an error

@@ -84,6 +84,7 @@ import {
   subscribeToDailyChallengeSnapshots,
 } from "./daily-challenge/service.js";
 import {
+  concedesHeadToHead,
   confirmHeadToHeadComment,
   confirmHeadToHeadBrag,
   createHeadToHead,
@@ -449,7 +450,7 @@ export class RealTimeRacer {
       playUnlockSound: (tier) => this.medalEffectsAudio?.scheduleMedalUnlock?.(tier),
       getGarageUi: () => this.garage,
       getRedditUsername: () => this.redditUsername,
-      previewShare: (payload) => {
+      previewShare: async (payload) => {
         if (payload?.kind === "head-to-head") {
           return previewHeadToHead(payload);
         }
@@ -457,7 +458,10 @@ export class RealTimeRacer {
           return previewHeadToHeadBrag(payload);
         }
         if (payload?.kind === "challenge-comment") {
-          return previewHeadToHeadComment(payload);
+          const response = await previewHeadToHeadComment(payload);
+          // Already posted settles this concession as surely as posting it now does.
+          if (concedesHeadToHead(payload, response?.body)) this.recordHeadToHeadConcede?.();
+          return response;
         }
         return previewDailyChallengeShare(payload);
       },
@@ -471,7 +475,10 @@ export class RealTimeRacer {
           return confirmHeadToHeadBrag(shareToken);
         }
         if (request?.kind === "challenge-comment") {
-          return confirmHeadToHeadComment(shareToken);
+          const response = await confirmHeadToHeadComment(shareToken);
+          // A posted concession restarts the count. A posted tie leaves it alone.
+          if (concedesHeadToHead(request, response?.body)) this.recordHeadToHeadConcede?.();
+          return response;
         }
         return confirmDailyChallengeShare(shareToken);
       },

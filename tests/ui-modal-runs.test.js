@@ -54,16 +54,17 @@ describe('standings return flow', () => {
 });
 
 describe('a challenge finish that has spent its comment', () => {
-    function finishContext(dom, spent) {
+    function finishContext(dom, spent, phase = 'lost') {
         return {
             modalCombinedView: dom.window.document.getElementById('finish'),
             content: new ModalContentUi(),
-            _challengeFinishPhase: 'lost',
+            _challengeFinishPhase: phase,
             _challengeFinishShareRequest: { kind: 'challenge-comment', challengeId: 'c1' },
             _challengeFinishCommentSpent: spent,
-            _combinedResultsLapData: { challengeConfirmPhase: 'lost' },
+            _combinedResultsLapData: { challengeConfirmPhase: phase },
             combinedPlaylistBtn: dom.window.document.getElementById('combined-playlist-btn'),
             _setShareButtonLabel: ModalShell.prototype._setShareButtonLabel,
+            _challengeCommentButtonText: ModalShell.prototype._challengeCommentButtonText,
             _bindClickAction: ModalShell.prototype._bindClickAction,
             _startShare: () => {},
         };
@@ -80,15 +81,19 @@ describe('a challenge finish that has spent its comment', () => {
         `);
     }
 
+    // A spent comment goes back to the locked Brag, whatever spent it: the finish has said its
+    // piece, and only the next race can unlock the button again.
     it.each([
-        ['posted', true, 'COMMENTED'],
-        ['unconfirmed', true, 'COMMENT'],
-        [null, false, 'COMMENT'],
-    ])('leaves the button %s when a late rank answer repaints it', (spent, disabled, label) => {
+        ['posted', 'lost', true, 'BRAG'],
+        ['unconfirmed', 'lost', true, 'BRAG'],
+        ['posted', 'tie', true, 'BRAG'],
+        [null, 'lost', false, 'CONCEDE'],
+        [null, 'tie', false, 'A TIE?'],
+    ])('leaves the button %s on a %s when a late rank answer repaints it', (spent, phase, disabled, label) => {
         const originalDocument = global.document;
         const dom = finishDom();
         global.document = dom.window.document;
-        const context = finishContext(dom, spent);
+        const context = finishContext(dom, spent, phase);
 
         try {
             ModalShell.prototype.updateChallengeFinishHero.call(context, {
@@ -1580,6 +1585,57 @@ describe('Daily finish share chooser', () => {
             await panel.querySelector('.result-share-panel__button--primary').onclick();
             expect(panel.querySelector('.result-share-panel__title').textContent).toBe('Comment posted');
             expect(shell.confirmShare).toHaveBeenCalledWith('share-1', request);
+            // The comment is spent, so the finish goes back to the button it had before the
+            // offer: the locked Brag, which only a win can unlock.
+            expect(triggerButton.querySelector('.combined-action-btn-label').textContent).toBe('BRAG');
+            expect(triggerButton.disabled).toBe(true);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('says a repeated tie is already posted without offering to post it again', async () => {
+        const originalDocument = global.document;
+        const dom = new JSDOM(`
+            <div id="modal">
+                <div id="modal-lap-times"></div>
+                <div id="modal-combined-view"></div>
+                <button id="combined-playlist-btn"><span class="combined-action-btn-label">A TIE?</span></button>
+            </div>
+        `, { url: 'http://localhost' });
+        global.document = dom.window.document;
+        const shell = new ModalShell({
+            getRedditUsername: () => 'OtherRacer',
+            previewShare: vi.fn(async () => ({
+                ok: true,
+                body: {
+                    status: 'already_commented',
+                    username: 'OtherRacer',
+                    commentText: 'I tried so hard and all I got was a tie 🙄',
+                    commentUrl: 'https://reddit.com/r/miniracer/challenge1/comment1',
+                },
+            })),
+            confirmShare: vi.fn(),
+        });
+
+        try {
+            const triggerButton = dom.window.document.getElementById('combined-playlist-btn');
+            const hostView = dom.window.document.getElementById('modal-combined-view');
+            await shell._startShare({
+                kind: 'challenge-comment',
+                challengeId: 'challenge-1',
+                reportedTimeMs: 10_000,
+                outcome: 'tie',
+            }, triggerButton, hostView);
+
+            const panel = dom.window.document.querySelector('.result-share-panel');
+            expect(panel.querySelector('.result-share-panel__title').textContent).toBe('Already posted');
+            expect(panel.querySelector('.result-share-panel__copy').textContent).toBe(
+                'I tried so hard and all I got was a tie 🙄',
+            );
+            expect(panel.querySelector('.result-share-panel__button--primary')).toBe(null);
+            expect(shell.confirmShare).not.toHaveBeenCalled();
+            expect(triggerButton.querySelector('.combined-action-btn-label').textContent).toBe('BRAG');
         } finally {
             global.document = originalDocument;
         }
@@ -1962,7 +2018,10 @@ describe('combined finish head to head win actions', () => {
         });
     });
 
-    it('enables Comment for a settled challenge loss', () => {
+    it.each([
+        ['lost', 'CONCEDE', 'Concede this challenge'],
+        ['tie', 'A TIE?', 'Comment that you tied this challenge'],
+    ])('enables the comment on a settled %s', (phase, label, aria) => {
         withWinSheet((shell, doc) => {
             shell.showCombinedResults(
                 {
@@ -1970,7 +2029,7 @@ describe('combined finish head to head win actions', () => {
                     bestTime: 8,
                     trackKey: 'number-zero',
                     challengeFinish: true,
-                    challengeConfirmPhase: 'lost',
+                    challengeConfirmPhase: phase,
                 },
                 {
                     modalKind: 'win',
@@ -1979,15 +2038,16 @@ describe('combined finish head to head win actions', () => {
                         kind: 'challenge-comment',
                         challengeId: 'challenge-1',
                         reportedTimeMs: 8_011,
+                        outcome: phase,
                     },
                     shareEnabled: true,
                 },
             );
 
             const comment = byId(doc, 'combined-playlist-btn');
-            expect(comment.querySelector('.combined-action-btn-label').textContent).toBe('COMMENT');
+            expect(comment.querySelector('.combined-action-btn-label').textContent).toBe(label);
             expect(comment.disabled).toBe(false);
-            expect(comment.getAttribute('aria-label')).toBe('Comment on this challenge');
+            expect(comment.getAttribute('aria-label')).toBe(aria);
         });
     });
 
