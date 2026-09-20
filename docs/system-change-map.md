@@ -412,9 +412,12 @@ flowchart LR
   standalone post and expanded game both forward the current Reddit `postId`
   with challenge reads and submissions; the server accepts that explicit
   context only as a validated `t3_` post ID before re-reading the Reddit post.
-  The challenger cannot accept or submit against their own post (`own_challenge`);
-  the in-feed Accept card shows an expired-style message and opens the source
-  mode via a stored launch target that overrides challenge post data.   The duel
+  The challenger cannot accept or submit against their own post (`own_challenge`).
+  The in-feed card paints from post data and client context (no Redis, no
+  `/api/head-to-head`); a matching `username` shows Open Mini Racer and opens
+  the lobby via a stored launch target that overrides challenge post data.
+  The expanded game loads the ghost and enforces own-challenge and
+  availability.   The duel
   verdict remains session-only even when its source run improves the ordinary
   PB and rank.   The challenge lobby still shows that originating Daily or Campaign
   personal best in the second seat when the player already holds one, labeled

@@ -3,31 +3,44 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     applyHeadToHeadAccessState,
     bindAcceptChallenge,
-    ensureChallengePlayerIdentity,
     formatHeadToHeadPreviewTime,
-    HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS,
     normalizeHeadToHeadPostData,
-    openCampaignAsRedirect,
     openHomeAsRedirect,
     OWN_CHALLENGE_MESSAGE,
     readHeadToHeadPostData,
-    resolveHeadToHeadAccess,
+    readHeadToHeadViewerIdentity,
+    resolveHeadToHeadPosterAccess,
     showOwnChallengeMessage,
 } from '../head-to-head.js';
-import { getGuestPlayerToken, setGuestPlayerToken } from '../game/scoreboard/player-identity.js';
 import { LAUNCH_TARGET_KEY } from '../game/modes/launch-target.js';
 
 afterEach(() => {
     vi.useRealTimers();
-    setGuestPlayerToken(null);
 });
 
+const PLAYABLE_POST = {
+    postType: 'head-to-head',
+    challengeId: 'challenge-1',
+    challengerUsername: 'RaceFan',
+    challengerAvatarUrl: 'https://i.redd.it/avatar.png',
+    trackKey: 'numberThree',
+    lapCount: 2,
+    targetTimeMs: 25_640,
+};
+
 describe('head-to-head custom-post preview', () => {
-    it('ships a disabled loading CTA until access has been resolved', () => {
+    it('ships an enabled Accept Challenge CTA', () => {
         const html = readFileSync(new URL('../head-to-head.html', import.meta.url), 'utf8');
         expect(html).toMatch(
-            /<button id="accept-challenge" type="button" disabled>Checking Challenge…<\/button>/,
+            /<button id="accept-challenge" type="button">Accept Challenge<\/button>/,
         );
+        expect(html).not.toMatch(/Checking Challenge/);
+    });
+
+    it('does not fetch challenge access or player bootstrap from the poster', () => {
+        const source = readFileSync(new URL('../head-to-head.js', import.meta.url), 'utf8');
+        expect(source).not.toMatch(/\/api\/head-to-head/);
+        expect(source).not.toMatch(/\/api\/player\/bootstrap/);
     });
 
     it('reads only the dedicated immutable post type', () => {
@@ -71,169 +84,73 @@ describe('head-to-head custom-post preview', () => {
         expect(formatHeadToHeadPreviewTime(null)).toBe('—');
     });
 
-    it('blocks guests when the signed-in challenge endpoint rejects them', async () => {
-        const guest = await resolveHeadToHeadAccess({
-            fetch: vi.fn(async () => ({
-                ok: false,
-                status: 401,
-                json: async () => ({ status: 'signed_in_required' }),
-            })),
+    it('reads the viewer name and snoovatar from client context when present', () => {
+        expect(readHeadToHeadViewerIdentity({
+            devvit: {
+                context: {
+                    username: '  RaceFan  ',
+                    snoovatar: 'https://i.redd.it/me.png',
+                },
+            },
+        })).toEqual({
+            username: 'RaceFan',
+            avatarUrl: 'https://i.redd.it/me.png',
         });
-        expect(guest).toEqual({
-            signedIn: false,
-            canRace: false,
-            ownChallenge: false,
-            body: { status: 'signed_in_required' },
+        expect(readHeadToHeadViewerIdentity({
+            devvit: { context: { username: 'RaceFan', snoovatar: 'https://evil.com/me.png' } },
+        })).toEqual({
+            username: 'RaceFan',
+            avatarUrl: null,
+        });
+        expect(readHeadToHeadViewerIdentity({})).toEqual({
+            username: '',
+            avatarUrl: null,
         });
     });
 
-    it('treats own_challenge as signed-in but blocked', async () => {
-        const access = await resolveHeadToHeadAccess({
-            fetch: vi.fn(async () => ({
-                ok: false,
-                status: 403,
-                json: async () => ({
-                    status: 'own_challenge',
-                    error: "You can't accept your own challenge.",
-                }),
-            })),
+    it('enables Accept from post data without a server check', () => {
+        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {})).toMatchObject({
+            signedIn: false,
+            canRace: true,
+            ownChallenge: false,
         });
-        expect(access).toEqual({
+    });
+
+    it('treats a matching client username as the poster\'s own challenge', () => {
+        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {
+            devvit: { context: { username: 'RaceFan' } },
+        })).toMatchObject({
             signedIn: true,
             canRace: false,
             ownChallenge: true,
-            body: {
-                status: 'own_challenge',
-                error: "You can't accept your own challenge.",
-            },
+        });
+        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {
+            devvit: { context: { username: '  racefan  ' } },
+        })).toMatchObject({
+            ownChallenge: true,
         });
     });
 
-    it('lets a guest with a bootstrapped identity race a ready challenge', async () => {
-        const fetch = vi.fn(async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({
-                status: 'ready',
-                viewerType: 'guest',
-                challenge: { challengeId: 'challenge-1' },
-            }),
-        }));
-        const access = await resolveHeadToHeadAccess({
-            fetch,
-            devvit: { context: { postId: 't3_challenge1' } },
-            location: { origin: 'https://miniracer.example' },
-        }, 'challenge-1');
-        expect(access).toMatchObject({
-            signedIn: false,
-            canRace: true,
-            ownChallenge: false,
-            body: { viewerType: 'guest' },
-        });
-        const requestedUrl = new URL(fetch.mock.calls[0][0]);
-        expect(requestedUrl.searchParams.get('challengeId')).toBe('challenge-1');
-        expect(requestedUrl.searchParams.get('postId')).toBe('t3_challenge1');
-    });
-
-    it('keeps a public ready challenge raceable before the viewer type is known', async () => {
-        const access = await resolveHeadToHeadAccess({
-            fetch: vi.fn(async () => ({
-                ok: true,
-                status: 200,
-                json: async () => ({
-                    status: 'ready',
-                    viewerType: 'anonymous',
-                    challenge: { challengeId: 'challenge-1' },
-                }),
-            })),
-        }, 'challenge-1');
-        expect(access).toMatchObject({
-            signedIn: false,
+    it('keeps Accept live when client username is missing', () => {
+        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {
+            devvit: { context: {} },
+        })).toMatchObject({
             canRace: true,
             ownChallenge: false,
         });
     });
 
-    it('bounds a stalled challenge access request and returns unavailable state', async () => {
-        vi.useFakeTimers();
-        let aborted = false;
-        const accessPromise = resolveHeadToHeadAccess({
-            location: { origin: 'https://miniracer.example' },
-            fetch: vi.fn((_url, options) => new Promise((_, reject) => {
-                options.signal.addEventListener('abort', () => {
-                    aborted = true;
-                    const error = new Error('aborted');
-                    error.name = 'AbortError';
-                    reject(error);
-                });
-            })),
-        }, 'challenge-1');
-
-        await vi.advanceTimersByTimeAsync(HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS);
-
-        await expect(accessPromise).resolves.toEqual({
-            signedIn: false,
+    it('disables Accept when the post has no challenge id', () => {
+        expect(resolveHeadToHeadPosterAccess({ postType: 'head-to-head' }, {
+            devvit: { context: { username: 'RaceFan' } },
+        })).toMatchObject({
             canRace: false,
             ownChallenge: false,
         });
-        expect(aborted).toBe(true);
-    });
-
-    it('bounds a stalled preview bootstrap without replacing the guest identity', async () => {
-        vi.useFakeTimers();
-        setGuestPlayerToken('existing-token');
-        let aborted = false;
-        const bootstrapPromise = ensureChallengePlayerIdentity({
-            location: { origin: 'https://miniracer.example' },
-            fetch: vi.fn((_url, options) => new Promise((_, reject) => {
-                options.signal.addEventListener('abort', () => {
-                    aborted = true;
-                    const error = new Error('aborted');
-                    error.name = 'AbortError';
-                    reject(error);
-                });
-            })),
+        expect(resolveHeadToHeadPosterAccess(null, {})).toMatchObject({
+            canRace: false,
+            ownChallenge: false,
         });
-
-        await vi.advanceTimersByTimeAsync(HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS);
-
-        await expect(bootstrapPromise).resolves.toBe(false);
-        expect(aborted).toBe(true);
-        expect(getGuestPlayerToken()).toBe('existing-token');
-        setGuestPlayerToken(null);
-    });
-
-    it('drops a stale guest token once, keeps the player id, and stores the reissued token', async () => {
-        setGuestPlayerToken('stale-token');
-        const fetch = vi.fn()
-            .mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                json: async () => ({ error: 'Guest token is required for this player.' }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => ({
-                    playerId: 'guest:refreshed',
-                    guestToken: 'refreshed-token',
-                }),
-            });
-
-        try {
-            await expect(ensureChallengePlayerIdentity({
-                fetch,
-                location: { origin: 'https://miniracer.example' },
-            })).resolves.toBe(true);
-            expect(fetch).toHaveBeenCalledTimes(2);
-            expect(new URL(fetch.mock.calls[0][0]).searchParams.get('guestToken'))
-                .toBe('stale-token');
-            expect(new URL(fetch.mock.calls[1][0]).searchParams.get('guestToken'))
-                .toBeNull();
-            expect(getGuestPlayerToken()).toBe('refreshed-token');
-        } finally {
-            setGuestPlayerToken(null);
-        }
     });
 
     it('never labels an unavailable or guest-ready challenge as sign-in gated', () => {

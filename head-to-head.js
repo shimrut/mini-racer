@@ -7,55 +7,17 @@ import {
 } from './game/track/presentation.js';
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 import { exposeHeadToHeadLauncherTestHooks } from './game/debug/launcher-hooks.js';
-import {
-    getGuestPlayerToken,
-    getOrCreatePlayerId,
-    setGuestPlayerToken,
-} from './game/scoreboard/player-identity.js';
 import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from './game/ui/avatar.js';
 
 const POST_TYPE = 'head-to-head';
 const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
-export const HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS = 20_000;
-
-function createPreviewTimeoutError() {
-    const error = new Error('Head to Head preview request timed out.');
-    error.name = 'AbortError';
-    return error;
-}
-
-async function fetchPreviewWithTimeout(root, url, options = {}) {
-    const AbortControllerClass = root?.AbortController || globalThis.AbortController;
-    const controller = typeof AbortControllerClass === 'function' && !options.signal
-        ? new AbortControllerClass()
-        : null;
-    let timeoutId = null;
-    const timeout = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-            controller?.abort();
-            reject(createPreviewTimeoutError());
-        }, HEAD_TO_HEAD_PREVIEW_REQUEST_TIMEOUT_MS);
-    });
-    const request = Promise.resolve().then(() => root.fetch(
-        url,
-        controller ? { ...options, signal: controller.signal } : options,
-    ));
-    try {
-        return await Promise.race([request, timeout]);
-    } finally {
-        if (timeoutId !== null) clearTimeout(timeoutId);
-    }
-}
 
 function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-function readChallengePostId(root = globalThis) {
-    const postId = root?.devvit?.context?.postId;
-    return typeof postId === 'string' && postId.startsWith('t3_')
-        ? postId
-        : '';
+function sameName(left, right) {
+    return cleanText(left).toLowerCase() === cleanText(right).toLowerCase();
 }
 
 export function readHeadToHeadPostData(root = globalThis) {
@@ -162,6 +124,40 @@ export function renderHeadToHead(documentRef, rawValue) {
     return value;
 }
 
+export function readHeadToHeadViewerIdentity(root = globalThis) {
+    const context = root?.devvit?.context;
+    const username = cleanText(context?.username);
+    return {
+        username,
+        avatarUrl: isRedditAvatarUrl(context?.snoovatar) ? context.snoovatar : null,
+    };
+}
+
+export function resolveHeadToHeadPosterAccess(rawValue, root = globalThis) {
+    const challenge = normalizeHeadToHeadPostData(rawValue);
+    const playable = Boolean(challenge.challengeId);
+    const viewer = readHeadToHeadViewerIdentity(root);
+    const ownChallenge = playable
+        && Boolean(viewer.username)
+        && sameName(viewer.username, challenge.challengerUsername);
+    return {
+        signedIn: Boolean(viewer.username),
+        canRace: playable && !ownChallenge,
+        ownChallenge,
+        viewer,
+        challenge,
+    };
+}
+
+function posterAvatars(challenge, viewer) {
+    return {
+        challengerUsername: challenge.challengerUsername,
+        challengerAvatarUrl: challenge.challengerAvatarUrl,
+        viewerUsername: viewer.username || 'You',
+        viewerAvatarUrl: viewer.avatarUrl,
+    };
+}
+
 function renderChallengeTrack(documentRef, trackKey) {
     const canvas = documentRef.getElementById('challenge-track');
     const track = TRACKS[trackKey];
@@ -188,77 +184,6 @@ function renderChallengeTrack(documentRef, trackKey) {
         hideSchematicStartArrow: true,
         runHistory: [],
     });
-}
-
-export async function resolveHeadToHeadAccess(root = globalThis, challengeId = null) {
-    if (typeof root?.fetch !== 'function') {
-        return { signedIn: false, canRace: false, ownChallenge: false };
-    }
-    try {
-        const url = new URL(
-            '/api/head-to-head',
-            root.location?.origin || 'http://localhost',
-        );
-        const requestedChallengeId = cleanText(challengeId);
-        if (requestedChallengeId) {
-            url.searchParams.set('challengeId', requestedChallengeId);
-        }
-        const postId = readChallengePostId(root);
-        if (postId) url.searchParams.set('postId', postId);
-        url.searchParams.set('playerId', getOrCreatePlayerId('challenge preview'));
-        const guestToken = getGuestPlayerToken();
-        if (guestToken) url.searchParams.set('guestToken', guestToken);
-        const response = await fetchPreviewWithTimeout(root, url.toString());
-        const body = await response?.json?.().catch?.(() => null) ?? null;
-        if (body?.status === 'own_challenge') {
-            return { signedIn: true, canRace: false, ownChallenge: true, body };
-        }
-        if (!response?.ok) return { signedIn: false, canRace: false, ownChallenge: false, body };
-        return {
-            signedIn: body?.viewerType === 'reddit',
-            canRace: body?.status === 'ready',
-            ownChallenge: false,
-            body,
-        };
-    } catch {
-        return { signedIn: false, canRace: false, ownChallenge: false };
-    }
-}
-
-export async function ensureChallengePlayerIdentity(root = globalThis) {
-    if (typeof root?.fetch !== 'function') return false;
-
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-            const url = new URL(
-                '/api/player/bootstrap',
-                root.location?.origin || 'http://localhost',
-            );
-            url.searchParams.set('playerId', getOrCreatePlayerId('challenge preview'));
-            const guestToken = getGuestPlayerToken();
-            if (guestToken) url.searchParams.set('guestToken', guestToken);
-            const response = await fetchPreviewWithTimeout(root, url.toString(), { method: 'GET' });
-            if (response?.status === 401 && attempt === 0) {
-                // Drop the rejected token and re-present the id: the server re-authorizes a guest profile it already holds.
-                setGuestPlayerToken(null);
-                continue;
-            }
-            if (!response?.ok) return false;
-            const body = await response.json?.().catch?.(() => null) ?? null;
-            if (body && Object.prototype.hasOwnProperty.call(body, 'guestToken')) {
-                setGuestPlayerToken(body.guestToken);
-            }
-            return Boolean(body?.playerId);
-        } catch (error) {
-            if (error?.status === 401 && attempt === 0) {
-                setGuestPlayerToken(null);
-                continue;
-            }
-            return false;
-        }
-    }
-
-    return false;
 }
 
 export function showOwnChallengeMessage(documentRef, openLobby = openHomeAsRedirect) {
@@ -367,48 +292,32 @@ export async function openHeadToHead(event) {
     }
 }
 
-let lastAccessAvatars = null;
+let lastPosterAvatars = null;
 
-function applyAccessAvatars(documentRef, challenge, access) {
-    const body = access?.body && typeof access.body === 'object' ? access.body : {};
-    const challengeBody = body.challenge && typeof body.challenge === 'object'
-        ? body.challenge
-        : {};
-    lastAccessAvatars = {
-        challengerUsername: challengeBody.challengerUsername || challenge.challengerUsername,
-        challengerAvatarUrl: challengeBody.challengerAvatarUrl
-            ?? challenge.challengerAvatarUrl
-            ?? body.challengerAvatarUrl,
-        viewerUsername: body.viewerUsername || 'You',
-        viewerAvatarUrl: body.viewerAvatarUrl,
-    };
-    renderHeadToHeadAvatars(documentRef, lastAccessAvatars);
-}
-
-async function boot() {
-    const challenge = renderHeadToHead(document, readHeadToHeadPostData());
-    const message = document.getElementById('challenge-message');
-    await ensureChallengePlayerIdentity(globalThis);
-    const access = await resolveHeadToHeadAccess(globalThis, challenge.challengeId);
-    applyAccessAvatars(document, challenge, access);
+function boot() {
+    const raw = readHeadToHeadPostData();
+    const challenge = renderHeadToHead(document, raw);
+    const poster = resolveHeadToHeadPosterAccess(raw);
+    lastPosterAvatars = posterAvatars(challenge, poster.viewer);
+    renderHeadToHeadAvatars(document, lastPosterAvatars);
     const button = bindAcceptChallenge(document, openHeadToHead, {
-        ownChallenge: access.ownChallenge === true,
+        ownChallenge: poster.ownChallenge === true,
         openOwnChallenge: openHomeAsRedirect,
     });
-    applyHeadToHeadAccessState(button, message, access);
-    exposeHeadToHeadLauncherTestHooks(challenge, access);
+    applyHeadToHeadAccessState(button, document.getElementById('challenge-message'), poster);
+    exposeHeadToHeadLauncherTestHooks(challenge, poster);
 }
 
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', boot);
     globalThis.addEventListener('resize', () => {
         const challenge = renderHeadToHead(document, readHeadToHeadPostData());
-        if (lastAccessAvatars) {
+        if (lastPosterAvatars) {
             renderHeadToHeadAvatars(document, {
-                ...lastAccessAvatars,
-                challengerUsername: lastAccessAvatars.challengerUsername
+                ...lastPosterAvatars,
+                challengerUsername: lastPosterAvatars.challengerUsername
                     || challenge.challengerUsername,
-                challengerAvatarUrl: lastAccessAvatars.challengerAvatarUrl
+                challengerAvatarUrl: lastPosterAvatars.challengerAvatarUrl
                     ?? challenge.challengerAvatarUrl,
             });
         }

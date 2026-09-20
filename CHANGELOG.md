@@ -1,5 +1,10 @@
 # Changelog
 
+- Head to Head posts no longer ask the server when they appear in the feed.
+  The card uses the post plus your Reddit name and picture when those are
+  sent with it. Accept is live immediately. Your own post still reads Open
+  Mini Racer when your name matches. The game loads the ghost after Accept.
+
 - A lost Head to Head no longer asks the player to comment on the first loss.
   The finish keeps the locked Brag button for the first two losses. The third
   loss offers CONCEDE, which posts the loss comment the app already writes.
