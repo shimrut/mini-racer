@@ -437,7 +437,9 @@ flowchart LR
   but does not replay-verify the losing run. Origin place on the sheet can stay empty. Brag, car unlocks, and remembered wins
   wait for the existing result confirmation; Comment is available for a settled
   tie or loss without waiting for that submission. The Head to Head finish shows VERIFYING until the
-  judged result arrives, then pushes that word out as `YOU WON` / `YOU LOST` /
+  judged result arrives, retrying dropped connections and 5xx/429 confirmation
+  failures on the open sheet. UNVERIFIED is reserved for a rejected replay. A
+  judged result then pushes VERIFYING out as `YOU WON` / `YOU LOST` /
   `YOU TIED` slides in. The lockup stays a left-aligned italic Outfit line with a
   right-aligned finish clock of the same size, both in the shared
   320px finish column used by Daily and Campaign as well. The three comparison rows own opponent margin,

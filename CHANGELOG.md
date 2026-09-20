@@ -1,5 +1,9 @@
 # Changelog
 
+- Head to Head no longer shows UNVERIFIED for a dropped or server-failed
+  confirmation. The finish stays on VERIFYING and retries. UNVERIFIED is only
+  for a run the server actually rejected.
+
 - Added `npm run typecheck`. Nothing checked the server's TypeScript before: the
   build strips the annotations without reading them.
 

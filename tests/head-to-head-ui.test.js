@@ -25,7 +25,11 @@ function stubLocalStorage() {
     return store;
 }
 
-import { headToHeadEngineMethods, resolveHeadToHeadHeldBest } from '../game/head-to-head/engine-methods.js';
+import {
+    HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS,
+    headToHeadEngineMethods,
+    resolveHeadToHeadHeldBest,
+} from '../game/head-to-head/engine-methods.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GENERIC_SNOO_URL } from '../game/ui/avatar.js';
 
@@ -39,6 +43,7 @@ function challengePaneDom() {
 }
 
 afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     headToHeadServiceMocks.getHeadToHead.mockReset();
@@ -322,32 +327,48 @@ describe('Head to Head lobby and finish', () => {
         expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
     });
 
-    it('does not strand a Head to Head finish when confirmation fails', async () => {
-        const modalMsg = { style: {}, textContent: '' };
+    function challengeFinishContext(overrides = {}) {
         const updateChallengeFinishHero = vi.fn();
-        const context = {
-            activeHeadToHead: {
-                challengeId: 'challenge-1',
-                trackKey: 'numberZero',
-                lapCount: 1,
-                targetTimeMs: 8_000,
+        return {
+            context: {
+                activeHeadToHead: {
+                    challengeId: 'challenge-1',
+                    trackKey: 'numberZero',
+                    lapCount: 1,
+                    targetTimeMs: 8_000,
+                    ...overrides.activeHeadToHead,
+                },
+                journeys: { endAttempt: vi.fn() },
+                scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
+                modal: {
+                    modalMsg: { style: {}, textContent: '' },
+                    showModal: vi.fn(),
+                    updateChallengeFinishHero,
+                    setChallengeWinActions: vi.fn(),
+                    clearChallengeWinActions: vi.fn(),
+                },
+                restartActiveRace: vi.fn(),
+                loadChallengeLobby: vi.fn(),
+                settings: { openSettings: vi.fn() },
+                ...overrides.context,
             },
-            journeys: { endAttempt: vi.fn() },
-            scoreboardReplay: { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
-            modal: {
-                modalMsg,
-                showModal: vi.fn(),
-                updateChallengeFinishHero,
-                setChallengeWinActions: vi.fn(),
-                clearChallengeWinActions: vi.fn(),
-            },
-            restartActiveRace: vi.fn(),
-            loadChallengeLobby: vi.fn(),
-            settings: { openSettings: vi.fn() },
+            updateChallengeFinishHero,
         };
-        headToHeadServiceMocks.submitHeadToHeadRun.mockRejectedValue(
-            new Error('response interrupted'),
-        );
+    }
+
+    it('retries an interrupted confirmation and then shows the win', async () => {
+        vi.useFakeTimers();
+        const { context, updateChallengeFinishHero } = challengeFinishContext();
+        headToHeadServiceMocks.submitHeadToHeadRun
+            .mockRejectedValueOnce(new Error('response interrupted'))
+            .mockResolvedValueOnce({
+                ok: true,
+                body: {
+                    accepted: true,
+                    outcome: 'won',
+                    differenceMs: -250,
+                },
+            });
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
         await headToHeadEngineMethods.handleHeadToHeadWin.call(
@@ -375,16 +396,89 @@ describe('Head to Head lobby and finish', () => {
                 restartAction: expect.any(Function),
             }),
         );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
+        expect(updateChallengeFinishHero).not.toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'error' }),
+        );
+        expect(context.modal.clearChallengeWinActions).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS[0]);
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(2);
+        expect(updateChallengeFinishHero).toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'won' }),
+        );
+        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
+        expect(context.modal.setChallengeWinActions).toHaveBeenCalled();
+        expect(context.modal.clearChallengeWinActions).not.toHaveBeenCalled();
+    });
+
+    it('retries a 500 confirmation instead of showing UNVERIFIED', async () => {
+        vi.useFakeTimers();
+        const { context, updateChallengeFinishHero } = challengeFinishContext();
+        headToHeadServiceMocks.submitHeadToHeadRun
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                body: {
+                    accepted: false,
+                    status: 'challenge_failed',
+                    error: 'Could not verify this challenge run.',
+                },
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                body: {
+                    accepted: true,
+                    outcome: 'won',
+                    differenceMs: -250,
+                },
+            });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(
+            context,
+            { lapTime: 7.75 },
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
+        expect(updateChallengeFinishHero).not.toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'error' }),
+        );
+
+        await vi.advanceTimersByTimeAsync(HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS[0]);
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(2);
+        expect(updateChallengeFinishHero).toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'won' }),
+        );
+    });
+
+    it('shows UNVERIFIED only after the server rejects the replay', async () => {
+        const { context, updateChallengeFinishHero } = challengeFinishContext();
+        headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
+            ok: false,
+            status: 422,
+            body: {
+                accepted: false,
+                status: 'invalid_replay',
+                error: 'This challenge run could not be verified.',
+            },
+        });
+
+        await headToHeadEngineMethods.handleHeadToHeadWin.call(
+            context,
+            { lapTime: 7.75 },
+        );
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledWith(
                 expect.objectContaining({
                     phase: 'error',
-                    error: 'Race finished, but the challenge result could not be confirmed.',
+                    error: 'This challenge run could not be verified.',
                 }),
             );
         });
-        expect(context.modal.showModal).toHaveBeenCalledTimes(1);
-        expect(context.modal.setChallengeWinActions).toHaveBeenCalledTimes(1);
+        expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
         expect(context.modal.clearChallengeWinActions).toHaveBeenCalledWith({
             restartAction: expect.any(Function),
         });

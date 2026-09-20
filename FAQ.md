@@ -143,10 +143,17 @@ never changes Campaign progress, PBs, medals, or leaderboards. Challenge
 finishes also do not award Campaign medals or ranks, and they never appear on
 Campaign or Daily standings.
 A win shows a display-only challenge medal and **Challenge beaten** after the
-result is verified (you’ll see Submitting/Verifying in that medal spot first).
+result is verified (you’ll see VERIFYING first).
 Finish buttons are always **Improve**, **Brag**, and **Home**; **Brag** unlocks
 only after a verified beat. A loss or tie uses the same buttons, but **Brag**
 stays disabled.
+
+### The challenge finish says UNVERIFIED
+
+That word means the run itself was rejected. A dropped connection or a busy
+server used to show the same word. The finish now stays on **VERIFYING** and
+tries again — leave it open. If it still says **UNVERIFIED**, Improve and race
+again.
 
 ### Can I accept or create a player challenge?
 

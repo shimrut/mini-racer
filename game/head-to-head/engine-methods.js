@@ -1,9 +1,7 @@
 import { getTrackName } from '../track/catalog.js';
 import {
-    createHeadToHead,
     confirmHeadToHeadComment,
     getHeadToHead,
-    previewHeadToHead,
     previewHeadToHeadComment,
     previewHeadToHeadBrag,
     confirmHeadToHeadBrag,
@@ -17,11 +15,55 @@ import {
 } from '../lobby/deferred-work.js';
 import { createModalActions } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
-import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
+import {
+    isRetryableVerificationFailure,
+    isVerificationQueueSubmissionBlocked,
+} from '../scoreboard/verification-queue.js';
+
+export const HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
 
 function finitePositiveMs(value) {
     const ms = Number(value);
     return Number.isFinite(ms) && ms > 0 ? Math.round(ms) : null;
+}
+
+function waitForHeadToHeadConfirmRetry(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function confirmationRetryDelayMs(attemptIndex, retryAfterSeconds) {
+    const retryAfterMs = Number(retryAfterSeconds) * 1000;
+    if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+        return Math.min(Math.max(retryAfterMs, 250), 30_000);
+    }
+    const delays = HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS;
+    return delays[Math.min(attemptIndex, delays.length - 1)];
+}
+
+function isRetryableHeadToHeadConfirmation(response, threw) {
+    if (threw) return true;
+    if (!response || response.ok) return false;
+    const bodyStatus = typeof response.body?.status === 'string'
+        ? response.body.status
+        : '';
+    if (
+        bodyStatus === 'invalid_replay'
+        || bodyStatus === 'target_not_beaten'
+        || bodyStatus === 'own_challenge'
+        || bodyStatus === 'challenge_unavailable'
+        || bodyStatus === 'player_identity_required'
+        || bodyStatus === 'progress_selection_required'
+    ) {
+        return false;
+    }
+    if (
+        bodyStatus === 'rate_limited'
+        || bodyStatus === 'progress_transfer_pending'
+        || bodyStatus === 'challenge_failed'
+    ) {
+        return true;
+    }
+    return isRetryableVerificationFailure(response);
 }
 
 /**
@@ -505,110 +547,109 @@ export const headToHeadEngineMethods = {
         if (optimisticWin) applyWinActions();
 
         void (async () => {
-            if (!stillOnThisFinish()) return;
+            let retryIndex = 0;
+            while (stillOnThisFinish()) {
+                let confirmationFailed = false;
+                let response = { ok: false, body: { error: 'This run could not be verified.' } };
+                try {
+                    response = await submitHeadToHeadRun({
+                        challengeId: challenge.challengeId,
+                        replay,
+                        bestTimeMs: finalTimeMs,
+                    });
+                } catch (submitError) {
+                    confirmationFailed = true;
+                    response = {
+                        ok: false,
+                        body: {
+                            error: 'Race finished, but the challenge result could not be confirmed.',
+                        },
+                    };
+                    console.error('Could not confirm Head to Head result:', submitError);
+                }
 
-            let confirmationFailed = false;
-            let response = { ok: false, body: { error: 'This run could not be verified.' } };
-            try {
-                response = await submitHeadToHeadRun({
-                    challengeId: challenge.challengeId,
-                    replay,
-                    bestTimeMs: finalTimeMs,
-                });
-            } catch (submitError) {
-                confirmationFailed = true;
-                response = {
-                    ok: false,
-                    body: {
-                        error: 'Race finished, but the challenge result could not be confirmed.',
-                    },
-                };
-                console.error('Could not confirm Head to Head result:', submitError);
-            }
+                if (!stillOnThisFinish()) return;
 
-            if (!stillOnThisFinish()) return;
+                const accepted = response.ok && response.body?.accepted === true;
+                const outcome = accepted ? response.body?.outcome : null;
 
-            const accepted = response.ok && response.body?.accepted === true;
-            const outcome = accepted ? response.body?.outcome : null;
-
-            if (!accepted) {
-                const serverDifferenceMs = Number(response.body?.differenceMs);
-                if (
-                    response.body?.status === 'target_not_beaten'
-                    && Number.isFinite(serverDifferenceMs)
-                ) {
-                    const serverTargetTimeMs = finitePositiveMs(response.body?.targetTimeMs)
-                        ?? targetTimeMs;
+                if (!accepted) {
+                    const serverDifferenceMs = Number(response.body?.differenceMs);
+                    if (
+                        response.body?.status === 'target_not_beaten'
+                        && Number.isFinite(serverDifferenceMs)
+                    ) {
+                        const serverTargetTimeMs = finitePositiveMs(response.body?.targetTimeMs)
+                            ?? targetTimeMs;
+                        this.modal.updateChallengeFinishHero?.({
+                            phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
+                            verdict: buildVerdict(serverDifferenceMs),
+                            shareRequest: buildCommentShareRequest(
+                                serverTargetTimeMs === null
+                                    ? null
+                                    : serverTargetTimeMs + serverDifferenceMs,
+                            ),
+                            ...(response.body?.bestUpdate
+                                ? { bestUpdate: response.body.bestUpdate }
+                                : {}),
+                        });
+                        revertOptimisticWin();
+                        return;
+                    }
+                    if (isRetryableHeadToHeadConfirmation(response, confirmationFailed)) {
+                        const delayMs = confirmationRetryDelayMs(
+                            retryIndex,
+                            response.body?.retryAfterSeconds,
+                        );
+                        retryIndex += 1;
+                        await waitForHeadToHeadConfirmRetry(delayMs);
+                        continue;
+                    }
                     this.modal.updateChallengeFinishHero?.({
-                        phase: serverDifferenceMs === 0 ? 'tie' : 'lost',
-                        verdict: buildVerdict(serverDifferenceMs),
-                        shareRequest: buildCommentShareRequest(
-                            serverTargetTimeMs === null
-                                ? null
-                                : serverTargetTimeMs + serverDifferenceMs,
-                        ),
-                        ...(response.body?.bestUpdate
-                            ? { bestUpdate: response.body.bestUpdate }
-                            : {}),
+                        phase: 'error',
+                        error: confirmationFailed
+                            ? (response.body?.error || 'Race finished, but the challenge result could not be confirmed.')
+                            : (response.body?.error || 'This run could not be verified.'),
                     });
                     revertOptimisticWin();
                     return;
                 }
+                const verdict = buildVerdict(Number(response.body?.differenceMs));
+                this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
+
+                const acceptToken = response.body?.acceptToken || null;
+                if (acceptToken) {
+                    this.modal.updateChallengeFinishHero?.({
+                        shareRequest: { kind: 'challenge-brag', acceptToken },
+                    });
+                }
+
+                const bestUpdate = response.body?.bestUpdate
+                    ? { bestUpdate: response.body.bestUpdate }
+                    : {};
+                if (outcome === 'won') {
+                    this.modal.updateChallengeFinishHero?.({
+                        phase: 'won',
+                        verdict,
+                        ...bestUpdate,
+                    });
+                    rememberHeadToHeadWin(
+                        challenge.challengeId,
+                        response.body?.bestTimeMs ?? null,
+                    );
+                    applyWinActions();
+                    return;
+                }
                 this.modal.updateChallengeFinishHero?.({
-                    phase: 'error',
-                    error: confirmationFailed
-                        ? (response.body?.error || 'Race finished, but the challenge result could not be confirmed.')
-                        : (response.body?.error || 'This run could not be verified.'),
+                    phase: outcome === 'tie' ? 'tie' : 'lost',
+                    verdict,
+                    shareRequest: buildCommentShareRequest(response.body?.bestTimeMs),
+                    ...bestUpdate,
                 });
                 revertOptimisticWin();
                 return;
             }
-            const verdict = buildVerdict(Number(response.body?.differenceMs));
-            this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
-
-            const acceptToken = response.body?.acceptToken || null;
-            if (acceptToken) {
-                this.modal.updateChallengeFinishHero?.({
-                    shareRequest: { kind: 'challenge-brag', acceptToken },
-                });
-            }
-
-            const bestUpdate = response.body?.bestUpdate
-                ? { bestUpdate: response.body.bestUpdate }
-                : {};
-            if (outcome === 'won') {
-                this.modal.updateChallengeFinishHero?.({
-                    phase: 'won',
-                    verdict,
-                    ...bestUpdate,
-                });
-                rememberHeadToHeadWin(
-                    challenge.challengeId,
-                    response.body?.bestTimeMs ?? null,
-                );
-                applyWinActions();
-                return;
-            }
-            this.modal.updateChallengeFinishHero?.({
-                phase: outcome === 'tie' ? 'tie' : 'lost',
-                verdict,
-                shareRequest: buildCommentShareRequest(response.body?.bestTimeMs),
-                ...bestUpdate,
-            });
-            revertOptimisticWin();
         })();
-    },
-
-    previewHeadToHead(request) {
-        return previewHeadToHead(request);
-    },
-
-    async confirmHeadToHead(token, request = null) {
-        const response = await createHeadToHead(token, request?.source === 'daily'
-            ? { replay: request.replay }
-            : {});
-        if (response?.ok) this.applyCarUnlockSnapshot?.(response.body?.carUnlocks);
-        return response;
     },
 
     previewHeadToHeadBrag(request) {
