@@ -161,3 +161,85 @@ never found. `postedAt` is the new field. Leave `createdAt` alone.
    `comment_unconfirmed`, shows the posted state, and offers no Try Again.
 
 Out of scope stays out of scope: a throw whose walk finds nothing, and the Garage reward.
+
+---
+
+# Round 2: the rewritten plan
+
+Round 1 is folded in. The diagnosis now matches the code, steps 1 and 2 ship together, the
+publication write is in the helper, an app-authored comment stores no id, and the failed-write
+hole is named. Four things left, two of which can still duplicate or lie to the player.
+
+## What I checked and found clean
+
+- Old receipts are safe. A complete receipt is only written after the author check
+  (`src/server/daily-gp-share.ts:630` then `:642`). A claim receipt has no `authorName` and no
+  `postedAt`, so it stays on the unchanged uncertain path.
+- Keeping `createdAt`, one wire name, the `toEqual` body, and the changelog amendment are all
+  in the document now.
+- Out of scope is still the right cut.
+
+## R1. `postedAt` has to be checked before the walk that posts (high)
+
+A publication receipt with no id is still a stored receipt. Today's `if (stored)` block
+(`src/server/user-comment-submit.ts:144`) walks, treats an empty listing as absent, and posts.
+If `postedAt` is handled inside or after that block, step 2 never runs on the path that
+duplicates.
+
+Check `commentId`, then `postedAt`, then the existing linkless walk. A `postedAt` receipt whose
+walk is unknown is `posted_without_link`, not `unconfirmed`. Unconfirmed is for a claim that
+may not have posted.
+
+## R2. Callers judge the receipt, so the helper has to return it (high)
+
+`posted` today carries only the Reddit comment (`src/server/user-comment-submit.ts:175`). Step 3
+reads `authorName` and the id off the receipt, and callers stop writing. Two consequences:
+
+- `posted` and `posted_without_link` must carry the receipt the helper just wrote (the
+  in-memory copy, even if Redis failed). If callers keep reading `outcome.comment`, a
+  `posted_without_link` retry has no comment and an empty author, so the author check reports
+  `user_action_unavailable` for a player comment that has no id.
+- "Return the comment when the walk finds it" is not enough. If the receipt still has no id,
+  callers still answer `posted_without_link`. When the walk finds it, complete the receipt with
+  the id — the author matched, so the id rule allows it — and return `already`.
+
+The publication write is an update of the claim. It must keep `commentText`, `username`, and
+`createdAt`. `parseUserCommentRecord` returns null without the first two
+(`src/server/user-comment-submit.ts:51`). A successful write of a record that does not parse
+looks like no receipt, and the next attempt posts again. That is worse than the failed-write
+hole, which at least leaves the claim.
+
+## R3. Do not intercept `user_action_unavailable` on challenge create (high)
+
+The confirm handler serves the challenge post as well as the three comment flows
+(`game/race/ui-modal-shell.js:1012`). Challenge create already returns 409
+`user_action_unavailable` when Reddit attributes the **post** to the app
+(`src/server/head-to-head-service.ts:815`). That is not a live comment, the quota slot is
+released, and the copy "the comment went up under the app's name" is false.
+
+Intercept `posted_without_link` for every confirm. Intercept `user_action_unavailable` only
+when the request is Daily Share, Brag, or Challenge Comment.
+
+## R4. The two new sentences live in the client (medium)
+
+The wave5 `toEqual` freezes the 409 error at "Reddit user-attributed sharing is not available
+for this app version." Showing `body.error` keeps that line. Changing it fails the test. The
+intercept keys off the status and supplies both quotes itself. Do not add `commentText` to
+that body.
+
+Same compare the callers already use (`trim` + lower) decides whether the helper stores an id.
+A case-only mismatch would otherwise skip the id and report `posted_without_link` for a
+comment that is the player's.
+
+The posted-state intercept marks the finish spent the way the success path does
+(`game/race/ui-modal-shell.js:1042`). Copying the unconfirmed branch instead leaves error
+styling and a Close button on a comment that is up.
+
+## Tests to add to the list
+
+- A `postedAt` receipt whose walk is unknown answers `posted_without_link` and does not post.
+- A `postedAt` receipt whose walk finds the comment answers with the id, not
+  `posted_without_link`.
+- Challenge create still surfaces `user_action_unavailable` as a failure, not as "the comment
+  went up under the app's name".
+
