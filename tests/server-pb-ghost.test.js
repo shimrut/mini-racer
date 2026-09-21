@@ -1,14 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { gunzipSync } from 'node:zlib';
 import { toDailyCompetition } from '../src/server/competition.ts';
-
-function decodeCompressedValue(value) {
-    const prefix = '__gz:b64__:';
-    return typeof value === 'string' && value.startsWith(prefix)
-        ? gunzipSync(Buffer.from(value.slice(prefix.length), 'base64')).toString('utf8')
-        : value;
-}
+import { decodeCompressedValue } from './helpers/redis-compressed-face.js';
 
 const { redis } = vi.hoisted(() => {
     const strings = new Map();
@@ -29,9 +22,9 @@ const { redis } = vi.hoisted(() => {
                 strings.delete(key);
                 hashes.delete(key);
             }),
-            hGet: vi.fn(async (key, field) => decodeCompressedValue(hashes.get(key)?.get(field) ?? null)),
+            hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
             hMGet: vi.fn(async (key, fields) => fields.map((field) => (
-                decodeCompressedValue(hashes.get(key)?.get(field) ?? null)
+                hashes.get(key)?.get(field) ?? null
             ))),
             hSet: vi.fn(async (key, values) => {
                 const hash = hashes.get(key) ?? new Map();
@@ -67,9 +60,10 @@ const { redis } = vi.hoisted(() => {
     };
 });
 
-vi.mock('@devvit/redis', () => ({
-    redisCompressed: redis,
-}));
+vi.mock('@devvit/redis', async () => {
+    const { asCompressedRedis } = await import('./helpers/redis-compressed-face.js');
+    return { redisCompressed: asCompressedRedis(redis) };
+});
 
 import {
     createPbGhostTraceRecorder,

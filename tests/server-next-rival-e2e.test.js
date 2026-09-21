@@ -1,24 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { TRACKS } from '../game/track/tracks.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { PB_GHOST_SAMPLE_INTERVAL_MS } from '../src/server/pb-ghost-trace.ts';
 
 vi.mock('@devvit/redis', async () => {
-    const COMPRESSION_PREFIX = '__gz:b64__:';
-    const { gunzipSync } = await import('node:zlib');
     const { RedisTestDouble } = await import('./redis-test-double.js');
-    function decodeCompressedValue(value) {
-        return typeof value === 'string' && value.startsWith(COMPRESSION_PREFIX)
-            ? gunzipSync(Buffer.from(value.slice(COMPRESSION_PREFIX.length), 'base64')).toString('utf8')
-            : value;
-    }
+    const { asCompressedRedis } = await import('./helpers/redis-compressed-face.js');
     const redis = new RedisTestDouble();
     redis.zRangeCalls = [];
-    const rawHGet = redis.hGet.bind(redis);
-    const rawHMGet = redis.hMGet.bind(redis);
     const rawZRange = redis.zRange.bind(redis);
-    redis.hGet = async (key, field) => decodeCompressedValue(await rawHGet(key, field));
-    redis.hMGet = async (key, fields) => (await rawHMGet(key, fields)).map(decodeCompressedValue);
     redis.zRange = async (key, start, stop, options) => {
         if (options?.by === 'score' && options?.reverse && Number(start) < Number(stop)) {
             throw new Error(`REV BYSCORE bounds inverted (${start} then ${stop})`);
@@ -31,31 +22,25 @@ vi.mock('@devvit/redis', async () => {
         });
         return rawZRange(key, start, stop, options);
     };
-    return { redis, redisCompressed: redis };
+    return { redis, redisCompressed: asCompressedRedis(redis) };
 });
 
 import { redis } from '@devvit/redis';
-import { toCampaignCompetition } from '../src/server/competition.ts';
+import { toCampaignCompetition, toDailyCompetition } from '../src/server/competition.ts';
 import { createRedisPlayerProfileKey } from '../src/server/competition-identity.ts';
-import { upsertPlayerTrackPersonalBest } from '../src/server/pb-ghost-store.ts';
+import { getPlayerTrackPbRecords, upsertPlayerTrackPersonalBest } from '../src/server/pb-ghost-store.ts';
+import { getServerDailyGpChallenge } from '../src/server/daily-gp-store.ts';
 import { prepareServerLeaderboardRace } from '../src/server/leaderboard-race-service.ts';
 import { opponentRaceEngineMethods } from '../game/scoreboard/opponent-race-engine-methods.js';
+import { decodeCompressedValue } from './helpers/redis-compressed-face.js';
 
 const stage = CAMPAIGN_STAGES[0];
 const competition = toCampaignCompetition(CAMPAIGN_ID, stage);
-const track = TRACKS[stage.trackKey];
 const PLAYER_ID = 'reddit:e2eracer';
 const PLAYER_TIME_MS = 5000;
 const RACEABLE_TIME_MS = 4000;
 const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 const originalFetch = globalThis.fetch;
-
-function checkpointTimes(bestTimeMs) {
-    const count = track.checkpoints.length * stage.lapCount;
-    return Array.from({ length: count }, (_, index) => (
-        ((index + 1) * (bestTimeMs / 1000)) / (count + 1)
-    ));
-}
 
 function ghostFor(timeMs) {
     const lastIntervalIndex = Math.ceil(timeMs / PB_GHOST_SAMPLE_INTERVAL_MS);
@@ -86,28 +71,36 @@ async function seedProfile(playerId, redditUsername) {
     }));
 }
 
-async function seedRacer(playerId, bestTimeMs, { raceable = false, displayName = null } = {}) {
-    await redis.hSet(competition.entryHashKey, {
+async function seedRacerOn(target, playerId, bestTimeMs, { raceable = false, displayName = null } = {}) {
+    const count = TRACKS[target.competition.trackKey].checkpoints.length * target.competition.lapCount;
+    const times = Array.from({ length: count }, (_, index) => (
+        ((index + 1) * (bestTimeMs / 1000)) / (count + 1)
+    ));
+    await redis.hSet(target.competition.entryHashKey, {
         [playerId]: JSON.stringify({
             playerId,
-            trackKey: stage.trackKey,
+            trackKey: target.competition.trackKey,
             bestTimeMs,
             updatedAt: '2026-07-27T10:00:00.000Z',
-            completedLaps: stage.lapCount,
+            completedLaps: target.competition.lapCount,
             medal: 'gold',
-            checkpointTimesSec: checkpointTimes(bestTimeMs),
+            checkpointTimesSec: times,
         }),
     });
-    await redis.zAdd(competition.leaderboardKey, { member: playerId, score: bestTimeMs });
+    await redis.zAdd(target.competition.leaderboardKey, { member: playerId, score: bestTimeMs });
     await upsertPlayerTrackPersonalBest({
         playerId,
-        competition,
-        track,
+        competition: target.competition,
+        track: TRACKS[target.competition.trackKey],
         bestTimeMs,
-        checkpointTimesSec: raceable ? checkpointTimes(bestTimeMs) : null,
+        checkpointTimesSec: raceable ? times : null,
         ghost: raceable ? ghostFor(bestTimeMs) : null,
     });
     if (displayName) await seedProfile(playerId, displayName);
+}
+
+async function seedRacer(playerId, bestTimeMs, options = {}) {
+    await seedRacerOn({ competition }, playerId, bestTimeMs, options);
 }
 
 function installServerBackedFetch() {
@@ -136,7 +129,12 @@ function createFinishPanelEngine() {
             },
         },
         startCampaignStage() {},
+        handleStartDailyChallenge() {},
         async startCampaignStageAgainstOpponent(_race, target) {
+            startedAgainst.push(target);
+            return true;
+        },
+        async startDailyChallengeAgainstOpponent(_race, target) {
             startedAgainst.push(target);
             return true;
         },
@@ -248,6 +246,75 @@ describe('next-rival finish-panel to Redis', () => {
             displayName: 'Rival',
             bestTimeMs: RACEABLE_TIME_MS,
             ghost: { finishTimeMs: RACEABLE_TIME_MS },
+        });
+    });
+
+    it('runs the same walk on today\'s Daily board and starts Daily against the ghost', async () => {
+        const challenge = await getServerDailyGpChallenge();
+        const daily = { competition: toDailyCompetition(challenge) };
+        await seedRacerOn(daily, PLAYER_ID, PLAYER_TIME_MS);
+        for (let i = 0; i < 22; i += 1) {
+            await seedRacerOn(daily, `reddit:daily-ghostless-${i}`, 4999 - i);
+        }
+        await seedRacerOn(daily, 'reddit:daily-rival', RACEABLE_TIME_MS, {
+            raceable: true,
+            displayName: 'DailyRival',
+        });
+
+        const { engine, primaryActions, startedAgainst } = createFinishPanelEngine();
+        engine.configureLeaderboardOpponentFinish({
+            mode: 'daily',
+            race: challenge,
+            finalTime: PLAYER_TIME_MS / 1000,
+            comparison: { target: { displayName: 'Prev' }, outcome: 'won' },
+            waitForVerification: true,
+        });
+        await engine.resolveLeaderboardOpponentAdvanceAfterVerification({
+            mode: 'daily',
+            competitionId: challenge.id,
+            benchmarkTimeMs: PLAYER_TIME_MS,
+        });
+
+        const windows = redis.zRangeCalls.filter((call) => (
+            call.key === daily.competition.leaderboardKey
+        ));
+        expect(windows.map((call) => [call.start, call.stop, call.offset])).toEqual([
+            [4999, 0, 0],
+            [4999, 0, 10],
+            [4999, 0, 20],
+        ]);
+        expect(primaryActions.at(-1)).toMatchObject({
+            label: 'Next rival',
+            ariaLabel: 'Next rival: #1 DailyRival',
+        });
+
+        await primaryActions.at(-1).action();
+        expect(startedAgainst.at(-1)).toMatchObject({
+            mode: 'daily',
+            competitionId: challenge.id,
+            bestTimeMs: RACEABLE_TIME_MS,
+            ghost: { finishTimeMs: RACEABLE_TIME_MS },
+        });
+    });
+
+    it('stores a real PB as a compressed envelope that only the compressed face decodes', async () => {
+        await seedRacer('reddit:rival', RACEABLE_TIME_MS, { raceable: true, displayName: 'Rival' });
+
+        const records = await getPlayerTrackPbRecords({
+            playerIds: ['reddit:rival'],
+            competition,
+            track: TRACKS[stage.trackKey],
+        });
+        expect(records.get('reddit:rival')).toMatchObject({
+            bestTimeMs: RACEABLE_TIME_MS,
+            ghost: { finishTimeMs: RACEABLE_TIME_MS },
+        });
+
+        const field = createHash('sha256').update('reddit:rival', 'utf8').digest('base64url');
+        const stored = await redis.hGet(competition.pbHashKey, field);
+        expect(stored.startsWith('__gz:b64__:')).toBe(true);
+        expect(JSON.parse(decodeCompressedValue(stored))).toMatchObject({
+            bestTimeMs: RACEABLE_TIME_MS,
         });
     });
 });
