@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSharedStandingsCacheKey } from '../src/server/competition.ts';
 
 const mocks = vi.hoisted(() => ({
     redis: {
@@ -71,6 +72,34 @@ function profileMap(playerIds) {
         leaderboardIdentity: 'reddit',
         redditUsername: playerId.split(':')[1],
     }]));
+}
+
+function stubTwentyPlayerBoard() {
+    const members = Array.from({ length: 20 }, (_, index) => ({
+        member: `reddit:rank-${index + 1}`,
+    }));
+    const nearbyEntries = Object.fromEntries(members.map(({ member }, index) => [member, {
+        playerId: member,
+        trackKey: 'numberZero',
+        bestTimeMs: 1000 + index,
+        updatedAt: '2026-08-08T00:00:00.000Z',
+        completedLaps: 1,
+        checkpointTimesSec: [0.5],
+        opponentRaceReady: true,
+    }]));
+    mocks.redis.zCard.mockResolvedValue(20);
+    mocks.redis.zRange.mockImplementation(async (_key, start, stop) => (
+        members.slice(start, stop + 1)
+    ));
+    mocks.redis.zRank.mockImplementation(async (_key, playerId) => (
+        members.findIndex((member) => member.member === playerId)
+    ));
+    mocks.redis.hGet.mockImplementation(async (_key, playerId) => (
+        JSON.stringify(nearbyEntries[playerId])
+    ));
+    mocks.redis.hMGet.mockImplementation(async (_key, playerIds) => (
+        playerIds.map((playerId) => JSON.stringify(nearbyEntries[playerId]))
+    ));
 }
 
 describe('shared standings page reads', () => {
@@ -193,5 +222,68 @@ describe('shared standings page reads', () => {
         expect(snapshot.topRows).toHaveLength(2);
         expect(mocks.cacheSharedJson).toHaveBeenCalledOnce();
         expect(mocks.redis.zRange).toHaveBeenCalledOnce();
+    });
+
+    it('shares the nearby window for viewers at the same rank', async () => {
+        stubTwentyPlayerBoard();
+
+        const first = await readSnapshot({
+            competition,
+            playerId: 'reddit:rank-15',
+            limit: 10,
+            offset: 0,
+        });
+        const second = await readSnapshot({
+            competition,
+            playerId: 'reddit:rank-15',
+            limit: 10,
+            offset: 0,
+        });
+
+        expect(first.nearbyRows.map((row) => row.rank)).toEqual([13, 14, 15, 16, 17]);
+        expect(second.nearbyRows.map((row) => row.rank)).toEqual([13, 14, 15, 16, 17]);
+        expect(first.nearbyRows.map((row) => row.isCurrentPlayer)).toEqual([
+            false, false, true, false, false,
+        ]);
+        expect(first.nearbyRows[2].opponentRaceAvailable).toBe(false);
+        expect(mocks.redis.zRange).toHaveBeenCalledTimes(2);
+        expect(mocks.redis.zRange).toHaveBeenNthCalledWith(
+            2,
+            competition.leaderboardKey,
+            12,
+            16,
+        );
+        const nearbyKey = createSharedStandingsCacheKey(competition, 12, 5, 0);
+        const topKey = createSharedStandingsCacheKey(competition, 0, 10, 0);
+        expect(nearbyKey).not.toBe(topKey);
+        const cacheKeys = mocks.cacheSharedJson.mock.calls.map((call) => call[1].key);
+        expect(cacheKeys).toEqual([topKey, nearbyKey, topKey, nearbyKey]);
+        expect(mocks.cacheSharedJson.mock.calls[1][1]).toMatchObject({ ttl: 10 });
+        expect(mocks.getPlayerTrackPbRecords).not.toHaveBeenCalled();
+    });
+
+    it('does not share nearby windows for neighbouring ranks', async () => {
+        stubTwentyPlayerBoard();
+
+        await readSnapshot({
+            competition,
+            playerId: 'reddit:rank-15',
+            limit: 10,
+            offset: 0,
+        });
+        await readSnapshot({
+            competition,
+            playerId: 'reddit:rank-16',
+            limit: 10,
+            offset: 0,
+        });
+
+        expect(mocks.redis.zRange).toHaveBeenCalledTimes(3);
+        expect(mocks.cacheSharedJson.mock.calls.map((call) => call[1].key)).toEqual([
+            createSharedStandingsCacheKey(competition, 0, 10, 0),
+            createSharedStandingsCacheKey(competition, 12, 5, 0),
+            createSharedStandingsCacheKey(competition, 0, 10, 0),
+            createSharedStandingsCacheKey(competition, 13, 5, 0),
+        ]);
     });
 });

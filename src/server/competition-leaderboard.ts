@@ -186,20 +186,6 @@ export async function readEntryByPlayerId(
     return parseStoredEntry(rawEntry, competition.trackKey);
 }
 
-export async function readRowsByRankRange(
-    competition: Competition,
-    start: number,
-    stop: number,
-    currentPlayerId: string | null,
-): Promise<SnapshotRow[]> {
-    if (stop < start || start < 0) {
-        return [];
-    }
-
-    const rankedMembers = await redis.zRange(competition.leaderboardKey, start, stop);
-    return readRowsForRankedMembers(competition, rankedMembers, start, currentPlayerId);
-}
-
 async function readRowsForRankedMembers(
     competition: Competition,
     rankedMembers: Array<{ member: string }>,
@@ -375,6 +361,20 @@ function isSharedStandingsPage(value: unknown): value is SharedStandingsPage {
     });
 }
 
+function rowsFromSharedPage(
+    page: SharedStandingsPage,
+    playerId: string | null,
+    currentPlayerRow: SnapshotRow | null,
+): SnapshotRow[] {
+    const rows = page.rows.map(({ row }) => ({ ...row, isCurrentPlayer: false }));
+    if (!playerId || !currentPlayerRow) return rows;
+    const index = page.rows.findIndex((entry) => entry.playerId === playerId);
+    if (index >= 0) {
+        rows[index] = { ...currentPlayerRow };
+    }
+    return rows;
+}
+
 function isSnapshotRow(value: unknown): value is SnapshotRow {
     if (!value || typeof value !== 'object') return false;
     const row = value as Partial<SnapshotRow>;
@@ -457,7 +457,6 @@ export async function readSnapshot({
         return createEmptySnapshot(competition, limit);
     }
 
-    let topRows = sharedPage.rows.map(({ row }) => ({ ...row, isCurrentPlayer: false }));
     const playerRank = leaderboardEntryCount
         ? await readPlayerRank(competition, playerId)
         : null;
@@ -469,12 +468,9 @@ export async function readSnapshot({
             const profileMap = await readPlayerProfileMap([playerId]);
             currentPlayerRow = toSnapshotRow(storedEntry, playerRank, playerId, profileMap);
             currentPlayerRow.isCurrentPlayer = true;
-            const playerRowIndex = sharedPage.rows.findIndex((row) => row.playerId === playerId);
-            if (playerRowIndex >= 0) {
-                topRows[playerRowIndex] = { ...currentPlayerRow };
-            }
         }
     }
+    const topRows = rowsFromSharedPage(sharedPage, playerId, currentPlayerRow);
 
     const paging = {
         pageOffset: offset,
@@ -503,8 +499,9 @@ export async function readSnapshot({
     );
     if (playerOutsidePage && leaderboardEntryCount) {
         const nearbyStart = Math.max(0, (playerRank as number) - DAILY_GP_NEARBY_RADIUS - 1);
-        const nearbyStop = nearbyStart + (DAILY_GP_NEARBY_RADIUS * 2);
-        nearbyRows = await readRowsByRankRange(competition, nearbyStart, nearbyStop, playerId);
+        const nearbyLimit = (DAILY_GP_NEARBY_RADIUS * 2) + 1;
+        const nearbyPage = await readSharedStandingsPage(competition, nearbyStart, nearbyLimit);
+        nearbyRows = rowsFromSharedPage(nearbyPage, playerId, currentPlayerRow);
     }
 
     return {

@@ -1,9 +1,15 @@
+- The “players near you” standings strip now uses the same ten-second shared
+  save as the top ten. Opening Standings again at the same rank reuses it. A
+  new best time still refreshes it. The five names around you do not change.
+
 - Standings no longer load each opponent's saved ghost just to decide whether
   **Race** is available. A yes/no is stored next to the time. Older rows without
-  that mark still load the ghost once. Tapping Race still loads the real ghost.
-  of a second of physics (the same cap it already used) and only skips ranking
-  when a freeze is longer than that. The finish line says the lap lagged
-  instead of “severe frame stalls.”
+  that mark still load the ghost on an uncached board read. Tapping Race still
+  loads the real ghost.
+
+- A freeze shorter than a tenth of a second of physics still ranks. The finish
+  line only skips ranking when a freeze is longer than that, and then says the
+  lap lagged instead of “severe frame stalls.”
 
 - Next rival no longer walks everyone ahead on the board. The server asks for
   the ten racers just faster than the player's stored best, checks them as a
