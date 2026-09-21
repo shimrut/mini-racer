@@ -20,11 +20,11 @@ const { mockRedis, hashes, strings, sortedSets } = vi.hoisted(() => {
                 const ordered = [...(sortedSets.get(key)?.entries() || [])]
                     .sort((a, b) => (a[1] === b[1] ? a[0].localeCompare(b[0]) : a[1] - b[1]));
                 if (options?.by === 'score') {
-                    const min = Number(start);
-                    const max = Number(stop);
-                    let rows = min > max
+                    const lo = options.reverse ? Number(stop) : Number(start);
+                    const hi = options.reverse ? Number(start) : Number(stop);
+                    let rows = lo > hi
                         ? []
-                        : ordered.filter(([, score]) => score >= min && score <= max);
+                        : ordered.filter(([, score]) => score >= lo && score <= hi);
                     if (options.reverse) rows = rows.slice().reverse();
                     const offset = options.limit?.offset ?? 0;
                     const count = options.limit?.count;
@@ -169,6 +169,16 @@ describe('next-faster opponent windows', () => {
             },
         });
         expect(walkCommands()).toBe(6);
+        expect(mockRedis.zRange).toHaveBeenCalledWith(
+            competition.leaderboardKey,
+            199,
+            0,
+            expect.objectContaining({
+                by: 'score',
+                reverse: true,
+                limit: { offset: 0, count: 10 },
+            }),
+        );
         expect(infoSpy).not.toHaveBeenCalled();
     });
 

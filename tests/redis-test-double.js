@@ -235,11 +235,12 @@ export class RedisTestDouble {
         return a[1] - b[1];
       });
     if (options?.by === "score") {
-      const min = Number(start);
-      const max = Number(stop);
-      let rows = min > max
+      // Redis ZRANGE BYSCORE REV: start is the high bound, stop is the low bound.
+      const lo = options.reverse ? Number(stop) : Number(start);
+      const hi = options.reverse ? Number(start) : Number(stop);
+      let rows = lo > hi
         ? []
-        : ordered.filter(([, score]) => score >= min && score <= max);
+        : ordered.filter(([, score]) => score >= lo && score <= hi);
       if (options.reverse) rows = rows.slice().reverse();
       const offset = options.limit?.offset ?? 0;
       const count = options.limit?.count;
