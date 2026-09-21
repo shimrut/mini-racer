@@ -1,6 +1,6 @@
-# Changelog
-
-- A short hitch no longer voids Standings. The race now catches up a tenth
+- Standings no longer load each opponent's saved ghost just to decide whether
+  **Race** is available. A yes/no is stored next to the time. Older rows without
+  that mark still load the ghost once. Tapping Race still loads the real ghost.
   of a second of physics (the same cap it already used) and only skips ranking
   when a freeze is longer than that. The finish line says the lap lagged
   instead of “severe frame stalls.”

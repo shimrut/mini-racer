@@ -22,6 +22,7 @@ import {
     readPlayerRank,
     readSnapshot,
     writeEntry,
+    withOpponentRaceReady,
 } from './competition-leaderboard.js';
 import {
     classifyStoredCampaignProgress,
@@ -1226,15 +1227,19 @@ export async function mergeGuestCampaignProgress({
                     && (!redditEntryResult || guestEntry.bestTimeMs < redditEntryResult.bestTimeMs)
                 );
             const entryToWrite = replace && guestResult && !guestEntry
-                ? {
-                    playerId: redditPlayerId,
-                    trackKey: stage.trackKey,
-                    bestTimeMs: guestResult.bestTimeMs,
-                    updatedAt: guestResult.updatedAt,
-                    completedLaps: stage.lapCount,
-                    checkpointTimesSec: guestResult.checkpointTimesSec,
-                    validationMethod: 'strict-replay' as const,
-                }
+                ? withOpponentRaceReady(
+                    {
+                        playerId: redditPlayerId,
+                        trackKey: stage.trackKey,
+                        bestTimeMs: guestResult.bestTimeMs,
+                        updatedAt: guestResult.updatedAt,
+                        completedLaps: stage.lapCount,
+                        checkpointTimesSec: guestResult.checkpointTimesSec,
+                        validationMethod: 'strict-replay' as const,
+                    },
+                    guestPb,
+                    redditCompetition,
+                )
                 : guestEntryWins
                     ? { ...guestEntry!, playerId: redditPlayerId }
                 : (!replace && redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs

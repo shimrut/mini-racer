@@ -127,6 +127,48 @@ describe('shared standings page reads', () => {
             .toBe(mocks.cacheSharedJson.mock.calls[1][1].key);
     });
 
+    it('skips ghost reads when every row already carries opponentRaceReady', async () => {
+        mocks.redis.hMGet.mockImplementation(async (key, playerIds) => playerIds.map((playerId) => (
+            JSON.stringify({ ...entries[playerId], opponentRaceReady: true })
+        )));
+
+        const snapshot = await readSnapshot({
+            competition,
+            playerId: 'reddit:alpha',
+            limit: 2,
+            offset: 0,
+        });
+
+        expect(mocks.getPlayerTrackPbRecords).not.toHaveBeenCalled();
+        expect(snapshot.topRows.map((row) => row.opponentRaceAvailable)).toEqual([false, true]);
+    });
+
+    it('reads ghosts only for unmarked rows', async () => {
+        mocks.redis.hMGet.mockImplementation(async (key, playerIds) => playerIds.map((playerId) => (
+            JSON.stringify({
+                ...entries[playerId],
+                opponentRaceReady: playerId === 'reddit:alpha' ? true : undefined,
+            })
+        )));
+        mocks.getPlayerTrackPbRecords.mockResolvedValue(new Map([
+            ['reddit:bravo', {
+                bestTimeMs: 2000,
+                checkpointTimesSec: [1],
+                ghost: { finishTimeMs: 2000 },
+            }],
+        ]));
+
+        const snapshot = await readSnapshot({
+            competition,
+            playerId: null,
+            limit: 2,
+            offset: 0,
+        });
+
+        expect(mocks.getPlayerTrackPbRecords.mock.calls[0][0].playerIds).toEqual(['reddit:bravo']);
+        expect(snapshot.topRows.map((row) => row.opponentRaceAvailable)).toEqual([true, false]);
+    });
+
     it('uses a new page source after the atomically advanced revision changes', async () => {
         await readSnapshot({ competition, playerId: null, limit: 2, offset: 0 });
         mocks.redis.get.mockResolvedValue('1');

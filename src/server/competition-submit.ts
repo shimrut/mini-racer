@@ -1,6 +1,12 @@
 import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';
-import { writeEntry, readEntryByPlayerId } from './competition-leaderboard.js';
+import {
+    isCompleteOpponentRecord,
+    markStoredEntryOpponentRaceReady,
+    readEntryByPlayerId,
+    withOpponentRaceReady,
+    writeEntry,
+} from './competition-leaderboard.js';
 import { upsertPlayerTrackPersonalBest } from './pb-ghost-store.js';
 import { validateDailyGpReplayDetailed, type ReplayValidationResult } from './replay-validator.js';
 import {
@@ -276,19 +282,27 @@ export async function submitCompetitionRun(
         };
     }
 
-    const nextEntry: DailyGpLeaderboardEntry = {
-        playerId,
-        trackKey: competition.trackKey,
-        bestTimeMs: nextBestTimeMs,
-        updatedAt: new Date().toISOString(),
-        completedLaps: strictReplayOutcome.run.completedLaps === 2
-            || strictReplayOutcome.run.completedLaps === 3
-            ? strictReplayOutcome.run.completedLaps
-            : 1,
-        checkpointTimesSec: normalizedCheckpointTimesSec,
-        validationMethod: 'strict-replay',
-        strictReplayFailureReason: null,
-    };
+    const nextEntry: DailyGpLeaderboardEntry = withOpponentRaceReady(
+        {
+            playerId,
+            trackKey: competition.trackKey,
+            bestTimeMs: nextBestTimeMs,
+            updatedAt: new Date().toISOString(),
+            completedLaps: strictReplayOutcome.run.completedLaps === 2
+                || strictReplayOutcome.run.completedLaps === 3
+                ? strictReplayOutcome.run.completedLaps
+                : 1,
+            checkpointTimesSec: normalizedCheckpointTimesSec,
+            validationMethod: 'strict-replay',
+            strictReplayFailureReason: null,
+        },
+        {
+            bestTimeMs: nextBestTimeMs,
+            checkpointTimesSec: normalizedCheckpointTimesSec,
+            ghost: strictReplayOutcome.run.ghost ?? null,
+        },
+        competition,
+    );
 
     let previousEntry: DailyGpLeaderboardEntry | null = null;
     let boardPersistence: PromiseSettledResult<{
@@ -366,6 +380,17 @@ export async function submitCompetitionRun(
         console.error('Challenge PB persistence failed after a valid run:', trackPbPersistence!.reason);
     }
     const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
+    if (
+        trackPbResult?.record
+        && isCompleteOpponentRecord(storedEntry, trackPbResult.record, competition)
+        && storedEntry.opponentRaceReady !== true
+    ) {
+        try {
+            await markStoredEntryOpponentRaceReady(competition, playerId, storedEntry);
+        } catch (error) {
+            console.error('Opponent-race ready marker failed after a valid run:', error);
+        }
+    }
     return {
         status: 200,
         body: {

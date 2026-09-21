@@ -123,7 +123,7 @@ flowchart LR
   the equivalent lap of that same earlier race, never the full race total. An
   accepted Daily PB is installed with that race's lap count, including when the
   queued result is the only challenge identity available.
-- Daily leaderboard rows and PB ghosts are separate challenge-scoped records with the same fixed deadline: 365 days after the race starts. The playlist still drops a race after seven days; times and ghosts stay until that 365-day mark. Entries retain the verified completed-lap count, and ghosts additionally bind rules revision and lap count. One server replay simulation validates the complete daily race and produces the canonical ghost. Both writes run concurrently; the leaderboard write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`.
+- Daily leaderboard rows and PB ghosts are separate challenge-scoped records with the same fixed deadline: 365 days after the race starts. The playlist still drops a race after seven days; times and ghosts stay until that 365-day mark. Entries retain the verified completed-lap count, and ghosts additionally bind rules revision and lap count. One server replay simulation validates the complete daily race and produces the canonical ghost. Both writes run concurrently; the leaderboard write decides acceptance, while a PB-only Redis or lock failure returns an accepted result with PB status `unavailable`. The stored entry also carries `opponentRaceReady` when that run's ghost would pass the opponent-race pin; standings read that flag from the entry hash (uncompressed Redis, never mixed with `redisCompressed` on the PB hash). Rows saved before the flag still load the PB record for that one boolean. Starting an opponent race still re-reads the real ghost.
 - A stored PB that cannot be used — corrupt, or bound to a superseded track fingerprint, rules revision, or lap count — is treated as absent by every reader, but only the write path, which owns that player's PB lock, deletes it. A lock-free reader that deleted it could destroy a compatible record committed between its own read and its delete, and the browser has already dropped the replay by then.
 - Accepted submissions return the complete canonical `trackPersonalBest` record. The client validates and installs that record before GO without another `/api/player/pb-ghost` request. A pending faster lap makes the old prepared ghost ineligible for Improve; if the canonical result is unresolved, unavailable, or malformed at GO, the attempt starts normally without a ghost and shows `GHOST UNAVAILABLE` for two seconds after GO disappears. A late valid response is cached for the next attempt and never changes a ghost during an active run.
 - Once a finish has been confirmed, the result sheet's Done action returns
@@ -497,7 +497,10 @@ flowchart LR
   stored PB record and its trace both carry that row's exact best time; the
   leaderboard entry and the PB record are written by two concurrent writes and
   their own timestamps are not comparable, so eligibility never depends on
-  them. This is not Challenge mode: the resulting replay still uses the
+  them. Standings themselves read `opponentRaceReady` from the entry when it is
+  present, so opening the board does not fetch the ghost. A missing flag falls
+  back to that PB check. A stale true still fails at race start with
+  `ghost_unavailable`. This is not Challenge mode: the resulting replay still uses the
   ordinary Daily or Campaign submission, PB, progression, and leaderboard path.
 - The active race comparison target is separate from the player's own PB.
   Ordinary Start/Continue compares against the player's PB; a standings start

@@ -122,6 +122,8 @@ export type DailyGpLeaderboardEntry = {
     checkpointTimesSec: number[] | null;
     validationMethod?: 'strict-replay';
     strictReplayFailureReason?: string | null;
+    /** Absent on rows saved before this field existed. */
+    opponentRaceReady?: boolean;
 };
 
 export type DailyGpPlayerProfile = {

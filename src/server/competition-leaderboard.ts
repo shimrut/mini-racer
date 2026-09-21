@@ -9,7 +9,7 @@ import {
 } from './daily-gp-model.js';
 import { createSharedStandingsCacheKey, type Competition } from './competition.js';
 import { readPlayerProfileMap } from './competition-identity.js';
-import { getPlayerTrackPbRecords, type PlayerTrackPbRecord } from './pb-ghost-store.js';
+import { getPlayerTrackPbRecords } from './pb-ghost-store.js';
 import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
 import { resolveLeaderboardDisplayName } from '../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../game/track/tracks.js';
@@ -80,6 +80,9 @@ export function parseStoredEntry(
             strictReplayFailureReason: typeof parsed.strictReplayFailureReason === 'string'
                 ? parsed.strictReplayFailureReason
                 : null,
+            opponentRaceReady: parsed.opponentRaceReady === true
+                ? true
+                : parsed.opponentRaceReady === false ? false : undefined,
         };
     } catch (_error) {
         return null;
@@ -116,7 +119,11 @@ export function toSnapshotRow(
 /** The leaderboard row and the PB record are written concurrently, so an exact best-time match on both is what pins a ghost to a row. */
 export function isCompleteOpponentRecord(
     entry: DailyGpLeaderboardEntry,
-    record: PlayerTrackPbRecord | null,
+    record: {
+        bestTimeMs: number;
+        checkpointTimesSec: number[] | null;
+        ghost?: { finishTimeMs: number } | null;
+    } | null,
     competition: Competition,
 ): boolean {
     const checkpointCount = (TRACKS[competition.trackKey]?.checkpoints?.length || 0)
@@ -128,6 +135,21 @@ export function isCompleteOpponentRecord(
         && Array.isArray(record.checkpointTimesSec)
         && record.checkpointTimesSec.length === checkpointCount,
     );
+}
+
+export function withOpponentRaceReady(
+    entry: DailyGpLeaderboardEntry,
+    record: {
+        bestTimeMs: number;
+        checkpointTimesSec: number[] | null;
+        ghost?: { finishTimeMs: number } | null;
+    } | null,
+    competition: Competition,
+): DailyGpLeaderboardEntry {
+    return {
+        ...entry,
+        opponentRaceReady: isCompleteOpponentRecord(entry, record, competition),
+    };
 }
 
 /**
@@ -199,26 +221,38 @@ async function readRowsForRankedMembers(
         member,
         entry: parseStoredEntry(rawEntries[index], competition.trackKey),
     }));
-    const opponentIds = storedEntries
-        .filter(({ member, entry }) => entry && member.member !== currentPlayerId)
+    const unmarkedOpponentIds = storedEntries
+        .filter(({ member, entry }) => (
+            entry
+            && member.member !== currentPlayerId
+            && typeof entry.opponentRaceReady !== 'boolean'
+        ))
         .map(({ member }) => member.member);
-    const pbRecords = await getPlayerTrackPbRecords({
-        playerIds: opponentIds,
-        competition,
-        track: TRACKS[competition.trackKey],
-    });
+    const pbRecords = unmarkedOpponentIds.length
+        ? await getPlayerTrackPbRecords({
+            playerIds: unmarkedOpponentIds,
+            competition,
+            track: TRACKS[competition.trackKey],
+        })
+        : new Map();
 
     const rows = storedEntries.map(({ member, entry }, index) => {
         if (!entry) return null;
-        const record = member.member === currentPlayerId
-            ? null
-            : pbRecords.get(member.member) ?? null;
+        const opponentRaceAvailable = member.member === currentPlayerId
+            ? false
+            : typeof entry.opponentRaceReady === 'boolean'
+                ? entry.opponentRaceReady
+                : isCompleteOpponentRecord(
+                    entry,
+                    pbRecords.get(member.member) ?? null,
+                    competition,
+                );
         return toSnapshotRow(
             entry,
             start + index + 1,
             currentPlayerId,
             profileMap,
-            isCompleteOpponentRecord(entry, record, competition),
+            opponentRaceAvailable,
         );
     });
     return rows
@@ -232,6 +266,21 @@ export async function readPlayerRank(
     if (!playerId) return null;
     const rankZeroBased = await redis.zRank(competition.leaderboardKey, playerId);
     return Number.isFinite(rankZeroBased) ? Number(rankZeroBased) + 1 : null;
+}
+
+export async function markStoredEntryOpponentRaceReady(
+    competition: Competition,
+    playerId: string,
+    entry: DailyGpLeaderboardEntry,
+): Promise<DailyGpLeaderboardEntry> {
+    if (entry.opponentRaceReady === true) return entry;
+    const nextEntry = { ...entry, opponentRaceReady: true };
+    // Entries hash is uncompressed Redis. Do not mix redisCompressed onto this key.
+    await redis.hSet(competition.entryHashKey, {
+        [playerId]: JSON.stringify(nextEntry),
+    });
+    await redis.incrBy(competition.standingsRevisionKey, 1);
+    return nextEntry;
 }
 
 export async function writeEntry(

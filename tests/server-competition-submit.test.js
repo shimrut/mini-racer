@@ -7,6 +7,7 @@ const mockBeginOwnedRedisLockTransaction = vi.fn();
 const mockWriteEntry = vi.fn();
 const mockReadEntryByPlayerId = vi.fn();
 const mockUpsertPlayerTrackPersonalBest = vi.fn();
+const mockRedisHSet = vi.fn(async () => 1);
 const mockRedisIncrBy = vi.fn(async () => 1);
 const mockRedisExpire = vi.fn(async () => true);
 const mockRedisExpireTime = vi.fn(async () => Math.floor(Date.now() / 1000) + 60);
@@ -15,6 +16,7 @@ const mockRedisGet = vi.fn(async () => null);
 vi.mock('@devvit/redis', () => ({
     redis: {
         incrBy: (...args) => mockRedisIncrBy(...args),
+        hSet: (...args) => mockRedisHSet(...args),
         expire: (...args) => mockRedisExpire(...args),
         expireTime: (...args) => mockRedisExpireTime(...args),
         get: (...args) => mockRedisGet(...args),
@@ -31,10 +33,14 @@ vi.mock('../src/server/redis-lock.js', () => ({
     beginOwnedRedisLockTransaction: (...args) => mockBeginOwnedRedisLockTransaction(...args),
 }));
 
-vi.mock('../src/server/competition-leaderboard.js', () => ({
-    writeEntry: (...args) => mockWriteEntry(...args),
-    readEntryByPlayerId: (...args) => mockReadEntryByPlayerId(...args),
-}));
+vi.mock('../src/server/competition-leaderboard.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        writeEntry: (...args) => mockWriteEntry(...args),
+        readEntryByPlayerId: (...args) => mockReadEntryByPlayerId(...args),
+    };
+});
 
 vi.mock('../src/server/pb-ghost-store.js', () => ({
     upsertPlayerTrackPersonalBest: (...args) => mockUpsertPlayerTrackPersonalBest(...args),
@@ -301,5 +307,79 @@ describe('submitCompetitionRun', () => {
         expect(mockValidateDailyGpReplayDetailed).toHaveBeenCalled();
         expect(consoleErrorSpy).not.toHaveBeenCalled();
         consoleErrorSpy.mockRestore();
+    });
+
+    it('writes opponentRaceReady with the new row when the run has a matching ghost', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const bestTimeMs = 12_345;
+        mockValidateDailyGpReplayDetailed.mockReturnValue({
+            ok: true,
+            run: {
+                bestTimeSec: bestTimeMs / 1000,
+                bestTimeMs,
+                completedLaps: 1,
+                checkpointTimesSec: [4, 8, 12.345],
+                lapCompletionTimesSec: [bestTimeMs / 1000],
+                ghost: {
+                    schemaVersion: 2,
+                    sampleIntervalMs: 50,
+                    finishTimeMs: bestTimeMs,
+                    origin: [0, 0, 0],
+                    deltas: [100, 100, 100],
+                },
+            },
+        });
+
+        await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(mockWriteEntry.mock.calls[0][2]).toMatchObject({
+            bestTimeMs,
+            opponentRaceReady: true,
+        });
+        expect(mockRedisHSet).not.toHaveBeenCalled();
+    });
+
+    it('stamps opponentRaceReady when a later ghost matches an unmarked stored time', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const previous = {
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            bestTimeMs: 12_345,
+            updatedAt: '2026-08-23T00:00:00.000Z',
+            completedLaps: 1,
+            checkpointTimesSec: [4, 8, 12.345],
+            validationMethod: 'strict-replay',
+        };
+        mockReadEntryByPlayerId.mockResolvedValue(previous);
+        mockUpsertPlayerTrackPersonalBest.mockResolvedValue({
+            improved: false,
+            record: {
+                bestTimeMs: 12_345,
+                checkpointTimesSec: [4, 8, 12.345],
+                ghost: { finishTimeMs: 12_345 },
+            },
+        });
+
+        const outcome = await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(outcome.status).toBe(200);
+        expect(mockWriteEntry).not.toHaveBeenCalled();
+        expect(mockRedisHSet).toHaveBeenCalledWith(
+            competition.entryHashKey,
+            {
+                'reddit:pm-user': expect.stringMatching(/"opponentRaceReady":true/),
+            },
+        );
+        expect(mockRedisIncrBy).toHaveBeenCalledWith(competition.standingsRevisionKey, 1);
     });
 });

@@ -47,6 +47,7 @@ import {
     readPlayerRank,
     readSnapshot,
     writeEntry,
+    withOpponentRaceReady,
     type SnapshotPayload,
 } from './competition-leaderboard.js';
 import {
@@ -1511,15 +1512,19 @@ export async function mergeGuestDailyProgress({
                 ? Boolean(guestPb)
                 : Boolean(guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs));
             const entryToWrite = replace && !guestEntry && guestPb
-                ? {
-                    playerId: redditPlayerId,
-                    trackKey: challenge.trackKey,
-                    bestTimeMs: guestPb.bestTimeMs,
-                    updatedAt: guestPb.updatedAt,
-                    completedLaps: challenge.objectiveParams.lapCount,
-                    checkpointTimesSec: guestPb.checkpointTimesSec,
-                    validationMethod: 'strict-replay' as const,
-                }
+                ? withOpponentRaceReady(
+                    {
+                        playerId: redditPlayerId,
+                        trackKey: challenge.trackKey,
+                        bestTimeMs: guestPb.bestTimeMs,
+                        updatedAt: guestPb.updatedAt,
+                        completedLaps: challenge.objectiveParams.lapCount,
+                        checkpointTimesSec: guestPb.checkpointTimesSec,
+                        validationMethod: 'strict-replay' as const,
+                    },
+                    guestPb,
+                    competition,
+                )
                 : guestWinsLeaderboard
                     ? { ...guestEntry!, playerId: redditPlayerId }
                     : (!replace && redditEntry && Number(redditRankedScore) !== redditEntry.bestTimeMs
